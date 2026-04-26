@@ -1,5 +1,6 @@
 // Three-call audit engine — Overview, Compliance, Risks run in parallel.
 // Each call returns strict JSON which is parsed defensively.
+// Optional PDF attachment is passed natively to Claude (no parsing library needed).
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = "claude-sonnet-4-6";
@@ -42,6 +43,11 @@ export interface AuditResult {
   bid_recommendation: string;
 }
 
+export interface AuditInput {
+  solicitation: unknown;
+  pdfBase64?: string | null;
+}
+
 function extractJSON(text: string | undefined): Record<string, unknown> | null {
   if (!text) return null;
   const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
@@ -56,12 +62,26 @@ function extractJSON(text: string | undefined): Record<string, unknown> | null {
   return null;
 }
 
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "document"; source: { type: "base64"; media_type: string; data: string } };
+
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens = 1000
+  maxTokens = 1000,
+  pdfBase64?: string | null
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const content: ContentBlock[] = [];
+  if (pdfBase64) {
+    content.push({
+      type: "document",
+      source: { type: "base64", media_type: "application/pdf", data: pdfBase64 }
+    });
+  }
+  content.push({ type: "text", text: userPrompt });
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -74,7 +94,7 @@ async function callClaude(
       model: CLAUDE_MODEL,
       max_tokens: maxTokens,
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }]
+      messages: [{ role: "user", content }]
     }),
     signal: AbortSignal.timeout(50000)
   });
@@ -88,10 +108,17 @@ async function callClaude(
   return data.content?.[0]?.text || "";
 }
 
-export async function runAudit(solicitation: unknown): Promise<AuditResult> {
+export async function runAudit(input: AuditInput): Promise<AuditResult> {
+  const { solicitation, pdfBase64 } = input;
   const solText = JSON.stringify(solicitation).slice(0, 4000);
+  const pdfNote = pdfBase64 ? "The full solicitation PDF is attached as a document — read it directly." : "";
 
-  const overviewPrompt = `Solicitation:\n${solText}\n\nReturn STRICT JSON in this exact shape:
+  const overviewPrompt = `${pdfNote}
+
+SAM.gov metadata:
+${solText}
+
+Return STRICT JSON in this exact shape:
 {
   "summary": "2-3 sentence executive summary",
   "scope": "what is being procured",
@@ -102,7 +129,12 @@ export async function runAudit(solicitation: unknown): Promise<AuditResult> {
   "period_of_performance": "duration with start/end if known"
 }`;
 
-  const compliancePrompt = `Solicitation:\n${solText}\n\nReturn STRICT JSON in this exact shape:
+  const compliancePrompt = `${pdfNote}
+
+SAM.gov metadata:
+${solText}
+
+Return STRICT JSON in this exact shape:
 {
   "far_clauses": ["52.212-1", "52.212-4"],
   "dfars_clauses": ["252.204-7012"],
@@ -113,7 +145,12 @@ export async function runAudit(solicitation: unknown): Promise<AuditResult> {
   "deadlines": ["question deadline: YYYY-MM-DD", "proposal due: YYYY-MM-DD"]
 }`;
 
-  const risksPrompt = `Solicitation:\n${solText}\n\nReturn STRICT JSON in this exact shape:
+  const risksPrompt = `${pdfNote}
+
+SAM.gov metadata:
+${solText}
+
+Return STRICT JSON in this exact shape:
 {
   "technical_risks": ["specific technical challenge 1", "..."],
   "schedule_risks": ["timeline pressure 1", "..."],
@@ -128,17 +165,20 @@ severity_score is 0-10 where 10 is highest overall risk.`;
     callClaude(
       "You are a federal contract analyst. Output ONLY valid JSON in the requested shape — no prose, no markdown commentary outside the JSON.",
       overviewPrompt,
-      800
+      800,
+      pdfBase64
     ),
     callClaude(
       "You are a federal procurement compliance officer. Extract every FAR/DFARS clause, certification, and eligibility requirement explicitly named in the solicitation. Output ONLY valid JSON.",
       compliancePrompt,
-      1200
+      1200,
+      pdfBase64
     ),
     callClaude(
       "You are a senior capture manager scoring risks on a federal opportunity. Identify the highest-impact risks for a small defense contractor. Output ONLY valid JSON.",
       risksPrompt,
-      1000
+      1000,
+      pdfBase64
     )
   ]);
 

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { runAudit } from "@/lib/audit-engine";
 
 export const maxDuration = 60;
 
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+
 export async function POST(req: NextRequest) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json(
-      { error: "Supabase env vars not set" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Supabase env vars not set" }, { status: 500 });
   }
 
   const supabase = await createServerClient();
@@ -22,27 +21,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const noticeId = (body.noticeId || "").trim();
-
-  if (!noticeId) {
-    return NextResponse.json({ error: "noticeId required" }, { status: 400 });
+  // Parse multipart form data
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
-  // 1. Pull solicitation from SAM.gov
-  const solicitation = await fetchSolicitationByNoticeId(noticeId);
+  const noticeId = String(formData.get("noticeId") || "").trim();
+  const pdfEntry = formData.get("pdf");
+  const pdf = pdfEntry instanceof File && pdfEntry.size > 0 ? pdfEntry : null;
+
+  if (!noticeId && !pdf) {
+    return NextResponse.json({ error: "noticeId or pdf required" }, { status: 400 });
+  }
+
+  if (pdf && pdf.size > MAX_PDF_BYTES) {
+    return NextResponse.json({ error: `PDF exceeds ${MAX_PDF_BYTES / 1024 / 1024}MB limit` }, { status: 413 });
+  }
+
+  // 1. Pull solicitation from SAM.gov when notice ID given. PDF-only audits use a stub.
+  let solicitation: Solicitation | null = null;
+  if (noticeId) {
+    solicitation = await fetchSolicitationByNoticeId(noticeId);
+    if (!solicitation && !pdf) {
+      return NextResponse.json(
+        { error: "Solicitation not found in SAM.gov (or SAM_API_KEY not set)" },
+        { status: 404 }
+      );
+    }
+  }
+
+  // PDF-only fallback — build a minimal solicitation record
+  if (!solicitation && pdf) {
+    solicitation = {
+      noticeId: noticeId || `pdf-${Date.now()}`,
+      solicitationNumber: null,
+      title: pdf.name.replace(/\.pdf$/i, ""),
+      department: null,
+      subTier: null,
+      naicsCode: null,
+      type: null,
+      typeOfSetAside: null,
+      postedDate: null,
+      responseDeadLine: null,
+      description: `(PDF upload: ${pdf.name}, ${(pdf.size / 1024).toFixed(0)} KB — Claude reads attached document directly.)`
+    };
+  }
+
   if (!solicitation) {
-    return NextResponse.json(
-      { error: "Solicitation not found in SAM.gov (or SAM_API_KEY not set)" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "No solicitation source available" }, { status: 400 });
   }
 
-  // 2. Insert pending audit row
+  // 2. Read PDF bytes (if any) into base64 for Claude
+  let pdfBase64: string | null = null;
+  if (pdf) {
+    const buffer = Buffer.from(await pdf.arrayBuffer());
+    pdfBase64 = buffer.toString("base64");
+  }
+
+  // 3. Insert pending audit row
   const { data: audit, error: insertError } = await supabase
     .from("audits")
     .insert({
-      notice_id: noticeId,
+      notice_id: solicitation.noticeId,
       solicitation_number: solicitation.solicitationNumber,
       title: solicitation.title,
       agency: solicitation.department,
@@ -63,9 +106,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3. Run three-call audit
+  // 4. Run three-call audit (with PDF if attached)
   try {
-    const result = await runAudit(solicitation);
+    const result = await runAudit({ solicitation, pdfBase64 });
 
     const { error: updateError } = await supabase
       .from("audits")
@@ -91,7 +134,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ auditId: audit.id, recommendation: result.recommendation, score: result.compliance_score });
+    return NextResponse.json({
+      auditId: audit.id,
+      recommendation: result.recommendation,
+      score: result.compliance_score
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     await supabase
