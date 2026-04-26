@@ -1,6 +1,6 @@
 // Three-call audit engine — Overview, Compliance, Risks run in parallel.
-// Each call returns strict JSON which is parsed defensively.
-// Optional PDF attachment is passed natively to Claude (no parsing library needed).
+// Each call returns strict JSON parsed via a brace-balanced extractor that
+// handles fenced blocks, raw JSON, and prose-wrapped JSON.
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = "claude-sonnet-4-6";
@@ -48,18 +48,77 @@ export interface AuditInput {
   pdfBase64?: string | null;
 }
 
+// Walk the text and find the first balanced top-level JSON object.
+// Respects strings (so braces inside string values don't throw off the count).
+function findBalancedJSON(text: string): string | null {
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+  return null;
+}
+
 function extractJSON(text: string | undefined): Record<string, unknown> | null {
   if (!text) return null;
-  const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+
+  // 1. Try fenced block (greedy outer)
+  const fenced = text.match(/```(?:json)?\s*([\s\S]+?)```/);
   if (fenced) {
-    try { return JSON.parse(fenced[1]); } catch { /* fallthrough */ }
+    const parsed = tryParse(fenced[1]);
+    if (parsed) return parsed;
+    // The content inside the fence might itself need balanced extraction
+    const balanced = findBalancedJSON(fenced[1]);
+    if (balanced) {
+      const p = tryParse(balanced);
+      if (p) return p;
+    }
   }
+
+  // 2. Try balanced brace match across whole text
+  const balanced = findBalancedJSON(text);
+  if (balanced) {
+    const p = tryParse(balanced);
+    if (p) return p;
+  }
+
+  // 3. Last-ditch greedy slice
   const first = text.indexOf("{");
   const last = text.lastIndexOf("}");
   if (first !== -1 && last > first) {
-    try { return JSON.parse(text.slice(first, last + 1)); } catch { /* fallthrough */ }
+    const p = tryParse(text.slice(first, last + 1));
+    if (p) return p;
   }
+
   return null;
+}
+
+function tryParse(s: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 type ContentBlock =
@@ -111,73 +170,71 @@ async function callClaude(
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64 } = input;
   const solText = JSON.stringify(solicitation).slice(0, 4000);
-  const pdfNote = pdfBase64 ? "The full solicitation PDF is attached as a document — read it directly." : "";
+  const pdfHeader = pdfBase64
+    ? "The full solicitation PDF is attached as a document — read it directly. The metadata below is supplemental.\n\n"
+    : "";
 
-  const overviewPrompt = `${pdfNote}
+  // Prompts use field DESCRIPTIONS (not literal example values) to prevent Claude
+  // from echoing example data instead of populating from the actual source.
 
-SAM.gov metadata:
+  const overviewPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-Return STRICT JSON in this exact shape:
-{
-  "summary": "2-3 sentence executive summary",
-  "scope": "what is being procured",
-  "primary_objective": "core deliverable or outcome",
-  "customer": "buying agency / program office",
-  "contract_type": "FFP / CPFF / IDIQ / BPA / etc",
-  "ceiling_value_estimate": "$X-Y million OR null if not stated",
-  "period_of_performance": "duration with start/end if known"
-}`;
+Output ONLY a JSON object with these keys (populate from the actual solicitation):
+- summary (string): 2-3 sentence executive summary of what is being procured
+- scope (string): the work scope
+- primary_objective (string): the core deliverable or outcome
+- customer (string): buying agency / program office name
+- contract_type (string): FFP, CPFF, CPIF, IDIQ, BPA, etc.
+- ceiling_value_estimate (string or null): "$X-Y million" if stated; null if not
+- period_of_performance (string): duration with start/end dates if known
 
-  const compliancePrompt = `${pdfNote}
+Do not include keys with empty strings. Do not echo this prompt's example phrases — use the real solicitation data. No prose, no markdown, JSON only.`;
 
-SAM.gov metadata:
+  const compliancePrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-Return STRICT JSON in this exact shape:
-{
-  "far_clauses": ["52.212-1", "52.212-4"],
-  "dfars_clauses": ["252.204-7012"],
-  "required_certifications": ["SAM.gov registration", "UEI", "..."],
-  "set_aside_type": "Total SB / 8(a) / WOSB / SDVOSB / HUBZone / None",
-  "small_business_eligibility": "yes / no / depends on NAICS size standard",
-  "key_compliance_actions": ["specific action items a small business must do"],
-  "deadlines": ["question deadline: YYYY-MM-DD", "proposal due: YYYY-MM-DD"]
-}`;
+Output ONLY a JSON object with these keys (every value populated from the actual solicitation):
+- far_clauses (string[]): every FAR clause cited (e.g. "52.212-1"). Empty array only if truly none.
+- dfars_clauses (string[]): every DFARS clause cited (e.g. "252.204-7012"). Empty array only if truly none.
+- required_certifications (string[]): every certification, registration, or compliance requirement explicitly required for this opportunity (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance level, etc.)
+- set_aside_type (string): "Total Small Business", "8(a)", "WOSB", "EDWOSB", "SDVOSB", "HUBZone", "Partial Small Business", or "None"
+- small_business_eligibility (string): "yes" / "no" / explanation including NAICS size standard
+- key_compliance_actions (string[]): action items a small business must complete to be eligible to bid
+- deadlines (string[]): every date the bidder must hit, in form "label: YYYY-MM-DD" (questions due, proposal due, period start, etc.)
 
-  const risksPrompt = `${pdfNote}
+If the solicitation does not specify a list, return [] for that key (not "None" or "N/A"). No prose outside JSON.`;
 
-SAM.gov metadata:
+  const risksPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-Return STRICT JSON in this exact shape:
-{
-  "technical_risks": ["specific technical challenge 1", "..."],
-  "schedule_risks": ["timeline pressure 1", "..."],
-  "price_risks": ["margin or pricing risk 1", "..."],
-  "evaluation_risks": ["how proposals are evaluated and where to lose points"],
-  "severity_score": 0,
-  "top_3_risks": ["the three deal-breakers in priority order"]
-}
-severity_score is 0-10 where 10 is highest overall risk.`;
+Output ONLY a JSON object with these keys (each list must contain at least one item if the solicitation has any meaningful content):
+- technical_risks (string[]): specific technical challenges or unknowns (e.g. "Requires custom integration with legacy MILSPEC interfaces")
+- schedule_risks (string[]): timeline pressures (e.g. "Award-to-kickoff window only 14 days")
+- price_risks (string[]): margin / pricing risks (e.g. "Cost-reimbursable with capped fee — limited upside")
+- evaluation_risks (string[]): how the proposal is evaluated and where points are easily lost (e.g. "Past performance weighted 40% — must show similar agency experience")
+- severity_score (number 0-10): overall risk; 10 = bet-the-company exposure
+- top_3_risks (string[]): the three deal-breakers in priority order, each one sentence
+
+Return real risks specific to this solicitation. Empty arrays only if the solicitation truly has no risk in that category. No prose outside JSON.`;
 
   const [overviewText, complianceText, risksText] = await Promise.all([
     callClaude(
-      "You are a federal contract analyst. Output ONLY valid JSON in the requested shape — no prose, no markdown commentary outside the JSON.",
+      "You are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.",
       overviewPrompt,
       800,
       pdfBase64
     ),
     callClaude(
-      "You are a federal procurement compliance officer. Extract every FAR/DFARS clause, certification, and eligibility requirement explicitly named in the solicitation. Output ONLY valid JSON.",
+      "You are a federal procurement compliance officer. You read solicitations and extract every clause, certification, and eligibility requirement. You output ONE valid JSON object — nothing before, nothing after.",
       compliancePrompt,
-      1200,
+      1500,
       pdfBase64
     ),
     callClaude(
-      "You are a senior capture manager scoring risks on a federal opportunity. Identify the highest-impact risks for a small defense contractor. Output ONLY valid JSON.",
+      "You are a senior capture manager scoring risks on a federal opportunity for a small defense contractor. You output ONE valid JSON object — nothing before, nothing after.",
       risksPrompt,
-      1000,
+      1200,
       pdfBase64
     )
   ]);
