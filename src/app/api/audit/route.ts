@@ -202,6 +202,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         auditId: audit.id,
+        status: "complete",
         recommendation: result.recommendation,
         score: result.compliance_score
       },

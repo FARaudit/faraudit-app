@@ -1,25 +1,74 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
+import KOEmailButton from "./ko-email-button";
 
 type Params = { id: string };
 
+interface DFARSFlag {
+  clause: string;
+  title: string;
+  detected: boolean;
+  severity: "P0" | "P1" | "P2";
+}
+
+interface PrioritizedRisk {
+  text: string;
+  priority: "P0" | "P1" | "P2";
+  category: string;
+  citation?: string;
+}
+
 const RECOMMENDATION_STYLES: Record<string, { color: string; label: string }> = {
-  PROCEED: {
-    color: "text-green border-green",
-    label: "Proceed"
-  },
-  PROCEED_WITH_CAUTION: {
-    color: "text-amber border-amber",
-    label: "Caution"
-  },
-  DECLINE: {
-    color: "text-red border-red",
-    label: "Decline"
-  }
+  PROCEED: { color: "text-green border-green", label: "Proceed" },
+  PROCEED_WITH_CAUTION: { color: "text-amber border-amber", label: "Caution" },
+  DECLINE: { color: "text-red border-red", label: "Decline" }
 };
 
-const DANGEROUS_DFARS = ["252.223-7008", "252.204-7018", "252.204-7021"];
+const PRIORITY_BORDERS: Record<string, string> = {
+  P0: "border-red bg-red/5",
+  P1: "border-amber bg-amber/5",
+  P2: "border-blue bg-blue/5"
+};
+const PRIORITY_COLORS: Record<string, string> = {
+  P0: "text-red",
+  P1: "text-amber",
+  P2: "text-blue"
+};
+
+// Fallback synthesizer for legacy audits that ran before the engine post-processing
+// landed. Maps the categorized arrays into PrioritizedRisk[] using the same rules.
+function synthesizePrioritized(risksJson: Record<string, unknown>): PrioritizedRisk[] {
+  const out: PrioritizedRisk[] = [];
+  const push = (arr: unknown, priority: PrioritizedRisk["priority"], category: string) => {
+    if (!Array.isArray(arr)) return;
+    for (const r of arr) {
+      if (typeof r === "string" && r.trim()) {
+        out.push({ text: r, priority, category, citation: extractCitation(r) });
+      }
+    }
+  };
+  push(risksJson.top_3_risks, "P0", "Deal-breaker");
+  push(risksJson.technical_risks, "P1", "Technical");
+  push(risksJson.schedule_risks, "P1", "Schedule");
+  push(risksJson.price_risks, "P1", "Price");
+  push(risksJson.evaluation_risks, "P2", "Evaluation");
+
+  const seen = new Set<string>();
+  const order: Record<"P0" | "P1" | "P2", number> = { P0: 0, P1: 1, P2: 2 };
+  return out
+    .filter((r) => {
+      const k = r.text.toLowerCase().trim();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .sort((a, b) => order[a.priority] - order[b.priority]);
+}
+
+function extractCitation(text: string): string | undefined {
+  return text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1];
+}
 
 function toStringList(value: unknown): string[] {
   if (value === null || value === undefined) return [];
@@ -36,9 +85,7 @@ function toStringList(value: unknown): string[] {
   if (typeof value === "string") {
     const s = value.trim();
     if (!s || s.toLowerCase() === "none" || s.toLowerCase() === "n/a") return [];
-    return s.includes(",")
-      ? s.split(",").map((x) => x.trim()).filter(Boolean)
-      : [s];
+    return s.includes(",") ? s.split(",").map((x) => x.trim()).filter(Boolean) : [s];
   }
   if (typeof value === "object") return [JSON.stringify(value)];
   return [String(value)];
@@ -72,17 +119,25 @@ export default async function AuditResultPage({
   const risksJson = (audit.risks_json ?? {}) as Record<string, unknown>;
   const overviewJson = (audit.overview_json ?? {}) as Record<string, unknown>;
 
+  // DFARS flags — always render 3 cards. Backfill if missing on legacy rows.
+  const dfarsFlags: DFARSFlag[] = Array.isArray(compJson.dfars_flags)
+    ? (compJson.dfars_flags as DFARSFlag[])
+    : [
+        { clause: "252.223-7008", title: "Hexavalent Chromium", detected: false, severity: "P0" },
+        { clause: "252.204-7018", title: "Covered Telecom", detected: false, severity: "P0" },
+        { clause: "252.204-7021", title: "CMMC", detected: false, severity: "P1" }
+      ];
+
+  // Prioritized risks — engine writes them; fall back to synthesis for older rows.
+  const prioritized: PrioritizedRisk[] = Array.isArray(risksJson.prioritized_risks)
+    ? (risksJson.prioritized_risks as PrioritizedRisk[])
+    : synthesizePrioritized(risksJson);
+
   const farClauses = toStringList(compJson.far_clauses);
   const dfarsClauses = toStringList(compJson.dfars_clauses);
   const certs = toStringList(compJson.required_certifications);
   const actions = toStringList(compJson.key_compliance_actions);
   const deadlines = toStringList(compJson.deadlines);
-
-  const top3 = toStringList(risksJson.top_3_risks);
-  const technical = toStringList(risksJson.technical_risks);
-  const schedule = toStringList(risksJson.schedule_risks);
-  const price = toStringList(risksJson.price_risks);
-  const evaluation = toStringList(risksJson.evaluation_risks);
 
   return (
     <div className="min-h-screen">
@@ -106,9 +161,7 @@ export default async function AuditResultPage({
         {/* Header bar */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-start">
           <div>
-            <p className="font-mono text-sm text-text-2 tracking-wider">
-              {audit.notice_id}
-            </p>
+            <p className="font-mono text-sm text-text-2 tracking-wider">{audit.notice_id}</p>
             <h1 className="mt-3 font-display text-3xl md:text-4xl text-text font-light leading-tight">
               {audit.title || "Untitled solicitation"}
             </h1>
@@ -136,9 +189,7 @@ export default async function AuditResultPage({
         {audit.status === "processing" && (
           <div className="mt-12 border border-amber/40 bg-amber/5 p-6">
             <p className="font-display text-xl text-text">Audit in progress</p>
-            <p className="mt-2 text-text-2 text-sm">
-              Refresh in a few seconds.
-            </p>
+            <p className="mt-2 text-text-2 text-sm">Refresh in a few seconds.</p>
           </div>
         )}
 
@@ -153,45 +204,35 @@ export default async function AuditResultPage({
 
         {audit.status === "complete" && (
           <>
-            {/* Executive Risk Summary */}
+            {/* SECTION 1 — Executive Risk Summary */}
             <Section eyebrow="Executive Risk Summary" title="What you need to know first">
-              {top3.length === 0 &&
-              technical.length === 0 &&
-              schedule.length === 0 &&
-              price.length === 0 &&
-              evaluation.length === 0 ? (
-                <p className="text-text-2 italic">
-                  No risks surfaced by the audit engine.
-                </p>
+              {prioritized.length === 0 ? (
+                <p className="text-text-2 italic">No risks surfaced by the audit engine.</p>
               ) : (
                 <div className="space-y-3">
-                  {top3.map((r, i) => (
-                    <RiskCard key={`p0-${i}`} priority="P0" text={r} />
-                  ))}
-                  {technical.map((r, i) => (
-                    <RiskCard key={`p1-t-${i}`} priority="P1" text={r} category="Technical" />
-                  ))}
-                  {schedule.map((r, i) => (
-                    <RiskCard key={`p1-s-${i}`} priority="P1" text={r} category="Schedule" />
-                  ))}
-                  {price.map((r, i) => (
-                    <RiskCard key={`p2-p-${i}`} priority="P2" text={r} category="Price" />
-                  ))}
-                  {evaluation.map((r, i) => (
-                    <RiskCard key={`p2-e-${i}`} priority="P2" text={r} category="Evaluation" />
+                  {prioritized.map((r, i) => (
+                    <RiskCard key={i} risk={r} />
                   ))}
                 </div>
               )}
             </Section>
 
-            {/* Compliance */}
+            {/* SECTION 2 — Compliance Findings (DFARS flags first, always all 3) */}
+            <Section eyebrow="Compliance" title="DFARS trap detection">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {dfarsFlags.map((flag) => (
+                  <DFARSFlagCard key={flag.clause} flag={flag} />
+                ))}
+              </div>
+            </Section>
+
             <Section eyebrow="Compliance" title="Clauses · certifications · deadlines">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
                 <ClauseList label="FAR Clauses" items={farClauses} />
                 <ClauseList
                   label="DFARS Clauses"
                   items={dfarsClauses}
-                  flagDangerous
+                  flagDetected={dfarsFlags.filter((f) => f.detected).map((f) => f.clause)}
                 />
                 <ListBlock label="Certifications Required" items={certs} />
                 <ListBlock label="Key Deadlines" items={deadlines} />
@@ -203,10 +244,7 @@ export default async function AuditResultPage({
                   </p>
                   <ul className="space-y-2.5 text-text">
                     {actions.map((a, i) => (
-                      <li
-                        key={i}
-                        className="border-l-2 border-gold pl-4 py-1 text-sm"
-                      >
+                      <li key={i} className="border-l-2 border-gold pl-4 py-1 text-sm">
                         {a}
                       </li>
                     ))}
@@ -215,9 +253,17 @@ export default async function AuditResultPage({
               )}
             </Section>
 
-            {/* Overview */}
+            {/* SECTION 3 — Overview */}
             <Section eyebrow="Overview" title="Solicitation summary">
               <OverviewGrid data={overviewJson} />
+            </Section>
+
+            {/* SECTION 4 — KO Email Draft */}
+            <Section eyebrow="Outreach" title="Contracting Officer email">
+              <p className="text-text-2 text-sm mb-4 max-w-2xl">
+                Draft a clarification email pre-populated with the highest-priority issues from this audit. Review and tailor before sending.
+              </p>
+              <KOEmailButton auditId={Number(audit.id)} />
             </Section>
 
             {/* Raw JSON debug */}
@@ -246,15 +292,7 @@ function ScoreCircle({ score }: { score: number }) {
   return (
     <div className="relative w-24 h-24 flex items-center justify-center">
       <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
-        <circle
-          cx="50"
-          cy="50"
-          r="44"
-          stroke="currentColor"
-          strokeWidth="2"
-          fill="none"
-          className="text-border"
-        />
+        <circle cx="50" cy="50" r="44" stroke="currentColor" strokeWidth="2" fill="none" className="text-border" />
         <circle
           cx="50"
           cy="50"
@@ -283,60 +321,52 @@ function Section({
 }) {
   return (
     <section className="mt-20">
-      <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-3">
-        {eyebrow}
-      </p>
-      <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-10">
-        {title}
-      </h2>
+      <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-3">{eyebrow}</p>
+      <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-10">{title}</h2>
       {children}
     </section>
   );
 }
 
-function RiskCard({
-  priority,
-  text,
-  category
-}: {
-  priority: "P0" | "P1" | "P2";
-  text: string;
-  category?: string;
-}) {
-  const borders = {
-    P0: "border-red bg-red/5",
-    P1: "border-amber bg-amber/5",
-    P2: "border-blue bg-blue/5"
-  };
-  const labelColors = {
-    P0: "text-red",
-    P1: "text-amber",
-    P2: "text-blue"
-  };
-  const citation = text.match(
-    /((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i
-  )?.[1];
-
+function RiskCard({ risk }: { risk: PrioritizedRisk }) {
+  const border = PRIORITY_BORDERS[risk.priority] || PRIORITY_BORDERS.P2;
+  const labelColor = PRIORITY_COLORS[risk.priority] || PRIORITY_COLORS.P2;
   return (
-    <div className={`border-l-4 ${borders[priority]} pl-5 pr-4 py-4`}>
+    <div className={`border-l-4 ${border} pl-5 pr-4 py-4`}>
       <div className="flex items-baseline gap-3 flex-wrap">
-        <span
-          className={`font-mono text-xs font-medium tracking-wider ${labelColors[priority]}`}
-        >
-          {priority}
+        <span className={`font-mono text-xs font-medium tracking-wider ${labelColor}`}>
+          {risk.priority}
         </span>
-        {category && (
-          <span className="font-mono text-xs text-text-3 uppercase tracking-wider">
-            {category}
-          </span>
-        )}
-        {citation && (
-          <span className="font-mono text-xs text-text-2 ml-auto">
-            {citation}
-          </span>
+        <span className="font-mono text-xs text-text-3 uppercase tracking-wider">
+          {risk.category}
+        </span>
+        {risk.citation && (
+          <span className="font-mono text-xs text-text-2 ml-auto">{risk.citation}</span>
         )}
       </div>
-      <p className="mt-2 text-text leading-relaxed">{text}</p>
+      <p className="mt-2 text-text leading-relaxed">{risk.text}</p>
+    </div>
+  );
+}
+
+function DFARSFlagCard({ flag }: { flag: DFARSFlag }) {
+  const detected = flag.detected;
+  const palette = detected
+    ? "border-red bg-red/5 text-red"
+    : "border-green/50 bg-green/5 text-green";
+  const sevColor = PRIORITY_COLORS[flag.severity] || PRIORITY_COLORS.P0;
+  return (
+    <div className={`border ${palette} p-5`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-xs tracking-wider opacity-80">{flag.clause}</p>
+          <p className="mt-1 font-display text-lg text-text">{flag.title}</p>
+        </div>
+        <span className={`font-mono text-xs ${sevColor}`}>{flag.severity}</span>
+      </div>
+      <p className="mt-4 font-mono text-xs uppercase tracking-[0.2em]">
+        {detected ? "⚠ Detected" : "✓ Not detected"}
+      </p>
     </div>
   );
 }
@@ -344,11 +374,11 @@ function RiskCard({
 function ClauseList({
   label,
   items,
-  flagDangerous = false
+  flagDetected = []
 }: {
   label: string;
   items: string[];
-  flagDangerous?: boolean;
+  flagDetected?: string[];
 }) {
   return (
     <div>
@@ -360,9 +390,7 @@ function ClauseList({
       ) : (
         <ul className="space-y-1.5">
           {items.map((c, i) => {
-            const isDanger =
-              flagDangerous &&
-              DANGEROUS_DFARS.some((d) => c.includes(d));
+            const isDanger = flagDetected.some((d) => c.includes(d));
             return (
               <li
                 key={i}
@@ -440,9 +468,7 @@ function OverviewGrid({ data }: { data: Record<string, unknown> }) {
 function RawJSON({ title, data }: { title: string; data: unknown }) {
   return (
     <div>
-      <p className="font-mono text-xs uppercase text-text-3 mb-2 tracking-wider">
-        {title}
-      </p>
+      <p className="font-mono text-xs uppercase text-text-3 mb-2 tracking-wider">{title}</p>
       <pre className="text-xs text-text-2 bg-surface border border-border p-3 overflow-auto max-h-80">
         {JSON.stringify(data, null, 2)}
       </pre>

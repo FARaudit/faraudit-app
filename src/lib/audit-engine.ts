@@ -55,6 +55,20 @@ export interface OverviewJSON {
   period_of_performance?: string;
 }
 
+export interface DFARSFlag {
+  clause: string;
+  title: string;
+  detected: boolean;
+  severity: "P0" | "P1" | "P2";
+}
+
+export interface PrioritizedRisk {
+  text: string;
+  priority: "P0" | "P1" | "P2";
+  category: string;
+  citation?: string;
+}
+
 export interface ComplianceJSON {
   far_clauses?: string[];
   dfars_clauses?: string[];
@@ -63,6 +77,7 @@ export interface ComplianceJSON {
   small_business_eligibility?: string;
   key_compliance_actions?: string[];
   deadlines?: string[];
+  dfars_flags?: DFARSFlag[];
 }
 
 export interface RisksJSON {
@@ -72,6 +87,77 @@ export interface RisksJSON {
   evaluation_risks?: string[];
   severity_score?: number;
   top_3_risks?: string[];
+  prioritized_risks?: PrioritizedRisk[];
+}
+
+// ━━ Engine post-processing ━━
+
+const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" | "P2" }> = [
+  { clause: "252.223-7008", title: "Hexavalent Chromium", severity: "P0" },
+  { clause: "252.204-7018", title: "Covered Telecom", severity: "P0" },
+  { clause: "252.204-7021", title: "CMMC", severity: "P1" }
+];
+
+export function parseDFARSTraps(complianceJson: ComplianceJSON): DFARSFlag[] {
+  const clauses = complianceJson.dfars_clauses ?? [];
+  return DFARS_TRAPS.map((trap) => ({
+    clause: trap.clause,
+    title: trap.title,
+    detected: clauses.some(
+      (c) => typeof c === "string" && c.includes(trap.clause)
+    ),
+    severity: trap.severity
+  }));
+}
+
+function extractCitation(text: string): string | undefined {
+  return text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1];
+}
+
+export function assignRiskPriority(risksJson: RisksJSON): PrioritizedRisk[] {
+  const items: PrioritizedRisk[] = [];
+
+  // P0 — deal-breakers (Claude's top_3_risks; often DFARS traps / disqualification)
+  for (const r of risksJson.top_3_risks ?? []) {
+    if (typeof r === "string" && r.trim()) {
+      items.push({ text: r, priority: "P0", category: "Deal-breaker", citation: extractCitation(r) });
+    }
+  }
+  // P1 — operational & financial impact
+  for (const r of risksJson.technical_risks ?? []) {
+    if (typeof r === "string" && r.trim()) {
+      items.push({ text: r, priority: "P1", category: "Technical", citation: extractCitation(r) });
+    }
+  }
+  for (const r of risksJson.schedule_risks ?? []) {
+    if (typeof r === "string" && r.trim()) {
+      items.push({ text: r, priority: "P1", category: "Schedule", citation: extractCitation(r) });
+    }
+  }
+  for (const r of risksJson.price_risks ?? []) {
+    if (typeof r === "string" && r.trim()) {
+      items.push({ text: r, priority: "P1", category: "Price", citation: extractCitation(r) });
+    }
+  }
+  // P2 — evaluation & process
+  for (const r of risksJson.evaluation_risks ?? []) {
+    if (typeof r === "string" && r.trim()) {
+      items.push({ text: r, priority: "P2", category: "Evaluation", citation: extractCitation(r) });
+    }
+  }
+
+  // Dedupe by exact text — top_3_risks often phrases the same risk that appears in
+  // a categorized list. First occurrence wins (so P0 sticks).
+  const seen = new Set<string>();
+  const unique = items.filter((item) => {
+    const key = item.text.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const order: Record<"P0" | "P1" | "P2", number> = { P0: 0, P1: 1, P2: 2 };
+  return unique.sort((a, b) => order[a.priority] - order[b.priority]);
 }
 
 export interface AuditResult {
@@ -290,6 +376,13 @@ Return real risks specific to this solicitation. Empty arrays only if the solici
   const overviewJson = (extractJSON(overviewText) as OverviewJSON) || {};
   const complianceJson = (extractJSON(complianceText) as ComplianceJSON) || {};
   const risksJson = (extractJSON(risksText) as RisksJSON) || {};
+
+  // ━━ Engine-level post-processing — DFARS trap detection + risk priority assignment ━━
+  // These were previously computed at render time; lifting them into the engine
+  // persists them in compliance_json / risks_json (Supabase JSONB) for SOC 2 audit
+  // trails and downstream analytics.
+  complianceJson.dfars_flags = parseDFARSTraps(complianceJson);
+  risksJson.prioritized_risks = assignRiskPriority(risksJson);
 
   // Composite scoring
   const farCount = complianceJson.far_clauses?.length || 0;
