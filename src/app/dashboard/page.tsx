@@ -1,9 +1,31 @@
-export default function DashboardPage() {
+import { redirect } from "next/navigation";
+import { createServerClient } from "@/lib/supabase-server";
+import SignOutButton from "./signout-button";
+
+export default async function DashboardPage() {
+  const supabase = await createServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
     <main className="min-h-screen bg-black text-white px-6 py-12">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold">FARaudit Dashboard</h1>
-        <p className="mt-2 text-zinc-400">Live solicitations · scores · capture intelligence</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">FARaudit Dashboard</h1>
+            <p className="mt-2 text-zinc-400">Live solicitations · scores · capture intelligence</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-zinc-500">Signed in as</p>
+            <p className="text-sm">{user.email}</p>
+            <SignOutButton />
+          </div>
+        </div>
 
         <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="rounded-xl border border-zinc-800 p-5">
