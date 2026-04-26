@@ -32,58 +32,100 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold tracking-tight">Sign in to FARaudit</h1>
-        <p className="mt-2 text-zinc-400">Magic link — no password.</p>
-
-        {status === "sent" ? (
-          <div className="mt-8 rounded-xl border border-emerald-800 bg-emerald-950/40 p-6">
-            <p className="font-semibold">Check your inbox</p>
-            <p className="text-sm text-zinc-400 mt-2">
-              We sent a sign-in link to <span className="text-white">{email}</span>. Click the link to continue.
-            </p>
-            <button
-              onClick={() => { setStatus("idle"); setEmail(""); }}
-              className="mt-4 text-xs text-zinc-500 underline hover:text-zinc-300"
-            >
-              Use a different email
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm text-zinc-400 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoFocus
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-zinc-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={status === "sending"}
-              className="w-full bg-white text-black font-semibold py-3 rounded-lg hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {status === "sending" ? "Sending..." : "Send magic link"}
-            </button>
-            {error && (
-              <p className="text-sm text-red-400 mt-2">{error}</p>
-            )}
-          </form>
-        )}
-
-        <p className="mt-8 text-xs text-zinc-600">
-          By continuing you agree to our terms. We never share your email.
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-5">
+      {/* Left panel — 40% */}
+      <aside className="lg:col-span-2 bg-bg border-b lg:border-b-0 lg:border-r border-border px-8 md:px-12 py-12 lg:py-16 flex flex-col justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
+            FARaudit
+          </p>
+          <h1 className="mt-12 lg:mt-20 font-display text-3xl md:text-4xl font-light text-text leading-[1.1]">
+            Federal Contract<br />Intelligence
+            <span className="text-gold">.</span>
+          </h1>
+          <p className="mt-6 text-text-2 leading-relaxed max-w-md">
+            Sign in to access live solicitation feeds, three-call compliance audits, and the full empire stack.
+          </p>
+          <ul className="mt-10 space-y-4 text-sm text-text-2">
+            <li className="flex items-start gap-3">
+              <span className="text-gold mt-1.5 font-mono">—</span>
+              <span>Solicitation compliance auditing in 45 seconds</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-gold mt-1.5 font-mono">—</span>
+              <span>FAR/DFARS clause extraction with risk scoring</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-gold mt-1.5 font-mono">—</span>
+              <span>Bloomberg-grade market intelligence</span>
+            </li>
+          </ul>
+        </div>
+        <p className="mt-12 lg:mt-0 text-xs text-text-3 font-mono">
+          © 2026 FARaudit. Federal Contract Intelligence.
         </p>
-      </div>
-    </main>
+      </aside>
+
+      {/* Right panel — 60% */}
+      <section className="lg:col-span-3 bg-surface flex items-center justify-center px-6 md:px-10 py-16 lg:py-0">
+        <div className="w-full max-w-md">
+          <h2 className="font-display text-3xl md:text-4xl text-text">
+            Sign in to FARaudit
+          </h2>
+          <p className="mt-3 text-text-2 text-sm">
+            Magic link — no password required.
+          </p>
+
+          {status === "sent" ? (
+            <div className="mt-12 border border-green/40 bg-green/5 p-7">
+              <p className="font-display text-xl text-text">Check your inbox</p>
+              <p className="mt-3 text-sm text-text-2">
+                We sent a sign-in link to <span className="text-text font-mono">{email}</span>.
+              </p>
+              <button
+                onClick={() => {
+                  setStatus("idle");
+                  setEmail("");
+                }}
+                className="mt-5 text-xs text-text-3 underline hover:text-text-2 font-mono"
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="mt-12 space-y-6">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-xs uppercase tracking-[0.2em] text-text-3 mb-3 font-mono"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                  className="w-full bg-bg border border-border text-text px-4 py-3.5 focus:outline-none focus:border-gold transition-colors font-body"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={status === "sending"}
+                className="w-full bg-gold text-bg py-4 font-medium tracking-wide hover:bg-gold-dim disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {status === "sending" ? "Sending..." : "Send magic link"}
+              </button>
+              {error && (
+                <p className="text-sm text-red border-l-2 border-red pl-3">{error}</p>
+              )}
+            </form>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }

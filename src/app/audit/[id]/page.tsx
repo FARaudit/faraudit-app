@@ -1,49 +1,26 @@
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
 
 type Params = { id: string };
 
 const RECOMMENDATION_STYLES: Record<string, { color: string; label: string }> = {
   PROCEED: {
-    color: "border-emerald-700 bg-emerald-950/40 text-emerald-300",
-    label: "✓ PROCEED"
+    color: "text-green border-green",
+    label: "Proceed"
   },
   PROCEED_WITH_CAUTION: {
-    color: "border-amber-700 bg-amber-950/40 text-amber-300",
-    label: "⚠ PROCEED WITH CAUTION"
+    color: "text-amber border-amber",
+    label: "Caution"
   },
   DECLINE: {
-    color: "border-red-800 bg-red-950/40 text-red-300",
-    label: "✗ DECLINE"
+    color: "text-red border-red",
+    label: "Decline"
   }
 };
 
-const COMPLIANCE_KEY_LABELS: Record<string, string> = {
-  far_clauses: "FAR clauses",
-  dfars_clauses: "DFARS clauses",
-  required_certifications: "Required certifications",
-  key_compliance_actions: "Key compliance actions",
-  deadlines: "Deadlines",
-  set_aside_type: "Set-aside",
-  small_business_eligibility: "Small business eligibility"
-};
+const DANGEROUS_DFARS = ["252.223-7008", "252.204-7018", "252.204-7021"];
 
-const RISK_KEY_LABELS: Record<string, string> = {
-  top_3_risks: "Top 3 risks",
-  technical_risks: "Technical",
-  schedule_risks: "Schedule",
-  price_risks: "Price",
-  evaluation_risks: "Evaluation",
-  severity_score: "Severity"
-};
-
-function humanLabel(key: string): string {
-  return key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// Coerces any JSON value into an array of strings for rendering.
 function toStringList(value: unknown): string[] {
   if (value === null || value === undefined) return [];
   if (Array.isArray(value)) {
@@ -59,11 +36,12 @@ function toStringList(value: unknown): string[] {
   if (typeof value === "string") {
     const s = value.trim();
     if (!s || s.toLowerCase() === "none" || s.toLowerCase() === "n/a") return [];
-    return s.includes(",") ? s.split(",").map((x) => x.trim()).filter(Boolean) : [s];
+    return s.includes(",")
+      ? s.split(",").map((x) => x.trim()).filter(Boolean)
+      : [s];
   }
-  if (typeof value === "number" || typeof value === "boolean") return [String(value)];
   if (typeof value === "object") return [JSON.stringify(value)];
-  return [];
+  return [String(value)];
 }
 
 export default async function AuditResultPage({
@@ -86,33 +64,88 @@ export default async function AuditResultPage({
 
   if (!audit) notFound();
 
-  const style =
+  const recStyle =
     RECOMMENDATION_STYLES[audit.recommendation as string] ||
     RECOMMENDATION_STYLES.PROCEED_WITH_CAUTION;
+  const score: number = audit.compliance_score ?? 0;
+  const compJson = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  const risksJson = (audit.risks_json ?? {}) as Record<string, unknown>;
+  const overviewJson = (audit.overview_json ?? {}) as Record<string, unknown>;
+
+  const farClauses = toStringList(compJson.far_clauses);
+  const dfarsClauses = toStringList(compJson.dfars_clauses);
+  const certs = toStringList(compJson.required_certifications);
+  const actions = toStringList(compJson.key_compliance_actions);
+  const deadlines = toStringList(compJson.deadlines);
+
+  const top3 = toStringList(risksJson.top_3_risks);
+  const technical = toStringList(risksJson.technical_risks);
+  const schedule = toStringList(risksJson.schedule_risks);
+  const price = toStringList(risksJson.price_risks);
+  const evaluation = toStringList(risksJson.evaluation_risks);
 
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-12">
-      <div className="max-w-4xl mx-auto">
-        <p className="text-sm text-zinc-500">Audit Result</p>
-        <h1 className="text-3xl font-bold mt-1">{audit.title || audit.notice_id}</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Notice {audit.notice_id}
-          {audit.agency ? ` · ${audit.agency}` : ""}
-          {audit.naics_code ? ` · NAICS ${audit.naics_code}` : ""}
-          {audit.set_aside ? ` · ${audit.set_aside}` : ""}
+    <div className="min-h-screen">
+      <header className="border-b border-border px-6 md:px-10 py-5 flex items-center justify-between">
+        <Link href="/dashboard" className="font-display text-2xl text-text">
+          FARaudit
+        </Link>
+        <Link
+          href="/audit"
+          className="text-sm text-gold hover:text-gold-dim font-mono uppercase tracking-wider"
+        >
+          + New audit
+        </Link>
+      </header>
+
+      <main className="px-6 md:px-10 py-12 md:py-16 max-w-5xl mx-auto">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
+          Audit Report
         </p>
 
+        {/* Header bar */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-start">
+          <div>
+            <p className="font-mono text-sm text-text-2 tracking-wider">
+              {audit.notice_id}
+            </p>
+            <h1 className="mt-3 font-display text-3xl md:text-4xl text-text font-light leading-tight">
+              {audit.title || "Untitled solicitation"}
+            </h1>
+            <p className="mt-4 text-text-2 text-sm font-mono">
+              {audit.agency || "—"}
+              {audit.naics_code && ` · NAICS ${audit.naics_code}`}
+              {audit.set_aside && ` · ${audit.set_aside}`}
+              {audit.response_deadline &&
+                ` · due ${new Date(audit.response_deadline).toLocaleDateString()}`}
+            </p>
+          </div>
+
+          {audit.status === "complete" && (
+            <div className="flex items-center gap-6">
+              <ScoreCircle score={score} />
+              <div
+                className={`px-5 py-3 border-2 ${recStyle.color} font-mono text-xs tracking-[0.25em] uppercase`}
+              >
+                {recStyle.label}
+              </div>
+            </div>
+          )}
+        </div>
+
         {audit.status === "processing" && (
-          <div className="mt-8 rounded-xl border border-amber-700 bg-amber-950/40 p-6">
-            <p className="font-semibold">Audit in progress</p>
-            <p className="text-sm text-zinc-400 mt-2">Refresh in a few seconds.</p>
+          <div className="mt-12 border border-amber/40 bg-amber/5 p-6">
+            <p className="font-display text-xl text-text">Audit in progress</p>
+            <p className="mt-2 text-text-2 text-sm">
+              Refresh in a few seconds.
+            </p>
           </div>
         )}
 
         {audit.status === "failed" && (
-          <div className="mt-8 rounded-xl border border-red-800 bg-red-950/40 p-6">
-            <p className="font-semibold">Audit failed</p>
-            <p className="text-sm text-zinc-400 mt-2">
+          <div className="mt-12 border border-red/40 bg-red/5 p-6">
+            <p className="font-display text-xl text-text">Audit failed</p>
+            <p className="mt-2 text-text-2 text-sm">
               {audit.error_message || "Unknown error"}
             </p>
           </div>
@@ -120,236 +153,299 @@ export default async function AuditResultPage({
 
         {audit.status === "complete" && (
           <>
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-zinc-800 p-5">
-                <p className="text-zinc-400 text-sm">Compliance score</p>
-                <p className="text-3xl font-bold mt-2">{audit.compliance_score}/100</p>
+            {/* Executive Risk Summary */}
+            <Section eyebrow="Executive Risk Summary" title="What you need to know first">
+              {top3.length === 0 &&
+              technical.length === 0 &&
+              schedule.length === 0 &&
+              price.length === 0 &&
+              evaluation.length === 0 ? (
+                <p className="text-text-2 italic">
+                  No risks surfaced by the audit engine.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {top3.map((r, i) => (
+                    <RiskCard key={`p0-${i}`} priority="P0" text={r} />
+                  ))}
+                  {technical.map((r, i) => (
+                    <RiskCard key={`p1-t-${i}`} priority="P1" text={r} category="Technical" />
+                  ))}
+                  {schedule.map((r, i) => (
+                    <RiskCard key={`p1-s-${i}`} priority="P1" text={r} category="Schedule" />
+                  ))}
+                  {price.map((r, i) => (
+                    <RiskCard key={`p2-p-${i}`} priority="P2" text={r} category="Price" />
+                  ))}
+                  {evaluation.map((r, i) => (
+                    <RiskCard key={`p2-e-${i}`} priority="P2" text={r} category="Evaluation" />
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            {/* Compliance */}
+            <Section eyebrow="Compliance" title="Clauses · certifications · deadlines">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                <ClauseList label="FAR Clauses" items={farClauses} />
+                <ClauseList
+                  label="DFARS Clauses"
+                  items={dfarsClauses}
+                  flagDangerous
+                />
+                <ListBlock label="Certifications Required" items={certs} />
+                <ListBlock label="Key Deadlines" items={deadlines} />
               </div>
-              <div className={`rounded-xl border p-5 ${style.color}`}>
-                <p className="text-xs uppercase tracking-wide opacity-75">Recommendation</p>
-                <p className="text-2xl font-bold mt-2">{style.label}</p>
-                {audit.bid_recommendation && (
-                  <p className="text-xs mt-2 opacity-80">{audit.bid_recommendation}</p>
-                )}
+              {actions.length > 0 && (
+                <div className="mt-12">
+                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-4">
+                    Key Compliance Actions
+                  </p>
+                  <ul className="space-y-2.5 text-text">
+                    {actions.map((a, i) => (
+                      <li
+                        key={i}
+                        className="border-l-2 border-gold pl-4 py-1 text-sm"
+                      >
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Section>
+
+            {/* Overview */}
+            <Section eyebrow="Overview" title="Solicitation summary">
+              <OverviewGrid data={overviewJson} />
+            </Section>
+
+            {/* Raw JSON debug */}
+            <details className="mt-16 mb-8">
+              <summary className="cursor-pointer text-xs text-text-3 hover:text-text-2 font-mono uppercase tracking-[0.2em]">
+                Show raw JSON (debug)
+              </summary>
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <RawJSON title="overview" data={overviewJson} />
+                <RawJSON title="compliance" data={compJson} />
+                <RawJSON title="risks" data={risksJson} />
               </div>
-            </div>
-
-            <Section title="Overview" summary={audit.overview_summary} raw={audit.overview_json}>
-              <OverviewView data={audit.overview_json} />
-            </Section>
-
-            <Section title="Compliance" summary={audit.compliance_summary} raw={audit.compliance_json}>
-              <KeyValueLists data={audit.compliance_json} keyLabels={COMPLIANCE_KEY_LABELS} />
-            </Section>
-
-            <Section title="Risks" summary={audit.risks_summary} raw={audit.risks_json}>
-              <RisksView data={audit.risks_json} />
-            </Section>
+            </details>
           </>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
+  );
+}
+
+function ScoreCircle({ score }: { score: number }) {
+  let color = "text-red";
+  if (score >= 70) color = "text-green";
+  else if (score >= 40) color = "text-amber";
+  const dash = Math.max(0, Math.min(100, score)) * 2.76;
+  return (
+    <div className="relative w-24 h-24 flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
+        <circle
+          cx="50"
+          cy="50"
+          r="44"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          className="text-border"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r="44"
+          stroke="currentColor"
+          strokeWidth="3"
+          fill="none"
+          className={color}
+          strokeDasharray={`${dash} 276`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="font-display text-3xl text-text font-light">{score}</span>
+    </div>
   );
 }
 
 function Section({
+  eyebrow,
   title,
-  summary,
-  children,
-  raw
+  children
 }: {
+  eyebrow: string;
   title: string;
-  summary?: string | null;
   children: React.ReactNode;
-  raw?: unknown;
 }) {
   return (
-    <div className="mt-8 rounded-xl border border-zinc-800 p-6">
-      <h2 className="font-semibold text-lg">{title}</h2>
-      {summary && <p className="text-zinc-400 text-sm mt-1">{summary}</p>}
-      <div className="mt-4">{children}</div>
-      {raw !== undefined && raw !== null && (
-        <details className="mt-6 group">
-          <summary className="cursor-pointer text-xs text-zinc-600 hover:text-zinc-400">
-            Show raw JSON
-          </summary>
-          <pre className="mt-3 text-xs text-zinc-500 bg-zinc-950 border border-zinc-900 rounded-lg p-3 overflow-x-auto">
-            {JSON.stringify(raw, null, 2)}
-          </pre>
-        </details>
+    <section className="mt-20">
+      <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-3">
+        {eyebrow}
+      </p>
+      <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-10">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function RiskCard({
+  priority,
+  text,
+  category
+}: {
+  priority: "P0" | "P1" | "P2";
+  text: string;
+  category?: string;
+}) {
+  const borders = {
+    P0: "border-red bg-red/5",
+    P1: "border-amber bg-amber/5",
+    P2: "border-blue bg-blue/5"
+  };
+  const labelColors = {
+    P0: "text-red",
+    P1: "text-amber",
+    P2: "text-blue"
+  };
+  const citation = text.match(
+    /((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i
+  )?.[1];
+
+  return (
+    <div className={`border-l-4 ${borders[priority]} pl-5 pr-4 py-4`}>
+      <div className="flex items-baseline gap-3 flex-wrap">
+        <span
+          className={`font-mono text-xs font-medium tracking-wider ${labelColors[priority]}`}
+        >
+          {priority}
+        </span>
+        {category && (
+          <span className="font-mono text-xs text-text-3 uppercase tracking-wider">
+            {category}
+          </span>
+        )}
+        {citation && (
+          <span className="font-mono text-xs text-text-2 ml-auto">
+            {citation}
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-text leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function ClauseList({
+  label,
+  items,
+  flagDangerous = false
+}: {
+  label: string;
+  items: string[];
+  flagDangerous?: boolean;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-4">
+        {label} <span className="text-text-3/60">({items.length})</span>
+      </p>
+      {items.length === 0 ? (
+        <p className="text-text-3 text-sm italic">None cited</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {items.map((c, i) => {
+            const isDanger =
+              flagDangerous &&
+              DANGEROUS_DFARS.some((d) => c.includes(d));
+            return (
+              <li
+                key={i}
+                className={`font-mono text-sm flex items-baseline gap-2 ${
+                  isDanger ? "text-red" : "text-text"
+                }`}
+              >
+                {isDanger && <span className="text-red">⚠</span>}
+                <span>{c}</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
 }
 
-function OverviewView({ data }: { data: unknown }) {
-  if (!data || typeof data !== "object") {
-    return <p className="text-sm text-zinc-500 italic">No overview data.</p>;
-  }
-  const obj = data as Record<string, unknown>;
-  const order = [
-    "summary",
-    "scope",
-    "primary_objective",
-    "customer",
-    "contract_type",
-    "ceiling_value_estimate",
-    "period_of_performance"
-  ];
-  const knownEntries = order
-    .filter((k) => obj[k] !== undefined && obj[k] !== null && obj[k] !== "")
-    .map((k) => [k, obj[k]] as const);
-  const extraEntries = Object.entries(obj).filter(
-    ([k, v]) => !order.includes(k) && v !== undefined && v !== null && v !== ""
-  );
-  const all = [...knownEntries, ...extraEntries];
-  if (all.length === 0) {
-    return <p className="text-sm text-zinc-500 italic">No overview fields populated.</p>;
-  }
+function ListBlock({ label, items }: { label: string; items: string[] }) {
   return (
-    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-      {all.map(([k, v]) => (
-        <div key={k} className={k === "summary" ? "sm:col-span-2" : ""}>
-          <dt className="text-zinc-500 text-xs uppercase">{humanLabel(k)}</dt>
-          <dd className="text-zinc-200 mt-1">
-            {typeof v === "object" ? JSON.stringify(v) : String(v)}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function KeyValueLists({
-  data,
-  keyLabels
-}: {
-  data: unknown;
-  keyLabels: Record<string, string>;
-}) {
-  if (!data || typeof data !== "object") {
-    return <p className="text-sm text-zinc-500 italic">No data returned.</p>;
-  }
-  const obj = data as Record<string, unknown>;
-  const entries = Object.entries(obj);
-  if (entries.length === 0) {
-    return <p className="text-sm text-zinc-500 italic">Claude returned an empty object.</p>;
-  }
-
-  let renderedAny = false;
-  const blocks = entries.map(([key, value]) => {
-    const label = keyLabels[key] || humanLabel(key);
-    const items = toStringList(value);
-    if (items.length === 0) {
-      // Scalar fallback — render single-line value
-      const single = value === null || value === undefined ? null : String(value);
-      if (!single || single === "[]" || single === "null") return null;
-      renderedAny = true;
-      return (
-        <div key={key}>
-          <p className="text-zinc-500 text-xs uppercase mb-1">{label}</p>
-          <p className="text-sm text-zinc-200">{single}</p>
-        </div>
-      );
-    }
-    renderedAny = true;
-    return (
-      <div key={key}>
-        <p className="text-zinc-500 text-xs uppercase mb-2">
-          {label} <span className="text-zinc-700">({items.length})</span>
-        </p>
-        <ul className="space-y-1 text-sm text-zinc-200">
-          {items.map((item, i) => (
-            <li key={i} className="border-l-2 border-zinc-800 pl-3">
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  });
-
-  if (!renderedAny) {
-    return (
-      <p className="text-sm text-zinc-500 italic">
-        Object had keys but no renderable values. Expand &quot;Show raw JSON&quot; below to inspect.
+    <div>
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-4">
+        {label} <span className="text-text-3/60">({items.length})</span>
       </p>
-    );
-  }
-
-  return <div className="space-y-4">{blocks}</div>;
-}
-
-function RisksView({ data }: { data: unknown }) {
-  if (!data || typeof data !== "object") {
-    return <p className="text-sm text-zinc-500 italic">No risks data.</p>;
-  }
-  const obj = data as Record<string, unknown>;
-  const severity = obj.severity_score;
-  const order = [
-    "top_3_risks",
-    "technical_risks",
-    "schedule_risks",
-    "price_risks",
-    "evaluation_risks"
-  ];
-  const orderedEntries = order
-    .filter((k) => obj[k] !== undefined && obj[k] !== null)
-    .map((k) => [k, obj[k]] as const);
-  const extraEntries = Object.entries(obj).filter(
-    ([k]) => !order.includes(k) && k !== "severity_score"
-  );
-
-  let renderedAny = false;
-  const blocks = [...orderedEntries, ...extraEntries].map(([key, value]) => {
-    const label = RISK_KEY_LABELS[key] || humanLabel(key);
-    const emphasis = key === "top_3_risks";
-    const items = toStringList(value);
-    if (items.length === 0) {
-      const single = value === null || value === undefined ? null : String(value);
-      if (!single || single === "[]" || single === "null") return null;
-      renderedAny = true;
-      return (
-        <div key={key}>
-          <p className={`text-xs uppercase mb-1 ${emphasis ? "text-red-400" : "text-zinc-500"}`}>
-            {label}
-          </p>
-          <p className="text-sm text-zinc-200">{single}</p>
-        </div>
-      );
-    }
-    renderedAny = true;
-    return (
-      <div key={key}>
-        <p className={`text-xs uppercase mb-2 ${emphasis ? "text-red-400" : "text-zinc-500"}`}>
-          {label} <span className="text-zinc-700">({items.length})</span>
-        </p>
-        <ul className="space-y-1 text-sm text-zinc-200">
-          {items.map((item, i) => (
-            <li key={i} className="border-l-2 border-zinc-800 pl-3">
-              {item}
+      {items.length === 0 ? (
+        <p className="text-text-3 text-sm italic">—</p>
+      ) : (
+        <ul className="space-y-2 text-sm text-text">
+          {items.map((c, i) => (
+            <li key={i} className="border-l-2 border-border pl-3 py-0.5">
+              {c}
             </li>
           ))}
         </ul>
-      </div>
-    );
-  });
+      )}
+    </div>
+  );
+}
 
+function OverviewGrid({ data }: { data: Record<string, unknown> }) {
+  const fields = [
+    { key: "scope", label: "Scope" },
+    { key: "primary_objective", label: "Primary Objective" },
+    { key: "customer", label: "Customer" },
+    { key: "contract_type", label: "Contract Type" },
+    { key: "ceiling_value_estimate", label: "Ceiling Value" },
+    { key: "period_of_performance", label: "Period of Performance" }
+  ];
+  const summary = data.summary;
   return (
-    <div className="space-y-4">
-      {typeof severity === "number" && (
-        <div>
-          <p className="text-zinc-500 text-xs uppercase mb-1">Severity</p>
-          <p className="text-2xl font-bold">{severity}/10</p>
-        </div>
-      )}
-      {renderedAny ? (
-        blocks
-      ) : (
-        <p className="text-sm text-zinc-500 italic">
-          No risk lists populated. Expand &quot;Show raw JSON&quot; below to inspect.
+    <div>
+      {summary ? (
+        <p className="font-display text-xl md:text-2xl text-text leading-relaxed mb-12 max-w-3xl font-light italic">
+          {String(summary)}
         </p>
-      )}
+      ) : null}
+      <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-7">
+        {fields.map(({ key, label }) => {
+          const v = data[key];
+          if (v === null || v === undefined || v === "") return null;
+          return (
+            <div key={key}>
+              <dt className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-2">
+                {label}
+              </dt>
+              <dd className="text-text">{String(v)}</dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
+function RawJSON({ title, data }: { title: string; data: unknown }) {
+  return (
+    <div>
+      <p className="font-mono text-xs uppercase text-text-3 mb-2 tracking-wider">
+        {title}
+      </p>
+      <pre className="text-xs text-text-2 bg-surface border border-border p-3 overflow-auto max-h-80">
+        {JSON.stringify(data, null, 2)}
+      </pre>
     </div>
   );
 }
