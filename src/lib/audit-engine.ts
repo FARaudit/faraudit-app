@@ -187,6 +187,22 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasPdf: boolean)
   };
 }
 
+export type DocumentType =
+  | "SOW"
+  | "PWS"
+  | "SOO"
+  | "RFP"
+  | "RFQ"
+  | "IFB"
+  | "Sources Sought"
+  | "Other";
+
+export interface DocClassification {
+  document_type: DocumentType;
+  rationale: string;
+  confidence: "high" | "medium" | "low";
+}
+
 export interface AuditResult {
   overview: { summary: string; json: OverviewJSON };
   compliance: { summary: string; json: ComplianceJSON };
@@ -194,12 +210,35 @@ export interface AuditResult {
   compliance_score: number;
   recommendation: "PROCEED" | "PROCEED_WITH_CAUTION" | "DECLINE";
   bid_recommendation: string;
+  classification: DocClassification;
 }
 
 export interface AuditInput {
   solicitation: unknown;
   pdfBase64?: string | null;
 }
+
+const DOC_TYPE_HINTS: Record<DocumentType, string> = {
+  SOW: "Statement of Work — prescriptive, deliverable-oriented. Pay close attention to deliverable lists, acceptance criteria, and 'how' specifications.",
+  PWS: "Performance Work Statement — outcome-based. Focus on performance objectives, performance standards, and performance thresholds (often paired with QASP).",
+  SOO: "Statement of Objectives — government states ends, contractor proposes means. Look for objective lists; expect heavier proposal narrative weight.",
+  RFP: "Request for Proposal — full negotiated procurement. All sections (B–M) should be present; Sections L and M drive proposal effort.",
+  RFQ: "Request for Quotation — usually simplified acquisition under FAR 13. Quotation, not offer; pricing schedule + minimal narrative.",
+  IFB: "Invitation for Bid — sealed bid procurement under FAR 14. Lowest responsive bid wins; evaluation is binary (responsive/non-responsive).",
+  "Sources Sought": "Sources Sought / RFI — market research, NOT a solicitation. Capability statement only; no bid commitment.",
+  Other: "Document type unclear; treat as standard solicitation."
+};
+
+const DOC_TYPE_FOCUS: Record<DocumentType, string> = {
+  SOW: "When extracting compliance data, prioritize the deliverable schedule (Section F) and acceptance criteria. Risks should focus on technical specification ambiguity.",
+  PWS: "Watch for QASP attachment and performance standards table. Risks should focus on whether thresholds are objectively measurable and whether penalty clauses are tied to performance metrics.",
+  SOO: "Compliance: extract objectives, not deliverables. Risks: weight evaluation criteria heavily — SOO procurements lean on technical narrative.",
+  RFP: "Standard full audit — extract Section L (preparation) and Section M (evaluation) with care. Risks should map to Section M weight distribution.",
+  RFQ: "Compliance: extract pricing schedule + commercial item determinations (52.212-x clauses are common). Risks: typically thin — focus on FOB terms and delivery windows.",
+  IFB: "Compliance: focus on responsiveness criteria; any deviation is disqualifying. Risks: focus on schedule pressure and FOB liability.",
+  "Sources Sought": "Compliance: this is NOT a binding solicitation. Note that no contract will result. Risks: capture management — the real risk is investing capability statement effort with no follow-on.",
+  Other: "Run the standard audit; flag in risks that document classification was uncertain."
+};
 
 function findBalancedJSON(text: string): string | null {
   let depth = 0;
@@ -309,6 +348,70 @@ async function callClaude(
   return data.content?.[0]?.text || "";
 }
 
+function isDocumentType(v: unknown): v is DocumentType {
+  return (
+    typeof v === "string" &&
+    ["SOW", "PWS", "SOO", "RFP", "RFQ", "IFB", "Sources Sought", "Other"].includes(v)
+  );
+}
+
+export async function classifyDocument(
+  solText: string,
+  pdfBase64?: string | null
+): Promise<DocClassification> {
+  const pdfHeader = pdfBase64
+    ? "The full solicitation document is attached as a PDF. Skim it (titles, headers, Section labels) to determine its type.\n\n"
+    : "PDF was NOT provided. Classify based only on the SAM.gov metadata below.\n\n";
+
+  const prompt = `${pdfHeader}SAM.gov metadata:
+${solText}
+
+Classify this federal procurement document into ONE category:
+- "SOW" — Statement of Work (prescriptive, lists deliverables and how-to)
+- "PWS" — Performance Work Statement (outcome-based, lists performance standards, often has QASP)
+- "SOO" — Statement of Objectives (government states ends; contractor proposes means)
+- "RFP" — Request for Proposal (full negotiated acquisition, FAR 15, has Sections L and M)
+- "RFQ" — Request for Quotation (simplified, FAR 13, quotations not offers)
+- "IFB" — Invitation for Bid (sealed bid, FAR 14)
+- "Sources Sought" — Market research / RFI / pre-solicitation notice (no bid commitment)
+- "Other" — none of the above or unable to determine
+
+Heuristics:
+- The TITLE and the document HEADER usually contain the document type explicitly ("Performance Work Statement", "Sources Sought Notice", etc.) — give that highest weight.
+- A SAM.gov "type" field of "Combined Synopsis/Solicitation" usually means RFP or RFQ — look at the body to disambiguate.
+- "Special Notice" or "Sources Sought" types are research notices, not solicitations.
+- If you see Section L and Section M, it is almost certainly an RFP.
+- If you see "performance standards" or a QASP attachment, it is a PWS.
+- If you see numbered objectives without prescriptive deliverables, it is a SOO.
+
+Output ONLY a JSON object with these keys:
+- document_type (string): EXACTLY one of the categories above
+- rationale (string): 1-2 sentence explanation citing the specific signal you used
+- confidence (string): "high" | "medium" | "low"
+
+JSON only, no prose.`;
+
+  const text = await callClaude(
+    `${SECURITY_DIRECTIVE}\n\nYou are a federal contract document classifier. You output ONE valid JSON object — nothing before, nothing after.`,
+    prompt,
+    400,
+    pdfBase64
+  );
+
+  const json = extractJSON(text) || {};
+  const dt = isDocumentType(json.document_type) ? (json.document_type as DocumentType) : "Other";
+  const rationale =
+    typeof json.rationale === "string" && json.rationale.trim()
+      ? json.rationale.trim()
+      : "Classifier returned no rationale.";
+  const conf =
+    json.confidence === "high" || json.confidence === "medium" || json.confidence === "low"
+      ? json.confidence
+      : "low";
+
+  return { document_type: dt, rationale, confidence: conf };
+}
+
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64 } = input;
   const rawText = JSON.stringify(solicitation).slice(0, 4000);
@@ -317,9 +420,25 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
     console.warn(`[audit-engine] redacted ${redactionCount} injection-pattern hit(s)`);
   }
 
+  // ━━ Pre-step: classify the document ━━
+  // This runs BEFORE the 3 main calls so each downstream prompt can be tailored
+  // to the document's procurement type (SOW emphasizes deliverables; PWS emphasizes
+  // performance standards; SOO emphasizes objectives; etc.).
+  const classification = await classifyDocument(solText, pdfBase64).catch(
+    (err): DocClassification => {
+      console.warn("[audit-engine] classifier failed:", err instanceof Error ? err.message : err);
+      return { document_type: "Other", rationale: "Classifier call failed; defaulted to Other.", confidence: "low" };
+    }
+  );
+
+  const docTypePreamble = `DOCUMENT TYPE: ${classification.document_type} — ${DOC_TYPE_HINTS[classification.document_type]}
+DOCUMENT-TYPE-SPECIFIC FOCUS: ${DOC_TYPE_FOCUS[classification.document_type]}
+
+`;
+
   const pdfHeader = pdfBase64
-    ? "The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n"
-    : "PDF was NOT provided. Use only the SAM.gov metadata below. If the metadata is thin, return an empty array for that field rather than fabricating.\n\n";
+    ? `${docTypePreamble}The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`
+    : `${docTypePreamble}PDF was NOT provided. Use only the SAM.gov metadata below. If the metadata is thin, return an empty array for that field rather than fabricating.\n\n`;
 
   const overviewPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
@@ -442,6 +561,7 @@ JSON only.`;
     },
     compliance_score,
     recommendation,
-    bid_recommendation
+    bid_recommendation,
+    classification
   };
 }

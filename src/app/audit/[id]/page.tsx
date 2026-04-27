@@ -164,7 +164,20 @@ export default async function AuditResultPage({
         {/* Header bar */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-start">
           <div>
-            <p className="font-mono text-sm text-text-2 tracking-wider">{audit.notice_id}</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="font-mono text-sm text-text-2 tracking-wider">{audit.notice_id}</p>
+              {audit.document_type && (
+                <span
+                  className="font-mono text-[10px] tracking-[0.2em] uppercase border border-gold text-gold px-2 py-1"
+                  title={audit.document_type_rationale || ""}
+                >
+                  {audit.document_type}
+                  {audit.document_type_confidence === "low" && (
+                    <span className="ml-1 text-text-3 normal-case tracking-normal">· low confidence</span>
+                  )}
+                </span>
+              )}
+            </div>
             <h1 className="mt-3 font-display text-3xl md:text-4xl text-text font-light leading-tight">
               {audit.title || "Untitled solicitation"}
             </h1>
@@ -175,6 +188,11 @@ export default async function AuditResultPage({
               {audit.response_deadline &&
                 ` · due ${new Date(audit.response_deadline).toLocaleDateString()}`}
             </p>
+            {audit.document_type_rationale && (
+              <p className="mt-2 text-xs text-text-3 italic max-w-2xl leading-relaxed">
+                {audit.document_type_rationale}
+              </p>
+            )}
           </div>
 
           {audit.status === "complete" && (

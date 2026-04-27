@@ -194,6 +194,9 @@ export async function POST(req: NextRequest) {
         compliance_score: result.compliance_score,
         recommendation: result.recommendation,
         bid_recommendation: result.bid_recommendation,
+        document_type: result.classification.document_type,
+        document_type_rationale: result.classification.rationale,
+        document_type_confidence: result.classification.confidence,
         status: "complete",
         completed_at: new Date().toISOString()
       })

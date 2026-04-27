@@ -86,8 +86,8 @@ export default function AuditPage() {
             Audit a solicitation
           </h1>
           <p className="mt-4 text-text-2 leading-relaxed">
-            Upload a SAM.gov PDF or enter a notice ID. Three-call analysis:{" "}
-            <span className="text-text">Overview · Compliance · Risks</span>.
+            Upload a SAM.gov PDF or enter a notice ID. Four-stage analysis:{" "}
+            <span className="text-text">Classify · Overview · Compliance · Risks</span>.
           </p>
 
           {submitting ? (
@@ -107,12 +107,12 @@ export default function AuditPage() {
                 />
               </div>
               <p className="font-display text-2xl text-text">
-                Running three-call analysis
+                Running four-stage analysis
               </p>
               <p className="mt-3 text-text-2 text-sm font-mono uppercase tracking-wider">
-                Overview · Compliance · Risks
+                Classify · Overview · Compliance · Risks
               </p>
-              <p className="mt-2 text-text-3 text-xs">~45 seconds</p>
+              <p className="mt-2 text-text-3 text-xs">~50 seconds</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-12 space-y-6">
