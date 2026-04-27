@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
 import SignOutButton from "./signout-button";
+import NewsToday from "./news-feed";
+import SAMFeed from "./sam-feed";
 
 interface AuditRow {
   id: number;
@@ -131,12 +133,7 @@ export default async function DashboardPage() {
         <div className="mt-20">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">News</p>
           <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-8">Today&apos;s digest</h2>
-          <div className="border border-border bg-surface p-10 text-center">
-            <p className="text-text-2">No news today.</p>
-            <p className="text-xs text-text-3 mt-2 font-mono">
-              FARaudit daily digest fires 06:15 CT · pulls from Federal Register, GAO, SAM.gov
-            </p>
-          </div>
+          <NewsToday />
         </div>
 
         {/* SAM.gov feed */}
@@ -145,16 +142,12 @@ export default async function DashboardPage() {
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">SAM.gov Feed</p>
               <h2 className="font-display text-2xl md:text-3xl text-text font-light">
-                Recent solicitations · NAICS 336413 · TX + OK
+                Recent solicitations · NAICS 336413 · 332710 · 332721
               </h2>
+              <p className="mt-1 text-xs text-text-3 font-mono">Last 7 days · TX + OK corridor</p>
             </div>
           </div>
-          <div className="border border-border bg-surface p-10 text-center">
-            <p className="text-text-2">Live feed warming up.</p>
-            <p className="text-xs text-text-3 mt-2 font-mono">
-              Tinker AFB · Sheppard AFB · Red River Army Depot · Sierra Army Depot
-            </p>
-          </div>
+          <SAMFeed />
         </div>
 
         {/* Competitor watch */}
