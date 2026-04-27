@@ -140,6 +140,39 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Validation case study */}
+      <section className="border-t border-border">
+        <div className="max-w-6xl mx-auto px-6 md:px-10 py-24">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-3">Validation</p>
+          <h2 className="font-display text-3xl md:text-4xl text-text font-light max-w-3xl leading-tight">
+            Validated on <span className="font-mono text-2xl md:text-3xl">FA301626Q0068</span>
+          </h2>
+          <p className="mt-4 max-w-3xl text-text-2 font-mono text-sm">
+            Air Force T-38 Talon RFQ · JBSA Lackland · NAICS 336413
+          </p>
+          <p className="mt-8 max-w-3xl text-text leading-relaxed font-display text-lg italic">
+            Three material compliance traps surfaced before the estimator opened a spreadsheet.
+          </p>
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-px bg-border">
+            <div className="bg-bg p-7">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-red mb-3">P0 · Margin</p>
+              <p className="font-display text-lg text-text leading-snug">CLIN quantity ambiguity</p>
+              <p className="mt-3 text-text-2 text-sm leading-relaxed">2× margin exposure if read at face value vs the cross-reference in Section J.</p>
+            </div>
+            <div className="bg-bg p-7">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-red mb-3">P0 · Liability</p>
+              <p className="font-display text-lg text-text leading-snug">FOB designation conflict</p>
+              <p className="mt-3 text-text-2 text-sm leading-relaxed">FOB Origin on CLIN 0001 contradicts FOB Destination on the master clause.</p>
+            </div>
+            <div className="bg-bg p-7">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-red mb-3">P0 · DFARS Trap</p>
+              <p className="font-display text-lg text-text leading-snug">252.223-7008 hexavalent chromium</p>
+              <p className="mt-3 text-text-2 text-sm leading-relaxed">Active clause requires representation; one missed checkbox in Section K is automatic disqualification.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section className="border-t border-border bg-surface">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-24">
