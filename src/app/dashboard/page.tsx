@@ -73,8 +73,6 @@ export default async function DashboardPage() {
           <nav className="hidden md:flex gap-6 text-sm text-text-2">
             <Link href="/dashboard" className="text-text">Dashboard</Link>
             <Link href="/audit" className="hover:text-text">Audit</Link>
-            <Link href="/capital" className="hover:text-text">Capital OS</Link>
-            <Link href="/legal" className="hover:text-text">LexAnchor</Link>
           </nav>
         </div>
         <div className="text-right">
