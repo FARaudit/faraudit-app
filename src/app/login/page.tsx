@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase-browser";
 
 type Status = "idle" | "sending" | "sent" | "error";
+
+const SAMPLES = [
+  {
+    label: "DFARS trap caught",
+    body: "Solicitation FA8501-26-Q-0142 cited 252.223-7008 (hexavalent chromium). One missing rep on Section K = automatic disqualification. Audit caught it in 38s."
+  },
+  {
+    label: "CLIN risk flagged",
+    body: "FA301626Q0068 had FOB Destination on CLIN 0001 + FOB Origin on CLIN 0002. Auditor flagged the freight liability inconsistency before the bid went out."
+  },
+  {
+    label: "Section M weight surfaced",
+    body: "W912DY-26-R-0042 weighted past performance at 50%. Most small businesses skip the volume — we surface that in the bid/no-bid recommendation."
+  }
+];
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [sample, setSample] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setSample((s) => (s + 1) % SAMPLES.length), 5000);
+    return () => clearInterval(id);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("sending");
     setError(null);
-
     const supabase = createBrowserClient();
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email,
@@ -22,7 +42,6 @@ export default function LoginPage() {
         emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
-
     if (otpError) {
       setError(otpError.message);
       setStatus("error");
@@ -31,50 +50,49 @@ export default function LoginPage() {
     }
   }
 
+  const current = SAMPLES[sample];
+
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-5">
-      {/* Left panel — 40% */}
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-5 bg-bg">
+      {/* Left panel */}
       <aside className="lg:col-span-2 bg-bg border-b lg:border-b-0 lg:border-r border-border px-8 md:px-12 py-12 lg:py-16 flex flex-col justify-between">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
-            FARaudit
-          </p>
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold">FARaudit</p>
           <h1 className="mt-12 lg:mt-20 font-display text-3xl md:text-4xl font-light text-text leading-[1.1]">
-            Federal Contract<br />Intelligence
-            <span className="text-gold">.</span>
+            Federal Contract<br />Intelligence<span className="text-gold">.</span>
           </h1>
           <p className="mt-6 text-text-2 leading-relaxed max-w-md">
-            Sign in to access live solicitation feeds, three-call compliance audits, and the full empire stack.
+            Sign in to run audits, draft KO clarification emails, and access the SAM.gov daily feed.
           </p>
-          <ul className="mt-10 space-y-4 text-sm text-text-2">
-            <li className="flex items-start gap-3">
-              <span className="text-gold mt-1.5 font-mono">—</span>
-              <span>Solicitation compliance auditing in 45 seconds</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-gold mt-1.5 font-mono">—</span>
-              <span>FAR/DFARS clause extraction with risk scoring</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-gold mt-1.5 font-mono">—</span>
-              <span>Bloomberg-grade market intelligence</span>
-            </li>
-          </ul>
+
+          {/* Rotating intel sample */}
+          <div className="mt-12 border border-border bg-surface p-6 max-w-md">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gold mb-3">
+              {current.label}
+            </p>
+            <p className="text-text-2 text-sm leading-relaxed">{current.body}</p>
+            <div className="mt-5 flex gap-1.5">
+              {SAMPLES.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-0.5 w-6 transition-colors ${
+                    i === sample ? "bg-gold" : "bg-border-2"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
         <p className="mt-12 lg:mt-0 text-xs text-text-3 font-mono">
           © 2026 FARaudit. Federal Contract Intelligence.
         </p>
       </aside>
 
-      {/* Right panel — 60% */}
+      {/* Right panel */}
       <section className="lg:col-span-3 bg-surface flex items-center justify-center px-6 md:px-10 py-16 lg:py-0">
         <div className="w-full max-w-md">
-          <h2 className="font-display text-3xl md:text-4xl text-text">
-            Sign in to FARaudit
-          </h2>
-          <p className="mt-3 text-text-2 text-sm">
-            Magic link — no password required.
-          </p>
+          <h2 className="font-display text-3xl md:text-4xl text-text">Sign in to FARaudit</h2>
+          <p className="mt-3 text-text-2 text-sm">Magic link — no password required.</p>
 
           {status === "sent" ? (
             <div className="mt-12 border border-green/40 bg-green/5 p-7">
@@ -119,9 +137,7 @@ export default function LoginPage() {
               >
                 {status === "sending" ? "Sending..." : "Send magic link"}
               </button>
-              {error && (
-                <p className="text-sm text-red border-l-2 border-red pl-3">{error}</p>
-              )}
+              {error && <p className="text-sm text-red border-l-2 border-red pl-3">{error}</p>}
             </form>
           )}
         </div>

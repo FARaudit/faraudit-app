@@ -138,6 +138,9 @@ export default async function AuditResultPage({
   const certs = toStringList(compJson.required_certifications);
   const actions = toStringList(compJson.key_compliance_actions);
   const deadlines = toStringList(compJson.deadlines);
+  const clins = Array.isArray(compJson.clins) ? (compJson.clins as Array<Record<string, unknown>>) : [];
+  const sectionL = typeof compJson.section_l_summary === "string" ? compJson.section_l_summary : "";
+  const sectionM = typeof compJson.section_m_summary === "string" ? compJson.section_m_summary : "";
 
   return (
     <div className="min-h-screen">
@@ -253,17 +256,61 @@ export default async function AuditResultPage({
               )}
             </Section>
 
-            {/* SECTION 3 — Overview */}
+            {/* SECTION 3 — CLIN breakdown (if any) */}
+            {clins.length > 0 && (
+              <Section eyebrow="Section B" title="CLIN breakdown">
+                <CLINTable clins={clins} />
+              </Section>
+            )}
+
+            {/* SECTION 4 — Section L/M analysis (if any) */}
+            {(sectionL || sectionM) && (
+              <Section eyebrow="Sections L & M" title="Proposal preparation · evaluation criteria">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-3">
+                      Section L — Preparation
+                    </p>
+                    <p className="text-text leading-relaxed">
+                      {sectionL || <span className="text-text-3 italic">No Section L surfaced.</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3 mb-3">
+                      Section M — Evaluation
+                    </p>
+                    <p className="text-text leading-relaxed">
+                      {sectionM || <span className="text-text-3 italic">No Section M surfaced.</span>}
+                    </p>
+                  </div>
+                </div>
+              </Section>
+            )}
+
+            {/* SECTION 5 — Overview */}
             <Section eyebrow="Overview" title="Solicitation summary">
               <OverviewGrid data={overviewJson} />
             </Section>
 
-            {/* SECTION 4 — KO Email Draft */}
+            {/* SECTION 6 — Bid/No-Bid */}
+            <Section eyebrow="Recommendation" title="Bid / no-bid">
+              <div className={`border-2 ${recStyle.color} p-6`}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="font-mono text-xs uppercase tracking-[0.25em]">{recStyle.label}</p>
+                  <p className="font-display text-2xl text-text">{score}/100</p>
+                </div>
+                <p className="mt-4 text-text leading-relaxed">
+                  {audit.bid_recommendation || `${recStyle.label}. Score ${score}/100.`}
+                </p>
+              </div>
+            </Section>
+
+            {/* SECTION 7 — KO Email Draft */}
             <Section eyebrow="Outreach" title="Contracting Officer email">
               <p className="text-text-2 text-sm mb-4 max-w-2xl">
                 Draft a clarification email pre-populated with the highest-priority issues from this audit. Review and tailor before sending.
               </p>
-              <KOEmailButton auditId={Number(audit.id)} />
+              <KOEmailButton auditId={audit.id} />
             </Section>
 
             {/* Raw JSON debug */}
@@ -461,6 +508,35 @@ function OverviewGrid({ data }: { data: Record<string, unknown> }) {
           );
         })}
       </dl>
+    </div>
+  );
+}
+
+function CLINTable({ clins }: { clins: Array<Record<string, unknown>> }) {
+  return (
+    <div className="overflow-x-auto border border-border">
+      <table className="w-full text-sm font-mono">
+        <thead>
+          <tr className="bg-surface text-text-3">
+            <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-[0.2em]">CLIN</th>
+            <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-[0.2em]">Description</th>
+            <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-[0.2em]">Qty</th>
+            <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-[0.2em]">Pricing</th>
+            <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-[0.2em]">FOB</th>
+          </tr>
+        </thead>
+        <tbody>
+          {clins.map((c, i) => (
+            <tr key={i} className="border-t border-border">
+              <td className="px-4 py-3 text-gold">{String(c.clin ?? "—")}</td>
+              <td className="px-4 py-3 text-text font-body">{String(c.description ?? "—")}</td>
+              <td className="px-4 py-3 text-text-2">{String(c.quantity ?? "—")}</td>
+              <td className="px-4 py-3 text-text-2">{String(c.pricing_arrangement ?? "—")}</td>
+              <td className="px-4 py-3 text-text-2">{String(c.fob ?? "—")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

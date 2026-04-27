@@ -124,10 +124,17 @@ export async function POST(req: NextRequest) {
 
   if (!solicitation && pdf) {
     const safeName = sanitizeFilename(pdf.name);
+    // PDF filenames downloaded from SAM.gov often look like "Solicitation+-+FA301626Q0068.pdf"
+    // (URL-encoded). Decode + normalize so the audit row stores a readable title.
+    const rawTitle = safeName.replace(/\.pdf$/i, "").replace(/\+/g, " ").trim();
+    const cleanedTitle = rawTitle
+      .replace(/^solicitation\s*[-–—]\s*/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
     solicitation = {
       noticeId: noticeId || `pdf-${Date.now()}`,
       solicitationNumber: null,
-      title: safeName.replace(/\.pdf$/i, ""),
+      title: cleanedTitle || rawTitle || "Untitled solicitation",
       department: null,
       subTier: null,
       naicsCode: null,

@@ -1,30 +1,39 @@
-export default function CapitalPage() {
+import Link from "next/link";
+
+export default function CapitalOSPage() {
   return (
-    <main className="min-h-screen bg-black text-white px-6 py-12">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold">Capital OS</h1>
-        <p className="mt-2 text-zinc-400">Bloomberg-grade market intelligence — without the $24K/yr terminal</p>
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b border-border px-6 md:px-10 py-5 flex items-center justify-between">
+        <Link href="/" className="font-display text-xl text-text">FARaudit</Link>
+        <nav className="flex items-center gap-6 text-sm text-text-2">
+          <Link href="/dashboard" className="hover:text-text">Dashboard</Link>
+          <Link href="/audit" className="hover:text-text">Audit</Link>
+          <Link href="/capital" className="text-text">Capital OS</Link>
+          <Link href="/legal" className="hover:text-text">LexAnchor</Link>
+        </nav>
+      </header>
 
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-4 gap-4">
-          {["S&P 500", "10Y Yield", "VIX", "DXY"].map((label) => (
-            <div key={label} className="rounded-xl border border-zinc-800 p-5">
-              <p className="text-zinc-400 text-sm">{label}</p>
-              <p className="text-2xl font-bold mt-2">—</p>
-            </div>
-          ))}
+      <main className="flex-1 flex items-center justify-center px-6 py-24">
+        <div className="max-w-2xl text-center">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold">02 / Apex Empire</p>
+          <h1 className="mt-6 font-display text-5xl md:text-6xl text-text font-light tracking-tight">
+            Capital OS<span className="text-gold">.</span>
+          </h1>
+          <p className="mt-8 text-text-2 text-lg leading-relaxed">
+            Market intelligence for the Apex Empire. Coming soon.
+          </p>
+          <p className="mt-10">
+            <a
+              href="https://www.notion.so/34efaf5b9314819bad4bfd97d6ef2105"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-gold hover:text-gold-dim font-mono text-sm tracking-wider"
+            >
+              View today&apos;s positions digest →
+            </a>
+          </p>
         </div>
-
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-zinc-800 p-6">
-            <h2 className="font-semibold text-lg">Macro regime</h2>
-            <p className="text-zinc-500 mt-2 text-sm">Loading classifier...</p>
-          </div>
-          <div className="rounded-xl border border-zinc-800 p-6">
-            <h2 className="font-semibold text-lg">Yield curve</h2>
-            <p className="text-zinc-500 mt-2 text-sm">Loading...</p>
-          </div>
-        </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

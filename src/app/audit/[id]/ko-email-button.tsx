@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 
-export default function KOEmailButton({ auditId }: { auditId: number }) {
+export default function KOEmailButton({ auditId }: { auditId: number | string }) {
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function handleClick() {
+    if (!auditId) {
+      setError("Audit ID missing — cannot draft email.");
+      return;
+    }
     setLoading(true);
     setError(null);
     setCopied(false);
@@ -38,7 +42,7 @@ export default function KOEmailButton({ auditId }: { auditId: number }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Older browsers — silently no-op; textarea is selectable
+      /* clipboard unavailable; textarea is selectable */
     }
   }
 
@@ -46,22 +50,18 @@ export default function KOEmailButton({ auditId }: { auditId: number }) {
     <div>
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || !auditId}
         className="px-6 py-3 bg-gold text-bg font-medium tracking-wide hover:bg-gold-dim disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? "Drafting…" : "Draft KO Clarification Email"}
       </button>
 
-      {error && (
-        <p className="mt-3 text-sm text-red border-l-2 border-red pl-3">{error}</p>
-      )}
+      {error && <p className="mt-3 text-sm text-red border-l-2 border-red pl-3">{error}</p>}
 
       {draft && (
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3">
-              Draft email
-            </p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-3">Draft email</p>
             <button
               type="button"
               onClick={handleCopy}
