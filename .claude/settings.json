@@ -1,1 +1,1 @@
-{"permissions":{"allow":["Bash(*)","Edit(*)","Write(*)","Read(*)"]}}
+{"permissions":{"allow":["Bash(*)","Edit(*)","Write(*)","Read(*)"],"deny":[]}}

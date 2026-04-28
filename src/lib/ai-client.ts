@@ -2,7 +2,7 @@
 //
 // One interface, three providers. Switch providers by setting AI_PROVIDER
 // (anthropic | openai | gemini) and AI_MODEL. Default: anthropic +
-// claude-sonnet-4-6. Every output is tagged with { provider, model } so
+// claude-sonnet-4-20250514. Every output is tagged with { provider, model } so
 // downstream rows record which model produced them.
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -42,7 +42,7 @@ function getModel(): string {
   const p = getProvider();
   if (p === "openai") return "gpt-4o-mini";
   if (p === "gemini") return "gemini-1.5-pro-latest";
-  return "claude-sonnet-4-6";
+  return "claude-sonnet-4-20250514";
 }
 
 export async function complete(req: AIRequest): Promise<AIResponse> {
