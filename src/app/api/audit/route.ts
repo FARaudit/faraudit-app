@@ -209,6 +209,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Best-effort intelligence-corpus write — every audit teaches the engine
+    // what trap clauses fire on what document types. Failure here doesn't
+    // disrupt the audit response.
+    try {
+      const flags = (result.compliance.json.dfars_flags ?? []).filter((f) => f.detected);
+      if (flags.length > 0) {
+        await supabase.from("fa_intelligence_corpus").insert(
+          flags.map((f) => ({
+            audit_id: audit.id,
+            solicitation_id: solicitation.noticeId,
+            trap_type: f.clause,
+            was_caught: true,
+            outcome: result.recommendation,
+            metadata: { document_type: result.classification.document_type, severity: f.severity }
+          }))
+        );
+      }
+    } catch {
+      /* silent — corpus is best-effort */
+    }
+
     return NextResponse.json(
       {
         auditId: audit.id,
