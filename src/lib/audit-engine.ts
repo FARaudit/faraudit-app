@@ -97,7 +97,8 @@ export interface RisksJSON {
 const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" | "P2" }> = [
   { clause: "252.223-7008", title: "Hexavalent Chromium", severity: "P0" },
   { clause: "252.204-7018", title: "Covered Telecom", severity: "P0" },
-  { clause: "252.204-7021", title: "CMMC", severity: "P1" }
+  { clause: "252.204-7021", title: "CMMC", severity: "P1" },
+  { clause: "252.225-7060", title: "Xinjiang Forced Labor", severity: "P0" }
 ];
 
 export function parseDFARSTraps(complianceJson: ComplianceJSON): DFARSFlag[] {
