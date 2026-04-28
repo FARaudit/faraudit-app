@@ -1,4 +1,23 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createServerClient } from "@/lib/supabase-server";
+
+// force-dynamic — never let Vercel serve a cached 404 for /.
+// On request: if the visitor is authenticated they jump to /dashboard;
+// otherwise they get the marketing landing below.
+export const dynamic = "force-dynamic";
+
+async function maybeRedirectToDashboard(): Promise<void> {
+  try {
+    const sb = await createServerClient();
+    const {
+      data: { user }
+    } = await sb.auth.getUser();
+    if (user) redirect("/dashboard");
+  } catch {
+    /* never block the public landing on a transient auth-check error */
+  }
+}
 
 const FINDINGS = [
   {
@@ -33,7 +52,12 @@ const STEPS = [
   { n: "03", title: "Audit report + KO email", body: "Findings landed. Clarification email drafted from the top 3 risks." }
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  await maybeRedirectToDashboard();
+  return _Landing();
+}
+
+function _Landing() {
   return (
     <main>
       <header className="px-6 md:px-10 py-6 flex items-center justify-between border-b border-border">
