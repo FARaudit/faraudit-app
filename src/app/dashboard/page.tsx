@@ -1,228 +1,161 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
-import SignOutButton from "./signout-button";
-import NewsToday from "./news-feed";
-import SAMFeed from "./sam-feed";
+import StreamingText from "@/components/StreamingText";
+
+export const dynamic = "force-dynamic";
 
 interface AuditRow {
   id: number;
   notice_id: string;
   title: string | null;
-  agency: string | null;
-  response_deadline: string | null;
-  compliance_score: number | null;
+  document_type: string | null;
   recommendation: string | null;
-  status: string | null;
-  created_at: string | null;
-}
-
-const COMPETITORS = [
-  { name: "GovDash", note: "AI proposal generation. Heavy on capture managers." },
-  { name: "VisibleThread", note: "Compliance matrix tooling. Static analysis only." },
-  { name: "Deltek GovWin", note: "$15-50K/yr seat. Bloated. Built for primes." },
-  { name: "Procurement Sciences", note: "Generic SAM.gov scraper + LLM summaries." },
-  { name: "Manual review", note: "$300/hr capture consultants. 2-day turnaround." }
-];
-
-// Display-cleanup for legacy titles that came in URL-encoded from PDF filename derivation.
-function cleanTitle(raw: string | null): string {
-  if (!raw) return "Untitled solicitation";
-  return raw
-    .replace(/\+/g, " ")
-    .replace(/^solicitation\s*[-–—]\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim() || "Untitled solicitation";
+  compliance_score: number | null;
+  ko_email_sent: boolean | null;
+  status: string;
+  created_at: string;
 }
 
 export default async function DashboardPage() {
-  const supabase = await createServerClient();
+  const sb = await createServerClient();
   const {
     data: { user }
-  } = await supabase.auth.getUser();
+  } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const [activeRes, highScoreRes, totalRes, recentRes] = await Promise.all([
-    supabase.from("audits").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-    supabase
+  const [{ data: audits }, { count: emails }, { count: solicitationsCount }] = await Promise.all([
+    sb
       .from("audits")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("compliance_score", 70),
-    supabase
-      .from("audits")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("status", "complete"),
-    supabase
-      .from("audits")
-      .select("id, notice_id, title, agency, response_deadline, compliance_score, recommendation, status, created_at")
-      .eq("user_id", user.id)
+      .select("id, notice_id, title, document_type, recommendation, compliance_score, ko_email_sent, status, created_at")
       .order("created_at", { ascending: false })
-      .limit(20)
+      .limit(20),
+    sb.from("audits").select("id", { count: "exact", head: true }).eq("ko_email_sent", true),
+    sb
+      .from("intel_briefs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
   ]);
 
-  const recent = (recentRes.data || []) as AuditRow[];
+  const auditList = (audits ?? []) as AuditRow[];
+  const auditCount = auditList.length;
+  const trapsCount = auditList.filter((a) => a.recommendation === "DECLINE").length;
+
+  const briefPrompt = `Today's federal contracting intelligence summary for a defense subcontractor in the TX/OK corridor. Cover in 4 bullets:
+1. New solicitations matched to NAICS 336413 / 332710 / 332721 in the last 24h
+2. Upcoming proposal deadlines in the next 7 days for tracked NAICS codes
+3. Congressional defense spending news that affects subcontract pipelines
+4. One actionable next step for the day
+
+No preamble. Bullets only. Each ≤25 words.`;
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <header className="border-b border-border px-6 md:px-10 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="font-display text-2xl text-text">FARaudit</Link>
-          <nav className="hidden md:flex gap-6 text-sm text-text-2">
-            <Link href="/dashboard" className="text-text">Dashboard</Link>
-            <Link href="/audit" className="hover:text-text">Audit</Link>
-          </nav>
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-accent mb-1">Dashboard</p>
+          <h1 className="font-display text-3xl text-text font-medium">FARaudit command</h1>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-text-3 font-mono uppercase tracking-wider">Signed in as</p>
-          <p className="text-sm text-text">{user.email}</p>
-          <SignOutButton />
-        </div>
+        <Link
+          href="/audit"
+          className="bg-accent text-white px-4 py-2 text-sm font-medium tracking-wide hover:bg-accent-2"
+        >
+          + New audit
+        </Link>
       </header>
 
-      <main className="px-6 md:px-10 py-12 md:py-16 max-w-7xl mx-auto">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-4">Command Center</p>
-        <h1 className="font-display text-4xl md:text-5xl text-text font-light">Dashboard</h1>
-        <p className="mt-3 text-text-2">Live solicitations · scores · capture intelligence</p>
+      <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto space-y-10">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
+          <Stat label="Audits Run" value={String(auditCount)} sub="Recent 20 shown" />
+          <Stat label="Traps Caught" value={String(trapsCount)} tone="red" sub="Declined recommendations" />
+          <Stat label="KO Emails Sent" value={String(emails ?? 0)} sub="via Resend" />
+          <Stat label="Active Solicitations" value={String(solicitationsCount ?? 0)} sub="Watched (30d)" />
+        </section>
 
-        {/* Metric cards */}
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-px bg-border">
-          <Metric label="Active Solicitations" value={activeRes.count ?? 0} />
-          <Metric label="High-Score Matches" value={highScoreRes.count ?? 0} accent="gold" />
-          <Metric label="Audit Reports" value={totalRes.count ?? 0} />
-        </div>
+        <section>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-accent mb-3">Morning Brief</p>
+          <StreamingText
+            prompt={briefPrompt}
+            emptyState="ANTHROPIC_API_KEY not set — brief unavailable."
+          />
+        </section>
 
-        {/* Recent audits */}
-        <div className="mt-20">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">Live Feed</p>
-              <h2 className="font-display text-2xl md:text-3xl text-text font-light">Recent audits</h2>
-            </div>
-            <Link
-              href="/audit"
-              className="text-sm text-gold hover:text-gold-dim font-mono uppercase tracking-wider"
-            >
-              + Run audit
-            </Link>
-          </div>
-
-          {recent.length === 0 ? (
-            <div className="border border-border bg-surface p-16 text-center">
-              <p className="font-display text-xl text-text-2">No audits yet.</p>
-              <p className="text-sm text-text-3 mt-2 mb-6">Audit your first solicitation to see findings here.</p>
-              <Link
-                href="/audit"
-                className="inline-block px-8 py-3 bg-gold text-bg font-medium hover:bg-gold-dim transition-colors"
-              >
-                Run your first audit
-              </Link>
-            </div>
+        <section>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-text-3 mb-3">Recent audits</p>
+          {auditList.length === 0 ? (
+            <p className="text-text-3 italic text-sm">No audits yet — run your first.</p>
           ) : (
-            <div className="border border-border">
-              {recent.map((a) => <FeedRow key={a.id} audit={a} />)}
+            <div className="border border-border bg-surface overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-2 text-text-3">
+                  <tr>
+                    <Th>Notice</Th>
+                    <Th>Title</Th>
+                    <Th>Type</Th>
+                    <Th align="right">Score</Th>
+                    <Th>Recommendation</Th>
+                    <Th>KO Email</Th>
+                    <Th>Status</Th>
+                    <Th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditList.map((a) => (
+                    <tr key={a.id} className="border-t border-border hover:bg-surface-2">
+                      <td className="px-4 py-2 text-text font-mono text-xs">{a.notice_id}</td>
+                      <td className="px-4 py-2 text-text-2 text-xs truncate max-w-[28ch]">{a.title || "—"}</td>
+                      <td className="px-4 py-2">
+                        {a.document_type ? (
+                          <span className="text-[10px] tracking-[0.18em] uppercase border border-accent/40 text-accent px-2 py-0.5">
+                            {a.document_type}
+                          </span>
+                        ) : (
+                          <span className="text-text-3">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-text text-right font-mono">{a.compliance_score ?? "—"}</td>
+                      <td className="px-4 py-2 text-xs">
+                        {a.recommendation === "PROCEED" && <span className="text-green">Proceed</span>}
+                        {a.recommendation === "PROCEED_WITH_CAUTION" && <span className="text-warn">Caution</span>}
+                        {a.recommendation === "DECLINE" && <span className="text-red">Decline</span>}
+                        {!a.recommendation && <span className="text-text-3">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        {a.ko_email_sent ? <span className="text-green">✓ sent</span> : <span className="text-text-3">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-text-3 uppercase">{a.status}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Link href={`/audit/${a.id}`} className="text-xs text-accent hover:text-mid">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
-
-        {/* News today */}
-        <div className="mt-20">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">News</p>
-          <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-8">Today&apos;s digest</h2>
-          <NewsToday />
-        </div>
-
-        {/* SAM.gov feed */}
-        <div className="mt-20">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">SAM.gov Feed</p>
-              <h2 className="font-display text-2xl md:text-3xl text-text font-light">
-                Recent solicitations · NAICS 336413 · 332710 · 332721
-              </h2>
-              <p className="mt-1 text-xs text-text-3 font-mono">Last 7 days · TX + OK corridor</p>
-            </div>
-          </div>
-          <SAMFeed />
-        </div>
-
-        {/* Competitor watch */}
-        <div className="mt-20">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-text-3 mb-2">Competitor Watch</p>
-          <h2 className="font-display text-2xl md:text-3xl text-text font-light mb-8">Who else is in this space</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-px bg-border">
-            {COMPETITORS.map((c) => (
-              <div key={c.name} className="bg-surface p-5">
-                <p className="font-display text-base text-text">{c.name}</p>
-                <p className="mt-2 text-xs text-text-2 leading-relaxed">{c.note}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        </section>
       </main>
     </div>
   );
 }
 
-function Metric({ label, value, accent }: { label: string; value: number; accent?: "gold" }) {
+function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "red" | "green" }) {
+  const color = tone === "red" ? "text-red" : tone === "green" ? "text-green" : "text-text";
   return (
-    <div className="bg-surface px-8 py-10">
-      <p className="text-xs uppercase tracking-[0.2em] text-text-3 font-mono">{label}</p>
-      <p
-        className={`mt-5 font-display text-5xl md:text-6xl font-light tracking-tight ${
-          accent === "gold" ? "text-gold" : "text-text"
-        }`}
-      >
-        {value}
-      </p>
+    <div className="bg-surface px-5 py-5">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-text-3">{label}</p>
+      <p className={`mt-2 font-mono text-3xl ${color}`}>{value}</p>
+      {sub && <p className="mt-1 text-[10px] text-text-3">{sub}</p>}
     </div>
   );
 }
 
-function FeedRow({ audit }: { audit: AuditRow }) {
-  const score = audit.compliance_score;
-  let scoreColor = "text-text-3 border-text-3/40";
-  if (typeof score === "number") {
-    if (score >= 70) scoreColor = "text-green border-green";
-    else if (score >= 40) scoreColor = "text-amber border-amber";
-    else scoreColor = "text-red border-red";
-  }
-
-  const isPending = audit.status === "processing" || audit.status === "pending";
-  const isFailed = audit.status === "failed";
-
+function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
   return (
-    <Link
-      href={`/audit/${audit.id}`}
-      className="group flex items-center justify-between gap-6 bg-surface hover:bg-surface-2 px-6 py-5 border-b border-border last:border-b-0 transition-colors"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3">
-          <p className="font-mono text-xs text-gold tracking-wider">{audit.notice_id}</p>
-          {isPending && <span className="font-mono text-xs text-amber uppercase">processing</span>}
-          {isFailed && <span className="font-mono text-xs text-red uppercase">failed</span>}
-        </div>
-        <p className="mt-1.5 text-text truncate font-display text-lg">{cleanTitle(audit.title)}</p>
-        <p className="mt-1 text-xs text-text-2 truncate font-mono">
-          {audit.agency || "—"}
-          {audit.response_deadline && ` · due ${new Date(audit.response_deadline).toLocaleDateString()}`}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-4">
-        {audit.recommendation && (
-          <span className="hidden sm:inline-block font-mono text-xs uppercase tracking-[0.2em] text-text-3 group-hover:text-text-2">
-            {audit.recommendation === "PROCEED_WITH_CAUTION" ? "Caution" : audit.recommendation}
-          </span>
-        )}
-        <div
-          className={`flex items-center justify-center w-14 h-14 rounded-full border-2 ${scoreColor} font-display text-xl`}
-        >
-          {typeof score === "number" ? score : "—"}
-        </div>
-      </div>
-    </Link>
+    <th className={`text-${align} px-4 py-2 text-[10px] uppercase tracking-[0.18em] font-normal`}>
+      {children ?? ""}
+    </th>
   );
 }
