@@ -4,6 +4,28 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { count: number; reset: number }>();
+
+function rateLimit(key: string): { ok: boolean; remaining: number } {
+  const now = Date.now();
+  const b = rateBuckets.get(key);
+  if (!b || now > b.reset) {
+    rateBuckets.set(key, { count: 1, reset: now + RATE_LIMIT_WINDOW_MS });
+    return { ok: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  if (b.count >= RATE_LIMIT_MAX) return { ok: false, remaining: 0 };
+  b.count += 1;
+  return { ok: true, remaining: RATE_LIMIT_MAX - b.count };
+}
+
+function clientKey(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip") || "unknown";
+}
+
 const SYSTEM_PROMPT = `You are FARaudit Support — the embedded help agent for FARaudit, a federal-contracting compliance product run by Woof Management LLC.
 
 PRODUCT CONTEXT:
@@ -28,6 +50,14 @@ OUT OF SCOPE:
 type Msg = { role: "user" | "assistant"; content: string };
 
 export async function POST(req: Request) {
+  const rate = rateLimit(clientKey(req));
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded — slow down." },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
+  }
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "Support is offline." }, { status: 503 });
   }
