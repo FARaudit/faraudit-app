@@ -242,6 +242,14 @@ function _Landing() {
           </div>
         </div>
       </footer>
+      <footer className="border-t border-border bg-surface px-6 md:px-10 py-8 text-xs text-text-3 flex flex-wrap items-center justify-between gap-3">
+        <span>© 2026 FARaudit · Woof Management LLC</span>
+        <nav className="flex items-center gap-5">
+          <Link href="/privacy" className="hover:text-text-2">Privacy</Link>
+          <Link href="/terms" className="hover:text-text-2">Terms</Link>
+          <a href="mailto:jose@faraudit.com" className="hover:text-text-2">Contact</a>
+        </nav>
+      </footer>
     </main>
   );
 }
