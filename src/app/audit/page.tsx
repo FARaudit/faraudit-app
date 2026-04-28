@@ -91,28 +91,50 @@ export default function AuditPage() {
           </p>
 
           {submitting ? (
-            <div className="mt-14 border border-gold/30 bg-gold/5 p-12 text-center">
-              <div className="inline-flex gap-2 mb-8">
-                <span
-                  className="w-2.5 h-2.5 bg-gold rounded-full"
-                  style={{ animation: "dotPulse 1.4s infinite", animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-2.5 h-2.5 bg-gold rounded-full"
-                  style={{ animation: "dotPulse 1.4s infinite", animationDelay: "200ms" }}
-                />
-                <span
-                  className="w-2.5 h-2.5 bg-gold rounded-full"
-                  style={{ animation: "dotPulse 1.4s infinite", animationDelay: "400ms" }}
-                />
-              </div>
-              <p className="font-display text-2xl text-text">
-                Running four-stage analysis
-              </p>
-              <p className="mt-3 text-text-2 text-sm font-mono uppercase tracking-wider">
-                Classify · Overview · Compliance · Risks
-              </p>
-              <p className="mt-2 text-text-3 text-xs">~50 seconds</p>
+            <div className="mt-14 border border-accent/40 bg-accent/5 p-10">
+              <p className="font-display text-2xl text-text mb-2">Running five-stage analysis</p>
+              <p className="text-text-3 text-xs font-mono mb-8">~50 seconds</p>
+              <ol className="space-y-3">
+                {[
+                  { label: "Upload", status: "done" },
+                  { label: "Classify", status: "active" },
+                  { label: "Overview", status: "queued" },
+                  { label: "Compliance", status: "queued" },
+                  { label: "Risks", status: "queued" }
+                ].map((step, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <span
+                      className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-mono ${
+                        step.status === "done"
+                          ? "bg-green text-bg"
+                          : step.status === "active"
+                          ? "bg-accent text-white"
+                          : "bg-surface-2 text-text-3 border border-border"
+                      }`}
+                    >
+                      {step.status === "done" ? "✓" : i + 1}
+                    </span>
+                    <span
+                      className={`text-sm font-mono uppercase tracking-[0.18em] ${
+                        step.status === "done"
+                          ? "text-green"
+                          : step.status === "active"
+                          ? "text-text"
+                          : "text-text-3"
+                      }`}
+                    >
+                      {step.label}
+                    </span>
+                    {step.status === "active" && (
+                      <span className="ml-auto inline-flex gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite" }} />
+                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite", animationDelay: "200ms" }} />
+                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite", animationDelay: "400ms" }} />
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-12 space-y-6">
