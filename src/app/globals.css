@@ -1,51 +1,141 @@
 @import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 
-@theme {
-  /* Ink Navy / Cream / Champagne Gold / Steel Blue per design system */
-  --color-bg: #0A1628;
-  --color-surface: #0F1E33;
-  --color-surface-2: #142A45;
-  --color-border: #1E3559;
-  --color-border-2: #2A456E;
-  --color-text: #F5F0E8;
-  --color-text-2: #8C9BAF;
-  --color-text-3: #4A5568;
-  --color-gold: #B79555;
-  --color-gold-dim: #8B7034;
-  --color-green: #1D9E75;
-  --color-amber: #BA7517;
-  --color-red: #A32D2D;
-  --color-blue: #185FA5;
+:root {
+  --fa-bg:        #050D1A;
+  --fa-surface:   #091322;
+  --fa-surface-2: #0D1C30;
+  --fa-border:    #122240;
+  --fa-border-2:  #1a3560;
+  --fa-text-1:    #EDF4FF;
+  --fa-text-2:    #5B8AB8;
+  --fa-text-3:    #2D5280;
+  --fa-accent:    #185FA5;
+  --fa-accent-2:  #1D4ED8;
+  --fa-mid:       #378ADD;
+  --fa-light:     #B5D4F4;
+  --fa-pale:      #E6F1FB;
+  --fa-gain:      #10B981;
+  --fa-loss:      #EF4444;
+  --fa-warn:      #F59E0B;
+  --fa-gold:      #D4AF37;
 
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-body: var(--font-source-serif), Georgia, serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: "Inter", system-ui, sans-serif;
 }
 
+@theme {
+  /* Tailwind v4 token bridge so all utility classes resolve. Kept token names
+     in sync with FARaudit design palette + the existing utility surface. */
+  --color-bg: #050D1A;
+  --color-surface: #091322;
+  --color-surface-2: #0D1C30;
+  --color-border: #122240;
+  --color-border-2: #1a3560;
+  --color-text: #EDF4FF;
+  --color-text-2: #5B8AB8;
+  --color-text-3: #2D5280;
+  --color-accent: #185FA5;
+  --color-accent-2: #1D4ED8;
+  --color-mid: #378ADD;
+  --color-blue: #185FA5;
+  --color-light: #B5D4F4;
+  --color-pale: #E6F1FB;
+  --color-green: #10B981;
+  --color-green-dim: #064E3B;
+  --color-red: #EF4444;
+  --color-red-dim: #7F1D1D;
+  --color-amber: #F59E0B;
+  --color-warn: #F59E0B;
+  --color-gold: #D4AF37;
+  --color-gold-dim: #8B7034;
+
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-fraunces: "Inter", system-ui, sans-serif;
+  --font-jetbrains: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 html {
-  font-family: var(--font-body);
+  background: var(--fa-bg);
+  color: var(--fa-text-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 15px;
-  line-height: 1.6;
+  background: var(--fa-bg);
+  color: var(--fa-text-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-@media (max-width: 640px) {
-  body { font-size: 14px; }
-}
+@media (max-width: 640px) { body { font-size: 13px; } }
 
-::selection {
-  background: var(--color-gold);
-  color: var(--color-bg);
-}
+::selection { background: var(--fa-accent); color: var(--fa-text-1); }
 
-/* subtle animated dot pulse for loading state */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Animations — mirrored across the empire (BR/FA/LA) */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@keyframes flash-gain {
+  0%, 100% { color: var(--fa-text-1); }
+  50%      { color: var(--fa-gain); text-shadow: 0 0 8px var(--fa-gain); }
+}
+@keyframes flash-loss {
+  0%, 100% { color: var(--fa-text-1); }
+  50%      { color: var(--fa-loss); text-shadow: 0 0 8px var(--fa-loss); }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%      { opacity: 0.5; transform: scale(1.4); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
 @keyframes dotPulse {
   0%, 80%, 100% { opacity: 0.3; }
-  40% { opacity: 1; }
+  40%           { opacity: 1; }
 }
+
+.flash-gain { animation: flash-gain 0.8s ease; }
+.flash-loss { animation: flash-loss 0.8s ease; }
+.slide-in   { animation: slide-in-right 0.3s ease; }
+.pulse-dot  { animation: pulse-dot 1.5s infinite; }
+.count-up   { animation: count-up 0.6s ease both; }
+.blink      { animation: blink-cursor 1s steps(1) infinite; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--fa-surface) 25%, var(--fa-surface-2) 50%, var(--fa-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--fa-bg); }
+::-webkit-scrollbar-thumb { background: var(--fa-border-2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fa-text-3); }
