@@ -1,0 +1,32 @@
+#!/bin/sh
+# Pre-commit hook: blocks commits that contain potential API keys.
+# Wire up with: git config --local core.hooksPath .githooks
+#
+# Patterns covered:
+#   sk-ant-…              Anthropic API keys
+#   sk-proj-…             OpenAI project keys
+#   sk-[32+ alnum]        Generic OpenAI / Stripe secret keys
+#   ghp_/gho_/ghs_…       GitHub personal/installation tokens
+#   AKIA[16]              AWS access keys
+#   xoxb-[0-9]+           Slack bot tokens
+#   whsec_…               Stripe / generic webhook secrets
+#   SUPABASE_SERVICE…="eyJ" hard-coded supabase service role JWT
+
+# Look at staged content only — skip deletions.
+# `git diff --cached -U0` gives just changed hunks.
+HITS=$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+' | \
+  grep -E "(sk-ant-[A-Za-z0-9_-]{8,}|sk-proj-[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9]{32,}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|AKIA[A-Z0-9]{16}|xoxb-[0-9]+-[A-Za-z0-9]+|whsec_[A-Za-z0-9]{32,}|SUPABASE_SERVICE_ROLE[A-Z_]*=[\"']?eyJ[A-Za-z0-9_.\\-]+)" 2>/dev/null)
+
+if [ -n "$HITS" ]; then
+  echo "─────────────────────────────────────────────"
+  echo "🚨 BLOCKED — possible API key in staged diff."
+  echo "─────────────────────────────────────────────"
+  echo "$HITS" | head -10
+  echo
+  echo "Move the value to an environment variable, then re-stage."
+  echo "If this is a false positive (test fixture, doc example), bypass with:"
+  echo "  git commit --no-verify"
+  exit 1
+fi
+
+exit 0
