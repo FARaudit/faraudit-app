@@ -64,6 +64,7 @@ function _Landing() {
         <Link href="/" className="font-display text-xl text-text tracking-tight">FARaudit</Link>
         <nav className="flex items-center gap-6 text-sm">
           <Link href="/audit" className="text-text-2 hover:text-text">Audit</Link>
+          <Link href="/how-it-works" className="text-text-2 hover:text-text">How It Works</Link>
           <Link href="/dashboard" className="text-text-2 hover:text-text">Dashboard</Link>
           <Link
             href="/login"
