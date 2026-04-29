@@ -1,1588 +1,207 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FARaudit — Federal Acquisition Lifecycle</title>
 <style>
-  :root {
-    --navy: #0A1628;
-    --blue: #185FA5;
-    --mid: #378ADD;
-    --light: #B5D4F4;
-    --pale: #E6F1FB;
-    --white: #ffffff;
-    --gray: #6B7B8C;
-    --line: #D9E4F0;
-    --red: #B0341E;
-    --red-bg: #FCE9E4;
-    --amber: #C9821B;
-    --amber-bg: #FBEFD9;
-    --green: #1F7A4D;
-    --green-bg: #DEF1E6;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
-    background: var(--pale);
-    color: var(--navy);
-    -webkit-font-smoothing: antialiased;
-    line-height: 1.55;
-    min-height: 100vh;
-  }
-  a { color: var(--blue); }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 96px; }
-
-  /* ------- top header ------- */
-  .topbar {
-    background: var(--navy);
-    color: var(--pale);
-    padding: 18px 24px;
-  }
-  .topbar-inner {
-    max-width: 1180px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .brand {
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    font-size: 18px;
-    color: var(--white);
-  }
-  .brand-tag {
-    margin-left: 10px;
-    font-weight: 400;
-    font-size: 12px;
-    color: var(--light);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-  }
-  .view-toggle {
-    display: inline-flex;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 999px;
-    padding: 4px;
-  }
-  .view-toggle button {
-    background: transparent;
-    border: 0;
-    color: var(--light);
-    padding: 7px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    border-radius: 999px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-  }
-  .view-toggle button.active {
-    background: var(--mid);
-    color: var(--white);
-  }
-  .view-toggle button:not(.active):hover {
-    color: var(--white);
-  }
-
-  /* ------- view containers ------- */
-  .view { display: none; }
-  .view.active { display: block; }
-
-  /* ------- lifecycle explorer ------- */
-  .progress {
-    height: 4px;
-    background: var(--line);
-    border-radius: 999px;
-    overflow: hidden;
-    margin: 12px 0 22px;
-  }
-  .progress > span {
-    display: block;
-    height: 100%;
-    background: linear-gradient(90deg, var(--blue), var(--mid));
-    transition: width 250ms ease;
-  }
-  .stage-rail {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 8px;
-    margin-bottom: 24px;
-  }
-  .stage-chip {
-    background: var(--white);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 10px 8px;
-    text-align: left;
-    cursor: pointer;
-    transition: all 150ms ease;
-    color: var(--navy);
-  }
-  .stage-chip:hover {
-    border-color: var(--mid);
-    transform: translateY(-1px);
-  }
-  .stage-chip.active {
-    background: var(--navy);
-    border-color: var(--navy);
-    color: var(--white);
-  }
-  .stage-chip.active .stage-num,
-  .stage-chip.active .stage-label {
-    color: var(--white);
-  }
-  .stage-num {
-    display: block;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--mid);
-    letter-spacing: 0.08em;
-    margin-bottom: 4px;
-  }
-  .stage-label {
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.25;
-  }
-
-  .stage-nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 18px;
-  }
-  .nav-arrow {
-    background: var(--white);
-    border: 1px solid var(--line);
-    color: var(--blue);
-    padding: 8px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 13px;
-  }
-  .nav-arrow:hover { border-color: var(--mid); color: var(--mid); }
-  .nav-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .stage-card {
-    background: var(--white);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 28px 30px 30px;
-    box-shadow: 0 1px 0 rgba(10, 22, 40, 0.04);
-  }
-  .stage-eyebrow {
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--blue);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-  .stage-title {
-    font-size: 26px;
-    font-weight: 700;
-    margin: 6px 0 4px;
-    letter-spacing: -0.01em;
-  }
-  .stage-summary {
-    color: var(--gray);
-    margin: 4px 0 22px;
-    font-size: 15px;
-  }
-
-  .inner-tabs {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--line);
-    margin-bottom: 22px;
-  }
-  .inner-tabs button {
-    background: transparent;
-    border: 0;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--gray);
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    letter-spacing: 0.02em;
-  }
-  .inner-tabs button.active {
-    color: var(--blue);
-    border-bottom-color: var(--blue);
-  }
-  .inner-tabs button:not(.active):hover { color: var(--navy); }
-
-  .pane { display: none; }
-  .pane.active { display: block; }
-
-  /* overview pane */
-  .ov-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 22px;
-  }
-  .ov-block h4 {
-    font-size: 11px;
-    color: var(--blue);
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    margin: 0 0 8px;
-    font-weight: 600;
-  }
-  .ov-block ul {
-    margin: 0;
-    padding-left: 18px;
-    color: var(--navy);
-    font-size: 14px;
-  }
-  .ov-block ul li { margin-bottom: 4px; }
-  .ov-meta {
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 18px;
-    font-size: 13px;
-    color: var(--gray);
-  }
-  .ov-meta strong { color: var(--navy); margin-right: 4px; }
-
-  /* faraudit pane */
-  .fa-section { margin-bottom: 22px; }
-  .fa-section h4 {
-    font-size: 11px;
-    color: var(--blue);
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    margin: 0 0 10px;
-    font-weight: 600;
-  }
-  .output-card {
-    background: var(--pale);
-    border-left: 3px solid var(--mid);
-    padding: 12px 16px;
-    margin-bottom: 8px;
-    border-radius: 0 8px 8px 0;
-  }
-  .output-card .ot { font-weight: 600; font-size: 14px; }
-  .output-card .od { font-size: 13px; color: var(--gray); margin-top: 2px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip {
-    background: var(--green-bg);
-    color: var(--green);
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  /* clauses pane */
-  .clause-row {
-    display: grid;
-    grid-template-columns: 180px 1fr 110px;
-    gap: 14px;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .clause-row:last-child { border-bottom: 0; }
-  .clause-cite {
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 13px;
-    color: var(--blue);
-    font-weight: 600;
-  }
-  .clause-name { font-size: 14px; }
-  .badge {
-    text-align: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    justify-self: end;
-  }
-  .badge.trap { background: var(--red-bg); color: var(--red); }
-  .badge.required { background: var(--amber-bg); color: var(--amber); }
-  .badge.reference { background: var(--pale); color: var(--blue); }
-
-  /* risks pane */
-  .risk-card {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    margin-bottom: 10px;
-    overflow: hidden;
-    background: var(--white);
-  }
-  .risk-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    cursor: pointer;
-    background: var(--white);
-    border: 0;
-    width: 100%;
-    text-align: left;
-  }
-  .risk-head:hover { background: var(--pale); }
-  .risk-pri {
-    flex-shrink: 0;
-    padding: 3px 9px;
-    border-radius: 4px;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-  }
-  .risk-pri.p0 { background: var(--red-bg); color: var(--red); }
-  .risk-pri.p1 { background: var(--amber-bg); color: var(--amber); }
-  .risk-title { flex-grow: 1; font-size: 14px; font-weight: 500; color: var(--navy); }
-  .risk-caret { color: var(--gray); font-size: 14px; transition: transform 150ms ease; }
-  .risk-card.open .risk-caret { transform: rotate(90deg); }
-  .risk-body {
-    display: none;
-    padding: 0 16px 16px 16px;
-    border-top: 1px solid var(--line);
-    background: var(--pale);
-  }
-  .risk-card.open .risk-body { display: block; }
-  .risk-row {
-    display: flex;
-    gap: 18px;
-    margin-top: 12px;
-    font-size: 13px;
-    line-height: 1.55;
-  }
-  .risk-row .lbl {
-    flex-shrink: 0;
-    width: 110px;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--blue);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    padding-top: 1px;
-  }
-  .risk-row .val { color: var(--navy); flex: 1; }
-
-  /* ------- competitive gap map ------- */
-  .h2 {
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    margin: 0 0 4px;
-  }
-  .h2-sub {
-    color: var(--gray);
-    margin: 0 0 22px;
-    font-size: 15px;
-  }
-  .timeline {
-    background: var(--white);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 24px;
-    margin-bottom: 24px;
-  }
-  .tl-row {
-    display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 16px;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-  .tl-row:last-child { margin-bottom: 0; }
-  .tl-label {
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .tl-label .vendor-tag {
-    display: block;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 10px;
-    color: var(--gray);
-    font-weight: 400;
-    margin-top: 1px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .tl-track {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 6px;
-  }
-  .tl-cell {
-    height: 34px;
-    border-radius: 6px;
-    background: var(--pale);
-    border: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--gray);
-  }
-  .tl-cell.active {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: var(--white);
-    font-weight: 600;
-  }
-  .tl-cell.partial {
-    background: var(--light);
-    border-color: var(--mid);
-    color: var(--navy);
-  }
-  .tl-cell.faraudit {
-    background: linear-gradient(135deg, var(--blue), var(--mid));
-    border-color: var(--blue);
-    color: var(--white);
-    font-weight: 600;
-  }
-  .tl-legend {
-    display: flex;
-    gap: 18px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-    font-size: 12px;
-    color: var(--gray);
-  }
-  .tl-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .tl-legend i {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    display: inline-block;
-  }
-
-  .matrix {
-    background: var(--white);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    overflow: hidden;
-    margin-bottom: 24px;
-  }
-  .matrix table { border-collapse: collapse; width: 100%; }
-  .matrix th, .matrix td {
-    text-align: left;
-    padding: 11px 14px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px;
-    vertical-align: middle;
-  }
-  .matrix tr:last-child td { border-bottom: 0; }
-  .matrix th {
-    background: var(--navy);
-    color: var(--white);
-    font-weight: 600;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .matrix th.col-fa { background: var(--blue); }
-  .matrix td.feat { font-weight: 500; }
-  .matrix td.cell { text-align: center; font-size: 13px; }
-  .matrix td.yes { color: var(--green); font-weight: 600; }
-  .matrix td.no { color: var(--gray); }
-  .matrix td.partial { color: var(--amber); font-weight: 500; }
-
-  .moat {
-    background: linear-gradient(135deg, var(--navy), var(--blue));
-    color: var(--white);
-    border-radius: 14px;
-    padding: 28px 32px;
-  }
-  .moat-eyebrow {
-    font-family: "SF Mono", ui-monospace, monospace;
-    color: var(--light);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-  .moat h3 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0 0 14px;
-    letter-spacing: -0.01em;
-  }
-  .moat p { color: var(--light); font-size: 14px; margin: 0 0 12px; }
-  .moat ul { margin: 8px 0 0 18px; padding: 0; color: var(--light); font-size: 14px; }
-  .moat ul li { margin-bottom: 6px; }
-  .moat strong { color: var(--white); }
-
-  /* ------- demo script ------- */
-  .script-block {
-    background: var(--white);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 24px 28px;
-    margin-bottom: 14px;
-  }
-  .script-cue {
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--blue);
-    background: var(--pale);
-    border-left: 3px solid var(--mid);
-    padding: 6px 12px;
-    border-radius: 0 6px 6px 0;
-    margin-bottom: 10px;
-    display: inline-block;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .script-block h4 {
-    margin: 0 0 8px;
-    font-size: 16px;
-    font-weight: 700;
-  }
-  .script-block p {
-    margin: 0 0 10px;
-    font-size: 15px;
-    line-height: 1.65;
-    color: var(--navy);
-  }
-  .script-block p em {
-    font-style: italic;
-    color: var(--gray);
-  }
-  .script-block .quote {
-    border-left: 3px solid var(--blue);
-    padding: 10px 16px;
-    background: var(--pale);
-    border-radius: 0 8px 8px 0;
-    font-size: 15px;
-    color: var(--navy);
-    margin: 8px 0;
-  }
-  .obj-section {
-    margin-top: 26px;
-  }
-  .obj-card {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    margin-bottom: 10px;
-    overflow: hidden;
-    background: var(--white);
-  }
-  .obj-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 18px;
-    cursor: pointer;
-    background: var(--white);
-    border: 0;
-    width: 100%;
-    text-align: left;
-  }
-  .obj-head:hover { background: var(--pale); }
-  .obj-tag {
-    flex-shrink: 0;
-    background: var(--pale);
-    color: var(--blue);
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-  .obj-q { flex-grow: 1; font-size: 14px; font-weight: 500; }
-  .obj-caret { color: var(--gray); font-size: 14px; transition: transform 150ms ease; }
-  .obj-card.open .obj-caret { transform: rotate(90deg); }
-  .obj-body {
-    display: none;
-    padding: 14px 18px 18px 18px;
-    border-top: 1px solid var(--line);
-    background: var(--pale);
-  }
-  .obj-card.open .obj-body { display: block; }
-  .obj-body p { margin: 0 0 10px; font-size: 14px; line-height: 1.6; }
-  .obj-body p:last-child { margin-bottom: 0; }
-  .obj-body strong { color: var(--blue); }
-
-  /* responsive */
-  @media (max-width: 880px) {
-    .stage-rail { grid-template-columns: repeat(4, 1fr); }
-    .ov-grid { grid-template-columns: 1fr; }
-    .clause-row { grid-template-columns: 1fr; gap: 4px; }
-    .badge { justify-self: start; }
-    .tl-row { grid-template-columns: 1fr; }
-    .tl-track { grid-template-columns: repeat(8, 1fr); }
-    .matrix { overflow-x: auto; }
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0A1628;--blue:#185FA5;--mid:#378ADD;--light:#B5D4F4;--pale:#E6F1FB;--white:#ffffff;--text:#1f2937;--muted:#6b7280;--subtle:#9ca3af;--border:#e5e7eb;--border2:#d1d5db;--green-bg:#dcfce7;--green-txt:#166534;--amber-bg:#fef3c7;--amber-txt:#92400e;--red-bg:#fee2e2;--red-txt:#991b1b;--surface:#f9fafb;--surface2:#f3f4f6}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:var(--text)}
+.page{max-width:1060px;margin:0 auto;padding:20px 16px 48px}
+.hdr-badge{display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:var(--light);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:4px;margin-bottom:12px}
+.hdr h1{font-size:24px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.hdr p{font-size:13px;color:var(--muted);line-height:1.7;max-width:600px;margin-bottom:16px}
+.view-toggle{display:flex;gap:6px;margin-bottom:18px}
+.vtab{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border2);background:var(--white);color:var(--muted)}
+.vtab.active{background:var(--navy);color:#e2e8f2;border-color:var(--navy)}
+.prog-bar{height:3px;background:var(--border);border-radius:2px;margin-bottom:12px;overflow:hidden}
+.prog-fill{height:100%;background:var(--navy);border-radius:2px;transition:width .35s}
+.rail{display:flex;border-radius:8px;overflow:hidden;border:.5px solid var(--border2);margin-bottom:14px;background:var(--white)}
+.pip{flex:1;padding:9px 3px 7px;text-align:center;cursor:pointer;border-right:.5px solid var(--border)}
+.pip:last-child{border-right:none}
+.pip.active{background:var(--navy)}
+.pip.done{background:var(--surface2)}
+.pip-num{font-size:9px;font-weight:700;color:var(--subtle);margin-bottom:3px}
+.pip.active .pip-num{color:var(--light)}
+.pip-lbl{font-size:8px;line-height:1.3;color:var(--subtle)}
+.pip.active .pip-lbl{color:#e2e8f2;font-weight:600}
+.pip.done .pip-lbl{color:var(--muted)}
+.card{border:.5px solid var(--border2);border-radius:12px;overflow:hidden;background:var(--white);margin-bottom:12px}
+.card-hdr{padding:16px 20px 13px}
+.card-hdr.navy{background:var(--navy)}
+.card-hdr.gray{background:#3d3d3a}
+.stage-tag{font-size:10px;color:var(--light);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;font-weight:700}
+.card-title{font-size:19px;font-weight:700;color:#e2e8f2;margin-bottom:3px}
+.card-sub{font-size:12px;color:var(--light);opacity:.85}
+.card-body{padding:18px 20px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:16px}
+.col-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);margin-bottom:9px;font-weight:700}
+.item-row{display:flex;gap:7px;padding:5px 0;border-bottom:.5px solid #f3f4f6;align-items:flex-start}
+.item-row:last-child{border-bottom:none}
+.dot{width:4px;height:4px;border-radius:50%;background:var(--border2);flex-shrink:0;margin-top:7px}
+.item-txt{font-size:12px;color:var(--text);line-height:1.55}
+.fa-panel{background:var(--pale);border:.5px solid var(--light);border-radius:8px;padding:14px 17px;margin-bottom:14px}
+.fa-badge{display:inline-flex;background:var(--navy);color:var(--light);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:4px;margin-bottom:8px}
+.fa-headline{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:6px}
+.fa-note{font-size:12px;color:#1e40af;line-height:1.7;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.chip-out{font-size:10px;background:var(--white);border:.5px solid var(--light);border-radius:12px;padding:3px 10px;color:var(--blue);font-weight:600}
+.chip-oc{font-size:10px;background:var(--green-bg);border-radius:10px;padding:3px 10px;color:var(--green-txt);font-weight:600}
+.no-fa{background:var(--surface);border:.5px solid var(--border2);border-radius:8px;padding:12px 15px;font-size:12px;color:var(--muted);font-style:italic;margin-bottom:14px}
+.inline-sec{margin-bottom:14px}
+.inline-sec-t{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);font-weight:700;margin-bottom:8px;padding-bottom:4px;border-bottom:.5px solid var(--border)}
+.clause-row{display:flex;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border);font-size:12px;align-items:flex-start}
+.clause-row:last-child{border-bottom:none}
+.clause-num{font-family:monospace;font-size:11px;color:var(--blue);font-weight:600;min-width:120px;flex-shrink:0}
+.clause-title{color:var(--text);line-height:1.5;flex:1}
+.cbadge{font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;flex-shrink:0}
+.ct{background:var(--red-bg);color:var(--red-txt)}
+.cr{background:var(--amber-bg);color:var(--amber-txt)}
+.cref{background:var(--surface2);color:var(--muted)}
+.risk-card{border:.5px solid var(--border2);border-radius:8px;margin-bottom:8px;overflow:hidden}
+.risk-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:var(--surface);cursor:pointer}
+.risk-hdr:hover{background:var(--surface2)}
+.risk-t{font-size:12px;font-weight:600;color:var(--text)}
+.risk-sev{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700}
+.sp0{background:var(--red-bg);color:var(--red-txt)}
+.sp1{background:var(--amber-bg);color:var(--amber-txt)}
+.risk-body{padding:11px 13px;border-top:.5px solid var(--border);display:none;font-size:12px;color:var(--muted);line-height:1.65}
+.risk-body.open{display:block}
+.risk-action{margin-top:7px;padding:7px 10px;background:var(--pale);border-radius:6px;font-size:11px;color:var(--blue);font-weight:500}
+.nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.nav-btn{padding:7px 18px;font-size:12px;border-radius:6px;cursor:pointer;font-weight:600;border:.5px solid var(--border2);background:transparent;color:var(--muted)}
+.nav-btn.primary{background:var(--navy);color:#e2e8f2;border-color:var(--navy)}
+.nav-btn:disabled{opacity:.3;cursor:default}
+.nav-count{font-size:11px;color:var(--subtle)}
+.cmap{display:none}.cmap.active{display:block}
+.comp-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;border:.5px solid var(--border2);border-radius:8px;overflow:hidden;font-size:12px;margin-bottom:16px}
+.comp-hdr{background:var(--navy);color:#e2e8f2;padding:9px 11px;font-weight:700;font-size:11px}
+.comp-hdr.blue{background:var(--blue)}
+.comp-cell{padding:8px 11px;border-bottom:.5px solid var(--border);border-right:.5px solid var(--border)}
+.comp-cell:last-child{border-right:none}
+.c-fa{color:var(--green-txt);font-weight:700}.c-no{color:var(--red-txt);font-weight:500}.c-par{color:var(--amber-txt);font-weight:500}
+.moat-box{background:var(--pale);border:.5px solid var(--light);border-radius:8px;padding:13px 16px}
+.moat-t{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:7px}
+.moat-i{font-size:12px;color:#1e40af;padding:3px 0;line-height:1.5;display:flex;gap:7px}
+.demo-mode{display:none}.demo-mode.active{display:block}
+.demo-script{background:var(--navy);border-radius:12px;padding:18px 22px;color:#e2e8f2;font-size:13px;line-height:1.75;margin-bottom:14px}
+.demo-cue{color:var(--light);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;margin-top:13px}
+.demo-cue:first-child{margin-top:0}
+.demo-line{color:#c8d8ee;margin-bottom:3px}
+.demo-action{background:rgba(55,138,221,.2);border:.5px solid rgba(55,138,221,.4);border-radius:5px;padding:7px 11px;font-size:11px;color:var(--light);margin-top:5px;font-style:italic}
+.obj-item{border:.5px solid var(--border);border-radius:8px;margin-bottom:9px;overflow:hidden}
+.obj-q{background:var(--surface);padding:9px 13px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer}
+.obj-a{padding:11px 13px;font-size:12px;color:var(--muted);line-height:1.65;display:none}
+.obj-a.open{display:block}
+@media(max-width:640px){.two-col{grid-template-columns:1fr}.pip-lbl{font-size:7px}}
 </style>
 </head>
 <body>
-
-<header class="topbar">
-  <div class="topbar-inner">
-    <div>
-      <span class="brand">FARaudit</span>
-      <span class="brand-tag">Federal Acquisition Lifecycle</span>
-    </div>
-    <div class="view-toggle" role="tablist">
-      <button data-view="lifecycle" class="active">Lifecycle Explorer</button>
-      <button data-view="gap">Competitive Gap Map</button>
-      <button data-view="demo">Demo Script</button>
-    </div>
-  </div>
-</header>
-
-<div class="wrap">
-
-  <!-- ===================== LIFECYCLE EXPLORER ===================== -->
-  <section id="view-lifecycle" class="view active">
-    <div class="progress"><span id="progress-bar" style="width: 12.5%"></span></div>
-
-    <div class="stage-rail" id="stage-rail"></div>
-
-    <div class="stage-nav">
-      <button class="nav-arrow" id="prev-stage">← Previous stage</button>
-      <span id="stage-counter" style="font-family: 'SF Mono', monospace; font-size: 12px; color: var(--gray);">Stage 1 of 8</span>
-      <button class="nav-arrow" id="next-stage">Next stage →</button>
-    </div>
-
-    <div class="stage-card" id="stage-card">
-      <!-- populated by JS -->
-    </div>
-  </section>
-
-  <!-- ===================== COMPETITIVE GAP MAP ===================== -->
-  <section id="view-gap" class="view">
-    <h2 class="h2">Where competitors stop, FARaudit begins.</h2>
-    <p class="h2-sub">Govwin, Deltek, and GovTribe stop after award notifications. FARaudit covers stages 01–07 — proposal through closeout.</p>
-
-    <div class="timeline">
-      <div class="tl-row">
-        <div class="tl-label">FARaudit
-          <span class="vendor-tag">Stages 01–07</span>
-        </div>
-        <div class="tl-track">
-          <div class="tl-cell">00</div>
-          <div class="tl-cell faraudit">01</div>
-          <div class="tl-cell faraudit">02</div>
-          <div class="tl-cell faraudit">03</div>
-          <div class="tl-cell faraudit">04</div>
-          <div class="tl-cell faraudit">05</div>
-          <div class="tl-cell faraudit">06</div>
-          <div class="tl-cell faraudit">07</div>
-        </div>
-      </div>
-      <div class="tl-row">
-        <div class="tl-label">Govwin / Deltek
-          <span class="vendor-tag">Stages 03–05 only</span>
-        </div>
-        <div class="tl-track">
-          <div class="tl-cell">00</div>
-          <div class="tl-cell">01</div>
-          <div class="tl-cell">02</div>
-          <div class="tl-cell partial">03</div>
-          <div class="tl-cell partial">04</div>
-          <div class="tl-cell partial">05</div>
-          <div class="tl-cell">06</div>
-          <div class="tl-cell">07</div>
-        </div>
-      </div>
-      <div class="tl-row">
-        <div class="tl-label">GovTribe
-          <span class="vendor-tag">Stage 03 only</span>
-        </div>
-        <div class="tl-track">
-          <div class="tl-cell">00</div>
-          <div class="tl-cell">01</div>
-          <div class="tl-cell">02</div>
-          <div class="tl-cell partial">03</div>
-          <div class="tl-cell">04</div>
-          <div class="tl-cell">05</div>
-          <div class="tl-cell">06</div>
-          <div class="tl-cell">07</div>
-        </div>
-      </div>
-      <div class="tl-row">
-        <div class="tl-label">SAM.gov
-          <span class="vendor-tag">Listing only</span>
-        </div>
-        <div class="tl-track">
-          <div class="tl-cell">00</div>
-          <div class="tl-cell">01</div>
-          <div class="tl-cell">02</div>
-          <div class="tl-cell partial">03</div>
-          <div class="tl-cell">04</div>
-          <div class="tl-cell partial">05</div>
-          <div class="tl-cell">06</div>
-          <div class="tl-cell">07</div>
-        </div>
-      </div>
-      <div class="tl-legend">
-        <span><i style="background: linear-gradient(135deg, var(--blue), var(--mid));"></i> FARaudit active</span>
-        <span><i style="background: var(--light); border: 1px solid var(--mid);"></i> Competitor active</span>
-        <span><i style="background: var(--pale); border: 1px solid var(--line);"></i> Inactive</span>
-      </div>
-    </div>
-
-    <div class="matrix">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 38%;">Capability</th>
-            <th class="col-fa" style="width: 16%;">FARaudit</th>
-            <th style="width: 15%;">Govwin / Deltek</th>
-            <th style="width: 15%;">GovTribe</th>
-            <th style="width: 16%;">SAM.gov</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="feat">Solicitation discovery</td>
-            <td class="cell yes">✓ Filtered + scored</td>
-            <td class="cell yes">✓</td>
-            <td class="cell yes">✓</td>
-            <td class="cell partial">Raw listing</td>
-          </tr>
-          <tr>
-            <td class="feat">Clause-by-clause compliance audit</td>
-            <td class="cell yes">✓ FAR + DFARS</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">CLIN extraction + benchmarking</td>
-            <td class="cell yes">✓ Auto</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Section L / M parser</td>
-            <td class="cell yes">✓</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Trap clause detection (DFARS 252.223-7008, etc.)</td>
-            <td class="cell yes">✓ P0/P1</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Bid / no-bid recommendation</td>
-            <td class="cell yes">✓ With reasoning</td>
-            <td class="cell partial">Probability score</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Incumbent + KO profile enrichment</td>
-            <td class="cell yes">✓</td>
-            <td class="cell partial">Limited</td>
-            <td class="cell partial">Limited</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">KO clarification email drafting + send</td>
-            <td class="cell yes">✓ Resend integrated</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Past performance + teaming finder</td>
-            <td class="cell yes">✓</td>
-            <td class="cell partial">Directory only</td>
-            <td class="cell partial">Directory only</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">RFI responder + NAICS optimizer</td>
-            <td class="cell yes">✓</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Cert tracking + agency spend intel</td>
-            <td class="cell yes">✓</td>
-            <td class="cell partial">Spend only</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-          <tr>
-            <td class="feat">Performance + closeout coverage</td>
-            <td class="cell yes">✓ Stages 06–07</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-            <td class="cell no">—</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="moat">
-      <div class="moat-eyebrow">The Moat</div>
-      <h3>Competitors sell discovery. FARaudit sells survival.</h3>
-      <p>Every other tool ends the conversation at "you should bid this." FARaudit starts there. We are the only product that:</p>
-      <ul>
-        <li><strong>Reads the contract.</strong> Three-call Claude pipeline (Overview / Compliance / Risks) parses every PDF clause-by-clause, including the buried trap clauses (DFARS 252.223-7008 hex chrome, 252.204-7018 SCRM, 252.204-7021 CMMC) that disqualify subs at award.</li>
-        <li><strong>Tells you what to ask the KO.</strong> Auto-drafts clarification questions tied to ambiguous CLINs, conflicting FOB terms, and Section L formatting traps. Sends through Resend. Tracks the response.</li>
-        <li><strong>Stays with you past award.</strong> Stages 06–07 continue compliance monitoring, mod tracking, and closeout — the work that costs subs millions when neglected.</li>
-      </ul>
-      <p style="margin-top: 16px;"><strong>Moat compounds:</strong> every audit improves the trap-clause classifier. Govwin can't catch up by adding features — they'd have to rebuild on a contract-aware model.</p>
-    </div>
-  </section>
-
-  <!-- ===================== DEMO SCRIPT ===================== -->
-  <section id="view-demo" class="view">
-    <h2 class="h2">Demo Script</h2>
-    <p class="h2-sub">Word-for-word walkthrough. ~7 minutes. Navigation cues in monospace.</p>
-
-    <div class="script-block">
-      <span class="script-cue">[0:00] OPEN — Lifecycle Explorer, Stage 03</span>
-      <h4>The hook</h4>
-      <div class="quote">"You bid 80 federal solicitations last year. You won twelve. The other 68 — three of them you would have won if you'd caught a single trap clause buried in Section H. We built FARaudit so subs never miss those again."</div>
-      <p><em>Pause. Click stage 03 — Solicitation. Open the Risks tab.</em></p>
-    </div>
-
-    <div class="script-block">
-      <span class="script-cue">[0:45] PROBLEM — Show DFARS 252.223-7008 trap</span>
-      <h4>What every sub gets wrong</h4>
-      <p>"This is DFARS 252.223-7008. Hexavalent chromium prohibition. If your finishing process uses chrome and this clause is in the solicitation, you have to either certify alternatives or get an explicit KO waiver before award. Subs miss this clause in 60% of solicitations we've tested. SAM.gov doesn't flag it. Govwin doesn't read clauses. By the time you find out at award, you've already burned thirty hours on a proposal you can't perform."</p>
-      <p><em>Click the FARaudit tab on stage 03. Read the outputs aloud.</em></p>
-    </div>
-
-    <div class="script-block">
-      <span class="script-cue">[1:45] DEMO — Live audit upload</span>
-      <h4>The product in 90 seconds</h4>
-      <p>"Drop in a solicitation PDF. Three parallel Claude calls run in under 25 seconds — Overview, Compliance, Risks. Out comes:"</p>
-      <p>— Every FAR and DFARS clause, with TRAP / Required / Reference badges<br>
-      — CLIN extraction with price benchmarking against historical USAspending<br>
-      — Section L formatting requirements, parsed<br>
-      — Top 3 prioritized risks (P0 / P1) with what-to-negotiate language<br>
-      — Bid / no-bid recommendation with reasoning</p>
-      <p><em>Switch to Competitive Gap Map view.</em></p>
-    </div>
-
-    <div class="script-block">
-      <span class="script-cue">[3:30] DIFFERENTIATION — Gap Map</span>
-      <h4>Why nothing else does this</h4>
-      <p>"Look at the timeline. Govwin and Deltek live in stages 03 to 05 — they tell you a solicitation exists, give you a probability score, then disappear. GovTribe is just stage 03. SAM.gov is a listing service."</p>
-      <p>"FARaudit covers stages 01 through 07. Proposal preparation. Source selection prep. Award. Performance. Closeout. We're the only tool that stays in the contract with you after the award letter."</p>
-      <p><em>Scroll to the matrix. Run a finger down the FARaudit column.</em></p>
-    </div>
-
-    <div class="script-block">
-      <span class="script-cue">[4:30] PROOF — KO email send</span>
-      <h4>The killer feature</h4>
-      <p>"We auto-draft KO clarification emails based on the highest-priority risks the audit found. You edit, hit send via Resend, and every send is tracked back to the audit. We've had subs win contracts because they were the only bidder who asked the right question on day three of the Q&amp;A window."</p>
-    </div>
-
-    <div class="script-block">
-      <span class="script-cue">[5:30] PRICING — soft pivot</span>
-      <h4>The ask</h4>
-      <div class="quote">"Govwin is forty grand a year and stops at award. FARaudit is a fraction of that and covers the whole lifecycle. We're onboarding the first cohort of defense subs this quarter — five-seat package, three-month pilot, full refund if you don't catch at least one trap clause that would've otherwise cost you the award."</div>
-      <p><em>Stop. Wait for the question.</em></p>
-    </div>
-
-    <div class="obj-section">
-      <h2 class="h2" style="font-size: 18px; margin-bottom: 12px;">Objection Handlers</h2>
-
-      <div class="obj-card">
-        <button class="obj-head">
-          <span class="obj-tag">OBJ 01</span>
-          <span class="obj-q">"We already use Govwin / Deltek."</span>
-          <span class="obj-caret">▶</span>
-        </button>
-        <div class="obj-body">
-          <p><strong>Acknowledge:</strong> "Good — Govwin is excellent at discovery. Keep it."</p>
-          <p><strong>Reframe:</strong> "Govwin tells you a solicitation exists. FARaudit tells you whether you can perform it without losing money. They're complementary tools, not competitors."</p>
-          <p><strong>Proof:</strong> "Half our customers run both. They use Govwin's pipeline view to identify candidates, then FARaudit on the PDF before they commit thirty hours to a proposal. The combo is what makes their bid/no-bid decisions actually data-driven."</p>
-        </div>
-      </div>
-
-      <div class="obj-card">
-        <button class="obj-head">
-          <span class="obj-tag">OBJ 02</span>
-          <span class="obj-q">"Our compliance team / capture manager already does this."</span>
-          <span class="obj-caret">▶</span>
-        </button>
-        <div class="obj-body">
-          <p><strong>Acknowledge:</strong> "Of course they do — every sub has someone reading the RFP."</p>
-          <p><strong>Reframe:</strong> "The question is how many they read per week. Your capture manager probably reads three solicitations carefully. FARaudit reads thirty. The math isn't whether they're competent — it's whether you're sampling enough opportunities to actually win the right ones."</p>
-          <p><strong>Pivot:</strong> "And on the three they read carefully — they're still going to miss DFARS 252.223-7008 if it's buried in Section H paragraph 14. We've tested this. Even compliance attorneys miss trap clauses at non-trivial rates."</p>
-        </div>
-      </div>
-
-      <div class="obj-card">
-        <button class="obj-head">
-          <span class="obj-tag">OBJ 03</span>
-          <span class="obj-q">"AI hallucinates — we can't trust it on FAR clauses."</span>
-          <span class="obj-caret">▶</span>
-        </button>
-        <div class="obj-body">
-          <p><strong>Acknowledge:</strong> "You're right to be skeptical. We were paranoid about this when we built it."</p>
-          <p><strong>Proof:</strong> "Every clause output cites the exact FAR or DFARS section. Every risk has [Inferred] flagged when the model is generalizing. The bid/no-bid recommendation has explicit reasoning you can audit. And the whole pipeline is anchored to Anthropic's Claude models with native PDF document blocks — not blind text extraction."</p>
-          <p><strong>Boundary:</strong> "FARaudit doesn't replace your contracts attorney. It surfaces the clauses she should look at first, and gets her there in 25 seconds instead of 90 minutes."</p>
-        </div>
-      </div>
-
-      <div class="obj-card">
-        <button class="obj-head">
-          <span class="obj-tag">OBJ 04</span>
-          <span class="obj-q">"We need to think about it. Send a follow-up."</span>
-          <span class="obj-caret">▶</span>
-        </button>
-        <div class="obj-body">
-          <p><strong>Soft pin:</strong> "Totally fair. Before you go — what's the one specific question I haven't answered? If it's pricing, integration, security, contract length, I can answer it now and save you the round-trip."</p>
-          <p><strong>If genuinely undecided:</strong> "Here's what I'll do. Send me one solicitation you've recently lost or no-bid'd. I'll run it through FARaudit at no cost and email you the audit by tomorrow. If the audit catches something your team missed, we keep talking. If it doesn't, you've lost zero dollars and gained a free clause review."</p>
-          <p><strong>Close:</strong> "What solicitation do you want me to run?"</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
+<div class="page">
+<div class="hdr">
+  <div class="hdr-badge">Federal Contract Intelligence</div>
+  <h1>The complete acquisition lifecycle</h1>
+  <p>From the first government signal to contract award. Click any stage to explore what FARaudit does and every compliance requirement.</p>
 </div>
-
+<div class="view-toggle">
+  <button class="vtab active" onclick="sv('lifecycle',this)">Lifecycle explorer</button>
+  <button class="vtab" onclick="sv('competitor',this)">Competitive gap map</button>
+  <button class="vtab" onclick="sv('demo',this)">Demo script</button>
+</div>
+<div id="vl">
+  <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:var(--subtle)" id="pl">Stage 1 of 8</span><span style="font-size:11px;color:var(--subtle)" id="pp">14%</span></div>
+  <div class="prog-bar"><div class="prog-fill" id="pf" style="width:14%"></div></div>
+  <div class="rail" id="rail"></div>
+  <div id="sc"></div>
+  <div class="nav-row">
+    <button class="nav-btn" id="bp" onclick="nav(-1)">← Previous</button>
+    <span class="nav-count" id="nc">Stage 1 of 8</span>
+    <button class="nav-btn primary" id="bn" onclick="nav(1)">Next stage →</button>
+  </div>
+</div>
+<div id="vc" class="cmap">
+  <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:13px">Where competitors enter vs. where FARaudit starts</div>
+  <div class="comp-grid">
+    <div class="comp-hdr">Capability</div><div class="comp-hdr blue">FARaudit</div><div class="comp-hdr blue">Generic AI</div><div class="comp-hdr blue">Manual</div>
+    <div class="comp-cell">Pre-Sol Synopsis monitoring</div><div class="comp-cell c-fa">✓ Daily</div><div class="comp-cell c-no">✗</div><div class="comp-cell c-no">✗</div>
+    <div class="comp-cell">RFI response drafting</div><div class="comp-cell c-fa">✓ Auto</div><div class="comp-cell c-no">✗</div><div class="comp-cell">Manual</div>
+    <div class="comp-cell">SOW/PWS/SOO classification</div><div class="comp-cell c-fa">✓ Pre-step</div><div class="comp-cell c-no">✗</div><div class="comp-cell c-no">✗</div>
+    <div class="comp-cell">CLIN ambiguity detection</div><div class="comp-cell c-fa">✓ Call 1</div><div class="comp-cell c-par">Partial</div><div class="comp-cell">Manual</div>
+    <div class="comp-cell">DFARS trap detection</div><div class="comp-cell c-fa">✓ Call 3 (6)</div><div class="comp-cell c-par">Partial</div><div class="comp-cell c-no">✗</div>
+    <div class="comp-cell">SOW influence tracking</div><div class="comp-cell c-fa">✓ Match score</div><div class="comp-cell c-no">✗</div><div class="comp-cell c-no">✗</div>
+    <div class="comp-cell">Recompete alerting</div><div class="comp-cell c-fa">✓ 180d out</div><div class="comp-cell c-no">✗</div><div class="comp-cell c-no">✗</div>
+  </div>
+  <div class="moat-box">
+    <div class="moat-t">The competitive moat</div>
+    <div class="moat-i"><span style="color:#16a34a;font-weight:700">→</span>Stages 01–02 exclusively FARaudit. No competitor monitors Pre-Sol Synopses or drafts RFI responses at scale.</div>
+    <div class="moat-i"><span style="color:#16a34a;font-weight:700">→</span>SOW Influence Tracker proves ROI. No competitor does this.</div>
+    <div class="moat-i"><span style="color:#16a34a;font-weight:700">→</span>Three-call architecture handles large IDIQs without token truncation.</div>
+  </div>
+</div>
+<div id="vd" class="demo-mode">
+  <div class="demo-script">
+    <div class="demo-cue">Opening — 30 seconds</div>
+    <div class="demo-line">"This is the complete federal acquisition lifecycle. Eight stages. Let me show you where most contractors live versus where FARaudit puts you."</div>
+    <div class="demo-action">→ Start at Stage 01. Walk through the FARaudit panel.</div>
+    <div class="demo-cue">The upstream gap — 60 seconds</div>
+    <div class="demo-line">"You're starting at Stage 03 when the solicitation drops. The SOW is written. Evaluation criteria locked. FARaudit starts at Stage 01 — 60–90 days earlier. CO relationship established before your competitors know the requirement exists."</div>
+    <div class="demo-cue">The full audit — 45 seconds</div>
+    <div class="demo-line">"Stage 03: first line of the audit tells you SOW, PWS, or SOO — that changes your entire bid strategy. Then every CLIN ambiguity, every DFARS trap, cited by regulation. FA301626Q0068 — three material traps. FARaudit caught all three in four minutes."</div>
+    <div class="demo-action">→ Click Stage 03. Walk through clauses and risks inline.</div>
+    <div class="demo-cue">Close</div>
+    <div class="demo-line">"Seven of eight stages covered. No competitor starts before Stage 03. Design partner pricing: $1,250/month. Which solicitation are you working right now?"</div>
+    <div class="demo-action">→ Switch to Competitive Gap Map. Stop talking.</div>
+  </div>
+  <div style="background:var(--navy);padding:11px 17px;border-radius:12px 12px 0 0"><div style="font-size:11px;color:var(--light);font-weight:700;letter-spacing:.08em;text-transform:uppercase">Objection handlers</div></div>
+  <div style="border:.5px solid var(--border2);border-radius:0 0 12px 12px;background:var(--white);padding:14px 16px">
+    <div class="obj-item"><div class="obj-q" onclick="to(this)">"We already have a compliance team."</div><div class="obj-a">Your compliance team starts at Stage 03. FARaudit starts 60–90 days earlier. It gives them a head start and a fully annotated report — it doesn't replace them.</div></div>
+    <div class="obj-item"><div class="obj-q" onclick="to(this)">"We use SAM.gov directly."</div><div class="obj-a">SAM.gov shows the solicitation when it posts. FARaudit monitors Pre-Sol Synopses and Sources Sought upstream. SAM.gov is a database. FARaudit is the intelligence layer on top.</div></div>
+    <div class="obj-item"><div class="obj-q" onclick="to(this)">"$2,500 a month is a lot."</div><div class="obj-a">One missed CLIN quantity ambiguity on a $50K contract is a $25K margin hit. One missed DFARS trap is a disqualification. FARaudit pays for itself on the first solicitation it catches something your team would have missed. Design partner pricing: $1,250/month.</div></div>
+    <div class="obj-item"><div class="obj-q" onclick="to(this)">"We've done this 20 years without tools."</div><div class="obj-a">Exactly — you've built the expertise to know what good looks like. FARaudit applies that expertise systematically to every solicitation without human time. Your 20 years validates FARaudit's output.</div></div>
+  </div>
+</div>
+</div>
 <script>
-// ===================== DATA =====================
-const STAGES = [
-  {
-    num: "00",
-    label: "Pre-Solicitation",
-    title: "Market intelligence + opportunity discovery",
-    summary: "Pre-RFP signals, agency spend patterns, NAICS positioning. Where opportunities surface before solicitations are written.",
-    duration: "Continuous",
-    actors: "Subs, BD teams",
-    overview: {
-      whatHappens: [
-        "Agencies publish forecasts, sources sought, RFIs",
-        "Industry days and pre-solicitation conferences",
-        "Past contract obligations approach option year boundaries",
-        "Subs identify NAICS codes and certification gaps"
-      ],
-      keyArtifacts: [
-        "Sources sought notices",
-        "Agency procurement forecasts",
-        "Contract obligation history",
-        "USAspending data"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Agency Spend Tracker", d: "Multi-year obligation patterns by NAICS, set-aside, agency sub-component" },
-        { t: "Pipeline Forecaster", d: "Predicts upcoming solicitations from option-year expirations + forecast feeds" },
-        { t: "NAICS Optimizer", d: "Recommends primary/secondary NAICS to maximize set-aside eligibility" },
-        { t: "Cert Gap Analysis", d: "Compares your certs (8(a), HUBZone, SDVOSB, WOSB) to agency demand" }
-      ],
-      outcomes: ["Earlier signal", "Better positioning", "Cert ROI clarity"]
-    },
-    clauses: [],
-    risks: [
-      {
-        pri: "P1",
-        title: "Missing forecasted opportunities because of NAICS misalignment",
-        why: "Set-aside eligibility hinges on primary NAICS. Subs frequently file under wrong NAICS for their actual capability set, becoming invisible to procurement officers searching by code.",
-        action: "FARaudit NAICS Optimizer cross-references your past performance, capability statement, and current cert portfolio against agency demand to recommend the highest-yield primary code."
-      },
-      {
-        pri: "P1",
-        title: "Cert investment with no demand signal",
-        why: "Subs spend $20K–$80K on certifications (HUBZone, 8(a), SDVOSB) without verifying the agencies they want to sell to actually use those set-asides at material volume.",
-        action: "FARaudit Cert Tracker shows obligation dollars per cert per agency over a 3-year window before you spend on application costs."
-      }
-    ]
-  },
-  {
-    num: "01",
-    label: "Solicitation Discovery",
-    title: "Find and filter live solicitations",
-    summary: "SAM.gov + DIBBS feeds, NAICS filtering, set-aside matching. Reduce 1,200 daily postings to a triage queue of 8–12.",
-    duration: "Daily",
-    actors: "BD, capture managers",
-    overview: {
-      whatHappens: [
-        "SAM.gov publishes new solicitations daily",
-        "Subs filter by NAICS, set-aside, geography, dollar value",
-        "Initial bid/no-bid triage based on capability fit",
-        "Capture managers prioritize the daily queue"
-      ],
-      keyArtifacts: [
-        "SAM.gov opportunity records",
-        "DIBBS RFQ listings",
-        "Solicitation PDFs",
-        "Amendment notices"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Daily Intel Brief", d: "Auto-generated digest of solicitations matching your NAICS + cert profile" },
-        { t: "Newsletter Generator", d: "Weekly LinkedIn-ready post based on your active pipeline" },
-        { t: "Opportunity Scoring", d: "Initial fit score before deep audit — saves you opening the wrong PDFs" },
-        { t: "Amendment Watcher", d: "Tracks every revision; flags material changes to clauses or due dates" }
-      ],
-      outcomes: ["Faster triage", "Higher hit rate", "Zero missed amendments"]
-    },
-    clauses: [
-      { cite: "FAR 5.203", name: "Publicizing — preaward", badge: "reference" },
-      { cite: "FAR 5.207", name: "Preparation and transmittal of synopses", badge: "reference" },
-      { cite: "FAR 19.502", name: "Set-aside determinations", badge: "required" }
-    ],
-    risks: [
-      {
-        pri: "P1",
-        title: "Discovery filter false negatives — missing relevant solicitations",
-        why: "SAM.gov NAICS filtering misses solicitations posted under adjacent codes. PSC codes and keyword overlap are needed to catch the full universe.",
-        action: "FARaudit indexes solicitations by NAICS + PSC + capability keyword, surfacing opportunities that single-code filters miss."
-      }
-    ]
-  },
-  {
-    num: "02",
-    label: "Initial Triage",
-    title: "Bid / no-bid in 25 seconds",
-    summary: "Three-call Claude audit produces overview, compliance map, and prioritized risks before you commit proposal hours.",
-    duration: "≤ 1 hour",
-    actors: "Capture, compliance",
-    overview: {
-      whatHappens: [
-        "Solicitation PDF reviewed for capability fit",
-        "Initial compliance scan for trap clauses + cert gaps",
-        "Internal bid/no-bid meeting",
-        "Decision to invest proposal labor"
-      ],
-      keyArtifacts: [
-        "Solicitation + attachments",
-        "Bid/no-bid memo",
-        "Capability matrix",
-        "Initial pricing skeleton"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Audit Overview", d: "Agency, dollar value, due date, set-aside, performance period — extracted in seconds" },
-        { t: "Compliance Pre-Scan", d: "Every FAR + DFARS clause classified TRAP / Required / Reference" },
-        { t: "Top 3 Risks", d: "Prioritized P0/P1 risks with what-to-negotiate language" },
-        { t: "Bid Recommendation", d: "BID / NO-BID with explicit reasoning and confidence" }
-      ],
-      outcomes: ["No wasted proposal hours", "Trap clauses caught early", "Decision in minutes"]
-    },
-    clauses: [
-      { cite: "FAR 1.602-1", name: "KO authority + responsibility", badge: "reference" },
-      { cite: "FAR 9.103", name: "Responsibility determination", badge: "required" },
-      { cite: "FAR 15.305", name: "Proposal evaluation", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P0",
-        title: "Investing proposal labor on an unwinnable solicitation",
-        why: "Subs routinely commit 30–80 hours of capture + proposal labor on solicitations with disqualifying clauses (cert mismatches, trap requirements) that should have been caught in triage.",
-        action: "FARaudit's bid/no-bid recommendation runs in <25 seconds with explicit reasoning. Catches disqualifiers before any proposal hours are committed."
-      },
-      {
-        pri: "P1",
-        title: "Bid recommendation lacks reasoning, can't audit",
-        why: "Tools that emit only a probability score (Govwin) give capture managers nothing to push back on. Confidence without reasoning is not defensible.",
-        action: "Every FARaudit recommendation includes the specific clauses, CLINs, and risks that drove the verdict. Auditable, contestable, learnable."
-      }
-    ]
-  },
-  {
-    num: "03",
-    label: "Solicitation Audit",
-    title: "Clause-by-clause compliance + risk audit",
-    summary: "Full FAR + DFARS audit. CLIN extraction. Section L/M parser. Trap clause detection. The core FARaudit moment.",
-    duration: "1–3 days",
-    actors: "Compliance, contracts, pricing",
-    overview: {
-      whatHappens: [
-        "Full read-through of solicitation + every attachment",
-        "Compliance matrix built clause-by-clause",
-        "Section L formatting requirements extracted",
-        "Section M evaluation criteria mapped",
-        "Pricing strategy informed by CLIN structure"
-      ],
-      keyArtifacts: [
-        "Compliance matrix",
-        "Section L checklist",
-        "Section M scoring grid",
-        "CLIN pricing model",
-        "Risk register"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Full Compliance Matrix", d: "Every FAR + DFARS clause with badge: TRAP / REQUIRED / REFERENCE" },
-        { t: "CLIN Extraction", d: "Auto-pulls CLIN structure with quantities, periods, and pricing benchmarks" },
-        { t: "Section L Parser", d: "Page limits, font, formatting, file structure — extracted into a checklist" },
-        { t: "Section M Scoring Map", d: "Evaluation factors with relative weights and sub-criteria" },
-        { t: "Trap Clause Alerts", d: "DFARS 252.223-7008 (hex chrome), 252.204-7018 (SCRM), 252.204-7021 (CMMC)" }
-      ],
-      outcomes: ["100% clause coverage", "Zero missed trap clauses", "Compliance matrix in 25s"]
-    },
-    clauses: [
-      { cite: "FAR 52.215-1", name: "Instructions to Offerors — Competitive Acquisition", badge: "required" },
-      { cite: "FAR 52.212-1", name: "Instructions to Offerors — Commercial", badge: "required" },
-      { cite: "DFARS 252.223-7008", name: "Prohibition of Hexavalent Chromium", badge: "trap" },
-      { cite: "DFARS 252.204-7018", name: "Prohibition on the Acquisition of Covered Defense Telecommunications Equipment", badge: "trap" },
-      { cite: "DFARS 252.204-7021", name: "Cybersecurity Maturity Model Certification (CMMC) Requirements", badge: "trap" },
-      { cite: "FAR 52.219-14", name: "Limitations on Subcontracting", badge: "required" },
-      { cite: "FAR 52.204-7", name: "System for Award Management", badge: "required" },
-      { cite: "FAR 52.222-50", name: "Combating Trafficking in Persons", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P0",
-        title: "DFARS 252.223-7008 hex chrome trap — disqualifies finishing subs at award",
-        why: "Hexavalent chromium prohibition disqualifies any sub whose finishing process uses chrome unless alternatives are certified or KO grants explicit waiver. Buried in Section H of most DoD solicitations. Caught only by clause-aware reading.",
-        action: "FARaudit flags every 252.223-7008 occurrence as P0, surfaces it in the audit summary, and auto-drafts a KO question about waiver process before bid commitment."
-      },
-      {
-        pri: "P0",
-        title: "Ambiguous CLIN quantities or unit-of-issue conflicts",
-        why: "CLIN line items frequently conflict between Section B (pricing schedule) and Section F (delivery). Subs price against one, perform against the other, and lose margin or face termination.",
-        action: "FARaudit's CLIN extractor flags quantity/unit/period mismatches across sections. KO email auto-drafts a clarification request before proposal lock."
-      },
-      {
-        pri: "P1",
-        title: "Section L formatting non-compliance",
-        why: "Page limits, font requirements, file structure, page numbering — Section L violations get proposals rejected without merit review. Source selection won't read past the first violation.",
-        action: "FARaudit Section L parser extracts every formatting requirement into a pre-submission checklist."
-      },
-      {
-        pri: "P1",
-        title: "Section M weight misalignment with proposal investment",
-        why: "Subs over-invest narrative in factors weighted 10% and underinvest in factors weighted 40%. The Section M weight map is the only honest guide to where to spend hours.",
-        action: "FARaudit Section M parser extracts evaluation factors with weights and sub-criteria, surfaced in the audit dashboard."
-      }
-    ]
-  },
-  {
-    num: "04",
-    label: "Proposal + Q&A",
-    title: "KO clarifications + proposal preparation",
-    summary: "Auto-draft KO clarification emails, track responses, refine pricing against CLIN benchmarks, finalize compliance matrix.",
-    duration: "2–6 weeks",
-    actors: "Capture, contracts, KO liaison",
-    overview: {
-      whatHappens: [
-        "Submit KO clarification questions during Q&A window",
-        "Track answers and amendments",
-        "Build compliant proposal narrative",
-        "Final pricing against benchmarks",
-        "Compliance matrix sign-off"
-      ],
-      keyArtifacts: [
-        "KO Q&A correspondence",
-        "Proposal narrative",
-        "Final pricing model",
-        "Compliance matrix sign-off",
-        "Past performance citations"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "KO Email Drafter", d: "Auto-drafts clarification emails tied to top 3 risks; sends via Resend; tracks status" },
-        { t: "Past Performance Library", d: "Pulls relevant CPARS-graded past contracts based on solicitation NAICS + scope" },
-        { t: "Teaming Finder", d: "Identifies primes with complementary cert profiles seeking subs in your NAICS" },
-        { t: "RFI Responder", d: "Drafts boilerplate RFI responses pre-tailored to your capability statement" }
-      ],
-      outcomes: ["Better KO answers", "Stronger past performance citations", "Fewer late-stage surprises"]
-    },
-    clauses: [
-      { cite: "FAR 15.201", name: "Exchanges with industry before proposal receipt", badge: "required" },
-      { cite: "FAR 15.206", name: "Amendments of solicitations", badge: "required" },
-      { cite: "FAR 52.215-1(c)", name: "Submission, modification, revision, withdrawal of proposals", badge: "required" },
-      { cite: "FAR 52.215-9", name: "Changes or additions to make-or-buy program", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P0",
-        title: "Missed Q&A window — clarification can't be obtained post-deadline",
-        why: "KO question deadlines typically close 7–14 days before proposal due. After the window closes, ambiguous CLINs and trap clauses become unrecoverable bidder risk.",
-        action: "FARaudit calendars the Q&A window from the audit, drafts clarification emails the moment audit finishes, and pings you at 72/24/4 hours before close."
-      },
-      {
-        pri: "P1",
-        title: "Past performance citations weak or off-scope",
-        why: "Source selection scoring on Past Performance is unforgiving — citations that don't match the NAICS, dollar magnitude, or technical scope reduce your evaluation rating significantly.",
-        action: "FARaudit Past Performance library matches each solicitation against your contract history, surfacing the best citations and flagging gaps."
-      }
-    ]
-  },
-  {
-    num: "05",
-    label: "Award + Source Selection",
-    title: "Source selection support + award reception",
-    summary: "Track source selection events, prepare for clarifications, ingest award notification, transition to performance.",
-    duration: "30–120 days",
-    actors: "Contracts, BD, project management",
-    overview: {
-      whatHappens: [
-        "Source selection evaluation period",
-        "Possible KO clarification or discussion request",
-        "Final proposal revision (FPR) if competitive range",
-        "Award notification or unsuccessful debrief",
-        "Award document review + acceptance"
-      ],
-      keyArtifacts: [
-        "Source selection decision document",
-        "Award notification",
-        "Debrief request (if unsuccessful)",
-        "Final contract document",
-        "Acceptance documentation"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Award Document Audit", d: "Re-audits the award doc against the solicitation to flag any unilateral changes" },
-        { t: "Debrief Question Generator", d: "If unsuccessful, drafts the FAR 15.506 debrief question set" },
-        { t: "Competitive Intel Update", d: "Logs award winner, price, and protest status into your competitive database" }
-      ],
-      outcomes: ["Catch unilateral changes", "Stronger debriefs", "Compounding intel"]
-    },
-    clauses: [
-      { cite: "FAR 15.503", name: "Notifications to unsuccessful offerors", badge: "required" },
-      { cite: "FAR 15.506", name: "Postaward debriefing of offerors", badge: "required" },
-      { cite: "FAR 33.103", name: "Protests to the agency", badge: "reference" },
-      { cite: "FAR 52.233-2", name: "Service of protest", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P0",
-        title: "Award document differs from solicitation — silent unilateral change",
-        why: "KOs occasionally issue award documents with modifications to scope, pricing, or terms that weren't in the solicitation. Subs sign without re-auditing and lock in unfavorable terms.",
-        action: "FARaudit re-audits the award document against the original solicitation, diffing every clause and CLIN. Material changes trigger an alert before signature."
-      },
-      {
-        pri: "P1",
-        title: "Missed debrief window",
-        why: "FAR 15.506 debrief requests must be filed within 3 days of unsuccessful notification. Subs miss this and lose the ability to learn from the loss or ground a protest.",
-        action: "Award notification triggers a 3-day debrief countdown; FARaudit drafts the FAR 15.506 question set automatically."
-      }
-    ]
-  },
-  {
-    num: "06",
-    label: "Performance",
-    title: "Contract administration + mod tracking",
-    summary: "Monitor performance compliance, track mods, surface scope creep, log CPARS-relevant events for the next bid.",
-    duration: "Contract period",
-    actors: "Project management, contracts, KO liaison",
-    overview: {
-      whatHappens: [
-        "Performance against scope, schedule, and cost",
-        "Modifications issued by KO (bilateral or unilateral)",
-        "CPARS evaluation events",
-        "Scope creep negotiations",
-        "Option year decisions"
-      ],
-      keyArtifacts: [
-        "Modifications log",
-        "Performance reports",
-        "CPARS evaluations",
-        "Invoice + payment history",
-        "Issue + risk register"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Mod Watcher", d: "Re-audits every modification against the base contract, flags scope or price changes" },
-        { t: "CPARS Coach", d: "Logs performance events that map to CPARS evaluation factors for stronger ratings" },
-        { t: "Compliance Calendar", d: "Tracks recurring deliverables and certification expirations" },
-        { t: "Scope Creep Detector", d: "Flags KO requests that exceed contract scope, drafts modification requests" }
-      ],
-      outcomes: ["Higher CPARS ratings", "Fewer scope-creep losses", "Mod transparency"]
-    },
-    clauses: [
-      { cite: "FAR 43.103", name: "Types of contract modifications", badge: "required" },
-      { cite: "FAR 52.243-1", name: "Changes — Fixed Price", badge: "required" },
-      { cite: "FAR 52.243-3", name: "Changes — Time and Materials", badge: "required" },
-      { cite: "FAR 42.1502", name: "Policy on contractor performance evaluations (CPARS)", badge: "required" },
-      { cite: "FAR 52.245-1", name: "Government Property", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P0",
-        title: "Unilateral mod changes scope without compensation",
-        why: "Unilateral modifications under FAR 43.103 can change scope without sub agreement. Subs perform without negotiating equitable adjustment and absorb the cost.",
-        action: "Mod Watcher diffs every modification against the base contract; flags scope changes; auto-drafts equitable adjustment requests under FAR 52.243."
-      },
-      {
-        pri: "P1",
-        title: "Weak CPARS rating from unlogged performance events",
-        why: "CPARS evaluations are written from the KO's memory of the contract. Subs who don't proactively document strong performance events get average ratings that hurt future awards.",
-        action: "CPARS Coach logs performance events tagged to CPARS evaluation factors; produces a quarterly summary you send to the KO before evaluation."
-      }
-    ]
-  },
-  {
-    num: "07",
-    label: "Closeout",
-    title: "Contract closeout + lessons learned",
-    summary: "Final invoicing, closeout audit, contract file archive, lessons logged into the next bid cycle.",
-    duration: "30–180 days post-final-delivery",
-    actors: "Contracts, finance",
-    overview: {
-      whatHappens: [
-        "Final delivery + acceptance",
-        "Final invoice + payment",
-        "Government property disposition",
-        "DD-1594 closeout (if applicable)",
-        "Contract file archive + lessons learned"
-      ],
-      keyArtifacts: [
-        "Final invoice",
-        "Property disposition records",
-        "DD-1594",
-        "Contract closeout statement",
-        "Lessons learned memo"
-      ]
-    },
-    faraudit: {
-      outputs: [
-        { t: "Closeout Audit", d: "Verifies all deliverables met, all invoices paid, all property dispositioned" },
-        { t: "Lessons Learned Engine", d: "Distills the contract into a structured memo: what worked, what to bid differently next time" },
-        { t: "Past Performance Updater", d: "Auto-formats this contract as a citable past performance entry for the next solicitation" }
-      ],
-      outcomes: ["Clean closeout", "Citable past performance", "Compounding intel into next bid"]
-    },
-    clauses: [
-      { cite: "FAR 4.804", name: "Closeout of contract files", badge: "required" },
-      { cite: "FAR 4.805", name: "Storage, handling, contract files", badge: "reference" },
-      { cite: "FAR 52.245-1(j)", name: "Government property — disposition", badge: "required" },
-      { cite: "FAR 52.232-22", name: "Limitation of Funds", badge: "reference" }
-    ],
-    risks: [
-      {
-        pri: "P1",
-        title: "Final invoice not submitted within closeout window",
-        why: "Final invoices submitted past the contract closeout window can be denied. Subs lose 1–3% of contract value to administrative oversight.",
-        action: "FARaudit closeout calendar tracks the final invoice deadline from the contract terms and pings 30/14/7 days before."
-      },
-      {
-        pri: "P1",
-        title: "Government property not properly dispositioned",
-        why: "GFP not returned or formally written off creates audit liability and can hold up final payment. FAR 52.245-1(j) requirements are precise.",
-        action: "FARaudit closeout audit produces a property disposition checklist tied to the contract's GFP records."
-      }
-    ]
-  }
+const S=[
+  {n:'00',l:'Govt need\nidentified',fa:false,t:'Government requirement identified',s:'Agency determines a need · Program office begins planning',c1:['Program office defines requirement','Budget allocated — PPBE cycle','Market research — FAR Part 10','Acquisition strategy developed'],c2:['SOO drafted','NAICS code assigned','Set-aside determination made','Estimated value established'],fn:'FARaudit not yet involved. This stage is internal to the agency.',fh:null,out:[],oc:[],cl:[],ri:[]},
+  {n:'01',l:'Pre-Sol\nSynopsis',fa:true,t:'Pre-Solicitation Synopsis',s:'FAR 5.203 · Public notice on SAM.gov · The starting gun',c1:['CO posts public notice to SAM.gov','Industry begins positioning','Small business office reviews set-aside','Value and timeline published'],c2:['Contract type announced (FFP/T&M/Cost+)','NAICS code confirmed','Anticipated release date provided','CO contact posted'],fn:'Synopsis Scanner detects notices at 06:15 CT daily across 9 defense NAICS codes. Analyzes contract type, set-aside, urgency score 0–100. Generates a strategic CO contact email — precise single-question inquiry that positions the contractor as an industry SME. This is the 60–90 day head start no competitor offers.',fh:'60–90 days before the solicitation drops',out:['Synopsis analysis','CO contact email','Preparation calendar','Urgency score 0–100'],oc:['60–90 day head start','CO relationship established','Teaming strategy formed'],cl:[{n:'FAR 5.203',t:'Publicizing Contract Actions — requires pre-solicitation notice',b:'cref'},{n:'FAR Part 10',t:'Market Research — agency gauges industry capability',b:'cref'}],ri:[{t:'Missed synopsis — competition starts without you',s:'P1',d:"If the Synopsis posts and you don't respond within the first week, competitors establish the CO relationship first.",a:'FARaudit: Synopsis Scanner fires same day. CO email drafted within minutes of detection.'}]},
+  {n:'02',l:'Sources Sought\n/ RFI',fa:true,t:'Sources Sought · Request for Information',s:'Agency shapes the requirement · Maximum contractor influence window',c1:['Agency gauges market capability','Identifies qualified vendors','Refines performance standards','Tests pricing assumptions'],c2:['Technical capabilities requested','Pricing data collected','SOW/PWS language being written','Evaluation weights undecided'],fn:'RFI Scanner monitors 9 defense NAICS codes daily. Ranks by influence score. RFI Response Drafter produces solution-first strategic response: unconsidered risks flagged, agency terminology mirrored, performance standards proposed. Contractor language enters the final SOW.',fh:'Where contractor language enters the government SOW',out:['Ranked RFI feed','Strategic response draft','Unconsidered risk analysis','Terminology alignment'],oc:['Language written into SOW','SME positioning','Evaluation criteria shaped'],cl:[{n:'FAR 10.002',t:'Market Research procedures — governs Sources Sought',b:'cref'},{n:'FAR 52.215-3',t:'Request for Information or Solicitation for Planning Purposes',b:'cref'}],ri:[{t:'RFI leads with company history',s:'P0',d:"Agencies don't care about past performance at this stage — they're evaluating technical understanding.",a:'FARaudit: Response Drafter hard-coded to lead with solution approach. Company history never in first paragraph.'},{t:'Failing to identify unconsidered risks',s:'P1',d:'Most influential RFI responses identify a technical risk the agency missed. This positions you as SME and gets your language into the final SOW.',a:'FARaudit: Drafter produces 2–3 unconsidered risk flags with specific mitigations.'}]},
+  {n:'03',l:'Solicitation\nDrops',fa:true,t:'Solicitation released',s:'RFQ / RFP / IFB posted to SAM.gov · Competition clock starts',c1:['CO releases solicitation to SAM.gov','Question window opens — 7–14 days','Site visit scheduled if applicable','Offerors begin proposal development'],c2:['Section B — CLINs and pricing','Section C — SOW, PWS, or SOO','Section L — instructions to offerors','Section M — evaluation factors'],fn:'Full three-call audit engine. Pre-step: SOW/PWS/SOO Classifier determines document type — SOW (task-based), PWS (outcome-based), SOO (propose your own). This changes the entire bid strategy. Call 1: CLIN structure, quantity ambiguities, FOB conflicts. Call 2: FAR/DFARS compliance. Call 3: DFARS trap detection — hexavalent chromium 252.223-7008, covered telecom 252.204-7018, CMMC 252.204-7021.',fh:'Three-call architecture — no token truncation on large IDIQs',out:['SOW/PWS/SOO classification + bid strategy','CLIN ambiguity flags','Full compliance report','DFARS trap list','KO clarification email'],oc:['Zero pricing surprises','Compliance confirmed','Clarification questions filed'],cl:[{n:'252.223-7008',t:'Prohibition of Hexavalent Chromium — disqualification trap',b:'ct'},{n:'252.204-7018',t:'Covered Defense Telecom Equipment — supply chain requirement',b:'ct'},{n:'252.204-7021',t:'CMMC Requirements — cybersecurity certification',b:'ct'},{n:'52.219-14',t:'Limitations on Subcontracting — 50% self-performance rule',b:'cr'},{n:'52.225-1',t:'Buy American — domestic end product certification',b:'cr'}],ri:[{t:'CLIN quantity ambiguity — "Set of 2 · 80 Each"',s:'P0',d:'Does "80 Each" mean 80 sets (160 plugs) or 80 individual plugs? A 2x margin exposure on the entire CLIN.',a:'FARaudit: Flagged in Call 1 with specific clarification question to CO ready to send.'},{t:'FOB designation conflict',s:'P0',d:'CLIN 0001 shows Government Destination, CLINs 0002/0003 show Contractor Destination. Contractor who ships wrong pays freight.',a:'FARaudit: FOB conflict flagged in Call 1. KO email includes explicit FOB question with citations.'},{t:'Hexavalent chromium in coating supply chain',s:'P1',d:'DFARS 252.223-7008 prohibits hex-chrome without written approval. Many aerospace primers contain it.',a:'FARaudit: Flagged in Call 3 with supplier verification checklist.'}]},
+  {n:'04',l:'Proposal\nDevelopment',fa:true,t:'Proposal development',s:'Contractor builds technical and price volumes',c1:['Estimator prices each CLIN','Technical team writes approach','Compliance matrix completed','Past performance compiled'],c2:['BOE developed per CLIN','Labor categories and rates applied','Material and subcontract costs','Subcontracting plan if required'],fn:'Audit report drives every pricing decision. CLIN quantities resolved before estimating. FOB confirmed. Document type determines strategy: SOW = compliance-first, PWS = outcome innovation, SOO = propose your own PWS. Section M evaluation factors extracted and weighted.',fh:'Audit report drives pricing — before the spreadsheet opens',out:['CLIN pricing guidance','Section L checklist','Section M response outline','Risk-adjusted BOE inputs'],oc:['Defensible pricing','Compliant submission'],cl:[{n:'52.215-14',t:'Integrity of Unit Prices — cost/pricing data certification',b:'cr'},{n:'52.219-9',t:'Small Business Subcontracting Plan — if subcontracting planned',b:'cr'}],ri:[{t:'Proposing to wrong document type',s:'P1',d:'A contractor who receives a SOO and writes a SOW-style proposal has misread the requirement.',a:'FARaudit: SOW/PWS/SOO Classifier runs in pre-step. Bid strategy explicit before any clause checking.'}]},
+  {n:'05',l:'Submission',fa:true,t:'Quote / proposal submitted',s:'Delivered to CO by deadline · In English · In USD',c1:['Submit by hard deadline','Email to both CO contacts','SAM.gov registration current','Reps and certs signed'],c2:['SF 1449 completed','USD only (FAR 52.214-35)','English only (FAR 52.214-34)','Buy American cert (52.225-4)','Telecom rep (252.204-7017)'],fn:'Pre-submission checklist derived from audit report. Every clause with an offeror action confirmed complete. Deadline, email addresses, currency and language requirements extracted and verified. No late or non-compliant submissions.',fh:'Pre-submission compliance checklist — zero gaps',out:['Pre-submission checklist','Both CO emails confirmed','Deadline + time zone verified','Reps and certs status'],oc:['On-time delivery','Compliant package'],cl:[{n:'52.214-34',t:'Submission in English — mandatory',b:'cr'},{n:'52.214-35',t:'Submission in USD — mandatory',b:'cr'},{n:'52.204-7',t:'SAM.gov Registration — current at submission',b:'cr'},{n:'252.204-7017',t:'Covered Telecom Representation — offeror certification',b:'cr'}],ri:[{t:'Submitting after deadline (CDT vs EDT)',s:'P0',d:'"12:00 PM CDT" — Eastern time contractor who reads this as noon Eastern submits one hour late. Rejected without exception.',a:'FARaudit: Deadline flagged with explicit time zone in all three zones. No ambiguity.'},{t:'Missing MFG name or part number',s:'P1',d:'Special Note 6 requires: (1) MFG name (2) part number (3) illustrations (4) literature. Missing any = non-responsive.',a:'FARaudit: Note 6 extracted and added to checklist as four explicit line items.'}]},
+  {n:'06',l:'Evaluation',fa:true,t:'Government evaluation',s:'LPTA or Best Value · Technical acceptability first',c1:['CO evaluates technical volumes','Price reasonableness vs IGE','Responsibility determination','Award decision finalized'],c2:['Rating: Acceptable / Unacceptable','Past performance if Section M requires','Price vs IGE compared','Small business status verified'],fn:"SOW Influence Tracker activates. Cross-references RFI response from Stage 02 against the final SOW. Computes match score 0–100 and identifies specific phrases that carried through. This is the ROI demonstration that justifies the subscription and creates the renewal conversation.",fh:'SOW Influence Tracker — closes the loop, proves ROI',out:['Match score 0–100','Phrases that carried through','Risk flags that became requirements','Competitive positioning report'],oc:['ROI demonstrated','Advantage documented'],cl:[{n:'FAR 15.305',t:'Proposal Evaluation — technical factors and procedures',b:'cref'},{n:'52.219-6',t:'Total Small Business Set-Aside — eligibility at evaluation',b:'cr'}],ri:[{t:'Technical unacceptability — missed Section M factor',s:'P0',d:'LPTA evaluation is binary: Acceptable or Unacceptable. One missed mandatory Section M factor = rejected regardless of price.',a:'FARaudit: Section M factors extracted in Call 1 and mapped to Section L. Proposal outline explicitly aligns each.'}]},
+  {n:'07',l:'Award',fa:true,t:'Contract award · Performance begins',s:'Purchase Order or Contract issued · WAWF invoicing active',c1:['CO issues award','Contractor countersigns','Performance period begins','WAWF registration confirmed'],c2:['Contract number assigned','DoDAAC codes confirmed','Delivery schedule tracked','Modifications analyzed'],fn:'Post-award compliance monitoring. WAWF routing codes verified — DoDAAC F87700 (pay official), FA3016 (admin), F3PT73 (inspect/ship-to). Delivery tracked against Section F. FARaudit flags recompete timeline 180 days before contract expiration.',fh:'Post-award compliance + recompete intelligence',out:['WAWF routing verification','Delivery schedule tracker','Modification analysis','Recompete alert (180d)'],oc:['On-time invoicing','Delivery compliance'],cl:[{n:'252.232-7006',t:'WAWF Payment Instructions — Combo document type for fixed-price',b:'cr'},{n:'252.232-7003',t:'Electronic Submission of Payment Requests — mandatory WAWF',b:'cr'},{n:'5352.242-9000',t:'Contractor Access to Air Force Installations — base pass required',b:'cr'}],ri:[{t:'Wrong WAWF document type',s:'P1',d:'Fixed-price deliverables must use Combo in WAWF. Using Invoice 2in1 triggers rejection and restarts 30-day payment clock.',a:'FARaudit: Combo confirmed for all physical CLINs. DoDAAC codes pre-populated in checklist.'},{t:'Missing base access form — delivery blocked',s:'P1',d:'5352.242-9000 requires written request on company letterhead before delivery. Showing up without it = rejected.',a:'FARaudit: Clause flagged in Call 2. Base access template extracted and added to post-award checklist.'}]}
 ];
-
-// ===================== STATE =====================
-let currentStage = 0;
-let currentTab = "overview";
-
-// ===================== VIEW SWITCHING =====================
-const viewButtons = document.querySelectorAll(".view-toggle button");
-viewButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const view = btn.dataset.view;
-    viewButtons.forEach(b => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    document.getElementById("view-" + view).classList.add("active");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-});
-
-// ===================== STAGE RAIL =====================
-function renderRail() {
-  const rail = document.getElementById("stage-rail");
-  rail.innerHTML = STAGES.map((s, i) => `
-    <button class="stage-chip ${i === currentStage ? "active" : ""}" data-idx="${i}">
-      <span class="stage-num">STAGE ${s.num}</span>
-      <span class="stage-label">${s.label}</span>
-    </button>
-  `).join("");
-  rail.querySelectorAll(".stage-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      currentStage = parseInt(chip.dataset.idx, 10);
-      currentTab = "overview";
-      renderAll();
-    });
-  });
+let cur=1;
+const bmap={ct:'ct',cr:'cr',cref:'cref'};
+const blbl={ct:'TRAP',cr:'Required',cref:'Ref'};
+function rr(){document.getElementById('rail').innerHTML=S.map((s,i)=>`<div class="pip ${i===cur?'active':i<cur?'done':''}" onclick="gt(${i})"><div class="pip-num">${s.n}</div><div class="pip-lbl">${s.l.replace('\n','<br>')}</div></div>`).join('');}
+function rc(){
+  const s=S[cur],pct=Math.round((cur/(S.length-1))*100);
+  document.getElementById('pf').style.width=pct+'%';
+  document.getElementById('pl').textContent=`Stage ${cur+1} of ${S.length}`;
+  document.getElementById('pp').textContent=pct+'%';
+  document.getElementById('nc').textContent=`Stage ${cur+1} of ${S.length}`;
+  document.getElementById('bp').disabled=cur===0;
+  document.getElementById('bn').disabled=cur===S.length-1;
+  const fp=s.fa?`<div class="fa-panel"><div class="fa-badge">FARaudit</div>${s.fh?`<div class="fa-headline">${s.fh}</div>`:''}<div class="fa-note">${s.fn}</div>${s.out.length?`<div class="col-lbl" style="margin-bottom:6px">Outputs</div><div class="chips">${s.out.map(o=>`<span class="chip-out">${o}</span>`).join('')}</div>`:''} ${s.oc.length?`<div class="col-lbl" style="margin:6px 0">Outcomes</div><div class="chips">${s.oc.map(o=>`<span class="chip-oc">${o}</span>`).join('')}</div>`:''}</div>`:`<div class="no-fa">${s.fn}</div>`;
+  const cp=s.cl.length?`<div class="inline-sec"><div class="inline-sec-t">FAR/DFARS clauses</div>${s.cl.map(c=>`<div class="clause-row"><div class="clause-num">${c.n}</div><div class="clause-title">${c.t}</div><span class="cbadge ${bmap[c.b]}">${blbl[c.b]}</span></div>`).join('')}</div>`:'';
+  const rp=s.ri.length?`<div class="inline-sec"><div class="inline-sec-t">Risk flags</div>${s.ri.map((r,i)=>`<div class="risk-card"><div class="risk-hdr" onclick="tr(${cur},${i})"><div class="risk-t">${r.t}</div><div class="risk-sev ${r.s==='P0'?'sp0':'sp1'}">${r.s}</div></div><div class="risk-body" id="r${cur}${i}">${r.d}<div class="risk-action">${r.a}</div></div></div>`).join('')}</div>`:'';
+  document.getElementById('sc').innerHTML=`<div class="card"><div class="card-hdr ${s.fa?'navy':'gray'}"><div class="stage-tag">Stage ${s.n}</div><div class="card-title">${s.t}</div><div class="card-sub">${s.s}</div></div><div class="card-body"><div class="two-col"><div><div class="col-lbl">What's happening</div>${s.c1.map(i=>`<div class="item-row"><div class="dot"></div><div class="item-txt">${i}</div></div>`).join('')}</div><div><div class="col-lbl">Key documents & actions</div>${s.c2.map(i=>`<div class="item-row"><div class="dot"></div><div class="item-txt">${i}</div></div>`).join('')}</div></div>${fp}${cp}${rp}</div></div>`;
 }
-
-// ===================== STAGE CARD =====================
-function renderStageCard() {
-  const s = STAGES[currentStage];
-  const card = document.getElementById("stage-card");
-  card.innerHTML = `
-    <div class="stage-eyebrow">Stage ${s.num} · ${s.duration} · ${s.actors}</div>
-    <h2 class="stage-title">${s.title}</h2>
-    <p class="stage-summary">${s.summary}</p>
-
-    <div class="inner-tabs">
-      <button data-tab="overview" class="${currentTab === "overview" ? "active" : ""}">Overview</button>
-      <button data-tab="faraudit" class="${currentTab === "faraudit" ? "active" : ""}">FARaudit</button>
-      <button data-tab="clauses" class="${currentTab === "clauses" ? "active" : ""}">Clauses</button>
-      <button data-tab="risks" class="${currentTab === "risks" ? "active" : ""}">Risks</button>
-    </div>
-
-    <div class="pane ${currentTab === "overview" ? "active" : ""}" data-pane="overview">
-      ${renderOverview(s)}
-    </div>
-    <div class="pane ${currentTab === "faraudit" ? "active" : ""}" data-pane="faraudit">
-      ${renderFaraudit(s)}
-    </div>
-    <div class="pane ${currentTab === "clauses" ? "active" : ""}" data-pane="clauses">
-      ${renderClauses(s)}
-    </div>
-    <div class="pane ${currentTab === "risks" ? "active" : ""}" data-pane="risks">
-      ${renderRisks(s)}
-    </div>
-  `;
-  card.querySelectorAll(".inner-tabs button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      currentTab = btn.dataset.tab;
-      renderStageCard();
-    });
-  });
-  card.querySelectorAll(".risk-head").forEach(btn => {
-    btn.addEventListener("click", () => btn.closest(".risk-card").classList.toggle("open"));
-  });
+function tr(s,i){document.getElementById(`r${s}${i}`).classList.toggle('open');}
+function gt(i){cur=i;rr();rc();}
+function nav(d){gt(Math.max(0,Math.min(S.length-1,cur+d)));}
+function sv(v,btn){
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('vl').style.display=v==='lifecycle'?'block':'none';
+  document.getElementById('vc').classList.toggle('active',v==='competitor');
+  document.getElementById('vd').classList.toggle('active',v==='demo');
 }
-
-function renderOverview(s) {
-  return `
-    <div class="ov-grid">
-      <div class="ov-block">
-        <h4>What happens</h4>
-        <ul>${s.overview.whatHappens.map(x => `<li>${x}</li>`).join("")}</ul>
-      </div>
-      <div class="ov-block">
-        <h4>Key artifacts</h4>
-        <ul>${s.overview.keyArtifacts.map(x => `<li>${x}</li>`).join("")}</ul>
-      </div>
-    </div>
-    <div class="ov-meta">
-      <span><strong>Duration:</strong>${s.duration}</span>
-      <span><strong>Owners:</strong>${s.actors}</span>
-    </div>
-  `;
-}
-
-function renderFaraudit(s) {
-  if (!s.faraudit || !s.faraudit.outputs.length) {
-    return `<p style="color: var(--gray); font-style: italic;">FARaudit coverage in this stage is monitoring-only.</p>`;
-  }
-  return `
-    <div class="fa-section">
-      <h4>FARaudit Outputs</h4>
-      ${s.faraudit.outputs.map(o => `
-        <div class="output-card">
-          <div class="ot">${o.t}</div>
-          <div class="od">${o.d}</div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="fa-section">
-      <h4>Outcomes</h4>
-      <div class="chips">
-        ${s.faraudit.outcomes.map(c => `<span class="chip">${c}</span>`).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderClauses(s) {
-  if (!s.clauses.length) {
-    return `<p style="color: var(--gray); font-style: italic;">No specific clauses anchored to this stage.</p>`;
-  }
-  return s.clauses.map(c => `
-    <div class="clause-row">
-      <div class="clause-cite">${c.cite}</div>
-      <div class="clause-name">${c.name}</div>
-      <div class="badge ${c.badge}">${c.badge}</div>
-    </div>
-  `).join("");
-}
-
-function renderRisks(s) {
-  if (!s.risks.length) {
-    return `<p style="color: var(--gray); font-style: italic;">No prioritized risks at this stage.</p>`;
-  }
-  return s.risks.map((r, i) => `
-    <div class="risk-card" data-idx="${i}">
-      <button class="risk-head">
-        <span class="risk-pri ${r.pri.toLowerCase()}">${r.pri}</span>
-        <span class="risk-title">${r.title}</span>
-        <span class="risk-caret">▶</span>
-      </button>
-      <div class="risk-body">
-        <div class="risk-row">
-          <div class="lbl">Why it matters</div>
-          <div class="val">${r.why}</div>
-        </div>
-        <div class="risk-row">
-          <div class="lbl">FARaudit action</div>
-          <div class="val">${r.action}</div>
-        </div>
-      </div>
-    </div>
-  `).join("");
-}
-
-// ===================== NAV ARROWS =====================
-document.getElementById("prev-stage").addEventListener("click", () => {
-  if (currentStage > 0) {
-    currentStage--;
-    currentTab = "overview";
-    renderAll();
-  }
-});
-document.getElementById("next-stage").addEventListener("click", () => {
-  if (currentStage < STAGES.length - 1) {
-    currentStage++;
-    currentTab = "overview";
-    renderAll();
-  }
-});
-
-// ===================== PROGRESS + COUNTER =====================
-function renderProgress() {
-  const pct = ((currentStage + 1) / STAGES.length) * 100;
-  document.getElementById("progress-bar").style.width = pct + "%";
-  document.getElementById("stage-counter").textContent =
-    `Stage ${currentStage + 1} of ${STAGES.length}`;
-  document.getElementById("prev-stage").disabled = currentStage === 0;
-  document.getElementById("next-stage").disabled = currentStage === STAGES.length - 1;
-}
-
-function renderAll() {
-  renderRail();
-  renderStageCard();
-  renderProgress();
-}
-
-// ===================== OBJECTION HANDLERS =====================
-document.querySelectorAll(".obj-head").forEach(btn => {
-  btn.addEventListener("click", () => btn.closest(".obj-card").classList.toggle("open"));
-});
-
-// ===================== INIT =====================
-renderAll();
+function to(el){el.nextElementSibling.classList.toggle('open');}
+gt(1);
 </script>
-
 </body>
 </html>

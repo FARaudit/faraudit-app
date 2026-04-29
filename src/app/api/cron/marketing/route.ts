@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const msg = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-7",
     max_tokens: 600,
     system: FARAUDIT_CONTEXT,
     messages: [{ role: "user", content: PROMPTS[contentType] || PROMPTS.linkedin_post }]

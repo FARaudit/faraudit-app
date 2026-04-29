@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARaudit — Federal Contract Intelligence</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1f2937;min-height:100vh}
+.page{max-width:800px;margin:0 auto;padding:40px 24px}
+.hdr{background:#0A1628;border-radius:12px;padding:32px;margin-bottom:24px;position:relative;overflow:hidden}
+.hdr::after{content:'';position:absolute;right:-40px;top:-40px;width:200px;height:200px;background:rgba(55,138,221,.15);border-radius:50%}
+.hdr-badge{font-size:10px;color:#B5D4F4;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:12px}
+.hdr h1{font-size:28px;font-weight:700;color:#fff;margin-bottom:8px;position:relative;z-index:1}
+.hdr p{font-size:14px;color:#B5D4F4;line-height:1.7;max-width:500px;position:relative;z-index:1}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.card{background:#fff;border:.5px solid #e5e7eb;border-radius:10px;padding:20px}
+.card-t{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;font-weight:700;margin-bottom:12px}
+.row{display:flex;gap:8px;padding:7px 0;border-bottom:.5px solid #f3f4f6;align-items:flex-start;font-size:13px}
+.row:last-child{border-bottom:none}
+.check{width:16px;height:16px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;color:#166534;margin-top:1px}
+.section-t{font-size:12px;font-weight:700;color:#0A1628;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.stage-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.pill{font-size:10px;padding:4px 10px;border-radius:12px;font-weight:600;background:#E6F1FB;color:#185FA5}
+.pill.active{background:#0A1628;color:#B5D4F4}
+.price-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:.5px solid #f3f4f6}
+.price-row:last-child{border-bottom:none}
+.price-t{font-size:13px;font-weight:600;color:#1f2937}
+.price-v{font-size:15px;font-weight:700;color:#0A1628}
+.price-s{font-size:11px;color:#6b7280}
+.cta{background:#0A1628;border-radius:10px;padding:24px;text-align:center;margin-top:24px}
+.cta h2{font-size:18px;font-weight:600;color:#fff;margin-bottom:8px}
+.cta p{font-size:13px;color:#B5D4F4;margin-bottom:16px}
+.cta a{display:inline-block;padding:10px 28px;background:#185FA5;color:#fff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;margin:4px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hdr">
+    <div class="hdr-badge">Federal Contract Intelligence</div>
+    <h1>FARaudit</h1>
+    <p>The complete federal acquisition intelligence platform for defense subcontractors. Eight stages of the acquisition lifecycle — audited, analyzed, and acted on before your competitors see the solicitation.</p>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-t">The problem</div>
+      <div class="row"><div class="check">✗</div><div>Most contractors start at Stage 03 — when the solicitation drops and evaluation criteria are already locked</div></div>
+      <div class="row"><div class="check">✗</div><div>DFARS traps, CLIN ambiguities, and FOB conflicts cost contractors 5–6 figure margin hits on every bid</div></div>
+      <div class="row"><div class="check">✗</div><div>No one tracks the recompete 180 days out — so the next competition starts without you too</div></div>
+    </div>
+    <div class="card">
+      <div class="card-t">The FARaudit difference</div>
+      <div class="row"><div class="check">✓</div><div>Starts at Stage 01 — Pre-Sol Synopsis — 60–90 days before the solicitation drops</div></div>
+      <div class="row"><div class="check">✓</div><div>Three-call audit architecture: CLIN review → FAR/DFARS compliance → DFARS trap detection</div></div>
+      <div class="row"><div class="check">✓</div><div>Every finding cited by regulation number — no black box, no hallucinated clauses</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-t">Where FARaudit operates across the lifecycle</div>
+    <div class="stage-pills">
+      <span class="pill">00 Govt need</span>
+      <span class="pill active">01 Pre-Sol Synopsis ↑</span>
+      <span class="pill active">02 Sources Sought ↑</span>
+      <span class="pill active">03 Solicitation ↑</span>
+      <span class="pill active">04 Proposal Dev ↑</span>
+      <span class="pill active">05 Submission ↑</span>
+      <span class="pill active">06 Evaluation ↑</span>
+      <span class="pill active">07 Award ↑</span>
+    </div>
+    <div style="font-size:12px;color:#6b7280">No competitor starts before Stage 03. FARaudit starts at Stage 01.</div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-t">Designed for</div>
+      <div class="row"><div class="check">→</div><div>Defense subcontractors · $5M–$100M revenue</div></div>
+      <div class="row"><div class="check">→</div><div>ISO 9001 / AS9100D / ITAR registered shops</div></div>
+      <div class="row"><div class="check">→</div><div>NAICS 336413, 332710, 332720, 332999, 334511</div></div>
+      <div class="row"><div class="check">→</div><div>Bidding federal without a dedicated capture team</div></div>
+    </div>
+    <div class="card">
+      <div class="card-t">Pricing</div>
+      <div class="price-row"><div><div class="price-t">Design Partner</div><div class="price-s">First 90 days · locked in</div></div><div><div class="price-v">$1,250<span style="font-size:11px;font-weight:400">/mo</span></div></div></div>
+      <div class="price-row"><div><div class="price-t">Standard</div><div class="price-s">After design partner period</div></div><div><div class="price-v">$2,500<span style="font-size:11px;font-weight:400">/mo</span></div></div></div>
+      <div style="font-size:11px;color:#6b7280;margin-top:10px">First 10 conversations: free audit of any active solicitation. No strings.</div>
+    </div>
+  </div>
+  <div class="cta">
+    <h2>Ready to see what FARaudit finds in your next solicitation?</h2>
+    <p>Send us any active solicitation number. We run the full audit — CLIN analysis, compliance check, DFARS traps — and send you the report. Free. No pitch call required.</p>
+    <a href="mailto:jose@faraudit.com">Request free audit →</a>
+    <a href="https://faraudit.com" style="background:transparent;border:.5px solid #B5D4F4;color:#B5D4F4">Visit faraudit.com</a>
+  </div>
+</div>
+</body>
+</html>
