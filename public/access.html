@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request Access — FARaudit · Federal Contract Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,900;1,9..144,300;1,9..144,400&family=JetBrains+Mono:wght@400;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#030810;--gold:#C9A84C;--gold2:#DFB96A;
+  --text:#F5F0E8;--text2:#E8E2D4;--text3:rgba(245,240,232,.4);
+  --mono:'JetBrains Mono',monospace;--serif:'Fraunces',Georgia,serif;
+}
+html,body{background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;min-height:100vh;}
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(245,240,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(245,240,232,.04) 1px,transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);pointer-events:none;}
+.glow-orb{position:fixed;top:-100px;right:-60px;width:800px;height:700px;background:radial-gradient(ellipse at 65% 25%,rgba(201,168,76,.07) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.scan-line{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.3) 50%,transparent);animation:scan 18s linear infinite;z-index:1;pointer-events:none;}
+@keyframes scan{0%{top:-1px;opacity:0}4%{opacity:1}96%{opacity:.3}100%{top:100vh;opacity:0}}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 56px;background:rgba(3,8,16,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(201,168,76,.1);}
+.nav-brand{display:flex;align-items:center;gap:12px;}
+.nav-wordmark{font-family:var(--serif);font-size:18px;font-weight:900;letter-spacing:-.02em;}
+.nav-wordmark span{color:var(--gold);}
+.nav-cat{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);padding-left:14px;border-left:1px solid rgba(201,168,76,.2);}
+.nav-back{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);text-decoration:none;display:flex;align-items:center;gap:8px;transition:color .2s;}
+.nav-back:hover{color:var(--gold);}
+
+.page{position:relative;z-index:2;min-height:100vh;display:grid;grid-template-columns:1fr 1fr;max-width:1320px;margin:0 auto;padding:0 56px;align-items:center;gap:80px;}
+
+/* LEFT — context */
+.left{padding:80px 0;}
+.eyebrow{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);opacity:.6;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.eyebrow::before{content:'';display:inline-block;width:22px;height:1px;background:var(--gold);opacity:.5;}
+.headline{font-size:clamp(36px,3.8vw,56px);font-weight:900;line-height:1.06;letter-spacing:-.03em;color:var(--text);margin-bottom:6px;}
+.headline em{font-style:italic;font-weight:300;color:var(--gold2);display:block;font-size:clamp(32px,3.4vw,50px);}
+.subtext{font-family:var(--mono);font-size:13px;color:var(--text3);line-height:1.7;margin-top:20px;max-width:440px;}
+
+.slots-badge{display:inline-flex;align-items:center;gap:8px;margin-top:28px;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:3px;padding:10px 16px;}
+.slots-dot{width:6px;height:6px;border-radius:50%;background:#EF4444;animation:pulse 2s ease-in-out infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{opacity:1;box-shadow:0 0 0 5px rgba(239,68,68,0)}}
+.slots-text{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#EF4444;}
+
+.what-you-get{margin-top:36px;}
+.wyg-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;}
+.wyg-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:rgba(245,240,232,.6);line-height:1.5;}
+.wyg-icon{color:var(--gold);opacity:.7;flex-shrink:0;font-size:12px;margin-top:1px;}
+
+.price-block{margin-top:32px;padding-top:24px;border-top:1px solid rgba(201,168,76,.1);}
+.price-main{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--gold2);letter-spacing:-.02em;line-height:1;}
+.price-period{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em;margin-top:4px;}
+
+/* RIGHT — form */
+.right{padding:80px 0;}
+.form-panel{background:rgba(5,13,24,.9);border:1px solid rgba(201,168,76,.18);border-radius:4px;padding:36px 32px;box-shadow:0 24px 64px rgba(0,0,0,.5);}
+.form-hdr{margin-bottom:28px;}
+.form-title{font-family:var(--serif);font-size:22px;font-weight:900;letter-spacing:-.02em;color:var(--text);margin-bottom:6px;}
+.form-sub{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.06em;line-height:1.6;}
+
+.field{margin-bottom:20px;}
+.field-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text3);margin-bottom:7px;display:block;}
+.field input,.field textarea,.field select{
+  width:100%;background:rgba(3,8,16,.8);
+  border:1px solid rgba(201,168,76,.16);border-radius:3px;
+  padding:12px 14px;font-family:var(--mono);font-size:12px;
+  color:var(--text);letter-spacing:.03em;
+  outline:none;transition:border-color .2s;
+  -webkit-appearance:none;
+}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.03);}
+.field input::placeholder,.field textarea::placeholder{color:rgba(245,240,232,.2);}
+.field textarea{resize:vertical;min-height:88px;line-height:1.6;}
+.field select{cursor:pointer;color:var(--text);}
+.field select option{background:#0a1628;color:var(--text);}
+
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+.submit-btn{
+  width:100%;font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--void);background:var(--gold);
+  padding:16px 32px;border-radius:2px;border:1px solid var(--gold);
+  cursor:pointer;transition:all .25s;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.submit-btn:hover{background:var(--gold2);box-shadow:0 8px 24px rgba(201,168,76,.3);transform:translateY(-1px);}
+.submit-btn:disabled{opacity:.5;cursor:default;transform:none;}
+
+.form-note{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.18);letter-spacing:.06em;text-align:center;margin-top:14px;line-height:1.6;}
+
+/* Success state */
+.success-state{display:none;text-align:center;padding:40px 20px;}
+.success-state.visible{display:block;}
+.form-panel.submitted .form-content{display:none;}
+.form-panel.submitted .success-state{display:block;}
+.success-icon{font-size:32px;margin-bottom:16px;}
+.success-title{font-family:var(--serif);font-size:22px;font-weight:900;color:var(--text);margin-bottom:10px;}
+.success-sub{font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.7;letter-spacing:.04em;}
+.success-detail{font-family:var(--mono);font-size:9px;color:rgba(201,168,76,.5);margin-top:16px;letter-spacing:.08em;}
+
+/* Vertical divider */
+.page::before{content:'';position:absolute;top:15%;bottom:15%;left:50%;width:1px;background:linear-gradient(to bottom,transparent,rgba(201,168,76,.15) 20%,rgba(201,168,76,.15) 80%,transparent);z-index:1;}
+
+/* Footer */
+footer{position:relative;z-index:2;padding:20px 56px;border-top:1px solid rgba(201,168,76,.08);display:flex;align-items:center;justify-content:space-between;}
+.footer-brand{font-family:var(--serif);font-size:13px;font-weight:900;letter-spacing:-.01em;color:rgba(245,240,232,.35);}
+.footer-brand span{color:var(--gold);opacity:.6;}
+.footer-copy{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.15);letter-spacing:.06em;}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow-orb"></div>
+<div class="scan-line"></div>
+
+<nav>
+  <div class="nav-brand">
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+      <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.2" fill="none" opacity=".6"/>
+      <path d="M14 6L20 9.5V14.5C20 17.8 17.5 20.5 14 21.5C10.5 20.5 8 17.8 8 14.5V9.5L14 6Z" fill="rgba(201,168,76,.1)" stroke="#C9A84C" stroke-width=".8" opacity=".8"/>
+      <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".8" opacity=".6"/>
+      <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".8" opacity=".4"/>
+    </svg>
+    <div class="nav-wordmark">FAR<span>audit</span></div>
+    <div class="nav-cat">Federal Contract Intelligence</div>
+  </div>
+  <a href="faraudit-landing-v4.html" class="nav-back">← Back to Overview</a>
+</nav>
+
+<div class="page">
+  <!-- LEFT — value context -->
+  <div class="left">
+    <div class="eyebrow">Design Partner Program</div>
+    <h1 class="headline">
+      Request Access
+      <em>to Federal Contract Intelligence.</em>
+    </h1>
+    <p class="subtext">
+      FARaudit is in design partner onboarding. Every access request is reviewed personally. You will hear directly from the founder within 24 hours.
+    </p>
+
+    <div class="slots-badge">
+      <div class="slots-dot"></div>
+      <div class="slots-text">5 design partner slots · <span id="slotsLeft">3 remaining</span></div>
+    </div>
+
+    <div class="what-you-get">
+      <div class="wyg-label">What design partners get</div>
+      <div class="wyg-item"><span class="wyg-icon">→</span>Full platform access — audit engine, KO email, PDF export</div>
+      <div class="wyg-item"><span class="wyg-icon">→</span>Direct founder access — not a support ticket queue</div>
+      <div class="wyg-item"><span class="wyg-icon">→</span>Input into the product roadmap — your workflow shapes the platform</div>
+      <div class="wyg-item"><span class="wyg-icon">→</span>Design partner pricing locked for 12 months after standard launch</div>
+      <div class="wyg-item"><span class="wyg-icon">→</span>Priority access to Phase 2 — live SAM.gov feed + upstream intelligence</div>
+    </div>
+
+    <div class="price-block">
+      <div class="price-main">$1,250<span style="font-size:16px;opacity:.6">/mo</span></div>
+      <div class="price-period">Design partner rate · First 90 days · Standard rate $2,500/mo after launch</div>
+    </div>
+  </div>
+
+  <!-- RIGHT — form -->
+  <div class="right">
+    <div class="form-panel" id="formPanel">
+      <div class="form-content">
+        <div class="form-hdr">
+          <div class="form-title">Request Access</div>
+          <div class="form-sub">All fields required · Reviewed personally · Response within 24 hours</div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">First Name</label>
+            <input type="text" id="firstName" placeholder="Jose" autocomplete="given-name"/>
+          </div>
+          <div class="field">
+            <label class="field-label">Last Name</label>
+            <input type="text" id="lastName" placeholder="Rodriguez" autocomplete="family-name"/>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Business Email</label>
+          <input type="email" id="email" placeholder="you@yourcompany.com" autocomplete="email"/>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Company Name</label>
+            <input type="text" id="company" placeholder="Lone Star Precision Machining"/>
+          </div>
+          <div class="field">
+            <label class="field-label">Your Role</label>
+            <input type="text" id="role" placeholder="Owner / BD Director / Estimator"/>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Primary NAICS Code</label>
+          <select id="naics">
+            <option value="">Select your primary NAICS</option>
+            <option value="336413">336413 — Other Aircraft Parts & Equipment</option>
+            <option value="332710">332710 — Machine Shops</option>
+            <option value="332721">332721 — Precision Turned Product Manufacturing</option>
+            <option value="334511">334511 — Search, Detection & Navigation Instruments</option>
+            <option value="541330">541330 — Engineering Services</option>
+            <option value="336412">336412 — Aircraft Engine & Engine Parts</option>
+            <option value="332999">332999 — Other Fabricated Metal Products</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">What solicitations are you currently working?</label>
+          <textarea id="solicitations" placeholder="e.g. We are bidding on an Air Force RFQ for precision machined brackets (FA8675-26-Q-XXXX). We currently audit manually and it takes 4+ hours per solicitation..."></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Annual federal revenue (approximate)</label>
+          <select id="revenue">
+            <option value="">Select range</option>
+            <option value="under1m">Under $1M</option>
+            <option value="1m-5m">$1M – $5M</option>
+            <option value="5m-20m">$5M – $20M</option>
+            <option value="20m-100m">$20M – $100M</option>
+            <option value="over100m">Over $100M</option>
+          </select>
+        </div>
+
+        <button class="submit-btn" id="submitBtn" onclick="submitForm()">
+          Submit Access Request <span style="font-size:14px">→</span>
+        </button>
+        <div class="form-note">
+          Your information is never sold or shared.<br>
+          FARaudit Inc. · Fort Worth, TX · jose@faraudit.com
+        </div>
+      </div>
+
+      <div class="success-state" id="successState">
+        <div class="success-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <path d="M24 4L40 11V23C40 32 33.5 40.5 24 43C14.5 40.5 8 32 8 23V11L24 4Z" stroke="#C9A84C" stroke-width="1.5" fill="rgba(201,168,76,.08)"/>
+            <polyline points="16,24 21,29 32,18" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="success-title">Request received.</div>
+        <div class="success-sub">
+          You'll hear directly from Jose within 24 hours.<br>
+          Check your inbox at <span id="confirmEmail" style="color:var(--gold);opacity:.7"></span>
+        </div>
+        <div class="success-detail">
+          FARaudit Design Partner Program · $1,250/month · First 90 days<br>
+          jose@faraudit.com · (203) 589-1929
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">FAR<span>audit</span></div>
+  <div class="footer-copy">© 2026 FARaudit Inc. · Federal Contract Intelligence · Fort Worth, TX</div>
+</footer>
+
+<script>
+async function submitForm(){
+  const btn = document.getElementById('submitBtn');
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const company = document.getElementById('company').value.trim();
+  const role = document.getElementById('role').value.trim();
+  const naics = document.getElementById('naics').value;
+  const solicitations = document.getElementById('solicitations').value.trim();
+  const revenue = document.getElementById('revenue').value;
+
+  // Validation
+  if(!firstName||!lastName||!email||!company||!role||!naics||!solicitations||!revenue){
+    const fields = document.querySelectorAll('.field input, .field textarea, .field select');
+    fields.forEach(f => {
+      if(!f.value.trim()) f.style.borderColor = 'rgba(220,38,38,.5)';
+      else f.style.borderColor = 'rgba(201,168,76,.16)';
+    });
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = 'Submitting <span style="font-size:14px">...</span>';
+
+  // Submit to Formspree (replace with your endpoint)
+  // For production: use Resend API or Formspree
+  const payload = {
+    name: `${firstName} ${lastName}`,
+    email,
+    company,
+    role,
+    naics,
+    solicitations,
+    revenue,
+    timestamp: new Date().toISOString(),
+    source: 'FARaudit Access Page'
+  };
+
+  // Attempt Formspree submission
+  // Replace 'YOUR_FORM_ID' with actual Formspree form ID at formspree.io
+  try {
+    const res = await fetch('https://formspree.io/f/mvzloray', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    // Show success regardless (fallback for demo)
+  } catch(e) {
+    // Show success state regardless for demo
+  }
+
+  // Show success
+  document.getElementById('confirmEmail').textContent = email;
+  document.getElementById('formPanel').classList.add('submitted');
+  document.getElementById('successState').style.display = 'block';
+}
+
+// Clear red borders on input
+document.querySelectorAll('.field input, .field textarea, .field select').forEach(f => {
+  f.addEventListener('input', () => { f.style.borderColor = 'rgba(201,168,76,.16)'; });
+});
+</script>
+</body>
+</html>

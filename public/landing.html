@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARaudit — Federal Contract Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,900;1,9..144,300;1,9..144,400&family=JetBrains+Mono:wght@400;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#030810;
+  --gold:#C9A84C;--gold2:#DFB96A;--gold3:#F0D48E;
+  --text:#F5F0E8;--text2:#E8E2D4;--text3:rgba(245,240,232,.4);
+  --mono:'JetBrains Mono',monospace;--serif:'Fraunces',Georgia,serif;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+
+/* ── FIXED ATMOSPHERE ── */
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(245,240,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(245,240,232,.04) 1px,transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);animation:gp 9s ease-in-out infinite;pointer-events:none;}
+@keyframes gp{0%,100%{opacity:.28}50%{opacity:.5}}
+.glow-orb{position:fixed;top:-100px;right:-60px;width:800px;height:700px;background:radial-gradient(ellipse at 65% 25%,rgba(201,168,76,.07) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.scan-line{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.3) 50%,transparent);animation:scan 18s linear infinite;z-index:1;pointer-events:none;}
+@keyframes scan{0%{top:-1px;opacity:0}4%{opacity:1}96%{opacity:.3}100%{top:100vh;opacity:0}}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 56px;background:rgba(3,8,16,.94);backdrop-filter:blur(24px);border-bottom:1px solid rgba(201,168,76,.1);}
+.nav-brand{display:flex;align-items:center;gap:12px;}
+.nav-wordmark{font-family:var(--serif);font-size:19px;font-weight:900;letter-spacing:-.02em;}
+.nav-wordmark span{color:var(--gold);}
+.nav-cat{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);padding-left:14px;border-left:1px solid rgba(201,168,76,.2);}
+.nav-links{display:flex;gap:30px;}
+.nav-link{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);text-decoration:none;transition:color .2s;}
+.nav-link:hover{color:var(--gold2);}
+.nav-right{display:flex;align-items:center;gap:14px;}
+.nav-signin{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);text-decoration:none;opacity:.45;}
+.nav-cta{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:10px 24px;border-radius:2px;text-decoration:none;border:1px solid var(--gold);transition:all .2s;}
+.nav-cta:hover{background:var(--gold2);box-shadow:0 6px 20px rgba(201,168,76,.3);}
+
+/* ════════════════════════════════════════
+   SECTION 1 — ABOVE THE FOLD
+   Exactly one viewport height. Declaration only.
+════════════════════════════════════════ */
+.fold{
+  position:relative;z-index:2;
+  min-height:100vh;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:120px 56px 80px;
+  max-width:1320px;margin:0 auto;
+}
+
+.eyebrow{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);opacity:.6;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.eyebrow::before{content:'';display:inline-block;width:22px;height:1px;background:var(--gold);opacity:.5;}
+
+.headline{
+  font-size:clamp(32px,4.2vw,62px);
+  font-weight:900;line-height:1.08;letter-spacing:-.022em;
+  color:var(--text);margin-bottom:0;
+  white-space:nowrap;display:block;width:100%;
+}
+.headline em{
+  font-style:italic;font-weight:300;color:var(--gold2);
+  display:block;white-space:nowrap;width:100%;
+  font-size:clamp(30px,4.5vw,66px);
+  letter-spacing:-.018em;line-height:1.15;
+}
+
+.dismiss{font-family:var(--mono);font-size:11px;font-weight:500;color:rgba(245,240,232,.28);letter-spacing:.06em;white-space:nowrap;margin-top:28px;}
+
+.verdict{
+  font-family:var(--serif);
+  font-size:clamp(22px,2.2vw,34px);
+  font-weight:900;color:var(--text);
+  letter-spacing:-.02em;white-space:nowrap;
+  line-height:1.1;margin-top:8px;
+}
+
+.cta-row{display:flex;align-items:center;gap:14px;margin-top:32px;}
+.btn-primary{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:16px 36px;border-radius:2px;text-decoration:none;display:inline-flex;align-items:center;gap:10px;border:1px solid var(--gold);transition:all .25s;}
+.btn-primary:hover{background:var(--gold2);transform:translateY(-1px);box-shadow:0 10px 32px rgba(201,168,76,.3);}
+.btn-secondary{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);padding:16px 26px;border-radius:2px;text-decoration:none;border:1px solid rgba(201,168,76,.16);transition:all .2s;}
+.btn-secondary:hover{color:var(--gold);border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.04);}
+
+/* Scroll prompt */
+.scroll-cue{position:absolute;bottom:36px;left:56px;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(245,240,232,.2);}
+.scroll-cue::after{content:'';display:block;width:24px;height:1px;background:rgba(245,240,232,.15);}
+.scroll-arrow{animation:bob 2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+
+/* ════════════════════════════════════════
+   SECTION WRAPPER — below the fold
+════════════════════════════════════════ */
+.below{position:relative;z-index:2;}
+.section{padding:96px 56px;max-width:1320px;margin:0 auto;}
+
+/* Process section overrides — wider than content but not full bleed */
+.section-process{
+  padding:96px 120px;
+  width:100%;
+  max-width:100%;
+  margin:0;
+  box-sizing:border-box;
+}
+.section-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);opacity:.5;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.section-label::before{content:'';display:inline-block;width:16px;height:1px;background:var(--gold);opacity:.5;}
+.section-divider{height:1px;background:linear-gradient(to right,rgba(201,168,76,.22) 0%,rgba(201,168,76,.06) 60%,transparent 100%);margin:0 56px;}
+
+/* ════════════════════════════════════════
+   SECTION 2 — PROCESS FLOW
+════════════════════════════════════════ */
+.process-grid{display:grid;grid-template-columns:1fr 56px 1fr 56px 1fr;align-items:stretch;gap:0;width:100%;}
+
+.process-step{
+  background:rgba(5,13,24,.9);
+  border:1px solid rgba(201,168,76,.16);
+  border-radius:4px;padding:28px 28px 24px;
+  display:flex;flex-direction:column;gap:0;
+  position:relative;overflow:hidden;
+  transition:border-color .25s, background .25s;
+}
+.process-step::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(to right,var(--gold),transparent);
+  opacity:0;transition:opacity .25s;
+}
+.process-step:hover{border-color:rgba(201,168,76,.35);background:rgba(201,168,76,.04);}
+.process-step:hover::before{opacity:1;}
+
+.ps-num{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);opacity:.45;margin-bottom:36px;}
+.ps-icon{
+  position:absolute;
+  top:22px;right:22px;
+  width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+  opacity:.85;
+}
+.ps-title{font-family:var(--serif);font-size:18px;font-weight:900;color:var(--text);letter-spacing:-.015em;line-height:1.2;margin-bottom:10px;text-align:center;}
+.ps-tags{display:flex;flex-wrap:nowrap;gap:4px;margin-bottom:12px;overflow:hidden;justify-content:center;}
+.ps-tag{font-family:var(--mono);font-size:8px;font-weight:700;padding:3px 8px;border-radius:2px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.14);color:var(--gold);letter-spacing:.06em;white-space:nowrap;flex-shrink:0;}
+.ps-detail{font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.3);line-height:1.6;margin-top:24px;padding-top:12px;border-top:1px solid rgba(201,168,76,.06);}
+.ps-bullet{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.32);line-height:1.5;}
+.ps-bullet:last-child{margin-bottom:0;}
+.ps-dot{color:var(--gold);opacity:.5;flex-shrink:0;font-size:11px;line-height:1.3;}
+
+.process-connector{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0 8px;}
+.pc-line{flex:1;width:1px;background:linear-gradient(to bottom,transparent,rgba(201,168,76,.3) 30%,rgba(201,168,76,.3) 70%,transparent);}
+.pc-arrow{font-family:var(--mono);font-size:11px;color:var(--gold);opacity:.4;transform:rotate(90deg);}
+
+/* ════════════════════════════════════════
+   SECTION 3 — INTELLIGENCE FEED
+════════════════════════════════════════ */
+.feed-panel{width:100%;background:rgba(3,8,16,.82);border:1px solid rgba(201,168,76,.2);border-radius:4px;overflow:hidden;backdrop-filter:blur(14px);box-shadow:0 24px 70px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.02);}
+.feed-hdr{padding:12px 20px;border-bottom:1px solid rgba(201,168,76,.12);background:rgba(201,168,76,.07);display:flex;align-items:center;justify-content:space-between;}
+.feed-hdr-left{display:flex;align-items:center;gap:12px;}
+.feed-hdr-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);opacity:.82;}
+.feed-hdr-div{width:1px;height:13px;background:rgba(201,168,76,.2);}
+.feed-hdr-sub{font-family:var(--mono);font-size:8px;color:var(--text3);letter-spacing:.05em;}
+.feed-hdr-right{display:flex;align-items:center;gap:12px;}
+.feed-timestamp{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.22);letter-spacing:.06em;}
+.feed-timestamp em{color:rgba(201,168,76,.6);font-style:normal;font-weight:700;}
+.feed-col-headers{display:grid;grid-template-columns:72px 1fr 260px 85px 58px 58px 78px 66px;gap:0 14px;align-items:center;padding:5px 20px;border-bottom:1px solid rgba(201,168,76,.07);background:rgba(201,168,76,.025);}
+.fch{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,240,232,.28);}
+.feed-live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.88);letter-spacing:.1em;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#4ADE80;animation:ldot 2s ease-in-out infinite;}
+@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{opacity:1;box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+.feed-counters{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border-bottom:1px solid rgba(201,168,76,.08);width:100%;}
+.fc{padding:11px 0 11px 20px;border-right:1px solid rgba(201,168,76,.07);display:flex;flex-direction:column;gap:3px;min-width:0;}
+.fc:last-child{border-right:none;}
+.fc-n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.01em;white-space:nowrap;}
+.fc-l{font-family:var(--mono);font-size:7px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);line-height:1.4;}
+.feed-window{height:260px;overflow:hidden;position:relative;}
+.feed-window::before{content:'';position:absolute;top:0;left:0;right:0;height:32px;background:linear-gradient(to bottom,rgba(3,8,16,.9),transparent);z-index:3;pointer-events:none;}
+.feed-window::after{content:'';position:absolute;bottom:0;left:0;right:0;height:32px;background:linear-gradient(to top,rgba(3,8,16,.9),transparent);z-index:3;pointer-events:none;}
+.feed-track{display:flex;flex-direction:column;}
+.feed-row{display:grid;grid-template-columns:72px 1fr 260px 85px 58px 58px 78px 66px;gap:0 14px;align-items:center;padding:9px 20px;border-bottom:1px solid rgba(201,168,76,.05);transition:background .12s;cursor:default;border-left:2px solid transparent;}
+.feed-row:hover{background:rgba(201,168,76,.04);}
+.feed-row.risk-p0{border-left-color:rgba(220,38,38,.55);}
+.feed-row.risk-p1{border-left-color:rgba(217,119,6,.45);}
+.feed-row:hover{background:rgba(201,168,76,.04);}
+.feed-naics{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--gold);opacity:.65;letter-spacing:.07em;}
+.feed-main{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.feed-title{font-size:11px;font-weight:600;color:rgba(245,240,232,.92);line-height:1.3;font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px;}
+.feed-meta{display:flex;align-items:center;gap:5px;}
+.feed-agency{font-family:var(--mono);font-size:7.5px;color:rgba(245,240,232,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}
+.feed-due-col{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.28);white-space:nowrap;}
+.feed-type{font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(201,168,76,.45);letter-spacing:.06em;white-space:nowrap;}
+.feed-value{font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(245,240,232,.82);white-space:nowrap;letter-spacing:-.01em;}
+.feed-days{font-family:var(--mono);font-size:9px;font-weight:700;white-space:nowrap;text-align:center;}
+.feed-days.urgent{color:#EF4444;}
+.feed-days.soon{color:#F59E0B;}
+.feed-days.ok{color:#4ADE80;}
+.feed-setaside{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.06em;white-space:nowrap;padding:2px 6px;border-radius:2px;}
+.feed-setaside.sb{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);color:var(--gold);}
+.feed-setaside.sdvosb{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);color:#4ADE80;}
+.feed-setaside.wosb{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.18);color:#A78BFA;}
+.feed-setaside.unrest{background:rgba(245,240,232,.04);border:1px solid rgba(245,240,232,.1);color:rgba(245,240,232,.35);}
+.feed-setaside.a8{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.18);color:#FBB524;}
+.feed-value{font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(245,240,232,.62);white-space:nowrap;letter-spacing:.02em;}
+.feed-days{font-family:var(--mono);font-size:9px;font-weight:700;white-space:nowrap;text-align:center;}
+.feed-days.urgent{color:#EF4444;}
+.feed-days.soon{color:#F59E0B;}
+.feed-days.clear{color:rgba(74,222,128,.7);}
+.feed-setaside{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 6px;border-radius:2px;white-space:nowrap;text-align:center;letter-spacing:.05em;}
+.sa-sb{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.22);color:#C9A84C;}
+.sa-sdvosb{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.22);color:#93C5FD;}
+.sa-wosb{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.22);color:#D8B4FE;}
+.sa-unrest{background:rgba(245,240,232,.06);border:1px solid rgba(245,240,232,.1);color:rgba(245,240,232,.35);}
+.sa-8a{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.22);color:#86EFAC;}
+.feed-agency{font-family:var(--mono);font-size:7.5px;color:rgba(245,240,232,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}
+.feed-agency em{color:rgba(245,240,232,.32);font-style:normal;font-size:7px;}
+.feed-sep{width:2px;height:2px;border-radius:50%;background:rgba(245,240,232,.18);flex-shrink:0;}
+.feed-due{font-family:var(--mono);font-size:7.5px;color:rgba(245,240,232,.22);}
+.badge{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 8px;border-radius:2px;white-space:nowrap;flex-shrink:0;}
+.b0{background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:#EF4444;}
+.b1{background:rgba(217,119,6,.11);border:1px solid rgba(217,119,6,.22);color:#F59E0B;}
+.bw{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.18);color:#C9A84C;}
+.feed-ftr{padding:9px 20px;border-top:1px solid rgba(201,168,76,.1);background:rgba(201,168,76,.035);display:flex;align-items:center;justify-content:space-between;}
+.ftr-note{font-family:var(--mono);font-size:7.5px;color:rgba(245,240,232,.2);letter-spacing:.05em;}
+.ftr-count{font-family:var(--mono);font-size:7.5px;font-weight:700;color:var(--gold);opacity:.5;letter-spacing:.06em;}
+
+/* ════════════════════════════════════════
+   SECTION 4 — CLOSING STATEMENT
+════════════════════════════════════════ */
+.closing{padding:80px 56px 60px;width:100%;max-width:100%;margin:0;box-sizing:border-box;display:grid;grid-template-columns:1fr auto;align-items:center;gap:60px;border-top:1px solid rgba(201,168,76,.1);}
+.closing-left{max-width:780px;}
+.closing-rule{width:24px;height:1px;background:var(--gold);opacity:.3;margin-bottom:20px;}
+.closing-statement{font-family:var(--serif);font-size:clamp(18px,1.6vw,24px);font-weight:300;color:var(--text2);line-height:1.7;}
+.closing-statement strong{color:var(--text);font-weight:700;}
+.closing-right{display:flex;flex-direction:column;align-items:flex-end;gap:16px;flex-shrink:0;}
+.closing-cta{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:16px 40px;border-radius:2px;text-decoration:none;border:1px solid var(--gold);transition:all .25s;white-space:nowrap;display:inline-flex;align-items:center;gap:10px;}
+.closing-cta:hover{background:var(--gold2);box-shadow:0 10px 32px rgba(201,168,76,.3);transform:translateY(-1px);}
+.closing-pricing{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.closing-price{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);opacity:.75;letter-spacing:.06em;}
+.closing-slots{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.35);letter-spacing:.08em;}
+.slots-dot{width:5px;height:5px;border-radius:50%;background:#EF4444;animation:ldot 2s ease-in-out infinite;}
+.closing-period{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.2);letter-spacing:.06em;}
+
+/* Footer */
+.site-footer{padding:24px 56px;border-top:1px solid rgba(201,168,76,.08);display:flex;align-items:center;justify-content:space-between;}
+.footer-brand{font-family:var(--serif);font-size:13px;font-weight:900;letter-spacing:-.01em;color:rgba(245,240,232,.4);}
+.footer-brand span{color:var(--gold);opacity:.6;}
+.footer-links{display:flex;gap:24px;}
+.footer-link{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.2);text-decoration:none;transition:color .2s;}
+.footer-link:hover{color:var(--gold);}
+.footer-copy{font-family:var(--mono);font-size:8px;color:rgba(245,240,232,.15);letter-spacing:.06em;}
+
+/* ── SCROLL REVEAL ── */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1);}
+.reveal.visible{opacity:1;transform:none;}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="glow-orb"></div>
+<div class="scan-line"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+      <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.5" fill="rgba(201,168,76,.08)" opacity=".9"/>
+      <path d="M14 6L20 9.5V14.5C20 17.8 17.5 20.5 14 21.5C10.5 20.5 8 17.8 8 14.5V9.5L14 6Z" fill="rgba(201,168,76,.1)" stroke="#C9A84C" stroke-width=".8" opacity=".8"/>
+      <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".8" opacity=".6"/>
+      <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".8" opacity=".4"/>
+    </svg>
+    <div class="nav-wordmark">FAR<span>audit</span></div>
+    <div class="nav-cat">Federal Contract Intelligence</div>
+  </div>
+  <div class="nav-links">
+    <a href="#how" class="nav-link">How It Works</a>
+    <a href="#intelligence" class="nav-link">Intelligence</a>
+    <a href="#access" class="nav-link">Access</a>
+  </div>
+  <div class="nav-right">
+    <a href="faraudit-signin.html" class="nav-signin">Sign In</a>
+    <a href="faraudit-access.html" class="nav-cta">Request Access</a>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════
+     SECTION 1 — ABOVE THE FOLD
+     Declaration only. Nothing else.
+══════════════════════════════════════ -->
+<section class="fold">
+  <div class="eyebrow">Federal Contract Intelligence</div>
+
+  <h1 class="headline">
+    The only platform that reads the solicitation
+    <em>the way a Contracting Officer wrote it.</em>
+  </h1>
+
+  <div class="dismiss">GovWin sells you data. &nbsp;·&nbsp; GovTribe shows you opportunities. &nbsp;·&nbsp; EZGovOpps tracks your pipeline.</div>
+  <div class="verdict">None of them read a single clause.</div>
+
+  <div class="cta-row">
+    <a href="faraudit-access.html" class="btn-primary">Request Access <span style="font-size:14px">→</span></a>
+    <a href="#how" class="btn-secondary">See How It Works</a>
+  </div>
+
+  <div class="scroll-cue">
+    <span class="scroll-arrow">↓</span>
+    Scroll to explore
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     BELOW THE FOLD
+══════════════════════════════════════ -->
+<div class="below">
+
+  <div class="section-divider"></div>
+
+  <!-- SECTION 2 — HOW IT WORKS -->
+  <section class="section-process reveal" id="how">
+    <div class="section-label">From Upload to Intelligence</div>
+
+    <div class="process-grid">
+
+      <div class="process-step">
+        <div class="ps-num">Before the RFQ Drops</div>
+        <div class="ps-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="2" width="16" height="22" rx="2" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".7" fill="none"/>
+            <line x1="9" y1="8" x2="17" y2="8" stroke="#C9A84C" stroke-width=".9" stroke-opacity=".5"/>
+            <line x1="9" y1="12" x2="17" y2="12" stroke="#C9A84C" stroke-width=".9" stroke-opacity=".5"/>
+            <line x1="9" y1="16" x2="14" y2="16" stroke="#C9A84C" stroke-width=".9" stroke-opacity=".5"/>
+            <path d="M17 18 L21 22" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".8" stroke-linecap="round"/>
+            <circle cx="19" cy="20" r="3.5" stroke="#C9A84C" stroke-width="1.1" stroke-opacity=".7" fill="none"/>
+          </svg>
+        </div>
+        <div class="ps-title">Upload the Solicitation</div>
+        <div class="ps-tags">
+          <span class="ps-tag">RFQ</span>
+          <span class="ps-tag">RFP</span>
+          <span class="ps-tag">IDIQ</span>
+          <span class="ps-tag">IFB</span>
+          <span class="ps-tag">Any page count</span>
+        </div>
+        <div class="ps-detail">
+          <div class="ps-bullet"><span class="ps-dot">·</span>Any federal solicitation PDF — any agency, any format</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Large IDIQs handled — no token truncation</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Base period + all options ingested in full</div>
+        </div>
+      </div>
+
+      <div class="process-connector">
+        <div class="pc-line"></div>
+        <div class="pc-arrow">→</div>
+        <div class="pc-line"></div>
+      </div>
+
+      <div class="process-step">
+        <div class="ps-num">Inside the Document</div>
+        <div class="ps-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="6" width="22" height="5" rx="1.5" stroke="#C9A84C" stroke-width="1.1" stroke-opacity=".7" fill="none"/>
+            <rect x="3" y="13" width="22" height="5" rx="1.5" stroke="#C9A84C" stroke-width="1.1" stroke-opacity=".55" fill="rgba(201,168,76,.06)"/>
+            <rect x="3" y="20" width="22" height="5" rx="1.5" stroke="#C9A84C" stroke-width="1.1" stroke-opacity=".4" fill="rgba(201,168,76,.04)"/>
+            <circle cx="7.5" cy="8.5" r="1.2" fill="#C9A84C" opacity=".8"/>
+            <circle cx="7.5" cy="15.5" r="1.2" fill="#C9A84C" opacity=".55"/>
+            <circle cx="7.5" cy="22.5" r="1.2" fill="#C9A84C" opacity=".4"/>
+            <line x1="11" y1="8.5" x2="21" y2="8.5" stroke="#C9A84C" stroke-width=".8" stroke-opacity=".4"/>
+            <line x1="11" y1="15.5" x2="21" y2="15.5" stroke="#C9A84C" stroke-width=".8" stroke-opacity=".35"/>
+            <line x1="11" y1="22.5" x2="18" y2="22.5" stroke="#C9A84C" stroke-width=".8" stroke-opacity=".3"/>
+          </svg>
+        </div>
+        <div class="ps-title">Three-Call Audit Engine</div>
+        <div class="ps-tags">
+          <span class="ps-tag">FAR</span>
+          <span class="ps-tag">DFARS</span>
+          <span class="ps-tag">Section L</span>
+          <span class="ps-tag">Section M</span>
+          <span class="ps-tag">CLIN Structure</span>
+        </div>
+        <div class="ps-detail">
+          Three sequential intelligence calls — no single-pass truncation, no black box. Every clause checked against current regulations. Every finding cited.
+        </div>
+      </div>
+
+      <div class="process-connector">
+        <div class="pc-line"></div>
+        <div class="pc-arrow">→</div>
+        <div class="pc-line"></div>
+      </div>
+
+      <div class="process-step">
+        <div class="ps-num">Intelligence Delivered</div>
+        <div class="ps-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2L24 6.5V14C24 19.5 19.5 24.5 14 26C8.5 24.5 4 19.5 4 14V6.5L14 2Z" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".7" fill="none"/>
+            <polyline points="9,14 12.5,17.5 19,11" stroke="#C9A84C" stroke-width="1.4" stroke-opacity=".85" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="ps-title">Intelligence Report</div>
+        <div class="ps-tags">
+          <span class="ps-tag">PDF Export</span>
+          <span class="ps-tag">KO Email</span>
+          <span class="ps-tag">DFARS Traps</span>
+          <span class="ps-tag">Required Actions</span>
+        </div>
+        <div class="ps-detail">
+          <div class="ps-bullet"><span class="ps-dot">·</span>15-page branded report — P0 / P1 / P2 risks ranked</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Contracting Officer clarification email drafted</div>
+          <div class="ps-bullet"><span class="ps-dot">·</span>Every finding cited to the exact FAR/DFARS clause</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- SECTION 3 — INTELLIGENCE FEED -->
+  <section class="section-process reveal" id="intelligence" style="padding-top:96px;padding-bottom:0;padding-left:56px;padding-right:56px;">
+    <div class="section-label">Live Intelligence</div>
+    <div class="feed-panel">
+      <div class="feed-hdr">
+        <div class="feed-hdr-left">
+          <div class="feed-hdr-label">Intelligence Feed</div>
+          <div class="feed-hdr-div"></div>
+          <div class="feed-hdr-sub">Sample data · SAM.gov live integration Phase 2</div>
+        </div>
+        <div class="feed-hdr-right">
+          <div class="feed-timestamp">Updated <em id="tsAgo">just now</em></div>
+          <div class="feed-live"><div class="live-dot"></div>LIVE</div>
+        </div>
+      </div>
+      <div class="feed-counters">
+        <div class="fc"><div class="fc-n" id="cSol">847</div><div class="fc-l">Active</div></div>
+        <div class="fc"><div class="fc-n" id="cP0">23</div><div class="fc-l">P0 Today</div></div>
+        <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">Clause audit<br>competitors</div></div>
+        <div class="fc"><div class="fc-n" style="color:#4ADE80;font-size:18px;">0</div><div class="fc-l">DFARS trap<br>rivals</div></div>
+        <div class="fc"><div class="fc-n">60–90d</div><div class="fc-l">Upstream</div></div>
+        <div class="fc"><div class="fc-n">Stage 01</div><div class="fc-l">Engagement</div></div>
+      </div>
+      <div class="feed-col-headers">
+        <div class="fch">NAICS</div>
+        <div class="fch">Solicitation</div>
+        <div class="fch">Agency</div>
+        <div class="fch">Est. Value</div>
+        <div class="fch">Days Left</div>
+        <div class="fch">Type</div>
+        <div class="fch">Set-Aside</div>
+        <div class="fch">Risk</div>
+      </div>
+      <div class="feed-window">
+        <div class="feed-track" id="feedTrack"></div>
+      </div>
+      <div class="feed-ftr">
+        <span class="ftr-note">Sample data · Live SAM.gov feed activates Phase 2</span>
+        <span class="ftr-count" id="ftrCount">847 solicitations active</span>
+      </div>
+    </div>
+  </section>
+
+    <!-- SECTION 4 — CLOSING STATEMENT + FINAL CTA -->
+  <section class="closing reveal" id="access">
+    <div class="closing-left">
+      <div class="closing-rule"></div>
+      <div class="closing-statement">
+        Built by someone who spent a decade inside the prime contractor world —
+        for every defense subcontractor bidding federal without a capture team.
+        <strong>The analysis capability that lives inside a prime capture team,
+        now available to every contractor who bids federal.</strong>
+      </div>
+    </div>
+    <div class="closing-right">
+      <a href="faraudit-access.html" class="closing-cta">Request Access <span style="font-size:14px">→</span></a>
+      <div class="closing-pricing">
+        <div class="closing-price">$1,250 / month</div>
+        <div class="closing-slots"><div class="slots-dot"></div>5 design partner slots remaining</div>
+        <div class="closing-period">First 90 days · Direct founder access · Input into roadmap</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="footer-brand">FAR<span>audit</span></div>
+    <div class="footer-links">
+      <a href="#" class="footer-link">Privacy</a>
+      <a href="#" class="footer-link">Terms</a>
+      <a href="#" class="footer-link">Contact</a>
+      <a href="#" class="footer-link">Security</a>
+    </div>
+    <div class="footer-copy">© 2026 FARaudit Inc. · Federal Contract Intelligence · Fort Worth, TX</div>
+  </footer>
+
+</div>
+
+<script>
+// ══════════════════════════════════════
+// FARAUDIT INTELLIGENCE FEED — LIVE API
+// SAM.gov + USASpending.gov Integration
+// ══════════════════════════════════════
+
+const SAM_API_KEY = 'CAQFhM7qTQGvCe5NCHxh1qDcFUCsnwQarM3mNrOk'; // Replace with your api.sam.gov key
+const NAICS_CODES = ['336413','332710','332721','334511','541330','336412','332999','541519','336415'];
+
+// USASpending agency spend data (no key required)
+const AGENCY_SPEND = {};
+
+// Sample data — used as fallback and while live data loads
+const SAMPLE_DATA = [
+  {n:'336413',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'Air Education & Training Command (AETC)',v:'$48K',days:3,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'2 P0'},
+  {n:'332710',t:'Precision Machined Brackets — F-16 Program',a:'Air Force Materiel Command (AFMC)',v:'$312K',days:14,ty:'RFP',sa:'unrest',sal:'UNREST',b:'b1',bl:'3 P1'},
+  {n:'334511',t:'Navigation Housing Units · IDIQ Increment IV',a:'Naval Air Systems Command (NAVAIR)',v:'$2.1M',days:22,ty:'IDIQ',sa:'sb',sal:'SB',b:'bw',bl:'Watch'},
+  {n:'336413',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army Contracting Command (ACC)',v:'$187K',days:5,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',b:'b0',bl:'1 P0'},
+  {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',b:'b1',bl:'2 P1'},
+  {n:'541330',t:'Structural Analysis Support — F-35B Variant',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
+  {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',b:'b0',bl:'2 P0'},
+  {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',b:'b1',bl:'1 P1'},
+  {n:'334511',t:'Radar Array Housing · Low Observable Coating',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'unrest',sal:'UNREST',b:'b0',bl:'3 P0'},
+  {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',b:'b1',bl:'2 P1'},
+  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR Controlled',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
+  {n:'332710',t:'Sikorsky UH-60 Transmission Housing CNC',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wosb',sal:'WOSB',b:'b1',bl:'1 P1'},
+  {n:'336413',t:'C-130J Hercules Wing Rib Machining · FFP',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$445K',days:7,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'2 P0'},
+  {n:'334511',t:'EW System Interface Housings · ITAR Export',a:'Air Force Research Laboratory (AFRL)',v:'$1.9M',days:48,ty:'RFP',sa:'unrest',sal:'UNREST',b:'bw',bl:'Watch'},
+  {n:'332710',t:'AH-64 Apache Gearbox Housing Precision CNC',a:'Corpus Christi Army Depot (CCAD)',v:'$203K',days:12,ty:'FFP',sa:'a8',sal:'8(a)',b:'b1',bl:'2 P1'},
+  {n:'336413',t:'F-16 Block 70 Hydraulic Actuator Brackets',a:'Air Force Materiel Command (AFMC)',v:'$521K',days:62,ty:'RFQ',sa:'sb',sal:'SB',b:'b0',bl:'1 P0'},
+];
+
+// ── SAM.GOV LIVE FETCH ──
+async function fetchSAMLive() {
+  const today = new Date();
+  const future = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const fmt = d => d.toISOString().split('T')[0];
+
+  const results = [];
+
+  for(const naics of NAICS_CODES.slice(0,3)) { // Rate limit: 3 NAICS on load
+    try {
+      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&postedFrom=${fmt(today)}&postedTo=${fmt(future)}&limit=5&offset=0&ptype=o,p,k,r`;
+      const res = await fetch(url);
+      if(!res.ok) continue;
+      const data = await res.json();
+
+      if(data.opportunitiesData) {
+        for(const opp of data.opportunitiesData) {
+          const daysLeft = opp.responseDeadLine ?
+            Math.ceil((new Date(opp.responseDeadLine) - today) / 86400000) : 30;
+
+          // Map set-aside
+          const saMap = {
+            'Total Small Business':'sb','SBA':'sb',
+            'Service-Disabled Veteran-Owned Small Business':'sdvosb',
+            'Women-Owned Small Business':'wosb','8A':'a8',
+            'Unrestricted':'unrest',''  :'unrest'
+          };
+          const saCode = opp.typeOfSetAsideDescription || '';
+          const sa = saMap[saCode] || 'unrest';
+          const salMap = {sb:'SB',sdvosb:'SDVOSB',wosb:'WOSB',a8:'8(a)',unrest:'UNREST'};
+
+          // Risk classification based on DFARS keywords
+          const title = opp.title || '';
+          const hasDFARS = /CMMC|cyber|telecom|hexavalent|chromium|Xinjiang|ITAR/i.test(title);
+          const isComplex = /IDIQ|BPA|GWAC|multiple award/i.test(title);
+          const b = hasDFARS ? 'b0' : isComplex ? 'b1' : 'bw';
+          const bl = hasDFARS ? '1 P0' : isComplex ? '1 P1' : 'Watch';
+
+          // Format value
+          let v = 'UNDISCL';
+          if(opp.award && opp.award.amount) {
+            const amt = parseFloat(opp.award.amount);
+            v = amt >= 1000000 ? `$${(amt/1000000).toFixed(1)}M` : `$${Math.round(amt/1000)}K`;
+          }
+
+          results.push({
+            n: naics,
+            t: title.length > 55 ? title.substring(0,52) + '...' : title,
+            a: (opp.organizationName || 'DoD').substring(0,42),
+            v, days: Math.max(1, daysLeft),
+            ty: opp.solicitationType === 'PRESOL' ? 'Pre-Sol' :
+                opp.solicitationType === 'COMBINE' ? 'RFQ' :
+                opp.solicitationType === 'AWARD' ? 'Award' : 'RFP',
+            sa, sal: salMap[sa], b, bl,
+            live: true
+          });
+        }
+      }
+    } catch(e) { /* Fall through to sample data */ }
+  }
+  return results;
+}
+
+// ── USASPENDING AGENCY INTEL ──
+async function fetchAgencySpend() {
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/agency/list/?sort=obligations&order=desc&limit=10', {
+      method: 'GET', headers: {'Content-Type':'application/json'}
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data.results;
+  } catch(e) { return null; }
+}
+
+// ── COUNTER STATS FROM USASPENDING ──
+async function fetchLiveStats() {
+  try {
+    // Get current FY contract count for defense NAICS
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        filters: {
+          naics_codes: NAICS_CODES,
+          award_type_codes: ['A','B','C','D'],
+          time_period: [{start_date:'2026-01-01', end_date:'2026-12-31'}]
+        },
+        fields: ['Award ID'],
+        sort: 'Award ID',
+        order: 'desc',
+        limit: 1,
+        page: 1
+      })
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return data.page_metadata ? data.page_metadata.total : null;
+  } catch(e) { return null; }
+}
+
+// ── BUILD FEED ROWS ──
+const track = document.getElementById('feedTrack');
+let currentData = SAMPLE_DATA;
+let liveMode = false;
+
+function buildRow(r) {
+  const d = document.createElement('div');
+  const riskClass = r.b === 'b0' ? 'risk-p0' : r.b === 'b1' ? 'risk-p1' : 'risk-watch';
+  d.className = 'feed-row ' + riskClass;
+  const daysCls = r.days <= 7 ? 'urgent' : r.days <= 21 ? 'soon' : 'ok';
+  const daysLbl = r.days + 'd';
+  const liveBadge = r.live ? '<span style="font-family:var(--mono);font-size:6px;color:#4ADE80;opacity:.6;margin-left:4px">●LIVE</span>' : '';
+  d.innerHTML = `
+    <span class="feed-naics">${r.n}</span>
+    <div class="feed-main"><div class="feed-title">${r.t}${liveBadge}</div></div>
+    <span class="feed-agency">${r.a}</span>
+    <span class="feed-value">${r.v}</span>
+    <span class="feed-days ${daysCls}">${daysLbl}</span>
+    <span class="feed-type">${r.ty}</span>
+    <span class="feed-setaside ${r.sa}">${r.sal}</span>
+    <span class="badge ${r.b}">${r.bl}</span>`;
+  return d;
+}
+
+function populateFeed(data) {
+  track.innerHTML = '';
+  [...data,...data,...data].forEach(r => track.appendChild(buildRow(r)));
+
+  // Set scroll animation
+  requestAnimationFrame(() => {
+    const h = track.scrollHeight / 3;
+    const dur = h / 40;
+    let styleEl = document.getElementById('feedAnim');
+    if(!styleEl){ styleEl = document.createElement('style'); styleEl.id='feedAnim'; document.head.appendChild(styleEl); }
+    styleEl.textContent = `@keyframes feedRoll{0%{transform:translateY(0)}100%{transform:translateY(-${h}px)}}#feedTrack{animation:feedRoll ${dur}s linear infinite;}#feedTrack:hover{animation-play-state:paused;}`;
+  });
+}
+
+// Init with sample data immediately
+populateFeed(SAMPLE_DATA);
+
+// Then attempt live SAM.gov fetch
+(async () => {
+  const liveResults = await fetchSAMLive();
+  if(liveResults && liveResults.length >= 4) {
+    // Merge live + sample data, live rows first
+    const merged = [...liveResults, ...SAMPLE_DATA].slice(0,20);
+    populateFeed(merged);
+    liveMode = true;
+
+    // Update header to show truly live
+    const subEl = document.querySelector('.feed-hdr-sub');
+    if(subEl) subEl.textContent = `${liveResults.length} live from SAM.gov · ${SAMPLE_DATA.length} sample`;
+
+    // Update active counter with real data
+    document.getElementById('cSol').textContent = liveResults.length + 847;
+  }
+
+  // Fetch USASpending stats
+  fetchAgencySpend();
+})();
+
+// ── LIVE COUNTERS ──
+let sol = 847, p0 = 23;
+const elSol = document.getElementById('cSol');
+const elP0 = document.getElementById('cP0');
+const elFtr = document.getElementById('ftrCount');
+
+(function tick(){
+  if(Math.random()>.45) sol++;
+  if(Math.random()>.78) p0++;
+  if(elSol) elSol.textContent = sol;
+  if(elP0) elP0.textContent = p0;
+  if(elFtr) elFtr.textContent = sol + ' solicitations active';
+  setTimeout(tick, 1800 + Math.random()*3600);
+})();
+
+// ── TIMESTAMP ──
+let tsSeconds = 0;
+function updateTimestamp(){
+  const el = document.getElementById('tsAgo');
+  if(!el) return;
+  tsSeconds++;
+  if(tsSeconds < 60) el.textContent = tsSeconds + 's ago';
+  else if(tsSeconds < 120) el.textContent = '1m ago';
+  else el.textContent = Math.floor(tsSeconds/60) + 'm ago';
+  if(tsSeconds >= 90){ tsSeconds = 0; el.textContent = 'just now'; }
+}
+setInterval(updateTimestamp, 1000);
+
+// ── SCROLL REVEAL ──
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, {threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — FARaudit · Federal Contract Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,900;1,9..144,300&family=JetBrains+Mono:wght@400;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#030810;--void2:#060F1C;
+  --gold:#C9A84C;--gold2:#DFB96A;
+  --text:#F5F0E8;--text2:#E8E2D4;
+  --t40:rgba(245,240,232,.4);--t25:rgba(245,240,232,.25);--t12:rgba(245,240,232,.12);
+  --red:#EF4444;--green:#4ADE80;
+  --border:rgba(201,168,76,.12);--border2:rgba(201,168,76,.22);
+  --mono:'JetBrains Mono',monospace;--serif:'Fraunces',Georgia,serif;
+}
+html,body{background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;min-height:100vh;overflow:hidden;}
+
+/* ── ATMOSPHERE ── */
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(245,240,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(245,240,232,.04) 1px,transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,black 20%,transparent 100%);pointer-events:none;}
+.glow-left{position:fixed;top:-100px;left:-100px;width:600px;height:600px;background:radial-gradient(ellipse at 30% 30%,rgba(201,168,76,.06) 0%,transparent 65%);pointer-events:none;z-index:0;}
+.glow-right{position:fixed;bottom:-100px;right:-100px;width:500px;height:500px;background:radial-gradient(ellipse at 70% 70%,rgba(201,168,76,.04) 0%,transparent 65%);pointer-events:none;z-index:0;}
+.scan-line{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.25) 50%,transparent);animation:scan 18s linear infinite;z-index:1;pointer-events:none;}
+@keyframes scan{0%{top:-1px;opacity:0}4%{opacity:1}96%{opacity:.3}100%{top:100vh;opacity:0}}
+
+/* ── LAYOUT ── */
+.page{position:relative;z-index:2;min-height:100vh;display:grid;grid-template-columns:1fr 1fr;}
+
+/* ── LEFT — Brand panel ── */
+.left{
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:48px 56px;
+  border-right:1px solid var(--border);
+  background:rgba(6,15,28,.6);
+  position:relative;overflow:hidden;
+}
+.left::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(201,168,76,.015) 40px,rgba(201,168,76,.015) 41px);
+  pointer-events:none;
+}
+.brand{display:flex;align-items:center;gap:12px;position:relative;}
+.brand-text{font-family:var(--serif);font-size:20px;font-weight:900;letter-spacing:-.02em;}
+.brand-text span{color:var(--gold);}
+.brand-cat{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--t25);padding-left:14px;border-left:1px solid var(--border2);}
+
+.left-center{flex:1;display:flex;flex-direction:column;justify-content:center;padding:60px 0;position:relative;}
+.left-eyebrow{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);opacity:.55;margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+.left-eyebrow::before{content:'';display:inline-block;width:18px;height:1px;background:var(--gold);opacity:.5;}
+.left-headline{font-size:clamp(32px,3.2vw,46px);font-weight:900;line-height:1.06;letter-spacing:-.03em;color:var(--text);margin-bottom:6px;}
+.left-headline em{font-style:italic;font-weight:300;color:var(--gold2);display:block;}
+.left-sub{font-family:var(--mono);font-size:11px;color:var(--t40);line-height:1.7;margin-top:20px;max-width:360px;}
+
+/* Intelligence stats */
+.intel-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-top:40px;max-width:380px;}
+.intel-stat{background:rgba(3,8,16,.8);padding:14px 16px;}
+.is-n{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:4px;letter-spacing:-.01em;}
+.is-n.green{color:var(--green);}
+.is-n.red{color:var(--red);}
+.is-l{font-family:var(--mono);font-size:7.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
+
+.left-footer{position:relative;}
+.left-footer-text{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.06em;line-height:1.6;}
+.left-footer-text a{color:var(--gold);opacity:.6;text-decoration:none;}
+
+/* ── RIGHT — Sign in panel ── */
+.right{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:48px 56px;
+  position:relative;
+}
+.signin-panel{width:100%;max-width:400px;}
+
+.panel-eyebrow{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);opacity:.55;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.panel-eyebrow::before{content:'';display:inline-block;width:14px;height:1px;background:var(--gold);opacity:.5;}
+.panel-title{font-size:28px;font-weight:900;letter-spacing:-.025em;color:var(--text);margin-bottom:4px;}
+.panel-sub{font-family:var(--mono);font-size:10px;color:var(--t40);letter-spacing:.04em;margin-bottom:32px;}
+
+/* Form fields */
+.field{margin-bottom:18px;}
+.field-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--t40);margin-bottom:7px;display:block;}
+.field-wrap{position:relative;}
+.field input{
+  width:100%;
+  background:rgba(3,8,16,.8);
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:13px 14px;
+  font-family:var(--mono);font-size:12px;
+  color:var(--text);letter-spacing:.03em;
+  outline:none;transition:border-color .2s,background .2s;
+  -webkit-appearance:none;
+}
+.field input:focus{border-color:var(--border2);background:rgba(201,168,76,.03);}
+.field input::placeholder{color:var(--t25);}
+.field input.error{border-color:rgba(220,38,38,.4);}
+
+/* Password toggle */
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--t25);transition:color .15s;background:none;border:none;padding:4px;}
+.pw-toggle:hover{color:var(--t40);}
+
+/* Options row */
+.options-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.remember-check{display:flex;align-items:center;gap:8px;cursor:pointer;}
+.check-box{width:14px;height:14px;border:1px solid var(--border2);border-radius:2px;background:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.check-box.checked{background:var(--gold);border-color:var(--gold);}
+.check-label{font-family:var(--mono);font-size:9px;color:var(--t40);letter-spacing:.04em;}
+.forgot-link{font-family:var(--mono);font-size:9px;color:var(--gold);opacity:.6;text-decoration:none;letter-spacing:.04em;transition:opacity .15s;}
+.forgot-link:hover{opacity:1;}
+
+/* Sign in button */
+.signin-btn{
+  width:100%;font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--void);background:var(--gold);
+  padding:15px 32px;border-radius:2px;border:1px solid var(--gold);
+  cursor:pointer;transition:all .25s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-bottom:16px;
+}
+.signin-btn:hover{background:var(--gold2);box-shadow:0 8px 24px rgba(201,168,76,.28);transform:translateY(-1px);}
+.signin-btn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none;}
+.signin-btn.loading{pointer-events:none;}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:12px;margin:20px 0;}
+.divider-line{flex:1;height:1px;background:var(--border);}
+.divider-text{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.1em;text-transform:uppercase;}
+
+/* Error state */
+.error-msg{
+  display:none;
+  background:rgba(220,38,38,.08);
+  border:1px solid rgba(220,38,38,.2);
+  border-radius:3px;padding:10px 14px;
+  font-family:var(--mono);font-size:10px;
+  color:var(--red);letter-spacing:.04em;
+  margin-bottom:16px;line-height:1.5;
+}
+.error-msg.visible{display:block;}
+
+/* Success state */
+.success-state{display:none;text-align:center;padding:20px 0;}
+.success-state.visible{display:block;}
+.success-icon{margin-bottom:14px;}
+.success-title{font-size:20px;font-weight:900;color:var(--text);margin-bottom:8px;}
+.success-sub{font-family:var(--mono);font-size:10px;color:var(--t40);line-height:1.65;letter-spacing:.04em;}
+.redirect-bar{height:2px;background:var(--border);border-radius:1px;margin-top:20px;overflow:hidden;}
+.redirect-fill{height:100%;background:var(--gold);width:0%;transition:width 2.5s linear;}
+
+/* Bottom link */
+.bottom-link{text-align:center;margin-top:20px;font-family:var(--mono);font-size:9px;color:var(--t25);letter-spacing:.06em;}
+.bottom-link a{color:var(--gold);opacity:.65;text-decoration:none;transition:opacity .15s;}
+.bottom-link a:hover{opacity:1;}
+
+/* Security badge */
+.security-badge{
+  display:flex;align-items:center;gap:8px;justify-content:center;
+  margin-top:24px;padding-top:20px;border-top:1px solid var(--border);
+}
+.sec-item{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:7.5px;color:var(--t25);letter-spacing:.06em;}
+.sec-dot{width:3px;height:3px;border-radius:50%;background:var(--t25);}
+
+/* Back link */
+.back-link{
+  position:absolute;top:24px;left:32px;
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t25);text-decoration:none;
+  display:flex;align-items:center;gap:6px;
+  transition:color .2s;
+}
+.back-link:hover{color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow-left"></div>
+<div class="glow-right"></div>
+<div class="scan-line"></div>
+
+<div class="page">
+
+  <!-- LEFT — Brand panel -->
+  <div class="left">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+        <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
+        <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".9" opacity=".7"/>
+        <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".9" opacity=".5"/>
+      </svg>
+      <div class="brand-text">FAR<span>audit</span></div>
+      <div class="brand-cat">Federal Contract Intelligence</div>
+    </div>
+
+    <div class="left-center">
+      <div class="left-eyebrow">Intelligence Platform</div>
+      <h2 class="left-headline">
+        Federal Contract Intelligence
+        <em>for every contractor who bids federal.</em>
+      </h2>
+      <p class="left-sub">
+        The only platform that reads a solicitation the way a Contracting Officer wrote it. FAR · DFARS · Section L · Section M · CLIN structure · P0/P1/P2 risk ranking.
+      </p>
+
+      <div class="intel-stats">
+        <div class="intel-stat">
+          <div class="is-n" id="statSol">851</div>
+          <div class="is-l">Active solicitations</div>
+        </div>
+        <div class="intel-stat">
+          <div class="is-n red" id="statP0">26</div>
+          <div class="is-l">P0 flags today</div>
+        </div>
+        <div class="intel-stat">
+          <div class="is-n green">0</div>
+          <div class="is-l">Clause audit competitors</div>
+        </div>
+        <div class="intel-stat">
+          <div class="is-n">60–90d</div>
+          <div class="is-l">Upstream advantage</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="left-footer">
+      <div class="left-footer-text">
+        © 2026 FARaudit Inc. · Fort Worth, TX<br>
+        <a href="faraudit-landing-FINAL.html">faraudit.com</a> · jose@faraudit.com
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT — Sign in -->
+  <div class="right">
+    <a href="faraudit-landing-FINAL.html" class="back-link">← Back to Overview</a>
+
+    <div class="signin-panel">
+      <div class="panel-eyebrow">Secure Sign In</div>
+      <div class="panel-title">Welcome back.</div>
+      <div class="panel-sub">Sign in to your FARaudit account</div>
+
+      <div id="formContent">
+        <div class="error-msg" id="errorMsg"></div>
+
+        <div class="field">
+          <label class="field-label">Email Address</label>
+          <input type="email" id="emailInput" placeholder="you@yourcompany.com" autocomplete="email"/>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Password</label>
+          <div class="field-wrap">
+            <input type="password" id="pwInput" placeholder="••••••••••••" autocomplete="current-password"/>
+            <button class="pw-toggle" onclick="togglePw()" tabindex="-1">
+              <svg id="eyeIcon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M1 8C1 8 3.5 3 8 3s7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+                <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="options-row">
+          <div class="remember-check" onclick="toggleRemember()">
+            <div class="check-box" id="rememberBox"></div>
+            <div class="check-label">Remember me</div>
+          </div>
+          <a href="#" class="forgot-link">Forgot password?</a>
+        </div>
+
+        <button class="signin-btn" id="signinBtn" onclick="handleSignIn()">
+          Sign In <span style="font-size:13px">→</span>
+        </button>
+
+        <div class="divider">
+          <div class="divider-line"></div>
+          <div class="divider-text">or</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div class="bottom-link">
+          Don't have access? <a href="faraudit-access-FINAL.html">Request Access →</a>
+        </div>
+
+        <div class="security-badge">
+          <div class="sec-item">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 1L10 3V6C10 8.5 8.2 10.5 6 11C3.8 10.5 2 8.5 2 6V3L6 1Z" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+            256-bit SSL
+          </div>
+          <div class="sec-dot"></div>
+          <div class="sec-item">SOC 2 Compliant</div>
+          <div class="sec-dot"></div>
+          <div class="sec-item">ITAR Aware</div>
+        </div>
+      </div>
+
+      <!-- Success state -->
+      <div class="success-state" id="successState">
+        <div class="success-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <path d="M26 4L44 12V24C44 34 36.5 43 26 46C15.5 43 8 34 8 24V12L26 4Z" stroke="#C9A84C" stroke-width="1.5" fill="rgba(201,168,76,.08)"/>
+            <polyline points="17,26 22,31 35,20" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="success-title">Identity verified.</div>
+        <div class="success-sub">Redirecting to your intelligence dashboard...</div>
+        <div class="redirect-bar"><div class="redirect-fill" id="redirectFill"></div></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Live counters — same as landing page
+let sol = 851, p0 = 26;
+(function tick(){
+  if(Math.random()>.45) sol++;
+  if(Math.random()>.78) p0++;
+  const s = document.getElementById('statSol');
+  const p = document.getElementById('statP0');
+  if(s) s.textContent = sol;
+  if(p) p.textContent = p0;
+  setTimeout(tick, 2200 + Math.random()*4000);
+})();
+
+// Password toggle
+let pwVisible = false;
+function togglePw(){
+  pwVisible = !pwVisible;
+  const input = document.getElementById('pwInput');
+  input.type = pwVisible ? 'text' : 'password';
+  document.getElementById('eyeIcon').style.opacity = pwVisible ? '1' : '0.5';
+}
+
+// Remember me toggle
+let remembered = false;
+function toggleRemember(){
+  remembered = !remembered;
+  document.getElementById('rememberBox').classList.toggle('checked', remembered);
+}
+
+// Enter key support
+document.getElementById('pwInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') handleSignIn();
+});
+document.getElementById('emailInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('pwInput').focus();
+});
+
+// Sign in handler
+// NOTE: Replace this with your Supabase auth call
+// import { supabase } from './lib/supabase'
+// const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+async function handleSignIn(){
+  const email = document.getElementById('emailInput').value.trim();
+  const pw = document.getElementById('pwInput').value;
+  const btn = document.getElementById('signinBtn');
+  const err = document.getElementById('errorMsg');
+
+  // Clear errors
+  err.classList.remove('visible');
+  document.getElementById('emailInput').classList.remove('error');
+  document.getElementById('pwInput').classList.remove('error');
+
+  // Basic validation
+  if(!email){
+    showError('Please enter your email address.');
+    document.getElementById('emailInput').classList.add('error');
+    return;
+  }
+  if(!pw){
+    showError('Please enter your password.');
+    document.getElementById('pwInput').classList.add('error');
+    return;
+  }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    showError('Please enter a valid email address.');
+    document.getElementById('emailInput').classList.add('error');
+    return;
+  }
+
+  // Loading state
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="animation:spin 1s linear infinite"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="20" stroke-dashoffset="10" opacity=".4"/></svg> Authenticating...';
+
+  // ── SUPABASE AUTH INTEGRATION POINT ──
+  // Replace the demo logic below with:
+  //
+  // try {
+  //   const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
+  //   if(error) { showError(error.message); resetBtn(); return; }
+  //   showSuccess();
+  //   setTimeout(() => window.location.href = '/home', 2500);
+  // } catch(e) {
+  //   showError('Authentication failed. Please try again.');
+  //   resetBtn();
+  // }
+
+  // DEMO: accept any credentials for now, redirect to home page
+  await new Promise(r => setTimeout(r, 1400));
+  showSuccess();
+  setTimeout(() => {
+    window.location.href = 'faraudit-dashboard-s01.html';
+  }, 2600);
+}
+
+function showError(msg){
+  const err = document.getElementById('errorMsg');
+  err.textContent = msg;
+  err.classList.add('visible');
+  document.getElementById('signinBtn').disabled = false;
+  document.getElementById('signinBtn').innerHTML = 'Sign In <span style="font-size:13px">→</span>';
+}
+
+function showSuccess(){
+  document.getElementById('formContent').style.display = 'none';
+  const ss = document.getElementById('successState');
+  ss.classList.add('visible');
+  // Animate redirect bar
+  setTimeout(() => {
+    document.getElementById('redirectFill').style.width = '100%';
+  }, 100);
+}
+
+// CSS for spin animation
+const style = document.createElement('style');
+style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(style);
+</script>
+</body>
+</html>

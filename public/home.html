@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARaudit — Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --void:#030810;--void2:#060F1C;--void3:#0A1628;
+  --gold:#C9A84C;--gold2:#DFB96A;--gold3:#F0D48E;
+  --text:#F5F0E8;--text2:#E8E2D4;
+  --t60:rgba(245,240,232,.6);--t40:rgba(245,240,232,.4);
+  --t25:rgba(245,240,232,.25);--t12:rgba(245,240,232,.12);
+  --red:#EF4444;--amber:#F59E0B;--green:#4ADE80;
+  --border:rgba(201,168,76,.12);--border2:rgba(201,168,76,.2);
+  --mono:'JetBrains Mono',monospace;--serif:'Fraunces',Georgia,serif;
+  --sidebar:240px;--topbar:56px;
+}
+html,body{background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;}
+
+/* ── LAYOUT ── */
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--topbar) 1fr;height:100vh;}
+
+/* ── TOP BAR ── */
+.topbar{
+  grid-column:1/-1;
+  background:rgba(3,8,16,.96);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px 0 0;
+  backdrop-filter:blur(20px);
+  z-index:100;
+}
+.topbar-brand{
+  width:var(--sidebar);
+  display:flex;align-items:center;gap:10px;
+  padding:0 20px;
+  border-right:1px solid var(--border);
+  height:100%;
+  flex-shrink:0;
+}
+.brand-mark{display:flex;align-items:center;gap:10px;}
+.brand-text{font-family:var(--serif);font-size:16px;font-weight:900;letter-spacing:-.02em;}
+.brand-text span{color:var(--gold);}
+.topbar-center{flex:1;padding:0 24px;display:flex;align-items:center;gap:8px;}
+.topbar-search{
+  flex:1;max-width:360px;
+  background:rgba(201,168,76,.04);
+  border:1px solid var(--border);border-radius:3px;
+  display:flex;align-items:center;gap:8px;padding:7px 12px;
+  font-family:var(--mono);font-size:11px;color:var(--t25);cursor:text;
+  transition:border-color .2s;
+}
+.topbar-search:hover{border-color:var(--border2);}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+.notif-btn{
+  position:relative;width:32px;height:32px;border-radius:3px;
+  background:rgba(201,168,76,.04);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .15s;
+}
+.notif-btn:hover{background:rgba(201,168,76,.08);}
+.notif-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red);border:1px solid var(--void);}
+.user-pill{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(201,168,76,.04);border:1px solid var(--border);
+  border-radius:3px;padding:6px 12px 6px 8px;cursor:pointer;
+  transition:background .15s;
+}
+.user-pill:hover{background:rgba(201,168,76,.08);}
+.user-avatar{width:24px;height:24px;border-radius:2px;background:rgba(201,168,76,.2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);}
+.user-name{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t60);letter-spacing:.04em;}
+.topbar-badge{display:flex;align-items:center;gap:5px;background:rgba(201,168,76,.08);border:1px solid var(--border2);border-radius:2px;padding:4px 10px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);opacity:.75;}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  background:var(--void2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  padding:16px 0;
+}
+.nav-section-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--t25);padding:0 20px;margin:16px 0 6px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 20px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;
+  color:var(--t40);transition:all .15s;
+  border-left:2px solid transparent;
+  position:relative;
+}
+.nav-item:hover{color:var(--text2);background:rgba(201,168,76,.03);}
+.nav-item.active{color:var(--gold3);background:rgba(201,168,76,.09);border-left-color:var(--gold);text-shadow:0 0 20px rgba(201,168,76,.3);}
+.nav-icon{width:14px;height:14px;opacity:.6;flex-shrink:0;}
+.nav-item.active .nav-icon{opacity:1;}
+.nav-badge{margin-left:auto;font-family:var(--mono);font-size:8px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(220,38,38,.18);color:var(--red);border:1px solid rgba(220,38,38,.25);}
+.nav-badge.amber{background:rgba(245,158,11,.12);color:var(--amber);border-color:rgba(245,158,11,.2);}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
+.sidebar-plan{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.06em;margin-bottom:6px;}
+.sidebar-days{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);opacity:.6;}
+
+/* ── MAIN CONTENT ── */
+.main{overflow-y:auto;background:var(--void);display:flex;flex-direction:column;}
+
+/* ── PAGE HEADER ── */
+.page-hdr{
+  padding:24px 32px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-end;justify-content:space-between;
+  flex-shrink:0;
+}
+.page-title-group{}
+.page-date{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--t25);margin-bottom:6px;}
+.page-title{font-size:22px;font-weight:900;letter-spacing:-.02em;color:var(--text);text-shadow:0 0 40px rgba(201,168,76,.1);}
+.page-title em{font-style:italic;font-weight:300;color:var(--gold2);}
+.page-actions{display:flex;gap:8px;}
+.btn-audit{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:10px 20px;border-radius:2px;border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px;}
+.btn-audit:hover{background:var(--gold2);box-shadow:0 6px 20px rgba(201,168,76,.28);}
+.btn-secondary{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--t40);padding:10px 18px;border-radius:2px;border:1px solid var(--border);background:transparent;cursor:pointer;transition:all .2s;}
+.btn-secondary:hover{color:var(--gold);border-color:var(--border2);}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0;}
+.stat-card{background:#0A1628;padding:16px 20px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid rgba(201,168,76,.06);}
+.stat-label{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t25);}
+.stat-value{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.01em;text-shadow:0 0 20px rgba(201,168,76,.2);}
+.stat-value.red{color:var(--red);}
+.stat-value.green{color:var(--green);}
+.stat-sub{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.04em;}
+
+/* ── TWO COLUMN BODY ── */
+.body-grid{display:grid;grid-template-columns:1fr 340px;gap:0;flex:1;overflow:hidden;}
+
+/* ── FEED PANEL ── */
+.feed-panel{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
+.panel-hdr{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:rgba(201,168,76,.025);}
+.panel-hdr-left{display:flex;align-items:center;gap:10px;}
+.panel-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.75;}
+.panel-sub{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.04em;}
+.live-chip{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.85);letter-spacing:.1em;}
+.live-dot-sm{width:5px;height:5px;border-radius:50%;background:var(--green);animation:ldot 2s ease-in-out infinite;}
+@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.4)}50%{opacity:1;box-shadow:0 0 0 4px rgba(74,222,128,0)}}
+
+/* Feed filter tabs */
+.feed-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.feed-tab{flex:1;padding:8px 12px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;}
+.feed-tab.active{color:var(--gold);border-bottom-color:var(--gold);background:rgba(201,168,76,.03);}
+.feed-tab:hover:not(.active){color:var(--t60);}
+
+/* Feed col headers */
+.feed-cols{display:grid;grid-template-columns:68px 1fr 220px 82px 54px 54px 76px 64px;gap:0 12px;padding:5px 24px;border-bottom:1px solid rgba(201,168,76,.06);background:rgba(201,168,76,.02);flex-shrink:0;}
+.fcol{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t25);}
+
+/* Feed rows */
+.feed-scroll{flex:1;overflow-y:auto;}
+.feed-scroll::-webkit-scrollbar{width:3px;}
+.feed-scroll::-webkit-scrollbar-track{background:transparent;}
+.feed-scroll::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);border-radius:2px;}
+.feed-row-dash{display:grid;grid-template-columns:68px 1fr 220px 82px 54px 54px 76px 64px;gap:0 12px;padding:9px 24px;border-bottom:1px solid rgba(201,168,76,.045);align-items:center;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
+.feed-row-dash:hover{background:rgba(201,168,76,.07);}
+.feed-row-dash.p0{border-left-color:rgba(220,38,38,.5);}
+.feed-row-dash.p1{border-left-color:rgba(245,158,11,.4);}
+.f-naics{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.07em;}
+.f-title{font-size:11px;font-weight:600;color:rgba(245,240,232,.96);line-height:1.3;font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.f-agency{font-family:var(--mono);font-size:7.5px;color:var(--t40);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.f-value{font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(245,240,232,.75);}
+.f-days{font-family:var(--mono);font-size:9px;font-weight:700;}
+.f-days.urgent{color:var(--red);}
+.f-days.soon{color:var(--amber);}
+.f-days.ok{color:var(--green);}
+.f-type{font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(201,168,76,.5);letter-spacing:.05em;}
+.f-sa{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 6px;border-radius:2px;}
+.sa-sb{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);color:var(--gold);}
+.sa-sdvosb{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);color:var(--green);}
+.sa-unrest{background:rgba(245,240,232,.04);border:1px solid var(--t12);color:var(--t25);}
+.sa-wosb{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.18);color:#A78BFA;}
+.sa-a8{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.18);color:#FBB524;}
+.f-risk{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 7px;border-radius:2px;}
+.r-p0{background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:var(--red);}
+.r-p1{background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.22);color:var(--amber);}
+.r-w{background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);}
+
+/* ── RIGHT PANEL ── */
+.right-panel{display:flex;flex-direction:column;overflow:hidden;background:rgba(6,15,28,.6);}
+
+/* Recent audits */
+.audit-list{flex:1;overflow-y:auto;padding:0;}
+.audit-list::-webkit-scrollbar{width:3px;}
+.audit-list::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);}
+.audit-item{padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
+.audit-item:hover{background:rgba(201,168,76,.03);}
+.audit-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px;}
+.audit-title{font-size:11px;font-weight:700;color:var(--text);line-height:1.3;font-family:var(--serif);}
+.audit-risk-badge{font-family:var(--mono);font-size:7px;font-weight:700;padding:2px 6px;border-radius:2px;flex-shrink:0;}
+.audit-meta{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;color:var(--t25);}
+.audit-dot{width:2px;height:2px;border-radius:50%;background:var(--t25);}
+.audit-actions{display:flex;gap:6px;margin-top:8px;}
+.audit-btn{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:2px;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:transparent;color:var(--t40);}
+.audit-btn:hover{color:var(--gold);border-color:var(--border2);}
+.audit-btn.primary{background:rgba(201,168,76,.08);border-color:var(--border2);color:var(--gold);}
+
+/* Account intel panel */
+.acct-panel{border-top:1px solid var(--border);padding:16px 20px;background:rgba(201,168,76,.02);}
+.acct-title{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--t25);margin-bottom:12px;}
+.acct-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.acct-stat{background:var(--void2);border:1px solid var(--border);border-radius:3px;padding:10px 12px;}
+.acct-stat-n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:3px;}
+.acct-stat-l{font-family:var(--mono);font-size:7px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
+.days-bar{margin-top:12px;}
+.days-bar-label{display:flex;justify-content:space-between;margin-bottom:6px;font-family:var(--mono);font-size:8px;color:var(--t25);}
+.days-bar-track{height:3px;background:rgba(201,168,76,.08);border-radius:2px;}
+.days-bar-fill{height:100%;background:linear-gradient(to right,var(--gold),var(--gold2));border-radius:2px;width:62%;}
+
+/* ── P0 ALERT BANNER ── */
+.alert-banner{
+  margin:16px 24px 0;
+  background:rgba(220,38,38,.06);
+  border:1px solid rgba(220,38,38,.2);
+  border-radius:3px;padding:10px 14px;
+  display:flex;align-items:center;gap:10px;
+  flex-shrink:0;
+}
+.alert-icon{width:16px;height:16px;flex-shrink:0;}
+.alert-text{font-family:var(--mono);font-size:10px;color:rgba(245,240,232,.88);line-height:1.4;flex:1;}
+.alert-text strong{color:var(--red);font-weight:700;}
+.alert-cta{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--red);white-space:nowrap;cursor:pointer;padding:4px 10px;border:1px solid rgba(220,38,38,.3);border-radius:2px;transition:all .15s;}
+.alert-cta:hover{background:rgba(220,38,38,.1);}
+
+/* Upload zone */
+.upload-zone{
+  margin:12px 24px;
+  border:1px dashed rgba(201,168,76,.2);
+  border-radius:4px;padding:18px;
+  display:flex;align-items:center;gap:16px;
+  cursor:pointer;transition:all .2s;background:rgba(201,168,76,.02);
+  flex-shrink:0;
+}
+.upload-zone:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.04);}
+.upload-icon{width:36px;height:36px;border:1px solid var(--border2);border-radius:3px;display:flex;align-items:center;justify-content:center;background:rgba(201,168,76,.06);flex-shrink:0;}
+.upload-text{flex:1;}
+.upload-title{font-family:var(--serif);font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.upload-sub{font-family:var(--mono);font-size:9px;color:var(--t25);letter-spacing:.04em;}
+.upload-badge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);opacity:.6;padding:4px 10px;border:1px solid var(--border2);border-radius:2px;white-space:nowrap;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+          <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
+          <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".9" opacity=".7"/>
+          <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".9" opacity=".5"/>
+        </svg>
+        <div class="brand-text">FAR<span>audit</span></div>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="topbar-search">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Search solicitations, audits, agencies...
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-badge">
+        <div class="live-dot-sm"></div>
+        Live Feed Active
+      </div>
+      <div class="notif-btn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 00-5 5v3l-1.5 2h13L13 9V6a5 5 0 00-5-5z" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".6" fill="none"/><line x1="6.5" y1="14" x2="9.5" y2="14" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".5" stroke-linecap="round"/></svg>
+        <div class="notif-dot"></div>
+      </div>
+      <div class="user-pill">
+        <div class="user-avatar">JR</div>
+        <div class="user-name">Jose Rodriguez</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="nav-section-label">Intelligence</div>
+    <div class="nav-item active">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="8" x2="11" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Live Feed
+      <span class="nav-badge">847</span>
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1" stroke-opacity=".6"/><line x1="5" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1" stroke-opacity=".6"/></svg>
+      New Audit
+    </div>
+
+    <div class="nav-section-label">History</div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1v7l4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      Past Audits
+      <span class="nav-badge amber">12</span>
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M4 2h8l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/><line x1="6" y1="10" x2="10" y2="10" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/></svg>
+      Reports
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><polyline points="2,12 5,8 8,10 11,5 14,7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Intelligence
+    </div>
+
+    <div class="nav-section-label">Account</div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Profile
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Settings
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-plan">Design Partner · $1,250/mo</div>
+      <div class="sidebar-days">62 days remaining</div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+
+    <!-- Page header -->
+    <div class="page-hdr">
+      <div class="page-title-group">
+        <div class="page-date" id="dashDate">Loading...</div>
+        <div class="page-title">Good morning, Jose. <em>2 P0 flags need attention.</em></div>
+      </div>
+      <div class="page-actions">
+        <button class="btn-secondary">Export Report</button>
+        <button class="btn-audit">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Run New Audit
+        </button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Solicitations</div>
+        <div class="stat-value" id="statSol">847</div>
+        <div class="stat-sub">Your 9 NAICS codes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">P0 Flags Today</div>
+        <div class="stat-value red" id="statP0">23</div>
+        <div class="stat-sub">Require immediate review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Audits Run</div>
+        <div class="stat-value">12</div>
+        <div class="stat-sub">This month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Value Audited</div>
+        <div class="stat-value">$48.2M</div>
+        <div class="stat-sub">Total contract value</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Traps Caught</div>
+        <div class="stat-value green">31</div>
+        <div class="stat-sub">DFARS · FAR · Compliance</div>
+      </div>
+    </div>
+
+    <!-- P0 Alert -->
+    <div class="alert-banner">
+      <svg class="alert-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 14H1L8 1z" stroke="#EF4444" stroke-width="1.3" fill="none"/><line x1="8" y1="6" x2="8" y2="10" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="12" r=".8" fill="#EF4444"/></svg>
+      <div class="alert-text"><strong>2 P0 flags</strong> detected in active solicitations matching your NAICS codes. T-38 Talon (due in 3 days) has a CLIN quantity ambiguity and FOB conflict requiring CO clarification.</div>
+      <div class="alert-cta">Review P0 →</div>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="upload-zone">
+      <div class="upload-icon">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 2v12M6 6l4-4 4 4" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg>
+      </div>
+      <div class="upload-text">
+        <div class="upload-title">Drop a solicitation PDF to run an audit</div>
+        <div class="upload-sub">RFQ · RFP · IDIQ · IFB · Any page count · Any agency · Results in ~60 seconds</div>
+      </div>
+      <div class="upload-badge">Run Audit →</div>
+    </div>
+
+    <!-- Body grid -->
+    <div class="body-grid">
+
+      <!-- LEFT: Live feed -->
+      <div class="feed-panel">
+        <div class="panel-hdr">
+          <div class="panel-hdr-left">
+            <div class="panel-title">Intelligence Feed</div>
+            <div class="panel-sub">Filtered to your NAICS · Updated <span id="feedTs">just now</span></div>
+          </div>
+          <div class="live-chip"><div class="live-dot-sm"></div>LIVE</div>
+        </div>
+        <div class="feed-tabs">
+          <div class="feed-tab active">All</div>
+          <div class="feed-tab">P0 · P1</div>
+          <div class="feed-tab">Expiring Soon</div>
+          <div class="feed-tab">Small Business</div>
+          <div class="feed-tab">IDIQ</div>
+        </div>
+        <div class="feed-cols">
+          <div class="fcol">NAICS</div>
+          <div class="fcol">Solicitation</div>
+          <div class="fcol">Agency</div>
+          <div class="fcol">Value</div>
+          <div class="fcol">Days</div>
+          <div class="fcol">Type</div>
+          <div class="fcol">Set-Aside</div>
+          <div class="fcol">Risk</div>
+        </div>
+        <div class="feed-scroll" id="dashFeed"></div>
+      </div>
+
+      <!-- RIGHT: Audits + Account -->
+      <div class="right-panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Recent Audits</div>
+          <div class="panel-sub">Last 5 runs</div>
+        </div>
+        <div class="audit-list" id="auditList"></div>
+        <div class="acct-panel">
+          <div class="acct-title">Account Intelligence</div>
+          <div class="acct-stats">
+            <div class="acct-stat"><div class="acct-stat-n">12</div><div class="acct-stat-l">Audits Run</div></div>
+            <div class="acct-stat"><div class="acct-stat-n" style="color:var(--red)">31</div><div class="acct-stat-l">Traps Caught</div></div>
+            <div class="acct-stat"><div class="acct-stat-n">$48.2M</div><div class="acct-stat-l">Value Audited</div></div>
+            <div class="acct-stat"><div class="acct-stat-n" style="color:var(--green)">$0</div><div class="acct-stat-l">Compliance Exposure</div></div>
+          </div>
+          <div class="days-bar">
+            <div class="days-bar-label">
+              <span>Design Partner Period</span>
+              <span style="color:var(--gold);opacity:.6">62 days left</span>
+            </div>
+            <div class="days-bar-track"><div class="days-bar-fill"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Date
+const now = new Date();
+document.getElementById('dashDate').textContent =
+  now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase();
+
+// Feed data
+const FEED = [
+  {n:'336413',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'Air Education & Training Command (AETC)',v:'$48K',days:3,ty:'RFQ',sa:'sb',sal:'SB',rc:'p0',rl:'2 P0'},
+  {n:'332710',t:'Precision Machined Brackets — F-16 Program',a:'Air Force Materiel Command (AFMC)',v:'$312K',days:14,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'p1',rl:'3 P1'},
+  {n:'334511',t:'Navigation Housing Units · IDIQ Increment IV',a:'Naval Air Systems Command (NAVAIR)',v:'$2.1M',days:22,ty:'IDIQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'336413',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army Contracting Command (ACC)',v:'$187K',days:5,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',rc:'p0',rl:'1 P0'},
+  {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',rc:'p1',rl:'2 P1'},
+  {n:'541330',t:'Structural Analysis Support — F-35B',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',rc:'p0',rl:'2 P0'},
+  {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',rc:'p1',rl:'1 P1'},
+  {n:'334511',t:'Radar Array Housing · Low Observable Coat',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'p0',rl:'3 P0'},
+  {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',rc:'p1',rl:'2 P1'},
+  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'unrest',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332710',t:'Sikorsky UH-60 Transmission Housing',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wosb',sal:'WOSB',rc:'p1',rl:'1 P1'},
+];
+
+const feed = document.getElementById('dashFeed');
+FEED.forEach(r => {
+  const row = document.createElement('div');
+  const daysCls = r.days <= 7 ? 'urgent' : r.days <= 21 ? 'soon' : 'ok';
+  row.className = `feed-row-dash ${r.rc}`;
+  row.innerHTML = `
+    <span class="f-naics">${r.n}</span>
+    <div style="min-width:0"><div class="f-title">${r.t}</div></div>
+    <span class="f-agency">${r.a}</span>
+    <span class="f-value">${r.v}</span>
+    <span class="f-days ${daysCls}">${r.days}d</span>
+    <span class="f-type">${r.ty}</span>
+    <span class="f-sa sa-${r.sa}">${r.sal}</span>
+    <span class="f-risk ${r.rc ? 'r-'+r.rc : 'r-w'}">${r.rl}</span>`;
+  feed.appendChild(row);
+});
+
+// Recent audits
+const AUDITS = [
+  {title:'T-38 Talon Intake Plugs & Exhaust Covers',sol:'FA301626Q0068',date:'30 Apr 2026',risk:'2 P0',rc:'p0',pages:20},
+  {title:'F-16 Block 70 Hydraulic Actuator Brackets',sol:'FA8675-26-Q-0442',date:'28 Apr 2026',risk:'1 P1',rc:'p1',pages:34},
+  {title:'CH-47 Rotor Hub Fittings — Army ACC',sol:'W911W6-26-Q-0081',date:'26 Apr 2026',risk:'3 P1',rc:'p1',pages:18},
+  {title:'Navigation Housing Units IDIQ IV',sol:'N00019-26-R-0084',date:'24 Apr 2026',risk:'Watch',rc:'',pages:92},
+  {title:'Titanium Fastener Sets MIL-SPEC-AN960',sol:'SPE4A6-26-Q-0234',date:'22 Apr 2026',risk:'2 P1',rc:'p1',pages:12},
+];
+
+const auditList = document.getElementById('auditList');
+AUDITS.forEach(a => {
+  const item = document.createElement('div');
+  item.className = 'audit-item';
+  const riskColor = a.rc === 'p0' ? 'var(--red)' : a.rc === 'p1' ? 'var(--amber)' : 'var(--gold)';
+  const riskBg = a.rc === 'p0' ? 'rgba(220,38,38,.14)' : a.rc === 'p1' ? 'rgba(245,158,11,.11)' : 'rgba(201,168,76,.08)';
+  item.innerHTML = `
+    <div class="audit-item-top">
+      <div class="audit-title">${a.title}</div>
+      <span class="audit-risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}40">${a.risk}</span>
+    </div>
+    <div class="audit-meta">
+      <span>${a.sol}</span>
+      <div class="audit-dot"></div>
+      <span>${a.date}</span>
+      <div class="audit-dot"></div>
+      <span>${a.pages}pp</span>
+    </div>
+    <div class="audit-actions">
+      <button class="audit-btn primary">View Report</button>
+      <button class="audit-btn">PDF</button>
+      <button class="audit-btn">KO Email</button>
+    </div>`;
+  auditList.appendChild(item);
+});
+
+// Live counters
+let sol = 847, p0 = 23;
+(function tick(){
+  if(Math.random()>.45) sol++;
+  if(Math.random()>.78) p0++;
+  const s = document.getElementById('statSol');
+  const p = document.getElementById('statP0');
+  if(s) s.textContent = sol;
+  if(p) p.textContent = p0;
+  setTimeout(tick, 2000 + Math.random()*4000);
+})();
+
+// Feed timestamp
+let ts = 0;
+setInterval(() => {
+  ts++;
+  const el = document.getElementById('feedTs');
+  if(!el) return;
+  el.textContent = ts < 60 ? ts+'s ago' : Math.floor(ts/60)+'m ago';
+  if(ts >= 90) ts = 0;
+}, 1000);
+
+// Tab switching
+document.querySelectorAll('.feed-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
