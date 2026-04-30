@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/sign-in", "/login", "/apex-hub.html"];
+const PUBLIC = ["/sign-in", "/login", "/apex-hub.html", "/vertex-hub-v6.html"];
 const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots"];
 
 export async function proxy(request: NextRequest) {
