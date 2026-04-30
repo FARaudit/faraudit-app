@@ -8,8 +8,7 @@ const PUBLIC = [
   "/vertex-hub-v6.html",
   "/landing.html",
   "/access.html",
-  "/signin.html",
-  "/home.html"
+  "/signin.html"
 ];
 const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots"];
 
