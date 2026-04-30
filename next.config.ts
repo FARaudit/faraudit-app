@@ -43,6 +43,12 @@ const nextConfig: NextConfig = {
         headers: securityHeaders
       }
     ];
+  },
+  async redirects() {
+    return [
+      { source: "/login", destination: "/sign-in", permanent: true },
+      { source: "/login/:path*", destination: "/sign-in", permanent: true }
+    ];
   }
 };
 
