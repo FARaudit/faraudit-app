@@ -1,9 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Pages that require an authenticated session.
-// API routes do their own auth — no proxy redirect needed.
-const PROTECTED_PREFIXES = ["/dashboard", "/audit"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/settings",
+  "/journal",
+  "/positions",
+  "/audit-results",
+  "/saved",
+  "/account"
+];
 
 function needsAuth(pathname: string): boolean {
   if (pathname.startsWith("/api/")) return false;
@@ -13,6 +19,14 @@ function needsAuth(pathname: string): boolean {
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
 }
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload"
+};
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -49,18 +63,21 @@ export async function proxy(request: NextRequest) {
     data: { user }
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users away from protected pages
-  if (needsAuth(request.nextUrl.pathname) && !user) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+  const path = request.nextUrl.pathname;
+  if (needsAuth(path) && !user) {
+    const signInUrl = new URL("/sign-in", request.url);
+    signInUrl.searchParams.set("next", path);
+    return NextResponse.redirect(signInUrl);
   }
 
-  // Redirect authenticated users away from /login
-  if (request.nextUrl.pathname === "/login" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (path === "/sign-in" && user) {
+    const next = request.nextUrl.searchParams.get("next") || "/dashboard";
+    return NextResponse.redirect(new URL(next, request.url));
   }
 
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(k, v);
+  }
   return response;
 }
 
