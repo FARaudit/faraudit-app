@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FARaudit — Dashboard</title>
+<title>FARaudit — Federal Contract Intelligence Platform</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -11,556 +11,867 @@
   --void:#030810;--void2:#060F1C;--void3:#0A1628;
   --gold:#C9A84C;--gold2:#DFB96A;--gold3:#F0D48E;
   --text:#F5F0E8;--text2:#E8E2D4;
-  --t60:rgba(245,240,232,.6);--t40:rgba(245,240,232,.4);
-  --t25:rgba(245,240,232,.25);--t12:rgba(245,240,232,.12);
-  --red:#EF4444;--amber:#F59E0B;--green:#4ADE80;
-  --border:rgba(201,168,76,.12);--border2:rgba(201,168,76,.2);
+  --t80:rgba(245,240,232,.80);--t60:rgba(245,240,232,.6);
+  --t40:rgba(245,240,232,.4);--t25:rgba(245,240,232,.25);--t12:rgba(245,240,232,.12);
+  --red:#EF4444;--amber:#F59E0B;--green:#4ADE80;--blue:#60A5FA;
+  --border:rgba(201,168,76,.1);--border2:rgba(201,168,76,.2);
   --mono:'JetBrains Mono',monospace;--serif:'Fraunces',Georgia,serif;
-  --sidebar:240px;--topbar:56px;
+  --sidebar:220px;--topbar:52px;
 }
 html,body{background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;}
 
-/* ── LAYOUT ── */
-.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--topbar) 1fr;height:100vh;}
+/* ── APP SHELL ── */
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--topbar) 1fr;height:100vh;overflow:hidden;}
 
-/* ── TOP BAR ── */
+/* ── TOPBAR ── */
 .topbar{
-  grid-column:1/-1;
-  background:rgba(3,8,16,.96);
-  border-bottom:1px solid var(--border);
+  grid-column:1/-1;height:var(--topbar);
+  background:rgba(3,8,16,.96);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 24px 0 0;
-  backdrop-filter:blur(20px);
-  z-index:100;
+  padding:0 20px 0 0;backdrop-filter:blur(20px);z-index:100;
 }
-.topbar-brand{
-  width:var(--sidebar);
-  display:flex;align-items:center;gap:10px;
-  padding:0 20px;
-  border-right:1px solid var(--border);
-  height:100%;
-  flex-shrink:0;
-}
-.brand-mark{display:flex;align-items:center;gap:10px;}
-.brand-text{font-family:var(--serif);font-size:16px;font-weight:900;letter-spacing:-.02em;}
-.brand-text span{color:var(--gold);}
-.topbar-center{flex:1;padding:0 24px;display:flex;align-items:center;gap:8px;}
-.topbar-search{
-  flex:1;max-width:360px;
-  background:rgba(201,168,76,.04);
+.tb-brand{width:var(--sidebar);height:100%;display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid var(--border);flex-shrink:0;}
+.tb-wordmark{font-family:var(--serif);font-size:16px;font-weight:900;letter-spacing:-.02em;}
+.tb-wordmark span{color:var(--gold);}
+.tb-center{flex:1;display:flex;align-items:center;padding:0 20px;}
+.tb-search{
+  flex:1;max-width:400px;background:rgba(201,168,76,.04);
   border:1px solid var(--border);border-radius:3px;
   display:flex;align-items:center;gap:8px;padding:7px 12px;
   font-family:var(--mono);font-size:11px;color:var(--t25);cursor:text;
   transition:border-color .2s;
 }
-.topbar-search:hover{border-color:var(--border2);}
-.topbar-right{display:flex;align-items:center;gap:16px;}
-.notif-btn{
-  position:relative;width:32px;height:32px;border-radius:3px;
-  background:rgba(201,168,76,.04);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  transition:background .15s;
-}
-.notif-btn:hover{background:rgba(201,168,76,.08);}
-.notif-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red);border:1px solid var(--void);}
-.user-pill{
-  display:flex;align-items:center;gap:10px;
-  background:rgba(201,168,76,.04);border:1px solid var(--border);
-  border-radius:3px;padding:6px 12px 6px 8px;cursor:pointer;
-  transition:background .15s;
-}
-.user-pill:hover{background:rgba(201,168,76,.08);}
-.user-avatar{width:24px;height:24px;border-radius:2px;background:rgba(201,168,76,.2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);}
-.user-name{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t60);letter-spacing:.04em;}
-.topbar-badge{display:flex;align-items:center;gap:5px;background:rgba(201,168,76,.08);border:1px solid var(--border2);border-radius:2px;padding:4px 10px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);opacity:.75;}
+.tb-search:hover{border-color:var(--border2);}
+.tb-right{display:flex;align-items:center;gap:12px;}
+.tb-live{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.8);letter-spacing:.1em;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.15);border-radius:2px;padding:4px 10px;}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:ldot 2s ease-in-out infinite;}
+@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.4)}50%{opacity:1;box-shadow:0 0 0 4px rgba(74,222,128,0)}}
+.tb-notif{width:30px;height:30px;border-radius:3px;background:rgba(201,168,76,.04);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:background .15s;}
+.tb-notif:hover{background:rgba(201,168,76,.08);}
+.notif-badge{position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--red);border:1px solid var(--void);}
+.tb-user{display:flex;align-items:center;gap:8px;background:rgba(201,168,76,.04);border:1px solid var(--border);border-radius:3px;padding:5px 10px 5px 6px;cursor:pointer;transition:background .15s;}
+.tb-user:hover{background:rgba(201,168,76,.08);}
+.user-av{width:22px;height:22px;border-radius:2px;background:rgba(201,168,76,.2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold);}
+.user-nm{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t60);letter-spacing:.03em;}
 
 /* ── SIDEBAR ── */
-.sidebar{
-  background:var(--void2);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  overflow:hidden;
-  padding:16px 0;
-}
-.nav-section-label{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--t25);padding:0 20px;margin:16px 0 6px;}
-.nav-item{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 20px;cursor:pointer;
-  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;
-  color:var(--t40);transition:all .15s;
-  border-left:2px solid transparent;
-  position:relative;
-}
+.sidebar{background:var(--void2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;padding:12px 0;}
+.nav-label{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--t25);padding:12px 16px 5px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;cursor:pointer;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.03em;color:var(--t40);transition:all .15s;border-left:2px solid transparent;position:relative;}
 .nav-item:hover{color:var(--text2);background:rgba(201,168,76,.03);}
-.nav-item.active{color:var(--gold3);background:rgba(201,168,76,.09);border-left-color:var(--gold);text-shadow:0 0 20px rgba(201,168,76,.3);}
-.nav-icon{width:14px;height:14px;opacity:.6;flex-shrink:0;}
-.nav-item.active .nav-icon{opacity:1;}
-.nav-badge{margin-left:auto;font-family:var(--mono);font-size:8px;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(220,38,38,.18);color:var(--red);border:1px solid rgba(220,38,38,.25);}
-.nav-badge.amber{background:rgba(245,158,11,.12);color:var(--amber);border-color:rgba(245,158,11,.2);}
-.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
-.sidebar-plan{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.06em;margin-bottom:6px;}
-.sidebar-days{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);opacity:.6;}
+.nav-item.active{color:var(--gold2);background:rgba(201,168,76,.07);border-left-color:var(--gold);}
+.nav-icon{width:13px;height:13px;opacity:.55;flex-shrink:0;}
+.nav-item.active .nav-icon{opacity:.9;}
+.nav-ct{margin-left:auto;font-family:var(--mono);font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;}
+.ct-red{background:rgba(220,38,38,.16);color:var(--red);border:1px solid rgba(220,38,38,.22);}
+.ct-gold{background:rgba(201,168,76,.12);color:var(--gold);border:1px solid rgba(201,168,76,.2);}
+.ct-green{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.18);}
+.sb-footer{margin-top:auto;padding:14px 16px;border-top:1px solid var(--border);}
+.sb-plan{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.05em;margin-bottom:4px;}
+.sb-days{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);opacity:.65;}
+.sb-upgrade{margin-top:8px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:7px 12px;border-radius:2px;text-align:center;cursor:pointer;opacity:.8;}
 
-/* ── MAIN CONTENT ── */
-.main{overflow-y:auto;background:var(--void);display:flex;flex-direction:column;}
+/* ── MAIN ── */
+.main{display:flex;flex-direction:column;overflow:hidden;height:calc(100vh - var(--topbar));}
 
-/* ── PAGE HEADER ── */
-.page-hdr{
-  padding:24px 32px 20px;
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:flex-end;justify-content:space-between;
+/* ── PAGE TABS (primary navigation) ── */
+.page-tabs{
+  display:flex;border-bottom:1px solid var(--border);
+  background:rgba(6,15,28,.8);flex-shrink:0;
+  padding:0 24px;gap:0;overflow-x:auto;
+}
+.page-tabs::-webkit-scrollbar{display:none;}
+.ptab{
+  display:flex;align-items:center;gap:7px;
+  padding:12px 18px;font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t40);cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;
+  transition:all .15s;position:relative;
+}
+.ptab:hover{color:var(--t80);background:rgba(201,168,76,.03);}
+.ptab.active{color:var(--gold2);border-bottom-color:var(--gold);}
+.ptab-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.ptab-dot.red{background:var(--red);}
+.ptab-dot.green{background:var(--green);}
+.ptab-dot.gold{background:var(--gold);}
+.ptab-dot.blue{background:var(--blue);}
+.ptab-count{font-family:var(--mono);font-size:8px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(220,38,38,.15);color:var(--red);border:1px solid rgba(220,38,38,.22);}
+.ptab-count.gold{background:rgba(201,168,76,.1);color:var(--gold);border-color:rgba(201,168,76,.2);}
+.ptab-count.green{background:rgba(74,222,128,.08);color:var(--green);border-color:rgba(74,222,128,.15);}
+
+/* ── TAB CONTENT PANELS ── */
+.tab-panels{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.tab-panel{display:none;flex:1;overflow:hidden;flex-direction:column;min-height:0;}
+.tab-panel.active{display:flex;min-height:0;}
+
+/* ── SITUATION BOARD ── */
+.situation-board{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:var(--border);border-bottom:1px solid var(--border);
   flex-shrink:0;
 }
-.page-title-group{}
-.page-date{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--t25);margin-bottom:6px;}
-.page-title{font-size:22px;font-weight:900;letter-spacing:-.02em;color:var(--text);text-shadow:0 0 40px rgba(201,168,76,.1);}
-.page-title em{font-style:italic;font-weight:300;color:var(--gold2);}
-.page-actions{display:flex;gap:8px;}
-.btn-audit{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:10px 20px;border-radius:2px;border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:7px;}
-.btn-audit:hover{background:var(--gold2);box-shadow:0 6px 20px rgba(201,168,76,.28);}
-.btn-secondary{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--t40);padding:10px 18px;border-radius:2px;border:1px solid var(--border);background:transparent;cursor:pointer;transition:all .2s;}
-.btn-secondary:hover{color:var(--gold);border-color:var(--border2);}
+.sit-card{background:var(--void3);padding:18px 22px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:background .15s;}
+.sit-card:hover{background:rgba(201,168,76,.05);}
+.sit-card.urgent{background:rgba(220,38,38,.04);}
+.sit-card.urgent:hover{background:rgba(220,38,38,.08);}
+.sit-label{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--t25);}
+.sit-value{font-family:var(--mono);font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em;margin-bottom:4px;}
+.sit-value.red{color:var(--red);text-shadow:0 0 20px rgba(220,38,38,.3);}.sit-value.amber{color:var(--amber);}
+.sit-value.gold{color:var(--gold2);}
+.sit-value.green{color:var(--green);}
+.sit-sub{font-family:var(--mono);font-size:8px;color:var(--t40);margin-top:1px;}
+.sit-cta{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-top:6px;display:flex;align-items:center;gap:4px;}
+.sit-cta.gold{color:var(--gold);opacity:.7;}
 
-/* ── STAT CARDS ── */
-.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0;}
-.stat-card{background:#0A1628;padding:16px 20px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid rgba(201,168,76,.06);}
-.stat-label{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t25);}
-.stat-value{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.01em;text-shadow:0 0 20px rgba(201,168,76,.2);}
-.stat-value.red{color:var(--red);}
-.stat-value.green{color:var(--green);}
-.stat-sub{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.04em;}
+/* ── UPLOAD ZONE ── */
+.upload-bar{
+  margin:14px 20px 0;
+  background:rgba(201,168,76,.04);
+  border:1.5px dashed rgba(201,168,76,.3);
+  border-radius:4px;padding:18px 24px;
+  display:flex;align-items:center;gap:18px;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.upload-bar:hover{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.07);}
+.upload-icon-wrap{width:40px;height:40px;border-radius:3px;background:rgba(201,168,76,.1);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.upload-copy{flex:1;}
+.upload-hed{font-family:var(--serif);font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.upload-sub{font-family:var(--mono);font-size:9px;color:var(--t60);letter-spacing:.04em;}
+.upload-tags{display:flex;gap:5px;margin-top:6px;}
+.utag{font-family:var(--mono);font-size:8px;font-weight:700;padding:2px 7px;border-radius:2px;background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);letter-spacing:.05em;}
+.upload-cta-btn{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:11px 22px;border-radius:2px;border:none;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;}
+.upload-cta-btn:hover{background:var(--gold2);box-shadow:0 6px 20px rgba(201,168,76,.3);}
 
-/* ── TWO COLUMN BODY ── */
-.body-grid{display:grid;grid-template-columns:1fr 340px;gap:0;flex:1;overflow:hidden;}
+/* ── TWO COL BODY ── */
+.two-col{display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden;margin-top:12px;gap:0;min-height:0;}
 
-/* ── FEED PANEL ── */
-.feed-panel{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
-.panel-hdr{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:rgba(201,168,76,.025);}
-.panel-hdr-left{display:flex;align-items:center;gap:10px;}
-.panel-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.75;}
-.panel-sub{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.04em;}
+/* ── FEED ── */
+.feed-wrap{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);min-height:0;}
+.feed-hdr{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:rgba(201,168,76,.025);}
+.feed-hdr-l{display:flex;align-items:center;gap:10px;}
+.feed-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.75;}
+.feed-sub{font-family:var(--mono);font-size:8px;color:var(--t25);}
 .live-chip{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.85);letter-spacing:.1em;}
-.live-dot-sm{width:5px;height:5px;border-radius:50%;background:var(--green);animation:ldot 2s ease-in-out infinite;}
-@keyframes ldot{0%,100%{opacity:.8;box-shadow:0 0 0 0 rgba(74,222,128,.4)}50%{opacity:1;box-shadow:0 0 0 4px rgba(74,222,128,0)}}
-
-/* Feed filter tabs */
-.feed-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
-.feed-tab{flex:1;padding:8px 12px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;}
-.feed-tab.active{color:var(--gold);border-bottom-color:var(--gold);background:rgba(201,168,76,.03);}
-.feed-tab:hover:not(.active){color:var(--t60);}
-
-/* Feed col headers */
-.feed-cols{display:grid;grid-template-columns:68px 1fr 220px 82px 54px 54px 76px 64px;gap:0 12px;padding:5px 24px;border-bottom:1px solid rgba(201,168,76,.06);background:rgba(201,168,76,.02);flex-shrink:0;}
+.feed-filters{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ff{flex:1;padding:7px 10px;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t25);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;}
+.ff.active{color:var(--gold);border-bottom-color:var(--gold);background:rgba(201,168,76,.03);}
+.ff:hover:not(.active){color:var(--t60);}
+.feed-cols{display:grid;grid-template-columns:68px 1fr 200px 80px 50px 52px 76px 62px;gap:0 12px;padding:5px 20px;border-bottom:1px solid rgba(201,168,76,.06);background:rgba(201,168,76,.02);flex-shrink:0;}
 .fcol{font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t25);}
+.feed-scroll{flex:1;overflow-y:auto;min-height:0;height:100%;}
+.feed-scroll::-webkit-scrollbar{width:2px;}
+.feed-scroll::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);}
 
-/* Feed rows */
-.feed-scroll{flex:1;overflow-y:auto;}
-.feed-scroll::-webkit-scrollbar{width:3px;}
-.feed-scroll::-webkit-scrollbar-track{background:transparent;}
-.feed-scroll::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);border-radius:2px;}
-.feed-row-dash{display:grid;grid-template-columns:68px 1fr 220px 82px 54px 54px 76px 64px;gap:0 12px;padding:9px 24px;border-bottom:1px solid rgba(201,168,76,.045);align-items:center;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
-.feed-row-dash:hover{background:rgba(201,168,76,.07);}
-.feed-row-dash.p0{border-left-color:rgba(220,38,38,.5);}
-.feed-row-dash.p1{border-left-color:rgba(245,158,11,.4);}
-.f-naics{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.07em;}
-.f-title{font-size:11px;font-weight:600;color:rgba(245,240,232,.96);line-height:1.3;font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.f-agency{font-family:var(--mono);font-size:7.5px;color:var(--t40);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.f-value{font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(245,240,232,.75);}
+/* Priority section header */
+.feed-section-hdr{display:flex;align-items:center;gap:10px;padding:9px 20px;background:rgba(220,38,38,.06);border-bottom:1px solid rgba(220,38,38,.15);border-top:1px solid rgba(220,38,38,.1);}
+.fsh-label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red);opacity:.9;}
+.fsh-count{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(220,38,38,.15);color:var(--red);border:1px solid rgba(220,38,38,.22);}
+
+.feed-row{display:grid;grid-template-columns:68px 1fr 200px 80px 50px 52px 76px 62px;gap:0 12px;padding:9px 20px;border-bottom:1px solid rgba(201,168,76,.045);align-items:center;cursor:pointer;transition:background .12s;border-left:2px solid transparent;}
+.feed-row:hover{background:rgba(201,168,76,.05);}
+.feed-row.rp0{border-left-color:rgba(220,38,38,.55);}
+.feed-row.rp1{border-left-color:rgba(245,158,11,.45);}
+.f-naics{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.06em;}
+.f-title{font-size:11px;font-weight:600;color:rgba(245,240,232,.94);font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.f-agency{font-family:var(--mono);font-size:7.5px;color:var(--t60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.f-val{font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(245,240,232,.78);}
 .f-days{font-family:var(--mono);font-size:9px;font-weight:700;}
-.f-days.urgent{color:var(--red);}
+.f-days.urg{color:var(--red);}
 .f-days.soon{color:var(--amber);}
 .f-days.ok{color:var(--green);}
 .f-type{font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(201,168,76,.5);letter-spacing:.05em;}
 .f-sa{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 6px;border-radius:2px;}
 .sa-sb{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);color:var(--gold);}
-.sa-sdvosb{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);color:var(--green);}
-.sa-unrest{background:rgba(245,240,232,.04);border:1px solid var(--t12);color:var(--t25);}
-.sa-wosb{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.18);color:#A78BFA;}
+.sa-sd{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);color:var(--green);}
+.sa-un{background:rgba(245,240,232,.04);border:1px solid var(--t12);color:var(--t25);}
+.sa-wo{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.18);color:#A78BFA;}
 .sa-a8{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.18);color:#FBB524;}
 .f-risk{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 7px;border-radius:2px;}
-.r-p0{background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:var(--red);}
-.r-p1{background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.22);color:var(--amber);}
-.r-w{background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);}
+.rk0{background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:var(--red);}
+.rk1{background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.22);color:var(--amber);}
+.rkw{background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);}
 
 /* ── RIGHT PANEL ── */
-.right-panel{display:flex;flex-direction:column;overflow:hidden;background:rgba(6,15,28,.6);}
+.right-col{display:flex;flex-direction:column;overflow:hidden;background:rgba(6,15,28,.5);min-height:0;}
+.rc-section{border-bottom:1px solid var(--border);}
+.rc-hdr{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(201,168,76,.025);border-bottom:1px solid var(--border);}
+.rc-title{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);opacity:.7;}
+.rc-sub{font-family:var(--mono);font-size:8px;color:var(--t25);}
+.audit-item{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
+.audit-item:hover{background:rgba(201,168,76,.04);}
+.ai-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;}
+.ai-title{font-size:11px;font-weight:700;color:var(--text);font-family:var(--serif);line-height:1.25;}
+.ai-badge{font-family:var(--mono);font-size:7px;font-weight:700;padding:2px 6px;border-radius:2px;flex-shrink:0;}
+.ai-meta{font-family:var(--mono);font-size:7.5px;color:var(--t25);margin-bottom:7px;}
+.ai-btns{display:flex;gap:5px;}
+.ai-btn{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border-radius:2px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--t40);transition:all .15s;}
+.ai-btn:hover{color:var(--gold);border-color:var(--border2);}
+.ai-btn.pri{background:rgba(201,168,76,.08);border-color:var(--border2);color:var(--gold);}
+.acct-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin:0;}
+.acct-stat{background:var(--void3);padding:10px 14px;}
+.as-n{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:3px;}
+.as-n.red{color:var(--red);}
+.as-n.green{color:var(--green);}
+.as-l{font-family:var(--mono);font-size:7px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
+.days-wrap{padding:12px 16px;}
+.days-top{display:flex;justify-content:space-between;margin-bottom:6px;font-family:var(--mono);font-size:8px;}
+.days-lbl{color:var(--t25);}
+.days-val{color:var(--gold);opacity:.65;font-weight:700;}
+.days-track{height:3px;background:rgba(201,168,76,.08);border-radius:2px;}
+.days-fill{height:100%;background:linear-gradient(to right,var(--gold),var(--gold2));border-radius:2px;width:65%;}
 
-/* Recent audits */
-.audit-list{flex:1;overflow-y:auto;padding:0;}
-.audit-list::-webkit-scrollbar{width:3px;}
-.audit-list::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);}
-.audit-item{padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
-.audit-item:hover{background:rgba(201,168,76,.03);}
-.audit-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px;}
-.audit-title{font-size:11px;font-weight:700;color:var(--text);line-height:1.3;font-family:var(--serif);}
-.audit-risk-badge{font-family:var(--mono);font-size:7px;font-weight:700;padding:2px 6px;border-radius:2px;flex-shrink:0;}
-.audit-meta{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:8px;color:var(--t25);}
-.audit-dot{width:2px;height:2px;border-radius:50%;background:var(--t25);}
-.audit-actions{display:flex;gap:6px;margin-top:8px;}
-.audit-btn{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:2px;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:transparent;color:var(--t40);}
-.audit-btn:hover{color:var(--gold);border-color:var(--border2);}
-.audit-btn.primary{background:rgba(201,168,76,.08);border-color:var(--border2);color:var(--gold);}
+/* ── SAM.GOV TAB ── */
+.intel-tab-content{flex:1;overflow-y:auto;padding:20px;min-height:0;}
+.intel-tab-content::-webkit-scrollbar{width:3px;}
+.intel-tab-content::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);}
+.intel-section{margin-bottom:28px;}
+.is-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.is-title{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);opacity:.7;display:flex;align-items:center;gap:8px;}
+.is-title::before{content:'';display:inline-block;width:14px;height:1px;background:var(--gold);opacity:.5;}
+.is-refresh{font-family:var(--mono);font-size:8px;color:var(--t25);letter-spacing:.06em;cursor:pointer;}
+.is-refresh:hover{color:var(--gold);}
+.sam-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:16px;}
+.sam-stat{background:var(--void3);padding:14px 16px;}
+.ss-n{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:4px;}
+.ss-l{font-family:var(--mono);font-size:7.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
+.sam-table{width:100%;border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px;}
+.sam-th{display:grid;grid-template-columns:80px 1fr 140px 80px 70px;gap:0 12px;padding:6px 16px;background:rgba(201,168,76,.04);border-bottom:1px solid var(--border);}
+.sam-th span{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t25);}
+.sam-row{display:grid;grid-template-columns:80px 1fr 140px 80px 70px;gap:0 12px;padding:10px 16px;border-bottom:1px solid rgba(201,168,76,.04);align-items:center;cursor:pointer;transition:background .12s;}
+.sam-row:hover{background:rgba(201,168,76,.04);}
+.sam-row:last-child{border-bottom:none;}
+.sr-num{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.06em;}
+.sr-title{font-size:11px;font-weight:600;color:var(--t80);font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-agency{font-family:var(--mono);font-size:8px;color:var(--t40);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-date{font-family:var(--mono);font-size:9px;color:var(--t60);}
+.sr-badge{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 8px;border-radius:2px;}
 
-/* Account intel panel */
-.acct-panel{border-top:1px solid var(--border);padding:16px 20px;background:rgba(201,168,76,.02);}
-.acct-title{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--t25);margin-bottom:12px;}
-.acct-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.acct-stat{background:var(--void2);border:1px solid var(--border);border-radius:3px;padding:10px 12px;}
-.acct-stat-n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:3px;}
-.acct-stat-l{font-family:var(--mono);font-size:7px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
-.days-bar{margin-top:12px;}
-.days-bar-label{display:flex;justify-content:space-between;margin-bottom:6px;font-family:var(--mono);font-size:8px;color:var(--t25);}
-.days-bar-track{height:3px;background:rgba(201,168,76,.08);border-radius:2px;}
-.days-bar-fill{height:100%;background:linear-gradient(to right,var(--gold),var(--gold2));border-radius:2px;width:62%;}
+/* ── BUDGET TAB ── */
+.budget-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+.budget-card{background:var(--void3);border:1px solid var(--border);border-radius:3px;padding:18px;}
+.bc-label{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t25);margin-bottom:8px;}
+.bc-value{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:-.02em;margin-bottom:4px;}
+.bc-sub{font-family:var(--mono);font-size:8px;color:var(--t40);}
+.bc-change{font-family:var(--mono);font-size:9px;font-weight:700;margin-top:6px;}
+.bc-change.up{color:var(--green);}
+.bc-change.down{color:var(--red);}
+.budget-table{width:100%;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+.bt-hdr{display:grid;grid-template-columns:1fr 100px 100px 80px;gap:0 12px;padding:7px 16px;background:rgba(201,168,76,.04);border-bottom:1px solid var(--border);}
+.bt-hdr span{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t25);}
+.bt-row{display:grid;grid-template-columns:1fr 100px 100px 80px;gap:0 12px;padding:11px 16px;border-bottom:1px solid rgba(201,168,76,.04);align-items:center;cursor:pointer;transition:background .12s;}
+.bt-row:hover{background:rgba(201,168,76,.04);}
+.bt-agency{font-family:var(--serif);font-size:12px;font-weight:600;color:var(--t80);}
+.bt-amount{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold2);}
+.bt-change{font-family:var(--mono);font-size:9px;font-weight:700;}
+.bt-bar-wrap{height:4px;background:rgba(201,168,76,.08);border-radius:2px;}
+.bt-bar{height:100%;background:var(--gold);border-radius:2px;opacity:.6;}
 
-/* ── P0 ALERT BANNER ── */
-.alert-banner{
-  margin:16px 24px 0;
-  background:rgba(220,38,38,.06);
-  border:1px solid rgba(220,38,38,.2);
-  border-radius:3px;padding:10px 14px;
-  display:flex;align-items:center;gap:10px;
-  flex-shrink:0;
+/* ── NEWS TAB ── */
+.news-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.news-card{background:var(--void3);border:1px solid var(--border);border-radius:3px;padding:16px;cursor:pointer;transition:all .2s;}
+.news-card:hover{border-color:var(--border2);background:rgba(201,168,76,.04);}
+.news-card.featured{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:20px;}
+.nc-tag{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;margin-bottom:10px;display:inline-block;}
+.tag-policy{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);color:var(--blue);}
+.tag-contract{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);color:var(--gold);}
+.tag-budget{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);color:var(--green);}
+.tag-defense{background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.2);color:var(--red);}
+.nc-title{font-family:var(--serif);font-size:14px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:8px;}
+.nc-featured .nc-title{font-size:18px;}
+.nc-meta{font-family:var(--mono);font-size:8px;color:var(--t25);margin-bottom:8px;display:flex;gap:8px;}
+.nc-excerpt{font-family:var(--mono);font-size:9px;color:var(--t40);line-height:1.65;}
+.nc-impact{margin-top:10px;padding:8px 10px;background:rgba(201,168,76,.06);border-radius:2px;font-family:var(--mono);font-size:8.5px;color:var(--t60);line-height:1.5;}
+.nc-impact strong{color:var(--gold);opacity:.8;}
+
+/* ── AUDIT TAB ── */
+.audit-tab{flex:1;display:flex;align-items:center;justify-content:center;padding:40px;min-height:0;}
+.audit-center{width:100%;max-width:600px;text-align:center;}
+.audit-hero-icon{margin:0 auto 20px;width:64px;height:64px;border:1px solid var(--border2);border-radius:6px;background:rgba(201,168,76,.06);display:flex;align-items:center;justify-content:center;}
+.audit-hero-title{font-family:var(--serif);font-size:26px;font-weight:900;color:var(--text);margin-bottom:8px;letter-spacing:-.02em;}
+.audit-hero-sub{font-family:var(--mono);font-size:11px;color:var(--t40);line-height:1.7;margin-bottom:28px;letter-spacing:.03em;}
+.audit-drop-zone{
+  border:2px dashed rgba(201,168,76,.25);border-radius:6px;
+  padding:40px;background:rgba(201,168,76,.03);
+  cursor:pointer;transition:all .2s;margin-bottom:20px;
 }
-.alert-icon{width:16px;height:16px;flex-shrink:0;}
-.alert-text{font-family:var(--mono);font-size:10px;color:rgba(245,240,232,.88);line-height:1.4;flex:1;}
-.alert-text strong{color:var(--red);font-weight:700;}
-.alert-cta{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--red);white-space:nowrap;cursor:pointer;padding:4px 10px;border:1px solid rgba(220,38,38,.3);border-radius:2px;transition:all .15s;}
-.alert-cta:hover{background:rgba(220,38,38,.1);}
+.audit-drop-zone:hover{border-color:rgba(201,168,76,.55);background:rgba(201,168,76,.07);}
+.adz-title{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px;}
+.adz-sub{font-family:var(--mono);font-size:10px;color:var(--t40);letter-spacing:.04em;}
+.adz-btn{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--void);background:var(--gold);padding:13px 28px;border-radius:2px;border:none;cursor:pointer;transition:all .2s;}
+.adz-btn:hover{background:var(--gold2);box-shadow:0 8px 24px rgba(201,168,76,.3);}
+.audit-formats{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+.af{font-family:var(--mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:2px;background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);letter-spacing:.06em;}
 
-/* Upload zone */
-.upload-zone{
-  margin:12px 24px;
-  border:1px dashed rgba(201,168,76,.2);
-  border-radius:4px;padding:18px;
-  display:flex;align-items:center;gap:16px;
-  cursor:pointer;transition:all .2s;background:rgba(201,168,76,.02);
-  flex-shrink:0;
-}
-.upload-zone:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.04);}
-.upload-icon{width:36px;height:36px;border:1px solid var(--border2);border-radius:3px;display:flex;align-items:center;justify-content:center;background:rgba(201,168,76,.06);flex-shrink:0;}
-.upload-text{flex:1;}
-.upload-title{font-family:var(--serif);font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;}
-.upload-sub{font-family:var(--mono);font-size:9px;color:var(--t25);letter-spacing:.04em;}
-.upload-badge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);opacity:.6;padding:4px 10px;border:1px solid var(--border2);border-radius:2px;white-space:nowrap;}
+/* ── PIPELINE TAB ── */
+.pipeline-stages{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0;}
+.ps{background:var(--void3);padding:14px 10px;text-align:center;cursor:pointer;transition:background .15s;border-bottom:2px solid transparent;}
+.ps:hover{background:rgba(201,168,76,.04);}
+.ps.active{background:rgba(201,168,76,.08);border-bottom-color:var(--gold);}
+.ps-num{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--t25);margin-bottom:4px;letter-spacing:.1em;}
+.ps-label{font-family:var(--mono);font-size:8px;font-weight:600;color:var(--t40);letter-spacing:.04em;line-height:1.3;}
+.ps.active .ps-label{color:var(--gold2);}
+.ps.done .ps-num{color:var(--green);}
+.ps.done .ps-label{color:rgba(74,222,128,.6);}
+.pipeline-content{flex:1;overflow-y:auto;padding:20px;min-height:0;}
+.pipeline-content::-webkit-scrollbar{width:3px;}
+.pipeline-content::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);}
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div class="topbar-brand">
-      <div class="brand-mark">
-        <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
-          <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
-          <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".9" opacity=".7"/>
-          <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".9" opacity=".5"/>
-        </svg>
-        <div class="brand-text">FAR<span>audit</span></div>
-      </div>
-    </div>
-    <div class="topbar-center">
-      <div class="topbar-search">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Search solicitations, audits, agencies...
-      </div>
-    </div>
-    <div class="topbar-right">
-      <div class="topbar-badge">
-        <div class="live-dot-sm"></div>
-        Live Feed Active
-      </div>
-      <div class="notif-btn">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 00-5 5v3l-1.5 2h13L13 9V6a5 5 0 00-5-5z" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".6" fill="none"/><line x1="6.5" y1="14" x2="9.5" y2="14" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".5" stroke-linecap="round"/></svg>
-        <div class="notif-dot"></div>
-      </div>
-      <div class="user-pill">
-        <div class="user-avatar">JR</div>
-        <div class="user-name">Jose Rodriguez</div>
-      </div>
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="tb-brand">
+    <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+      <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
+      <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" stroke-width=".9" opacity=".7"/>
+      <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" stroke-width=".9" opacity=".5"/>
+    </svg>
+    <div class="tb-wordmark">FAR<span>audit</span></div>
+  </div>
+  <div class="tb-center">
+    <div class="tb-search">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Search solicitations, audits, agencies, clauses...
     </div>
   </div>
-
-  <!-- SIDEBAR -->
-  <div class="sidebar">
-    <div class="nav-section-label">Intelligence</div>
-    <div class="nav-item active">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
-      Dashboard
+  <div class="tb-right">
+    <div class="tb-live"><div class="live-dot"></div>Live · <span id="solCount">851</span> Active</div>
+    <div class="tb-notif">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 00-5 5v3l-1.5 2h13L13 9V6a5 5 0 00-5-5z" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".6" fill="none"/><line x1="6.5" y1="14" x2="9.5" y2="14" stroke="#C9A84C" stroke-width="1.2" stroke-opacity=".5" stroke-linecap="round"/></svg>
+      <div class="notif-badge"></div>
     </div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="8" x2="11" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-      Live Feed
-      <span class="nav-badge">847</span>
-    </div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1" stroke-opacity=".6"/><line x1="5" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1" stroke-opacity=".6"/></svg>
-      New Audit
-    </div>
-
-    <div class="nav-section-label">History</div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1v7l4 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/></svg>
-      Past Audits
-      <span class="nav-badge amber">12</span>
-    </div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M4 2h8l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/><line x1="6" y1="10" x2="10" y2="10" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/></svg>
-      Reports
-    </div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><polyline points="2,12 5,8 8,10 11,5 14,7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Intelligence
-    </div>
-
-    <div class="nav-section-label">Account</div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-      Profile
-    </div>
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-      Settings
-    </div>
-
-    <div class="sidebar-footer">
-      <div class="sidebar-plan">Design Partner · $1,250/mo</div>
-      <div class="sidebar-days">62 days remaining</div>
+    <div class="tb-user">
+      <div class="user-av">JR</div>
+      <div class="user-nm">Jose Rodriguez</div>
     </div>
   </div>
-
-  <!-- MAIN CONTENT -->
-  <div class="main">
-
-    <!-- Page header -->
-    <div class="page-hdr">
-      <div class="page-title-group">
-        <div class="page-date" id="dashDate">Loading...</div>
-        <div class="page-title">Good morning, Jose. <em>2 P0 flags need attention.</em></div>
-      </div>
-      <div class="page-actions">
-        <button class="btn-secondary">Export Report</button>
-        <button class="btn-audit">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Run New Audit
-        </button>
-      </div>
-    </div>
-
-    <!-- Stat cards -->
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">Active Solicitations</div>
-        <div class="stat-value" id="statSol">847</div>
-        <div class="stat-sub">Your 9 NAICS codes</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">P0 Flags Today</div>
-        <div class="stat-value red" id="statP0">23</div>
-        <div class="stat-sub">Require immediate review</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Audits Run</div>
-        <div class="stat-value">12</div>
-        <div class="stat-sub">This month</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Value Audited</div>
-        <div class="stat-value">$48.2M</div>
-        <div class="stat-sub">Total contract value</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Traps Caught</div>
-        <div class="stat-value green">31</div>
-        <div class="stat-sub">DFARS · FAR · Compliance</div>
-      </div>
-    </div>
-
-    <!-- P0 Alert -->
-    <div class="alert-banner">
-      <svg class="alert-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 14H1L8 1z" stroke="#EF4444" stroke-width="1.3" fill="none"/><line x1="8" y1="6" x2="8" y2="10" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="12" r=".8" fill="#EF4444"/></svg>
-      <div class="alert-text"><strong>2 P0 flags</strong> detected in active solicitations matching your NAICS codes. T-38 Talon (due in 3 days) has a CLIN quantity ambiguity and FOB conflict requiring CO clarification.</div>
-      <div class="alert-cta">Review P0 →</div>
-    </div>
-
-    <!-- Upload zone -->
-    <div class="upload-zone">
-      <div class="upload-icon">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 2v12M6 6l4-4 4 4" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg>
-      </div>
-      <div class="upload-text">
-        <div class="upload-title">Drop a solicitation PDF to run an audit</div>
-        <div class="upload-sub">RFQ · RFP · IDIQ · IFB · Any page count · Any agency · Results in ~60 seconds</div>
-      </div>
-      <div class="upload-badge">Run Audit →</div>
-    </div>
-
-    <!-- Body grid -->
-    <div class="body-grid">
-
-      <!-- LEFT: Live feed -->
-      <div class="feed-panel">
-        <div class="panel-hdr">
-          <div class="panel-hdr-left">
-            <div class="panel-title">Intelligence Feed</div>
-            <div class="panel-sub">Filtered to your NAICS · Updated <span id="feedTs">just now</span></div>
-          </div>
-          <div class="live-chip"><div class="live-dot-sm"></div>LIVE</div>
-        </div>
-        <div class="feed-tabs">
-          <div class="feed-tab active">All</div>
-          <div class="feed-tab">P0 · P1</div>
-          <div class="feed-tab">Expiring Soon</div>
-          <div class="feed-tab">Small Business</div>
-          <div class="feed-tab">IDIQ</div>
-        </div>
-        <div class="feed-cols">
-          <div class="fcol">NAICS</div>
-          <div class="fcol">Solicitation</div>
-          <div class="fcol">Agency</div>
-          <div class="fcol">Value</div>
-          <div class="fcol">Days</div>
-          <div class="fcol">Type</div>
-          <div class="fcol">Set-Aside</div>
-          <div class="fcol">Risk</div>
-        </div>
-        <div class="feed-scroll" id="dashFeed"></div>
-      </div>
-
-      <!-- RIGHT: Audits + Account -->
-      <div class="right-panel">
-        <div class="panel-hdr">
-          <div class="panel-title">Recent Audits</div>
-          <div class="panel-sub">Last 5 runs</div>
-        </div>
-        <div class="audit-list" id="auditList"></div>
-        <div class="acct-panel">
-          <div class="acct-title">Account Intelligence</div>
-          <div class="acct-stats">
-            <div class="acct-stat"><div class="acct-stat-n">12</div><div class="acct-stat-l">Audits Run</div></div>
-            <div class="acct-stat"><div class="acct-stat-n" style="color:var(--red)">31</div><div class="acct-stat-l">Traps Caught</div></div>
-            <div class="acct-stat"><div class="acct-stat-n">$48.2M</div><div class="acct-stat-l">Value Audited</div></div>
-            <div class="acct-stat"><div class="acct-stat-n" style="color:var(--green)">$0</div><div class="acct-stat-l">Compliance Exposure</div></div>
-          </div>
-          <div class="days-bar">
-            <div class="days-bar-label">
-              <span>Design Partner Period</span>
-              <span style="color:var(--gold);opacity:.6">62 days left</span>
-            </div>
-            <div class="days-bar-track"><div class="days-bar-fill"></div></div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
 </div>
 
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="nav-label">Platform</div>
+  <div class="nav-item active" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+    Intelligence Home
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M4 2h8l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/><line x1="6" y1="10" x2="10" y2="10" stroke="currentColor" stroke-width="1" stroke-opacity=".5"/></svg>
+    Run Audit
+    <span class="nav-ct ct-gold">New</span>
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Pipeline Tracker
+    <span class="nav-ct ct-red">2</span>
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="8" x2="11" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Past Audits
+    <span class="nav-ct ct-gold">12</span>
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Reports Library
+  </div>
+
+  <div class="nav-label">Intelligence</div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    SAM.gov Feed
+    <span class="nav-ct ct-green">Live</span>
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+    Budget Tracker
+  </div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Defense News
+    <span class="nav-ct ct-red">7</span>
+  </div>
+
+  <div class="nav-label">Account</div>
+  <div class="nav-item" onclick="setNav(this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Profile & Settings
+  </div>
+
+  <div class="sb-footer">
+    <div class="sb-plan">Design Partner · $1,250/mo</div>
+    <div class="sb-days">62 days remaining</div>
+    <div class="sb-upgrade">Upgrade to Standard</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- PRIMARY NAVIGATION TABS -->
+  <div class="page-tabs">
+    <div class="ptab active" onclick="switchTab('home',this)">
+      <div class="ptab-dot red"></div>
+      Intelligence Home
+    </div>
+    <div class="ptab" onclick="switchTab('audit',this)">
+      <div class="ptab-dot gold"></div>
+      Run Audit
+    </div>
+    <div class="ptab" onclick="switchTab('sam',this)">
+      <div class="ptab-dot green"></div>
+      SAM.gov
+      <span class="ptab-count green" id="samCount">851</span>
+    </div>
+    <div class="ptab" onclick="switchTab('budget',this)">
+      <div class="ptab-dot blue"></div>
+      Congressional Budget
+    </div>
+    <div class="ptab" onclick="switchTab('news',this)">
+      <div class="ptab-dot red"></div>
+      Defense News
+      <span class="ptab-count">7</span>
+    </div>
+    <div class="ptab" onclick="switchTab('pipeline',this)">
+      <div class="ptab-dot gold"></div>
+      Pipeline
+      <span class="ptab-count gold">2</span>
+    </div>
+  </div>
+
+  <!-- TAB PANELS -->
+  <div class="tab-panels">
+
+    <!-- ══ HOME TAB ══ -->
+    <div class="tab-panel active" id="tab-home">
+      <!-- Situation Board -->
+      <div class="situation-board">
+        <!-- CARD 1: Critical P0 Flags -->
+        <div class="sit-card urgent" style="cursor:pointer" onclick="setFf(document.querySelectorAll('.ff')[1])">
+          <div class="sit-label" style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--red);margin-bottom:8px;">⚠ Critical — Act Today</div>
+          <div class="sit-value red" id="p0Val">2</div>
+          <div class="sit-sub" style="font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.65);line-height:1.6;margin-top:6px;">Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
+          <div style="font-family:var(--mono);font-size:8px;color:rgba(220,38,38,.75);margin-top:6px;line-height:1.6;">→ T-38 Talon · 3d · CLIN + FOB trap<br>→ CH-47 · 5d · DFARS 252.223-7008</div>
+          <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-top:10px;display:flex;align-items:center;gap:4px;border-top:1px solid rgba(220,38,38,.15);padding-top:8px;">Review P0 Flags →</div>
+        </div>
+
+        <!-- CARD 2: Expiring -->
+        <div class="sit-card" style="cursor:pointer;border-top:3px solid var(--amber);" onclick="setFf(document.querySelectorAll('.ff')[2])">
+          <div class="sit-label" style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;">⏱ Expiring This Week</div>
+          <div class="sit-value gold" id="expVal">3</div>
+          <div class="sit-sub" style="font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.65);line-height:1.6;margin-top:6px;">Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
+          <div style="font-family:var(--mono);font-size:8px;color:rgba(245,158,11,.75);margin-top:6px;line-height:1.6;">→ T-38 Talon · 27 Apr · 12:00 PM CDT<br>→ Radar Array Housing · 4d · CH-47 · 5d</div>
+          <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-top:10px;display:flex;align-items:center;gap:4px;border-top:1px solid rgba(245,158,11,.15);padding-top:8px;">View Expiring →</div>
+        </div>
+
+        <!-- CARD 3: Live SAM.gov -->
+        <div class="sit-card" style="cursor:pointer;border-top:3px solid var(--gold);" onclick="setFf(document.querySelectorAll('.ff')[0])">
+          <div class="sit-label" style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold2);margin-bottom:8px;">● Live on SAM.gov Now</div>
+          <div class="sit-value gold" id="homeActive">851</div>
+          <div class="sit-sub" style="font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.65);line-height:1.6;margin-top:6px;">Active federal solicitations posted right now across your 9 NAICS codes. Updated in real time — every one is a potential contract.</div>
+          <div style="font-family:var(--mono);font-size:8px;color:rgba(201,168,76,.6);margin-top:6px;line-height:1.6;">→ 9 NAICS codes monitored 24/7<br>→ 0 competitors with clause-level audit</div>
+          <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-top:10px;display:flex;align-items:center;gap:4px;border-top:1px solid rgba(201,168,76,.15);padding-top:8px;">Open SAM.gov Feed →</div>
+        </div>
+
+        <!-- CARD 4: Audit Activity -->
+        <div class="sit-card" style="cursor:pointer;border-top:3px solid var(--green);" onclick="document.getElementById('auditList').scrollIntoView({behavior:'smooth'});document.querySelector('.right-col').style.background='rgba(74,222,128,.04)';setTimeout(()=>document.querySelector('.right-col').style.background='rgba(6,15,28,.5)',1200)">
+          <div class="sit-label" style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-bottom:8px;">✓ Your Audit Activity</div>
+          <div class="sit-value green">12</div>
+          <div class="sit-sub" style="font-family:var(--mono);font-size:9px;color:rgba(245,240,232,.65);line-height:1.6;margin-top:6px;">Audits completed this month. Every clause read, every trap flagged, every KO email drafted — saving 48+ hours of manual review.</div>
+          <div style="font-family:var(--mono);font-size:8px;color:rgba(74,222,128,.6);margin-top:6px;line-height:1.6;">→ 31 compliance traps caught<br>→ $48.2M total contract value audited</div>
+          <div style="font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-top:10px;display:flex;align-items:center;gap:4px;border-top:1px solid rgba(74,222,128,.15);padding-top:8px;">View Recent Audits →</div>
+        </div>
+      </div>
+
+      <!-- Upload Bar -->
+      <div class="upload-bar" onclick="switchTab('audit',document.querySelector('[onclick*=audit]'))">
+        <div class="upload-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v11M6 6l4-4 4 4" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" opacity=".6"/></svg>
+        </div>
+        <div class="upload-copy">
+          <div class="upload-hed">Start a New Audit — Drop Any Solicitation PDF</div>
+          <div class="upload-sub">FARaudit reads every clause · FAR · DFARS · Section L · Section M · CLIN Structure · P0/P1/P2 risk ranking · KO email drafted</div>
+          <div class="upload-tags">
+            <span class="utag">RFQ</span><span class="utag">RFP</span><span class="utag">IDIQ</span><span class="utag">IFB</span><span class="utag">Any Page Count</span><span class="utag">Any Agency</span>
+          </div>
+        </div>
+        <button class="upload-cta-btn">Run Audit →</button>
+      </div>
+
+      <!-- Two column body -->
+      <div class="two-col">
+        <div class="feed-wrap">
+          <div class="feed-hdr">
+            <div class="feed-hdr-l">
+              <div class="feed-title">Intelligence Feed</div>
+              <div class="feed-sub">Filtered to your NAICS · <span id="feedTs">just now</span></div>
+            </div>
+            <div class="live-chip"><div class="live-dot"></div>LIVE</div>
+          </div>
+          <div class="feed-filters">
+            <div class="ff active" onclick="setFf(this)">All</div>
+            <div class="ff" onclick="setFf(this)">P0 · P1</div>
+            <div class="ff" onclick="setFf(this)">≤7 Days</div>
+            <div class="ff" onclick="setFf(this)">Small Business</div>
+            <div class="ff" onclick="setFf(this)">IDIQ</div>
+          </div>
+          <div class="feed-cols">
+            <div class="fcol">NAICS</div><div class="fcol">Solicitation</div>
+            <div class="fcol">Agency</div><div class="fcol">Est. Value</div>
+            <div class="fcol">Days</div><div class="fcol">Type</div>
+            <div class="fcol">Set-Aside</div><div class="fcol">Risk</div>
+          </div>
+          <div class="feed-scroll" id="feedScroll">
+            <!-- P0 section -->
+            <div class="feed-section-hdr">
+              <div class="fsh-label">⚠ Requires Immediate Action</div>
+              <div class="fsh-count">2 P0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right-col">
+          <div class="rc-section">
+            <div class="rc-hdr"><div class="rc-title">Recent Audits</div><div class="rc-sub">Last 5</div></div>
+            <div id="auditList"></div>
+          </div>
+          <div class="rc-section">
+            <div class="rc-hdr"><div class="rc-title">Account Intelligence</div></div>
+            <div class="acct-grid">
+              <div class="acct-stat"><div class="as-n">12</div><div class="as-l">Audits Run</div></div>
+              <div class="acct-stat"><div class="as-n red">31</div><div class="as-l">Traps Caught</div></div>
+              <div class="acct-stat"><div class="as-n">$48.2M</div><div class="as-l">Value Audited</div></div>
+              <div class="acct-stat"><div class="as-n green">$0</div><div class="as-l">Compliance Risk</div></div>
+            </div>
+            <div class="days-wrap">
+              <div class="days-top"><span class="days-lbl">Design Partner Period</span><span class="days-val">62d left</span></div>
+              <div class="days-track"><div class="days-fill"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ AUDIT TAB ══ -->
+    <div class="tab-panel" id="tab-audit">
+      <div class="audit-tab">
+        <div class="audit-center">
+          <div class="audit-hero-icon">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" stroke-width="1.2" fill="rgba(201,168,76,.08)"/>
+              <polyline points="9,14 12.5,17.5 19,11" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <div class="audit-hero-title">Run a New Audit</div>
+          <div class="audit-hero-sub">Upload any federal solicitation PDF. FARaudit runs three sequential intelligence calls — Overview · FAR/DFARS Compliance · Risk Extraction — and delivers a ranked report with a KO clarification email drafted and ready to send.</div>
+          <div class="audit-drop-zone">
+            <div class="adz-title">Drop your solicitation PDF here</div>
+            <div class="adz-sub">Or click to browse · Any page count · Any agency · Any format</div>
+            <button class="adz-btn">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4-5 4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Select PDF to Audit
+            </button>
+          </div>
+          <div class="audit-formats">
+            <span class="af">RFQ</span><span class="af">RFP</span><span class="af">IDIQ</span>
+            <span class="af">IFB</span><span class="af">Sources Sought</span><span class="af">Pre-Sol Synopsis</span>
+            <span class="af">Task Order</span><span class="af">Modification</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SAM.GOV TAB ══ -->
+    <div class="tab-panel" id="tab-sam">
+      <div class="intel-tab-content">
+        <div class="intel-section">
+          <div class="is-header">
+            <div class="is-title">SAM.gov · Live Opportunity Feed</div>
+            <div class="is-refresh" id="samRefresh">Last updated <span id="samTs">just now</span> · Refresh ↻</div>
+          </div>
+          <div class="sam-stat-row">
+            <div class="sam-stat"><div class="ss-n" id="samActive">851</div><div class="ss-l">Active Opportunities</div></div>
+            <div class="sam-stat"><div class="ss-n" style="color:var(--red)" id="samP0">26</div><div class="ss-l">P0 Flags Today</div></div>
+            <div class="sam-stat"><div class="ss-n">9</div><div class="ss-l">NAICS Codes Monitored</div></div>
+            <div class="sam-stat"><div class="ss-n" style="color:var(--green)">0</div><div class="ss-l">Competitors w/ Audit</div></div>
+          </div>
+          <div class="sam-table">
+            <div class="sam-th">
+              <span>Sol. Number</span><span>Title</span><span>Agency</span><span>Due Date</span><span>Risk</span>
+            </div>
+            <div id="samRows"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ BUDGET TAB ══ -->
+    <div class="tab-panel" id="tab-budget">
+      <div class="intel-tab-content">
+        <div class="intel-section">
+          <div class="is-header">
+            <div class="is-title">Congressional Budget · Defense Appropriations FY2026</div>
+            <div class="is-refresh">Source: USASpending.gov · Updated daily</div>
+          </div>
+          <div class="budget-grid">
+            <div class="budget-card">
+              <div class="bc-label">DoD Total Budget FY2026</div>
+              <div class="bc-value">$895.2B</div>
+              <div class="bc-sub">Department of Defense appropriation</div>
+              <div class="bc-change up">↑ +3.2% from FY2025</div>
+            </div>
+            <div class="budget-card">
+              <div class="bc-label">Defense Contracts Awarded YTD</div>
+              <div class="bc-value">$312.8B</div>
+              <div class="bc-sub">Fiscal year to date · Through Apr 2026</div>
+              <div class="bc-change up">↑ +7.1% vs prior year</div>
+            </div>
+            <div class="budget-card">
+              <div class="bc-label">Small Business Set-Aside Goal</div>
+              <div class="bc-value">23%</div>
+              <div class="bc-sub">FY2026 statutory requirement</div>
+              <div class="bc-change up">↑ 24.1% current pace</div>
+            </div>
+            <div class="budget-card">
+              <div class="bc-label">Your NAICS — Agency Spend</div>
+              <div class="bc-value">$48.6B</div>
+              <div class="bc-sub">NAICS 336413 · 332710 · 332721</div>
+              <div class="bc-change up">↑ +4.8% YoY</div>
+            </div>
+          </div>
+          <div class="intel-section">
+            <div class="is-header"><div class="is-title">Top Agencies by Defense Contract Spend FY2026</div></div>
+            <div class="budget-table">
+              <div class="bt-hdr"><span>Agency</span><span>FY2026 Spend</span><span>YoY Change</span><span>Share</span></div>
+              <div id="budgetRows"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ NEWS TAB ══ -->
+    <div class="tab-panel" id="tab-news">
+      <div class="intel-tab-content">
+        <div class="intel-section">
+          <div class="is-header">
+            <div class="is-title">Defense &amp; Federal Contracting News</div>
+            <div class="is-refresh">Curated for your NAICS · Updated hourly</div>
+          </div>
+          <div class="news-grid" id="newsGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PIPELINE TAB ══ -->
+    <div class="tab-panel" id="tab-pipeline">
+      <div class="pipeline-stages">
+        <div class="ps done" onclick="setPs(this)"><div class="ps-num">01</div><div class="ps-label">Pre-Sol Synopsis</div></div>
+        <div class="ps done" onclick="setPs(this)"><div class="ps-num">02</div><div class="ps-label">Sources Sought</div></div>
+        <div class="ps active" onclick="setPs(this)"><div class="ps-num">03</div><div class="ps-label">Solicitation Drops</div></div>
+        <div class="ps" onclick="setPs(this)"><div class="ps-num">04</div><div class="ps-label">Proposal Dev</div></div>
+        <div class="ps" onclick="setPs(this)"><div class="ps-num">05</div><div class="ps-label">Submission</div></div>
+        <div class="ps" onclick="setPs(this)"><div class="ps-num">06</div><div class="ps-label">Evaluation</div></div>
+        <div class="ps" onclick="setPs(this)"><div class="ps-num">07</div><div class="ps-label">Award</div></div>
+        <div class="ps" onclick="setPs(this)"><div class="ps-num">08</div><div class="ps-label">Post-Award</div></div>
+      </div>
+      <div class="pipeline-content">
+        <div class="intel-section">
+          <div class="is-header"><div class="is-title">Stage 03 — Active Solicitations</div></div>
+          <div id="pipelineRows"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-panels -->
+</div><!-- /main -->
+</div><!-- /app -->
+
 <script>
-// Date
-const now = new Date();
-document.getElementById('dashDate').textContent =
-  now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase();
-
-// Feed data
-const FEED = [
-  {n:'336413',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'Air Education & Training Command (AETC)',v:'$48K',days:3,ty:'RFQ',sa:'sb',sal:'SB',rc:'p0',rl:'2 P0'},
-  {n:'332710',t:'Precision Machined Brackets — F-16 Program',a:'Air Force Materiel Command (AFMC)',v:'$312K',days:14,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'p1',rl:'3 P1'},
+// ── DATA ──
+const FEED_DATA = [
+  {n:'336413',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'Air Education & Training Command (AETC)',v:'$48K',days:3,ty:'RFQ',sa:'sb',sal:'SB',rc:'rp0',rl:'2 P0'},
+  {n:'336413',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army Contracting Command (ACC)',v:'$187K',days:5,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'rp0',rl:'1 P0'},
+  {n:'334511',t:'Radar Array Housing · Low Observable Coat',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp0',rl:'3 P0'},
+  {n:'332710',t:'Precision Machined Brackets — F-16 Program',a:'Air Force Materiel Command (AFMC)',v:'$312K',days:14,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp1',rl:'3 P1'},
+  {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
+  {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
   {n:'334511',t:'Navigation Housing Units · IDIQ Increment IV',a:'Naval Air Systems Command (NAVAIR)',v:'$2.1M',days:22,ty:'IDIQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
-  {n:'336413',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army Contracting Command (ACC)',v:'$187K',days:5,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',rc:'p0',rl:'1 P0'},
-  {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',rc:'p1',rl:'2 P1'},
-  {n:'541330',t:'Structural Analysis Support — F-35B',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'',rl:'Watch'},
-  {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',rc:'p0',rl:'2 P0'},
-  {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sdvosb',sal:'SDVOSB',rc:'p1',rl:'1 P1'},
-  {n:'334511',t:'Radar Array Housing · Low Observable Coat',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'unrest',sal:'UNREST',rc:'p0',rl:'3 P0'},
-  {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',rc:'p1',rl:'2 P1'},
-  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'unrest',sal:'UNREST',rc:'',rl:'Watch'},
-  {n:'332710',t:'Sikorsky UH-60 Transmission Housing',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wosb',sal:'WOSB',rc:'p1',rl:'1 P1'},
+  {n:'541330',t:'Structural Analysis Support — F-35B',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'rp1',rl:'1 P1'},
+  {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
+  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332710',t:'Sikorsky UH-60 Transmission Housing',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wo',sal:'WOSB',rc:'rp1',rl:'1 P1'},
 ];
 
-const feed = document.getElementById('dashFeed');
-FEED.forEach(r => {
+// Build feed
+const feedScroll = document.getElementById('feedScroll');
+FEED_DATA.forEach(r => {
   const row = document.createElement('div');
-  const daysCls = r.days <= 7 ? 'urgent' : r.days <= 21 ? 'soon' : 'ok';
-  row.className = `feed-row-dash ${r.rc}`;
-  row.innerHTML = `
-    <span class="f-naics">${r.n}</span>
-    <div style="min-width:0"><div class="f-title">${r.t}</div></div>
-    <span class="f-agency">${r.a}</span>
-    <span class="f-value">${r.v}</span>
-    <span class="f-days ${daysCls}">${r.days}d</span>
-    <span class="f-type">${r.ty}</span>
-    <span class="f-sa sa-${r.sa}">${r.sal}</span>
-    <span class="f-risk ${r.rc ? 'r-'+r.rc : 'r-w'}">${r.rl}</span>`;
-  feed.appendChild(row);
+  const dc = r.days<=7?'urg':r.days<=21?'soon':'ok';
+  row.className = `feed-row ${r.rc}`;
+  row.dataset.days=r.days; row.dataset.sa=r.sal; row.dataset.type=r.ty; row.dataset.risk=r.rc;
+  row.innerHTML = `<span class="f-naics">${r.n}</span><div style="min-width:0"><div class="f-title">${r.t}</div></div><span class="f-agency">${r.a}</span><span class="f-val">${r.v}</span><span class="f-days ${dc}">${r.days}d</span><span class="f-type">${r.ty}</span><span class="f-sa sa-${r.sa}">${r.sal}</span><span class="f-risk ${r.rc?r.rc.replace('rp','rk'):'rkw'}">${r.rl}</span>`;
+  feedScroll.appendChild(row);
 });
 
-// Recent audits
+// Build audit list
 const AUDITS = [
-  {title:'T-38 Talon Intake Plugs & Exhaust Covers',sol:'FA301626Q0068',date:'30 Apr 2026',risk:'2 P0',rc:'p0',pages:20},
-  {title:'F-16 Block 70 Hydraulic Actuator Brackets',sol:'FA8675-26-Q-0442',date:'28 Apr 2026',risk:'1 P1',rc:'p1',pages:34},
-  {title:'CH-47 Rotor Hub Fittings — Army ACC',sol:'W911W6-26-Q-0081',date:'26 Apr 2026',risk:'3 P1',rc:'p1',pages:18},
-  {title:'Navigation Housing Units IDIQ IV',sol:'N00019-26-R-0084',date:'24 Apr 2026',risk:'Watch',rc:'',pages:92},
-  {title:'Titanium Fastener Sets MIL-SPEC-AN960',sol:'SPE4A6-26-Q-0234',date:'22 Apr 2026',risk:'2 P1',rc:'p1',pages:12},
+  {t:'T-38 Talon Intake Plugs & Exhaust Covers',s:'FA301626Q0068',d:'30 Apr',r:'2 P0',rc:'rk0'},
+  {t:'F-16 Block 70 Hydraulic Actuator Brackets',s:'FA8675-26-Q-0442',d:'28 Apr',r:'1 P1',rc:'rk1'},
+  {t:'CH-47 Rotor Hub Fittings',s:'W911W6-26-Q-0081',d:'26 Apr',r:'3 P1',rc:'rk1'},
+  {t:'Navigation Housing Units IDIQ IV',s:'N00019-26-R-0084',d:'24 Apr',r:'Watch',rc:'rkw'},
+  {t:'Titanium Fastener Sets MIL-SPEC',s:'SPE4A6-26-Q-0234',d:'22 Apr',r:'2 P1',rc:'rk1'},
 ];
-
-const auditList = document.getElementById('auditList');
+const al = document.getElementById('auditList');
 AUDITS.forEach(a => {
-  const item = document.createElement('div');
-  item.className = 'audit-item';
-  const riskColor = a.rc === 'p0' ? 'var(--red)' : a.rc === 'p1' ? 'var(--amber)' : 'var(--gold)';
-  const riskBg = a.rc === 'p0' ? 'rgba(220,38,38,.14)' : a.rc === 'p1' ? 'rgba(245,158,11,.11)' : 'rgba(201,168,76,.08)';
-  item.innerHTML = `
-    <div class="audit-item-top">
-      <div class="audit-title">${a.title}</div>
-      <span class="audit-risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}40">${a.risk}</span>
-    </div>
-    <div class="audit-meta">
-      <span>${a.sol}</span>
-      <div class="audit-dot"></div>
-      <span>${a.date}</span>
-      <div class="audit-dot"></div>
-      <span>${a.pages}pp</span>
-    </div>
-    <div class="audit-actions">
-      <button class="audit-btn primary">View Report</button>
-      <button class="audit-btn">PDF</button>
-      <button class="audit-btn">KO Email</button>
-    </div>`;
-  auditList.appendChild(item);
+  const rc = a.rc==='rk0'?'var(--red)':a.rc==='rk1'?'var(--amber)':'var(--gold)';
+  const bg = a.rc==='rk0'?'rgba(220,38,38,.14)':a.rc==='rk1'?'rgba(245,158,11,.11)':'rgba(201,168,76,.08)';
+  const d = document.createElement('div');
+  d.className = 'audit-item';
+  d.innerHTML = `<div class="ai-top"><div class="ai-title">${a.t}</div><span class="ai-badge" style="color:${rc};background:${bg};border:1px solid ${rc}40">${a.r}</span></div><div class="ai-meta">${a.s} · ${a.d}</div><div class="ai-btns"><button class="ai-btn pri">View Report</button><button class="ai-btn">PDF</button><button class="ai-btn">KO Email</button></div>`;
+  al.appendChild(d);
 });
+
+// SAM.gov rows
+const SAM_ROWS = [
+  {num:'FA301626Q0068',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'USAF AETC',d:'27 Apr 2026',r:'2 P0',rc:'rk0'},
+  {num:'FA8675-26-Q-0442',t:'Precision Machined Brackets — F-16 Program',a:'AFMC',d:'02 May 2026',r:'3 P1',rc:'rk1'},
+  {num:'N00019-26-R-0084',t:'Navigation Housing Units · IDIQ IV',a:'NAVAIR',d:'08 May 2026',r:'Watch',rc:'rkw'},
+  {num:'W911W6-26-Q-0081',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army ACC',d:'12 May 2026',r:'1 P0',rc:'rk0'},
+  {num:'SPE4A6-26-Q-0234',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'DLA Aviation',d:'15 May 2026',r:'2 P1',rc:'rk1'},
+  {num:'N68335-26-R-0198',t:'Structural Analysis Support — F-35B',a:'NAVAIR',d:'19 May 2026',r:'Watch',rc:'rkw'},
+  {num:'FA8811-26-Q-0301',t:'F-22 Raptor Canopy Frame Components',a:'AFLCMC',d:'22 May 2026',r:'2 P0',rc:'rk0'},
+];
+const sr = document.getElementById('samRows');
+SAM_ROWS.forEach(r => {
+  const rc = r.rc==='rk0'?'var(--red)':r.rc==='rk1'?'var(--amber)':'var(--gold)';
+  const bg = r.rc==='rk0'?'rgba(220,38,38,.14)':r.rc==='rk1'?'rgba(245,158,11,.11)':'rgba(201,168,76,.08)';
+  const d = document.createElement('div');
+  d.className = 'sam-row';
+  d.innerHTML = `<span class="sr-num">${r.num}</span><span class="sr-title">${r.t}</span><span class="sr-agency">${r.a}</span><span class="sr-date">${r.d}</span><span class="sr-badge" style="color:${rc};background:${bg};border:1px solid ${rc}40">${r.r}</span>`;
+  sr.appendChild(d);
+});
+
+// Budget rows
+const BUDGET = [
+  {a:'Air Force (USAF)',v:'$212.4B',ch:'+4.1%',pct:24,up:true},
+  {a:'Army',v:'$189.1B',ch:'+2.8%',pct:21,up:true},
+  {a:'Navy / USMC',v:'$201.3B',ch:'+3.5%',pct:22,up:true},
+  {a:'Defense Logistics Agency',v:'$48.6B',ch:'+1.2%',pct:5,up:true},
+  {a:'DARPA',v:'$4.1B',ch:'+8.3%',pct:0.5,up:true},
+  {a:'Missile Defense Agency',v:'$32.8B',ch:'-1.4%',pct:4,up:false},
+];
+const br = document.getElementById('budgetRows');
+BUDGET.forEach(r => {
+  const d = document.createElement('div');
+  d.className = 'bt-row';
+  d.innerHTML = `<span class="bt-agency">${r.a}</span><span class="bt-amount">${r.v}</span><span class="bt-change" style="color:${r.up?'var(--green)':'var(--red)'}">${r.up?'↑':'↓'} ${r.ch}</span><div class="bt-bar-wrap"><div class="bt-bar" style="width:${r.pct*4}%"></div></div>`;
+  br.appendChild(d);
+});
+
+// News items
+const NEWS = [
+  {tag:'policy',tagClass:'tag-policy',title:'DoD Issues Updated DFARS Rule on Cybersecurity Certification Requirements for FY2026',meta:'Defense Acquisition / Apr 30 2026',excerpt:'The Department of Defense finalized updates to DFARS 252.204-7021 expanding CMMC Level 2 requirements to additional contract categories. Defense subcontractors in NAICS 336413 and 332710 are now required to demonstrate certification by Q3 2026.',impact:'<strong>FARaudit Impact:</strong> CMMC trap detection updated. All audits now flag 252.204-7021 with certification timeline requirements.',featured:true},
+  {tag:'budget',tagClass:'tag-budget',title:'FY2026 Defense Budget Includes $4.2B Increase for Aviation Depot Maintenance',meta:'Congressional Budget / Apr 29 2026',excerpt:'Senate Armed Services Committee approved increased funding for aviation maintenance accounts, signaling higher demand for precision machined components through DLA Aviation and AFMC.',impact:'<strong>Opportunity Signal:</strong> Expected 12-15% increase in NAICS 332710 solicitations Q3 2026.',featured:false},
+  {tag:'contract',tagClass:'tag-contract',title:'F-35 Program Office Issues IDIQ Notice for Ground Support Equipment',meta:'SAM.gov Alert / Apr 28 2026',excerpt:'The F-35 JPO posted a sources sought notice for a multi-year IDIQ covering ground support equipment sets across all F-35 variants. Estimated value $250M–$500M.',impact:'<strong>FARaudit Alert:</strong> Pre-solicitation tracked since Stage 01. 60-day head start on competitors.',featured:false},
+  {tag:'defense',tagClass:'tag-defense',title:'Army Contracting Command Announces Small Business Innovation Days — DFW Region',meta:'Industry Event / Apr 27 2026',excerpt:'ACC Fort Worth hosting small business matchmaking event May 15, 2026. Buyers from 12 Army programs attending. Registration deadline May 5.',impact:'<strong>Action Required:</strong> Register at acc.army.mil before May 5.',featured:false},
+];
+const ng = document.getElementById('newsGrid');
+NEWS.forEach(n => {
+  const d = document.createElement('div');
+  d.className = `news-card${n.featured?' featured':''}`;
+  d.innerHTML = `<div><span class="nc-tag ${n.tagClass}">${n.tag.toUpperCase()}</span><div class="nc-title">${n.title}</div><div class="nc-meta">${n.meta}</div><div class="nc-excerpt">${n.excerpt}</div><div class="nc-impact">${n.impact}</div></div>`;
+  ng.appendChild(d);
+});
+
+// Pipeline rows
+const pl = document.getElementById('pipelineRows');
+[
+  {t:'T-38 Talon Intake Plugs & Exhaust Covers',s:'FA301626Q0068',d:'27 Apr 2026',r:'2 P0',status:'Audit Complete · KO Email Ready'},
+  {t:'Precision Machined Brackets — F-16',s:'FA8675-26-Q-0442',d:'02 May 2026',r:'3 P1',status:'Audit Running...'},
+].forEach(r => {
+  const rc = r.r.includes('P0')?'var(--red)':'var(--amber)';
+  const d = document.createElement('div');
+  d.style.cssText = 'background:var(--void3);border:1px solid var(--border);border-radius:3px;padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:background .15s;';
+  d.innerHTML = `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px"><div style="font-family:var(--serif);font-size:14px;font-weight:700;color:var(--text)">${r.t}</div><span style="font-family:var(--mono);font-size:8px;font-weight:700;padding:3px 8px;border-radius:2px;background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:var(--red);white-space:nowrap">${r.r}</span></div><div style="font-family:var(--mono);font-size:8.5px;color:var(--t40);margin-bottom:10px">${r.s} · Due ${r.d}</div><div style="font-family:var(--mono);font-size:9px;color:var(--green);opacity:.8">✓ ${r.status}</div>`;
+  pl.appendChild(d);
+});
+
+// ── INTERACTIVITY ──
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById('tab-'+id);
+  if(panel) panel.classList.add('active');
+  if(el) el.classList.add('active');
+}
+function setNav(el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+}
+function setFf(el){
+  document.querySelectorAll('.ff').forEach(f=>f.classList.remove('active'));
+  el.classList.add('active');
+  const label = el.textContent.trim();
+  const rows = document.querySelectorAll('.feed-row');
+  rows.forEach(row => {
+    const days = parseInt(row.dataset.days)||99;
+    const sa = row.dataset.sa||'';
+    const risk = row.querySelector('.f-risk')?.textContent?.trim();
+    const type=row.dataset.type||''; const risk=row.dataset.risk||'';
+    let show = true;
+    if(label === 'P0 · P1'){
+      show = risk==='rp0'||risk==='rp1';
+    } else if(label === '≤7 Days'){
+      show = !isNaN(days) && days <= 7;
+    } else if(label === 'Small Business'){
+      show = sa === 'SB' || sa === 'SDVOSB' || sa === 'WOSB' || sa === '8(a)';
+    } else if(label === 'IDIQ'){
+      show = isIDIQ;
+    }
+    row.style.display = show ? '' : 'none';
+  });
+  // Show empty state if no rows visible
+  const visible = [...rows].filter(r => r.style.display !== 'none');
+  let emptyEl = document.getElementById('feedEmpty');
+  if(!emptyEl){
+    emptyEl = document.createElement('div');
+    emptyEl.id = 'feedEmpty';
+    emptyEl.style.cssText = 'padding:32px 20px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--t25);letter-spacing:.06em;';
+    document.getElementById('feedScroll').appendChild(emptyEl);
+  }
+  emptyEl.style.display = visible.length === 0 ? 'block' : 'none';
+  emptyEl.textContent = visible.length === 0 ? 'No solicitations match this filter.' : '';
+  // Also remove section header if filtering
+  const sectionHdr = document.querySelector('.feed-section-hdr');
+  if(sectionHdr) sectionHdr.style.display = label === 'All' ? '' : 'none';
+}
+function setPs(el){
+  document.querySelectorAll('.ps').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+}
 
 // Live counters
-let sol = 847, p0 = 23;
-(function tick(){
-  if(Math.random()>.45) sol++;
-  if(Math.random()>.78) p0++;
-  const s = document.getElementById('statSol');
-  const p = document.getElementById('statP0');
-  if(s) s.textContent = sol;
-  if(p) p.textContent = p0;
-  setTimeout(tick, 2000 + Math.random()*4000);
+(function(){const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+const c=FEED_DATA.filter(r=>r.rc==='rp0'||r.rc==='rp1').length;
+const x=FEED_DATA.filter(r=>r.days<=7).length;
+const t=FEED_DATA.length;
+s('p0Val',c);s('expVal',x);s('homeActive',t);s('solCount',t);s('samActive',t);s('samCount',t);s('samP0',c);
 })();
 
-// Feed timestamp
-let ts = 0;
-setInterval(() => {
+// Timestamps
+let ts=0;
+setInterval(()=>{
   ts++;
-  const el = document.getElementById('feedTs');
-  if(!el) return;
-  el.textContent = ts < 60 ? ts+'s ago' : Math.floor(ts/60)+'m ago';
-  if(ts >= 90) ts = 0;
-}, 1000);
-
-// Tab switching
-document.querySelectorAll('.feed-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
+  ['feedTs','samTs'].forEach(id=>{
+    const e=document.getElementById(id);
+    if(!e)return;
+    e.textContent=ts<60?ts+'s ago':Math.floor(ts/60)+'m ago';
   });
-});
+  if(ts>=90)ts=0;
+},1000);
 </script>
 </body>
 </html>
