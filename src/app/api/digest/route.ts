@@ -14,5 +14,5 @@ export async function GET(req: Request) {
     return new NextResponse("Access denied", { status: 401 });
   }
 
-  return NextResponse.redirect(new URL("/ceo-digest-protected.html", req.url));
+  return NextResponse.redirect(new URL("/home.html", req.url));
 }

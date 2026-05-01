@@ -5,7 +5,6 @@ const PUBLIC = [
   "/sign-in",
   "/login",
   "/apex-hub.html",
-  "/vertex-hub-v6.html",
   "/landing.html",
   "/access.html",
   "/signin.html"
