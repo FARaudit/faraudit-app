@@ -691,18 +691,41 @@ html,body{background:var(--void);color:var(--text);font-family:var(--serif);-web
 <script>
 // ── DATA ──
 const FEED_DATA = [
+  // P0 — Critical, act today
   {n:'336413',t:'T-38 Talon Intake Plugs & Exhaust Covers',a:'Air Education & Training Command (AETC)',v:'$48K',days:3,ty:'RFQ',sa:'sb',sal:'SB',rc:'rp0',rl:'2 P0'},
   {n:'336413',t:'CH-47 Chinook Rotor Hub Fittings',a:'Army Contracting Command (ACC)',v:'$187K',days:5,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'rp0',rl:'1 P0'},
   {n:'334511',t:'Radar Array Housing · Low Observable Coat',a:'DARPA',v:'$14.2M',days:4,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp0',rl:'3 P0'},
+  {n:'332710',t:'F-22 Canopy Frame Set · Phase II',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$1.4M',days:6,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp0',rl:'2 P0'},
+  {n:'336413',t:'A-10 Wing Skin Panels — Re-Skinning Program',a:'Hill AFB Ogden ALC',v:'$2.8M',days:7,ty:'FFP',sa:'sb',sal:'SB',rc:'rp0',rl:'2 P0'},
+  // P1 — Watch closely
   {n:'332710',t:'Precision Machined Brackets — F-16 Program',a:'Air Force Materiel Command (AFMC)',v:'$312K',days:14,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp1',rl:'3 P1'},
   {n:'332721',t:'Titanium Fastener Sets MIL-SPEC-AN960',a:'Defense Logistics Agency (DLA)',v:'$94K',days:18,ty:'RFQ',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
   {n:'336413',t:'F-22 Raptor Canopy Frame Components',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$620K',days:8,ty:'FFP',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
-  {n:'334511',t:'Navigation Housing Units · IDIQ Increment IV',a:'Naval Air Systems Command (NAVAIR)',v:'$2.1M',days:22,ty:'IDIQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
-  {n:'541330',t:'Structural Analysis Support — F-35B',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'334511',t:'AESA Radar Sub-Assembly · Block IIIF',a:'Naval Air Warfare Ctr (NAWC)',v:'$3.7M',days:11,ty:'RFP',sa:'un',sal:'UNREST',rc:'rp1',rl:'2 P1'},
   {n:'332710',t:'Bell 407 Engine Mount Brackets',a:'Army Aviation Tech Directorate (AATD)',v:'$156K',days:26,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'rp1',rl:'1 P1'},
   {n:'336413',t:'F-35A Ground Support Equipment Set · IDIQ',a:'F-35 Joint Program Office (JPO)',v:'$8.4M',days:42,ty:'IDIQ',sa:'sb',sal:'SB',rc:'rp1',rl:'2 P1'},
-  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
   {n:'332710',t:'Sikorsky UH-60 Transmission Housing',a:'Army Contracting Command (ACC)',v:'$278K',days:31,ty:'FFP',sa:'wo',sal:'WOSB',rc:'rp1',rl:'1 P1'},
+  // Watch
+  {n:'334511',t:'Navigation Housing Units · IDIQ Increment IV',a:'Naval Air Systems Command (NAVAIR)',v:'$2.1M',days:22,ty:'IDIQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'541330',t:'Structural Analysis Support — F-35B',a:'Naval Air Systems Command (NAVAIR)',v:'$4.8M',days:34,ty:'RFP',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332721',t:'High-Temp Alloy Fasteners · ITAR',a:'SpaceX Government (SpaceX Gov)',v:'UNDISCL',days:55,ty:'RFQ',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'336413',t:'KC-46 Pegasus Boom Operator Console Bracket',a:'AFLCMC Tanker Directorate',v:'$540K',days:38,ty:'FFP',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'332710',t:'V-22 Osprey Nacelle Strut Assemblies',a:'Naval Air Systems Command (NAVAIR)',v:'$1.9M',days:46,ty:'RFP',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'336413',t:'B-1B Lancer Forward Equipment Bay Brackets',a:'Tinker AFB OC-ALC',v:'$420K',days:29,ty:'FFP',sa:'a8',sal:'8(a)',rc:'',rl:'Watch'},
+  {n:'334511',t:'Inertial Measurement Unit · Replenishment',a:'Defense Logistics Agency (DLA)',v:'$680K',days:51,ty:'IDIQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'332721',t:'Stainless Hex-Head Bolts · NAS6604',a:'Defense Logistics Agency (DLA)',v:'$72K',days:24,ty:'RFQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'541330',t:'Aero-Structural Loads Analysis · CH-53K',a:'Naval Air Systems Command (NAVAIR)',v:'$2.4M',days:60,ty:'RFP',sa:'wo',sal:'WOSB',rc:'',rl:'Watch'},
+  {n:'332710',t:'AH-64 Apache Tail Rotor Drive Components',a:'Redstone Arsenal · ACC',v:'$890K',days:36,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'',rl:'Watch'},
+  {n:'336413',t:'F-15EX Eagle II Avionics Bay Mounts',a:'AF Life Cycle Mgmt Center (AFLCMC)',v:'$1.2M',days:48,ty:'RFP',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332710',t:'Patriot PAC-3 Launcher Mount Brackets',a:'Missile Defense Agency (MDA)',v:'$3.1M',days:41,ty:'IDIQ',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'334511',t:'GPS Anti-Jam Antenna Array Housings',a:'Space Systems Command (SSC)',v:'$2.6M',days:33,ty:'RFP',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'332721',t:'Inconel 718 Locking Pin Sets · MS-Spec',a:'Defense Logistics Agency (DLA)',v:'$118K',days:27,ty:'RFQ',sa:'a8',sal:'8(a)',rc:'',rl:'Watch'},
+  {n:'336413',t:'C-130J Super Hercules Cargo Floor Tracks',a:'AFLCMC Mobility Directorate',v:'$760K',days:53,ty:'FFP',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'541330',t:'Fatigue Life Modeling — Navy Rotary Wing',a:'Naval Air Warfare Ctr (NAWC)',v:'$1.1M',days:67,ty:'RFP',sa:'un',sal:'UNREST',rc:'',rl:'Watch'},
+  {n:'332710',t:'Black Hawk Mast Assembly Sub-Components',a:'Army Contracting Command (ACC)',v:'$540K',days:44,ty:'IDIQ',sa:'wo',sal:'WOSB',rc:'',rl:'Watch'},
+  {n:'334511',t:'Ku-Band SATCOM Modem Chassis',a:'Space Systems Command (SSC)',v:'$1.8M',days:39,ty:'RFP',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'332721',t:'A286 Stainless Steel Studs · MIL-S-8879',a:'Defense Logistics Agency (DLA)',v:'$96K',days:21,ty:'RFQ',sa:'sb',sal:'SB',rc:'',rl:'Watch'},
+  {n:'336413',t:'F-18E Super Hornet Wingfold Hinge Brackets',a:'Naval Air Systems Command (NAVAIR)',v:'$1.5M',days:58,ty:'FFP',sa:'sd',sal:'SDVOSB',rc:'',rl:'Watch'},
 ];
 
 // Build feed
@@ -711,7 +734,10 @@ FEED_DATA.forEach(r => {
   const row = document.createElement('div');
   const dc = r.days<=7?'urg':r.days<=21?'soon':'ok';
   row.className = `feed-row ${r.rc}`;
-  row.dataset.days=r.days; row.dataset.sa=r.sal; row.dataset.type=r.ty; row.dataset.risk=r.rc;
+  row.dataset.days = r.days;
+  row.dataset.sa = r.sal;
+  row.dataset.type = r.ty;
+  row.dataset.risk = r.rc || 'watch';
   row.innerHTML = `<span class="f-naics">${r.n}</span><div style="min-width:0"><div class="f-title">${r.t}</div></div><span class="f-agency">${r.a}</span><span class="f-val">${r.v}</span><span class="f-days ${dc}">${r.days}d</span><span class="f-type">${r.ty}</span><span class="f-sa sa-${r.sa}">${r.sal}</span><span class="f-risk ${r.rc?r.rc.replace('rp','rk'):'rkw'}">${r.rl}</span>`;
   feedScroll.appendChild(row);
 });
@@ -817,13 +843,13 @@ function setFf(el){
   const label = el.textContent.trim();
   const rows = document.querySelectorAll('.feed-row');
   rows.forEach(row => {
-    const days = parseInt(row.dataset.days)||99;
-    const sa = row.dataset.sa||'';
-    const risk = row.querySelector('.f-risk')?.textContent?.trim();
-    const type=row.dataset.type||''; const risk=row.dataset.risk||'';
+    const days = parseInt(row.dataset.days);
+    const sa = row.dataset.sa;
+    const risk = row.dataset.risk;
+    const isIDIQ = row.dataset.type === 'IDIQ';
     let show = true;
     if(label === 'P0 · P1'){
-      show = risk==='rp0'||risk==='rp1';
+      show = row.classList.contains('rp0') || row.classList.contains('rp1');
     } else if(label === '≤7 Days'){
       show = !isNaN(days) && days <= 7;
     } else if(label === 'Small Business'){
@@ -853,12 +879,17 @@ function setPs(el){
   el.classList.add('active');
 }
 
-// Live counters
-(function(){const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-const c=FEED_DATA.filter(r=>r.rc==='rp0'||r.rc==='rp1').length;
-const x=FEED_DATA.filter(r=>r.days<=7).length;
-const t=FEED_DATA.length;
-s('p0Val',c);s('expVal',x);s('homeActive',t);s('solCount',t);s('samActive',t);s('samCount',t);s('samP0',c);
+// Static counts — derived from FEED_DATA (no random ticker)
+(function setCounts(){
+  const sol = FEED_DATA.length;
+  const p0  = FEED_DATA.filter(r => r.rc === 'rp0').length;
+  const exp = FEED_DATA.filter(r => r.days <= 7).length;
+  ['solCount','homeActive','samActive','samCount'].forEach(id=>{
+    const e = document.getElementById(id); if(e) e.textContent = sol;
+  });
+  const p  = document.getElementById('p0Val');  if(p)  p.textContent  = p0;
+  const sp = document.getElementById('samP0');  if(sp) sp.textContent = p0;
+  const ev = document.getElementById('expVal'); if(ev) ev.textContent = exp;
 })();
 
 // Timestamps
