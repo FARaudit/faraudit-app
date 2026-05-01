@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC = [
   "/sign-in",
   "/login",
-  "/apex-hub.html",
   "/landing.html",
   "/access.html",
   "/signin.html"
