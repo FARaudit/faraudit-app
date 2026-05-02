@@ -22,7 +22,7 @@ export interface PendingAudit {
   pdf_path: string | null;
   source: "seed" | "sam_live" | "manual";
   status: "pending" | "processing" | "processed" | "failed";
-  audit_id: number | null;
+  audit_id: string | null;  // audits.id is UUID
   recommendation: string | null;
   compliance_score: number | null;
   bid_no_bid: string | null;
@@ -53,7 +53,7 @@ export async function markProcessing(id: string): Promise<void> {
 
 export async function markProcessed(
   id: string,
-  result: { audit_id: number | null; recommendation: string; compliance_score: number; bid_no_bid: string | null }
+  result: { audit_id: string | null; recommendation: string; compliance_score: number; bid_no_bid: string | null }
 ): Promise<void> {
   const { error } = await supabase
     .from("pending_audits")

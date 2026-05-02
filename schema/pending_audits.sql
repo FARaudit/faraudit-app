@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS pending_audits (
   pdf_path        TEXT,            -- local file path — for fixture-based dry runs
   source          TEXT NOT NULL DEFAULT 'seed',     -- seed | sam_live | manual
   status          TEXT NOT NULL DEFAULT 'pending',  -- pending | processing | processed | failed
-  audit_id        BIGINT,                            -- soft link to audits.id once written
+  audit_id        UUID,                              -- soft link to audits.id once written
   recommendation  TEXT,                              -- mirror of the audit result for quick scan
   compliance_score INTEGER,
   bid_no_bid      TEXT,

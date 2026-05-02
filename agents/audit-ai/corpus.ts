@@ -13,7 +13,7 @@ export interface RecordAuditInput {
 }
 
 export interface RecordAuditOutput {
-  audit_id: number | null;
+  audit_id: string | null;  // audits.id is UUID
   inserted_corpus_rows: number;
 }
 
@@ -52,19 +52,18 @@ export async function recordAudit(input: RecordAuditInput): Promise<RecordAuditO
     completed_at: new Date().toISOString()
   };
 
-  let auditId: number | null = null;
   const { data: auditRow, error: auditErr } = await supabase
     .from("audits")
     .insert(auditPayload)
     .select("id")
     .single();
   if (auditErr) {
-    // Soft-fail the audit insert. Corpus rows still get attempted so DFARS
-    // trap intelligence is preserved even if the parent row is rejected.
-    console.warn(`[audit-ai] audits insert failed (${auditErr.message}) · continuing with corpus only`);
-  } else {
-    auditId = (auditRow?.id as number) ?? null;
+    // Hard-fail. Anthropic credits already burned producing the result — if we
+    // can't persist, the orchestrator must mark the queue row failed (not
+    // processed) so the next run retries cleanly.
+    throw new Error(`audits insert failed: ${auditErr.message}`);
   }
+  const auditId = (auditRow?.id as string) ?? null;
 
   // Mirror api/audit/route.ts: write trap detections to fa_intelligence_corpus.
   const flags = (result.compliance.json.dfars_flags ?? []).filter((f) => f.detected);
@@ -87,10 +86,12 @@ export async function recordAudit(input: RecordAuditInput): Promise<RecordAuditO
       .from("fa_intelligence_corpus")
       .insert(corpusRows, { count: "exact" });
     if (corpusErr) {
-      console.warn(`[audit-ai] fa_intelligence_corpus insert failed: ${corpusErr.message}`);
-    } else {
-      insertedCorpusRows = count || corpusRows.length;
+      // Hard-fail. The audits row already persisted is fine to keep — but the
+      // queue row stays 'failed' so we know corpus is incomplete. Manual repair
+      // path: re-insert the corpus rows for that audit_id.
+      throw new Error(`fa_intelligence_corpus insert failed: ${corpusErr.message}`);
     }
+    insertedCorpusRows = count || corpusRows.length;
   }
 
   return { audit_id: auditId, inserted_corpus_rows: insertedCorpusRows };
