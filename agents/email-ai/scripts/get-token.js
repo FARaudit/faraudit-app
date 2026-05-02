@@ -1,95 +1,52 @@
 #!/usr/bin/env node
-// Email-AI OAuth bootstrap.
-// Generates a Gmail refresh token for the email-ai-v2 OAuth client.
+// Email-AI OAuth refresh-token bootstrap.
 //
-// Usage:
-//   1. Put GMAIL_CLIENT_ID + GMAIL_CLIENT_SECRET in agents/email-ai/.env
-//   2. cd agents/email-ai
-//   3. node scripts/get-token.js
-//   4. Click the printed URL, sign in as jose@faraudit.com, approve scopes
-//   5. Browser will redirect to http://localhost/?code=... (page will fail
-//      to load — that's fine). Copy the FULL URL from the address bar.
-//   6. Paste the URL when prompted; script prints GMAIL_REFRESH_TOKEN
-//   7. Paste that token into Railway:
-//      railway variables --set GMAIL_REFRESH_TOKEN=<token>
+// The local-script flow was deprecated after recurring "Access blocked:
+// request is invalid" errors on the redirect-URI handshake. We now use
+// Google's official OAuth Playground, which handles the loopback portion
+// inside Google's own infra so there is nothing to register or match.
+//
+// Run this script (`node scripts/get-token.js`) any time you need to
+// regenerate the refresh token. It prints the exact 9-step flow.
 
-import 'dotenv/config';
-import { google } from 'googleapis';
-import readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/gmail.modify',
-  'https://www.googleapis.com/auth/gmail.labels'
+const lines = [
+  '',
+  '━━ EMAIL-AI · GMAIL REFRESH TOKEN — OAuth Playground flow ━━',
+  '',
+  'The local OAuth script was retired. Use Google\'s OAuth Playground instead:',
+  '',
+  '  1. Open https://developers.google.com/oauthplayground',
+  '',
+  '  2. Click the gear icon (top right)',
+  '     → check "Use your own OAuth credentials"',
+  '',
+  '  3. Paste from 1Password "email-ai-v2":',
+  '     · OAuth Client ID',
+  '     · OAuth Client secret',
+  '',
+  '  4. In the left panel, scroll to "Gmail API v1" and select BOTH:',
+  '     · https://www.googleapis.com/auth/gmail.modify',
+  '     · https://www.googleapis.com/auth/gmail.labels',
+  '',
+  '  5. Click "Authorize APIs"',
+  '     → sign in as jose@faraudit.com',
+  '     → click Allow',
+  '',
+  '  6. On the next screen, click "Exchange authorization code for tokens"',
+  '',
+  '  7. Copy the "Refresh token" value (long string starting with 1// or 4/0)',
+  '',
+  '  8. Save to 1Password as: "Email-AI Gmail Refresh Token v2"',
+  '',
+  '  9. Update Railway:',
+  '     cd ~/faraudit-app/agents/email-ai',
+  '     railway variables --set GMAIL_REFRESH_TOKEN=<paste-token-here>',
+  '     railway redeploy',
+  '',
+  'After redeploy, the next 30-min cron tick will print boot diagnostics',
+  'including the new GMAIL_REFRESH_TOKEN length. If the token is valid,',
+  'you should see "inbox threads: N" instead of an OAUTH FAIL line.',
+  ''
 ];
 
-const REDIRECT = 'http://localhost';
-
-async function main() {
-  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET } = process.env;
-  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
-    console.error('Missing GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET — populate .env from .env.example before running this script.');
-    process.exit(1);
-  }
-
-  const oauth2 = new google.auth.OAuth2(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, REDIRECT);
-
-  const authUrl = oauth2.generateAuthUrl({
-    access_type: 'offline',
-    prompt: 'consent',           // forces re-issuing a fresh refresh_token
-    scope: SCOPES,
-    include_granted_scopes: true
-  });
-
-  console.log('\n━━ STEP 1 ━━ Open this URL in your browser:\n');
-  console.log(authUrl);
-  console.log('\n━━ STEP 2 ━━ Sign in as jose@faraudit.com, approve the scopes.');
-  console.log('             Browser will redirect to http://localhost/?code=...');
-  console.log('             That page will fail to load — that is fine.');
-  console.log('             Copy the FULL URL from the address bar.\n');
-
-  const rl = readline.createInterface({ input, output });
-  const pasted = (await rl.question('━━ STEP 3 ━━ Paste full URL or just the code: ')).trim();
-  rl.close();
-
-  let code = pasted;
-  try {
-    if (pasted.startsWith('http')) {
-      const u = new URL(pasted);
-      const c = u.searchParams.get('code');
-      if (c) code = c;
-    }
-  } catch { /* fall through, treat input as bare code */ }
-
-  if (!code) {
-    console.error('No code found in input — aborting.');
-    process.exit(1);
-  }
-
-  console.log('\nExchanging code for tokens…');
-  let tokens;
-  try {
-    const { tokens: t } = await oauth2.getToken(code);
-    tokens = t;
-  } catch (err) {
-    console.error('Token exchange failed:', err?.message || err);
-    process.exit(1);
-  }
-
-  if (!tokens.refresh_token) {
-    console.error('Google did not return a refresh_token. This usually means the user already granted consent for this client.');
-    console.error('Fix: revoke at https://myaccount.google.com/permissions then re-run with prompt=consent (already set).');
-    process.exit(1);
-  }
-
-  console.log('\n━━ SUCCESS ━━');
-  console.log('GMAIL_REFRESH_TOKEN=' + tokens.refresh_token);
-  console.log('\nNext: paste into Railway env:\n');
-  console.log('  cd agents/email-ai');
-  console.log('  railway variables --set GMAIL_REFRESH_TOKEN=' + tokens.refresh_token);
-  console.log('\nThen trigger redeploy:');
-  console.log('  railway redeploy');
-  console.log('');
-}
-
-main().catch((err) => { console.error('fatal:', err); process.exit(1); });
+console.log(lines.join('\n'));
