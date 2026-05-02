@@ -130,13 +130,14 @@ async function auditsCitingClause(clause: string): Promise<Array<{ id: string; n
 async function run() {
   console.log(`[regulatory-ai] starting · DRY_RUN=${DRY_RUN}`);
 
-  const [cfr, gao, fedReg] = await Promise.all([
-    fetchRSS("https://www.govinfo.gov/rss/cfr.xml", "far"),
-    fetchRSS("https://www.govinfo.gov/rss/GAO-LEGAL.xml", "gao_protest"),
-    fetchFedRegister()
+  const [cfr, gao, plaw, fedReg] = await Promise.all([
+    fetchRSS("https://www.govinfo.gov/rss/cfr.xml", "far"),         // FAR/DFARS rule changes (Title 48)
+    fetchRSS("https://www.govinfo.gov/rss/GAO-LEGAL.xml", "gao_protest"), // GAO bid-protest decisions
+    fetchRSS("https://www.govinfo.gov/rss/PLAW.xml", "far"),        // Public Laws — NDAA + appropriations enactments
+    fetchFedRegister()                                               // Federal Register — defense-acquisition + DoD docs
   ]);
-  const all = [...cfr, ...gao, ...fedReg];
-  console.log(`[regulatory-ai] pulled ${all.length} items (cfr=${cfr.length} gao=${gao.length} fr=${fedReg.length})`);
+  const all = [...cfr, ...gao, ...plaw, ...fedReg];
+  console.log(`[regulatory-ai] pulled ${all.length} items (cfr=${cfr.length} gao=${gao.length} plaw=${plaw.length} fr=${fedReg.length})`);
 
   if (all.length === 0) { console.log("[regulatory-ai] nothing to process"); return; }
 

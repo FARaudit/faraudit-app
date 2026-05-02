@@ -1,0 +1,15 @@
+# Per-agent Nixpacks override — kicks in only if Railway service Root
+# Directory is set to agents/sam-ingest/. Service currently uses Root = /
+# (per railway.toml comment), so the repo-root nixpacks.toml is the active
+# one. This file is the belt-and-suspenders fallback.
+
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm ci || npm install"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx index.ts"

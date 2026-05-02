@@ -1,0 +1,16 @@
+# Per-agent Nixpacks override — kicks in only if Railway service Root
+# Directory is set to agents/audit-ai/. Service currently uses Root = /
+# (audit-ai imports from src/lib/audit-engine.ts and src/lib/sam.ts), so
+# the repo-root nixpacks.toml is the active one. This file is the
+# belt-and-suspenders fallback if Root Directory ever drifts to the agent dir.
+
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm ci || npm install"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx index.ts"
