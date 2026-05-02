@@ -37,9 +37,13 @@ const DAILY_WINDOW_DAYS = Number(process.env.BACKFILL_DAYS) || Number(process.en
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
 const DRY_RUN = process.env.DRY_RUN === "true";
 
+// Build marker — incremented to force Railway hash-differential on redeploy
+// so an otherwise-identical-source rebuild doesn't get SKIPPED.
+const BUILD_MARKER = "v0.2-2026-05-02";
+
 async function main() {
   const startedAt = new Date();
-  console.log(`[sam-ingest] start ${startedAt.toISOString()} · DRY_RUN=${DRY_RUN}`);
+  console.log(`[sam-ingest] start ${startedAt.toISOString()} · DRY_RUN=${DRY_RUN} · build=${BUILD_MARKER}`);
   console.log(`  NAICS: ${NAICS_CODES.join(", ")}`);
   console.log(`  set-asides: ${SET_ASIDES.join(", ")}`);
   console.log(`  window: last ${DAILY_WINDOW_DAYS}d · page limit: ${PAGE_LIMIT}`);
