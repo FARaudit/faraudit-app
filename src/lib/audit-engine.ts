@@ -98,7 +98,12 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.223-7008", title: "Hexavalent Chromium", severity: "P0" },
   { clause: "252.204-7018", title: "Covered Telecom", severity: "P0" },
   { clause: "252.204-7021", title: "CMMC", severity: "P1" },
-  { clause: "252.225-7060", title: "Xinjiang Forced Labor", severity: "P0" }
+  { clause: "252.225-7060", title: "Xinjiang Forced Labor", severity: "P0" },
+  { clause: "252.232-7006", title: "WAWF Payment Routing", severity: "P1" },
+  { clause: "5352.242-9000", title: "Air Force Base Access", severity: "P1" },
+  { clause: "252.225-7001", title: "Buy American / Balance of Payments", severity: "P1" },
+  { clause: "252.215-7010", title: "Certified Cost or Pricing Data", severity: "P1" },
+  { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" }
 ];
 
 export function parseDFARSTraps(complianceJson: ComplianceJSON): DFARSFlag[] {
@@ -471,6 +476,11 @@ Output ONLY a JSON object with these keys:
 - clins (object[]): array of {clin: "0001", description: "...", quantity: "...", pricing_arrangement: "FFP|CPFF|...", fob: "Origin|Destination"} for EVERY CLIN in Section B
 - section_l_summary (string): 2-3 sentence summary of Section L proposal preparation instructions, OR empty string if no Section L found
 - section_m_summary (string): 2-3 sentence summary of Section M evaluation criteria with weights/factors, OR empty string if no Section M found
+- dfars_traps (object[]): array of {clause, title, risk_level: "P0"|"P1"|"P2", description, required_action} — specifically flag when present: 252.223-7008 hexavalent chromium · 252.204-7018 covered telecom · 252.204-7021 CMMC · 252.225-7060 Xinjiang forced labor · 252.232-7006 WAWF payment routing · 5352.242-9000 base access. Empty array if none cited.
+- fob_conflicts (string[]): any conflicts between FOB designations across CLINs (e.g. one CLIN FOB Origin, another FOB Destination — flag as a freight liability mismatch). Empty array if consistent.
+- wawf_routing (object): {pay_official_dodaac, issue_by_dodaac, admin_dodaac, inspect_by_dodaac, document_type} extracted from 252.232-7006 attachments. Use empty strings for unknown fields; emit empty object {} only if 252.232-7006 not cited.
+- section_l_requirements (string[]): every specific requirement from Section L as individual action items (page limit, font size, volume structure, oral presentation rules, demo requirements, past performance reference count, etc.).
+- section_m_factors (object[]): array of {factor, weight_or_priority, description} — one entry per evaluation factor in Section M (Technical, Past Performance, Price, etc.) with the weight or priority order stated in the solicitation.
 
 CRITICAL: Do not return empty arrays for far_clauses / dfars_clauses if you can see ANY clauses cited in the document. Be exhaustive. If you see "52.212-1 Instructions to Offerors" anywhere, list "52.212-1". Do not omit clauses just because they are common (52.212-1, 52.212-4, 52.232-33 are essentially universal — list them when present).
 
@@ -488,6 +498,12 @@ Output ONLY a JSON object with these keys:
 - evaluation_risks (string[]): how Section M factors (technical / past performance / price) are weighted, where points are easily lost, oral presentation risks. MUST contain at least 1 entry.
 - severity_score (number 0-10): overall bid risk. Use 4-7 for typical small-business federal opportunities.
 - top_3_risks (string[]): EXACTLY 3 entries, each one sentence, ranked. These are the deal-breakers — if a DFARS trap (252.223-7008 hexavalent chromium / 252.204-7018 covered telecom / 252.204-7021 CMMC) is present, ELEVATE it to top_3_risks. If FOB destination + small business + no past performance, that's a top_3 risk. If proposal due window <14 days, that's a top_3 risk.
+- dfars_trap_risks (object[]): {clause, trap_name, specific_risk, required_verification, consequence_if_missed} — one object per DFARS trap detected (252.223-7008, 252.204-7018, 252.204-7021, 252.225-7060, 252.232-7006, 5352.242-9000, etc.). Empty array if no traps fired.
+- base_access_risk (string | null): if 5352.242-9000 (Air Force base access) is present, describe the access requirement, escort/credential timeline (typically 4–8 weeks), and risk to schedule if cleared personnel are not pre-staged. null if clause not present.
+- hex_chrome_risk (string | null): if 252.223-7008 is present, describe supply-chain verification effort required (vendor cert letters, mill certs, alternate-finish substitution path) and timeline impact. null if clause not present.
+- cmmc_risk (string | null): if 252.204-7021 is present, identify the CMMC level required (Level 1 / Level 2 / Level 3), whether C3PAO assessment is needed, current readiness gap, and time-to-certify (typically 6–12 months for Level 2). null if clause not present.
+- bid_no_bid_recommendation (string): one of "BID" | "BID_WITH_CAUTION" | "NO_BID" followed by " — " and one-sentence rationale. Example: "BID_WITH_CAUTION — DFARS hex chrome trap fires and small business has no documented mill-cert process."
+- executive_risk_summary (string): 3-paragraph CEO briefing. Paragraph 1: what is being bought (1–2 sentences, plain English). Paragraph 2: top 3 risks + the consequence if each is missed (cure notice, termination for default, lost evaluation points). Paragraph 3: recommended actions ranked, each tied to a calendar window. Use "\\n\\n" between paragraphs.
 
 NEVER return fewer than 3 entries in top_3_risks. NEVER return all-empty arrays. If the source is too thin, infer from typical patterns for this NAICS code, contract type, and agency, and prefix the inferred risk with "[Inferred from typical patterns] ...".
 
@@ -497,19 +513,19 @@ JSON only.`;
     callClaude(
       `${SECURITY_DIRECTIVE}\n\nYou are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`,
       overviewPrompt,
-      900,
+      1500,
       pdfBase64
     ),
     callClaude(
-      `${SECURITY_DIRECTIVE}\n\nYou are a federal procurement compliance officer. You read every page of the solicitation and extract EVERY clause, certification, CLIN, and eligibility requirement. You output ONE valid JSON object — nothing before, nothing after.`,
+      `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
       compliancePrompt,
-      2500,
+      3500,
       pdfBase64
     ),
     callClaude(
-      `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager. You always identify at least 3 specific risks and never return empty risk arrays. You output ONE valid JSON object — nothing before, nothing after.`,
+      `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
       risksPrompt,
-      1800,
+      2500,
       pdfBase64
     )
   ]);
