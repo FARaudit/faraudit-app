@@ -1,4 +1,5 @@
 // SAM Ingest — Railway daily cron worker.
+// Last hash-bust: 2026-05-02T16:05:00Z — force fresh Railway image build.
 //
 // For each (NAICS × set-aside) combo, paginates SAM.gov for solicitations
 // posted in the last DAILY_WINDOW_DAYS days, dedupes by notice_id, and inserts
