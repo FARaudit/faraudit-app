@@ -17,8 +17,8 @@ export default function Topbar({ user, counter }: Props) {
         gridColumn: "1 / -1",
         gridRow: "1",
         height: "var(--bd-topbar)",
-        background: "rgba(3,8,16,.96)",
-        borderBottom: "1px solid var(--bd-border)",
+        background: "var(--bg-primary)",
+        borderBottom: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
         flexShrink: 0,
@@ -34,17 +34,16 @@ export default function Topbar({ user, counter }: Props) {
           height: "100%",
           display: "flex",
           alignItems: "center",
-          gap: 10,
           padding: "0 18px",
-          borderRight: "1px solid var(--bd-border)",
+          borderRight: "1px solid var(--border)",
           flexShrink: 0
         }}
       >
         <div
           style={{
             fontFamily: "var(--bd-serif)",
-            fontSize: 16,
-            fontWeight: 900,
+            fontSize: 17,
+            fontWeight: 700,
             letterSpacing: "-0.02em",
             color: "var(--text)"
           }}
@@ -53,57 +52,46 @@ export default function Topbar({ user, counter }: Props) {
         </div>
       </div>
 
-      {/* Center search */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "0 24px", gap: 16, minWidth: 0 }}>
-        <div
-          style={{
-            flex: 1,
-            maxWidth: 400,
-            background: "rgba(201,168,76,.04)",
-            border: "1px solid var(--bd-border)",
-            borderRadius: 3,
-            fontFamily: "var(--bd-mono)",
-            fontSize: 11,
-            color: "var(--t25)",
-            cursor: "text",
-            padding: "6px 12px"
-          }}
-        >
-          ⌕ Search solicitations · NAICS · agency · KO
-        </div>
-      </div>
-
-      {/* Right cluster */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 18px" }}>
+      {/* Center — live corpus counter */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 5,
+            gap: 8,
             fontFamily: "var(--bd-mono)",
-            fontSize: 8,
-            fontWeight: 700,
-            color: "rgba(74,222,128,.8)",
-            letterSpacing: "0.1em",
-            background: "rgba(74,222,128,.06)",
-            border: "1px solid rgba(74,222,128,.15)",
-            borderRadius: 2,
-            padding: "4px 10px"
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+            background: "rgba(16,185,129,.06)",
+            border: "1px solid rgba(16,185,129,.2)",
+            borderRadius: 3,
+            padding: "5px 12px",
+            color: "var(--green)"
           }}
         >
           <span
             style={{
-              width: 5,
-              height: 5,
+              width: 6,
+              height: 6,
               borderRadius: "50%",
               background: "var(--green)",
-              animation: "bd-ldot 2s ease-in-out infinite",
-              display: "inline-block"
+              animation: "bd-ldot 1.6s ease-in-out infinite",
+              boxShadow: "0 0 8px rgba(16,185,129,.6)"
             }}
           />
-          LIVE · <span style={{ fontFamily: "var(--bd-mono)" }}>{counter.audits.toLocaleString()}</span> AUDITED · <span style={{ fontFamily: "var(--bd-mono)" }}>{counter.traps.toLocaleString()}</span> TRAPS
+          <span>LIVE</span>
+          <span style={{ color: "var(--text2)", margin: "0 4px" }}>·</span>
+          <span style={{ color: "var(--text)", fontWeight: 700 }}>{counter.audits.toLocaleString()}</span>
+          <span style={{ color: "var(--text2)" }}>solicitations</span>
+          <span style={{ color: "var(--muted)" }}>·</span>
+          <span style={{ color: "var(--text)", fontWeight: 700 }}>{counter.traps.toLocaleString()}</span>
+          <span style={{ color: "var(--text2)" }}>traps</span>
         </div>
+      </div>
 
+      {/* Right — user */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 18px" }}>
         <button
           aria-label="Notifications"
           title="Notifications · coming next"
@@ -111,14 +99,14 @@ export default function Topbar({ user, counter }: Props) {
             width: 30,
             height: 30,
             borderRadius: 3,
-            background: "rgba(201,168,76,.04)",
-            border: "1px solid var(--bd-border)",
+            background: "transparent",
+            border: "1px solid var(--border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
             position: "relative",
-            color: "var(--t60)"
+            color: "var(--text2)"
           }}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -134,8 +122,8 @@ export default function Topbar({ user, counter }: Props) {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: "rgba(201,168,76,.04)",
-            border: "1px solid var(--bd-border)",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
             borderRadius: 3,
             padding: "5px 10px 5px 6px",
             cursor: "pointer",
@@ -147,7 +135,7 @@ export default function Topbar({ user, counter }: Props) {
               width: 22,
               height: 22,
               borderRadius: 2,
-              background: "rgba(201,168,76,.2)",
+              background: "rgba(200,146,42,.18)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -159,7 +147,7 @@ export default function Topbar({ user, counter }: Props) {
           >
             {initials}
           </span>
-          <span style={{ fontFamily: "var(--bd-mono)", fontSize: 10, fontWeight: 600, color: "var(--t60)", letterSpacing: "0.03em" }}>
+          <span style={{ fontFamily: "var(--bd-mono)", fontSize: 10, fontWeight: 600, color: "var(--text2)" }}>
             {handle}
           </span>
         </a>

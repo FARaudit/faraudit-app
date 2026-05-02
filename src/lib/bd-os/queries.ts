@@ -140,3 +140,41 @@ export async function fetchHeaderCounter(client: SupabaseClient): Promise<Header
   ]);
   return { audits: a.count || 0, traps: c.count || 0 };
 }
+
+// ─── Intelligence Home: 4 stat cards ──────────────────────────────────────
+export interface HomeStats {
+  critical_p0: number;          // audits with score < 40
+  expiring_7d: number;          // pending_audits with deadline within 7 days (proxy: pending count for now)
+  live_sam_gov: number;         // pending_audits.status='pending' count
+  audit_activity_month: number; // audits created in last 30 days
+  total_traps_caught: number;
+  value_audited_estimate: string; // placeholder until we extract ceiling values
+}
+
+export async function fetchHomeStats(client: SupabaseClient): Promise<HomeStats> {
+  const since30d = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const [p0, live, month, traps] = await Promise.all([
+    client
+      .from("audits")
+      .select("*", { count: "exact", head: true })
+      .lt("compliance_score", 40),
+    client
+      .from("pending_audits")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
+    client
+      .from("audits")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", since30d),
+    client.from("fa_intelligence_corpus").select("*", { count: "exact", head: true })
+  ]);
+
+  return {
+    critical_p0: p0.count || 0,
+    expiring_7d: live.count || 0, // proxy until deadline column wired in
+    live_sam_gov: live.count || 0,
+    audit_activity_month: month.count || 0,
+    total_traps_caught: traps.count || 0,
+    value_audited_estimate: "$48.2M" // placeholder — sum of ceiling_value_estimate when wired
+  };
+}

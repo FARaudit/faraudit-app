@@ -5,36 +5,40 @@
 @import "@fontsource/jetbrains-mono/500.css";
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700;900&display=swap');
 
-/* BD OS / home-s04 design tokens — match public/home.html visual spec.
+/* BD OS / home-s04 design tokens — exact CEO-spec values.
    Scoped under .bd-os so they don't pollute the rest of the app. */
 .bd-os {
-  --void:  #030810;
-  --void2: #060F1C;
-  --void3: #0A1628;
-  --gold:  #C9A84C;
-  --gold2: #DFB96A;
-  --gold3: #F0D48E;
-  --text:  #F5F0E8;
-  --text2: #E8E2D4;
-  --t80:   rgba(245,240,232,.80);
-  --t60:   rgba(245,240,232,.60);
-  --t40:   rgba(245,240,232,.40);
-  --t25:   rgba(245,240,232,.25);
-  --t12:   rgba(245,240,232,.12);
-  --red:   #EF4444;
-  --amber: #F59E0B;
-  --green: #4ADE80;
-  --blue:  #60A5FA;
+  --bg-primary: #0A0F1A;
+  --bg-surface: #0D1520;
+  --bg-card:    #111827;
+  --border:     #1E293B;
+  --border2:    #334155;
+  --gold:       #C8922A;
+  --gold2:      #E0A436;
+  --blue:       #2563EB;
+  --green:      #10B981;
+  --red:        #EF4444;
+  --amber:      #F59E0B;
+  --text:       #F8FAFC;
+  --text2:      #94A3B8;
+  --muted:      #475569;
   --bd-mono:  'JetBrains Mono', ui-monospace, monospace;
   --bd-serif: 'Fraunces', Georgia, serif;
-  --bd-border:  rgba(201,168,76,.10);
-  --bd-border2: rgba(201,168,76,.20);
+  --bd-sans:  'Inter', system-ui, sans-serif;
   --bd-sidebar: 220px;
-  --bd-topbar:  52px;
+  --bd-topbar:  48px;
 }
 @keyframes bd-ldot {
-  0%, 100% { opacity: 1 }
-  50%      { opacity: 0.4 }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes bd-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bd-os .fade-in { animation: bd-fade-in 0.12s ease-out; }
+@keyframes bd-spin {
+  to { transform: rotate(360deg); }
 }
 
 :root {
