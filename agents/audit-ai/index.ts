@@ -9,18 +9,33 @@
 //      SUPABASE_SERVICE_ROLE_KEY · DRY_RUN · QUEUE_BATCH_SIZE · CLAUDE_TIMEOUT_MS
 
 import dotenv from "dotenv";
+import { fetchPdfFromPath, fetchPdfFromSam } from "./pdf.js";
+
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-import { fetchPending, markProcessing, markProcessed, markFailed, type PendingAudit } from "./queue.js";
-import { fetchPdfFromPath, fetchPdfFromSam } from "./pdf.js";
-import { recordAudit } from "./corpus.js";
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.ANTHROPIC_API_KEY) {
+  console.error("[audit-ai] missing one of NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY in env");
+  process.exit(1);
+}
 
-// Engine + sam imports use .ts paths because the worker runs under tsx.
-// @ts-expect-error tsx resolves at runtime; TS strict imports don't permit .ts extensions
-import * as engineNs from "../../src/lib/audit-engine.ts";
+// Dynamic imports AFTER env load — queue.ts and audit-engine.ts both capture
+// env at module-init time, so static imports would fire too early.
+// @ts-expect-error tsx runtime resolves .ts; tsc strict imports forbid the extension
+const queueNs: any = await import("./queue.ts");
+const queue = queueNs.default ?? queueNs;
+const { fetchPending, markProcessing, markProcessed, markFailed } = queue;
+type PendingAudit = import("./queue.ts").PendingAudit;
+
 // @ts-expect-error see above
-import * as samNs from "../../src/lib/sam.ts";
+const corpusNs: any = await import("./corpus.ts");
+const corpus = corpusNs.default ?? corpusNs;
+const recordAudit = corpus.recordAudit;
+
+// @ts-expect-error see above
+const engineNs: any = await import("../../src/lib/audit-engine.ts");
+// @ts-expect-error see above
+const samNs: any = await import("../../src/lib/sam.ts");
 
 // Handle ESM/CJS interop quirk under tsx — runAudit and fetchSolicitationByNoticeId
 // may be on .default depending on how tsx loaded the module.

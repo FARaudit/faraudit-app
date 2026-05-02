@@ -4,11 +4,21 @@
 // Idempotent — uses upsert(notice_id) so re-running won't duplicate.
 
 import dotenv from "dotenv";
+import { resolve } from "node:path";
+
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-import { upsertPending } from "./queue.js";
-import { resolve } from "node:path";
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("[seed] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in env");
+  process.exit(1);
+}
+
+// Dynamic import AFTER env load — queue.ts captures env at module init.
+// @ts-expect-error tsx runtime resolves .ts; tsc strict imports forbid the extension
+const queueNs: any = await import("./queue.ts");
+const queue = queueNs.default ?? queueNs;
+const upsertPending = queue.upsertPending;
 
 const APP_ROOT = resolve(process.cwd());
 

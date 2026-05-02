@@ -1,0 +1,15 @@
+{
+  "name": "audit-ai",
+  "version": "0.1.0",
+  "description": "FARaudit Audit AI — Railway worker. Pulls solicitations from pending_audits queue, runs the upgraded 3-call audit engine, writes outcomes to the corpus.",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "seed": "tsx seed.ts",
+    "dry-run": "DRY_RUN=true tsx index.ts"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
