@@ -9,7 +9,7 @@ import type {
   AgencyRow
 } from "@/lib/bd-os/queries";
 
-type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response" | "teaming" | "capability";
+type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response" | "teaming" | "capability" | "protest" | "regulatory" | "cmmc" | "labor" | "subcontracts";
 type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ" | "Pre-Sol";
 
 interface Props {
@@ -26,7 +26,7 @@ const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", 
 const TAB_KEYS: TabKey[] = [
   "home", "audit", "sam", "budget", "news", "pipeline",
   "past-audits", "ko-intelligence", "agency-intelligence", "rfi-response",
-  "teaming", "capability"
+  "teaming", "capability", "protest", "regulatory", "cmmc", "labor", "subcontracts"
 ];
 
 export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
@@ -254,6 +254,43 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             </svg>
             Capability Statement
           </button>
+          <button className={`nav-item ${tab === "protest" ? "active" : ""}`} onClick={() => setTab("protest")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            Protest Intelligence
+          </button>
+          <button className={`nav-item ${tab === "regulatory" ? "active" : ""}`} onClick={() => setTab("regulatory")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Regulatory Updates
+          </button>
+          <button className={`nav-item ${tab === "cmmc" ? "active" : ""}`} onClick={() => setTab("cmmc")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2L13 4V8C13 11 11 13 8 14C5 13 3 11 3 8V4L8 2Z" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M6 8l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            CMMC Readiness
+          </button>
+          <button className={`nav-item ${tab === "labor" ? "active" : ""}`} onClick={() => setTab("labor")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Labor Rates
+          </button>
+          <button className={`nav-item ${tab === "subcontracts" ? "active" : ""}`} onClick={() => setTab("subcontracts")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="3" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <rect x="9" y="3" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <rect x="3" y="9" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <rect x="9" y="9" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            Subcontracts
+          </button>
 
           <div className="nav-label">Account</div>
           <button className="nav-item" onClick={() => alert("Profile & Settings — V2 lives here. Email: " + user.email)}>
@@ -426,6 +463,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       <div className="days-track"><div className="days-fill" /></div>
                     </div>
                   </div>
+                  <CustomerMetricsCard counter={counter} recentAudits={recentAudits} />
                 </div>
               </div>
             </div>
@@ -532,6 +570,31 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             {/* CAPABILITY STATEMENT */}
             <div className={`tab-panel ${tab === "capability" ? "active" : ""}`}>
               <CapabilityPanel />
+            </div>
+
+            {/* PROTEST INTELLIGENCE */}
+            <div className={`tab-panel ${tab === "protest" ? "active" : ""}`}>
+              <ProtestPanel />
+            </div>
+
+            {/* REGULATORY UPDATES */}
+            <div className={`tab-panel ${tab === "regulatory" ? "active" : ""}`}>
+              <RegulatoryPanel />
+            </div>
+
+            {/* CMMC READINESS */}
+            <div className={`tab-panel ${tab === "cmmc" ? "active" : ""}`}>
+              <CMMCPanel />
+            </div>
+
+            {/* LABOR RATES */}
+            <div className={`tab-panel ${tab === "labor" ? "active" : ""}`}>
+              <LaborRatesPanel naicsOptions={naicsOptions} />
+            </div>
+
+            {/* SUBCONTRACT OPPORTUNITIES */}
+            <div className={`tab-panel ${tab === "subcontracts" ? "active" : ""}`}>
+              <SubcontractsPanel naicsOptions={naicsOptions} />
             </div>
           </div>
         </div>
@@ -1927,6 +1990,481 @@ function CapTextarea({ label, value, onChange, placeholder }: { label: string; v
         rows={4}
         style={{ ...inputStyle, width: "100%", fontFamily: "var(--serif)", fontSize: 13, lineHeight: 1.5, resize: "vertical" }}
       />
+    </div>
+  );
+}
+
+function CustomerMetricsCard({ counter, recentAudits }: { counter: HeaderCounter; recentAudits: AuditRow[] }) {
+  // Engagement: audits + outcomes logged + notes added.
+  const decided = recentAudits.filter((a) => {
+    const o = ((a as unknown) as { outcome?: string | null }).outcome;
+    return o === "won" || o === "lost";
+  });
+  const noted = recentAudits.filter((a) => {
+    const n = ((a as unknown) as { notes?: string | null }).notes;
+    return typeof n === "string" && n.trim().length > 0;
+  });
+  const engagementRaw = counter.audits + decided.length * 2 + noted.length;
+  const engagement = Math.min(100, engagementRaw); // 100-point cap
+
+  const milestoneTarget = 25;
+  const milestonePct = Math.min(100, (counter.audits / milestoneTarget) * 100);
+
+  const wins = decided.filter((a) => ((a as unknown) as { outcome?: string }).outcome === "won").length;
+  const yourWinRate = decided.length > 0 ? Math.round((wins / decided.length) * 100) : null;
+
+  return (
+    <div className="rc-section">
+      <div className="rc-hdr"><div className="rc-title">Your Metrics</div><div className="rc-sub">vs corpus</div></div>
+      <div style={{ padding: "12px 16px" }}>
+        <MetricBlock
+          label="Milestone — Design Partner status"
+          value={`${counter.audits} / ${milestoneTarget} audits`}
+          pct={milestonePct}
+          color="var(--gold)"
+          sub={milestonePct >= 100 ? "Eligible — apply for Design Partner pricing" : `${Math.max(0, milestoneTarget - counter.audits)} more to qualify`}
+        />
+        <MetricBlock
+          label="Engagement score"
+          value={`${engagement} / 100`}
+          pct={engagement}
+          color={engagement >= 60 ? "var(--green)" : engagement >= 30 ? "var(--amber)" : "var(--red)"}
+          sub="Audits + outcomes logged + notes added"
+        />
+        <MetricBlock
+          label="Corpus contribution"
+          value={`${counter.traps} data points`}
+          pct={Math.min(100, (counter.traps / 100) * 100)}
+          color="var(--blue)"
+          sub="Every trap your audits caught feeds the FARaudit corpus"
+        />
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 4 }}>
+            Win rate (this account)
+          </div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 18, fontWeight: 700, color: yourWinRate == null ? "var(--t40)" : yourWinRate >= 50 ? "var(--green)" : "var(--amber)" }}>
+            {yourWinRate == null ? "—" : `${yourWinRate}%`}
+          </div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", marginTop: 4 }}>
+            {decided.length === 0 ? "Mark outcomes on /audit/[id] to see your win rate" : `${wins} won · ${decided.length - wins} lost · ${decided.length} decided`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricBlock({ label, value, pct, color, sub }: { label: string; value: string; pct: number; color: string; sub: string }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".12em", textTransform: "uppercase" }}>{label}</span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, color, fontWeight: 700 }}>{value}</span>
+      </div>
+      <div style={{ height: 3, background: "rgba(201,168,76,.06)", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, opacity: 0.6 }} />
+      </div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", marginTop: 4 }}>{sub}</div>
+    </div>
+  );
+}
+
+function ProtestPanel() {
+  const [data, setData] = useState<{ decisions: Array<{ docket: string; agency: string | null; protester: string | null; outcome: string | null; ground: string | null; decision_date: string | null; decision_url: string | null }>; agencies: Array<{ agency: string; total: number; sustained: number; sustained_rate: number; recent_grounds: string[] }> } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/protest-intel");
+        const d = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        setData(d);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Protest Intelligence · GAO public decisions</div>
+          <div className="is-refresh">RSS-cached · 6h TTL</div>
+        </div>
+        {loading && <div className="empty-block">Loading GAO protest decisions…</div>}
+        {err && <div className="ko-status error">{err}</div>}
+        {data && (
+          <>
+            {data.agencies.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Per-agency protest risk</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+                  {data.agencies.slice(0, 12).map((a) => {
+                    const risk = a.sustained_rate >= 25 ? "HIGH" : a.sustained_rate >= 10 ? "MEDIUM" : "LOW";
+                    const color = risk === "HIGH" ? "var(--red)" : risk === "MEDIUM" ? "var(--amber)" : "var(--green)";
+                    return (
+                      <div key={a.agency} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderLeft: `3px solid ${color}`, borderRadius: 3, padding: "10px 14px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                          <span style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }} title={a.agency}>{a.agency}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, color, letterSpacing: ".1em" }}>{risk}</span>
+                        </div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", marginTop: 4 }}>
+                          {a.sustained}/{a.total} sustained · {a.sustained_rate}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Recent decisions</div>
+            <div className="sam-table">
+              <div className="sam-th" style={{ gridTemplateColumns: "100px 130px 1fr 130px 90px" }}>
+                <span>Decision</span><span>Docket</span><span>Protester / ground</span><span>Agency</span><span>Outcome</span>
+              </div>
+              {data.decisions.length === 0 && <div className="empty-state">No decisions cached yet — GAO RSS unavailable.</div>}
+              {data.decisions.map((d) => {
+                const out = (d.outcome || "").toLowerCase();
+                const color = out === "sustained" ? "var(--red)" : out === "denied" ? "var(--green)" : "var(--t60)";
+                return (
+                  <a key={d.docket} className="sam-row" style={{ gridTemplateColumns: "100px 130px 1fr 130px 90px", textDecoration: "none", color: "inherit" }} href={d.decision_url || "#"} target="_blank" rel="noopener noreferrer">
+                    <span className="sr-date">{d.decision_date ? new Date(d.decision_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span>
+                    <span className="sr-num">{d.docket}</span>
+                    <span className="sr-title" title={d.ground || ""}>
+                      <span style={{ color: "var(--text)" }}>{d.protester || "—"}</span>
+                      {d.ground && <span style={{ color: "var(--t60)", marginLeft: 8 }}>· {d.ground.slice(0, 100)}</span>}
+                    </span>
+                    <span className="sr-agency">{d.agency || "—"}</span>
+                    <span className="sr-badge" style={{ color, background: "transparent", border: `1px solid ${color}40` }}>{d.outcome || "—"}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RegulatoryPanel() {
+  const [data, setData] = useState<{ updates: Array<{ source: string; clause: string | null; title: string; summary: string | null; link: string; published_at: string | null; affects_clauses: string[] }> } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [filterClause, setFilterClause] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/regulatory-updates${filterClause ? `?clause=${encodeURIComponent(filterClause)}` : ""}`);
+        const d = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        setData(d);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [filterClause]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Regulatory Updates · FAR · DFARS · Federal Register</div>
+          <div className="is-refresh">
+            <input
+              type="text"
+              value={filterClause}
+              onChange={(e) => setFilterClause(e.target.value.toUpperCase())}
+              placeholder="Filter by clause (e.g. DFARS 252.204-7012)"
+              style={{ ...inputStyle, width: 260 }}
+            />
+          </div>
+        </div>
+        {loading && <div className="empty-block">Loading regulatory feeds…</div>}
+        {err && <div className="ko-status error">{err}</div>}
+        {data && data.updates.length === 0 && <div className="empty-state">No updates match this filter.</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 14 }}>
+          {data?.updates.map((u, i) => (
+            <a key={i} href={u.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px", textDecoration: "none", color: "inherit" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "2px 8px", borderRadius: 2, color: "var(--gold)", border: "1px solid var(--border2)" }}>{u.source.toUpperCase()}</span>
+                {u.clause && <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--blue)" }}>{u.clause}</span>}
+                {u.published_at && <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", marginLeft: "auto" }}>{new Date(u.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+              </div>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.3, marginBottom: 6 }}>{u.title}</div>
+              {u.summary && <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5 }}>{u.summary.slice(0, 280)}{u.summary.length > 280 ? "…" : ""}</div>}
+              {u.affects_clauses.length > 0 && (
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>
+                  Affects: {u.affects_clauses.slice(0, 5).join(" · ")}
+                </div>
+              )}
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CmmcLevel { label: string; practices: number; summary: string; triggers: string[]; checklist: string[] }
+
+function CMMCPanel() {
+  const [data, setData] = useState<{ reference: Record<string, CmmcLevel>; distribution: Record<string, number>; recent_by_level: Record<string, Array<{ id: string; notice_id: string | null; agency: string | null }>>; total_audited: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeLevel, setActiveLevel] = useState<"1" | "2" | "3">("2");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/cmmc-readiness");
+        const d = await res.json();
+        if (!cancelled && res.ok) setData(d);
+      } catch { /* */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return <div className="intel-tab-content"><div className="intel-section"><div className="empty-block">Loading CMMC reference…</div></div></div>;
+  if (!data) return <div className="intel-tab-content"><div className="intel-section"><div className="ko-status error">Failed to load CMMC reference.</div></div></div>;
+
+  const level = data.reference[activeLevel];
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">CMMC Readiness · Levels 1 / 2 / 3</div>
+          <div className="is-refresh">{data.total_audited} audits assessed · {data.distribution["2"] + data.distribution["3"]} require Level 2+</div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
+          {(["0", "1", "2", "3"] as const).map((lvl) => {
+            const labels = { "0": "Not required", "1": "Level 1", "2": "Level 2", "3": "Level 3" };
+            const colors = { "0": "var(--green)", "1": "var(--gold)", "2": "var(--amber)", "3": "var(--red)" };
+            return (
+              <div key={lvl} style={{ background: "var(--void3)", border: `1px solid ${colors[lvl]}40`, borderRadius: 3, padding: "14px 16px" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: colors[lvl], letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 6 }}>{labels[lvl]}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: colors[lvl], lineHeight: 1 }}>{data.distribution[lvl]}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {(["1", "2", "3"] as const).map((lvl) => {
+            const active = lvl === activeLevel;
+            return (
+              <button
+                key={lvl}
+                onClick={() => setActiveLevel(lvl)}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
+                  letterSpacing: ".08em", textTransform: "uppercase",
+                  padding: "5px 12px", borderRadius: 2,
+                  background: active ? "rgba(201,168,76,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
+                }}
+              >
+                Level {lvl}
+              </button>
+            );
+          })}
+        </div>
+
+        {level && (
+          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "16px 18px" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{level.label}</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", letterSpacing: ".06em", marginBottom: 10 }}>{level.practices} practices · triggered by: {level.triggers.join(" · ")}</div>
+            <p style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text2)", lineHeight: 1.6, marginBottom: 14 }}>{level.summary}</p>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Implementation checklist</div>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {level.checklist.map((c, i) => (
+                <li key={i} style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)", lineHeight: 1.5, padding: "6px 0", borderBottom: "1px solid rgba(201,168,76,.05)", display: "flex", gap: 8 }}>
+                  <span style={{ color: "var(--gold)" }}>—</span>
+                  <span>{c}</span>
+                </li>
+              ))}
+            </ul>
+            <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(96,165,250,.05)", borderLeft: "3px solid var(--blue)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text2)", lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--blue)" }}>C3PAO Directory:</strong>{" "}
+              <a href="https://cyberab.org/Catalog/C3PAOs" target="_blank" rel="noopener noreferrer" style={{ color: "var(--gold)" }}>cyberab.org/Catalog/C3PAOs</a>
+              {" — "}assessment partners authorized for Level 2 third-party assessments.
+            </div>
+          </div>
+        )}
+
+        {data.recent_by_level[activeLevel] && data.recent_by_level[activeLevel].length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Recent Level {activeLevel} solicitations from your audits</div>
+            {data.recent_by_level[activeLevel].map((a) => (
+              <a key={a.id} href={`/audit/${a.id}`} style={{ display: "block", padding: "8px 12px", borderLeft: "2px solid var(--gold)", marginBottom: 6, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", textDecoration: "none" }}>
+                {a.notice_id || "—"} <span style={{ color: "var(--t40)" }}>· {a.agency || "—"}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface LaborRow { category: string; naics_codes: string[]; rate_low: number; rate_median: number; rate_high: number; source: string; curated: boolean }
+
+function LaborRatesPanel({ naicsOptions }: { naicsOptions: string[] }) {
+  const [naics, setNaics] = useState<string>("");
+  const [q, setQ] = useState<string>("");
+  const [rows, setRows] = useState<LaborRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (naics) params.set("naics", naics);
+        if (q) params.set("q", q);
+        const res = await fetch(`/api/labor-rates${params.toString() ? `?${params}` : ""}`);
+        const d = await res.json();
+        if (!cancelled && res.ok) setRows(d.rates || []);
+      } catch { /* */ } finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [naics, q]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Labor Rate Intelligence · SCA + corpus benchmarks</div>
+          <div className="is-refresh">
+            <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
+              <option value="">All NAICS</option>
+              {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search category…"
+              style={{ ...inputStyle, marginLeft: 8, width: 220 }}
+            />
+          </div>
+        </div>
+        {loading && <div className="empty-block">Loading rates…</div>}
+        {!loading && rows.length === 0 && <div className="empty-state">No rates match this filter.</div>}
+
+        <div className="sam-table">
+          <div className="sam-th" style={{ gridTemplateColumns: "1.4fr 80px 90px 90px 90px 1fr" }}>
+            <span>Labor category</span><span>NAICS</span><span>Low</span><span>Median</span><span>High</span><span>Source</span>
+          </div>
+          {rows.map((r, i) => (
+            <div key={i} className="sam-row" style={{ gridTemplateColumns: "1.4fr 80px 90px 90px 90px 1fr" }}>
+              <span className="sr-title">{r.category}{r.curated && <span style={{ marginLeft: 8, fontFamily: "var(--mono)", fontSize: 8, color: "var(--green)" }}>· curated</span>}</span>
+              <span className="sr-num">{r.naics_codes[0] || "—"}</span>
+              <span className="sr-num" style={{ color: "var(--t60)" }}>${r.rate_low}</span>
+              <span className="sr-num" style={{ color: "var(--gold)", fontWeight: 700 }}>${r.rate_median}</span>
+              <span className="sr-num" style={{ color: "var(--t60)" }}>${r.rate_high}</span>
+              <span className="sr-agency" title={r.source}>{r.source.slice(0, 36)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SubcontractRow { prime_uei: string | null; prime_name: string; contract_value: number | null; naics_code: string | null; agency: string | null; sblo_name: string | null; sblo_email: string | null; expiration: string | null; source_url: string | null; notes: string | null }
+
+function SubcontractsPanel({ naicsOptions }: { naicsOptions: string[] }) {
+  const [naics, setNaics] = useState<string>(naicsOptions[0] || "");
+  const [agency, setAgency] = useState<string>("");
+  const [rows, setRows] = useState<SubcontractRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function search() {
+    if (!naics) { setErr("NAICS required"); return; }
+    setLoading(true); setErr(null);
+    try {
+      const params = new URLSearchParams({ naics });
+      if (agency) params.set("agency", agency);
+      const res = await fetch(`/api/subcontract-opportunities?${params.toString()}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+      setRows(d.opportunities || []);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally { setLoading(false); }
+  }
+
+  function fmt(n: number | null): string {
+    if (n == null) return "—";
+    if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+    return `$${n}`;
+  }
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Subcontracting Opportunities · prime contracts &gt; $2M</div>
+          <div className="is-refresh">USAspending · 7-day cache</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14, padding: "12px 14px", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3 }}>
+          <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)} required>
+            <option value="">Choose NAICS…</option>
+            {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <input
+            type="text"
+            value={agency}
+            onChange={(e) => setAgency(e.target.value)}
+            placeholder="Agency keyword (optional)"
+            style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+          />
+          <button type="button" className="action-btn primary" onClick={search} disabled={loading}>{loading ? "Searching…" : "Search"}</button>
+        </div>
+
+        {err && <div className="ko-status error">{err}</div>}
+        {!loading && !err && rows.length === 0 && naics && <div className="empty-state">No prime awards over $2M found in last 180 days. Try a broader NAICS.</div>}
+
+        {rows.length > 0 && (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "1.4fr 110px 130px 110px 110px" }}>
+              <span>Prime</span><span>Value</span><span>Agency</span><span>Expires</span><span>Action</span>
+            </div>
+            {rows.map((r, i) => (
+              <div key={r.prime_uei || `${r.prime_name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1.4fr 110px 130px 110px 110px" }}>
+                <span className="sr-title">{r.prime_name}</span>
+                <span className="sr-num" style={{ color: "var(--gold)" }}>{fmt(r.contract_value)}</span>
+                <span className="sr-agency" title={r.agency || ""}>{r.agency || "—"}</span>
+                <span className="sr-date">{r.expiration ? new Date(r.expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
+                {r.source_url ? (
+                  <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="sr-badge" style={{ color: "var(--gold)", background: "rgba(201,168,76,.06)", border: "1px solid var(--border2)", textDecoration: "none", textAlign: "center" }}>USA→</a>
+                ) : <span className="sr-date">—</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CheckoutButton from "./CheckoutButton";
 
 export const metadata: Metadata = {
   title: "FARaudit Pricing — Federal Contract Intelligence",
@@ -7,12 +8,26 @@ export const metadata: Metadata = {
     "Unlimited audits, full FAR/DFARS reports, DFARS trap detection. Design Partner $1,250/mo · Standard $1,500/mo · Growth $2,500/mo."
 };
 
-const tiers = [
+type TierSlug = "design_partner" | "standard" | "growth";
+
+interface Tier {
+  slug: TierSlug;
+  name: string;
+  price: string;
+  term: string;
+  featured: boolean;
+  features: string[];
+  ctaLabel: string;
+  ctaStyle: "primary" | "outline";
+}
+
+const tiers: Tier[] = [
   {
+    slug: "design_partner",
     name: "Design Partner",
     price: "$1,250",
     term: "12-month commitment · rate locked · 7 spots",
-    featured: false,
+    featured: true,
     features: [
       "Unlimited audits — all solicitations",
       "Direct line to founder",
@@ -20,15 +35,18 @@ const tiers = [
       "Full FAR/DFARS compliance report",
       "All 6 DFARS trap detections",
       "KO clarification email drafts",
-      "Section L/M analysis"
+      "Section L/M analysis",
+      "Incumbent intelligence + Win probability score"
     ],
-    cta: { text: "Apply for a spot", href: "mailto:jose@faraudit.com?subject=Design%20Partner", style: "outline" }
+    ctaLabel: "Become a design partner",
+    ctaStyle: "primary"
   },
   {
+    slug: "standard",
     name: "Standard",
     price: "$1,500",
     term: "Month-to-month · cancel anytime",
-    featured: true,
+    featured: false,
     features: [
       "Unlimited audits — all solicitations",
       "Full FAR/DFARS compliance report",
@@ -38,9 +56,11 @@ const tiers = [
       "Section L/M analysis",
       "SOW/PWS/SOO classification"
     ],
-    cta: { text: "Start free audit", href: "/audit", style: "primary" }
+    ctaLabel: "Subscribe",
+    ctaStyle: "outline"
   },
   {
+    slug: "growth",
     name: "Growth",
     price: "$2,500",
     term: "Month-to-month · cancel anytime",
@@ -54,7 +74,8 @@ const tiers = [
       "Priority turnaround and support",
       "Proposal strategy output per audit"
     ],
-    cta: { text: "Contact us", href: "mailto:jose@faraudit.com?subject=Growth%20plan", style: "outline" }
+    ctaLabel: "Subscribe",
+    ctaStyle: "outline"
   }
 ];
 
@@ -129,8 +150,9 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <Link
-                href={tier.cta.href}
+              <CheckoutButton
+                tier={tier.slug}
+                label={tier.ctaLabel}
                 style={{
                   display: "block",
                   textAlign: "center",
@@ -139,14 +161,12 @@ export default function PricingPage() {
                   fontFamily: "Syne, sans-serif",
                   fontSize: 12,
                   fontWeight: 600,
-                  textDecoration: "none",
-                  background: tier.cta.style === "primary" ? GOLD : "transparent",
-                  color: tier.cta.style === "primary" ? BG : TEXT_1,
-                  border: tier.cta.style === "outline" ? "1px solid rgba(255,255,255,0.14)" : "none"
+                  background: tier.ctaStyle === "primary" ? GOLD : "transparent",
+                  color: tier.ctaStyle === "primary" ? BG : TEXT_1,
+                  border: tier.ctaStyle === "outline" ? "1px solid rgba(255,255,255,0.14)" : "none",
+                  width: "100%"
                 }}
-              >
-                {tier.cta.text}
-              </Link>
+              />
             </div>
           ))}
         </div>

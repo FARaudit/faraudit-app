@@ -123,6 +123,7 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
           </div>
           <div className="report-actions">
             <ScoreGauge score={score} />
+            <WinProbabilityBadge auditId={id} cached={typeof audit.win_probability === "number" ? (audit.win_probability as number) : null} cachedBasis={typeof audit.win_probability_basis === "number" ? (audit.win_probability_basis as number) : null} />
             <span className="verdict-pill" style={{ color: verdictColor, borderColor: verdictColor, background: `${verdictColor}10` }}>
               {verdictLabel}
             </span>
@@ -1072,4 +1073,75 @@ function IncumbentCard({ noticeId, initial }: { noticeId: string; initial: Incum
     </section>
   );
 }
+
+function WinProbabilityBadge({ auditId, cached, cachedBasis }: { auditId: string; cached: number | null; cachedBasis: number | null }) {
+  const [pct, setPct] = useState<number | null>(cached);
+  const [basis, setBasis] = useState<number>(cachedBasis ?? 0);
+  const [reason, setReason] = useState<string>("");
+  const [loading, setLoading] = useState(cached == null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (cached != null) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/win-probability/${auditId}`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok) {
+          setPct(typeof data.probability === "number" ? data.probability : null);
+          setBasis(data.basis ?? 0);
+          setReason(data.reason || "");
+        }
+      } catch {
+        // silent — badge gracefully shows insufficient corpus
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [auditId, cached]);
+
+  if (loading) {
+    return (
+      <span style={{ ...gaugePillBase, color: "var(--t40)", borderColor: "var(--border)" }} title="Computing win probability…">
+        WIN%·…
+      </span>
+    );
+  }
+  if (pct == null) {
+    return (
+      <span
+        style={{ ...gaugePillBase, color: "var(--t40)", borderColor: "var(--border)" }}
+        title={reason || `Need ≥100 comparable audits in corpus. Current: ${basis}.`}
+      >
+        WIN% · —
+      </span>
+    );
+  }
+  const color = pct >= 60 ? "var(--green)" : pct >= 35 ? "var(--amber)" : "var(--red)";
+  return (
+    <span
+      style={{ ...gaugePillBase, color, borderColor: color, background: `${color}10` }}
+      title={`Based on ${basis} comparable audits in the corpus`}
+    >
+      WIN · {pct}%
+    </span>
+  );
+}
+
+const gaugePillBase: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  fontFamily: "var(--mono)",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: ".12em",
+  textTransform: "uppercase",
+  padding: "8px 12px",
+  borderRadius: 2,
+  border: "1.5px solid"
+};
+
 
