@@ -78,6 +78,32 @@ function SignInInner() {
     }
   }
 
+  async function onForgotPassword() {
+    setError(null);
+    setInfo(null);
+    if (!email) {
+      setError("Enter your email above first.");
+      return;
+    }
+    try {
+      const sb = createBrowserClient();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      // Supabase appends type=recovery to the link automatically; our
+      // /auth/callback route detects type=recovery and routes to
+      // /auth/update-password where the user sets the new password.
+      const { error: err } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin}/auth/callback?type=recovery`
+      });
+      if (err) {
+        setError(err.message);
+        return;
+      }
+      setInfo(`Password reset link sent to ${email}. Check your inbox · expires in 1 hour.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reset send failed");
+    }
+  }
+
   return (
     <main style={{ background: BG, minHeight: "100vh", padding: "80px 24px", fontFamily: "Inter, system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -189,6 +215,26 @@ function SignInInner() {
           <p style={{ fontSize: 11, color: TEXT_3, marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
             One-click sign-in for demos · existing accounts only · link expires in 1h
           </p>
+
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              disabled={busy || magicBusy}
+              style={{
+                fontSize: 12,
+                color: TEXT_2,
+                background: "transparent",
+                border: "none",
+                cursor: (busy || magicBusy) ? "not-allowed" : "pointer",
+                textDecoration: "underline",
+                fontFamily: "Inter, sans-serif",
+                opacity: (busy || magicBusy) ? 0.5 : 1
+              }}
+            >
+              Forgot password?
+            </button>
+          </div>
 
           <p style={{ fontSize: 12, color: TEXT_3, marginTop: 18, textAlign: "center" }}>
             Need an account? <Link href="/audit" style={{ color: GOLD }}>Run a free audit</Link>
