@@ -73,6 +73,7 @@ export interface OpportunityRow {
   agency: string | null;
   naics_code: string | null;
   set_aside: string | null;
+  document_type: string | null;
   source: string;
   status: string;
   recommendation: string | null;
@@ -87,16 +88,24 @@ export async function fetchOpportunities(
   client: SupabaseClient,
   opts: { limit?: number; status?: string | null; naics?: string | null } = {}
 ): Promise<OpportunityRow[]> {
-  let q = client
-    .from("pending_audits")
-    .select("id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at")
-    .order("created_at", { ascending: false })
-    .limit(opts.limit || 100);
-  if (opts.status) q = q.eq("status", opts.status);
-  if (opts.naics) q = q.eq("naics_code", opts.naics);
-  const { data, error } = await q;
-  if (error) throw new Error(`fetchOpportunities: ${error.message}`);
-  return (data as OpportunityRow[]) || [];
+  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  for (const cols of [RICH, BASIC]) {
+    let q = client
+      .from("pending_audits")
+      .select(cols)
+      .order("created_at", { ascending: false })
+      .limit(opts.limit || 100);
+    if (opts.status) q = q.eq("status", opts.status);
+    if (opts.naics) q = q.eq("naics_code", opts.naics);
+    const { data, error } = await q;
+    if (error) {
+      if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
+      throw new Error(`fetchOpportunities: ${error.message}`);
+    }
+    return ((data || []) as unknown[]).map((r) => ({ document_type: null, ...(r as object) })) as OpportunityRow[];
+  }
+  return [];
 }
 
 // ─── Tab 3: Audit (history) ───────────────────────────────────────────────

@@ -52,7 +52,8 @@ const nextConfig: NextConfig = {
       { source: "/audit", destination: "/home", permanent: true },
       { source: "/upstream-intel", destination: "/home", permanent: true },
       { source: "/prospects", destination: "/home", permanent: true },
-      { source: "/alerts", destination: "/home", permanent: true }
+      { source: "/alerts", destination: "/home", permanent: true },
+      { source: "/settings", destination: "/home", permanent: true }
     ];
   }
 };

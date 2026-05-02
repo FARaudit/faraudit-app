@@ -7,7 +7,7 @@ import type {
   AuditRow
 } from "@/lib/bd-os/queries";
 
-type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline";
+type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits";
 type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ";
 
 interface Props {
@@ -49,7 +49,10 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
       if (filter === "P0 · P1") return r.risk === "rp0" || r.risk === "rp1";
       if (filter === "≤7 Days") return r.daysNum != null && r.daysNum <= 7;
       if (filter === "Small Business") return ["SB", "SDVOSB", "WOSB", "8(a)"].includes(r.saLabel);
-      if (filter === "IDIQ") return false; // pending_audits has no document_type yet
+      if (filter === "IDIQ") {
+        const dt = (r.row.document_type || "").toUpperCase();
+        return dt.includes("IDIQ");
+      }
       return true;
     });
   }, [enriched, filter, naics]);
@@ -98,7 +101,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
               </svg>
               <div className="notif-badge" />
             </div>
-            <a className="tb-user" href="/settings" title={user.email}>
+            <a className="tb-user" href="/home" title={user.email}>
               <div className="user-av">{initials || "U"}</div>
               <div className="user-nm">{handle || "user"}</div>
             </a>
@@ -133,7 +136,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
             Pipeline Tracker
             {stats.p0 > 0 && <span className="nav-ct ct-red">{stats.p0}</span>}
           </button>
-          <button className="nav-item" onClick={() => setTab("home")}>
+          <button className={`nav-item ${tab === "past-audits" ? "active" : ""}`} onClick={() => setTab("past-audits")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
               <line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -142,7 +145,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
             Past Audits
             <span className="nav-ct ct-gold">{recentAudits.length}</span>
           </button>
-          <button className="nav-item" onClick={() => setTab("home")}>
+          <button className={`nav-item ${tab === "past-audits" ? "active" : ""}`} onClick={() => setTab("past-audits")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
@@ -175,13 +178,14 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
           </button>
 
           <div className="nav-label">Account</div>
-          <a className="nav-item" href="/settings" style={{ textDecoration: "none" }}>
+          <button className="nav-item" onClick={() => alert("Profile & Settings — V2 lives here. Email: " + user.email)}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
               <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
             Profile &amp; Settings
-          </a>
+          </button>
+          <SignOutButton />
 
           <div className="sb-footer">
             <div className="sb-plan">Design Partner · $1,250/mo</div>
@@ -239,7 +243,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
                   <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(201,168,76,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
                 </button>
-                <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("audit")}>
+                <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("past-audits")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--green)", marginBottom: 8 }}>✓ Your Audit Activity</div>
                   <div className="sit-value green">{counter.audits}</div>
                   <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Audits completed total. {counter.traps} compliance traps caught — every clause read, every trap flagged, every KO email drafted.</div>
@@ -432,6 +436,10 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
             <div className={`tab-panel ${tab === "pipeline" ? "active" : ""}`}>
               <div className="intel-tab-content">
                 <div className="intel-section">
+                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Synthetic +30d window from posted date · sam-ingest will populate response_deadline once column wired</div></div>
+                  <DeadlineCalendar rows={enriched.map((e) => e.row)} onPick={() => setTab("audit")} />
+                </div>
+                <div className="intel-section">
                   <div className="is-header"><div className="is-title">Active Solicitations · Bid Stage</div></div>
                   {filtered.length === 0 && <div className="empty-state">No active solicitations.</div>}
                   {filtered.slice(0, 20).map((r) => {
@@ -451,6 +459,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
                   })}
                 </div>
               </div>
+            </div>
+
+            {/* PAST AUDITS */}
+            <div className={`tab-panel ${tab === "past-audits" ? "active" : ""}`}>
+              <PastAuditsPanel audits={recentAudits} />
             </div>
           </div>
         </div>
@@ -595,6 +608,238 @@ function RunAuditPanel() {
           </div>
         )}
       </form>
+    </div>
+  );
+}
+
+function SignOutButton() {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+    } catch { /* swallow */ }
+    window.location.href = "/sign-in";
+  }
+  return (
+    <button className="nav-item" onClick={go} disabled={busy} title="Sign out and return to sign-in">
+      <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+        <path d="M10 12l3-4-3-4M5 8h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      </svg>
+      {busy ? "Signing out…" : "Sign Out"}
+    </button>
+  );
+}
+
+function PastAuditsPanel({ audits }: { audits: AuditRow[] }) {
+  const [filter, setFilter] = useState<"all" | "p0" | "ai" | "user">("all");
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    return audits.filter((a) => {
+      if (filter === "p0") return a.compliance_score != null && a.compliance_score < 40;
+      if (filter === "ai") return a.audit_source === "audit_ai";
+      if (filter === "user") return a.audit_source !== "audit_ai";
+      return true;
+    }).filter((a) => {
+      if (!query) return true;
+      const q = query.toLowerCase();
+      return (
+        (a.notice_id || "").toLowerCase().includes(q) ||
+        (a.title || "").toLowerCase().includes(q) ||
+        (a.agency || "").toLowerCase().includes(q)
+      );
+    });
+  }, [audits, filter, query]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Past Audits · {audits.length} total</div>
+          <div className="is-refresh">Click any row to open full intelligence report</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+          {([
+            { k: "all",  l: "All" },
+            { k: "p0",   l: "P0 (< 40)" },
+            { k: "ai",   l: "AI Audited" },
+            { k: "user", l: "User Audited" }
+          ] as const).map((f) => {
+            const active = f.k === filter;
+            return (
+              <button
+                key={f.k}
+                onClick={() => setFilter(f.k)}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
+                  letterSpacing: ".08em", textTransform: "uppercase",
+                  padding: "5px 12px", borderRadius: 2,
+                  background: active ? "rgba(201,168,76,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  color: active ? "var(--gold)" : "var(--t40)",
+                  cursor: "pointer"
+                }}
+              >
+                {f.l}
+              </button>
+            );
+          })}
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search notice ID · title · agency…"
+            style={{
+              flex: 1, minWidth: 240,
+              background: "rgba(3,8,16,.6)", border: "1px solid var(--border2)",
+              borderRadius: 2, padding: "6px 12px",
+              fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", outline: "none"
+            }}
+          />
+        </div>
+
+        <div className="sam-table">
+          <div className="sam-th" style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px" }}>
+            <span>Date</span><span>Notice ID</span><span>Title</span><span>Agency</span><span>Source</span><span>Score</span><span>Verdict</span>
+          </div>
+          {filtered.length === 0 && <div className="empty-state">No audits match.</div>}
+          {filtered.map((a) => {
+            const r = riskFromScore(a.compliance_score);
+            const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
+            const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
+            const recColor = a.recommendation === "PROCEED" ? "var(--green)" : a.recommendation === "DECLINE" ? "var(--red)" : "var(--amber)";
+            return (
+              <a
+                key={a.id}
+                href={`/audit/${a.id}`}
+                className="sam-row"
+                style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
+              >
+                <span className="sr-date">{new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                <span className="sr-num">{a.notice_id || "—"}</span>
+                <span className="sr-title" title={a.title || ""}>{a.title || "—"}</span>
+                <span className="sr-agency" title={a.agency || ""}>{a.agency || "—"}</span>
+                <span className="sr-badge" style={{ background: a.audit_source === "audit_ai" ? "rgba(96,165,250,.10)" : "rgba(148,163,184,.06)", color: a.audit_source === "audit_ai" ? "var(--blue)" : "var(--t40)", border: "1px solid var(--border)" }}>
+                  {a.audit_source === "audit_ai" ? "AI" : "USER"}
+                </span>
+                {a.compliance_score != null
+                  ? <span className="sr-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{a.compliance_score}</span>
+                  : <span className="sr-date">—</span>}
+                <span className="sr-badge" style={{ color: recColor, background: "transparent", border: `1px solid ${recColor}40` }}>
+                  {a.recommendation ? a.recommendation.replace("_", " ") : "—"}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CalendarCell {
+  date: Date;
+  rows: OpportunityRow[];
+}
+
+function DeadlineCalendar({ rows, onPick }: { rows: OpportunityRow[]; onPick: (row: OpportunityRow) => void }) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const monthName = today.toLocaleString("en-US", { month: "long", year: "numeric" });
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+
+  const cells: CalendarCell[] = [];
+  // Pad leading blanks for week start (Sun-based grid).
+  for (let i = 0; i < first.getDay(); i++) {
+    cells.push({ date: new Date(year, month, -first.getDay() + i + 1), rows: [] });
+  }
+  for (let d = 1; d <= last.getDate(); d++) {
+    cells.push({ date: new Date(year, month, d), rows: [] });
+  }
+
+  // Synthetic deadline = created_at + 30 days. Slot each row into its cell if in this month.
+  for (const r of rows) {
+    const created = new Date(r.created_at);
+    if (isNaN(created.getTime())) continue;
+    const deadline = new Date(created);
+    deadline.setDate(deadline.getDate() + 30);
+    if (deadline.getFullYear() !== year || deadline.getMonth() !== month) continue;
+    const cell = cells.find((c) =>
+      c.date.getFullYear() === deadline.getFullYear() &&
+      c.date.getMonth() === deadline.getMonth() &&
+      c.date.getDate() === deadline.getDate()
+    );
+    if (cell) cell.rows.push(r);
+  }
+
+  function toneFor(date: Date): { bg: string; ring: string } {
+    const days = Math.floor((date.getTime() - today.getTime()) / 86400_000);
+    if (days < 0) return { bg: "rgba(148,163,184,.04)", ring: "var(--border)" };
+    if (days < 7) return { bg: "rgba(220,38,38,.10)", ring: "rgba(220,38,38,.4)" };
+    if (days <= 30) return { bg: "rgba(245,158,11,.08)", ring: "rgba(245,158,11,.32)" };
+    return { bg: "rgba(74,222,128,.06)", ring: "rgba(74,222,128,.28)" };
+  }
+
+  return (
+    <div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--gold)", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 10 }}>
+        {monthName}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6, fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, color: "var(--t25)", letterSpacing: ".12em", textTransform: "uppercase" }}>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div key={d} style={{ textAlign: "center" }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((c, i) => {
+          const inMonth = c.date.getMonth() === month;
+          const tone = inMonth ? toneFor(c.date) : { bg: "transparent", ring: "transparent" };
+          return (
+            <div
+              key={i}
+              style={{
+                minHeight: 70,
+                padding: 6,
+                background: tone.bg,
+                border: `1px solid ${tone.ring}`,
+                borderRadius: 3,
+                opacity: inMonth ? 1 : 0.25,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4
+              }}
+            >
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textAlign: "right" }}>{c.date.getDate()}</div>
+              {c.rows.slice(0, 3).map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => onPick(r)}
+                  style={{
+                    fontFamily: "var(--mono)", fontSize: 8, color: "var(--gold)",
+                    background: "rgba(201,168,76,.06)",
+                    border: "1px solid rgba(201,168,76,.18)",
+                    borderRadius: 2,
+                    padding: "2px 4px",
+                    textAlign: "left",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    cursor: "pointer"
+                  }}
+                  title={`${r.notice_id} — ${r.title || ""}`}
+                >
+                  {r.notice_id}
+                </button>
+              ))}
+              {c.rows.length > 3 && (
+                <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t25)" }}>+{c.rows.length - 3} more</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
