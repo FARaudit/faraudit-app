@@ -1,0 +1,13 @@
+# SAM Ingest — Railway cron worker.
+# Runs at 11:00 UTC = 06:00 CDT (30 min before audit-ai's 06:30 CDT cron) so
+# any solicitations posted overnight land in pending_audits before the
+# auditor wakes up.
+#
+# Service is configured with Root Directory = /  (repo root) and Watch Paths
+# scoped to agents/sam-ingest/** so the deploy is monorepo-friendly.
+
+[deploy]
+startCommand = "npx tsx agents/sam-ingest/index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+cronSchedule = "0 11 * * *"  # 11:00 UTC = 06:00 CDT

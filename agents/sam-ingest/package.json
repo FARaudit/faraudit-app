@@ -1,0 +1,15 @@
+{
+  "name": "sam-ingest",
+  "version": "0.1.0",
+  "description": "FARaudit SAM.gov ingestion worker — Railway daily cron. Pulls NAICS 336413 + small business set-aside solicitations posted in last 24h and upserts to pending_audits queue. Audit AI consumes from there.",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "backfill": "tsx backfill.ts",
+    "dry-run": "DRY_RUN=true tsx index.ts"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
