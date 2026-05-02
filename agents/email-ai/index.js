@@ -6,6 +6,23 @@ import { evaluate } from './rules.js';
 const ACTION_REQUIRED_LABEL = '⚠️ Action Required';
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
+// Loud boot diagnostics — print what's reaching the container before we touch
+// any Google APIs. If Railway logs show missing env vars or zero-length tokens,
+// the fix is in the dashboard, not the code.
+function bootDiagnostics() {
+  const have = (k) => {
+    const v = process.env[k];
+    if (!v) return `${k}=MISSING`;
+    return `${k}=present (len=${v.length})`;
+  };
+  console.log('[email-ai] env check ·',
+    have('GMAIL_CLIENT_ID'),
+    have('GMAIL_CLIENT_SECRET'),
+    have('GMAIL_REFRESH_TOKEN')
+  );
+  console.log('[email-ai] runtime · node=' + process.version + ' · DRY_RUN=' + DRY_RUN);
+}
+
 function extractHeaders(thread) {
   const messages = thread.messages || [];
   const latest = messages[messages.length - 1];
@@ -23,11 +40,34 @@ function extractHeaders(thread) {
 async function run() {
   const startedAt = new Date();
   console.log(`[email-ai] start ${startedAt.toISOString()}${DRY_RUN ? ' · DRY_RUN' : ''}`);
+  bootDiagnostics();
 
-  const auth = getAuthClient();
+  let auth;
+  try {
+    auth = getAuthClient();
+  } catch (e) {
+    console.error('[email-ai] auth-config FAIL · check Railway dashboard env vars: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN');
+    throw e;
+  }
+
   const client = new GmailClient(auth);
 
-  const threads = await client.listInboxThreads(100);
+  let threads;
+  try {
+    threads = await client.listInboxThreads(100);
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (/invalid_grant|invalid_token|unauthorized_client/i.test(msg)) {
+      console.error('[email-ai] OAUTH FAIL · refresh token rejected by Google.');
+      console.error('[email-ai]   most likely cause: token was rotated (email-ai-v2 client) but Railway still holds the old GMAIL_REFRESH_TOKEN.');
+      console.error('[email-ai]   fix: re-run scripts/get-token.js locally with the v2 client + paste the new token into the Railway service env.');
+    } else if (/insufficient.*scope|forbidden|permission/i.test(msg)) {
+      console.error('[email-ai] SCOPE FAIL · token does not have gmail.modify or gmail.labels scope.');
+    } else {
+      console.error('[email-ai] gmail.threads.list FAIL ·', msg);
+    }
+    throw e;
+  }
   console.log(`[email-ai] inbox threads: ${threads.length}`);
 
   let labeled = 0,
