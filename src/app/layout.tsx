@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-bg text-text">
         <AuthShell />
-        <div className="flex-1 md:pl-[var(--sidebar-w,52px)] transition-[padding] duration-150">
+        <div className="flex-1 md:pl-[var(--sidebar-w,0px)] transition-[padding] duration-150">
           {children}
         </div>
       </body>

@@ -41,6 +41,15 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
   const expanded = pinned || hovering;
   const ref = useRef<HTMLElement>(null);
 
+  useEffect(() => {
+    if (pathname?.startsWith("/home")) {
+      document.documentElement.style.setProperty("--sidebar-w", "0px");
+      return () => { document.documentElement.style.removeProperty("--sidebar-w"); };
+    }
+  }, [pathname]);
+
+  if (pathname?.startsWith("/home")) return null;
+
   async function togglePin() {
     const next = !pinned;
     setPinned(next);

@@ -3,43 +3,6 @@
 @import "@fontsource/inter/500.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700;900&display=swap');
-
-/* BD OS / home-s04 design tokens — exact CEO-spec values.
-   Scoped under .bd-os so they don't pollute the rest of the app. */
-.bd-os {
-  --bg-primary: #0A0F1A;
-  --bg-surface: #0D1520;
-  --bg-card:    #111827;
-  --border:     #1E293B;
-  --border2:    #334155;
-  --gold:       #C8922A;
-  --gold2:      #E0A436;
-  --blue:       #2563EB;
-  --green:      #10B981;
-  --red:        #EF4444;
-  --amber:      #F59E0B;
-  --text:       #F8FAFC;
-  --text2:      #94A3B8;
-  --muted:      #475569;
-  --bd-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --bd-serif: 'Fraunces', Georgia, serif;
-  --bd-sans:  'Inter', system-ui, sans-serif;
-  --bd-sidebar: 220px;
-  --bd-topbar:  48px;
-}
-@keyframes bd-ldot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.4; transform: scale(0.85); }
-}
-@keyframes bd-fade-in {
-  from { opacity: 0; transform: translateY(2px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.bd-os .fade-in { animation: bd-fade-in 0.12s ease-out; }
-@keyframes bd-spin {
-  to { transform: rotate(360deg); }
-}
 
 :root {
   --fa-bg:        #050D1A;
