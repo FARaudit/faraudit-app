@@ -20,11 +20,14 @@ function SignInInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [magicBusy, setMagicBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setBusy(true);
     try {
       const sb = createBrowserClient();
@@ -39,6 +42,39 @@ function SignInInner() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
       setBusy(false);
+    }
+  }
+
+  async function onMagicLink() {
+    setError(null);
+    setInfo(null);
+    if (!email) {
+      setError("Enter your email above first.");
+      return;
+    }
+    setMagicBusy(true);
+    try {
+      const sb = createBrowserClient();
+      // Supabase emails a one-time token; clicking the link hits /auth/callback
+      // which exchanges the code for a session + redirects to `next`.
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const { error: err } = await sb.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          shouldCreateUser: false  // demo flow only — don't allow drive-by registrations
+        }
+      });
+      if (err) {
+        setError(err.message);
+        setMagicBusy(false);
+        return;
+      }
+      setInfo(`Magic-link sent to ${email}. Check your inbox · the link expires in 1 hour.`);
+      setMagicBusy(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Magic-link send failed");
+      setMagicBusy(false);
     }
   }
 
@@ -96,10 +132,15 @@ function SignInInner() {
                 {error}
               </div>
             )}
+            {info && (
+              <div style={{ padding: "10px 12px", background: "rgba(55,138,221,0.08)", border: "1px solid rgba(55,138,221,0.3)", borderRadius: 6, fontSize: 12, color: "#9bc4eb", marginBottom: 16 }}>
+                {info}
+              </div>
+            )}
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || magicBusy}
               style={{
                 width: "100%",
                 padding: 12,
@@ -117,6 +158,37 @@ function SignInInner() {
               {busy ? "Signing in…" : "Sign in"}
             </button>
           </form>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 16px" }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
+            <span style={{ fontSize: 10, color: TEXT_3, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.14em", textTransform: "uppercase" }}>or</span>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.07)" }} />
+          </div>
+
+          <button
+            type="button"
+            onClick={onMagicLink}
+            disabled={busy || magicBusy}
+            title="No password — click the link in your email to sign in"
+            style={{
+              width: "100%",
+              padding: 12,
+              background: "transparent",
+              color: TEXT_1,
+              border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 6,
+              fontFamily: "Syne, sans-serif",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: magicBusy ? "wait" : "pointer",
+              opacity: (busy || magicBusy) ? 0.6 : 1
+            }}
+          >
+            {magicBusy ? "Sending magic link…" : "Email me a magic link"}
+          </button>
+          <p style={{ fontSize: 11, color: TEXT_3, marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
+            One-click sign-in for demos · existing accounts only · link expires in 1h
+          </p>
 
           <p style={{ fontSize: 12, color: TEXT_3, marginTop: 18, textAlign: "center" }}>
             Need an account? <Link href="/audit" style={{ color: GOLD }}>Run a free audit</Link>
