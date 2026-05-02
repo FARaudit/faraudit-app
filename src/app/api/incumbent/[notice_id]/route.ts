@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { findIncumbentByNaicsAgency } from "@/lib/usaspending";
+import { findIncumbentByNoticeId } from "@/lib/fpds";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,27 +62,38 @@ export async function GET(
 
   const naics = row.naics_code as string | null;
   const agency = row.agency as string | null;
-  if (!naics) {
+
+  // 1. Try FPDS-NG first — exact PIID match, 30-90 days fresher than USAspending.
+  let source: "fpds" | "usaspending" | null = null;
+  let found = await findIncumbentByNoticeId(notice_id);
+  if (found && found.recipient_name) {
+    source = "fpds";
+  } else if (naics) {
+    // 2. Fall back to USAspending NAICS+agency search.
+    found = await findIncumbentByNaicsAgency({ naicsCode: naics, agencyKeyword: agency });
+    if (found && found.recipient_name) source = "usaspending";
+  }
+
+  const lookedUpAt = new Date().toISOString();
+
+  if (!naics && !found) {
     return NextResponse.json({
       cached: false,
       incumbent: null,
-      reason: "No NAICS on solicitation — cannot look up incumbent."
+      reason: "No NAICS on solicitation and FPDS-NG had no PIID match."
     });
   }
 
-  const found = await findIncumbentByNaicsAgency({ naicsCode: naics, agencyKeyword: agency });
-  const lookedUpAt = new Date().toISOString();
-
   if (!found || !found.recipient_name) {
-    // Persist the negative lookup so we don't hammer USAspending repeatedly.
+    // Persist the negative lookup so we don't hammer the APIs repeatedly.
     await supabase
       .from(table)
-      .update({ incumbent_lookup_at: lookedUpAt })
+      .update({ incumbent_lookup_at: lookedUpAt, incumbent_source: null })
       .eq("id", row.id as string);
     return NextResponse.json({
       cached: false,
       incumbent: null,
-      reason: "No matching prime contract found in the past 365 days."
+      reason: "No matching prime contract found in FPDS-NG or USAspending (last 365 days)."
     });
   }
 
@@ -90,7 +102,8 @@ export async function GET(
     incumbent_uei: found.recipient_uei,
     incumbent_award_value: found.award_amount ? Math.round(found.award_amount) : null,
     incumbent_expiry: found.period_of_performance_end ? found.period_of_performance_end.slice(0, 10) : null,
-    incumbent_lookup_at: lookedUpAt
+    incumbent_lookup_at: lookedUpAt,
+    incumbent_source: source
   };
 
   await supabase.from(table).update(update).eq("id", row.id as string);
@@ -105,7 +118,8 @@ export async function GET(
       looked_up_at: lookedUpAt,
       agency: found.agency,
       award_id: found.award_id,
-      period_start: found.period_of_performance_start
+      period_start: found.period_of_performance_start,
+      source
     }
   });
 }

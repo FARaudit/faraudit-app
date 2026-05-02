@@ -1,0 +1,12 @@
+# Regulatory AI — daily 13:00 UTC = 08:00 CDT.
+# Configure Root Directory = agents/regulatory-ai in Railway dashboard.
+# nixpacks.toml in this directory disables the build phase explicitly.
+
+[build]
+buildCommand = ""
+
+[deploy]
+startCommand = "npx tsx index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+cronSchedule = "0 13 * * *"

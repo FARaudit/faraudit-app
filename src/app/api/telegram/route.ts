@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { sendTelegram } from "@/lib/telegram";
+import { getAdminClient } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,8 +95,18 @@ export async function POST(req: Request) {
       reply = `Done: "${text.replace("/done ", "")}" — logged. Say "create handoff" in Claude to update Done tab.`;
     } else if (text.startsWith("/build ")) {
       reply = `Queued: "${text.replace("/build ", "")}" — paste in Claude Code or say "add to build" in Claude chat.`;
+    } else if (text === "/signals") {
+      reply = await topSignalsReply();
+    } else if (text === "/corpus") {
+      reply = await corpusReply();
+    } else if (text === "/pipeline") {
+      reply = await pipelineReply();
+    } else if (text === "/fleet") {
+      reply = await fleetReply();
+    } else if (text.startsWith("/audit ")) {
+      reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — deadline countdown\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — deadline countdown\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);
@@ -109,3 +120,103 @@ export async function POST(req: Request) {
   }
   return NextResponse.json({ ok: true, sent, command: text });
 }
+
+// ─── Vertex Intelligence command helpers ───────────────────────
+
+async function topSignalsReply(): Promise<string> {
+  // Bullrize signal_corpus lives in a separate Supabase project.
+  // We call the Bullrize signals endpoint over HTTPS — public-readable
+  // via Bullrize's own cron output. Fall back to "no signals" gracefully.
+  try {
+    const url = process.env.BULLRIZE_SIGNALS_URL || "https://bullrize.com/api/signals/top";
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return `Bullrize signals · service ${res.status}. Check bullrize.com/api/signals/top.`;
+    const data = await res.json() as { signals?: Array<{ ticker: string; conviction_score: number; factor_count: number; signal_type: string }> };
+    const signals = data.signals || [];
+    if (signals.length === 0) return "Bullrize signals · no high-conviction signals today.";
+    const lines = signals.slice(0, 5).map((s, i) =>
+      `${i + 1}. ${s.ticker} · conviction ${s.conviction_score} · ${s.factor_count}/4 factors · ${s.signal_type}`
+    );
+    return `Top Bullrize signals — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\n${lines.join("\n")}`;
+  } catch (err) {
+    return `Bullrize signals · ${err instanceof Error ? err.message : "unreachable"}`;
+  }
+}
+
+async function corpusReply(): Promise<string> {
+  const sb = getAdminClient();
+  if (!sb) return "Corpus · admin client unavailable.";
+  const [audits, traps, pending] = await Promise.all([
+    sb.from("audits").select("*", { count: "exact", head: true }),
+    sb.from("fa_intelligence_corpus").select("*", { count: "exact", head: true }),
+    sb.from("pending_audits").select("*", { count: "exact", head: true }).eq("status", "pending")
+  ]);
+  const total = audits.count || 0;
+  const targetPct = Math.min(100, (total / 10_000) * 100).toFixed(1);
+  return `FARaudit corpus — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nAudits: ${total.toLocaleString()}\nTraps caught: ${traps.count || 0}\nPending queue: ${pending.count || 0}\nProgress to 10K: ${targetPct}%`;
+}
+
+async function pipelineReply(): Promise<string> {
+  const sb = getAdminClient();
+  if (!sb) return "Pipeline · admin client unavailable.";
+  const [tracking, bidding, submitted, won, lost] = await Promise.all([
+    sb.from("audits").select("*", { count: "exact", head: true }).is("outcome", null).is("bid_submitted", false),
+    sb.from("audits").select("*", { count: "exact", head: true }).is("outcome", null).eq("bid_submitted", false).in("recommendation", ["PROCEED", "PROCEED_WITH_CAUTION"]),
+    sb.from("audits").select("*", { count: "exact", head: true }).eq("bid_submitted", true).is("outcome", null),
+    sb.from("audits").select("*", { count: "exact", head: true }).eq("outcome", "won"),
+    sb.from("audits").select("*", { count: "exact", head: true }).eq("outcome", "lost")
+  ]);
+  return `FARaudit pipeline — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nTracking: ${tracking.count || 0}\nBidding: ${bidding.count || 0}\nSubmitted: ${submitted.count || 0}\nAwarded (won): ${won.count || 0}\nLost: ${lost.count || 0}`;
+}
+
+async function fleetReply(): Promise<string> {
+  // Railway doesn't expose a public health-check API key-free, so this is a
+  // best-effort domain probe across our 4 deployed services.
+  const services = [
+    { name: "FARaudit web (Vercel)",  url: "https://faraudit.com/" },
+    { name: "Bullrize web (Vercel)",  url: "https://bullrize.com/" },
+    { name: "LexAnchor web (Vercel)", url: "https://lexanchor.ai/" }
+  ];
+  const results = await Promise.all(services.map(async (s) => {
+    try {
+      const res = await fetch(s.url, { method: "HEAD", signal: AbortSignal.timeout(8000) });
+      return `${s.name} · ${res.status}`;
+    } catch {
+      return `${s.name} · unreachable`;
+    }
+  }));
+  // Railway agent status — we can only confirm "scheduled" by reading their last cron-output footprint.
+  const sb = getAdminClient();
+  let agentLine = "Railway crons: schema unavailable";
+  if (sb) {
+    const since24h = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const [recentAudits, recentPending] = await Promise.all([
+      sb.from("audits").select("*", { count: "exact", head: true }).gte("created_at", since24h),
+      sb.from("pending_audits").select("*", { count: "exact", head: true }).gte("created_at", since24h).eq("source", "sam_live")
+    ]);
+    agentLine = `audit-ai 24h: ${recentAudits.count || 0} new audits\nsam-ingest 24h: ${recentPending.count || 0} new solicitations`;
+  }
+  return `Railway fleet — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" })} CT\n\n${results.join("\n")}\n\n${agentLine}`;
+}
+
+async function triggerAuditReply(noticeId: string): Promise<string> {
+  if (!noticeId) return "Usage: /audit <notice_id>";
+  // Insert into pending_audits with manual source so audit-ai picks it up next cron tick.
+  const sb = getAdminClient();
+  if (!sb) return "Manual audit · admin client unavailable.";
+  // Skip if already queued.
+  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).maybeSingle();
+  if (existing) {
+    return `Manual audit · ${noticeId} already queued (status: ${existing.status}). audit-ai will pick it up next cron tick (06:30 CDT).`;
+  }
+  const { error } = await sb.from("pending_audits").insert({
+    notice_id: noticeId,
+    title: `Telegram-triggered manual audit · ${noticeId}`,
+    source: "telegram_manual",
+    status: "pending",
+    notice_type: "solicitation"
+  });
+  if (error) return `Manual audit · queue failed: ${error.message}`;
+  return `Manual audit queued · ${noticeId}\n\naudit-ai will run at next 06:30 CDT cron tick. Result will appear in /audit/[id] once complete.`;
+}
+
