@@ -1,0 +1,11 @@
+# QA AI — Railway cron worker.
+# Runs every 30 min · checks all 3 domains · Telegram-alerts on regression.
+# Configure with Root Directory = agents/qa-ai (NOT / — same misconfig that
+# tripped sam-ingest and audit-ai when the GitHub source defaulted to repo
+# root and Nixpacks rebuilt Next.js).
+
+[deploy]
+startCommand = "npx tsx index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+cronSchedule = "*/30 * * * *"
