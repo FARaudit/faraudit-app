@@ -168,6 +168,17 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                 koNameFromAudit={(audit.ko_name as string) || (compJson.ko_name as string) || ""}
               />
 
+              <IncumbentCard
+                noticeId={noticeId}
+                initial={{
+                  name: (audit.incumbent_name as string) || null,
+                  award_value: typeof audit.incumbent_award_value === "number" ? (audit.incumbent_award_value as number) : null,
+                  expiry: (audit.incumbent_expiry as string) || null,
+                  uei: (audit.incumbent_uei as string) || null,
+                  looked_up_at: (audit.incumbent_lookup_at as string) || null
+                }}
+              />
+
               {/* SECTION 1 — Document Classification */}
               <section className="report-section">
                 <div className="report-section-eyebrow">Section 1 · Classification</div>
@@ -944,3 +955,121 @@ function KOCard({
     </section>
   );
 }
+
+interface IncumbentState {
+  name: string | null;
+  award_value: number | null;
+  expiry: string | null;
+  uei: string | null;
+  looked_up_at: string | null;
+}
+
+function IncumbentCard({ noticeId, initial }: { noticeId: string; initial: IncumbentState }) {
+  const [state, setState] = useState<IncumbentState>(initial);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
+
+  // Auto-fetch on mount when nothing cached yet.
+  useEffect(() => {
+    if (state.name || !noticeId) return;
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      try {
+        const res = await fetch(`/api/incumbent/${encodeURIComponent(noticeId)}`);
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (data.incumbent) {
+          setState({
+            name: data.incumbent.name ?? null,
+            award_value: data.incumbent.award_value ?? null,
+            expiry: data.incumbent.expiry ?? null,
+            uei: data.incumbent.uei ?? null,
+            looked_up_at: data.incumbent.looked_up_at ?? null
+          });
+        } else if (data.reason) {
+          setReason(data.reason);
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [noticeId, state.name]);
+
+  async function refresh() {
+    setBusy(true); setErr(null); setReason(null);
+    try {
+      const res = await fetch(`/api/incumbent/${encodeURIComponent(noticeId)}?refresh=1`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.incumbent) {
+        setState({
+          name: data.incumbent.name ?? null,
+          award_value: data.incumbent.award_value ?? null,
+          expiry: data.incumbent.expiry ?? null,
+          uei: data.incumbent.uei ?? null,
+          looked_up_at: data.incumbent.looked_up_at ?? null
+        });
+      } else if (data.reason) {
+        setReason(data.reason);
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const fmtMoney = (n: number | null) =>
+    n == null ? "—" : n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${(n / 1_000).toFixed(0)}K`;
+
+  return (
+    <section className="report-section" style={{ borderColor: "rgba(167,139,250,.32)" }}>
+      <div className="report-section-eyebrow" style={{ color: "#A78BFA" }}>Incumbent intelligence</div>
+      <h2 className="report-section-title">{state.name || (busy ? "Looking up…" : "No incumbent identified")}</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
+        <div>
+          <div style={fieldLabelStyle}>Award value</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 14, color: "var(--gold)" }}>{fmtMoney(state.award_value)}</div>
+        </div>
+        <div>
+          <div style={fieldLabelStyle}>Expires</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--text)" }}>
+            {state.expiry ? new Date(state.expiry).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+          </div>
+        </div>
+        <div>
+          <div style={fieldLabelStyle}>UEI</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text2)" }}>{state.uei || "—"}</div>
+        </div>
+        <div>
+          <div style={fieldLabelStyle}>Last lookup</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t40)" }}>
+            {state.looked_up_at ? new Date(state.looked_up_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button type="button" className="action-btn" onClick={refresh} disabled={busy}>
+          {busy ? "Querying USAspending…" : "↻ Refresh"}
+        </button>
+        {reason && <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t40)" }}>{reason}</span>}
+        {err && <span className="ko-status error">{err}</span>}
+      </div>
+      {state.name && (
+        <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(167,139,250,.04)", borderLeft: "3px solid #A78BFA", borderRadius: 2 }}>
+          <strong style={{ fontFamily: "var(--mono)", fontSize: 9, color: "#A78BFA", letterSpacing: ".12em", textTransform: "uppercase" }}>Strategic note</strong>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text2)", lineHeight: 1.6, marginTop: 4 }}>
+            Incumbent has the install base. To displace, your bid needs a clearly differentiated technical advantage or a price that beats their re-baseline by ≥15%. Reference their PoP end date in your timeline narrative.
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+

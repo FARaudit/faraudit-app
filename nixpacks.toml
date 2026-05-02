@@ -1,0 +1,16 @@
+# Repo-root Nixpacks override — affects ONLY Railway services that use this
+# directory as their Root Directory (currently audit-ai + sam-ingest, which
+# both `import` from src/lib and therefore need the full repo tree). It tells
+# Nixpacks: install npm deps, run NO build (especially not `next build`),
+# defer to whatever railway.toml startCommand the service specifies.
+#
+# Vercel does not use Nixpacks; this file is invisible to the Next.js
+# production deploy of faraudit.com.
+
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm ci --legacy-peer-deps || npm install --legacy-peer-deps"]
+
+[phases.build]
+cmds = []

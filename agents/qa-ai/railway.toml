@@ -4,6 +4,9 @@
 # tripped sam-ingest and audit-ai when the GitHub source defaulted to repo
 # root and Nixpacks rebuilt Next.js).
 
+[build]
+buildCommand = ""
+
 [deploy]
 startCommand = "npx tsx index.ts"
 restartPolicyType = "ON_FAILURE"

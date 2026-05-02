@@ -1,0 +1,14 @@
+# Nixpacks override — no build phase, just install + tsx start.
+# Locks down the same misconfig that broke Email AI when Root Directory ever
+# drifted to / and Nixpacks ran the parent Next.js build.
+
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm ci || npm install"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx index.ts"

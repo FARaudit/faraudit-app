@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type {
   HeaderCounter,
   OpportunityRow,
@@ -9,7 +9,7 @@ import type {
   AgencyRow
 } from "@/lib/bd-os/queries";
 
-type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response";
+type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response" | "teaming" | "capability";
 type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ" | "Pre-Sol";
 
 interface Props {
@@ -25,7 +25,8 @@ const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", 
 
 const TAB_KEYS: TabKey[] = [
   "home", "audit", "sam", "budget", "news", "pipeline",
-  "past-audits", "ko-intelligence", "agency-intelligence", "rfi-response"
+  "past-audits", "ko-intelligence", "agency-intelligence", "rfi-response",
+  "teaming", "capability"
 ];
 
 export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
@@ -235,6 +236,23 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               }).length;
               return presol > 0 ? <span className="nav-ct ct-red">{presol}</span> : null;
             })()}
+          </button>
+          <button className={`nav-item ${tab === "teaming" ? "active" : ""}`} onClick={() => setTab("teaming")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="5" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <circle cx="11" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M2 13c0-2 1.5-3 3-3s3 1 3 3M8 13c0-2 1.5-3 3-3s3 1 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Find Teaming Partners
+          </button>
+          <button className={`nav-item ${tab === "capability" ? "active" : ""}`} onClick={() => setTab("capability")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
+              <line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <line x1="5" y1="10" x2="11" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <line x1="5" y1="13" x2="9" y2="13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Capability Statement
           </button>
 
           <div className="nav-label">Account</div>
@@ -462,61 +480,26 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               </div>
             </div>
 
-            {/* BUDGET */}
+            {/* BUDGET — live USAspending.gov */}
             <div className={`tab-panel ${tab === "budget" ? "active" : ""}`}>
-              <div className="intel-tab-content">
-                <div className="intel-section">
-                  <div className="is-header">
-                    <div className="is-title">Congressional Budget · Defense Appropriations</div>
-                    <div className="is-refresh">USASpending.gov ingestion · V2</div>
-                  </div>
-                  <div className="empty-state" style={{ padding: "60px 20px" }}>
-                    Budget tracker wires after USASpending.gov ingestion ships.
-                  </div>
-                </div>
-              </div>
+              <BudgetPanel naicsOptions={naicsOptions} />
             </div>
 
-            {/* NEWS */}
+            {/* NEWS — live RSS aggregation */}
             <div className={`tab-panel ${tab === "news" ? "active" : ""}`}>
-              <div className="intel-tab-content">
-                <div className="intel-section">
-                  <div className="is-header">
-                    <div className="is-title">Defense &amp; Federal Contracting News</div>
-                    <div className="is-refresh">NewsAPI worker · V2</div>
-                  </div>
-                  <div className="empty-state" style={{ padding: "60px 20px" }}>
-                    News feed wires after the NewsAPI worker ships.
-                  </div>
-                </div>
-              </div>
+              <DefenseNewsPanel />
             </div>
 
-            {/* PIPELINE */}
+            {/* PIPELINE — kanban */}
             <div className={`tab-panel ${tab === "pipeline" ? "active" : ""}`}>
               <div className="intel-tab-content">
                 <div className="intel-section">
-                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Synthetic +30d window from posted date · sam-ingest will populate response_deadline once column wired</div></div>
-                  <DeadlineCalendar rows={enriched.map((e) => e.row)} onPick={() => setTab("audit")} />
+                  <div className="is-header"><div className="is-title">Pipeline Kanban</div><div className="is-refresh">Drag a card to update its outcome · auto-saves to audits.outcome</div></div>
+                  <PipelineKanban audits={recentAudits} />
                 </div>
                 <div className="intel-section">
-                  <div className="is-header"><div className="is-title">Active Solicitations · Bid Stage</div></div>
-                  {filtered.length === 0 && <div className="empty-state">No active solicitations.</div>}
-                  {filtered.slice(0, 20).map((r) => {
-                    const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : "var(--gold)";
-                    return (
-                      <div key={r.row.id} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3, padding: "16px 20px", marginBottom: 10, cursor: "pointer" }} onClick={() => setTab("audit")}>
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-                          <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{r.row.title || "—"}</div>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "3px 8px", borderRadius: 2, color: rc, border: `1px solid ${rc}40`, whiteSpace: "nowrap" }}>{r.riskLabel}</span>
-                        </div>
-                        <div style={{ fontFamily: "var(--mono)", fontSize: 8.5, color: "var(--t40)", marginBottom: 10 }}>{r.row.notice_id} · {r.row.agency || "—"}</div>
-                        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: r.row.status === "processed" ? "var(--green)" : "var(--gold)", opacity: .8 }}>
-                          {r.row.status === "processed" ? "✓ Audit Complete" : "● Queued for audit"}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Synthetic +30d window from posted date · sam-ingest will populate response_deadline once column wired</div></div>
+                  <DeadlineCalendar rows={enriched.map((e) => e.row)} onPick={() => setTab("audit")} />
                 </div>
               </div>
             </div>
@@ -539,6 +522,16 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             {/* RFI RESPONSE */}
             <div className={`tab-panel ${tab === "rfi-response" ? "active" : ""}`}>
               <RFIResponsePanel opportunities={opportunities} />
+            </div>
+
+            {/* TEAMING PARTNERS */}
+            <div className={`tab-panel ${tab === "teaming" ? "active" : ""}`}>
+              <TeamingPartnersPanel naicsOptions={naicsOptions} />
+            </div>
+
+            {/* CAPABILITY STATEMENT */}
+            <div className={`tab-panel ${tab === "capability" ? "active" : ""}`}>
+              <CapabilityPanel />
             </div>
           </div>
         </div>
@@ -603,6 +596,20 @@ function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
               border: "1px solid rgba(167,139,250,.28)"
             }}>
               {nt === "sources_sought" ? "Src Sought" : "Pre-Sol"}
+            </span>
+          )}
+          {r.row.incumbent_name && (
+            <span
+              title={`Incumbent: ${r.row.incumbent_name}`}
+              style={{
+                fontFamily: "var(--mono)", fontSize: 7, fontWeight: 700,
+                padding: "1px 5px", marginRight: 6, borderRadius: 2,
+                letterSpacing: ".1em", textTransform: "uppercase",
+                color: "var(--blue)", background: "rgba(96,165,250,.08)",
+                border: "1px solid rgba(96,165,250,.22)"
+              }}
+            >
+              Inc
             </span>
           )}
           {r.row.title || "—"}
@@ -1113,6 +1120,850 @@ function Metric({ label, value, color }: { label: string; value: string; color: 
     <div>
       <div style={{ fontFamily: "var(--mono)", fontSize: 7, color: "var(--t25)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       <div style={{ fontFamily: "var(--mono)", fontSize: 16, fontWeight: 700, color }}>{value}</div>
+    </div>
+  );
+}
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: "block",
+  fontFamily: "var(--mono)",
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+  color: "var(--t40)",
+  marginBottom: 6
+};
+
+const inputStyle: React.CSSProperties = {
+  background: "rgba(3,8,16,.6)",
+  border: "1px solid var(--border2)",
+  borderRadius: 2,
+  padding: "7px 10px",
+  fontFamily: "var(--mono)",
+  fontSize: 11,
+  color: "var(--text)",
+  outline: "none"
+};
+
+// Stage assignment for kanban: derives from audits.outcome / status / recommendation.
+type KanbanStage = "tracking" | "bidding" | "submitted" | "awarded" | "lost";
+const STAGES: { key: KanbanStage; label: string; color: string; bg: string }[] = [
+  { key: "tracking",  label: "Tracking",  color: "var(--t60)",  bg: "rgba(148,163,184,.04)" },
+  { key: "bidding",   label: "Bidding",   color: "var(--gold)", bg: "rgba(201,168,76,.04)" },
+  { key: "submitted", label: "Submitted", color: "var(--blue)", bg: "rgba(96,165,250,.04)" },
+  { key: "awarded",   label: "Awarded",   color: "var(--green)",bg: "rgba(74,222,128,.04)" },
+  { key: "lost",      label: "Lost",      color: "var(--red)",  bg: "rgba(220,38,38,.04)" }
+];
+
+function stageOf(a: AuditRow): KanbanStage {
+  const outcome = ((a as unknown) as { outcome?: string | null; bid_submitted?: boolean }).outcome;
+  const submitted = ((a as unknown) as { bid_submitted?: boolean }).bid_submitted;
+  if (outcome === "won")  return "awarded";
+  if (outcome === "lost") return "lost";
+  if (submitted)          return "submitted";
+  if (a.recommendation === "PROCEED" || a.recommendation === "PROCEED_WITH_CAUTION") return "bidding";
+  return "tracking";
+}
+
+function PipelineKanban({ audits }: { audits: AuditRow[] }) {
+  const [grouped, setGrouped] = useState<Record<KanbanStage, AuditRow[]>>(() => {
+    const buckets: Record<KanbanStage, AuditRow[]> = { tracking: [], bidding: [], submitted: [], awarded: [], lost: [] };
+    for (const a of audits) buckets[stageOf(a)].push(a);
+    return buckets;
+  });
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function moveTo(auditId: string, stage: KanbanStage) {
+    setBusyId(auditId);
+    setErr(null);
+    // Optimistic update
+    setGrouped((prev) => {
+      const next: Record<KanbanStage, AuditRow[]> = { tracking: [...prev.tracking], bidding: [...prev.bidding], submitted: [...prev.submitted], awarded: [...prev.awarded], lost: [...prev.lost] };
+      let moved: AuditRow | undefined;
+      for (const k of Object.keys(next) as KanbanStage[]) {
+        const idx = next[k].findIndex((a) => a.id === auditId);
+        if (idx !== -1) { [moved] = next[k].splice(idx, 1); break; }
+      }
+      if (moved) next[stage].unshift(moved);
+      return next;
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const payload: Record<string, unknown> = {};
+    if (stage === "awarded") { payload.outcome = "won";    payload.outcome_date = today; }
+    if (stage === "lost")    { payload.outcome = "lost";   payload.outcome_date = today; }
+    if (stage === "submitted") { payload.bid_submitted = true; payload.bid_submit_date = today; payload.outcome = "pending"; }
+    if (stage === "bidding")  { payload.outcome = null; payload.bid_submitted = false; }
+    if (stage === "tracking") { payload.outcome = null; payload.bid_submitted = false; }
+
+    try {
+      const res = await fetch(`/api/audit/${auditId}/lifecycle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <>
+      {err && <div className="ko-status error" style={{ marginBottom: 10 }}>{err}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, alignItems: "start" }}>
+        {STAGES.map((s) => (
+          <div
+            key={s.key}
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const id = e.dataTransfer.getData("text/plain");
+              if (id) moveTo(id, s.key);
+              setDraggingId(null);
+            }}
+            style={{
+              background: "var(--void2)",
+              border: "1px solid var(--border)",
+              borderRadius: 3,
+              minHeight: 280,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden"
+            }}
+          >
+            <div style={{ padding: "8px 12px", background: s.bg, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: s.color }}>{s.label}</span>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, color: s.color }}>{grouped[s.key].length}</span>
+            </div>
+            <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+              {grouped[s.key].length === 0 && (
+                <div style={{ padding: "20px 8px", textAlign: "center", fontFamily: "var(--mono)", fontSize: 9, color: "var(--t25)", fontStyle: "italic" }}>—</div>
+              )}
+              {grouped[s.key].slice(0, 30).map((a) => {
+                const r = riskFromScore(a.compliance_score);
+                const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
+                const isDragging = draggingId === a.id;
+                return (
+                  <div
+                    key={a.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", a.id);
+                      setDraggingId(a.id);
+                    }}
+                    onDragEnd={() => setDraggingId(null)}
+                    onClick={() => { window.location.href = `/audit/${a.id}`; }}
+                    style={{
+                      background: "var(--void3)",
+                      border: `1px solid ${isDragging ? "rgba(201,168,76,.6)" : "var(--border)"}`,
+                      borderRadius: 2,
+                      padding: "10px 12px",
+                      cursor: busyId === a.id ? "wait" : "grab",
+                      opacity: busyId === a.id ? 0.6 : 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      transition: "border-color .12s"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {a.notice_id || "—"}
+                      </span>
+                      {a.compliance_score != null && (
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, color: rc, border: `1px solid ${rc}40` }}>
+                          {a.compliance_score}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 11, fontWeight: 500, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {a.title || "—"}
+                    </div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)" }}>
+                      {a.agency || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </div>
+                  </div>
+                );
+              })}
+              {grouped[s.key].length > 30 && (
+                <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t25)", textAlign: "center", padding: "6px 0" }}>+ {grouped[s.key].length - 30} more</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function BudgetPanel({ naicsOptions }: { naicsOptions: string[] }) {
+  const [naics, setNaics] = useState<string>("");
+  const [rows, setRows] = useState<Array<{ agency: string; obligated_amount: number; prior_year_amount: number | null; delta_pct: number | null; fiscal_year: number }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [cached, setCached] = useState(false);
+  const [filterMode, setFilterMode] = useState<"all" | "growing" | "shrinking">("all");
+  const fy = new Date().getFullYear();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    (async () => {
+      try {
+        const url = `/api/budget?fy=${fy}` + (naics ? `&naics=${encodeURIComponent(naics)}` : "");
+        const res = await fetch(url);
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        setRows(data.rows || []);
+        setCached(!!data.cached);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [naics, fy]);
+
+  const visible = useMemo(() => {
+    if (filterMode === "growing")    return rows.filter((r) => (r.delta_pct ?? 0) > 0);
+    if (filterMode === "shrinking")  return rows.filter((r) => (r.delta_pct ?? 0) < 0);
+    return rows;
+  }, [rows, filterMode]);
+
+  function fmt(n: number): string {
+    if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+    return `$${n}`;
+  }
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Congressional Budget · Defense Appropriations FY{fy}</div>
+          <div className="is-refresh">
+            <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
+              <option value="">All NAICS</option>
+              {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span style={{ marginLeft: 6 }}>{cached ? "Cached" : "Live"} · USAspending.gov</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {(["all", "growing", "shrinking"] as const).map((m) => {
+            const active = m === filterMode;
+            const labels: Record<typeof m, string> = { all: "All", growing: "Growing ↑", shrinking: "Shrinking ↓" };
+            return (
+              <button
+                key={m}
+                onClick={() => setFilterMode(m)}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
+                  letterSpacing: ".08em", textTransform: "uppercase",
+                  padding: "5px 12px", borderRadius: 2,
+                  background: active ? "rgba(201,168,76,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
+                }}
+              >
+                {labels[m]}
+              </button>
+            );
+          })}
+        </div>
+
+        {loading && <div className="empty-block">Loading budget data from USAspending.gov…</div>}
+        {err && <div className="ko-status error">{err}</div>}
+        {!loading && !err && visible.length === 0 && (
+          <div className="empty-state">No data returned. Try a different NAICS code or wait for cache to populate.</div>
+        )}
+
+        {visible.length > 0 && (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "1fr 130px 130px 110px" }}>
+              <span>Agency</span><span>FY{fy}</span><span>YoY Δ</span><span>Trend</span>
+            </div>
+            {visible.map((r) => {
+              const deltaColor = r.delta_pct == null ? "var(--t40)" : r.delta_pct > 0 ? "var(--green)" : "var(--red)";
+              const arrow = r.delta_pct == null ? "—" : r.delta_pct > 0 ? "↑" : "↓";
+              const max = visible[0]?.obligated_amount || 1;
+              const pct = Math.min(100, (r.obligated_amount / max) * 100);
+              return (
+                <div key={r.agency} className="sam-row" style={{ gridTemplateColumns: "1fr 130px 130px 110px" }}>
+                  <span className="sr-title" title={r.agency}>{r.agency}</span>
+                  <span className="sr-num">{fmt(r.obligated_amount)}</span>
+                  <span className="sr-num" style={{ color: deltaColor }}>
+                    {arrow} {r.delta_pct != null ? `${r.delta_pct > 0 ? "+" : ""}${r.delta_pct.toFixed(1)}%` : "—"}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <div style={{ width: "100%", height: 4, background: "rgba(201,168,76,.08)", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", background: deltaColor, opacity: 0.6 }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface NewsItemRow {
+  source: string;
+  title: string;
+  link: string;
+  pub_date: string | null;
+  summary: string;
+  tag: string;
+  relevance: string;
+}
+
+function DefenseNewsPanel() {
+  const [items, setItems] = useState<NewsItemRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string>("all");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/defense-news");
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        setItems(data.items || []);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const visible = useMemo(() => {
+    if (tagFilter === "all") return items;
+    return items.filter((i) => i.tag === tagFilter);
+  }, [items, tagFilter]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Defense &amp; Federal Contracting News</div>
+          <div className="is-refresh">Live RSS · 30 min cache</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          {(["all", "policy", "defense", "contract", "budget"] as const).map((t) => {
+            const active = t === tagFilter;
+            return (
+              <button
+                key={t}
+                onClick={() => setTagFilter(t)}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
+                  letterSpacing: ".08em", textTransform: "uppercase",
+                  padding: "5px 12px", borderRadius: 2,
+                  background: active ? "rgba(201,168,76,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
+                }}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+
+        {loading && <div className="empty-block">Loading RSS feeds…</div>}
+        {err && <div className="ko-status error">{err}</div>}
+        {!loading && !err && visible.length === 0 && <div className="empty-state">No news in this filter.</div>}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 14 }}>
+          {visible.slice(0, 30).map((n, i) => (
+            <a
+              key={i}
+              href={n.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "block", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "16px 18px", textDecoration: "none", color: "inherit" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: tagColor(n.tag), padding: "2px 8px", borderRadius: 2, border: `1px solid ${tagColor(n.tag)}40` }}>
+                  {n.tag}
+                </span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)" }}>
+                  {n.source}{n.pub_date ? ` · ${new Date(n.pub_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                </span>
+              </div>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 700, color: "var(--text)", lineHeight: 1.3, marginBottom: 8 }}>
+                {n.title}
+              </div>
+              {n.summary && (
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5, marginBottom: 8 }}>
+                  {n.summary.slice(0, 200)}{n.summary.length > 200 ? "…" : ""}
+                </div>
+              )}
+              <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", lineHeight: 1.5 }}>
+                <strong style={{ color: "var(--gold)" }}>How this affects your bids:</strong> {n.relevance}
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function tagColor(t: string): string {
+  if (t === "policy")   return "var(--blue)";
+  if (t === "contract") return "var(--gold)";
+  if (t === "budget")   return "var(--green)";
+  if (t === "defense")  return "var(--red)";
+  return "var(--t40)";
+}
+
+interface SamEntityRow {
+  uei: string | null;
+  legal_business_name: string | null;
+  cage_code: string | null;
+  primary_naics: string | null;
+  naics_codes: string[];
+  state: string | null;
+  zip: string | null;
+  business_types: string[];
+  certifications: string[];
+  poc_name: string | null;
+  poc_email: string | null;
+  poc_phone: string | null;
+  registration_status: string | null;
+  registration_expiration: string | null;
+}
+
+function TeamingPartnersPanel({ naicsOptions }: { naicsOptions: string[] }) {
+  const [naics, setNaics] = useState<string>(naicsOptions[0] || "");
+  const [state, setState] = useState<string>("");
+  const [setAside, setSetAside] = useState<string>("");
+  const [partners, setPartners] = useState<SamEntityRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
+  const [draftFor, setDraftFor] = useState<SamEntityRow | null>(null);
+
+  async function search(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!naics) { setErr("NAICS code required"); return; }
+    setLoading(true); setErr(null); setReason(null);
+    try {
+      const params = new URLSearchParams({ naics });
+      if (state) params.set("state", state);
+      if (setAside) params.set("setAside", setAside);
+      const res = await fetch(`/api/teaming-partners?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setPartners(data.partners || []);
+      if (data.reason) setReason(data.reason);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function draftIntro(p: SamEntityRow): string {
+    return [
+      `Subject: Teaming inquiry · NAICS ${p.primary_naics || naics} · FARaudit-sourced`,
+      "",
+      `Hi ${p.poc_name || "team"},`,
+      "",
+      `I'm reaching out from the FARaudit network. We're tracking active solicitations under NAICS ${naics}${state ? ` in ${state}` : ""} and your firm came up as a strong fit on capability and certifications (${p.business_types.slice(0, 3).join(", ") || "registered SAM entity"}).`,
+      "",
+      "We'd like to explore a teaming arrangement on an upcoming opportunity. A few specifics on our side:",
+      "  · Past performance: we can share our FARaudit capability statement on request",
+      "  · Geography: TX + OK corridor primary, national delivery available",
+      "  · Bid-ready timeline: 60–90 days with full FAR/DFARS audit complete on every solicitation",
+      "",
+      "Open to a 20-minute call this week or next? Happy to send our capability statement first if useful.",
+      "",
+      "Best,"
+    ].join("\n");
+  }
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Find Teaming Partners · SAM.gov registered entities</div>
+          <div className="is-refresh">Live · SAM Entity Management API v3</div>
+        </div>
+
+        <form
+          onSubmit={search}
+          style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14, padding: "12px 14px", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3 }}
+        >
+          <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)} required>
+            <option value="">Choose NAICS…</option>
+            {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <input
+            type="text"
+            value={state}
+            onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
+            placeholder="State (e.g. TX)"
+            maxLength={2}
+            style={{
+              background: "rgba(3,8,16,.6)", border: "1px solid var(--border2)",
+              borderRadius: 2, padding: "6px 12px", width: 100,
+              fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", outline: "none"
+            }}
+          />
+          <input
+            type="text"
+            value={setAside}
+            onChange={(e) => setSetAside(e.target.value)}
+            placeholder="Set-aside type (e.g. SDVOSB)"
+            style={{
+              background: "rgba(3,8,16,.6)", border: "1px solid var(--border2)",
+              borderRadius: 2, padding: "6px 12px",
+              fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", outline: "none", flex: 1, minWidth: 200
+            }}
+          />
+          <button type="submit" className="action-btn primary" disabled={loading}>
+            {loading ? "Searching…" : "Search"}
+          </button>
+        </form>
+
+        {err && <div className="ko-status error">{err}</div>}
+        {reason && <div className="empty-block">{reason}</div>}
+
+        {!loading && !err && partners.length === 0 && naics && (
+          <div className="empty-state">No SAM-registered entities matched. Try removing state or set-aside filter.</div>
+        )}
+
+        {partners.length > 0 && (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "1.4fr 110px 1fr 100px 100px 80px" }}>
+              <span>Company</span><span>UEI</span><span>POC</span><span>State</span><span>Cert</span><span>Action</span>
+            </div>
+            {partners.map((p, i) => (
+              <div key={p.uei || i} className="sam-row" style={{ gridTemplateColumns: "1.4fr 110px 1fr 100px 100px 80px" }}>
+                <span className="sr-title">{p.legal_business_name || "—"}</span>
+                <span className="sr-num">{p.uei || "—"}</span>
+                <span className="sr-agency">
+                  {p.poc_name || p.poc_email || "—"}
+                </span>
+                <span className="sr-date" style={{ textAlign: "center" }}>{p.state || "—"}</span>
+                <span className="sr-date" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.business_types.join(", ")}>
+                  {p.business_types[0] ? p.business_types[0].slice(0, 14) : "—"}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDraftFor(p); }}
+                  style={{
+                    fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                    color: "var(--gold)", background: "rgba(201,168,76,.08)",
+                    border: "1px solid var(--border2)", borderRadius: 2, padding: "4px 8px", cursor: "pointer"
+                  }}
+                >
+                  Intro
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {draftFor && (
+          <div style={{ marginTop: 16, background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)" }}>
+                Introduction draft · {draftFor.legal_business_name}
+              </div>
+              <button onClick={() => setDraftFor(null)} className="action-btn">Close</button>
+            </div>
+            <textarea
+              className="ko-email-textarea"
+              defaultValue={draftIntro(draftFor)}
+              style={{ minHeight: 280 }}
+            />
+            <div style={{ marginTop: 10, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)" }}>
+              {draftFor.poc_email ? `Send to: ${draftFor.poc_email}` : "No email on SAM record — copy and use your own outreach channel."}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface CapStatement {
+  user_id?: string;
+  company_name: string | null;
+  uei: string | null;
+  cage_code: string | null;
+  duns: string | null;
+  naics_codes: string[];
+  certifications: string[];
+  core_competencies: string | null;
+  differentiators: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_website: string | null;
+  contact_address: string | null;
+  past_performance: Array<{
+    notice_id?: string | null;
+    title?: string | null;
+    agency?: string | null;
+    naics_code?: string | null;
+    contract_value?: string | number | null;
+    period?: string | null;
+  }>;
+  updated_at?: string | null;
+  stub?: boolean;
+}
+
+function CapabilityPanel() {
+  const [stmt, setStmt] = useState<CapStatement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [err, setErr] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSent = useRef("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/capability-statement");
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        setStmt(data.statement);
+        lastSent.current = JSON.stringify(data.statement);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function update<K extends keyof CapStatement>(key: K, value: CapStatement[K]) {
+    setStmt((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [key]: value };
+    });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => persist(), 1000);
+  }
+
+  async function persist() {
+    if (!stmt) return;
+    const payload: Partial<CapStatement> = {
+      company_name: stmt.company_name,
+      uei: stmt.uei,
+      cage_code: stmt.cage_code,
+      duns: stmt.duns,
+      naics_codes: stmt.naics_codes,
+      certifications: stmt.certifications,
+      core_competencies: stmt.core_competencies,
+      differentiators: stmt.differentiators,
+      contact_name: stmt.contact_name,
+      contact_email: stmt.contact_email,
+      contact_phone: stmt.contact_phone,
+      contact_website: stmt.contact_website,
+      contact_address: stmt.contact_address
+    };
+    const sig = JSON.stringify(payload);
+    if (sig === lastSent.current) return;
+    setSave("saving");
+    setErr(null);
+    try {
+      const res = await fetch("/api/capability-statement", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      lastSent.current = sig;
+      setStmt(data.statement);
+      setSavedAt(new Date());
+      setSave("saved");
+    } catch (e) {
+      setSave("error");
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="intel-tab-content">
+        <div className="intel-section">
+          <div className="empty-block">Loading capability statement…</div>
+        </div>
+      </div>
+    );
+  }
+  if (!stmt) {
+    return (
+      <div className="intel-tab-content">
+        <div className="intel-section">
+          <div className="ko-status error">{err || "Failed to load."}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const indicator = save === "saving" ? { cls: "saving", txt: "● Saving…" }
+    : save === "error"  ? { cls: "error",  txt: `! ${err || "Save failed"}` }
+    : save === "saved" && savedAt ? { cls: "saved", txt: `✓ Saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` }
+    : { cls: "", txt: "Auto-saves 1s after you stop typing" };
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Capability Statement</div>
+          <div className="is-refresh">
+            <a className="action-btn primary" href="/api/capability-statement/pdf" download style={{ marginRight: 8 }}>
+              ↓ Export PDF
+            </a>
+            <span>{stmt.stub ? "Draft (not yet saved)" : "Synced"}</span>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <CapField label="Company name" value={stmt.company_name || ""} onChange={(v) => update("company_name", v)} />
+          <CapField label="Contact name" value={stmt.contact_name || ""} onChange={(v) => update("contact_name", v)} />
+          <CapField label="UEI" value={stmt.uei || ""} onChange={(v) => update("uei", v)} placeholder="12-character SAM UEI" />
+          <CapField label="CAGE code" value={stmt.cage_code || ""} onChange={(v) => update("cage_code", v)} />
+          <CapField label="Contact email" value={stmt.contact_email || ""} onChange={(v) => update("contact_email", v)} />
+          <CapField label="Contact phone" value={stmt.contact_phone || ""} onChange={(v) => update("contact_phone", v)} />
+          <CapField label="Website" value={stmt.contact_website || ""} onChange={(v) => update("contact_website", v)} />
+          <CapField label="Address" value={stmt.contact_address || ""} onChange={(v) => update("contact_address", v)} />
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <CapTextarea label="Core competencies" value={stmt.core_competencies || ""} onChange={(v) => update("core_competencies", v)} placeholder="3–5 sentences. What you build / how you build it / who you've delivered to." />
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <CapTextarea label="Differentiators" value={stmt.differentiators || ""} onChange={(v) => update("differentiators", v)} placeholder="Why FARaudit-tier intelligence + your delivery wins where others can't." />
+        </div>
+
+        <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <CapTagList label="NAICS codes" values={stmt.naics_codes} onChange={(v) => update("naics_codes", v)} />
+          <CapTagList label="Certifications" values={stmt.certifications} onChange={(v) => update("certifications", v)} />
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10 }}>
+            Past performance · auto-pulled from won audits
+          </div>
+          {stmt.past_performance.length === 0 ? (
+            <div className="empty-block">No won audits yet. Outcomes you mark "won" on /audit/[id] will appear here automatically.</div>
+          ) : (
+            stmt.past_performance.map((p, i) => (
+              <div key={i} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderLeft: "3px solid var(--gold)", borderRadius: 2, padding: "10px 14px", marginBottom: 8 }}>
+                <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{p.title || p.notice_id || "—"}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", marginTop: 4 }}>
+                  {p.agency || "—"}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
+                  {p.contract_value ? ` · ${p.contract_value}` : ""}
+                  {p.period ? ` · ${p.period}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className={`notes-status ${indicator.cls}`} style={{ marginTop: 18 }}>{indicator.txt}</div>
+      </div>
+    </div>
+  );
+}
+
+function CapField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label style={fieldLabelStyle}>{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inputStyle, width: "100%" }}
+      />
+    </div>
+  );
+}
+
+function CapTextarea({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label style={fieldLabelStyle}>{label}</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={4}
+        style={{ ...inputStyle, width: "100%", fontFamily: "var(--serif)", fontSize: 13, lineHeight: 1.5, resize: "vertical" }}
+      />
+    </div>
+  );
+}
+
+function CapTagList({ label, values, onChange }: { label: string; values: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  return (
+    <div>
+      <label style={fieldLabelStyle}>{label}</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+        {values.map((v, i) => (
+          <span key={`${v}-${i}`} style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 2, background: "rgba(201,168,76,.08)", border: "1px solid var(--border2)", color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {v}
+            <button
+              type="button"
+              onClick={() => onChange(values.filter((_, j) => j !== i))}
+              style={{ background: "transparent", border: "none", color: "var(--gold)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11, lineHeight: 1, padding: 0 }}
+              aria-label="Remove"
+            >×</button>
+          </span>
+        ))}
+      </div>
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            const v = draft.trim();
+            if (v && !values.includes(v)) onChange([...values, v]);
+            setDraft("");
+          }
+        }}
+        placeholder="Add — press Enter"
+        style={{ ...inputStyle, width: "100%" }}
+      />
     </div>
   );
 }

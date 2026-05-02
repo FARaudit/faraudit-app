@@ -4,6 +4,11 @@
 # the deploy is monorepo-friendly: the worker imports the upgraded engine
 # directly from src/lib/ instead of duplicating it.
 
+[build]
+# Empty build command — repo-root nixpacks.toml also disables the build
+# phase so Nixpacks won't try `next build` even though Root Directory = /.
+buildCommand = ""
+
 [deploy]
 startCommand = "npx tsx agents/audit-ai/index.ts"
 restartPolicyType = "ON_FAILURE"

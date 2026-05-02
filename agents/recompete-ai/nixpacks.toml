@@ -1,0 +1,12 @@
+# Nixpacks override — no build phase, just install + tsx start.
+
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm ci || npm install"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx index.ts"

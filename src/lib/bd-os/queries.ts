@@ -75,6 +75,7 @@ export interface OpportunityRow {
   set_aside: string | null;
   document_type: string | null;
   notice_type: string | null;
+  incumbent_name: string | null;
   source: string;
   status: string;
   recommendation: string | null;
@@ -89,7 +90,7 @@ export async function fetchOpportunities(
   client: SupabaseClient,
   opts: { limit?: number; status?: string | null; naics?: string | null } = {}
 ): Promise<OpportunityRow[]> {
-  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, notice_type, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, notice_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   for (const cols of [RICH, BASIC]) {
     let q = client
@@ -104,7 +105,7 @@ export async function fetchOpportunities(
       if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
       throw new Error(`fetchOpportunities: ${error.message}`);
     }
-    return ((data || []) as unknown[]).map((r) => ({ document_type: null, notice_type: null, ...(r as object) })) as OpportunityRow[];
+    return ((data || []) as unknown[]).map((r) => ({ document_type: null, notice_type: null, incumbent_name: null, ...(r as object) })) as OpportunityRow[];
   }
   return [];
 }

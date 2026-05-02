@@ -1,3 +1,15 @@
+# Railway service config — Email AI · Gmail organize cron.
+#
+# Required Railway dashboard settings (set once when wiring the service):
+#   • Root Directory: agents/email-ai
+#   • Build Command:  (leave empty)
+#   • Start Command:  inherits from below
+# nixpacks.toml in this directory locks down the build phase so even if Root
+# Directory ever drifts back to /, Railway won't try to run `next build`.
+
+[build]
+buildCommand = ""
+
 [deploy]
 startCommand = "node index.js"
 restartPolicyType = "ON_FAILURE"

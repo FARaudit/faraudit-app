@@ -6,8 +6,13 @@
 # Service is configured with Root Directory = /  (repo root) and Watch Paths
 # scoped to agents/sam-ingest/** so the deploy is monorepo-friendly.
 
+[build]
+# Empty build command — repo-root nixpacks.toml also disables the build
+# phase so Nixpacks won't try `next build` even though Root Directory = /.
+buildCommand = ""
+
 [deploy]
 startCommand = "npx tsx agents/sam-ingest/index.ts"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-cronSchedule = "*/2 * * * *"  # TEMP for first-run smoke test — revert to 0 11 * * * after first run logs
+cronSchedule = "0 11 * * *"  # 11:00 UTC = 06:00 CDT
