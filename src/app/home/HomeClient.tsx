@@ -4,26 +4,53 @@ import { useState, useMemo, useEffect } from "react";
 import type {
   HeaderCounter,
   OpportunityRow,
-  AuditRow
+  AuditRow,
+  KORow,
+  AgencyRow
 } from "@/lib/bd-os/queries";
 
-type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits";
-type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ";
+type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response";
+type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ" | "Pre-Sol";
 
 interface Props {
   user: { email: string; id: string };
   counter: HeaderCounter;
   opportunities: OpportunityRow[];
   recentAudits: AuditRow[];
+  kos: KORow[];
+  agencies: AgencyRow[];
 }
 
-const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", "IDIQ"];
+const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", "IDIQ", "Pre-Sol"];
 
-export default function HomeClient({ user, counter, opportunities, recentAudits }: Props) {
-  const [tab, setTab] = useState<TabKey>("home");
+const TAB_KEYS: TabKey[] = [
+  "home", "audit", "sam", "budget", "news", "pipeline",
+  "past-audits", "ko-intelligence", "agency-intelligence", "rfi-response"
+];
+
+export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
+  const [tab, setTabState] = useState<TabKey>("home");
   const [filter, setFilter] = useState<FilterKey>("All");
   const [naics, setNaics] = useState<string>("all");
   const [feedTs, setFeedTs] = useState<string>("just now");
+
+  const setTab = (next: TabKey) => {
+    setTabState(next);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${next}`);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const apply = () => {
+      const h = window.location.hash.replace("#", "") as TabKey;
+      if (TAB_KEYS.includes(h)) setTabState(h);
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
 
   useEffect(() => {
     let s = 0;
@@ -52,6 +79,10 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
       if (filter === "IDIQ") {
         const dt = (r.row.document_type || "").toUpperCase();
         return dt.includes("IDIQ");
+      }
+      if (filter === "Pre-Sol") {
+        const nt = (r.row.notice_type || "").toLowerCase();
+        return nt === "pre_sol" || nt === "sources_sought";
       }
       return true;
     });
@@ -175,6 +206,35 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
               <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
             Defense News
+          </button>
+          <button className={`nav-item ${tab === "ko-intelligence" ? "active" : ""}`} onClick={() => setTab("ko-intelligence")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M3 14c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            KO Intelligence
+            {kos.length > 0 && <span className="nav-ct ct-gold">{kos.length}</span>}
+          </button>
+          <button className={`nav-item ${tab === "agency-intelligence" ? "active" : ""}`} onClick={() => setTab("agency-intelligence")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Agency Intelligence
+            {agencies.length > 0 && <span className="nav-ct ct-gold">{agencies.length}</span>}
+          </button>
+          <button className={`nav-item ${tab === "rfi-response" ? "active" : ""}`} onClick={() => setTab("rfi-response")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M3 4h10v7H6l-3 2V4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            RFI Response
+            {(() => {
+              const presol = opportunities.filter((o) => {
+                const nt = (o.notice_type || "").toLowerCase();
+                return nt === "pre_sol" || nt === "sources_sought";
+              }).length;
+              return presol > 0 ? <span className="nav-ct ct-red">{presol}</span> : null;
+            })()}
           </button>
 
           <div className="nav-label">Account</div>
@@ -465,6 +525,21 @@ export default function HomeClient({ user, counter, opportunities, recentAudits 
             <div className={`tab-panel ${tab === "past-audits" ? "active" : ""}`}>
               <PastAuditsPanel audits={recentAudits} />
             </div>
+
+            {/* KO INTELLIGENCE */}
+            <div className={`tab-panel ${tab === "ko-intelligence" ? "active" : ""}`}>
+              <KOIntelPanel kos={kos} />
+            </div>
+
+            {/* AGENCY INTELLIGENCE */}
+            <div className={`tab-panel ${tab === "agency-intelligence" ? "active" : ""}`}>
+              <AgencyIntelPanel agencies={agencies} />
+            </div>
+
+            {/* RFI RESPONSE */}
+            <div className={`tab-panel ${tab === "rfi-response" ? "active" : ""}`}>
+              <RFIResponsePanel opportunities={opportunities} />
+            </div>
           </div>
         </div>
       </div>
@@ -512,14 +587,31 @@ function enrichRow(row: OpportunityRow): Enriched {
 
 function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
   const riskCls = r.risk === "rp0" ? "rk0" : r.risk === "rp1" ? "rk1" : "rkw";
+  const nt = (r.row.notice_type || "").toLowerCase();
+  const isPreSol = nt === "pre_sol" || nt === "sources_sought";
   return (
     <div className={`feed-row ${r.risk}`} onClick={onClick}>
       <span className="f-naics">{r.row.naics_code || "—"}</span>
-      <div style={{ minWidth: 0 }}><div className="f-title" title={r.row.title || ""}>{r.row.title || "—"}</div></div>
+      <div style={{ minWidth: 0 }}>
+        <div className="f-title" title={r.row.title || ""}>
+          {isPreSol && (
+            <span style={{
+              fontFamily: "var(--mono)", fontSize: 7, fontWeight: 700,
+              padding: "1px 5px", marginRight: 6, borderRadius: 2,
+              letterSpacing: ".1em", textTransform: "uppercase",
+              color: "#A78BFA", background: "rgba(167,139,250,.10)",
+              border: "1px solid rgba(167,139,250,.28)"
+            }}>
+              {nt === "sources_sought" ? "Src Sought" : "Pre-Sol"}
+            </span>
+          )}
+          {r.row.title || "—"}
+        </div>
+      </div>
       <span className="f-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
       <span className="f-val">—</span>
       <span className={`f-days ${r.daysCls === "none" ? "" : r.daysCls}`}>{r.daysLabel}</span>
-      <span className="f-type">—</span>
+      <span className="f-type">{(r.row.document_type || "—").toUpperCase().slice(0, 6)}</span>
       <span className={`f-sa sa-${r.saCls}`}>{r.saLabel}</span>
       <span className={`f-risk ${riskCls}`}>{r.riskLabel}</span>
     </div>
@@ -839,6 +931,313 @@ function DeadlineCalendar({ rows, onPick }: { rows: OpportunityRow[]; onPick: (r
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function KOIntelPanel({ kos }: { kos: KORow[] }) {
+  const [query, setQuery] = useState("");
+  const [agencyFilter, setAgencyFilter] = useState("all");
+  const [sort, setSort] = useState<"recent" | "response" | "agency">("recent");
+
+  const agencies = useMemo(() => {
+    const set = new Set<string>();
+    kos.forEach((k) => { if (k.agency) set.add(k.agency); });
+    return Array.from(set).sort();
+  }, [kos]);
+
+  const visible = useMemo(() => {
+    let rows = kos.filter((k) => {
+      if (agencyFilter !== "all" && k.agency !== agencyFilter) return false;
+      if (!query) return true;
+      const q = query.toLowerCase();
+      return (
+        (k.ko_email || "").toLowerCase().includes(q) ||
+        (k.ko_name || "").toLowerCase().includes(q) ||
+        (k.agency || "").toLowerCase().includes(q)
+      );
+    });
+    rows = [...rows].sort((a, b) => {
+      if (sort === "response") {
+        const ar = a.questions_asked > 0 ? a.questions_answered / a.questions_asked : -1;
+        const br = b.questions_asked > 0 ? b.questions_answered / b.questions_asked : -1;
+        return br - ar;
+      }
+      if (sort === "agency") return (a.agency || "").localeCompare(b.agency || "");
+      return new Date(b.last_contact || 0).getTime() - new Date(a.last_contact || 0).getTime();
+    });
+    return rows;
+  }, [kos, agencyFilter, query, sort]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">KO Intelligence · {kos.length} contacts</div>
+          <div className="is-refresh">Auto-populated by audit-ai · enriched on every KO email send</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+          <select className="naics-select" value={agencyFilter} onChange={(e) => setAgencyFilter(e.target.value)}>
+            <option value="all">All agencies</option>
+            {agencies.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <select className="naics-select" value={sort} onChange={(e) => setSort(e.target.value as "recent" | "response" | "agency")}>
+            <option value="recent">Most recent contact</option>
+            <option value="response">Highest response rate</option>
+            <option value="agency">Agency A→Z</option>
+          </select>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name · email · agency…"
+            style={{
+              flex: 1, minWidth: 220,
+              background: "rgba(3,8,16,.6)", border: "1px solid var(--border2)",
+              borderRadius: 2, padding: "6px 12px",
+              fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", outline: "none"
+            }}
+          />
+        </div>
+
+        <div className="sam-table">
+          <div className="sam-th" style={{ gridTemplateColumns: "1fr 1.4fr 130px 100px 80px 110px" }}>
+            <span>Name</span><span>Email</span><span>Agency</span><span>Solicitations</span><span>Avg Resp</span><span>Response Rate</span>
+          </div>
+          {visible.length === 0 && <div className="empty-state">No KOs in your intelligence layer yet. Start auditing — auto-populates on draft.</div>}
+          {visible.map((k) => {
+            const rate = k.questions_asked > 0 ? Math.round((k.questions_answered / k.questions_asked) * 100) : null;
+            const rateColor = rate == null ? "var(--gold)" : rate >= 80 ? "var(--green)" : rate >= 50 ? "var(--amber)" : "var(--red)";
+            return (
+              <div key={k.id} className="sam-row" style={{ gridTemplateColumns: "1fr 1.4fr 130px 100px 80px 110px" }}>
+                <span className="sr-title">{k.ko_name || "—"}</span>
+                <span className="sr-num">{k.ko_email}</span>
+                <span className="sr-agency" title={k.agency || ""}>{k.agency || "—"}</span>
+                <span className="sr-date" style={{ textAlign: "center" }}>{k.solicitations_issued ?? 0}</span>
+                <span className="sr-date" style={{ textAlign: "center" }}>
+                  {k.avg_response_days != null ? `${Number(k.avg_response_days).toFixed(1)}d` : "—"}
+                </span>
+                <span className="sr-badge" style={{ color: rateColor, background: "transparent", border: `1px solid ${rateColor}40` }}>
+                  {rate != null ? `${rate}% (${k.questions_answered}/${k.questions_asked})` : "No data"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgencyIntelPanel({ agencies }: { agencies: AgencyRow[] }) {
+  const [sort, setSort] = useState<"audits" | "score" | "win">("audits");
+
+  const sorted = useMemo(() => {
+    return [...agencies].sort((a, b) => {
+      if (sort === "score") return (b.avg_score ?? -1) - (a.avg_score ?? -1);
+      if (sort === "win")   return (b.win_rate ?? -1)  - (a.win_rate ?? -1);
+      return b.total_audits - a.total_audits;
+    });
+  }, [agencies, sort]);
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Agency Intelligence · {agencies.length} agencies</div>
+          <div className="is-refresh">
+            <select className="naics-select" value={sort} onChange={(e) => setSort(e.target.value as "audits" | "score" | "win")}>
+              <option value="audits">Most audits</option>
+              <option value="score">Avg score ↓</option>
+              <option value="win">Win rate ↓</option>
+            </select>
+          </div>
+        </div>
+
+        {sorted.length === 0 && <div className="empty-state" style={{ padding: "60px 20px" }}>No agency data yet — run audits to populate.</div>}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))", gap: 14 }}>
+          {sorted.map((a) => {
+            const scoreColor = a.avg_score == null ? "var(--gold)" : a.avg_score >= 70 ? "var(--green)" : a.avg_score >= 40 ? "var(--amber)" : "var(--red)";
+            const winColor = a.win_rate == null ? "var(--t40)" : a.win_rate >= 50 ? "var(--green)" : "var(--amber)";
+            return (
+              <div key={a.agency} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "16px 18px" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{a.agency}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".1em" }}>{a.total_audits} audits</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  <Metric label="Avg score" value={a.avg_score != null ? `${a.avg_score}/100` : "—"} color={scoreColor} />
+                  <Metric label="Win rate" value={a.win_rate != null ? `${a.win_rate}%` : "—"} color={winColor} />
+                  <Metric label="Top NAICS" value={a.top_naics[0]?.code || "—"} color="var(--gold2)" />
+                </div>
+
+                {a.top_traps.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 6 }}>Top DFARS traps</div>
+                    {a.top_traps.map((t) => (
+                      <div key={t.clause} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--red)", padding: "2px 0" }}>
+                        ⚠ {t.clause} <span style={{ color: "var(--t40)", marginLeft: 4 }}>· {t.count}×</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {a.recent.length > 0 && (
+                  <div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 6 }}>Recent solicitations</div>
+                    {a.recent.slice(0, 3).map((r) => (
+                      <a key={r.id} href={`/audit/${r.id}`} style={{ display: "block", textDecoration: "none", padding: "4px 0", borderBottom: "1px solid rgba(201,168,76,.05)" }}>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.notice_id || "—"}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", marginLeft: 8 }}>
+                          {r.title ? r.title.slice(0, 50) + (r.title.length > 50 ? "…" : "") : "—"}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 7, color: "var(--t25)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 16, fontWeight: 700, color }}>{value}</div>
+    </div>
+  );
+}
+
+function RFIResponsePanel({ opportunities }: { opportunities: OpportunityRow[] }) {
+  const presol = useMemo(() => {
+    return opportunities.filter((o) => {
+      const nt = (o.notice_type || "").toLowerCase();
+      return nt === "pre_sol" || nt === "sources_sought";
+    });
+  }, [opportunities]);
+
+  const [selected, setSelected] = useState<OpportunityRow | null>(null);
+  const [draft, setDraft] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function buildDraft(row: OpportunityRow) {
+    setSelected(row);
+    setDraft("");
+    setErr(null);
+    setDrafting(true);
+    try {
+      const res = await fetch("/api/rfi-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pending_audit_id: row.id,
+          notice_id: row.notice_id,
+          title: row.title,
+          agency: row.agency,
+          naics_code: row.naics_code,
+          notice_type: row.notice_type
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setDraft(data.draft || "");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  async function copy() {
+    if (!draft) return;
+    try { await navigator.clipboard.writeText(draft); } catch { /* */ }
+  }
+
+  return (
+    <div className="intel-tab-content">
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Pre-Solicitation Intelligence · 60–90 day upstream</div>
+          <div className="is-refresh">{presol.length} pre-sol / sources-sought notices</div>
+        </div>
+
+        {presol.length === 0 ? (
+          <div className="empty-state" style={{ padding: "60px 20px" }}>
+            No pre-sol or sources-sought notices in the queue. sam-ingest will populate once expanded notice-type pull is live.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, alignItems: "start" }}>
+            <div>
+              {presol.map((r) => (
+                <div
+                  key={r.id}
+                  onClick={() => buildDraft(r)}
+                  style={{
+                    background: selected?.id === r.id ? "rgba(167,139,250,.06)" : "var(--void3)",
+                    border: `1px solid ${selected?.id === r.id ? "rgba(167,139,250,.4)" : "var(--border)"}`,
+                    borderRadius: 3, padding: "12px 14px", marginBottom: 8, cursor: "pointer"
+                  }}
+                >
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "#A78BFA", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 4 }}>
+                    {r.notice_type === "sources_sought" ? "Sources Sought" : "Pre-Solicitation"}
+                  </div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.notice_id}</div>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 600, color: "var(--text)", marginTop: 4, lineHeight: 1.3 }}>
+                    {r.title || "—"}
+                  </div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t60)", marginTop: 4 }}>
+                    {r.agency || "—"} · NAICS {r.naics_code || "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div>
+              {!selected && (
+                <div className="empty-state" style={{ background: "var(--void3)", border: "1px dashed var(--border)" }}>
+                  ← Select a notice to draft a strategic RFI response.
+                </div>
+              )}
+              {selected && (
+                <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: 16 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>
+                    Strategic Response · {selected.notice_id}
+                  </div>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: 14, color: "var(--text)", marginBottom: 14 }}>
+                    {selected.title || "—"}
+                  </div>
+                  {drafting && <div className="empty-block">Drafting response… (this can take 8–15 seconds)</div>}
+                  {err && <div className="ko-status error">{err}</div>}
+                  {draft && (
+                    <>
+                      <textarea
+                        className="ko-email-textarea"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        style={{ minHeight: 360 }}
+                      />
+                      <div className="ko-email-actions" style={{ marginTop: 10 }}>
+                        <button type="button" className="action-btn" onClick={copy}>Copy</button>
+                        <button type="button" className="action-btn" onClick={() => buildDraft(selected)} disabled={drafting}>
+                          ↻ Re-draft
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

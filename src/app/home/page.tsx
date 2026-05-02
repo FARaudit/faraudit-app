@@ -3,7 +3,9 @@ import { createServerClient } from "@/lib/supabase-server";
 import {
   fetchHeaderCounter,
   fetchOpportunities,
-  fetchRecentAudits
+  fetchRecentAudits,
+  fetchKOs,
+  fetchAgencyStats
 } from "@/lib/bd-os/queries";
 import HomeClient from "./HomeClient";
 import "./home.css";
@@ -18,10 +20,12 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [counter, opportunities, recentAudits] = await Promise.all([
+  const [counter, opportunities, recentAudits, kos, agencies] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
     fetchOpportunities(supabase, { limit: 200 }).catch(() => []),
-    fetchRecentAudits(supabase, 25).catch(() => [])
+    fetchRecentAudits(supabase, 200).catch(() => []),
+    fetchKOs(supabase).catch(() => []),
+    fetchAgencyStats(supabase).catch(() => [])
   ]);
 
   return (
@@ -30,6 +34,8 @@ export default async function HomePage() {
       counter={counter}
       opportunities={opportunities}
       recentAudits={recentAudits}
+      kos={kos}
+      agencies={agencies}
     />
   );
 }

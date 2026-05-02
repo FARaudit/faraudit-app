@@ -160,6 +160,14 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
             <>
               <ProcessFlow />
 
+              <KOCard
+                auditId={id}
+                agency={agency}
+                noticeId={noticeId}
+                koEmailFromAudit={(audit.ko_email_recipient as string) || (compJson.ko_email as string) || ""}
+                koNameFromAudit={(audit.ko_name as string) || (compJson.ko_name as string) || ""}
+              />
+
               {/* SECTION 1 — Document Classification */}
               <section className="report-section">
                 <div className="report-section-eyebrow">Section 1 · Classification</div>
@@ -325,6 +333,27 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                   Add internal notes. Auto-saved to FARaudit · never leaves your account.
                 </p>
                 <NotesEditor auditId={id} initial={(audit.notes as string) || ""} />
+              </section>
+
+              {/* SECTION 8 — Outcome Tracker */}
+              <section className="report-section">
+                <div className="report-section-eyebrow">Section 8 · Track outcome</div>
+                <h2 className="report-section-title">Bid lifecycle</h2>
+                <p style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t60)", lineHeight: 1.6, marginBottom: 14 }}>
+                  Mark KO contact, bid submission, and final outcome. Pipeline stage updates automatically. Win-rate analytics depend on this data.
+                </p>
+                <OutcomeTracker
+                  auditId={id}
+                  initial={{
+                    outcome: (audit.outcome as string) || null,
+                    outcome_date: (audit.outcome_date as string) || null,
+                    ko_contacted: !!audit.ko_contacted,
+                    ko_contact_date: (audit.ko_contact_date as string) || null,
+                    bid_submitted: !!audit.bid_submitted,
+                    bid_submit_date: (audit.bid_submit_date as string) || null,
+                    team_assignee: (audit.team_assignee as string) || ""
+                  }}
+                />
               </section>
             </>
           )}
@@ -609,5 +638,309 @@ function NotesEditor({ auditId, initial }: { auditId: string; initial: string })
       />
       <div className={`notes-status ${indicator.cls}`}>{indicator.txt}</div>
     </div>
+  );
+}
+
+interface OutcomeState {
+  outcome: string | null;
+  outcome_date: string | null;
+  ko_contacted: boolean;
+  ko_contact_date: string | null;
+  bid_submitted: boolean;
+  bid_submit_date: string | null;
+  team_assignee: string;
+}
+
+function OutcomeTracker({ auditId, initial }: { auditId: string; initial: OutcomeState }) {
+  const [state, setState] = useState<OutcomeState>(initial);
+  const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  async function patch(update: Partial<OutcomeState>) {
+    const next = { ...state, ...update };
+    setState(next);
+    setSave("saving");
+    try {
+      const res = await fetch(`/api/audit/${auditId}/lifecycle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(update)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSave("saved");
+      setSavedAt(new Date());
+    } catch (err) {
+      setSave("error");
+      setErrMsg(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+  const indicator = (() => {
+    if (save === "saving") return { cls: "saving", txt: "● Saving…" };
+    if (save === "error")  return { cls: "error",  txt: `! ${errMsg || "Save failed"}` };
+    if (save === "saved" && savedAt) return { cls: "saved", txt: `✓ Saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` };
+    return { cls: "", txt: "Changes save instantly" };
+  })();
+
+  return (
+    <div className="notes-area">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+
+        {/* Outcome */}
+        <div>
+          <label style={fieldLabelStyle}>Outcome</label>
+          <select
+            value={state.outcome || ""}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              patch({ outcome: v, outcome_date: v && !state.outcome_date ? todayISO() : state.outcome_date });
+            }}
+            style={selectStyle}
+          >
+            <option value="">— Not set —</option>
+            <option value="pending">Pending</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+            <option value="no-bid">No-bid</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={fieldLabelStyle}>Outcome date</label>
+          <input
+            type="date"
+            value={state.outcome_date ? state.outcome_date.slice(0, 10) : ""}
+            onChange={(e) => patch({ outcome_date: e.target.value || null })}
+            style={inputStyle}
+          />
+        </div>
+
+        {/* KO contacted */}
+        <div>
+          <label style={fieldLabelStyle}>KO contacted</label>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              id={`ko-contacted-${auditId}`}
+              type="checkbox"
+              checked={state.ko_contacted}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                patch({ ko_contacted: checked, ko_contact_date: checked && !state.ko_contact_date ? todayISO() : state.ko_contact_date });
+              }}
+            />
+            <input
+              type="date"
+              value={state.ko_contact_date ? state.ko_contact_date.slice(0, 10) : ""}
+              onChange={(e) => patch({ ko_contact_date: e.target.value || null })}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Bid submitted */}
+        <div>
+          <label style={fieldLabelStyle}>Bid submitted</label>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={state.bid_submitted}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                patch({ bid_submitted: checked, bid_submit_date: checked && !state.bid_submit_date ? todayISO() : state.bid_submit_date });
+              }}
+            />
+            <input
+              type="date"
+              value={state.bid_submit_date ? state.bid_submit_date.slice(0, 10) : ""}
+              onChange={(e) => patch({ bid_submit_date: e.target.value || null })}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Team assignee */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={fieldLabelStyle}>Team assignee</label>
+          <input
+            type="text"
+            value={state.team_assignee}
+            onChange={(e) => setState({ ...state, team_assignee: e.target.value })}
+            onBlur={() => patch({ team_assignee: state.team_assignee })}
+            placeholder="Name or email of internal owner"
+            style={{ ...inputStyle, width: "100%" }}
+          />
+        </div>
+      </div>
+      <div className={`notes-status ${indicator.cls}`}>{indicator.txt}</div>
+    </div>
+  );
+}
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: "block",
+  fontFamily: "var(--mono)",
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+  color: "var(--t40)",
+  marginBottom: 6
+};
+
+const inputStyle: React.CSSProperties = {
+  background: "rgba(3,8,16,.6)",
+  border: "1px solid var(--border2)",
+  borderRadius: 2,
+  padding: "7px 10px",
+  fontFamily: "var(--mono)",
+  fontSize: 11,
+  color: "var(--text)",
+  outline: "none"
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  width: "100%",
+  cursor: "pointer"
+};
+
+interface KOIntelRow {
+  ko_email: string;
+  ko_name?: string | null;
+  agency?: string | null;
+  solicitations_issued?: number;
+  questions_asked?: number;
+  questions_answered?: number;
+  avg_response_days?: number | null;
+  last_contact?: string | null;
+  notes?: string | null;
+}
+
+function KOCard({
+  auditId,
+  agency,
+  noticeId,
+  koEmailFromAudit,
+  koNameFromAudit
+}: {
+  auditId: string;
+  agency: string;
+  noticeId: string;
+  koEmailFromAudit: string;
+  koNameFromAudit: string;
+}) {
+  const [ko, setKo] = useState<KOIntelRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!koEmailFromAudit) { setLoading(false); return; }
+      try {
+        const res = await fetch(`/api/ko-intelligence?email=${encodeURIComponent(koEmailFromAudit)}`);
+        if (cancelled) return;
+        if (res.status === 404) { setKo(null); return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        setKo(data.ko);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [koEmailFromAudit]);
+
+  async function addToContacts() {
+    if (!koEmailFromAudit) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/ko-intelligence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ko_email: koEmailFromAudit,
+          ko_name: koNameFromAudit || null,
+          agency: agency || null,
+          last_solicitation_id: auditId
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setKo(data.ko);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!koEmailFromAudit && !loading) {
+    return null; // No KO email surfaced — skip card entirely.
+  }
+
+  const respRate = ko && ko.questions_asked && ko.questions_asked > 0
+    ? Math.round(((ko.questions_answered || 0) / ko.questions_asked) * 100)
+    : null;
+
+  return (
+    <section className="report-section" style={{ borderColor: "rgba(96,165,250,.32)" }}>
+      <div className="report-section-eyebrow" style={{ color: "var(--blue)" }}>Contracting Officer</div>
+      <h2 className="report-section-title">{koNameFromAudit || ko?.ko_name || "KO contact"}</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <div>
+          <div style={fieldLabelStyle}>Email</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--gold)" }}>{koEmailFromAudit || "—"}</div>
+          <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Agency</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{agency}</div>
+          <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Notice</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)" }}>{noticeId}</div>
+        </div>
+        <div>
+          {loading && <div className="empty-block">Loading contact history…</div>}
+          {!loading && !ko && koEmailFromAudit && (
+            <div>
+              <div className="empty-block" style={{ marginBottom: 10 }}>No prior contact recorded.</div>
+              <button className="action-btn primary" onClick={addToContacts} disabled={busy}>
+                {busy ? "Adding…" : "+ Add to KO Intelligence"}
+              </button>
+            </div>
+          )}
+          {!loading && ko && (
+            <>
+              <div style={fieldLabelStyle}>Response rate</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--text)" }}>
+                {respRate != null
+                  ? `${ko.questions_answered}/${ko.questions_asked} questions answered · ${respRate}%`
+                  : "No questions tracked yet"}
+                {ko.avg_response_days != null && (
+                  <> · avg {Number(ko.avg_response_days).toFixed(1)}d</>
+                )}
+              </div>
+              <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Solicitations issued</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--text)" }}>
+                {ko.solicitations_issued ?? 0}
+              </div>
+              <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Last contact</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--text2)" }}>
+                {ko.last_contact ? new Date(ko.last_contact).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+              </div>
+              <a className="action-btn" href={`/home#ko-intelligence`} style={{ marginTop: 14, display: "inline-block" }}>
+                Contact history →
+              </a>
+            </>
+          )}
+          {err && <div className="ko-status error" style={{ marginTop: 10 }}>{err}</div>}
+        </div>
+      </div>
+    </section>
   );
 }

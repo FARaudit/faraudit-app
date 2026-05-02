@@ -88,6 +88,27 @@ async function main() {
     return;
   }
 
+  // Map SAM.gov "type" string into our 3-bucket notice_type taxonomy.
+  // SAM strings observed: "Solicitation", "Combined Synopsis/Solicitation",
+  // "Presolicitation", "Sources Sought", "Special Notice", "Award Notice".
+  const classifyNoticeType = (t: string | null): "solicitation" | "pre_sol" | "sources_sought" => {
+    const s = (t || "").toLowerCase();
+    if (s.includes("sources sought")) return "sources_sought";
+    if (s.includes("presolicitation") || s.includes("pre-sol") || s.includes("pre sol")) return "pre_sol";
+    return "solicitation";
+  };
+
+  // Map a SAM opportunity "type" string to our document_type bucket if the
+  // string already encodes contract structure (IDIQ / BPA / Modification etc).
+  const classifyDocType = (t: string | null): string | null => {
+    const s = (t || "").toLowerCase();
+    if (s.includes("idiq")) return "IDIQ";
+    if (s.includes("bpa"))  return "BPA";
+    if (s.includes("task order")) return "Task Order";
+    if (s.includes("modification")) return "Modification";
+    return null;
+  };
+
   // Map SAM opportunities → pending_audits rows.
   const rows = Array.from(seen.values()).map((o) => ({
     notice_id: o.noticeId,
@@ -95,6 +116,8 @@ async function main() {
     agency: o.department || null,
     naics_code: o.naicsCode || null,
     set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
+    notice_type: classifyNoticeType(o.type),
+    document_type: classifyDocType(o.type),
     pdf_url: o.resourceLinks?.[0] || null,
     source: "sam_live" as const,
     notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`
