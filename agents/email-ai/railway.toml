@@ -8,6 +8,7 @@
 # Directory ever drifts back to /, Railway won't try to run `next build`.
 
 [build]
+builder = "nixpacks"
 buildCommand = ""
 
 [deploy]
