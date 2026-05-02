@@ -31,7 +31,9 @@ const { insertNew } = queue;
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
   .split(",").map((s) => s.trim()).filter(Boolean);
-const DAILY_WINDOW_DAYS = Number(process.env.DAILY_WINDOW_DAYS) || 1;
+// BACKFILL_DAYS overrides DAILY_WINDOW_DAYS — used for one-shot historical
+// pulls. Set on Railway, deploy, run, then unset so cron returns to daily mode.
+const DAILY_WINDOW_DAYS = Number(process.env.BACKFILL_DAYS) || Number(process.env.DAILY_WINDOW_DAYS) || 1;
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
 const DRY_RUN = process.env.DRY_RUN === "true";
 
