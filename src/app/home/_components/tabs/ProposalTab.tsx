@@ -5,10 +5,10 @@ import { SectionHeader, V2Notice } from "./PipelineTab";
 
 const SECTION_L_PLACEHOLDER = [
   "Page-limit compliance",
-  "Volume structure (Vol I — Technical · Vol II — Past Performance · Vol III — Price)",
+  "Volume structure (Vol I — Tech · Vol II — Past Performance · Vol III — Price)",
   "Format requirements (font · margin · spacing)",
   "Past performance reference count",
-  "Demo / oral presentation requirement",
+  "Demo / oral presentation",
   "Submission method (eBuy · email · physical)",
   "Pre-proposal questions deadline"
 ];
@@ -16,67 +16,67 @@ const SECTION_L_PLACEHOLDER = [
 const SECTION_M_PLACEHOLDER = [
   { factor: "Technical", weight: "Most important" },
   { factor: "Past Performance", weight: "Slightly less important than Technical" },
-  { factor: "Price", weight: "When combined less important than non-price factors" }
+  { factor: "Price", weight: "Combined less important than non-price factors" }
 ];
 
 export default function ProposalTab() {
   return (
-    <div className="space-y-5">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SectionHeader
-        title="Proposal Workspace"
-        subtitle="Active proposal scaffold · Section L compliance · Section M alignment · risk-adjusted pricing"
+        eyebrow="Proposal workspace"
+        title="Proposal"
+        subtitle="Section L compliance · Section M alignment · doc-type · risk-adjusted pricing"
       />
 
-      <div className="bg-[#091322] border border-[#122240] rounded p-4 text-center text-[12px] text-[#5B8AB8]">
-        <div className="text-[14px] text-[#EDF4FF] mb-1">No active proposal</div>
-        <div>Select a solicitation from the Pipeline → Bidding column to start a proposal workspace.</div>
-      </div>
+      <EmptyBanner
+        title="No active proposal"
+        body="Move a card to Bidding in the Pipeline tab to start a proposal workspace."
+      />
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card title="Section L — Preparation Instructions">
-          <div className="text-[11px] text-[#5B8AB8] mb-2">Compliance checklist (auto-extracted from audit):</div>
-          <ul className="space-y-1.5 text-[12px]">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Card title="Section L · Preparation Instructions">
+          <SubLabel>Auto-extracted from audit</SubLabel>
+          <ul style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8, listStyle: "none" }}>
             {SECTION_L_PLACEHOLDER.map((item, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <input type="checkbox" disabled className="mt-1 accent-[#378ADD] disabled:opacity-30" />
-                <span className="text-[#B5D4F4]">{item}</span>
+              <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <input type="checkbox" disabled style={{ marginTop: 4, accentColor: "var(--gold)", opacity: 0.4 }} />
+                <span style={{ fontFamily: "var(--bd-mono)", fontSize: 10, color: "var(--t60)" }}>{item}</span>
               </li>
             ))}
           </ul>
         </Card>
 
-        <Card title="Section M — Evaluation Factors">
-          <div className="text-[11px] text-[#5B8AB8] mb-2">Weight-aligned focus map:</div>
-          <ul className="space-y-2 text-[12px]">
+        <Card title="Section M · Evaluation Factors">
+          <SubLabel>Weight-aligned focus map</SubLabel>
+          <ul style={{ display: "flex", flexDirection: "column", marginTop: 8, listStyle: "none" }}>
             {SECTION_M_PLACEHOLDER.map((f) => (
-              <li key={f.factor} className="flex items-center justify-between gap-2 py-1.5 border-b border-[#122240] last:border-b-0">
-                <span className="text-[#EDF4FF] font-medium">{f.factor}</span>
-                <span className="text-[#5B8AB8] text-[11px] text-right max-w-[60%]">{f.weight}</span>
+              <li key={f.factor} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--bd-border)", gap: 10 }}>
+                <span style={{ fontFamily: "var(--bd-serif)", fontSize: 12, color: "var(--text)", fontWeight: 600 }}>{f.factor}</span>
+                <span style={{ fontFamily: "var(--bd-mono)", fontSize: 9, color: "var(--t40)", textAlign: "right", maxWidth: "60%" }}>{f.weight}</span>
               </li>
             ))}
           </ul>
         </Card>
 
         <Card title="Document type">
-          <div className="space-y-1.5">
+          <SubLabel>Auto-classified by audit pre-step</SubLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
             {(["SOW", "PWS", "SOO", "RFP", "RFQ", "IFB"] as const).map((t) => (
-              <div key={t} className="flex items-center justify-between text-[12px]">
-                <span className="text-[#B5D4F4]" style={{ fontFamily: "var(--mono)" }}>{t}</span>
+              <div key={t} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--bd-mono)", fontSize: 10 }}>
+                <span style={{ color: "var(--gold)" }}>{t}</span>
                 <StatusPill kind="neutral">—</StatusPill>
               </div>
             ))}
           </div>
-          <div className="mt-3 text-[11px] text-[#5B8AB8]">Auto-classified by audit pre-step.</div>
         </Card>
 
         <Card title="Risk-adjusted pricing">
-          <div className="text-[12px] text-[#5B8AB8] leading-relaxed">
-            Price reserves auto-suggested from risks_json (hex-chrome rework reserve · CMMC certification ramp ·
-            FOB freight liability · schedule contingency).
-          </div>
-          <div className="mt-3 text-[11px] text-[#2D5280] italic">
+          <p style={{ fontFamily: "var(--bd-mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.6 }}>
+            Reserves auto-suggested from <span style={{ color: "var(--gold)" }}>risks_json</span> — hex-chrome rework · CMMC certification · FOB freight liability · schedule contingency.
+          </p>
+          <p style={{ fontFamily: "var(--bd-mono)", fontSize: 9, color: "var(--t25)", fontStyle: "italic", marginTop: 10 }}>
             No active solicitation — open a proposal to see specific reserves.
-          </div>
+          </p>
         </Card>
       </div>
 
@@ -84,18 +84,41 @@ export default function ProposalTab() {
         "Drag audit findings onto proposal sections",
         "Real-time co-edit with team",
         "Compliance checkbox state persists per solicitation",
-        "Auto-generate Vol I / II / III outline scaffolds",
+        "Auto-generate Vol I / II / III scaffolds",
         "Pricing reserves calculated from compliance_json + risks_json"
       ]} />
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+export function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-[#091322] border border-[#122240] rounded p-4">
-      <h3 className="text-[10px] uppercase tracking-[0.1em] text-[#5B8AB8] mb-3">{title}</h3>
+    <section style={{ background: "var(--void2)", border: "1px solid var(--bd-border)", borderRadius: 3, padding: 16 }}>
+      <h3 style={{ fontFamily: "var(--bd-mono)", fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--gold)", opacity: 0.85, marginBottom: 6 }}>
+        {title}
+      </h3>
       {children}
     </section>
+  );
+}
+
+export function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontFamily: "var(--bd-mono)", fontSize: 8, color: "var(--t25)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+      {children}
+    </div>
+  );
+}
+
+export function EmptyBanner({ title, body }: { title: string; body: string }) {
+  return (
+    <div style={{ background: "var(--void2)", border: "1px dashed var(--bd-border2)", borderRadius: 3, padding: "20px 24px", textAlign: "center" }}>
+      <div style={{ fontFamily: "var(--bd-serif)", fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
+        {title}
+      </div>
+      <div style={{ fontFamily: "var(--bd-mono)", fontSize: 10, color: "var(--t60)" }}>
+        {body}
+      </div>
+    </div>
   );
 }

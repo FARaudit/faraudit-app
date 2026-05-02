@@ -3,6 +3,39 @@
 @import "@fontsource/inter/500.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700;900&display=swap');
+
+/* BD OS / home-s04 design tokens — match public/home.html visual spec.
+   Scoped under .bd-os so they don't pollute the rest of the app. */
+.bd-os {
+  --void:  #030810;
+  --void2: #060F1C;
+  --void3: #0A1628;
+  --gold:  #C9A84C;
+  --gold2: #DFB96A;
+  --gold3: #F0D48E;
+  --text:  #F5F0E8;
+  --text2: #E8E2D4;
+  --t80:   rgba(245,240,232,.80);
+  --t60:   rgba(245,240,232,.60);
+  --t40:   rgba(245,240,232,.40);
+  --t25:   rgba(245,240,232,.25);
+  --t12:   rgba(245,240,232,.12);
+  --red:   #EF4444;
+  --amber: #F59E0B;
+  --green: #4ADE80;
+  --blue:  #60A5FA;
+  --bd-mono:  'JetBrains Mono', ui-monospace, monospace;
+  --bd-serif: 'Fraunces', Georgia, serif;
+  --bd-border:  rgba(201,168,76,.10);
+  --bd-border2: rgba(201,168,76,.20);
+  --bd-sidebar: 220px;
+  --bd-topbar:  52px;
+}
+@keyframes bd-ldot {
+  0%, 100% { opacity: 1 }
+  50%      { opacity: 0.4 }
+}
 
 :root {
   --fa-bg:        #050D1A;

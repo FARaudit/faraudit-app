@@ -1,28 +1,42 @@
 interface Props {
-  kind: "clean" | "review" | "trap" | "info" | "neutral";
+  kind: "clean" | "review" | "trap" | "info" | "neutral" | "gold";
   children: React.ReactNode;
 }
 
-const STYLE: Record<Props["kind"], string> = {
-  clean:   "bg-[#10B98120] text-[#10B981] border border-[#10B98140]",
-  review:  "bg-[#F59E0B20] text-[#F59E0B] border border-[#F59E0B40]",
-  trap:    "bg-[#EF444420] text-[#EF4444] border border-[#EF444440]",
-  info:    "bg-[#378ADD20] text-[#378ADD] border border-[#378ADD40]",
-  neutral: "bg-[#0D1C30] text-[#5B8AB8] border border-[#122240]"
+const STYLE: Record<Props["kind"], React.CSSProperties> = {
+  clean:   { background: "rgba(74,222,128,.10)",  color: "var(--green)", borderColor: "rgba(74,222,128,.18)" },
+  review:  { background: "rgba(245,158,11,.10)",  color: "var(--amber)", borderColor: "rgba(245,158,11,.20)" },
+  trap:    { background: "rgba(239,68,68,.12)",   color: "var(--red)",   borderColor: "rgba(239,68,68,.22)"  },
+  info:    { background: "rgba(96,165,250,.10)",  color: "var(--blue)",  borderColor: "rgba(96,165,250,.18)" },
+  neutral: { background: "rgba(245,240,232,.04)", color: "var(--t40)",   borderColor: "rgba(245,240,232,.08)" },
+  gold:    { background: "rgba(201,168,76,.10)",  color: "var(--gold)",  borderColor: "rgba(201,168,76,.20)" }
 };
 
 export default function StatusPill({ kind, children }: Props) {
+  const s = STYLE[kind];
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-[1px] rounded text-[10px] font-medium uppercase tracking-[0.06em] ${STYLE[kind]}`}
-      style={{ fontFamily: "var(--sans)" }}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "1px 6px",
+        borderRadius: 2,
+        fontFamily: "var(--bd-mono)",
+        fontSize: 8,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        border: `1px solid ${s.borderColor as string}`,
+        background: s.background,
+        color: s.color
+      }}
     >
       {children}
     </span>
   );
 }
 
-// Map a recommendation string to a pill kind.
 export function recPillKind(rec: string | null | undefined): Props["kind"] {
   if (!rec) return "neutral";
   if (rec === "PROCEED") return "clean";
@@ -31,7 +45,6 @@ export function recPillKind(rec: string | null | undefined): Props["kind"] {
   return "info";
 }
 
-// Map a compliance score 0-100 to a pill kind.
 export function scorePillKind(score: number | null | undefined): Props["kind"] {
   if (score == null) return "neutral";
   if (score >= 70) return "clean";

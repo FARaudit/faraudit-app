@@ -1,37 +1,94 @@
 "use client";
 
-import type { TabKey } from "./BdOsShell";
+import type { TabKey, TabSpec } from "./BdOsShell";
 
 interface Props {
-  tabs: { key: TabKey; label: string }[];
+  tabs: TabSpec[];
   active: TabKey;
   onSelect: (k: TabKey) => void;
 }
 
 export default function TabNav({ tabs, active, onSelect }: Props) {
   return (
-    <nav className="border-b border-[#122240] bg-[#050D1A] sticky top-14 z-20">
-      <div className="max-w-[1600px] mx-auto px-4 flex">
-        {tabs.map((t) => {
-          const isActive = t.key === active;
-          return (
-            <button
-              key={t.key}
-              onClick={() => onSelect(t.key)}
-              className={[
-                "px-4 h-11 text-[12px] uppercase tracking-[0.1em] transition-colors relative",
-                isActive ? "text-[#EDF4FF]" : "text-[#5B8AB8] hover:text-[#B5D4F4]"
-              ].join(" ")}
-              style={{ fontFamily: "var(--sans)", fontWeight: 500 }}
-            >
-              {t.label}
-              {isActive && (
-                <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-[#378ADD]" aria-hidden="true" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+    <nav
+      style={{
+        display: "flex",
+        borderBottom: "1px solid var(--bd-border)",
+        background: "rgba(6,15,28,.8)",
+        flexShrink: 0,
+        overflowX: "auto"
+      }}
+    >
+      {tabs.map((t) => {
+        const isActive = t.key === active;
+        return (
+          <button
+            key={t.key}
+            onClick={() => onSelect(t.key)}
+            style={{
+              padding: "12px 18px",
+              fontFamily: "var(--bd-mono)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              color: isActive ? "var(--gold2)" : "var(--t40)",
+              background: "transparent",
+              border: "none",
+              borderBottom: `2px solid ${isActive ? "var(--gold)" : "transparent"}`,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              textTransform: "uppercase"
+            }}
+          >
+            {t.dot && (
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  background:
+                    t.dot === "red" ? "var(--red)" :
+                    t.dot === "gold" ? "var(--gold)" :
+                    t.dot === "green" ? "var(--green)" :
+                    "var(--blue)"
+                }}
+              />
+            )}
+            {t.label}
+            {t.count != null && t.count > 0 && (
+              <span
+                style={{
+                  fontFamily: "var(--bd-mono)",
+                  fontSize: 8,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 8,
+                  ...(t.countTone === "red" && {
+                    background: "rgba(220,38,38,.15)",
+                    color: "var(--red)",
+                    border: "1px solid rgba(220,38,38,.22)"
+                  }),
+                  ...(t.countTone === "gold" && {
+                    background: "rgba(201,168,76,.1)",
+                    color: "var(--gold)",
+                    border: "1px solid rgba(201,168,76,.2)"
+                  }),
+                  ...(t.countTone === "green" && {
+                    background: "rgba(74,222,128,.08)",
+                    color: "var(--green)",
+                    border: "1px solid rgba(74,222,128,.15)"
+                  })
+                }}
+              >
+                {t.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </nav>
   );
 }
