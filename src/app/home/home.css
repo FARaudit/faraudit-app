@@ -92,7 +92,7 @@
 .bd-home .sit-value.amber{color:var(--amber);}
 .bd-home .sit-value.gold{color:var(--gold2);}
 .bd-home .sit-value.green{color:var(--green);}
-.bd-home .sit-sub{font-family:var(--mono);font-size:8px;color:var(--t40);margin-top:1px;}
+.bd-home .sit-sub{font-family:var(--mono);font-size:11px;color:var(--t80);margin-top:1px;line-height:1.55;}
 .bd-home .sit-cta{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-top:6px;display:flex;align-items:center;gap:4px;}
 .bd-home .sit-cta.gold{color:var(--gold);opacity:.7;}
 

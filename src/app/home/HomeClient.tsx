@@ -347,25 +347,25 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   ) : (
                     <div className="sit-value red">{stats.p0}</div>
                   )}
-                  <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--red)", marginTop: 10, borderTop: "1px solid rgba(220,38,38,.15)", paddingTop: 8 }}>Review P0 Flags →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--amber)" }} onClick={() => setFilter("≤7 Days")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--amber)", marginBottom: 8 }}>⏱ Expiring This Week</div>
                   <div className="sit-value gold">{stats.exp}</div>
-                  <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--amber)", marginTop: 10, borderTop: "1px solid rgba(245,158,11,.15)", paddingTop: 8 }}>View Expiring →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("sam")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>● Live on SAM.gov Now</div>
                   <div className="sit-value gold">{stats.total}</div>
-                  <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(201,168,76,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("past-audits")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--green)", marginBottom: 8 }}>✓ Your Audit Activity</div>
                   <div className="sit-value green">{counter.audits}</div>
-                  <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Audits completed total. {counter.traps} compliance traps caught — every clause read, every trap flagged, every KO email drafted.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Audits completed total. {counter.traps} compliance traps caught — every clause read, every trap flagged, every KO email drafted.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--green)", marginTop: 10, borderTop: "1px solid rgba(74,222,128,.15)", paddingTop: 8 }}>View Recent Audits →</div>
                 </button>
               </div>
