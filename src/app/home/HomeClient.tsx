@@ -342,7 +342,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <div className="situation-board">
                 <button className="sit-card urgent" onClick={() => setFilter("P0 · P1")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--red)", marginBottom: 8 }}>⚠ Critical — Act Today</div>
-                  <div className="sit-value red">{stats.p0}</div>
+                  {stats.p0 === 0 ? (
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--green)", lineHeight: 1.4, padding: "8px 0" }}>0 traps detected · feed is clean</div>
+                  ) : (
+                    <div className="sit-value red">{stats.p0}</div>
+                  )}
                   <div className="sit-sub" style={{ fontSize: 9, color: "rgba(245,240,232,.65)", lineHeight: 1.6, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--red)", marginTop: 10, borderTop: "1px solid rgba(220,38,38,.15)", paddingTop: 8 }}>Review P0 Flags →</div>
                 </button>
@@ -409,7 +413,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                     {filtered.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
-                          ? "No solicitations queued yet. sam-ingest will populate the feed at 06:00 CDT."
+                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
                           : "No solicitations match this filter."}
                       </div>
                     )}
@@ -455,7 +459,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                     <div className="acct-grid">
                       <div className="acct-stat"><div className="as-n">{counter.audits}</div><div className="as-l">Audits Run</div></div>
                       <div className="acct-stat"><div className="as-n red">{counter.traps}</div><div className="as-l">Traps Caught</div></div>
-                      <div className="acct-stat"><div className="as-n">—</div><div className="as-l">Value Audited</div></div>
+                      <div className="acct-stat"><div className="as-n">$0</div><div className="as-l">audited · pending first solicitation</div></div>
                       <div className="acct-stat"><div className="as-n green">$0</div><div className="as-l">Compliance Risk</div></div>
                     </div>
                     <div className="days-wrap">
@@ -498,7 +502,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       <span>Sol. Number</span><span>Title</span><span>Agency</span><span>Posted</span><span>Risk</span>
                     </div>
                     {filtered.length === 0 && (
-                      <div className="empty-state">{opportunities.length === 0 ? "No solicitations queued yet." : "No rows match this NAICS filter."}</div>
+                      <div className="empty-state">
+                        {opportunities.length === 0
+                          ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
+                          : "No rows match this NAICS filter."}
+                      </div>
                     )}
                     {[...filtered].sort((a, b) => (a.daysNum ?? 9999) - (b.daysNum ?? 9999)).map((r) => {
                       const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : "var(--gold)";
@@ -612,6 +620,19 @@ interface Enriched {
   riskLabel: string;
   saCls: "sb" | "sd" | "wo" | "a8" | "un";
   saLabel: string;
+}
+
+// Hours until the next sam-ingest cron run (06:00 CDT = 11:00 UTC).
+// Returns at least 1 so the empty-state never displays "in 0 hours".
+function hoursUntilNextSamIngest(): number {
+  const now = new Date();
+  const nextRun = new Date();
+  nextRun.setUTCHours(11, 0, 0, 0);
+  if (nextRun.getTime() <= now.getTime()) {
+    nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+  }
+  const hours = Math.ceil((nextRun.getTime() - now.getTime()) / 3_600_000);
+  return Math.max(1, hours);
 }
 
 function enrichRow(row: OpportunityRow): Enriched {
@@ -1450,7 +1471,7 @@ function BudgetPanel({ naicsOptions }: { naicsOptions: string[] }) {
         {loading && <div className="empty-block">Loading budget data from USAspending.gov…</div>}
         {err && <div className="ko-status error">{err}</div>}
         {!loading && !err && visible.length === 0 && (
-          <div className="empty-state">No data returned. Try a different NAICS code or wait for cache to populate.</div>
+          <div className="empty-state">Select a NAICS code from the dropdown to view DoD FY2026 spend ($895B total)</div>
         )}
 
         {visible.length > 0 && (
@@ -2129,7 +2150,7 @@ function ProtestPanel() {
               <div className="sam-th" style={{ gridTemplateColumns: "100px 130px 1fr 130px 90px" }}>
                 <span>Decision</span><span>Docket</span><span>Protester / ground</span><span>Agency</span><span>Outcome</span>
               </div>
-              {data.decisions.length === 0 && <div className="empty-state">No decisions cached yet — GAO RSS unavailable.</div>}
+              {data.decisions.length === 0 && <div className="empty-state">GAO RSS feed temporarily unavailable · cache refreshes every 6 hours</div>}
               {data.decisions.map((d) => {
                 const out = (d.outcome || "").toLowerCase();
                 const color = out === "sustained" ? "var(--red)" : out === "denied" ? "var(--green)" : "var(--t60)";
@@ -2562,7 +2583,7 @@ function RFIResponsePanel({ opportunities }: { opportunities: OpportunityRow[] }
 
         {presol.length === 0 ? (
           <div className="empty-state" style={{ padding: "60px 20px" }}>
-            No pre-sol or sources-sought notices in the queue. sam-ingest will populate once expanded notice-type pull is live.
+            Pre-solicitation feed activates when sam-ingest expands notice-type pull · ETA next sprint
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, alignItems: "start" }}>
