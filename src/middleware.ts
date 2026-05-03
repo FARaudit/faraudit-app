@@ -2,8 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC = [
+  "/",
   "/sign-in",
   "/login",
+  "/pricing",
+  "/how-it-works",
+  "/learn",
+  "/terms",
+  "/privacy",
+  "/access",
   "/landing.html",
   "/access.html",
   "/signin.html"
