@@ -234,3 +234,78 @@
 .bd-home .audit-input input:focus{border-color:var(--gold);}
 .bd-home .audit-error{margin-top:14px;padding:10px 12px;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:2px;font-family:var(--mono);font-size:10px;color:var(--red);}
 .bd-home .audit-success{margin-top:14px;padding:12px 14px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:2px;font-family:var(--mono);font-size:10px;color:var(--green);text-align:left;}
+
+/* ━━ Theme migration · light-mode overrides ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Default palette above is FARaudit dark-mode (deep navy + gold).
+   Light mode flips content-area vars; sidebar + topbar stay dark for the
+   distinctive Bloomberg-terminal look. System mode follows OS preference.
+   Components use the same CSS vars; only var values change per theme. */
+
+[data-theme="light"] .bd-home {
+  --void:#FFFFFF;
+  --void2:#F9FAFB;
+  --void3:#F1F5F9;
+  --text:#1F2937;
+  --text2:#475569;
+  --t80:rgba(31,41,55,.85);
+  --t60:rgba(31,41,55,.65);
+  --t40:rgba(31,41,55,.45);
+  --t25:rgba(31,41,55,.30);
+  --t12:rgba(31,41,55,.15);
+  --border:rgba(201,168,76,.25);
+  --border2:rgba(201,168,76,.40);
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] .bd-home {
+    --void:#FFFFFF;
+    --void2:#F9FAFB;
+    --void3:#F1F5F9;
+    --text:#1F2937;
+    --text2:#475569;
+    --t80:rgba(31,41,55,.85);
+    --t60:rgba(31,41,55,.65);
+    --t40:rgba(31,41,55,.45);
+    --t25:rgba(31,41,55,.30);
+    --t12:rgba(31,41,55,.15);
+    --border:rgba(201,168,76,.25);
+    --border2:rgba(201,168,76,.40);
+  }
+}
+
+/* Sidebar + topbar stay dark in both themes — distinctive aesthetic.
+   Override the var-driven backgrounds with literal dark values; restore
+   cream text + gold-tinted borders so nav remains readable on dark bg. */
+[data-theme="light"] .bd-home .sidebar,
+[data-theme="light"] .bd-home .topbar,
+[data-theme="light"] .bd-home .tb-brand,
+[data-theme="light"] .bd-home .page-tabs {
+  background:#060F1C;
+  color:#F5F0E8;
+  border-color:rgba(201,168,76,.10);
+}
+[data-theme="light"] .bd-home .topbar { background:rgba(3,8,16,.96); }
+[data-theme="light"] .bd-home .tb-wordmark { color:#F5F0E8; }
+[data-theme="light"] .bd-home .nav-label { color:rgba(245,240,232,.30); }
+[data-theme="light"] .bd-home .nav-item { color:rgba(245,240,232,.45); }
+[data-theme="light"] .bd-home .nav-item:hover { color:#E8E2D4; }
+[data-theme="light"] .bd-home .ptab { color:rgba(245,240,232,.45); }
+[data-theme="light"] .bd-home .ptab:hover { color:rgba(245,240,232,.85); }
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] .bd-home .sidebar,
+  [data-theme="system"] .bd-home .topbar,
+  [data-theme="system"] .bd-home .tb-brand,
+  [data-theme="system"] .bd-home .page-tabs {
+    background:#060F1C;
+    color:#F5F0E8;
+    border-color:rgba(201,168,76,.10);
+  }
+  [data-theme="system"] .bd-home .topbar { background:rgba(3,8,16,.96); }
+  [data-theme="system"] .bd-home .tb-wordmark { color:#F5F0E8; }
+  [data-theme="system"] .bd-home .nav-label { color:rgba(245,240,232,.30); }
+  [data-theme="system"] .bd-home .nav-item { color:rgba(245,240,232,.45); }
+  [data-theme="system"] .bd-home .nav-item:hover { color:#E8E2D4; }
+  [data-theme="system"] .bd-home .ptab { color:rgba(245,240,232,.45); }
+  [data-theme="system"] .bd-home .ptab:hover { color:rgba(245,240,232,.85); }
+}
