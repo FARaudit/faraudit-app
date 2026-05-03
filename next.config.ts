@@ -52,8 +52,8 @@ const nextConfig: NextConfig = {
       { source: "/audit", destination: "/home", permanent: true },
       { source: "/upstream-intel", destination: "/home", permanent: true },
       { source: "/prospects", destination: "/home", permanent: true },
-      { source: "/alerts", destination: "/home", permanent: true },
-      { source: "/settings", destination: "/home", permanent: true }
+      { source: "/alerts", destination: "/home", permanent: true }
+      // /settings is a real route now (Profile & Settings · theme toggle).
     ];
   }
 };

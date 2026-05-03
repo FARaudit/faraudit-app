@@ -4,7 +4,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
-const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled"]);
+const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme"]);
+const VALID_THEMES = new Set(["light", "dark", "system"]);
 
 export async function GET() {
   const sb = await createServerClient();
@@ -32,7 +33,9 @@ export async function PATCH(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const update: Record<string, unknown> = { user_id: user.id, updated_at: new Date().toISOString() };
   for (const [k, v] of Object.entries(body)) {
-    if (ALLOWED.has(k)) update[k] = v;
+    if (!ALLOWED.has(k)) continue;
+    if (k === "theme" && (typeof v !== "string" || !VALID_THEMES.has(v))) continue;
+    update[k] = v;
   }
   if (Object.keys(update).length <= 2) {
     return NextResponse.json({ error: "no allowed fields" }, { status: 400 });

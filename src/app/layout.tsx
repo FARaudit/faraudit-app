@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AuthShell from "./_components/auth-shell";
+import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "FARaudit — Federal Contract Intelligence",
@@ -14,12 +15,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" data-theme="light">
       <body className="min-h-full flex flex-col bg-bg text-text">
-        <AuthShell />
-        <div className="flex-1 md:pl-[var(--sidebar-w,0px)] transition-[padding] duration-150">
-          {children}
-        </div>
+        <ThemeProvider>
+          <AuthShell />
+          <div className="flex-1 md:pl-[var(--sidebar-w,0px)] transition-[padding] duration-150">
+            {children}
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
