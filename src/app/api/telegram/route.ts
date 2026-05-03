@@ -34,6 +34,15 @@ async function askClaude(prompt: string, maxTokens: number): Promise<string> {
   }
 }
 
+// PUBLIC ENDPOINT — Telegram webhook receiver.
+// Telegram POSTs here from its own infra; there is no Supabase session to verify.
+// Cannot use supabase.auth.getUser() — would break the webhook.
+// KNOWN ABUSE VECTOR: anyone can POST a fake Telegram update body and burn Anthropic
+// credits per request (each /brief, /learn, /news call hits Claude Opus).
+// FOLLOW-UP TO HARDEN: register webhook with secret_token via Telegram setWebhook,
+// store as TELEGRAM_WEBHOOK_SECRET env var, then verify
+// req.headers.get("x-telegram-bot-api-secret-token") === process.env.TELEGRAM_WEBHOOK_SECRET
+// before processing the body. Tracked as P1 in security backlog.
 export async function POST(req: Request) {
   let text = "";
   try {
