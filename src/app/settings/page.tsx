@@ -75,14 +75,28 @@ export default function SettingsPage() {
 
   return (
     <main
+      className="settings-main"
       style={{
         minHeight: "100vh",
         background: BG,
         color: TEXT_1,
         fontFamily: "Inter, system-ui, sans-serif",
-        padding: "40px 24px 80px"
+        paddingTop: 40,
+        paddingBottom: 80,
+        paddingLeft: 24,
+        paddingRight: 24
       }}
     >
+      {/* Reserve space on the left for AuthShell's fixed sidebar (Navigation.tsx · 220px expanded · 52px collapsed).
+          Layout's md:pl-[var(--sidebar-w,0px)] Tailwind class was failing to apply consistently — overriding here directly. */}
+      <style>{`
+        @media (min-width: 768px) {
+          .settings-main {
+            padding-left: calc(var(--sidebar-w, 220px) + 32px) !important;
+            padding-right: 32px !important;
+          }
+        }
+      `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         {/* Top breadcrumb */}
         <Link
