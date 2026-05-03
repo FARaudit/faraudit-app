@@ -10,7 +10,7 @@ import {
 } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // PDF magic bytes — first four bytes of every PDF are %PDF (0x25 0x50 0x44 0x46).
 const PDF_MAGIC = Buffer.from("%PDF", "ascii");

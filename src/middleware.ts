@@ -10,7 +10,7 @@ const PUBLIC = [
 ];
 const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots"];
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC.includes(pathname) || PUBLIC_PREFIX.some((p) => pathname.startsWith(p))) {
