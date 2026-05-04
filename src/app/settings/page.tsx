@@ -178,7 +178,7 @@ export default function SettingsPage() {
           </div>
           <h2 style={{ fontSize: 16, fontWeight: 600, color: TEXT_1, margin: "0 0 6px" }}>Theme</h2>
           <p style={{ fontSize: 12.5, color: TEXT_2, lineHeight: 1.55, margin: "0 0 16px" }}>
-            Choose how FARaudit looks. <strong style={{ color: TEXT_1 }}>System</strong> follows your OS preference.
+            Choose how FARaudit looks. <strong style={{ color: TEXT_1 }}>Auto</strong> follows your OS preference.
           </p>
 
           <div
@@ -193,7 +193,7 @@ export default function SettingsPage() {
               background: SURFACE_2
             }}
           >
-            {(["light", "dark", "system"] as Theme[]).map((option, idx) => {
+            {(["dark", "auto"] as Theme[]).map((option, idx, arr) => {
               const active = theme === option;
               return (
                 <button
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                     fontSize: 13,
                     fontWeight: 600,
                     border: "none",
-                    borderRight: idx < 2 ? `1px solid ${BORDER_2}` : "none",
+                    borderRight: idx < arr.length - 1 ? `1px solid ${BORDER_2}` : "none",
                     background: active ? ACCENT : "transparent",
                     color: active ? "#FFFFFF" : TEXT_2,
                     cursor: "pointer",

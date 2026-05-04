@@ -1,8 +1,8 @@
 "use client";
 
-// Theme system foundation — light default · dark + system options.
+// Theme system — Dark + Auto only (Light dropped May 3 2026, F-44).
+// Stale 'light' / 'system' values from localStorage or server coerce to 'auto' on load.
 // Persists to user_preferences.theme (server) when authed, localStorage (client) otherwise.
-// Components stay on legacy --fa-* vars until migrated; this file builds the wiring.
 
 import {
   createContext,
@@ -13,9 +13,9 @@ import {
   type ReactNode
 } from "react";
 
-export type Theme = "light" | "dark" | "system";
+export type Theme = "dark" | "auto";
 const STORAGE_KEY = "faraudit-theme";
-const VALID: Theme[] = ["light", "dark", "system"];
+const VALID: Theme[] = ["dark", "auto"];
 
 type ThemeContextValue = {
   theme: Theme;
@@ -30,38 +30,52 @@ function isTheme(v: unknown): v is Theme {
   return typeof v === "string" && (VALID as readonly string[]).includes(v);
 }
 
+// Stale values from before the F-44 cleanup map to Auto.
+function coerce(v: unknown): Theme {
+  if (v === "dark") return "dark";
+  if (v === "auto") return "auto";
+  if (v === "light" || v === "system") return "auto";
+  return "dark";
+}
+
 function applyToDom(theme: Theme) {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", theme);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // SSR-safe initial: render with light default; once mounted, hydrate from storage/server.
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("dark");
   const [ready, setReady] = useState(false);
 
   // ━ Initial load (client only) ━
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // 1. localStorage first (fast, works logged-out).
-      let initial: Theme = "light";
+      let initial: Theme = "dark";
+      let staleLocal = false;
       try {
         const fromLocal = window.localStorage.getItem(STORAGE_KEY);
-        if (isTheme(fromLocal)) initial = fromLocal;
+        if (fromLocal !== null) {
+          const next = coerce(fromLocal);
+          if (next !== fromLocal) staleLocal = true;
+          initial = next;
+        }
       } catch {
         /* private mode or storage disabled · fall through */
       }
 
-      // 2. If logged in, server pref wins (canonical source of truth).
+      let serverStale = false;
       try {
         const res = await fetch("/api/preferences", { credentials: "include" });
         if (res.ok) {
           const json = (await res.json()) as { preferences?: { theme?: string } | null };
           const serverTheme = json?.preferences?.theme;
-          if (isTheme(serverTheme)) initial = serverTheme;
+          if (typeof serverTheme === "string") {
+            const next = coerce(serverTheme);
+            if (next !== serverTheme) serverStale = true;
+            initial = next;
+          }
         }
-        // 401 (logged out) and other errors → keep localStorage fallback.
       } catch {
         /* network · keep localStorage */
       }
@@ -70,13 +84,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setThemeState(initial);
       applyToDom(initial);
       setReady(true);
+
+      // Persist coerced value back if stale value was found.
+      if (staleLocal) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, initial);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (serverStale) {
+        fetch("/api/preferences", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ theme: initial })
+        }).catch(() => {
+          /* offline */
+        });
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // ━ Setter — apply DOM, persist locally + server (best effort) ━
   const setTheme = useCallback((next: Theme) => {
     if (!isTheme(next)) return;
     setThemeState(next);
@@ -86,7 +118,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    // Best-effort server persist · ignore 401 (logged-out user uses localStorage).
     fetch("/api/preferences", {
       method: "PATCH",
       credentials: "include",
@@ -105,10 +136,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
-    // Defensive — if a component using useTheme() renders outside the provider
-    // (e.g. during a refactor), give it a no-op so we don't crash the page.
     return {
-      theme: "light",
+      theme: "dark",
       setTheme: () => {},
       ready: false
     };

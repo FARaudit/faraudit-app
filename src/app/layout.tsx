@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased" data-theme="light">
+    <html lang="en" className="h-full antialiased" data-theme="dark">
       <body className="min-h-full flex flex-col bg-bg text-text">
         <ThemeProvider>
           <AuthShell />
