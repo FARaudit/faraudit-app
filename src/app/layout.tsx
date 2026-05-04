@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AuthShell from "./_components/auth-shell";
+import MobileAdvisory from "./_components/mobile-advisory";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-bg text-text">
         <ThemeProvider>
           <AuthShell />
+          <MobileAdvisory />
           <div className="flex-1 md:pl-[var(--sidebar-w,0px)] transition-[padding] duration-150">
             {children}
           </div>

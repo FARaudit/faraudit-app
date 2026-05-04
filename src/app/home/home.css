@@ -280,3 +280,38 @@
   .bd-home .feed-cols,
   .bd-home .feed-row { min-width: 720px; }
 }
+
+/* ━━ Phone graceful landing · <768px (Prompt 15) ━━━━━━━━━━━━━━━━━━━━━━━━
+   Per CEO Q5: phone is read-only graceful landing, not full functionality.
+   Customer can sign in, see Today, browse Past Audits, click into an audit.
+   Sidebar disappears entirely (advisory banner explains why · MobileAdvisory
+   component renders sticky-top below 768px). Grids collapse to 1-col; dense
+   tables keep the scroll-inside-container pattern from iPad.
+   Navigation.tsx (non-home routes) already hides at <768px via Tailwind
+   `hidden md:flex` — no rule needed here. */
+@media (max-width: 767px) {
+  /* Hide internal sidebar entirely · single-column main area */
+  .bd-home .app { grid-template-columns: 1fr; }
+  .bd-home .sidebar { display: none; }
+  .bd-home .tb-brand { width: auto; padding: 0 14px; border-right: none; }
+  .bd-home .tb-search { display: none; }
+
+  /* Stack KPI grids 1-col */
+  .bd-home .situation-board { grid-template-columns: 1fr; }
+  .bd-home .sam-stat-row { grid-template-columns: 1fr 1fr; } /* 2x2 keeps KPI density readable */
+  .bd-home .acct-grid { grid-template-columns: 1fr; }
+  .bd-home .two-col { grid-template-columns: 1fr; }
+
+  /* Page tabs already overflow-x:auto · ensure tabs don't compress text */
+  .bd-home .page-tabs { padding: 0 12px; }
+
+  /* Dense tables: same scroll-inside pattern as iPad */
+  .bd-home .sam-table { overflow-x: auto; }
+  .bd-home .sam-th,
+  .bd-home .sam-row { min-width: 600px; }
+  .bd-home .feed-cols,
+  .bd-home .feed-row { min-width: 720px; }
+
+  /* Hide footer plan card and counter pills on phone */
+  .bd-home .sb-footer { display: none; }
+}
