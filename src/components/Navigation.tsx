@@ -90,6 +90,15 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
     }
   }, [pathname]);
 
+  // iPad responsive (Prompt 14): default to collapsed 52px at viewports under
+  // 1024px so the sidebar doesn't eat half the content area. User's explicit
+  // pin click still wins (writes localStorage + /api/preferences sidebar_pinned).
+  // Runs once on mount — does NOT fight subsequent togglePin updates.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth < 1024) setPinned(false);
+  }, []);
+
   if (pathname.startsWith("/home")) return null;
 
   async function togglePin() {

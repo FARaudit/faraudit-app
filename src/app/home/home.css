@@ -239,3 +239,29 @@
    Default palette above is FARaudit dark-mode (deep navy + gold).
    [data-theme="auto"] currently mirrors dark; future ticket: respect
    prefers-color-scheme: light inside [data-theme="auto"] when light ships. */
+
+/* ━━ iPad responsive · 768–1023px (Prompt 14) ━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Phone (<768px) handled separately in P15.
+   Desktop (≥1024px) keeps 4-col grids + dense tables as-is.
+   At iPad widths, content area shrinks to 548–803px (220px sidebar +
+   gutter), so 4-col grids become unreadable and dense tables overflow.
+   Reflow grids to 2-col and let tables scroll inside their container. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Today dashboard: Critical · Expiring · Live · Activity → 2x2 */
+  .bd-home .situation-board { grid-template-columns: repeat(2, 1fr); }
+  /* Opportunities tab top stat row (NAICS counts etc.) */
+  .bd-home .sam-stat-row { grid-template-columns: repeat(2, 1fr); }
+  /* Account-level grid (KO + Agency Intel cards) */
+  .bd-home .acct-grid { grid-template-columns: 1fr; }
+  /* Two-col layout (main feed + side rail) → stack so feed gets full width */
+  .bd-home .two-col { grid-template-columns: 1fr; }
+  /* Dense tables: scroll inside the container instead of overflowing the page.
+     Rows keep their fixed grid layout; the table itself becomes horizontally
+     scrollable. min-width on rows preserves desktop column widths so the
+     scroll feels intentional, not broken. */
+  .bd-home .sam-table { overflow-x: auto; }
+  .bd-home .sam-th,
+  .bd-home .sam-row { min-width: 600px; }
+  .bd-home .feed-cols,
+  .bd-home .feed-row { min-width: 720px; }
+}
