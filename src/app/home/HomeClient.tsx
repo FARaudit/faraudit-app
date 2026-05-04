@@ -1828,6 +1828,27 @@ interface CapStatement {
   stub?: boolean;
 }
 
+// Shared by initial-load lastSent baseline and debounced persist payload.
+// Order matters — JSON.stringify is order-sensitive and we use the result
+// as a signature to skip duplicate PATCHes.
+function extractCapPayload(s: CapStatement) {
+  return {
+    company_name: s.company_name,
+    uei: s.uei,
+    cage_code: s.cage_code,
+    duns: s.duns,
+    naics_codes: s.naics_codes,
+    certifications: s.certifications,
+    core_competencies: s.core_competencies,
+    differentiators: s.differentiators,
+    contact_name: s.contact_name,
+    contact_email: s.contact_email,
+    contact_phone: s.contact_phone,
+    contact_website: s.contact_website,
+    contact_address: s.contact_address
+  };
+}
+
 function CapabilityPanel() {
   const [stmt, setStmt] = useState<CapStatement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1836,6 +1857,11 @@ function CapabilityPanel() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSent = useRef("");
+  // Mirror of stmt for the debounced timeout to read. Without this the
+  // setTimeout arrow captured persist() from the render where update() was
+  // called, which read stmt from THAT render's closure — i.e., the value
+  // BEFORE the latest setState was applied. F-37: typed values were lost.
+  const stmtRef = useRef<CapStatement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1846,7 +1872,8 @@ function CapabilityPanel() {
         if (cancelled) return;
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         setStmt(data.statement);
-        lastSent.current = JSON.stringify(data.statement);
+        stmtRef.current = data.statement;
+        lastSent.current = JSON.stringify(extractCapPayload(data.statement));
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
       } finally {
@@ -1856,32 +1883,24 @@ function CapabilityPanel() {
     return () => { cancelled = true; };
   }, []);
 
+  // Keep stmtRef synced with state so the debounced persist reads the latest values.
+  useEffect(() => {
+    stmtRef.current = stmt;
+  }, [stmt]);
+
   function update<K extends keyof CapStatement>(key: K, value: CapStatement[K]) {
     setStmt((prev) => {
       if (!prev) return prev;
       return { ...prev, [key]: value };
     });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => persist(), 1000);
+    timer.current = setTimeout(() => {
+      if (stmtRef.current) persist(stmtRef.current);
+    }, 1000);
   }
 
-  async function persist() {
-    if (!stmt) return;
-    const payload: Partial<CapStatement> = {
-      company_name: stmt.company_name,
-      uei: stmt.uei,
-      cage_code: stmt.cage_code,
-      duns: stmt.duns,
-      naics_codes: stmt.naics_codes,
-      certifications: stmt.certifications,
-      core_competencies: stmt.core_competencies,
-      differentiators: stmt.differentiators,
-      contact_name: stmt.contact_name,
-      contact_email: stmt.contact_email,
-      contact_phone: stmt.contact_phone,
-      contact_website: stmt.contact_website,
-      contact_address: stmt.contact_address
-    };
+  async function persist(current: CapStatement) {
+    const payload = extractCapPayload(current);
     const sig = JSON.stringify(payload);
     if (sig === lastSent.current) return;
     setSave("saving");
@@ -1895,7 +1914,10 @@ function CapabilityPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       lastSent.current = sig;
-      setStmt(data.statement);
+      // Don't replace local stmt with server response — user may have typed
+      // additional characters during the PATCH round-trip. Just flip the stub
+      // flag and capture the server's updated_at.
+      setStmt((prev) => prev ? { ...prev, stub: false, updated_at: data.statement.updated_at } : prev);
       setSavedAt(new Date());
       setSave("saved");
     } catch (e) {
