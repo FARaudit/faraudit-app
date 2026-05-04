@@ -122,6 +122,61 @@ export interface BudgetRow {
   obligated_amount: number;
 }
 
+// DoD-scoped total obligated + top-N prime recipients for a single NAICS code in
+// a given fiscal year. Two parallel calls to the spending_by_category endpoint:
+// one with category=awarding_agency to derive the DoD-only total (sum of all
+// DoD sub-tiers), one with category=recipient to get the top primes. Used by
+// /api/budget for the Defense Spending panel header + recipients list.
+export interface RecipientShare {
+  name: string;
+  amount: number;
+}
+export async function fetchDoDTotalAndRecipientsByNaics(opts: {
+  fiscalYear: number;
+  naicsCode: string;
+  recipientLimit?: number;
+}): Promise<{ totalObligated: number; topRecipients: RecipientShare[] } | null> {
+  if (!opts.naicsCode) return null;
+  const fyStart = `${opts.fiscalYear - 1}-10-01`;
+  const fyEnd = `${opts.fiscalYear}-09-30`;
+  const dodFilter = {
+    award_type_codes: ["A", "B", "C", "D"],
+    naics_codes: [opts.naicsCode],
+    time_period: [{ start_date: fyStart, end_date: fyEnd }],
+    agencies: [{ type: "awarding", tier: "toptier", name: "Department of Defense" }]
+  };
+
+  async function callCategory(category: "awarding_agency" | "recipient", limit: number): Promise<Array<{ name?: string; amount?: number }>> {
+    try {
+      const res = await fetch(`${BASE}/search/spending_by_category/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ category, filters: dodFilter, limit, page: 1, subawards: false }),
+        signal: AbortSignal.timeout(20000)
+      });
+      if (!res.ok) return [];
+      const data: { results?: Array<{ name?: string; amount?: number }> } = await res.json();
+      return data.results || [];
+    } catch {
+      return [];
+    }
+  }
+
+  const [agencyRows, recipientRows] = await Promise.all([
+    callCategory("awarding_agency", 50),
+    callCategory("recipient", opts.recipientLimit || 10)
+  ]);
+
+  // DoD agency sub-tiers (Army, Navy, Air Force, etc.) all roll up under DoD.
+  // Sum across whatever agencies USAspending returns within the DoD filter.
+  const totalObligated = agencyRows.reduce((sum, r) => sum + (typeof r.amount === "number" ? r.amount : 0), 0);
+  const topRecipients: RecipientShare[] = recipientRows
+    .filter((r) => r.name && typeof r.amount === "number")
+    .map((r) => ({ name: r.name as string, amount: r.amount as number }));
+
+  return { totalObligated, topRecipients };
+}
+
 export async function fetchAgencySpendByNaics(opts: {
   fiscalYear: number;
   naicsCodes?: string[];
