@@ -90,7 +90,12 @@ export async function fetchOpportunities(
   client: SupabaseClient,
   opts: { limit?: number; status?: string | null; naics?: string | null } = {}
 ): Promise<OpportunityRow[]> {
-  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, notice_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  // notice_type was added in migration 003 but that migration was never applied
+  // to apex-production — so RICH used to error out and silently fall through to
+  // BASIC on every page load. Dropped from RICH; if/when migration 003 is
+  // applied, add it back here. document_type and incumbent_name DO exist on
+  // production (migrations 002 + 004 applied · schema probed 2026-05-04).
+  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   for (const cols of [RICH, BASIC]) {
     let q = client
