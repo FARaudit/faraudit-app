@@ -10,7 +10,28 @@ import type {
   AgencyRow
 } from "@/lib/bd-os/queries";
 
-type TabKey = "home" | "audit" | "sam" | "budget" | "news" | "pipeline" | "past-audits" | "ko-intelligence" | "agency-intelligence" | "rfi-response" | "teaming" | "capability" | "protest" | "regulatory" | "cmmc" | "labor" | "subcontracts";
+type TabKey =
+  | "home" | "audit" | "past-audits" | "pipeline" | "capability"
+  | "opportunities" | "defense-spending" | "news" | "contracting-officers" | "agencies"
+  | "protests" | "regulatory" | "cmmc" | "wages" | "teaming";
+
+// Legacy hash redirect map · keeps CEO bookmarks + LinkedIn links alive after
+// the Prompt 8 sidebar IA restructure. Old hashes silently rewrite to their
+// new equivalents on /home page mount.
+const LEGACY_HASH_MAP: Record<string, TabKey> = {
+  sam: "opportunities",
+  budget: "defense-spending",
+  ko: "contracting-officers",
+  "ko-intelligence": "contracting-officers",
+  agency: "agencies",
+  "agency-intelligence": "agencies",
+  protest: "protests",
+  rfi: "opportunities",
+  "rfi-response": "opportunities",
+  subcontracts: "home",
+  labor: "wages",
+  reports: "past-audits"
+};
 type FilterKey = "All" | "P0 · P1" | "≤7 Days" | "Small Business" | "IDIQ" | "Pre-Sol";
 
 interface Props {
@@ -25,9 +46,9 @@ interface Props {
 const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", "IDIQ", "Pre-Sol"];
 
 const TAB_KEYS: TabKey[] = [
-  "home", "audit", "sam", "budget", "news", "pipeline",
-  "past-audits", "ko-intelligence", "agency-intelligence", "rfi-response",
-  "teaming", "capability", "protest", "regulatory", "cmmc", "labor", "subcontracts"
+  "home", "audit", "past-audits", "pipeline", "capability",
+  "opportunities", "defense-spending", "news", "contracting-officers", "agencies",
+  "protests", "regulatory", "cmmc", "wages", "teaming"
 ];
 
 export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
@@ -46,7 +67,15 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
   useEffect(() => {
     if (typeof window === "undefined") return;
     const apply = () => {
-      const h = window.location.hash.replace("#", "") as TabKey;
+      const raw = window.location.hash.replace("#", "");
+      // Legacy hash → new hash (silent rewrite, preserves bookmarks).
+      if (raw && raw in LEGACY_HASH_MAP) {
+        const next = LEGACY_HASH_MAP[raw];
+        window.history.replaceState(null, "", `#${next}`);
+        setTabState(next);
+        return;
+      }
+      const h = raw as TabKey;
       if (TAB_KEYS.includes(h)) setTabState(h);
     };
     apply();
@@ -143,7 +172,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
         {/* SIDEBAR */}
         <div className="sidebar">
-          <div className="nav-label">Platform</div>
+          <div className="nav-label">Workspace</div>
           <button className={`nav-item ${tab === "home" ? "active" : ""}`} onClick={() => setTab("home")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -151,7 +180,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
               <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
-            Intelligence Home
+            Today
           </button>
           <button className={`nav-item ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -162,13 +191,6 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             Run Audit
             <span className="nav-ct ct-gold">New</span>
           </button>
-          <button className={`nav-item ${tab === "pipeline" ? "active" : ""}`} onClick={() => setTab("pipeline")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Pipeline Tracker
-            {stats.p0 > 0 && <span className="nav-ct ct-red">{stats.p0}</span>}
-          </button>
           <button className={`nav-item ${tab === "past-audits" ? "active" : ""}`} onClick={() => setTab("past-audits")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
@@ -178,73 +200,12 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             Past Audits
             <span className="nav-ct ct-gold">{recentAudits.length}</span>
           </button>
-          <button className={`nav-item ${tab === "past-audits" ? "active" : ""}`} onClick={() => setTab("past-audits")}>
+          <button className={`nav-item ${tab === "pipeline" ? "active" : ""}`} onClick={() => setTab("pipeline")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Reports Library
-          </button>
-
-          <div className="nav-label">Intelligence</div>
-          <button className={`nav-item ${tab === "sam" ? "active" : ""}`} onClick={() => setTab("sam")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            SAM.gov Feed
-            <span className="nav-ct ct-green">Live</span>
-          </button>
-          <button className={`nav-item ${tab === "budget" ? "active" : ""}`} onClick={() => setTab("budget")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-            </svg>
-            Budget Tracker
-          </button>
-          <button className={`nav-item ${tab === "news" ? "active" : ""}`} onClick={() => setTab("news")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-              <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            Defense News
-          </button>
-          <button className={`nav-item ${tab === "ko-intelligence" ? "active" : ""}`} onClick={() => setTab("ko-intelligence")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M3 14c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            KO Intelligence
-            {kos.length > 0 && <span className="nav-ct ct-gold">{kos.length}</span>}
-          </button>
-          <button className={`nav-item ${tab === "agency-intelligence" ? "active" : ""}`} onClick={() => setTab("agency-intelligence")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Agency Intelligence
-            {agencies.length > 0 && <span className="nav-ct ct-gold">{agencies.length}</span>}
-          </button>
-          <button className={`nav-item ${tab === "rfi-response" ? "active" : ""}`} onClick={() => setTab("rfi-response")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M3 4h10v7H6l-3 2V4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-              <line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            RFI Response
-            {(() => {
-              const presol = opportunities.filter((o) => {
-                const nt = (o.notice_type || "").toLowerCase();
-                return nt === "pre_sol" || nt === "sources_sought";
-              }).length;
-              return presol > 0 ? <span className="nav-ct ct-red">{presol}</span> : null;
-            })()}
-          </button>
-          <button className={`nav-item ${tab === "teaming" ? "active" : ""}`} onClick={() => setTab("teaming")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="5" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
-              <circle cx="11" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M2 13c0-2 1.5-3 3-3s3 1 3 3M8 13c0-2 1.5-3 3-3s3 1 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            Find Teaming Partners
+            Pipeline
+            {stats.p0 > 0 && <span className="nav-ct ct-red">{stats.p0}</span>}
           </button>
           <button className={`nav-item ${tab === "capability" ? "active" : ""}`} onClick={() => setTab("capability")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -255,12 +216,52 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             </svg>
             Capability Statement
           </button>
-          <button className={`nav-item ${tab === "protest" ? "active" : ""}`} onClick={() => setTab("protest")}>
+
+          <div className="nav-label">Intelligence</div>
+          <button className={`nav-item ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Opportunities
+            <span className="nav-ct ct-green">Live</span>
+          </button>
+          <button className={`nav-item ${tab === "defense-spending" ? "active" : ""}`} onClick={() => setTab("defense-spending")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            Defense Spending
+          </button>
+          <button className={`nav-item ${tab === "news" ? "active" : ""}`} onClick={() => setTab("news")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+              <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Defense News
+          </button>
+          <button className={`nav-item ${tab === "contracting-officers" ? "active" : ""}`} onClick={() => setTab("contracting-officers")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M3 14c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Contracting Officers
+            {kos.length > 0 && <span className="nav-ct ct-gold">{kos.length}</span>}
+          </button>
+          <button className={`nav-item ${tab === "agencies" ? "active" : ""}`} onClick={() => setTab("agencies")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Agencies
+            {agencies.length > 0 && <span className="nav-ct ct-gold">{agencies.length}</span>}
+          </button>
+          <button className={`nav-item ${tab === "protests" ? "active" : ""}`} onClick={() => setTab("protests")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
-            Protest Intelligence
+            GAO Protests
           </button>
           <button className={`nav-item ${tab === "regulatory" ? "active" : ""}`} onClick={() => setTab("regulatory")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -268,7 +269,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            Regulatory Updates
+            FAR/DFARS Updates
           </button>
           <button className={`nav-item ${tab === "cmmc" ? "active" : ""}`} onClick={() => setTab("cmmc")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -277,20 +278,19 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             </svg>
             CMMC Readiness
           </button>
-          <button className={`nav-item ${tab === "labor" ? "active" : ""}`} onClick={() => setTab("labor")}>
+          <button className={`nav-item ${tab === "wages" ? "active" : ""}`} onClick={() => setTab("wages")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            Labor Rates
+            Wage Benchmarks
           </button>
-          <button className={`nav-item ${tab === "subcontracts" ? "active" : ""}`} onClick={() => setTab("subcontracts")}>
+          <button className={`nav-item ${tab === "teaming" ? "active" : ""}`} onClick={() => setTab("teaming")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <rect x="3" y="3" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="9" y="3" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="3" y="9" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="9" y="9" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <circle cx="5" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <circle cx="11" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M2 13c0-2 1.5-3 3-3s3 1 3 3M8 13c0-2 1.5-3 3-3s3 1 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            Subcontracts
+            Teaming Partners
           </button>
 
           <div className="nav-label">Account</div>
@@ -315,17 +315,17 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
           {/* PAGE TABS */}
           <div className="page-tabs">
             <button className={`ptab ${tab === "home" ? "active" : ""}`} onClick={() => setTab("home")}>
-              <div className="ptab-dot red" />Intelligence Home
+              <div className="ptab-dot red" />Today
             </button>
             <button className={`ptab ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
               <div className="ptab-dot gold" />Run Audit
             </button>
-            <button className={`ptab ${tab === "sam" ? "active" : ""}`} onClick={() => setTab("sam")}>
-              <div className="ptab-dot green" />SAM.gov
+            <button className={`ptab ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
+              <div className="ptab-dot green" />Opportunities
               <span className="ptab-count green">{stats.total}</span>
             </button>
-            <button className={`ptab ${tab === "budget" ? "active" : ""}`} onClick={() => setTab("budget")}>
-              <div className="ptab-dot blue" />Congressional Budget
+            <button className={`ptab ${tab === "defense-spending" ? "active" : ""}`} onClick={() => setTab("defense-spending")}>
+              <div className="ptab-dot blue" />Defense Spending
             </button>
             <button className={`ptab ${tab === "news" ? "active" : ""}`} onClick={() => setTab("news")}>
               <div className="ptab-dot red" />Defense News
@@ -357,7 +357,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--amber)", marginTop: 10, borderTop: "1px solid rgba(245,158,11,.15)", paddingTop: 8 }}>View Expiring →</div>
                 </button>
-                <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("sam")}>
+                <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("opportunities")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>● Live on SAM.gov Now</div>
                   <div className="sit-value gold">{stats.total}</div>
                   <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
@@ -479,7 +479,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             </div>
 
             {/* SAM */}
-            <div className={`tab-panel ${tab === "sam" ? "active" : ""}`}>
+            <div className={`tab-panel ${tab === "opportunities" ? "active" : ""}`}>
               <div className="intel-tab-content">
                 <div className="intel-section">
                   <div className="is-header">
@@ -528,7 +528,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             </div>
 
             {/* BUDGET — live USAspending.gov */}
-            <div className={`tab-panel ${tab === "budget" ? "active" : ""}`}>
+            <div className={`tab-panel ${tab === "defense-spending" ? "active" : ""}`}>
               <BudgetPanel naicsOptions={naicsOptions} />
             </div>
 
@@ -556,19 +556,14 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <PastAuditsPanel audits={recentAudits} />
             </div>
 
-            {/* KO INTELLIGENCE */}
-            <div className={`tab-panel ${tab === "ko-intelligence" ? "active" : ""}`}>
+            {/* CONTRACTING OFFICERS */}
+            <div className={`tab-panel ${tab === "contracting-officers" ? "active" : ""}`}>
               <KOIntelPanel kos={kos} />
             </div>
 
-            {/* AGENCY INTELLIGENCE */}
-            <div className={`tab-panel ${tab === "agency-intelligence" ? "active" : ""}`}>
+            {/* AGENCIES */}
+            <div className={`tab-panel ${tab === "agencies" ? "active" : ""}`}>
               <AgencyIntelPanel agencies={agencies} />
-            </div>
-
-            {/* RFI RESPONSE */}
-            <div className={`tab-panel ${tab === "rfi-response" ? "active" : ""}`}>
-              <RFIResponsePanel opportunities={opportunities} />
             </div>
 
             {/* TEAMING PARTNERS */}
@@ -581,12 +576,12 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <CapabilityPanel />
             </div>
 
-            {/* PROTEST INTELLIGENCE */}
-            <div className={`tab-panel ${tab === "protest" ? "active" : ""}`}>
+            {/* GAO PROTESTS */}
+            <div className={`tab-panel ${tab === "protests" ? "active" : ""}`}>
               <ProtestPanel />
             </div>
 
-            {/* REGULATORY UPDATES */}
+            {/* FAR/DFARS UPDATES */}
             <div className={`tab-panel ${tab === "regulatory" ? "active" : ""}`}>
               <RegulatoryPanel />
             </div>
@@ -596,14 +591,9 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <CMMCPanel />
             </div>
 
-            {/* LABOR RATES */}
-            <div className={`tab-panel ${tab === "labor" ? "active" : ""}`}>
+            {/* WAGE BENCHMARKS */}
+            <div className={`tab-panel ${tab === "wages" ? "active" : ""}`}>
               <LaborRatesPanel naicsOptions={naicsOptions} />
-            </div>
-
-            {/* SUBCONTRACT OPPORTUNITIES */}
-            <div className={`tab-panel ${tab === "subcontracts" ? "active" : ""}`}>
-              <SubcontractsPanel naicsOptions={naicsOptions} />
             </div>
           </div>
         </div>
@@ -2445,86 +2435,6 @@ function LaborRatesPanel({ naicsOptions }: { naicsOptions: string[] }) {
   );
 }
 
-interface SubcontractRow { prime_uei: string | null; prime_name: string; contract_value: number | null; naics_code: string | null; agency: string | null; sblo_name: string | null; sblo_email: string | null; expiration: string | null; source_url: string | null; notes: string | null }
-
-function SubcontractsPanel({ naicsOptions }: { naicsOptions: string[] }) {
-  const [naics, setNaics] = useState<string>(naicsOptions[0] || "");
-  const [agency, setAgency] = useState<string>("");
-  const [rows, setRows] = useState<SubcontractRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function search() {
-    if (!naics) { setErr("NAICS required"); return; }
-    setLoading(true); setErr(null);
-    try {
-      const params = new URLSearchParams({ naics });
-      if (agency) params.set("agency", agency);
-      const res = await fetch(`/api/subcontract-opportunities?${params.toString()}`);
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-      setRows(d.opportunities || []);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally { setLoading(false); }
-  }
-
-  function fmt(n: number | null): string {
-    if (n == null) return "—";
-    if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-    return `$${n}`;
-  }
-
-  return (
-    <div className="intel-tab-content">
-      <div className="intel-section">
-        <div className="is-header">
-          <div className="is-title">Subcontracting Opportunities · prime contracts &gt; $2M</div>
-          <div className="is-refresh">USAspending · 7-day cache</div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14, padding: "12px 14px", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3 }}>
-          <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)} required>
-            <option value="">Choose NAICS…</option>
-            {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <input
-            type="text"
-            value={agency}
-            onChange={(e) => setAgency(e.target.value)}
-            placeholder="Agency keyword (optional)"
-            style={{ ...inputStyle, flex: 1, minWidth: 200 }}
-          />
-          <button type="button" className="action-btn primary" onClick={search} disabled={loading}>{loading ? "Searching…" : "Search"}</button>
-        </div>
-
-        {err && <div className="ko-status error">{err}</div>}
-        {!loading && !err && rows.length === 0 && naics && <div className="empty-state">No prime awards over $2M found in last 180 days. Try a broader NAICS.</div>}
-
-        {rows.length > 0 && (
-          <div className="sam-table">
-            <div className="sam-th" style={{ gridTemplateColumns: "1.4fr 110px 130px 110px 110px" }}>
-              <span>Prime</span><span>Value</span><span>Agency</span><span>Expires</span><span>Action</span>
-            </div>
-            {rows.map((r, i) => (
-              <div key={r.prime_uei || `${r.prime_name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1.4fr 110px 130px 110px 110px" }}>
-                <span className="sr-title">{r.prime_name}</span>
-                <span className="sr-num" style={{ color: "var(--gold)" }}>{fmt(r.contract_value)}</span>
-                <span className="sr-agency" title={r.agency || ""}>{r.agency || "—"}</span>
-                <span className="sr-date">{r.expiration ? new Date(r.expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
-                {r.source_url ? (
-                  <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="sr-badge" style={{ color: "var(--gold)", background: "rgba(201,168,76,.06)", border: "1px solid var(--border2)", textDecoration: "none", textAlign: "center" }}>USA→</a>
-                ) : <span className="sr-date">—</span>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function CapTagList({ label, values, onChange }: { label: string; values: string[]; onChange: (v: string[]) => void }) {
   const [draft, setDraft] = useState("");
@@ -2563,128 +2473,3 @@ function CapTagList({ label, values, onChange }: { label: string; values: string
   );
 }
 
-function RFIResponsePanel({ opportunities }: { opportunities: OpportunityRow[] }) {
-  const presol = useMemo(() => {
-    return opportunities.filter((o) => {
-      const nt = (o.notice_type || "").toLowerCase();
-      return nt === "pre_sol" || nt === "sources_sought";
-    });
-  }, [opportunities]);
-
-  const [selected, setSelected] = useState<OpportunityRow | null>(null);
-  const [draft, setDraft] = useState("");
-  const [drafting, setDrafting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function buildDraft(row: OpportunityRow) {
-    setSelected(row);
-    setDraft("");
-    setErr(null);
-    setDrafting(true);
-    try {
-      const res = await fetch("/api/rfi-response", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pending_audit_id: row.id,
-          notice_id: row.notice_id,
-          title: row.title,
-          agency: row.agency,
-          naics_code: row.naics_code,
-          notice_type: row.notice_type
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setDraft(data.draft || "");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDrafting(false);
-    }
-  }
-
-  async function copy() {
-    if (!draft) return;
-    try { await navigator.clipboard.writeText(draft); } catch { /* */ }
-  }
-
-  return (
-    <div className="intel-tab-content">
-      <div className="intel-section">
-        <div className="is-header">
-          <div className="is-title">Pre-Solicitation Intelligence · 60–90 day upstream</div>
-          <div className="is-refresh">{presol.length} pre-sol / sources-sought notices</div>
-        </div>
-
-        {presol.length === 0 ? (
-          <div className="empty-state" style={{ padding: "60px 20px" }}>
-            Pre-solicitation feed activates when sam-ingest expands notice-type pull · ETA next sprint
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, alignItems: "start" }}>
-            <div>
-              {presol.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => buildDraft(r)}
-                  style={{
-                    background: selected?.id === r.id ? "rgba(167,139,250,.06)" : "var(--void3)",
-                    border: `1px solid ${selected?.id === r.id ? "rgba(167,139,250,.4)" : "var(--border)"}`,
-                    borderRadius: 3, padding: "12px 14px", marginBottom: 8, cursor: "pointer"
-                  }}
-                >
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "#A78BFA", letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 4 }}>
-                    {r.notice_type === "sources_sought" ? "Sources Sought" : "Pre-Solicitation"}
-                  </div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.notice_id}</div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 600, color: "var(--text)", marginTop: 4, lineHeight: 1.3 }}>
-                    {r.title || "—"}
-                  </div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t60)", marginTop: 4 }}>
-                    {r.agency || "—"} · NAICS {r.naics_code || "—"}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div>
-              {!selected && (
-                <div className="empty-state" style={{ background: "var(--void3)", border: "1px dashed var(--border)" }}>
-                  ← Select a notice to draft a strategic RFI response.
-                </div>
-              )}
-              {selected && (
-                <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: 16 }}>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>
-                    Strategic Response · {selected.notice_id}
-                  </div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 14, color: "var(--text)", marginBottom: 14 }}>
-                    {selected.title || "—"}
-                  </div>
-                  {drafting && <div className="empty-block">Drafting response… (this can take 8–15 seconds)</div>}
-                  {err && <div className="ko-status error">{err}</div>}
-                  {draft && (
-                    <>
-                      <textarea
-                        className="ko-email-textarea"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        style={{ minHeight: 360 }}
-                      />
-                      <div className="ko-email-actions" style={{ marginTop: 10 }}>
-                        <button type="button" className="action-btn" onClick={copy}>Copy</button>
-                        <button type="button" className="action-btn" onClick={() => buildDraft(selected)} disabled={drafting}>
-                          ↻ Re-draft
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
