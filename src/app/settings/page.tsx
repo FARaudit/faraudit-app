@@ -317,26 +317,23 @@ export default function SettingsPage() {
           <p style={{ fontSize: 12, color: TEXT_2, lineHeight: 1.6, marginTop: 14, marginBottom: 14 }}>
             Billing setup coming with Phase 1 launch. Design partner pricing locks in your rate when invoicing begins.
           </p>
-          {/* TODO Phase 1.5 (Prompt 16): re-enable when /pricing page ships */}
-          {false && (
-            <Link
-              href="/pricing"
-              style={{
-                display: "inline-block",
-                background: "transparent",
-                border: `1px solid ${GOLD}`,
-                color: GOLD,
-                padding: "7px 14px",
-                borderRadius: 4,
-                fontSize: 12,
-                fontFamily: "JetBrains Mono, ui-monospace, monospace",
-                letterSpacing: "0.04em",
-                textDecoration: "none"
-              }}
-            >
-              View pricing →
-            </Link>
-          )}
+          <Link
+            href="/pricing"
+            style={{
+              display: "inline-block",
+              background: "transparent",
+              border: `1px solid ${GOLD}`,
+              color: GOLD,
+              padding: "7px 14px",
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+              letterSpacing: "0.04em",
+              textDecoration: "none"
+            }}
+          >
+            View pricing →
+          </Link>
         </section>
       </div>
     </main>
