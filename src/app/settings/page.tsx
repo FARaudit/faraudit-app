@@ -35,6 +35,8 @@ type Profile = {
 export default function SettingsPage() {
   const { theme, setTheme, ready } = useTheme();
   const [profile, setProfile] = useState<Profile>({ email: null, id: null, createdAt: null });
+  const [displayName, setDisplayName] = useState<string>("");
+  const [displayNameStatus, setDisplayNameStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
@@ -49,6 +51,17 @@ export default function SettingsPage() {
           id: data.user.id,
           createdAt: data.user.created_at ?? null
         });
+        // Load display_name from user_preferences (Prompt 1 / migration 007).
+        try {
+          const res = await fetch("/api/preferences", { credentials: "include" });
+          if (cancelled || !res.ok) return;
+          const json = (await res.json()) as { preferences?: { display_name?: string | null } | null };
+          if (typeof json.preferences?.display_name === "string") {
+            setDisplayName(json.preferences.display_name);
+          }
+        } catch {
+          /* ignore */
+        }
       } catch {
         /* ignore — profile section will show fallbacks */
       }
@@ -57,6 +70,23 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, []);
+
+  async function persistDisplayName(next: string) {
+    setDisplayNameStatus("saving");
+    try {
+      const res = await fetch("/api/preferences", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: next })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setDisplayNameStatus("saved");
+      setTimeout(() => setDisplayNameStatus("idle"), 1800);
+    } catch {
+      setDisplayNameStatus("error");
+    }
+  }
 
   const memberSince = profile.createdAt
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -124,7 +154,7 @@ export default function SettingsPage() {
           Tune the platform to your preferences.
         </p>
 
-        {/* Profile section */}
+        {/* SECTION 1 · Account */}
         <section
           style={{
             background: SURFACE,
@@ -135,9 +165,42 @@ export default function SettingsPage() {
           }}
         >
           <div style={{ fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10, color: TEXT_3, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
-            Profile
+            Account
           </div>
           <Row label="Email" value={profile.email ?? "—"} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `0.5px solid ${BORDER}`, gap: 14 }}>
+            <span style={{ color: TEXT_2, fontSize: 13 }}>Display name</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {displayNameStatus === "saving" && (
+                <span style={{ color: TEXT_3, fontSize: 11, fontFamily: "JetBrains Mono, ui-monospace, monospace" }}>● Saving…</span>
+              )}
+              {displayNameStatus === "saved" && (
+                <span style={{ color: "#10B981", fontSize: 11, fontFamily: "JetBrains Mono, ui-monospace, monospace" }}>✓ Saved</span>
+              )}
+              {displayNameStatus === "error" && (
+                <span style={{ color: "#EF4444", fontSize: 11, fontFamily: "JetBrains Mono, ui-monospace, monospace" }}>! Save failed</span>
+              )}
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                onBlur={() => { if (displayName.trim() !== "") persistDisplayName(displayName.trim()); }}
+                placeholder="Your name"
+                maxLength={80}
+                style={{
+                  background: SURFACE_2,
+                  border: `1px solid ${BORDER_2}`,
+                  color: TEXT_1,
+                  padding: "6px 10px",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  width: 220,
+                  outline: "none"
+                }}
+              />
+            </div>
+          </div>
           <Row label="User ID" value={profile.id ? profile.id.slice(0, 8) + "…" + profile.id.slice(-4) : "—"} mono />
           <Row label="Member since" value={memberSince ?? "—"} />
           <div style={{ marginTop: 16, borderTop: `1px solid ${BORDER}`, paddingTop: 14 }}>
@@ -163,7 +226,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Appearance / theme toggle section */}
+        {/* SECTION 2 · Preferences (theme · more options as backends ship) */}
         <section
           style={{
             background: SURFACE,
@@ -174,7 +237,7 @@ export default function SettingsPage() {
           }}
         >
           <div style={{ fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10, color: TEXT_3, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 8 }}>
-            Appearance
+            Preferences
           </div>
           <h2 style={{ fontSize: 16, fontWeight: 600, color: TEXT_1, margin: "0 0 6px" }}>Theme</h2>
           <p style={{ fontSize: 12.5, color: TEXT_2, lineHeight: 1.55, margin: "0 0 16px" }}>
@@ -233,27 +296,45 @@ export default function SettingsPage() {
           >
             Current: {theme}
             {ready ? "" : " · loading…"}
-            {" · persists to localStorage"}
-            {profile.id ? " + Supabase user_preferences" : ""}
           </p>
         </section>
 
-        {/* Persistence note */}
-        <p
+        {/* SECTION 3 · Plan & Billing (placeholder · billing backend ships in Phase 1 launch) */}
+        <section
           style={{
-            fontSize: 11,
-            color: TEXT_3,
-            lineHeight: 1.6,
-            fontStyle: "italic",
-            marginTop: 8
+            background: SURFACE,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 8,
+            padding: "20px 22px",
+            marginBottom: 18
           }}
         >
-          Note: server-side theme persistence requires migration{" "}
-          <code style={{ background: SURFACE_2, color: GOLD, padding: "1px 5px", borderRadius: 3, fontSize: 10, fontFamily: "JetBrains Mono, ui-monospace, monospace" }}>
-            007_user_preferences_theme.sql
-          </code>{" "}
-          to be applied in Supabase Studio. Until then, theme persists per-browser via localStorage.
-        </p>
+          <div style={{ fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10, color: TEXT_3, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
+            Plan &amp; Billing
+          </div>
+          <Row label="Current plan" value="Design Partner" />
+          <Row label="Pricing" value="$1,250/mo · waived during T1 sprint" />
+          <p style={{ fontSize: 12, color: TEXT_2, lineHeight: 1.6, marginTop: 14, marginBottom: 14 }}>
+            Billing setup coming with Phase 1 launch. Design partner pricing locks in your rate when invoicing begins.
+          </p>
+          <Link
+            href="/pricing"
+            style={{
+              display: "inline-block",
+              background: "transparent",
+              border: `1px solid ${GOLD}`,
+              color: GOLD,
+              padding: "7px 14px",
+              borderRadius: 4,
+              fontSize: 12,
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+              letterSpacing: "0.04em",
+              textDecoration: "none"
+            }}
+          >
+            View pricing →
+          </Link>
+        </section>
       </div>
     </main>
   );
