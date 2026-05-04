@@ -157,7 +157,10 @@ export async function fetchDoDTotalAndRecipientsByNaics(opts: {
 
   async function callCategory(category: "naics" | "recipient", limit: number): Promise<Array<{ name?: string; amount?: number; code?: string }>> {
     try {
-      const res = await fetch(`${BASE}/search/spending_by_category/`, {
+      // USAspending v2 requires the category in the URL path. Posting to
+      // /search/spending_by_category/ (without category) returns 404. The body
+      // also carries category for clarity but the path is what routes.
+      const res = await fetch(`${BASE}/search/spending_by_category/${category}/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ category, filters: dodFilter, limit, page: 1, subawards: false }),
@@ -249,16 +252,23 @@ export async function fetchAgencySpendByNaics(opts: {
 
   let res: Response;
   try {
-    res = await fetch(`${BASE}/search/spending_by_category/`, {
+    // USAspending v2 routes by category in the URL path. The shared
+    // /search/spending_by_category/ root returns 404.
+    res = await fetch(`${BASE}/search/spending_by_category/awarding_agency/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000)
     });
-  } catch {
+  } catch (err) {
+    console.error("[usaspending agency] fetch threw", { naics: opts.naicsCodes, fy: opts.fiscalYear, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "(unreadable)");
+    console.error("[usaspending agency] non-OK", { status: res.status, naics: opts.naicsCodes, fy: opts.fiscalYear, body: errBody.slice(0, 500) });
+    return [];
+  }
 
   let data: { results?: Array<{ name?: string; amount?: number }> } = {};
   try { data = await res.json(); } catch { return []; }
