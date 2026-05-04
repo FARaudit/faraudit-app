@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { sendTelegram } from "@/lib/telegram";
 import { getAdminClient } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// F-14: Telegram webhook authentication. Telegram echoes back the secret_token
+// we register via setWebhook on every webhook request via the
+// X-Telegram-Bot-Api-Secret-Token header. Fail-closed: if TELEGRAM_WEBHOOK_SECRET
+// is unset or the header doesn't match, reject with 401. This eliminates the
+// abuse vector documented in the prior comment (anyone POSTing /brief and
+// burning Anthropic credits per request).
+function isAuthorizedTelegramRequest(req: Request): boolean {
+  const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const provided = req.headers.get("x-telegram-bot-api-secret-token");
+  if (!expected || !provided) return false;
+  if (expected.length !== provided.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+}
 
 function extractText(content: Anthropic.Messages.ContentBlock[]): string {
   return content
@@ -34,16 +49,14 @@ async function askClaude(prompt: string, maxTokens: number): Promise<string> {
   }
 }
 
-// PUBLIC ENDPOINT — Telegram webhook receiver.
-// Telegram POSTs here from its own infra; there is no Supabase session to verify.
-// Cannot use supabase.auth.getUser() — would break the webhook.
-// KNOWN ABUSE VECTOR: anyone can POST a fake Telegram update body and burn Anthropic
-// credits per request (each /brief, /learn, /news call hits Claude Opus).
-// FOLLOW-UP TO HARDEN: register webhook with secret_token via Telegram setWebhook,
-// store as TELEGRAM_WEBHOOK_SECRET env var, then verify
-// req.headers.get("x-telegram-bot-api-secret-token") === process.env.TELEGRAM_WEBHOOK_SECRET
-// before processing the body. Tracked as P1 in security backlog.
+// Telegram webhook receiver. Authenticated via X-Telegram-Bot-Api-Secret-Token
+// header — see isAuthorizedTelegramRequest above. Telegram POSTs here from its
+// own infra; no Supabase session to verify (can't use supabase.auth.getUser).
 export async function POST(req: Request) {
+  if (!isAuthorizedTelegramRequest(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let text = "";
   try {
     const body = await req.json();
