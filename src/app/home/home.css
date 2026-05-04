@@ -247,6 +247,21 @@
    gutter), so 4-col grids become unreadable and dense tables overflow.
    Reflow grids to 2-col and let tables scroll inside their container. */
 @media (min-width: 768px) and (max-width: 1023px) {
+  /* Sidebar collapse · 220px → 56px (icons-only at iPad). Mirrors the
+     Navigation.tsx auto-collapse behavior shipped in commit d371904.
+     This sidebar has no React pin state (it's pure CSS via --sidebar),
+     so collapse is achieved by narrowing --sidebar + hiding label text
+     via font-size:0 on .nav-item. SVG icons render unaffected. Counter
+     pills + group eyebrows hide entirely. */
+  .bd-home { --sidebar: 56px; }
+  .bd-home .nav-item { font-size: 0; padding: 10px 0; justify-content: center; gap: 0; }
+  .bd-home .nav-icon { opacity: 0.7; }
+  .bd-home .nav-ct { display: none; }
+  .bd-home .nav-label { display: none; }
+  .bd-home .tb-brand { padding: 0; justify-content: center; overflow: hidden; }
+  .bd-home .tb-wordmark { font-size: 12px; letter-spacing: -0.04em; }
+  .bd-home .sb-footer { display: none; }
+
   /* Today dashboard: Critical · Expiring · Live · Activity → 2x2 */
   .bd-home .situation-board { grid-template-columns: repeat(2, 1fr); }
   /* Opportunities tab top stat row (NAICS counts etc.) */
