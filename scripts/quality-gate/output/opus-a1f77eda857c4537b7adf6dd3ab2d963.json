@@ -1,0 +1,321 @@
+{
+  "tc": {
+    "notice_id": "a1f77eda857c4537b7adf6dd3ab2d963",
+    "label": "NAICS 721110 · lodging",
+    "naics": "721110"
+  },
+  "model": "claude-opus-4-7",
+  "audit": {
+    "overview": {
+      "summary": "The 182d Airlift Wing seeks off-site lodging services for Regularly Scheduled Drill (RSD) weekends under a Blanket Purchase Agreement (BPA) for FY26. Vendors submit pricing for single and double occupancy hotel rooms, including applicable bed occupancy and city/county taxes, to support a rooming list of drilling personnel.",
+      "json": {
+        "summary": "The 182d Airlift Wing seeks off-site lodging services for Regularly Scheduled Drill (RSD) weekends under a Blanket Purchase Agreement (BPA) for FY26. Vendors submit pricing for single and double occupancy hotel rooms, including applicable bed occupancy and city/county taxes, to support a rooming list of drilling personnel.",
+        "scope": "Provide off-site hotel lodging (single and double occupancy rooms) for 182d Airlift Wing personnel during Regularly Scheduled Drill (RSD) weekends. Contractors must submit nightly room availability per RSD weekend, nightly rates, and current bed occupancy and city/county tax rates. Selected hotels will receive BPA Calls with rooming lists.",
+        "primary_objective": "Establish a Blanket Purchase Agreement with hotel(s) to provide reliable, cost-effective lodging for 182d Airlift Wing drill personnel during RSD weekends in FY26.",
+        "customer": "182d Airlift Wing (Air National Guard)",
+        "contract_type": "BPA",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "FY26 (Fiscal Year 2026); specific start/end dates not stated in the provided document"
+      }
+    },
+    "compliance": {
+      "summary": "0 FAR · 0 DFARS · 1 certifications · 2 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [],
+        "dfars_clauses": [],
+        "required_certifications": [
+          "SAM.gov registration (implied for federal BPA award)"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes - NAICS 721110 (Hotels and Motels, except Casino Hotels), SBA size standard $40M annual receipts",
+        "key_compliance_actions": [
+          "Complete Exhibit 1 Pricing Sheet with Contractor Name, Point of Contact, Email, and Phone",
+          "Provide Nightly Room Availability Per RSD Weekend for Single Occupancy (CLIN 0001) and Double Occupancy (CLIN 0002) hotel rooms",
+          "Provide Nightly Rate for both CLIN 0001 and CLIN 0002",
+          "Disclose current Bed Occupancy Tax rate",
+          "Disclose current City/County Tax rate",
+          "Obtain Contractor Representative signature and title on pricing sheet",
+          "Ensure SAM.gov active registration prior to BPA award",
+          "Submit response by solicitation deadline 2026-05-15 12:00 CST"
+        ],
+        "deadlines": [
+          "Solicitation Posted: 2026-05-03",
+          "Proposal/Quote Due: 2026-05-15"
+        ],
+        "clins": [
+          {
+            "clin": "0001",
+            "description": "Single Occupancy Hotel Room",
+            "quantity": "Per RSD Weekend (TBD via rooming list at BPA Call)",
+            "pricing_arrangement": "FFP (Nightly Rate - BPA)",
+            "fob": "Destination (lodging service at hotel location)"
+          },
+          {
+            "clin": "0002",
+            "description": "Double Occupancy Hotel Room",
+            "quantity": "Per RSD Weekend (TBD via rooming list at BPA Call)",
+            "pricing_arrangement": "FFP (Nightly Rate - BPA)",
+            "fob": "Destination (lodging service at hotel location)"
+          }
+        ],
+        "section_l_summary": "",
+        "section_m_summary": "",
+        "dfars_traps": [],
+        "fob_conflicts": [],
+        "wawf_routing": {},
+        "section_l_requirements": [
+          "Complete Exhibit 1 Pricing Sheet in full",
+          "Provide Contractor Name",
+          "Provide Point of Contact name",
+          "Provide Email address",
+          "Provide Phone number",
+          "Enter Nightly Room Availability for CLIN 0001 (Single Occupancy) per RSD Weekend",
+          "Enter Nightly Rate for CLIN 0001",
+          "Enter Nightly Room Availability for CLIN 0002 (Double Occupancy) per RSD Weekend",
+          "Enter Nightly Rate for CLIN 0002",
+          "Disclose Bed Occupancy Tax rate",
+          "Disclose City/County Tax rate",
+          "Affix Contractor Representative Signature",
+          "State Contractor Title"
+        ],
+        "section_m_factors": [],
+        "audit_risks": [
+          "Document classification uncertain - only Exhibit 1 Pricing Sheet was provided; full Combined Synopsis/Solicitation body (Sections A-M, FAR/DFARS clause list, SOW/PWS, evaluation criteria) is NOT included in the attachment and must be retrieved separately from SAM.gov noticeId a1f77eda857c4537b7adf6dd3ab2d963",
+          "No FAR or DFARS clauses visible on the pricing exhibit - clause list resides in the missing solicitation body; offeror MUST review full solicitation before quoting",
+          "No Section L proposal instructions or Section M evaluation criteria available in the provided pages",
+          "WAWF routing (DFARS 252.232-7006) cannot be verified - BPA Calls typically use government purchase card or WAWF; confirm in full solicitation",
+          "Tax disclosure required - federal government is generally exempt from state/local lodging taxes under GSA/DoD travel; offeror should confirm whether taxes will be reimbursed or excluded",
+          "Quantities are indefinite (rooming list provided later at BPA Call) - this is a Blanket Purchase Agreement, not a guaranteed-quantity contract; revenue forecasting risk",
+          "NAICS 721110 size standard is $40M - verify small business self-certification accuracy before submission",
+          "Confirm Air National Guard 182d Airlift Wing (Peoria, IL) base access requirements for any on-base coordination meetings"
+        ],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 6/10 · 18 prioritized · top: Response window of ~12 days is below the 14-day adequate-preparation threshold a",
+      "json": {
+        "technical_risks": [
+          "Pricing sheet does not specify minimum room standards (star rating, AAA approval, FEMA-approved lodging facility certification typically required for military lodging) — bidders may underbid against unstated quality requirements and face rejection during inspection.",
+          "No specified distance/proximity requirement to the 182d Airlift Wing (Peoria, IL — note: agency is Illinois ANG, NOT TX/OK corridor as assumed) — hotels too far from base may be technically unacceptable even if low-priced.",
+          "[Inferred from typical patterns] Solicitation requires 'Nightly Room Availability Per RSD Weekend' but does not define block size, peak surge nights, or guarantee terms — risk of overcommitting room blocks and incurring no-show/cancellation liability.",
+          "Single vs. Double Occupancy definitions are not provided (1 bed vs. 2 beds, single guest vs. shared room) — ambiguity creates billing disputes at BPA call execution.",
+          "Government per diem rate cap (GSA/JTR lodging rate for the locality) is not stated on the pricing sheet but will govern award — bids exceeding per diem will be non-compliant."
+        ],
+        "schedule_risks": [
+          "Response deadline 15 May 2026 at 12:00 CT against 03 May 2026 posting yields only ~12 days to gather GSA per diem data, tax certifications, sign Exhibit 1, and submit — under the 14-day threshold for adequate proposal preparation.",
+          "BPA Call rooming list is provided 'later' with no lead time committed — hotels must hold inventory speculatively across an entire FY26 of RSD weekends without firm dates.",
+          "[Inferred from typical patterns] RSD weekends typically begin first weekend after award; if award slips past 1 Oct 2025, FY26 first-drill lodging coverage gap is likely."
+        ],
+        "price_risks": [
+          "Single nightly rate locked for full FY26 BPA period with no economic price adjustment clause shown — exposes contractor to inflation and seasonal demand spikes (graduations, conventions) that exceed the locked rate.",
+          "Bed Occupancy Tax and City/County Tax must be disclosed on Exhibit 1 — federal lodging is typically tax-exempt with proper certificate, but if contractor builds tax into the rate and government refuses to pay it, margin is eroded.",
+          "BPA is not a guaranteed minimum — contractor may invest in block holds and receive zero calls, with no recovery mechanism.",
+          "Fixed unit pricing on 'Each' room with no surge/peak premium provision — large RSD events (annual training, mobilizations) may require rooms above base capacity at the same locked rate."
+        ],
+        "evaluation_risks": [
+          "Combined Synopsis/Solicitation under SBA set-aside with a one-page pricing sheet strongly implies LPTA (Lowest Price Technically Acceptable) — any non-trivial price premium loses regardless of hotel quality or past performance.",
+          "No Section L/M provided in this exhibit — evaluation factors (proximity, amenities, past performance with DoD lodging) are unstated, making it impossible to optimize the proposal narrative.",
+          "[Inferred from typical patterns] Multiple-award BPA likely; failure to submit competitive rates on BOTH CLINs 0001 and 0002 may result in exclusion from the awardee pool entirely."
+        ],
+        "severity_score": 6,
+        "top_3_risks": [
+          "Response window of ~12 days is below the 14-day adequate-preparation threshold and forces rushed pricing decisions on a year-long rate lock.",
+          "Geographic mismatch — solicitation is for the 182d Airlift Wing (Peoria, IL Air National Guard), NOT the TX/OK corridor where this small business operates; bidding outside the local lodging market is almost certainly non-responsive on proximity grounds.",
+          "Document classification was uncertain (Exhibit 1 pricing sheet only — full Section L/M, BPA terms, and minimum hotel standards are not in the provided document), creating high risk of submitting a non-compliant offer against unseen requirements."
+        ],
+        "dfars_trap_risks": [],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "NO_BID — The 182d Airlift Wing is located in Peoria, Illinois; a TX/OK-corridor small business cannot provide lodging within commuting distance of the installation and would be technically unacceptable on proximity regardless of price.",
+        "executive_risk_summary": "The 182d Airlift Wing (Illinois Air National Guard, Peoria IL) is establishing a FY26 Blanket Purchase Agreement for off-site lodging during Regularly Scheduled Drill (RSD) weekends, set aside for small business under NAICS 721110 (Hotels and Motels). Bidders submit a one-page Exhibit 1 pricing sheet with single and double occupancy nightly rates plus local tax disclosures.\n\nThe top three risks are: (1) geographic mismatch — our TX/OK-corridor footprint cannot serve a Peoria IL drill site, and submitting anyway wastes BD bandwidth and risks a 'non-responsive' mark on our SAM.gov record; (2) the ~12-day response window is below the 14-day adequate-preparation floor, which combined with a year-long locked rate creates margin erosion if we did pursue a similar BPA; (3) the provided document is only the pricing exhibit — full Section L/M evaluation criteria, minimum hotel standards (FEMA/AAA), and BPA terms are not visible, so any bid submitted blind risks rejection or a cure notice for failing unstated requirements.\n\nRecommended actions: (a) within 24 hours, confirm via SAM.gov that the place of performance is Peoria IL and issue a NO-BID memo to capture leadership; (b) within 1 week, query SAM.gov for the equivalent BPA at Sheppard AFB, Altus AFB, Tinker AFB, or Fort Sill — these are the in-region NAICS 721110 set-asides that match our footprint; (c) within 30 days, build a reusable lodging BPA proposal template (per diem-aligned pricing model, tax exemption certificate handling, RSD block-hold terms) so we can respond to in-region opportunities inside a 10-day window.",
+        "prioritized_risks": [
+          {
+            "text": "Response window of ~12 days is below the 14-day adequate-preparation threshold and forces rushed pricing decisions on a year-long rate lock.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Geographic mismatch — solicitation is for the 182d Airlift Wing (Peoria, IL Air National Guard), NOT the TX/OK corridor where this small business operates; bidding outside the local lodging market is almost certainly non-responsive on proximity grounds.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Document classification was uncertain (Exhibit 1 pricing sheet only — full Section L/M, BPA terms, and minimum hotel standards are not in the provided document), creating high risk of submitting a non-compliant offer against unseen requirements.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Pricing sheet does not specify minimum room standards (star rating, AAA approval, FEMA-approved lodging facility certification typically required for military lodging) — bidders may underbid against unstated quality requirements and face rejection during inspection.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "No specified distance/proximity requirement to the 182d Airlift Wing (Peoria, IL — note: agency is Illinois ANG, NOT TX/OK corridor as assumed) — hotels too far from base may be technically unacceptable even if low-priced.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns] Solicitation requires 'Nightly Room Availability Per RSD Weekend' but does not define block size, peak surge nights, or guarantee terms — risk of overcommitting room blocks and incurring no-show/cancellation liability.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Single vs. Double Occupancy definitions are not provided (1 bed vs. 2 beds, single guest vs. shared room) — ambiguity creates billing disputes at BPA call execution.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Government per diem rate cap (GSA/JTR lodging rate for the locality) is not stated on the pricing sheet but will govern award — bids exceeding per diem will be non-compliant.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Response deadline 15 May 2026 at 12:00 CT against 03 May 2026 posting yields only ~12 days to gather GSA per diem data, tax certifications, sign Exhibit 1, and submit — under the 14-day threshold for adequate proposal preparation.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "BPA Call rooming list is provided 'later' with no lead time committed — hotels must hold inventory speculatively across an entire FY26 of RSD weekends without firm dates.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] RSD weekends typically begin first weekend after award; if award slips past 1 Oct 2025, FY26 first-drill lodging coverage gap is likely.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Single nightly rate locked for full FY26 BPA period with no economic price adjustment clause shown — exposes contractor to inflation and seasonal demand spikes (graduations, conventions) that exceed the locked rate.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Bed Occupancy Tax and City/County Tax must be disclosed on Exhibit 1 — federal lodging is typically tax-exempt with proper certificate, but if contractor builds tax into the rate and government refuses to pay it, margin is eroded.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "BPA is not a guaranteed minimum — contractor may invest in block holds and receive zero calls, with no recovery mechanism.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Fixed unit pricing on 'Each' room with no surge/peak premium provision — large RSD events (annual training, mobilizations) may require rooms above base capacity at the same locked rate.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Combined Synopsis/Solicitation under SBA set-aside with a one-page pricing sheet strongly implies LPTA (Lowest Price Technically Acceptable) — any non-trivial price premium loses regardless of hotel quality or past performance.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "No Section L/M provided in this exhibit — evaluation factors (proximity, amenities, past performance with DoD lodging) are unstated, making it impossible to optimize the proposal narrative.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns] Multiple-award BPA likely; failure to submit competitive rates on BOTH CLINs 0001 and 0002 may result in exclusion from the awardee pool entirely.",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 69,
+    "recommendation": "PROCEED_WITH_CAUTION",
+    "bid_recommendation": "PROCEED_WITH_CAUTION. Score 69/100. Top risk: Response window of ~12 days is below the 14-day adequate-preparation threshold and forces rushed pricing decisions on a year-long rate lock..",
+    "classification": {
+      "document_type": "Other",
+      "rationale": "This document is Exhibit 1: Pricing Sheet, a pricing/attachment form for contractors to fill in nightly rates and tax information, not a standalone solicitation type like an RFP, RFQ, or PWS.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 2878,
+      "output_tokens": 101,
+      "ms": 3625
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 2588,
+      "output_tokens": 426,
+      "ms": 9404
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 3898,
+      "output_tokens": 1520,
+      "ms": 23411
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 3730,
+      "output_tokens": 2235,
+      "ms": 43706
+    }
+  ],
+  "wallMs": 48927,
+  "error": null,
+  "pdfBytes": 144843,
+  "pdfSrc": "sam.gov"
+}

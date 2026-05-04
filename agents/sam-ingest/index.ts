@@ -116,20 +116,38 @@ async function main() {
   // migration if needed for first-class filtering. classifyNoticeType call
   // retained but its result is discarded — keeps the function eligible for
   // re-introduction without churn.
-  const rows = Array.from(seen.values()).map((o) => {
+  //
+  // Filter (May 4 2026 · audit-ai crash diagnosis): skip opportunities where
+  // resourceLinks is empty/null. These are typically NSN-prefixed DLA tiny
+  // purchase orders ("61--MOTOR,ALTERNATING C") whose full description lives
+  // at a separate noticedesc URL — there's no attachable PDF for the audit
+  // engine. Inserting them just creates 100% audit-ai failures (loadPdf throws
+  // before any Claude call) and pollutes the pending queue. Filtering here
+  // means the consumer (/home Intelligence Feed) shows fewer-but-auditable rows.
+  const seenArr = Array.from(seen.values());
+  const audited: any[] = [];
+  let droppedNoPdf = 0;
+  for (const o of seenArr) {
     void classifyNoticeType(o.type);
-    return {
+    const pdfUrl = o.resourceLinks?.[0] || null;
+    if (!pdfUrl) {
+      droppedNoPdf++;
+      continue;
+    }
+    audited.push({
       notice_id: o.noticeId,
       title: o.title || null,
       agency: o.department || null,
       naics_code: o.naicsCode || null,
       set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
       document_type: classifyDocType(o.type),
-      pdf_url: o.resourceLinks?.[0] || null,
+      pdf_url: pdfUrl,
       source: "sam_live" as const,
       notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`
-    };
-  });
+    });
+  }
+  console.log(`[sam-ingest] filter · ${droppedNoPdf} opportunit${droppedNoPdf === 1 ? "y" : "ies"} dropped (no PDF · NSN line items / metadata-only) · ${audited.length} auditable`);
+  const rows = audited;
 
   if (DRY_RUN) {
     console.log("[DRY_RUN] sample of first 5 rows that would be inserted:");

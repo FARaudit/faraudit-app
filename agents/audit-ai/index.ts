@@ -59,10 +59,33 @@ function shorten(s: string | null | undefined, n: number): string {
   return ((s || "") + "").replace(/\s+/g, " ").slice(0, n);
 }
 
+// Anthropic Messages API rejects requests >32MB; the 25MB ceiling here gives
+// headroom for the JSON envelope, system prompts, and base64 expansion overhead
+// (base64 inflates by ~33%, so a 25MB raw PDF becomes ~33MB on the wire).
+// Anything bigger gets a clean structured failure (kPdfTooLargeError) so the
+// row is marked failed with a clear error_message instead of triggering the
+// generic catch-all in processOne.
+const MAX_PDF_BYTES = 25 * 1024 * 1024;
+const kPdfTooLargeError = "PDF exceeds 25MB Anthropic API limit";
+const kNoPdfError = "pending_audit row has neither pdf_path nor pdf_url";
+
 async function loadPdf(row: PendingAudit) {
-  if (row.pdf_path) return fetchPdfFromPath(row.pdf_path);
-  if (row.pdf_url) return fetchPdfFromSam(row.pdf_url);
-  throw new Error("pending_audit row has neither pdf_path nor pdf_url");
+  let result;
+  if (row.pdf_path) result = await fetchPdfFromPath(row.pdf_path);
+  else if (row.pdf_url) result = await fetchPdfFromSam(row.pdf_url);
+  else throw new Error(kNoPdfError);
+  if (result.bytes > MAX_PDF_BYTES) {
+    throw new Error(`${kPdfTooLargeError} (${(result.bytes / 1024 / 1024).toFixed(1)}MB)`);
+  }
+  return result;
+}
+
+// Data-quality failures = rows that should have been filtered upstream (no PDF,
+// PDF too large). These don't represent worker bugs · audit-ai exits 0 even
+// when only data-quality failures fired. Genuine engine errors (timeout, API
+// 4xx/5xx, schema mismatch) still exit 1 to surface as Railway alerts.
+function isDataQualityFailure(message: string): boolean {
+  return message.includes(kNoPdfError) || message.includes(kPdfTooLargeError);
 }
 
 async function processOne(row: PendingAudit, i: number, total: number): Promise<{ ok: boolean; reason?: string }> {
@@ -146,16 +169,21 @@ async function main() {
   console.log(`[audit-ai] queue: ${rows.length} pending row(s)`);
 
   let ok = 0;
-  let failed = 0;
+  let failedDataQuality = 0;
+  let failedEngine = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = await processOne(rows[i], i, rows.length);
     if (r.ok) ok++;
-    else failed++;
+    else if (isDataQualityFailure(r.reason || "")) failedDataQuality++;
+    else failedEngine++;
   }
 
   const finishedAt = new Date();
-  console.log(`\n[audit-ai] done ${finishedAt.toISOString()} · processed=${rows.length} ok=${ok} failed=${failed} duration=${finishedAt.getTime() - startedAt.getTime()}ms`);
-  if (failed > 0) process.exit(1);
+  console.log(`\n[audit-ai] done ${finishedAt.toISOString()} · processed=${rows.length} ok=${ok} data-quality-failed=${failedDataQuality} engine-failed=${failedEngine} duration=${finishedAt.getTime() - startedAt.getTime()}ms`);
+  // Exit 1 only on genuine engine errors. Data-quality failures (no PDF, oversized PDF)
+  // are upstream-filterable and don't indicate worker malfunction — they should
+  // shrink to zero once sam-ingest's resourceLinks=null filter is in place.
+  if (failedEngine > 0) process.exit(1);
 }
 
 main().catch((e) => {

@@ -1,0 +1,433 @@
+{
+  "tc": {
+    "notice_id": "9c482352092e4e7381f8db40564616a9",
+    "label": "NAICS 541370 · LIDAR survey",
+    "naics": "541370"
+  },
+  "model": "claude-sonnet-4-6",
+  "audit": {
+    "overview": {
+      "summary": "The Bureau of Land Management (BLM) Alaska is soliciting quotes for a LiDAR survey of mining claims in Alaska under solicitation 140L6326Q0008, titled Western Mines LiDAR Survey. This is a 100% small business set-aside Request for Quotation issued under FAR Part 12 simplified procedures. Award will be made to the responsible offeror whose technically acceptable quote represents the best value to the Government considering technical acceptability and price.",
+      "json": {
+        "summary": "The Bureau of Land Management (BLM) Alaska is soliciting quotes for a LiDAR survey of mining claims in Alaska under solicitation 140L6326Q0008, titled Western Mines LiDAR Survey. This is a 100% small business set-aside Request for Quotation issued under FAR Part 12 simplified procedures. Award will be made to the responsible offeror whose technically acceptable quote represents the best value to the Government considering technical acceptability and price.",
+        "scope": "The contractor shall perform a LiDAR survey of mining claims for BLM Alaska. The work is categorized under NAICS 541370 (Surveying and Mapping Services) and Product/Service Code R404 (Support Professional: Land Surveys-Cadastral, Non-Construction). Delivery of results is to BLM Alaska, 222 W. 7th Avenue STOP 13, Anchorage, AK 99513, with primary operations associated with the BLM Fairbanks District Office at 222 University Avenue, Fairbanks, AK 99709.",
+        "primary_objective": "Completion and delivery of a LiDAR survey of mining claims in Alaska, with data/deliverables delivered to BLM Alaska by 09/01/2026, under a firm-fixed price contract.",
+        "customer": "Bureau of Land Management (BLM) Alaska, administered by BLM AK State Office Business and Fiscal Branch (AK952), Anchorage, Alaska.",
+        "contract_type": "FFP",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "05/25/2026 to 09/01/2027"
+      }
+    },
+    "compliance": {
+      "summary": "57 FAR · 0 DFARS · 12 certifications · 1 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [
+          "52.203-17",
+          "52.203-18",
+          "52.203-19",
+          "52.204-7",
+          "52.204-13",
+          "52.204-21",
+          "52.204-23",
+          "52.204-25",
+          "52.204-27",
+          "52.204-30",
+          "52.209-2",
+          "52.209-6",
+          "52.209-10",
+          "52.212-1",
+          "52.212-2",
+          "52.212-3",
+          "52.212-4",
+          "52.212-5",
+          "52.219-2",
+          "52.219-6",
+          "52.219-8",
+          "52.219-28",
+          "52.222-3",
+          "52.222-18",
+          "52.222-21",
+          "52.222-26",
+          "52.222-35",
+          "52.222-36",
+          "52.222-37",
+          "52.222-40",
+          "52.222-41",
+          "52.222-42",
+          "52.222-50",
+          "52.222-55",
+          "52.222-62",
+          "52.222-90",
+          "52.223-23",
+          "52.224-3",
+          "52.225-13",
+          "52.225-25",
+          "52.225-26",
+          "52.232-33",
+          "52.232-40",
+          "52.233-3",
+          "52.233-4",
+          "52.240-90",
+          "52.240-91",
+          "52.240-1",
+          "52.243-1",
+          "52.244-6",
+          "52.247-64",
+          "52.252-1",
+          "52.252-2",
+          "52.252-5",
+          "52.252-6",
+          "52.203-13",
+          "52.203-15"
+        ],
+        "dfars_clauses": [],
+        "required_certifications": [
+          "SAM.gov registration — active registration required at time of quote submission and maintained through contract performance (52.204-7, 52.204-13)",
+          "Unique Entity Identifier (UEI) — must be included with quote",
+          "CAGE Code — must be included with quote (stated in solicitation as alternative to UEI)",
+          "Small Business concern certification — must be a registered/certified small business concern under NAICS 541370, size standard $19 million",
+          "Representation: Not an inverted domestic corporation (52.209-2)",
+          "Representation: No prohibited internal confidentiality agreements (52.203-18)",
+          "Representation: No activities/transactions relating to Iran (52.225-25)",
+          "Representation: No child labor for listed end products (52.222-18)",
+          "Security Prohibitions and Exclusions Representation (52.240-90 / 52.240-91 — RFO Mar 2026)",
+          "Representations and certifications per 52.212-3 (attached — must be completed or completed via SAM.gov annual reps and certs)",
+          "Electronic Funds Transfer (EFT) via SAM.gov — required for payment (52.232-33)",
+          "IPP (Invoice Processing Platform) registration — must register at https://www.ipp.gov for invoice submission; waiver request required in writing if unable to comply"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes — 100% set aside for Small Business concerns under NAICS 541370 (Surveying and Mapping Services), size standard $19 million average annual receipts. Offeror must be a registered/certified small business. Note: SF 1449 header indicates WOSB set-aside designation box is present but Block 10 checkbox selection shows 'Small Business' at 100%, not WOSB/EDWOSB specifically. SAM.gov metadata confirms 'SBA' (Small Business) set-aside type. Clause 52.219-6 Notice of Total Small Business Set-Aside is included.",
+        "key_compliance_actions": [
+          "Confirm active SAM.gov registration with current representations and certifications prior to quote submission",
+          "Include UEI or CAGE Code in the quote",
+          "Confirm small business size standard eligibility under NAICS 541370 ($19M average annual receipts)",
+          "Complete and submit 52.209-2 representation (inverted domestic corporation — checkboxes must be marked)",
+          "Complete 52.212-3 representations and certifications (attached to solicitation) — ensure SAM.gov annual reps are current or submit completed 52.212-3 with quote",
+          "Complete 52.203-18 representation (internal confidentiality agreements)",
+          "Complete 52.225-25 representation (Iran activities/transactions)",
+          "Complete 52.222-18 certification (child labor)",
+          "Complete 52.240-90 representation (Security Prohibitions and Exclusions)",
+          "Submit technical description of the LiDAR survey service in sufficient detail to demonstrate compliance with solicitation requirements (evaluation factor: Technical Acceptability)",
+          "Submit firm-fixed price quote for CLIN 00010 (LiDAR survey of mining claims)",
+          "Limit quote to 40 pages or under",
+          "Submit quote electronically by email to laura_sherman@ios.doi.gov by 05/12/2026 at 1700 Alaska Daylight Savings Time",
+          "Include solicitation number 140L6326Q0008 on all correspondence",
+          "Cite delivery date of 09/01/2026 in quote",
+          "Monitor SAM.gov for any amendments until quote due date and follow amendment instructions",
+          "Register for IPP (Invoice Processing Platform) at https://www.ipp.gov after award for electronic invoice submission, or submit waiver request with quote if unable to comply",
+          "Ensure EFT information is current in SAM.gov for payment via 52.232-33",
+          "Review and comply with 52.222-41 Service Contract Labor Standards — obtain applicable Wage Determinations for Alaska (Fairbanks District area) and price accordingly",
+          "Review 52.222-62 Paid Sick Leave under EO 13706 requirements and ensure pricing accounts for compliance",
+          "If using subcontractors, ensure subcontracts include required flow-down clauses per 52.244-6, and verify subcontractors are not debarred/suspended per 52.209-6",
+          "Review 52.240-91 Security Prohibitions and Exclusions contract clause requirements for performance",
+          "Review 52.240-1 (in 52.244-6 flow-down) — Prohibition on Unmanned Aircraft Systems from covered foreign entities; LiDAR survey may involve UAS — verify any drone/UAS equipment used is not manufactured/assembled by American Security Drone Act-covered foreign entities",
+          "Review 52.222-90 Addressing DEI Discrimination by Federal Contractors (RFO Apr 2026) for compliance obligations",
+          "Submit signed SF 1449 (Block 30a signature, Block 30b name/title, Block 30c date) with quote — contractor required to sign and return 1 copy"
+        ],
+        "deadlines": [
+          "Questions Due: 2026-05-08 (noon Alaska Daylight Savings Time)",
+          "Quote/Offer Due: 2026-05-12 (1700 Alaska Daylight Savings Time)",
+          "Solicitation Issue Date: 2026-05-02",
+          "Period of Performance Start: 2026-05-25",
+          "Delivery Date (CLIN 00010): 2026-09-01",
+          "Period of Performance End: 2027-09-01",
+          "Price Hold Period: 60 calendar days from quote due date (approximately 2026-07-11) per 52.212-1(b)"
+        ],
+        "clins": [
+          {
+            "clin": "00010",
+            "description": "LiDAR survey of mining claims. Product/Service Code: R404. Product/Service Description: SUPPORT-PROFESSIONAL: LAND SURVEYS-CADASTRAL (NON-CONSTRUCTION). Period of Performance: 05/25/2026 to 09/01/2027. Delivery: 09/01/2026.",
+            "quantity": "Not specified (lump sum service)",
+            "pricing_arrangement": "FFP",
+            "fob": "Destination (FOB Destination stated on SF 1449 Block 11 — See Schedule; total cost to include delivery to BLM Alaska 222 W. 7th Avenue STOP 13, Anchorage, AK 99513)"
+          }
+        ],
+        "section_l_summary": "This solicitation uses SF 1449 / FAR Part 12 simplified commercial acquisition procedures. Proposal preparation instructions are governed by FAR 52.212-1 (Instructions to Offerors—Commercial Products and Commercial Services, Sep 2023, DOI Deviation Mar 2026). Offerors must submit signed and dated quotes electronically via email to laura_sherman@ios.doi.gov by 05/12/2026 at 1700 ADST, including the solicitation number, offeror name/address/phone, UEI or CAGE Code, a technical description sufficient to evaluate compliance with requirements, completed representations and certifications (beyond SAM.gov-collected), a statement of agreement with all terms and conditions, and a firm-fixed price. Quotes must be 40 pages or under.",
+        "section_m_summary": "Evaluation is governed by FAR 52.212-2 (Evaluation—Commercial Products and Commercial Services, Nov 2021, DOI Deviation Mar 2026). Award will be made to the responsible offeror whose conforming quote is most advantageous to the Government considering two factors: (1) Technical Acceptability — a technical description of the service in sufficient detail to evaluate compliance with solicitation requirements; and (2) Price. The Government intends to award without discussions but reserves the right to conduct discussions; it may award a single contract or multiple contracts if more advantageous.",
+        "dfars_traps": [],
+        "fob_conflicts": [],
+        "wawf_routing": {},
+        "section_l_requirements": [
+          "Submit quote electronically by email to laura_sherman@ios.doi.gov",
+          "Quote must be submitted by 05/12/2026 at 1700 Alaska Daylight Savings Time",
+          "Include solicitation number 140L6326Q0008 on all correspondence",
+          "Include offeror name, address, and telephone number",
+          "Include UEI or CAGE Code with quote",
+          "Include EFT indicator if applicable",
+          "Provide technical description of the LiDAR survey service in sufficient detail to evaluate compliance with solicitation requirements",
+          "Provide firm-fixed price for CLIN 00010 (total cost to include delivery to BLM Alaska, Anchorage, AK 99513)",
+          "Respond to all provisions requiring offeror completion of representations and certifications not collected via SAM.gov",
+          "Include a statement specifying extent of agreement with all terms, conditions, and provisions including any amendments",
+          "Limit quote to 40 pages or under",
+          "Sign and date the SF 1449 (Block 30a, 30b, 30c) — return 1 copy to issuing office",
+          "Mark Block 17b if remittance address is different from offeror address",
+          "Complete Block 12 (Discount Terms) on SF 1449",
+          "Submit 52.209-2 representation with checkboxes marked (inverted domestic corporation)",
+          "Monitor SAM.gov until quote due date for any amendments and follow amendment instructions",
+          "Submit waiver request in writing to the Contracting Officer with quote if unable to comply with IPP electronic invoicing requirement",
+          "Questions must be submitted no later than 05/08/2026 at noon Alaska Daylight Savings Time",
+          "Initial offer should contain offeror's best terms (Government intends to award without discussions)"
+        ],
+        "section_m_factors": [
+          {
+            "factor": "Technical Acceptability",
+            "weight_or_priority": "Factor 1 — pass/fail acceptability threshold; must demonstrate compliance with solicitation requirements",
+            "description": "A technical description of the service being quoted in sufficient detail to evaluate compliance with the requirements in this solicitation. Quote must be technically acceptable to be considered for award."
+          },
+          {
+            "factor": "Price",
+            "weight_or_priority": "Factor 2 — evaluated after technical acceptability; award to most advantageous offer price and other factors considered",
+            "description": "Firm-fixed price for CLIN 00010 LiDAR survey of mining claims, including delivery. Government may accept other than lowest price if most advantageous. Option prices (if applicable) evaluated by adding to base price; significantly unbalanced option prices may render offer unacceptable."
+          }
+        ],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 7/10 · 19 prioritized · top: Missing SOW and specifications — the solicitation references a statement of work",
+      "json": {
+        "technical_risks": [
+          "SOW is referenced but NOT included in the 12-page solicitation package provided — offerors must scope and price a LiDAR survey of Alaskan mining claims without knowing exact acreage, point density requirements, datum/projection standards, accuracy thresholds (e.g., NVA/VVA per ASPRS), deliverable formats, or number of discrete claim polygons; an under-scoped technical description will be rated technically unacceptable under 52.212-2 Factor 1.",
+          "Alaska interior terrain and weather (Fairbanks District Office delivery location at 222 University Ave, Fairbanks AK 99709) creates severe operational constraints: short flyable weather window between spring breakup and fall freeze, potential for smoke from wildfires obscuring flight corridors, permafrost-induced ground control point (GCP) instability, and remote mining claim access requiring helicopter or floatplane mobilization — none of which are scoped in the RFQ but all of which materially affect cost and schedule.",
+          "52.240-1 (Prohibition on Unmanned Aircraft Systems from American Security Drone Act-Covered Foreign Entities, Nov 2024) flows down via 52.244-6 — if offeror or any subcontractor proposes Chinese-manufactured UAS (DJI, Autel, Yuneec) for LiDAR collection, the platform is prohibited; contractor must affirmatively verify UAS country of manufacture and confirm ASDA compliance before bid submission or face technical rejection.",
+          "[Inferred from typical patterns for NAICS 541370 / BLM Alaska LiDAR] BLM Alaska may require adherence to USGS 3DEP or BLM Geospatial Standards for LiDAR data collection and processing; without the referenced SOW and specifications, offeror cannot confirm whether their sensor suite (pulse density, swath overlap, IMU/GNSS quality) meets the government's accuracy tier, risking a technically unacceptable rating or post-award cure notice."
+        ],
+        "schedule_risks": [
+          "Period of Performance starts 05/25/2026 — only 13 days after the 05/12/2026 quote due date — meaning contractor must be ready to mobilize to the Fairbanks AK area within two weeks of receiving notice of award, with no defined post-award kickoff grace period; for a TX/OK-based small business this requires pre-positioned Alaska field crew, aircraft/sensor mobilization plans, and lodging/logistics arranged BEFORE award, at contractor's financial risk.",
+          "Interim delivery date is 09/01/2026 (Block 11 'See Schedule' and explicit delivery line) while the full Period of Performance extends to 09/01/2027 — the gap between these two dates is not explained in the available solicitation pages, creating ambiguity about whether the 09/01/2026 date is a partial deliverable milestone or a hard final delivery; missing this date on an FFP contract exposes the contractor to default.",
+          "Questions due 05/08/2026 at noon Alaska Daylight Time, with offers due 05/12/2026 at 1700 AD — only a 4-day window between question deadline and offer due date, meaning government answers to critical SOW/scope questions may arrive with insufficient time to incorporate into a compliant, well-priced quote.",
+          "Alaska's optimal airborne LiDAR collection season for the Fairbanks area is typically late May through early August; a 05/25/2026 start with a 09/01/2026 interim delivery date compresses the entire data collection, processing, QA/QC, and delivery cycle into approximately 14 weeks including mobilization — weather delays, smoke events, or equipment failures have no buffer."
+        ],
+        "price_risks": [
+          "Firm-Fixed-Price (FFP) contract with no SOW provided in the RFQ package forces offeror to price against undefined scope; if the government's actual acreage, point density, or deliverable specifications exceed assumptions, the contractor absorbs 100% of cost overrun with zero relief mechanism — this is the single highest financial risk on this solicitation.",
+          "Alaska field operations carry 2–3x continental US cost premiums for aircraft fuel, pilot hourly rates, per diem, equipment mobilization, and GNSS/GCP survey crews; a TX/OK-corridor small business without established Alaska subcontractor relationships will systematically underprice mobilization and logistical support, eroding margin to zero or below.",
+          "Page limit of 40 pages constrains the ability to include detailed cost breakdowns and assumptions that would protect the contractor in a post-award scope dispute; without documented pricing assumptions on the face of the quote, the government can hold the contractor to the broadest reasonable interpretation of the SOW.",
+          "52.222-41 (Service Contract Labor Standards) is included — contractor must identify and apply applicable DOL Wage Determinations for Alaska, including Fairbanks area, for any labor categories that qualify as service employees; failure to price SCA wages and fringe correctly on an FFP creates unrecoverable cost exposure."
+        ],
+        "evaluation_risks": [
+          "52.212-2 establishes only two evaluation factors: (1) Technical Acceptability and (2) Price — this is a binary technical gate (acceptable/unacceptable) followed by lowest-price-technically-acceptable (LPTA) logic; any deficiency in the technical description — missing methodology, vague sensor specs, no GCP strategy, no QA/QC plan — results in technical rejection with no opportunity for discussion per 52.212-1(d) (award without discussions).",
+          "The solicitation explicitly states 'The Government intends to evaluate offers and award a contract without discussions' per 52.212-1(d) — the initial quote IS the final quote; there is no Best and Final Offer (BAFO) round, so an offeror who submits an incomplete technical description or a non-competitive price has no recovery path.",
+          "No past performance factor is listed in 52.212-2 — this removes a differentiator that a qualified small business could use to distinguish itself from lower-priced competitors with less Alaska LiDAR experience; competition defaults entirely to price among technically acceptable offerors, pressuring margin.",
+          "The solicitation is set aside 100% for Small Business (Block 10, 'Small Business' checked, 100% set-aside) under NAICS 541370 with a $19M size standard — offeror must affirmatively verify SB status is current and accurate in SAM.gov before submission; a size status discrepancy or lapsed SAM registration is an automatic disqualification under 52.204-7 (DOI Deviation Mar 2026)."
+        ],
+        "severity_score": 7,
+        "top_3_risks": [
+          "Missing SOW and specifications — the solicitation references a statement of work and specifications but does not include them in the 12-page package, forcing the offeror to price an undefined LiDAR scope in Alaska; submitting a quote without obtaining and reviewing those documents will produce either a technically unacceptable response or a catastrophically mispriced FFP that cannot be renegotiated after award.",
+          "Extreme timeline compression — the Period of Performance starts 05/25/2026 (13 days post-due date), questions close only 4 days before quotes are due, and an interim delivery of 09/01/2026 compresses full Alaska LiDAR mobilization, collection, processing, and delivery into ~14 weeks; a TX/OK small business without pre-positioned Alaska field assets and subcontractors will miss the interim delivery date and face a cure notice or termination for default on an FFP contract.",
+          "52.240-1 UAS foreign entity prohibition flows down via 52.244-6 and fires against any DJI or other ASDA-covered drone used for LiDAR collection — failure to verify UAS country of manufacture before bid submission risks post-award contract termination for non-compliance with a mandatory flow-down clause that cannot be waived."
+        ],
+        "dfars_trap_risks": [
+          {
+            "clause": "52.240-1",
+            "trap_name": "American Security Drone Act (ASDA) UAS Prohibition",
+            "specific_risk": "Clause prohibits UAS manufactured or assembled by ASDA-covered foreign entities (primarily Chinese manufacturers including DJI, Autel, Yuneec); this flows down to all subcontractors via 52.244-6; LiDAR survey operations commonly use DJI Matrice or similar platforms which are ASDA-covered and therefore prohibited on this contract.",
+            "required_verification": "Contractor must obtain manufacturer country-of-origin documentation for every UAS proposed in the technical approach; acceptable platforms include American-made alternatives (Skydio, Inspired Flight, Freefly) or NDAA-compliant options; subcontractor UAS must also be verified and documented.",
+            "consequence_if_missed": "Post-award discovery of prohibited UAS use constitutes a material contract violation; contracting officer may issue cure notice requiring immediate platform substitution at contractor's expense, or terminate for default if cure is not achieved within the cure period."
+          },
+          {
+            "clause": "52.240-90 / 52.240-91",
+            "trap_name": "DOI/DOI Security Prohibitions and Exclusions (RFO Mar 2026)",
+            "specific_risk": "Both the solicitation provision (52.240-90) and contract clause (52.240-91) reference RFO Mar 2026 security prohibitions — these are relatively new DOI-specific deviations whose full text is not included in the solicitation package; they may impose restrictions on IT systems, data handling, or personnel that are not immediately apparent and that could disqualify non-compliant offerors or trigger post-award compliance requirements.",
+            "required_verification": "Offeror must retrieve full text of 52.240-90 and 52.240-91 from acquisition.gov/far-overhaul before submission and certify compliance; any IT systems used for LiDAR data processing, storage, or transmission must be evaluated against these security requirements.",
+            "consequence_if_missed": "Incomplete representation on 52.240-90 at time of quote submission constitutes a material omission; post-award non-compliance with 52.240-91 security requirements can result in stop-work order, cure notice, or termination for cause."
+          }
+        ],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — This is a legitimate small-business opportunity in a specialized geospatial services market, but a TX/OK contractor must immediately obtain the missing SOW and specifications, verify ASDA-compliant UAS availability, and confirm Alaska mobilization partnerships before committing to a price on this FFP.",
+        "executive_risk_summary": "The Bureau of Land Management Alaska is soliciting a firm-fixed-price LiDAR survey of mining claims in the Fairbanks, Alaska area under solicitation 140L6326Q0008, set aside 100% for small businesses under NAICS 541370 (Surveying and Mapping Services), with quotes due May 12, 2026. The contract is a single award anticipated, evaluated on technical acceptability (binary gate) and price (lowest wins), with a Period of Performance running May 25, 2026 through September 1, 2027 and an interim delivery milestone of September 1, 2026.\n\nThree risks are existential for this bid. First, the referenced SOW and specifications are not included in the 12-page solicitation package — without them, any price submitted is a guess on an FFP contract with zero cost relief, and any technical description is incomplete, risking an 'unacceptable' rating and automatic elimination with no discussion round. Second, the timeline is brutally compressed: questions close May 8, quotes due May 12, performance starts May 25 — a TX/OK small business has 13 days from award to mobilize personnel, aircraft, and LiDAR sensors to interior Alaska for a 14-week collection-through-delivery cycle; missing the September 1, 2026 interim delivery on an FFP exposes the company to cure notice and potential termination for default. Third, FAR 52.240-1 (flowing down via 52.244-6) prohibits UAS manufactured by ASDA-covered foreign entities — if the company's LiDAR sensor is mounted on a DJI platform, that platform cannot be used on this contract, and discovering this post-award requires immediate re-sourcing of an ASDA-compliant UAS at contractor expense.\n\nImmediate actions, ranked by deadline: (1) By May 7 — contact CO Laura Sherman at laura_sherman@ios.doi.gov and submit written questions requesting the full SOW, specifications, mining claim acreage/location data, required point density/accuracy standards, and deliverable formats; without this you cannot price or write a compliant technical section. (2) By May 8 — confirm UAS platform country of manufacture and ASDA compliance status; if current platform is DJI or other covered entity, identify a compliant substitute (Skydio X10D, Inspired Flight IF1200A) and verify sensor integration timeline. (3) By May 9 — identify and pre-negotiate with an Alaska-based LiDAR subcontractor or aviation support firm (Fairbanks area) to validate mobilization cost assumptions and confirm availability in the May 25 window; this single step is the difference between a profitable and a money-losing bid. (4) By May 12, 1700 AKDT — submit quote with explicit scope assumptions documented on the face of the quote, verified SAM.gov active registration, current SB certification, UEI included, and a signed SF 1449 Block 30.",
+        "prioritized_risks": [
+          {
+            "text": "Missing SOW and specifications — the solicitation references a statement of work and specifications but does not include them in the 12-page package, forcing the offeror to price an undefined LiDAR scope in Alaska; submitting a quote without obtaining and reviewing those documents will produce either a technically unacceptable response or a catastrophically mispriced FFP that cannot be renegotiated after award.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Extreme timeline compression — the Period of Performance starts 05/25/2026 (13 days post-due date), questions close only 4 days before quotes are due, and an interim delivery of 09/01/2026 compresses full Alaska LiDAR mobilization, collection, processing, and delivery into ~14 weeks; a TX/OK small business without pre-positioned Alaska field assets and subcontractors will miss the interim delivery date and face a cure notice or termination for default on an FFP contract.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "52.240-1 UAS foreign entity prohibition flows down via 52.244-6 and fires against any DJI or other ASDA-covered drone used for LiDAR collection — failure to verify UAS country of manufacture before bid submission risks post-award contract termination for non-compliance with a mandatory flow-down clause that cannot be waived.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "SOW is referenced but NOT included in the 12-page solicitation package provided — offerors must scope and price a LiDAR survey of Alaskan mining claims without knowing exact acreage, point density requirements, datum/projection standards, accuracy thresholds (e.g., NVA/VVA per ASPRS), deliverable formats, or number of discrete claim polygons; an under-scoped technical description will be rated technically unacceptable under 52.212-2 Factor 1.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Alaska interior terrain and weather (Fairbanks District Office delivery location at 222 University Ave, Fairbanks AK 99709) creates severe operational constraints: short flyable weather window between spring breakup and fall freeze, potential for smoke from wildfires obscuring flight corridors, permafrost-induced ground control point (GCP) instability, and remote mining claim access requiring helicopter or floatplane mobilization — none of which are scoped in the RFQ but all of which materially affect cost and schedule.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "52.240-1 (Prohibition on Unmanned Aircraft Systems from American Security Drone Act-Covered Foreign Entities, Nov 2024) flows down via 52.244-6 — if offeror or any subcontractor proposes Chinese-manufactured UAS (DJI, Autel, Yuneec) for LiDAR collection, the platform is prohibited; contractor must affirmatively verify UAS country of manufacture and confirm ASDA compliance before bid submission or face technical rejection.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns for NAICS 541370 / BLM Alaska LiDAR] BLM Alaska may require adherence to USGS 3DEP or BLM Geospatial Standards for LiDAR data collection and processing; without the referenced SOW and specifications, offeror cannot confirm whether their sensor suite (pulse density, swath overlap, IMU/GNSS quality) meets the government's accuracy tier, risking a technically unacceptable rating or post-award cure notice.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Period of Performance starts 05/25/2026 — only 13 days after the 05/12/2026 quote due date — meaning contractor must be ready to mobilize to the Fairbanks AK area within two weeks of receiving notice of award, with no defined post-award kickoff grace period; for a TX/OK-based small business this requires pre-positioned Alaska field crew, aircraft/sensor mobilization plans, and lodging/logistics arranged BEFORE award, at contractor's financial risk.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Interim delivery date is 09/01/2026 (Block 11 'See Schedule' and explicit delivery line) while the full Period of Performance extends to 09/01/2027 — the gap between these two dates is not explained in the available solicitation pages, creating ambiguity about whether the 09/01/2026 date is a partial deliverable milestone or a hard final delivery; missing this date on an FFP contract exposes the contractor to default.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Questions due 05/08/2026 at noon Alaska Daylight Time, with offers due 05/12/2026 at 1700 AD — only a 4-day window between question deadline and offer due date, meaning government answers to critical SOW/scope questions may arrive with insufficient time to incorporate into a compliant, well-priced quote.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Alaska's optimal airborne LiDAR collection season for the Fairbanks area is typically late May through early August; a 05/25/2026 start with a 09/01/2026 interim delivery date compresses the entire data collection, processing, QA/QC, and delivery cycle into approximately 14 weeks including mobilization — weather delays, smoke events, or equipment failures have no buffer.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Firm-Fixed-Price (FFP) contract with no SOW provided in the RFQ package forces offeror to price against undefined scope; if the government's actual acreage, point density, or deliverable specifications exceed assumptions, the contractor absorbs 100% of cost overrun with zero relief mechanism — this is the single highest financial risk on this solicitation.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Alaska field operations carry 2–3x continental US cost premiums for aircraft fuel, pilot hourly rates, per diem, equipment mobilization, and GNSS/GCP survey crews; a TX/OK-corridor small business without established Alaska subcontractor relationships will systematically underprice mobilization and logistical support, eroding margin to zero or below.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Page limit of 40 pages constrains the ability to include detailed cost breakdowns and assumptions that would protect the contractor in a post-award scope dispute; without documented pricing assumptions on the face of the quote, the government can hold the contractor to the broadest reasonable interpretation of the SOW.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "52.222-41 (Service Contract Labor Standards) is included — contractor must identify and apply applicable DOL Wage Determinations for Alaska, including Fairbanks area, for any labor categories that qualify as service employees; failure to price SCA wages and fringe correctly on an FFP creates unrecoverable cost exposure.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "52.212-2 establishes only two evaluation factors: (1) Technical Acceptability and (2) Price — this is a binary technical gate (acceptable/unacceptable) followed by lowest-price-technically-acceptable (LPTA) logic; any deficiency in the technical description — missing methodology, vague sensor specs, no GCP strategy, no QA/QC plan — results in technical rejection with no opportunity for discussion per 52.212-1(d) (award without discussions).",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "The solicitation explicitly states 'The Government intends to evaluate offers and award a contract without discussions' per 52.212-1(d) — the initial quote IS the final quote; there is no Best and Final Offer (BAFO) round, so an offeror who submits an incomplete technical description or a non-competitive price has no recovery path.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "No past performance factor is listed in 52.212-2 — this removes a differentiator that a qualified small business could use to distinguish itself from lower-priced competitors with less Alaska LiDAR experience; competition defaults entirely to price among technically acceptable offerors, pressuring margin.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "The solicitation is set aside 100% for Small Business (Block 10, 'Small Business' checked, 100% set-aside) under NAICS 541370 with a $19M size standard — offeror must affirmatively verify SB status is current and accurate in SAM.gov before submission; a size status discrepancy or lapsed SAM registration is an automatic disqualification under 52.204-7 (DOI Deviation Mar 2026).",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 25,
+    "recommendation": "DECLINE",
+    "bid_recommendation": "DECLINE. Score 25/100. Top risk: Missing SOW and specifications — the solicitation references a statement of work and specifications but does not include them in the 12-page package, forcing the offeror to price an undefined LiDAR sc.",
+    "classification": {
+      "document_type": "RFQ",
+      "rationale": "The SF 1449 form header explicitly marks 'REQUEST FOR QUOTE (RFQ)' as the method of solicitation (Block 14), and the document uses FAR Part 12/13 simplified acquisition procedures with quotes submitted by email rather than formal proposals. The SAM.gov metadata also confirms 'type: Solicitation' with a small business set-aside consistent with an RFQ structure.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27189,
+      "output_tokens": 113,
+      "ms": 6476
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27003,
+      "output_tokens": 384,
+      "ms": 10670
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27972,
+      "output_tokens": 3209,
+      "ms": 57209
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27832,
+      "output_tokens": 3276,
+      "ms": 76124
+    }
+  ],
+  "wallMs": 83876,
+  "error": null,
+  "pdfBytes": 342713,
+  "pdfSrc": "sam.gov"
+}

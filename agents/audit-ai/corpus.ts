@@ -48,6 +48,15 @@ export async function recordAudit(input: RecordAuditInput): Promise<RecordAuditO
     document_type: result.classification.document_type,
     document_type_rationale: result.classification.rationale,
     document_type_confidence: result.classification.confidence,
+    // Model bookkeeping (migration 012). model_used = the default this audit
+    // ran on. model_version = retry-escalation summary or null when no calls
+    // escalated. Lets us empirically validate quality if a customer ever flags
+    // a Sonnet audit they suspect was wrong — we know whether the retry path
+    // (Opus) was invoked.
+    model_used: result.model_used,
+    model_version: result.retry_escalations.length > 0
+      ? `retry-escalations:${result.retry_escalations.join(",")}`
+      : null,
     status: "complete",
     completed_at: new Date().toISOString()
   };

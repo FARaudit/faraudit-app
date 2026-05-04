@@ -1,0 +1,14 @@
+{
+  "tc": {
+    "notice_id": "321d7371d37d4e7bbde72151c4cf855c",
+    "label": "NAICS 236220 · construction",
+    "naics": "236220"
+  },
+  "model": "claude-sonnet-4-6",
+  "audit": null,
+  "usage": [],
+  "wallMs": 121649,
+  "error": "Claude API 413: {\n  \"error\": {\n    \"type\": \"request_too_large\",\n    \"message\": \"Request exceeds the maximum size\"\n  }\n}",
+  "pdfBytes": 72565780,
+  "pdfSrc": "sam.gov"
+}

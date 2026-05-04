@@ -1,0 +1,461 @@
+{
+  "tc": {
+    "notice_id": "b6c6835770f44fe7b5ab2bf58c3ccc43",
+    "label": "NAICS 561730 · landscaping",
+    "naics": "561730"
+  },
+  "model": "claude-sonnet-4-6",
+  "audit": {
+    "overview": {
+      "summary": "The National Park Service, Grand Teton National Park, is soliciting quotes for an IDIQ contract for invasive plant backpack spraying treatments. The contract covers a base year plus two option periods, with pricing established per acre and task orders issued on a firm-fixed-price basis. This is a 100% Total Small Business Set-Aside under NAICS 561730 with a small business size standard of $9.5M.",
+      "json": {
+        "summary": "The National Park Service, Grand Teton National Park, is soliciting quotes for an IDIQ contract for invasive plant backpack spraying treatments. The contract covers a base year plus two option periods, with pricing established per acre and task orders issued on a firm-fixed-price basis. This is a 100% Total Small Business Set-Aside under NAICS 561730 with a small business size standard of $9.5M.",
+        "scope": "Invasive weed treatment using backpack spraying equipment within Grand Teton National Park. Work includes herbicide application to control invasive plant species per the attached Scope of Work, priority species lists, Wyoming State Designated Weed List, and wildlife regulations. Contractor must maintain monitoring data sheets and comply with NPS land use restrictions including prohibition on ATVs.",
+        "primary_objective": "Control and treatment of invasive plant species via backpack herbicide application across Grand Teton National Park lands, with pricing per acre and delivery task orders issued against the IDIQ as needed throughout each performance period.",
+        "customer": "National Park Service (NPS), IMR - Northern Rockies MABO / Grand Teton National Park, DOI",
+        "contract_type": "IDIQ (task orders are Firm Fixed Price)",
+        "ceiling_value_estimate": "$349,000",
+        "period_of_performance": "Base Year: June 1, 2026 – May 31, 2027; Option Period I: June 1, 2027 – May 31, 2028; Option Period II: June 1, 2028 – May 31, 2029; total not to exceed 3 years"
+      }
+    },
+    "compliance": {
+      "summary": "59 FAR · 0 DFARS · 23 certifications · 3 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [
+          "52.203-11",
+          "52.203-12",
+          "52.203-17",
+          "52.203-18",
+          "52.203-19",
+          "52.204-7",
+          "52.204-10",
+          "52.204-13",
+          "52.204-14",
+          "52.204-15",
+          "52.204-19",
+          "52.209-2",
+          "52.209-6",
+          "52.209-10",
+          "52.209-11",
+          "52.212-1",
+          "52.212-2",
+          "52.212-4",
+          "52.216-27",
+          "52.217-8",
+          "52.217-9",
+          "52.219-6",
+          "52.219-28",
+          "52.222-3",
+          "52.222-19",
+          "52.222-35",
+          "52.222-36",
+          "52.222-37",
+          "52.222-41",
+          "52.222-42",
+          "52.222-43",
+          "52.222-50",
+          "52.222-54",
+          "52.222-62",
+          "52.222-90",
+          "52.223-5",
+          "52.223-23",
+          "52.225-5",
+          "52.225-6",
+          "52.226-7",
+          "52.226-8",
+          "52.232-33",
+          "52.232-90",
+          "52.233-3",
+          "52.233-4",
+          "52.237-1",
+          "52.237-2",
+          "52.240-1",
+          "52.240-90",
+          "52.240-91",
+          "52.240-93",
+          "52.244-6",
+          "52.249-1",
+          "52.249-4",
+          "52.252-1",
+          "52.252-2",
+          "52.252-5",
+          "52.252-6",
+          "52.253-1"
+        ],
+        "dfars_clauses": [],
+        "required_certifications": [
+          "SAM.gov active registration required at time of quote submission and at time of award",
+          "SAM Unique Entity Identifier (UEI) — must be provided in Contractor Core Data form",
+          "CAGE Code — must be provided in Contractor Core Data form",
+          "52.203-11 Certification and Disclosure Regarding Payments to Influence Certain Federal Transactions (Lobby certification, contract over $200K threshold)",
+          "52.203-18 Prohibition on Contracting with Entities that Require Certain Internal Confidentiality Agreements — Representation",
+          "52.209-2 Prohibition on Contracting with Inverted Domestic Corporations — Representation",
+          "52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law — must complete and submit checkbox representation",
+          "52.225-6 Trade Agreements Certificate — must certify end-product country of origin compliance",
+          "52.240-90 Security Prohibitions and Exclusions Representations and Certifications — must complete",
+          "52.222-54 Employment Eligibility Verification (E-Verify enrollment and use required for all new hires and existing employees assigned to contract)",
+          "52.222-41 Service Contract Labor Standards compliance — must comply with Wage Determination for Teton County, WY (Attachment 10)",
+          "52.222-62 Paid Sick Leave under Executive Order 13706 — must provide paid sick leave to employees performing on contract",
+          "52.222-35 Equal Opportunity for Veterans — VETS-4212 filing required if applicable",
+          "52.222-37 Employment Reports on Veterans — annual VETS-4212 report filing",
+          "52.222-50 Combating Trafficking in Persons compliance plan if required by contract value",
+          "52.222-90 Addressing DEI Discrimination by Federal Contractors compliance",
+          "52.226-7 Drug-Free Workplace program maintenance required",
+          "52.219-28 Post-Award Small Business Program Rerepresentation — must rerepresent small business status if applicable triggering events occur during contract performance",
+          "DIAR 1452.228-70 Liability Insurance — must procure and maintain: $100,000 per person / $500,000 per occurrence / $100,000 property damage; certificate must be furnished to Contracting Officer prior to beginning work",
+          "Invoice Processing Platform (IPP) registration — must register at https://www.ipp.gov and submit all invoices electronically through IPP",
+          "Small business size standard compliance: NAICS 561730, size standard $9.5M annual receipts — must qualify as small business",
+          "52.204-10 Reporting Executive Compensation and First-Tier Subcontract Awards — FSRS reporting if subcontracts meet threshold",
+          "52.204-14 / 52.204-15 Service Contract Reporting Requirements — must report in SAM.gov/FPDS as applicable"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes — 100% Total Small Business Set-Aside under NAICS 561730 (Landscaping Services), size standard $9.5M average annual receipts. Offeror must be registered in SAM, qualify as small under NAICS 561730 at time of offer and award, and complete 52.219-6 Notice acknowledgment.",
+        "key_compliance_actions": [
+          "Register and maintain active SAM.gov registration (UEI and CAGE Code required) prior to quote submission and at time of award",
+          "Confirm small business eligibility under NAICS 561730 with $9.5M size standard",
+          "Complete and sign SF-18 (Block 13–16) and return with quote package",
+          "Acknowledge all amendments (SF-30, Box 11 method) if any amendments are issued",
+          "Complete Contractor Core Data form: Name, Address, UEI, CAGE Code, POC, Email, Phone",
+          "Submit Completed Price Schedule for CLINs 10, 20, and 30 (per acre pricing for base year and two option periods)",
+          "Submit Technical Approach narrative (limit 2 pages) demonstrating ability to meet SOW specifications",
+          "Submit 3 prior experience examples of similar size and scope within the past 3 years including brief project description and point of contact information",
+          "Complete all applicable Provisions including 52.209-11 (delinquent tax/felony checkbox representation), 52.203-11 (lobbying certification), 52.203-18, 52.209-2, 52.225-6, 52.240-90",
+          "Procure and maintain liability insurance per DIAR 1452.228-70: $100,000/person, $500,000/occurrence, $100,000 property damage; furnish insurance certificate to CO before work begins",
+          "Enroll in Invoice Processing Platform (IPP) at https://www.ipp.gov within 3-5 business days of award; submit all payment requests electronically through IPP with company letterhead invoice stating contract number",
+          "Comply with Service Contract Labor Standards (SCA) Wage Determination for Teton County, WY (Attachment 10)",
+          "Enroll in E-Verify and use for all new hires and employees assigned to this contract per FAR 52.222-54",
+          "Provide paid sick leave to employees per EO 13706 (FAR 52.222-62)",
+          "Comply with ATV prohibition on NPS lands — no ATVs permitted; UTVs (side-by-sides) are permitted",
+          "Review all 11 attachments including Scope of Work (11 pages), Contractor Priority Species, Teton County Weed & Pest Priority Species, Wyoming State Designated Weed List, QASP Matrix, Wildlife Regulations, Contractor Weed Spraying Monitoring Data Sheet, UTV Visibility, and Wage Determination",
+          "Submit questions in writing only (no phone calls) to Sharon_larosa@ios.doi.gov no later than 5 business days prior to May 19, 2026 deadline (i.e., by approximately May 12, 2026)",
+          "Submit entire quote package by email to Sharon_larosa@ios.doi.gov by 1300 Mountain Daylight Time on May 19, 2026; ensure all attachments open correctly",
+          "Note: FAR 52.223-22 and paragraph (t) of 52.212-3 greenhouse gas representations are NOT required per EO 14148/14208 compliance notice — do not complete those SAM representations",
+          "If unable to comply with IPP invoicing requirement, submit written waiver request to CO with quote",
+          "Ensure option period pricing is not significantly unbalanced — Government may reject unbalanced offers",
+          "Include best technical and price terms in initial quote — no assumption of opportunity for discussions"
+        ],
+        "deadlines": [
+          "Questions Due: approximately 2026-05-12 (5 business days prior to quote due date — written only, no phone calls)",
+          "Quote Due Date: 2026-05-19 by 1300 Mountain Daylight Time",
+          "Base Year Period of Performance Start: 2026-06-01",
+          "Base Year Period of Performance End: 2027-05-31",
+          "Option Period 1 Start: 2027-06-01",
+          "Option Period 1 End: 2028-05-31",
+          "Option Period 2 Start: 2028-06-01",
+          "Option Period 2 End: 2029-05-31",
+          "Delivery Date (all CLINs): 2027-05-31",
+          "Option Exercise Notice (FAR 52.217-9): CO must give preliminary notice at least 60 days before contract expiration; final written notice within 30 days of expiration",
+          "Insurance Certificate: Must be furnished to CO prior to beginning work",
+          "IPP Enrollment: Within 3-5 business days of contract award date",
+          "COR Designation: At time of award"
+        ],
+        "clins": [
+          {
+            "clin": "00010",
+            "description": "Invasive Weed Spraying-Backpack Base Year — Product/Service Code F099, Natural Resources/Conservation-Other",
+            "quantity": "1",
+            "unit_of_measure": "ACRE",
+            "pricing_arrangement": "IDIQ / Firm Fixed Price per acre (task orders will be FFP)",
+            "period_of_performance": "06/01/2026 to 05/31/2027",
+            "delivery": "05/31/2027",
+            "fob": "Destination"
+          },
+          {
+            "clin": "00020",
+            "description": "Invasive Weed Spraying-Backpack Option Period 1 — Product/Service Code F099, Natural Resources/Conservation-Other",
+            "quantity": "1",
+            "unit_of_measure": "ACRE",
+            "pricing_arrangement": "IDIQ / Firm Fixed Price per acre (task orders will be FFP)",
+            "period_of_performance": "06/01/2027 to 05/31/2028",
+            "delivery": "05/31/2027",
+            "fob": "Destination"
+          },
+          {
+            "clin": "00030",
+            "description": "Invasive Weed Spraying-Backpack Option Period 2 — Product/Service Code F099, Natural Resources/Conservation-Other",
+            "quantity": "1",
+            "unit_of_measure": "ACRE",
+            "pricing_arrangement": "IDIQ / Firm Fixed Price per acre (task orders will be FFP)",
+            "period_of_performance": "06/01/2028 to 05/31/2029",
+            "delivery": "05/31/2027",
+            "fob": "Destination"
+          }
+        ],
+        "section_l_summary": "The solicitation's Instructions to Offerors (incorporating FAR 52.212-1) require quotes to be submitted by email to Sharon_larosa@ios.doi.gov in a specific order following the Submittal Checklist: completed solicitation cover page, signed SF-18, amendment acknowledgments, completed provisions, a 2-page technical approach narrative, 3 prior experience examples (past 3 years, similar size/scope with POC info), completed price schedule (per acre for all three CLINs), and completed Contractor Core Data form. Quoters must be SAM-registered at submission and award; best technical and price terms should be included in the initial quote with no assumption of discussions. Late quotes may not be accepted, and quotes lacking sufficient information to determine capability may be removed from consideration.",
+        "section_m_summary": "Award will be made using comparative evaluation under FAR Part 12 (FAR 12.203), with no stated relative importance or weighting among the three evaluation factors: (1) Price, (2) Technical (factual documentation of ability to meet SOW specifications and qualifications), and (3) Prior Experience (factual documentation/narrative of firm's experience and capability with 3 examples of similar projects within the past 3 years). Option period prices will be added to the base price for total evaluated price, and significantly unbalanced option pricing may render an offer unacceptable. Debriefings do not apply under FAR Part 12.",
+        "dfars_traps": [],
+        "fob_conflicts": [
+          "MINOR NOTATION: The SF-18 Block 7 indicates FOB DESTINATION is checked for the overall contract. All three CLINs (00010, 00020, 00030) are services (invasive weed spraying) performed at Grand Teton National Park, so FOB Destination is consistently applied and appropriate. No freight liability mismatch identified. However, the 'Delivery' date listed for CLINs 00020 and 00030 option periods shows '05/31/2027' rather than the end of their respective option periods (05/31/2028 and 05/31/2029) — this is a potential data entry error in the solicitation that offerors should seek clarification on via written questions before the May 12, 2026 questions deadline."
+        ],
+        "wawf_routing": {},
+        "section_l_requirements": [
+          "Submit quote by email to Sharon_larosa@ios.doi.gov on or before 1300 Mountain Daylight Time on May 19, 2026",
+          "Quote package must follow the Submittal Checklist order exactly; failure to follow order may result in quote not being considered",
+          "Item 1: This page of the solicitation completed as the first page in the package",
+          "Item 2: Signed acknowledgement of SF-18 (Blocks 13-16 completed)",
+          "Item 3: All amendments acknowledged using one of the methods set forth in Box 11 of the SF-30, if applicable",
+          "Item 4: Completed Provisions as applicable (including 52.209-11, 52.203-11, 52.203-18, 52.209-2, 52.225-6, 52.240-90)",
+          "Item 5: Description of Offeror's proposed technical approach, resources, and capabilities demonstrating full compliance with the attached SOW — LIMIT TO 2 PAGES",
+          "Item 6: 3 prior experiences of projects in similar size and scope within the past 3 years, each including: (a) brief description of project, (b) point of contact information",
+          "Item 7: Completed Price Schedule — per acre pricing for CLIN 10 (Base Year), CLIN 20 (Option Period 1), CLIN 30 (Option Period 2)",
+          "Item 8: Completed Contractor Core Data form — Name, Address, City/State/Zip, SAM UEI, CAGE Code, POC Name, Email, Phone",
+          "All interested parties must be registered in SAM at time of quote submission",
+          "Quoters may submit more than one quote by the due date/time",
+          "Withdrawal of previously submitted quote must be done in writing",
+          "It is the quoter's responsibility to ensure the entire quote is received (not just sent); unreadable attachments may render quote unacceptable",
+          "All questions must be submitted in writing (no phone calls) to Sharon_larosa@ios.doi.gov at least 5 business days prior to due date",
+          "If unable to comply with IPP invoicing, submit written waiver request with quote",
+          "Quoters are reminded to include best technical and price terms in initial quote — no assumption of discussions opportunity"
+        ],
+        "section_m_factors": [
+          {
+            "factor": "Price",
+            "weight_or_priority": "Factor 1 of 3 — no relative weight stated; comparative evaluation under FAR 12.203",
+            "description": "Total evaluated price = sum of all CLIN prices (base year + Option Period 1 + Option Period 2). Option prices added to base for total evaluation. Significantly unbalanced option pricing may render offer unacceptable."
+          },
+          {
+            "factor": "Technical",
+            "weight_or_priority": "Factor 2 of 3 — no relative weight stated; comparative evaluation under FAR 12.203",
+            "description": "Factual documentation of the firm's ability to meet the specifications and qualifications required by the Statement of Work (SOW). Evaluated based on 2-page technical approach narrative submitted with quote."
+          },
+          {
+            "factor": "Prior Experience",
+            "weight_or_priority": "Factor 3 of 3 — no relative weight stated; comparative evaluation under FAR 12.203",
+            "description": "Factual documentation or narrative of a firm's experience, qualifications, and capability. Requires 3 examples of the firm's most recent projects within the past 3 years of similar size and scope, with brief project descriptions and point of contact information."
+          }
+        ],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 6/10 · 18 prioritized · top: The SOW (Attachment 1) and QASP Matrix (Attachment 5) are not included in the up",
+      "json": {
+        "technical_risks": [
+          "No SOW acreage ceiling or minimum acreage per task order is defined in the RFQ body — the IDIQ maximum is $349,000 with only a $50,000 minimum guarantee, meaning the contractor could win the contract and receive only the $50K floor task order across the entire 3-year base+options period; a TX/OK corridor firm must model worst-case revenue at $50K total, not $349K.",
+          "The solicitation references 11 attachments (SOW, priority species lists, QASP Matrix, wildlife regulations, monitoring data sheets) that are NOT included in the uploaded document — a bidder without the actual SOW cannot determine true technical complexity, chemical application protocols, GPS data recording requirements, species identification obligations, or performance standards against which the QASP will evaluate quality.",
+          "NAICS 561730 (Landscaping Services) requires field-level pesticide applicator licensing valid in Wyoming — a TX/OK-based firm must verify whether it holds Wyoming Department of Agriculture commercial pesticide applicator certification for herbicide application in a National Park, or can legally perform under a Wyoming-licensed subcontractor/employee, prior to submitting a quote.",
+          "Work is at Grand Teton National Park (elevation 6,800–13,770 ft, remote terrain, grizzly bear and bison habitat per Wildlife Regulations Attachment 6) — a contractor with no high-altitude, remote wilderness operations experience faces genuine performance risk: crew safety plans, bear spray protocols, emergency egress, and communication blackout zones are not trivial and failure to address them in the 2-page technical narrative will be flagged by the evaluator."
+        ],
+        "schedule_risks": [
+          "RFQ issued 05/03/2026 with quotes due 05/19/2026 (1300 MD) — that is only 16 calendar days, 11 business days, to assemble: signed SF-18, completed provisions (52.203-11, 52.209-11, 52.240-90 representations), 2-page technical narrative, 3 past performance references with POC contact info, price schedule, and Contractor Core Data; a TX/OK firm must mobilize immediately with zero margin for delay.",
+          "Base year period of performance is 06/01/2026 to 05/31/2027, meaning award must occur within approximately 12 days of quote due date (05/19/2026) to allow any contract startup before the base year begins — if NPS award is delayed (common), the contractor could face a compressed operational season in Grand Teton (effective weed treatment window is June–September) with no schedule relief mechanism documented.",
+          "FAR 52.217-8 (Option to Extend Services) allows NPS to extend performance up to 6 additional months beyond the 3-year IDIQ ceiling — the contractor must price and staff for potential 3.5-year total performance duration at SCA-compliant wages, since Teton County WY wage determination (Attachment 10) will apply and wage escalation across 5 years 6 months maximum duration (per 52.217-9) is unpriced in a per-acre FFP structure."
+        ],
+        "price_risks": [
+          "Pricing is structured as a single per-acre unit price for each period with quantity set at '1 Acre' as a placeholder — the actual number of acres to be treated per task order is unknown because the SOW (Attachment 1, 11 pages) is not in the uploaded document; a bidder who under-prices per acre because they assumed low-density, easily accessible infestations will be locked into FFP task orders that may cover dense, multi-species infestations in remote terrain requiring multiple herbicide passes.",
+          "SCA wage determination for Teton County, WY (Attachment 10, 10 pages) applies under FAR 52.222-41 — Teton County WY has among the highest prevailing wages in Wyoming due to resort economy labor competition; a TX/OK firm accustomed to lower SCA rates in TX or OK WDs must cost-build from the Teton County WD rates, not home-market assumptions, or the per-acre price will be fatally under-bid.",
+          "FAR 52.222-43 (FLSA and SCA Price Adjustment for Multiple Year and Option Contracts) allows wage rate adjustments at option exercise — however, the per-acre FFP price does not automatically escalate for non-SCA cost components (fuel, chemical costs, equipment maintenance, liability insurance premiums); 3 years of potential herbicide price inflation and Wyoming fuel costs in a remote park with no price escalation clause for materials creates unhedged cost exposure.",
+          "DIAR 1452.228-70 mandates liability insurance with the US Government as named co-insured ($500K per occurrence, $100K per person, $100K property damage) — the contractor must obtain a policy endorsement naming the United States of America before work begins; specialty environmental/pesticide liability riders for NPS lands may carry significant premium surcharges not typically encountered by TX/OK landscaping subcontractors."
+        ],
+        "evaluation_risks": [
+          "FAR 12.203 comparative evaluation applies — the RFQ explicitly states factors are NOT required to be weighted or disclosed; this gives the CO unconstrained discretion to select any quoter based on holistic comparison, meaning a technically superior but slightly higher-priced quote can be passed over for any documentable reason without a formal tradeoff narrative, and debriefings do NOT apply under FAR Part 12.",
+          "Prior experience requires exactly 3 projects within the past 3 years of 'similar size and scope' — 'similar size and scope' for invasive weed backpack treatments in a federally protected National Park setting is a very specific niche; a TX/OK contractor with only roadside or agricultural herbicide spray experience may not have qualifying NPS, BLM, USFS, or DOI references, and submitting dissimilar references (e.g., urban landscaping maintenance) will weaken the comparative position against competitors with federal land management experience.",
+          "The technical narrative is hard-capped at 2 pages — the evaluator must assess technical approach, resources, and capabilities across: species identification, chemical selection and application rates, data recording compliance (Attachment 7 monitoring data sheet), QASP compliance (Attachment 5), wildlife awareness protocols (Attachment 6), and crew qualifications, all within 2 pages; a poorly organized 2-page narrative that does not map directly to the SOW will lose the comparative evaluation to a competitor who mirrors the SOW structure exactly.",
+          "Quote submission is via email only to Sharon_larosa@ios.doi.gov — lateness is determined by timestamp in the CO's email inbox, NOT by send time; file attachment failures or large file sizes that cause delivery delays or non-delivery render the quote unacceptable with no recourse, and the CO has sole discretion on late quote acceptance under FAR 52.212-1(c)."
+        ],
+        "severity_score": 6,
+        "top_3_risks": [
+          "The SOW (Attachment 1) and QASP Matrix (Attachment 5) are not included in the uploaded solicitation document, forcing the bidder to price a 3-year FFP IDIQ contract for unknown technical performance standards, species identification obligations, and acreage volumes — submitting a price without the SOW is gambling, not bidding.",
+          "The quote is due 05/19/2026 (11 business days from issue) with a base year start of 06/01/2026, leaving a TX/OK firm virtually no time to obtain Wyoming pesticide applicator credentials, secure SCA-compliant crew familiar with Grand Teton terrain, obtain the DOI-required insurance certificate naming the US Government, and register/confirm active SAM.gov status — a compliance failure on any one of these items is a non-award.",
+          "FAR Part 12 comparative evaluation with no disclosed factor weights and no debriefing rights means the Government can select a locally-based Wyoming/Idaho/Montana competitor with direct Grand Teton NPS past performance over a lower-priced TX/OK firm with no national park credentials, and the losing bidder has no effective protest path."
+        ],
+        "dfars_trap_risks": [],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — The $349K IDIQ ceiling is accessible and SBA set-aside removes large-business competition, but a TX/OK firm must immediately obtain the missing SOW attachment, verify Wyoming pesticide applicator licensing, and build price from Teton County WY SCA wage rates before committing to a per-acre FFP price with only 11 business days to submission.",
+        "executive_risk_summary": "NPS Grand Teton National Park is soliciting a 3-year IDIQ contract (base + 2 options, $50K minimum / $349K ceiling) for invasive weed control using backpack herbicide sprayers across park lands near Moose, Wyoming. Task orders will be issued as firm-fixed-price per acre. The Service Contract Act applies, and a Teton County, WY wage determination governs labor rates.\n\nThree risks stand out as potential contract-killers. First, the Scope of Work (Attachment 1, 11 pages) is absent from the solicitation as uploaded — pricing a per-acre FFP IDIQ without knowing acreage volumes, species density, chemical protocols, or QASP performance thresholds invites a bid that is either fatally under-priced (leading to a loss on every task order and eventual default) or fatally over-priced (losing the comparative evaluation). Second, the 11-business-day response window combined with a June 1 start date leaves virtually no time to secure Wyoming commercial pesticide applicator licensing, the DOI liability insurance certificate naming the US Government, and SCA-compliant crew experienced in remote wilderness conditions — missing any one of these at award results in a cure notice or immediate non-performance finding. Third, FAR Part 12 comparative evaluation with no disclosed factor weights and no debriefing rights means a CO can select a regionally-based competitor with Grand Teton NPS past performance regardless of price, with no effective protest remedy for the losing firm.\n\nImmediate actions in priority order: (1) By 05/05/2026 — submit a written RFI to Sharon_larosa@ios.doi.gov requesting the complete SOW (Attachment 1), QASP Matrix (Attachment 5), and Teton County WY Wage Determination (Attachment 10) if not already in possession, as questions are due 5 business days before 05/19/2026 (deadline approximately 05/12/2026); (2) By 05/07/2026 — verify active SAM.gov registration, confirm Wyoming Department of Agriculture commercial pesticide applicator license status or identify a licensed Wyoming-based subcontractor to team with; (3) By 05/09/2026 — contact liability insurance broker to obtain a DOI-compliant certificate naming the United States of America at required coverage levels ($500K per occurrence); (4) By 05/14/2026 — complete price build using Teton County WY SCA wage rates (not TX/OK rates), model worst-case at $50K minimum guarantee, model per-acre price against realistic 50–500 acre annual treatment scenarios, and ensure option year prices are not 'significantly unbalanced' relative to base year to avoid unacceptable offer finding.",
+        "prioritized_risks": [
+          {
+            "text": "The SOW (Attachment 1) and QASP Matrix (Attachment 5) are not included in the uploaded solicitation document, forcing the bidder to price a 3-year FFP IDIQ contract for unknown technical performance standards, species identification obligations, and acreage volumes — submitting a price without the SOW is gambling, not bidding.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "The quote is due 05/19/2026 (11 business days from issue) with a base year start of 06/01/2026, leaving a TX/OK firm virtually no time to obtain Wyoming pesticide applicator credentials, secure SCA-compliant crew familiar with Grand Teton terrain, obtain the DOI-required insurance certificate naming the US Government, and register/confirm active SAM.gov status — a compliance failure on any one of these items is a non-award.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "FAR Part 12 comparative evaluation with no disclosed factor weights and no debriefing rights means the Government can select a locally-based Wyoming/Idaho/Montana competitor with direct Grand Teton NPS past performance over a lower-priced TX/OK firm with no national park credentials, and the losing bidder has no effective protest path.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "No SOW acreage ceiling or minimum acreage per task order is defined in the RFQ body — the IDIQ maximum is $349,000 with only a $50,000 minimum guarantee, meaning the contractor could win the contract and receive only the $50K floor task order across the entire 3-year base+options period; a TX/OK corridor firm must model worst-case revenue at $50K total, not $349K.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "The solicitation references 11 attachments (SOW, priority species lists, QASP Matrix, wildlife regulations, monitoring data sheets) that are NOT included in the uploaded document — a bidder without the actual SOW cannot determine true technical complexity, chemical application protocols, GPS data recording requirements, species identification obligations, or performance standards against which the QASP will evaluate quality.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "NAICS 561730 (Landscaping Services) requires field-level pesticide applicator licensing valid in Wyoming — a TX/OK-based firm must verify whether it holds Wyoming Department of Agriculture commercial pesticide applicator certification for herbicide application in a National Park, or can legally perform under a Wyoming-licensed subcontractor/employee, prior to submitting a quote.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Work is at Grand Teton National Park (elevation 6,800–13,770 ft, remote terrain, grizzly bear and bison habitat per Wildlife Regulations Attachment 6) — a contractor with no high-altitude, remote wilderness operations experience faces genuine performance risk: crew safety plans, bear spray protocols, emergency egress, and communication blackout zones are not trivial and failure to address them in the 2-page technical narrative will be flagged by the evaluator.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "RFQ issued 05/03/2026 with quotes due 05/19/2026 (1300 MD) — that is only 16 calendar days, 11 business days, to assemble: signed SF-18, completed provisions (52.203-11, 52.209-11, 52.240-90 representations), 2-page technical narrative, 3 past performance references with POC contact info, price schedule, and Contractor Core Data; a TX/OK firm must mobilize immediately with zero margin for delay.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Base year period of performance is 06/01/2026 to 05/31/2027, meaning award must occur within approximately 12 days of quote due date (05/19/2026) to allow any contract startup before the base year begins — if NPS award is delayed (common), the contractor could face a compressed operational season in Grand Teton (effective weed treatment window is June–September) with no schedule relief mechanism documented.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "FAR 52.217-8 (Option to Extend Services) allows NPS to extend performance up to 6 additional months beyond the 3-year IDIQ ceiling — the contractor must price and staff for potential 3.5-year total performance duration at SCA-compliant wages, since Teton County WY wage determination (Attachment 10) will apply and wage escalation across 5 years 6 months maximum duration (per 52.217-9) is unpriced in a per-acre FFP structure.",
+            "priority": "P1",
+            "category": "Schedule",
+            "citation": "FAR 52.217-8"
+          },
+          {
+            "text": "Pricing is structured as a single per-acre unit price for each period with quantity set at '1 Acre' as a placeholder — the actual number of acres to be treated per task order is unknown because the SOW (Attachment 1, 11 pages) is not in the uploaded document; a bidder who under-prices per acre because they assumed low-density, easily accessible infestations will be locked into FFP task orders that may cover dense, multi-species infestations in remote terrain requiring multiple herbicide passes.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "SCA wage determination for Teton County, WY (Attachment 10, 10 pages) applies under FAR 52.222-41 — Teton County WY has among the highest prevailing wages in Wyoming due to resort economy labor competition; a TX/OK firm accustomed to lower SCA rates in TX or OK WDs must cost-build from the Teton County WD rates, not home-market assumptions, or the per-acre price will be fatally under-bid.",
+            "priority": "P1",
+            "category": "Price",
+            "citation": "FAR 52.222-41"
+          },
+          {
+            "text": "FAR 52.222-43 (FLSA and SCA Price Adjustment for Multiple Year and Option Contracts) allows wage rate adjustments at option exercise — however, the per-acre FFP price does not automatically escalate for non-SCA cost components (fuel, chemical costs, equipment maintenance, liability insurance premiums); 3 years of potential herbicide price inflation and Wyoming fuel costs in a remote park with no price escalation clause for materials creates unhedged cost exposure.",
+            "priority": "P1",
+            "category": "Price",
+            "citation": "FAR 52.222-43"
+          },
+          {
+            "text": "DIAR 1452.228-70 mandates liability insurance with the US Government as named co-insured ($500K per occurrence, $100K per person, $100K property damage) — the contractor must obtain a policy endorsement naming the United States of America before work begins; specialty environmental/pesticide liability riders for NPS lands may carry significant premium surcharges not typically encountered by TX/OK landscaping subcontractors.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "FAR 12.203 comparative evaluation applies — the RFQ explicitly states factors are NOT required to be weighted or disclosed; this gives the CO unconstrained discretion to select any quoter based on holistic comparison, meaning a technically superior but slightly higher-priced quote can be passed over for any documentable reason without a formal tradeoff narrative, and debriefings do NOT apply under FAR Part 12.",
+            "priority": "P2",
+            "category": "Evaluation",
+            "citation": "FAR 12.203"
+          },
+          {
+            "text": "Prior experience requires exactly 3 projects within the past 3 years of 'similar size and scope' — 'similar size and scope' for invasive weed backpack treatments in a federally protected National Park setting is a very specific niche; a TX/OK contractor with only roadside or agricultural herbicide spray experience may not have qualifying NPS, BLM, USFS, or DOI references, and submitting dissimilar references (e.g., urban landscaping maintenance) will weaken the comparative position against competitors with federal land management experience.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "The technical narrative is hard-capped at 2 pages — the evaluator must assess technical approach, resources, and capabilities across: species identification, chemical selection and application rates, data recording compliance (Attachment 7 monitoring data sheet), QASP compliance (Attachment 5), wildlife awareness protocols (Attachment 6), and crew qualifications, all within 2 pages; a poorly organized 2-page narrative that does not map directly to the SOW will lose the comparative evaluation to a competitor who mirrors the SOW structure exactly.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "Quote submission is via email only to Sharon_larosa@ios.doi.gov — lateness is determined by timestamp in the CO's email inbox, NOT by send time; file attachment failures or large file sizes that cause delivery delays or non-delivery render the quote unacceptable with no recourse, and the CO has sole discretion on late quote acceptance under FAR 52.212-1(c).",
+            "priority": "P2",
+            "category": "Evaluation",
+            "citation": "FAR 52.212-1"
+          }
+        ]
+      }
+    },
+    "compliance_score": 30,
+    "recommendation": "DECLINE",
+    "bid_recommendation": "DECLINE. Score 30/100. Top risk: The SOW (Attachment 1) and QASP Matrix (Attachment 5) are not included in the uploaded solicitation document, forcing the bidder to price a 3-year FFP IDIQ contract for unknown technical performance s.",
+    "classification": {
+      "document_type": "RFQ",
+      "rationale": "The document header explicitly states 'REQUEST FOR QUOTATION' on Standard Form 18, and the solicitation text confirms it is issued under FAR Part 12/13 simplified acquisition procedures with quotations (not offers) requested. The SAM.gov metadata also confirms type as 'Solicitation' with a small business set-aside, and the body repeatedly references 'quotes' and 'quoters' rather than proposals.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 30412,
+      "output_tokens": 116,
+      "ms": 6806
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 30226,
+      "output_tokens": 375,
+      "ms": 11866
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 31055,
+      "output_tokens": 2703,
+      "ms": 70751
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 31195,
+      "output_tokens": 4433,
+      "ms": 77669
+    }
+  ],
+  "wallMs": 86668,
+  "error": null,
+  "pdfBytes": 567249,
+  "pdfSrc": "sam.gov"
+}

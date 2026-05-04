@@ -1,0 +1,334 @@
+{
+  "tc": {
+    "notice_id": "a1f77eda857c4537b7adf6dd3ab2d963",
+    "label": "NAICS 721110 · lodging",
+    "naics": "721110"
+  },
+  "model": "claude-sonnet-4-6",
+  "audit": {
+    "overview": {
+      "summary": "The 182d Airlift Wing is soliciting quotations for off-site hotel lodging to support personnel attending Regularly Scheduled Drill (RSD) weekends during FY26 under a Blanket Purchase Agreement (BPA). The procurement covers single and double occupancy hotel rooms on a per-night basis for each RSD weekend. This is a combined synopsis/solicitation under simplified acquisition procedures with a small business set-aside.",
+      "json": {
+        "summary": "The 182d Airlift Wing is soliciting quotations for off-site hotel lodging to support personnel attending Regularly Scheduled Drill (RSD) weekends during FY26 under a Blanket Purchase Agreement (BPA). The procurement covers single and double occupancy hotel rooms on a per-night basis for each RSD weekend. This is a combined synopsis/solicitation under simplified acquisition procedures with a small business set-aside.",
+        "scope": "Provide off-site lodging (single and double occupancy hotel rooms) for 182d Airlift Wing personnel during Regularly Scheduled Drill (RSD) weekends throughout FY26. Contractors must quote nightly room availability per RSD weekend and applicable tax rates (bed occupancy tax and city/county tax).",
+        "primary_objective": "Establish a Blanket Purchase Agreement (BPA) with qualified hotel(s) to ensure available and priced lodging for 182d AW drill weekend personnel throughout FY26, resulting in a rooming list distributed to BPA Call awardees.",
+        "customer": "182d Airlift Wing (182d AW), Illinois Air National Guard",
+        "contract_type": "BPA (Blanket Purchase Agreement) with BPA Calls",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "FY26 (October 1, 2025 – September 30, 2026); solicitation posted 2026-05-03, response deadline 2026-05-15"
+      }
+    },
+    "compliance": {
+      "summary": "0 FAR · 0 DFARS · 3 certifications · 2 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [],
+        "dfars_clauses": [],
+        "required_certifications": [
+          "SAM.gov registration required (implied by federal acquisition — NAICS 721110, SBA set-aside)",
+          "Unique Entity Identifier (UEI) required for SAM.gov registration",
+          "Small Business eligibility certification (SBA Total Small Business set-aside)"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes — NAICS code 721110 (Hotels and Motels); SBA size standard is $47.0 million average annual receipts; set-aside type listed as 'SBA' (Total Small Business) per SAM.gov metadata",
+        "key_compliance_actions": [
+          "Register and maintain active SAM.gov registration with UEI prior to award",
+          "Confirm small business status under NAICS 721110 ($47.0M average annual receipts size standard)",
+          "Complete and return Exhibit 1 Pricing Sheet with: Contractor Name, Point of Contact, Email, Phone",
+          "Provide nightly room availability per RSD weekend for CLIN 0001 (Single Occupancy Hotel Room)",
+          "Provide nightly room availability per RSD weekend for CLIN 0002 (Double Occupancy Hotel Room)",
+          "Provide nightly rate for CLIN 0001 (Single Occupancy Hotel Room)",
+          "Provide nightly rate for CLIN 0002 (Double Occupancy Hotel Room)",
+          "Provide current Bed Occupancy Tax rate",
+          "Provide current City/County Tax rate",
+          "Obtain Contractor Representative Signature on Exhibit 1",
+          "Provide Contractor Title on Exhibit 1",
+          "Submit quotation by response deadline: 2026-05-15 at 12:00 PM Central Time",
+          "Review full solicitation notice at SAM.gov notice ID a1f77eda857c4537b7adf6dd3ab2d963 for any additional clauses, terms, or requirements not captured in Exhibit 1 alone — the document provided is ONLY Exhibit 1 (Pricing Sheet); the full solicitation text was not provided and may contain FAR/DFARS clauses, Section L, Section M, and other requirements",
+          "Confirm hotel property location and proximity to 182d Wing (Peoria ANG Base, Peoria, IL) meets any geographic requirements stated in the full solicitation"
+        ],
+        "deadlines": [
+          "Quotation Due: 2026-05-15 (12:00 PM Central Time)",
+          "Solicitation Posted: 2026-05-03",
+          "Period of Performance: FY2026 (specific PoP dates not provided in Exhibit 1 — review full solicitation)"
+        ],
+        "clins": [
+          {
+            "clin": "0001",
+            "description": "Single Occupancy Hotel Room — off-site lodging for 182d Wing Regularly Scheduled Drill (RSD) weekends",
+            "quantity": "Per RSD Weekend (specific quantities not stated in Exhibit 1 — rooming list to be provided later via BPA Call)",
+            "pricing_arrangement": "FFP — Firm Fixed Price (nightly rate per room)",
+            "fob": "Not specified in Exhibit 1"
+          },
+          {
+            "clin": "0002",
+            "description": "Double Occupancy Hotel Room — off-site lodging for 182d Wing Regularly Scheduled Drill (RSD) weekends",
+            "quantity": "Per RSD Weekend (specific quantities not stated in Exhibit 1 — rooming list to be provided later via BPA Call)",
+            "pricing_arrangement": "FFP — Firm Fixed Price (nightly rate per room)",
+            "fob": "Not specified in Exhibit 1"
+          }
+        ],
+        "section_l_summary": "Section L was not included in the document provided (Exhibit 1 — Pricing Sheet only). The full solicitation (W50S7T26QA004) must be retrieved from SAM.gov notice ID a1f77eda857c4537b7adf6dd3ab2d963 to identify all proposal preparation instructions. Exhibit 1 instructs vendors to provide contractor identification, nightly room availability per RSD weekend, nightly rates for single and double occupancy rooms, applicable tax rates, and an authorized representative signature.",
+        "section_m_summary": "Section M was not included in the document provided (Exhibit 1 — Pricing Sheet only). Evaluation criteria cannot be confirmed without the full solicitation text from SAM.gov. Given the BPA/simplified acquisition context under FAR Part 13 and NAICS 721110, evaluation is likely based on price and availability, but this must be verified against the complete solicitation.",
+        "dfars_traps": [],
+        "fob_conflicts": [
+          "FOB terms not specified in Exhibit 1 for either CLIN 0001 or CLIN 0002 — freight/delivery liability cannot be assessed from this document alone; full solicitation must be reviewed to determine FOB designation and any applicable delivery terms"
+        ],
+        "wawf_routing": {},
+        "section_l_requirements": [
+          "Provide Contractor Name on Exhibit 1 Pricing Sheet",
+          "Provide Point of Contact name on Exhibit 1 Pricing Sheet",
+          "Provide Email address on Exhibit 1 Pricing Sheet",
+          "Provide Phone number on Exhibit 1 Pricing Sheet",
+          "Provide nightly room availability per RSD weekend for CLIN 0001 (Single Occupancy Hotel Room)",
+          "Provide nightly rate for CLIN 0001 (Single Occupancy Hotel Room)",
+          "Provide nightly room availability per RSD weekend for CLIN 0002 (Double Occupancy Hotel Room)",
+          "Provide nightly rate for CLIN 0002 (Double Occupancy Hotel Room)",
+          "Include current Bed Occupancy Tax rate",
+          "Include current City/County Tax rate",
+          "Obtain and provide Contractor Representative Signature",
+          "Provide Contractor Title",
+          "NOTE: Full Section L not provided — only Exhibit 1 is included in the uploaded document; retrieve complete solicitation from SAM.gov for all submission requirements"
+        ],
+        "section_m_factors": [
+          {
+            "factor": "Price/Nightly Rate",
+            "weight_or_priority": "Unknown — Section M not provided in Exhibit 1; inferred as primary factor given simplified acquisition BPA context",
+            "description": "Nightly rates for single and double occupancy hotel rooms per RSD weekend"
+          },
+          {
+            "factor": "Room Availability",
+            "weight_or_priority": "Unknown — inferred as key factor; BPA calls contingent on room availability per RSD weekend",
+            "description": "Number of rooms available per RSD weekend for single and double occupancy"
+          },
+          {
+            "factor": "Tax Rates",
+            "weight_or_priority": "Unknown — inferred as price-related factor impacting total cost to government",
+            "description": "Bed Occupancy Tax and City/County Tax rates applicable to lodging charges"
+          }
+        ],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 5/10 · 17 prioritized · top: Proposal due in only 12 calendar days (below the 14-day threshold) with no defin",
+      "json": {
+        "technical_risks": [
+          "RSD weekend availability commitment is ambiguous: the pricing sheet requests 'Nightly Room Availability Per RSD Weekend' but provides no total room block requirement, minimum room count, or guaranteed pick-up volume — hotel cannot determine whether blocking rooms will displace higher-revenue commercial guests without knowing the 182d Wing's typical headcount, which is not disclosed in this solicitation.",
+          "The solicitation does not define minimum quality standards, brand tier, proximity radius to Peoria AIA (or applicable TX/OK base), ADA-compliant room ratio, or required amenities (parking, breakfast, fitness center) — a submitted quote could be technically acceptable on price but later fail a contracting officer's undisclosed standard, leading to disqualification or cure notice after award.",
+          "[Inferred from typical patterns for NAICS 721110 Air National Guard BPAs] The government will issue individual BPA Calls with specific rooming lists; failure to honor a Call when rooms were previously blocked due to a sold-out event constitutes a material performance failure — but the solicitation does not define cancellation lead time, attrition clauses, or force-majeure relief, creating open-ended technical performance obligations.",
+          "[Inferred from typical patterns] No statement of work or performance work statement is attached — only a pricing exhibit. Technical requirements for room type, check-in/check-out procedures, group billing format, and government purchase card (GPC) acceptance are entirely undefined at quotation stage, meaning the contractor is pricing a blank obligation."
+        ],
+        "schedule_risks": [
+          "Response deadline is 2026-05-15 at 12:00 CST — posted 2026-05-03, yielding only 12 calendar days (approximately 8 business days) to complete pricing research, verify current tax rates, obtain authorized signature, and submit. This is below the 14-day threshold and constitutes a compressed response window, particularly for properties that require corporate approval for government rate commitments.",
+          "[Inferred from typical patterns] BPA period of performance for FY26 RSDs likely begins in October 2025 or immediately upon award in May/June 2026; if award is delayed past the first FY26 RSD drill weekend, the government may issue a bridge or emergency procurement that excludes the awardee from the first call, reducing total revenue opportunity.",
+          "[Inferred from typical patterns] BPA Calls will be issued with short lead times (often 30–60 days before RSD weekends); a hotel that does not pre-block rooms on its own reservation system will face inventory conflicts with leisure/commercial bookings, resulting in inability to honor the Call and potential termination for default."
+        ],
+        "price_risks": [
+          "Nightly rate is fixed per the pricing sheet with no escalation clause referenced — for a multi-drill FY26 BPA spanning up to 12 months, hotel operating cost increases (labor, utilities, linen service) cannot be recovered, compressing margins, particularly for independent properties in the TX/OK corridor.",
+          "Tax rates (Bed Occupancy Tax and City/County Tax) must be disclosed at quotation time but are not guaranteed to be reimbursed separately — if the BPA Call structure rolls taxes into the nightly rate rather than billing them as pass-throughs, the contractor absorbs any mid-period tax rate increases enacted by local government.",
+          "[Inferred from typical patterns] GSA per diem rates for the applicable locality cap the government's willingness to pay; if the quoted nightly rate exceeds the FY26 GSA lodging per diem for the applicable county, the contracting officer may deem the quote non-competitive even if it represents fair market value, and no negotiation mechanism is described in this simplified acquisition.",
+          "No minimum guaranteed room-nights are stated — the BPA is a vehicle with no guaranteed minimum (FAR 13.303 BPAs carry no minimum purchase obligation), meaning the hotel could block inventory for drill weekends and receive zero calls if the government elects not to use the BPA, resulting in stranded capacity costs."
+        ],
+        "evaluation_risks": [
+          "Evaluation criteria are entirely absent from the pricing exhibit — the solicitation provides no Section M, no technical evaluation factors, and no past performance requirements. Under FAR 13 simplified acquisition, the contracting officer has broad discretion to make a best-value determination; a quoter with no prior 182d Wing relationship or Air National Guard lodging history may lose to a known incumbent even with a lower price.",
+          "[Inferred from typical patterns for Combined Synopsis/Solicitation under SBA set-aside] The SBA set-aside designation means only small businesses under NAICS 721110 ($47.5M annual receipts) are eligible — a hotel that is a franchise of a large chain must verify its size status carefully; misrepresentation triggers SBA size protest and possible debarment.",
+          "[Inferred from typical patterns] With no technical narrative required, the only differentiator is price and availability commitment — a hotel that underestimates demand and commits fewer rooms than needed may be rated lower than a competitor offering more availability, even at a higher nightly rate, if the CO values capacity over cost."
+        ],
+        "severity_score": 5,
+        "top_3_risks": [
+          "Proposal due in only 12 calendar days (below the 14-day threshold) with no defined room block requirements, creating a compressed window in which the contractor must price a blank obligation — misquoting availability or rate results in either lost award or post-award performance failure.",
+          "No minimum purchase guarantee in this BPA structure (FAR 13.303) means the contractor may block inventory for every FY26 RSD weekend and receive zero BPA Calls, absorbing full opportunity cost with zero revenue recovery mechanism.",
+          "[Inferred from typical patterns] Absence of any performance standards, cancellation policy, or attrition clause in the solicitation creates an open-ended obligation where a single failure to honor a BPA Call — even due to a sold-out weekend — could constitute default and damage past performance ratings used in future government bids."
+        ],
+        "dfars_trap_risks": [],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — Opportunity is accessible for a small hotel in the TX/OK corridor under NAICS 721110, but the complete absence of performance standards, guaranteed minimums, and evaluation criteria means the contractor is signing a blank check on availability with no revenue floor and no defined exit; proceed only after confirming room availability can be blocked without displacing higher-margin commercial business on RSD weekends.",
+        "executive_risk_summary": "The 182d Wing is soliciting hotel lodging for Air National Guard drill weekends (Regularly Scheduled Drills) under a Blanket Purchase Agreement for FY2026. The government wants to pre-establish nightly rates for single and double occupancy rooms so it can issue individual room block orders (BPA Calls) as drill weekends are confirmed. This is a simplified acquisition under FAR Part 13, set aside exclusively for small businesses under NAICS 721110.\n\nThree risks could derail performance or future contract standing. First, the 12-day response window (deadline May 15, 2026) is below the 14-day standard — a rushed submission with incorrect tax rates or an uncommitted room count could result in either disqualification or an awardee locked into terms they cannot honor, triggering a cure notice on the first BPA Call. Second, BPAs under FAR 13.303 carry no guaranteed minimum purchase; if the government issues zero Calls against your BPA, you have blocked inventory for nothing and have no legal remedy — this is a pure revenue risk, not a contract compliance risk, but it is material to the go/no-go decision. Third, the absence of cancellation, attrition, and force-majeure provisions means any failure to honor a Call — even one caused by a fire alarm, burst pipe, or sold-out weekend — is a potential termination for convenience or default, with permanent past performance record consequences.\n\nRecommended actions in priority order: (1) Before May 10, 2026, confirm with your revenue manager that RSD weekends can be blocked in your PMS without triggering blackout conflicts with existing group commitments — do not quote availability you cannot guarantee. (2) Before May 12, 2026, verify your current Bed Occupancy Tax and City/County Tax rates with your local tax authority and confirm whether the government will reimburse taxes on top of the nightly rate or whether they must be baked in — call the contracting officer (solicitation W50S7T26QA004) to clarify before submitting. (3) Before May 14, 2026, confirm your SAM.gov registration is active and your NAICS 721110 size status is current to avoid protest-driven disqualification after award; if your hotel is a franchise, verify small business size with your SBA size standard analyst. (4) At time of submission, attach a brief cover letter noting your cancellation policy and requesting the government include a 72-hour cancellation notice in the BPA Call terms — this protects both parties and signals professionalism that can differentiate you in the CO's best-value judgment.",
+        "prioritized_risks": [
+          {
+            "text": "Proposal due in only 12 calendar days (below the 14-day threshold) with no defined room block requirements, creating a compressed window in which the contractor must price a blank obligation — misquoting availability or rate results in either lost award or post-award performance failure.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "No minimum purchase guarantee in this BPA structure (FAR 13.303) means the contractor may block inventory for every FY26 RSD weekend and receive zero BPA Calls, absorbing full opportunity cost with zero revenue recovery mechanism.",
+            "priority": "P0",
+            "category": "Deal-breaker",
+            "citation": "FAR 13.303"
+          },
+          {
+            "text": "[Inferred from typical patterns] Absence of any performance standards, cancellation policy, or attrition clause in the solicitation creates an open-ended obligation where a single failure to honor a BPA Call — even due to a sold-out weekend — could constitute default and damage past performance ratings used in future government bids.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "RSD weekend availability commitment is ambiguous: the pricing sheet requests 'Nightly Room Availability Per RSD Weekend' but provides no total room block requirement, minimum room count, or guaranteed pick-up volume — hotel cannot determine whether blocking rooms will displace higher-revenue commercial guests without knowing the 182d Wing's typical headcount, which is not disclosed in this solicitation.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "The solicitation does not define minimum quality standards, brand tier, proximity radius to Peoria AIA (or applicable TX/OK base), ADA-compliant room ratio, or required amenities (parking, breakfast, fitness center) — a submitted quote could be technically acceptable on price but later fail a contracting officer's undisclosed standard, leading to disqualification or cure notice after award.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns for NAICS 721110 Air National Guard BPAs] The government will issue individual BPA Calls with specific rooming lists; failure to honor a Call when rooms were previously blocked due to a sold-out event constitutes a material performance failure — but the solicitation does not define cancellation lead time, attrition clauses, or force-majeure relief, creating open-ended technical performance obligations.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns] No statement of work or performance work statement is attached — only a pricing exhibit. Technical requirements for room type, check-in/check-out procedures, group billing format, and government purchase card (GPC) acceptance are entirely undefined at quotation stage, meaning the contractor is pricing a blank obligation.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Response deadline is 2026-05-15 at 12:00 CST — posted 2026-05-03, yielding only 12 calendar days (approximately 8 business days) to complete pricing research, verify current tax rates, obtain authorized signature, and submit. This is below the 14-day threshold and constitutes a compressed response window, particularly for properties that require corporate approval for government rate commitments.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] BPA period of performance for FY26 RSDs likely begins in October 2025 or immediately upon award in May/June 2026; if award is delayed past the first FY26 RSD drill weekend, the government may issue a bridge or emergency procurement that excludes the awardee from the first call, reducing total revenue opportunity.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] BPA Calls will be issued with short lead times (often 30–60 days before RSD weekends); a hotel that does not pre-block rooms on its own reservation system will face inventory conflicts with leisure/commercial bookings, resulting in inability to honor the Call and potential termination for default.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Nightly rate is fixed per the pricing sheet with no escalation clause referenced — for a multi-drill FY26 BPA spanning up to 12 months, hotel operating cost increases (labor, utilities, linen service) cannot be recovered, compressing margins, particularly for independent properties in the TX/OK corridor.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Tax rates (Bed Occupancy Tax and City/County Tax) must be disclosed at quotation time but are not guaranteed to be reimbursed separately — if the BPA Call structure rolls taxes into the nightly rate rather than billing them as pass-throughs, the contractor absorbs any mid-period tax rate increases enacted by local government.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "[Inferred from typical patterns] GSA per diem rates for the applicable locality cap the government's willingness to pay; if the quoted nightly rate exceeds the FY26 GSA lodging per diem for the applicable county, the contracting officer may deem the quote non-competitive even if it represents fair market value, and no negotiation mechanism is described in this simplified acquisition.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "No minimum guaranteed room-nights are stated — the BPA is a vehicle with no guaranteed minimum (FAR 13.303 BPAs carry no minimum purchase obligation), meaning the hotel could block inventory for drill weekends and receive zero calls if the government elects not to use the BPA, resulting in stranded capacity costs.",
+            "priority": "P1",
+            "category": "Price",
+            "citation": "FAR 13.303"
+          },
+          {
+            "text": "Evaluation criteria are entirely absent from the pricing exhibit — the solicitation provides no Section M, no technical evaluation factors, and no past performance requirements. Under FAR 13 simplified acquisition, the contracting officer has broad discretion to make a best-value determination; a quoter with no prior 182d Wing relationship or Air National Guard lodging history may lose to a known incumbent even with a lower price.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns for Combined Synopsis/Solicitation under SBA set-aside] The SBA set-aside designation means only small businesses under NAICS 721110 ($47.5M annual receipts) are eligible — a hotel that is a franchise of a large chain must verify its size status carefully; misrepresentation triggers SBA size protest and possible debarment.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns] With no technical narrative required, the only differentiator is price and availability commitment — a hotel that underestimates demand and commits fewer rooms than needed may be rated lower than a competitor offering more availability, even at a higher nightly rate, if the CO values capacity over cost.",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 71,
+    "recommendation": "PROCEED",
+    "bid_recommendation": "PROCEED. Score 71/100. Top risk: Proposal due in only 12 calendar days (below the 14-day threshold) with no defined room block requirements, creating a compressed window in which the contractor must price a blank obligation — misquot.",
+    "classification": {
+      "document_type": "RFQ",
+      "rationale": "The SAM.gov metadata shows type 'Combined Synopsis/Solicitation' with NAICS 721110 (hotels) and a Small Business Administration set-aside under solicitation number W50S7T26QA004. The document body is a pricing sheet exhibit for a Blanket Purchase Agreement (BPA) seeking quotations for nightly room rates — consistent with a simplified acquisition RFQ under FAR 13, not a full negotiated RFP.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 2486,
+      "output_tokens": 125,
+      "ms": 4182
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 2300,
+      "output_tokens": 364,
+      "ms": 8611
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 3269,
+      "output_tokens": 1761,
+      "ms": 31085
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 3129,
+      "output_tokens": 2143,
+      "ms": 51397
+    }
+  ],
+  "wallMs": 56965,
+  "error": null,
+  "pdfBytes": 144843,
+  "pdfSrc": "sam.gov"
+}

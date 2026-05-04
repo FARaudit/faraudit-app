@@ -1,0 +1,512 @@
+{
+  "tc": {
+    "notice_id": "FA301626Q0068",
+    "label": "baseline · T-38 Talon RFQ",
+    "pdf_path": "/Users/josearodriguezjr./faraudit-app/Solicitation+-+FA301626Q0068.pdf",
+    "naics": "336413"
+  },
+  "model": "claude-opus-4-7",
+  "audit": {
+    "overview": {
+      "summary": "The U.S. Air Force (502d Contracting Squadron, JBSA Lackland) is soliciting quotes via RFQ FA301626Q0068 for T-38 Talon aircraft Intake Plugs and Exhaust Covers in support of the 12th Maintenance Group at JBSA Randolph. The requirement covers 80 sets of intake plugs, 80 exhaust covers, and associated shipping, on a firm fixed price basis. Award will be made on a Lowest Price Technically Acceptable (LPTA) basis to a small business concern.",
+      "json": {
+        "summary": "The U.S. Air Force (502d Contracting Squadron, JBSA Lackland) is soliciting quotes via RFQ FA301626Q0068 for T-38 Talon aircraft Intake Plugs and Exhaust Covers in support of the 12th Maintenance Group at JBSA Randolph. The requirement covers 80 sets of intake plugs, 80 exhaust covers, and associated shipping, on a firm fixed price basis. Award will be made on a Lowest Price Technically Acceptable (LPTA) basis to a small business concern.",
+        "scope": "Manufacture and delivery of 80 sets (of 2) Intake Plugs (CLIN 0001) and 80 Exhaust Covers (CLIN 0002) for the T-38 Talon aircraft, plus shipping (CLIN 0003), in accordance with the attached Statement of Need and Insignia/Markings specifications. Items must be fully assembled and ready for use upon delivery FOB Destination to JBSA Randolph, TX.",
+        "primary_objective": "Procurement and delivery of T-38 Talon Intake Plugs and Exhaust Covers (PSC 1680) to the 12 MXG at JBSA Randolph, TX by 03 August 2026.",
+        "customer": "Department of the Air Force, Air Education and Training Command (AETC), 502d Contracting Squadron (502 CONS/PKC), JBSA Lackland, TX — end user: 12th Maintenance Group (12 MXG), JBSA Randolph, TX",
+        "contract_type": "Firm Fixed Price (FFP) Purchase Order",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "Delivery on or before 03 August 2026; solicitation issued April 2026 with quotes due 27 April 2026 12:00 PM CDT"
+      }
+    },
+    "compliance": {
+      "summary": "32 FAR · 16 DFARS · 14 certifications · 3 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [
+          "52.203-18",
+          "52.203-19",
+          "52.204-7",
+          "52.204-13",
+          "52.209-6",
+          "52.209-10",
+          "52.212-1",
+          "52.212-3",
+          "52.212-4",
+          "52.212-5",
+          "52.213-1",
+          "52.214-34",
+          "52.214-35",
+          "52.216-7",
+          "52.219-6",
+          "52.219-14",
+          "52.222-3",
+          "52.222-19",
+          "52.222-36",
+          "52.222-50",
+          "52.223-23",
+          "52.225-1",
+          "52.225-3",
+          "52.225-4",
+          "52.226-8",
+          "52.232-33",
+          "52.232-40",
+          "52.233-3",
+          "52.233-4",
+          "52.240-90",
+          "52.240-91",
+          "52.244-6"
+        ],
+        "dfars_clauses": [
+          "252.203-7000",
+          "252.203-7002",
+          "252.203-7005",
+          "252.204-7016",
+          "252.204-7017",
+          "252.204-7018",
+          "252.204-7024",
+          "252.223-7008",
+          "252.225-7055",
+          "252.225-7056",
+          "252.225-7059",
+          "252.225-7060",
+          "252.232-7003",
+          "252.232-7006",
+          "252.232-7010",
+          "252.247-7023"
+        ],
+        "required_certifications": [
+          "Active SAM.gov registration (FAR 52.204-13 / 52.204-7) — required for award eligibility",
+          "Unique Entity Identifier (UEI) via SAM.gov",
+          "WAWF/iRAPT registration at https://wawf.eb.mil for electronic invoicing (DFARS 252.232-7006)",
+          "Small Business self-certification under NAICS 336413 (1,250 employee size standard)",
+          "FAR 52.225-4 Buy American/FTA/Israeli Trade Act Certificate completion",
+          "DFARS 252.204-7016/7017 Covered Defense Telecommunications representation (Section 889)",
+          "DFARS 252.225-7055 Maduro Regime business operations representation",
+          "DFARS 252.225-7059 Xinjiang Uyghur Autonomous Region representation",
+          "DFARS 252.203-7005 Representation Relating to Compensation of Former DoD Officials",
+          "FAR 52.203-18 Internal Confidentiality Agreements representation",
+          "FAR 52.212-3 Offeror Representations and Certifications-Commercial",
+          "DFARS 252.223-7008 Hexavalent Chromium prohibition compliance",
+          "DFARS 252.247-7023 Transportation of Supplies by Sea compliance",
+          "Base access credentialing per 5352.242-9000 (drivers license, vehicle registration, insurance for site visit)"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes - 100% Total Small Business set-aside under NAICS 336413 (Other Aircraft Parts and Auxiliary Equipment Manufacturing) with 1,250 employee size standard. Only small business concerns may submit quotes.",
+        "key_compliance_actions": [
+          "Maintain active SAM.gov registration with current representations and certifications prior to quote submission",
+          "Self-certify as small business under NAICS 336413 (≤1,250 employees)",
+          "Submit quote via email to lauren.oshaughnessy@us.af.mil AND edwin.dela_cruz.3@us.af.mil NLT 27 Apr 2026 12:00 PM CDT",
+          "Submit any questions NLT 16 Apr 2026 12:00 PM CDT to both contracting POCs",
+          "Submit Base Access Request Form (Attachment 3) NLT 9 Apr 2026 10:00 AM CDT if attending site visit",
+          "Provide MFG name, Part Number, illustrations, and product literature/description in quote per Statement of Need",
+          "Quote in English (52.214-34) and U.S. dollars (52.214-35)",
+          "Price all CLINs FOB Destination unless explicitly stated otherwise",
+          "Complete FAR 52.225-4 Buy American/FTA certificate identifying foreign end products by line item",
+          "Complete DFARS 252.204-7016/7017 covered telecom representation (Section 889 Part B)",
+          "Register in WAWF and configure routing per DFARS 252.232-7006 table for invoicing",
+          "Comply with FAR 52.219-14 limitations on subcontracting (≤50% to non-similarly situated entities for supplies)",
+          "Ensure no hexavalent chromium in deliverables per DFARS 252.223-7008",
+          "Provide after-hours contact for EMNS per 5352.242-9000(f) if performing on installation",
+          "Confirm delivery to JBSA Randolph TX 78150 by 03 Aug 2026"
+        ],
+        "deadlines": [
+          "Site visit access request due: 2026-04-09",
+          "Site visit: 2026-04-15",
+          "Questions due: 2026-04-16",
+          "Quote due: 2026-04-27",
+          "Delivery required by: 2026-08-03"
+        ],
+        "clins": [
+          {
+            "clin": "0001",
+            "description": "INTAKE PLUGS (SET OF 2) IAW Statement of Need; PSC 1680",
+            "quantity": "80 Each",
+            "pricing_arrangement": "FFP",
+            "fob": "Destination (Government per Section F)"
+          },
+          {
+            "clin": "0002",
+            "description": "EXHAUST COVERS IAW Statement of Need; PSC 1680",
+            "quantity": "80 Each",
+            "pricing_arrangement": "FFP",
+            "fob": "Destination (Contractor per Section F)"
+          },
+          {
+            "clin": "0003",
+            "description": "SHIPPING; PSC 1680",
+            "quantity": "1 Each",
+            "pricing_arrangement": "FFP",
+            "fob": "Destination (Contractor per Section F)"
+          }
+        ],
+        "section_l_summary": "Section L (Instructions, Conditions & Notices) directs quoters to submit via email to both contracting POCs by 27 Apr 2026 12:00 PM CDT. Quotes must include MFG name, part number, illustrations, and supporting literature demonstrating compliance with the Statement of Need. All CLINs must be priced FOB Destination with items fully assembled and ready for use on delivery; SAM registration is mandatory for award eligibility.",
+        "section_m_summary": "Section M establishes Lowest Price Technically Acceptable (LPTA) as the basis for award. Technical acceptability is binary (Acceptable/Unacceptable) and ALL CLINs must be rated Acceptable for the overall quote to be Acceptable. Award goes to the lowest-priced, technically acceptable, responsible quoter; the Government will stop evaluating once two technically acceptable quotes are identified.",
+        "dfars_traps": [
+          {
+            "clause": "252.223-7008",
+            "title": "Prohibition of Hexavalent Chromium",
+            "risk_level": "P1",
+            "description": "Deliverables (intake plugs/exhaust covers) cannot contain hexavalent chromium >0.1% by weight in any homogeneous material. Common in metal coatings/primers used on aircraft ground support equipment.",
+            "required_action": "Verify with manufacturer that no Cr(VI) is used in plating, primers, paints, or sealants on the covers/plugs. Obtain written supplier certification."
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Prohibition on Acquisition of Covered Defense Telecommunications Equipment or Services",
+            "risk_level": "P1",
+            "description": "Section 889 Part B prohibition on Huawei, ZTE, Hytera, Hikvision, Dahua equipment/services in any system used to perform the contract.",
+            "required_action": "Verify SAM 252.204-7016 representation is current and accurate; complete 252.204-7017 disclosure if 'does provide' was elected."
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region",
+            "risk_level": "P1",
+            "description": "Prohibits products mined, produced, or manufactured wholly or in part by forced labor from XUAR. Textile/fabric covers carry elevated risk.",
+            "required_action": "Trace fabric/material supply chain for exhaust covers and intake plugs; obtain supplier attestation of non-XUAR origin and complete 252.225-7059 representation."
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "Wide Area WorkFlow Payment Instructions",
+            "risk_level": "P2",
+            "description": "Mandatory invoicing routing: Pay Official F87700, Issue/Admin FA3016, Inspect/Ship To F3PT73. Document type: Combo (Invoice + Receiving Report).",
+            "required_action": "Register in WAWF; pre-configure Combo document with exact DoDAACs prior to first delivery to avoid payment delays."
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Contractor Access to Air Force Installations",
+            "risk_level": "P2",
+            "description": "Site visit at JBSA Randolph requires base access submission via Attachment 3 by 9 Apr 2026; deliveries also require base entry credentials.",
+            "required_action": "Submit Base Access Request Form on company letterhead with employee names, valid DL, vehicle registration, and insurance to contracting officer."
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation of Supplies by Sea",
+            "risk_level": "P2",
+            "description": "If any portion of supplies ships via ocean, must use U.S.-flag vessels and report to USTRANSCOM.",
+            "required_action": "For domestic CONUS delivery to JBSA Randolph this is unlikely to apply, but flow down to subcontractors and confirm no ocean transport in supply chain."
+          },
+          {
+            "clause": "252.203-7000",
+            "title": "Requirements Relating to Compensation of Former DoD Officials",
+            "risk_level": "P2",
+            "description": "Restrictions on hiring/compensating former DoD officials within 2-year post-employment window.",
+            "required_action": "Verify no key personnel are former DoD officials with covered relationships to this acquisition; complete 252.203-7005 representation."
+          }
+        ],
+        "fob_conflicts": [
+          "CLIN 0001 listed as 'FoB Details Government Destination' while CLINs 0002 and 0003 listed as 'FoB Details Contractor Destination' in Section F — inconsistent FOB labeling across line items for the same delivery point (JBSA Randolph). Section L para 7 directs ALL CLINs FOB Destination. Quoter should request clarification or assume FOB Destination uniformly to avoid freight cost/liability ambiguity.",
+          "SF 1449 Block 11 'FOB Destination unless block is marked SEE SCHEDULE' is unchecked, implying FOB Destination contract-wide, which conflicts with the 'Government Destination' vs 'Contractor Destination' labels in Section F."
+        ],
+        "wawf_routing": {
+          "pay_official_dodaac": "F87700",
+          "issue_by_dodaac": "FA3016",
+          "admin_dodaac": "FA3016",
+          "inspect_by_dodaac": "F3PT73",
+          "document_type": "Combo (Invoice and Receiving Report) for fixed-price line items requiring shipment of a deliverable"
+        },
+        "section_l_requirements": [
+          "Submit quote via email to lauren.oshaughnessy@us.af.mil AND edwin.dela_cruz.3@us.af.mil",
+          "Quote due NLT 12:00 PM CDT, 27 April 2026",
+          "Submit questions NLT 12:00 PM CDT, 16 April 2026 to both POCs",
+          "Site visit RSVP/base access form due NLT 10:00 AM CDT, 9 April 2026",
+          "Site visit attendance 15 April 2026 9:00 AM CDT at 11090 5th St East, Hangar 3, JBSA Randolph TX 78150",
+          "Include (1) Manufacturer name, (2) Part Number, (3) illustrations, (4) literature or description supporting product",
+          "Demonstrate product details meet Statement of Need (SoN) requirements",
+          "Price all CLINs FOB Destination unless otherwise clearly stated",
+          "Items must be fully assembled and ready for use upon delivery",
+          "Quote must be complete, self-sufficient, and respond directly to RFQ requirements",
+          "Submission in English language (FAR 52.214-34)",
+          "Submission in U.S. currency (FAR 52.214-35)",
+          "Active SAM.gov registration required for award eligibility",
+          "Small business self-certification under NAICS 336413 (1,250 employee size standard) — non-small business quotes will not be considered",
+          "Complete FAR 52.212-3 representations and certifications",
+          "Complete FAR 52.225-4 Buy American/FTA/Israeli Trade Act Certificate",
+          "Complete DFARS 252.204-7017 covered telecom disclosure if applicable",
+          "Complete DFARS 252.225-7059 Xinjiang representation",
+          "No reimbursement for quote preparation, site visits, or preliminary work"
+        ],
+        "section_m_factors": [
+          {
+            "factor": "Technical Acceptability",
+            "weight_or_priority": "Pass/Fail gate (Acceptable or Unacceptable) — all CLINs must be Acceptable",
+            "description": "Quoted product evaluated against Statement of Need and solicitation criteria. ALL CLINs/items must be technically acceptable for overall rating of Acceptable. Government may conduct informal or formal interchanges (clarifications) at its discretion."
+          },
+          {
+            "factor": "Price",
+            "weight_or_priority": "Lowest evaluated price among technically acceptable quotes wins (LPTA)",
+            "description": "Firm-Fixed-Price evaluation; lowest-priced technically acceptable quote represents best value. Evaluation halts when two technically acceptable quotes are identified."
+          },
+          {
+            "factor": "Contractor Responsibility",
+            "weight_or_priority": "Pass/Fail responsibility determination",
+            "description": "Award contingent upon Contracting Officer's affirmative responsibility determination of the apparent successful quoter (FAR 9.104 standards, SAM exclusions, SPRS per DFARS 252.204-7024)."
+          }
+        ],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": true,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": true,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": true,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": true,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": true,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 5/10 · 18 prioritized · top: LPTA + binary technical acceptability + 90-day delivery for unit-marked aircraft",
+      "json": {
+        "technical_risks": [
+          "Statement of Need (Attachment 1) and Insignia/Markings (Attachment 2) drive technical acceptability but the Section C narrative on the contract face is one line ('Intake Plugs and Exhaust Covers') — all real specifications (materials, dimensions, fit to T-38 nacelle/exhaust geometry, REMOVE BEFORE FLIGHT streamer requirements, color/insignia) live in the attachments; failure to mirror every SoN bullet in the quote will draw an 'Unacceptable' technical rating since the evaluation is binary acceptable/unacceptable with no tradeoff.",
+          "Quote MUST include (1) MFG name, (2) Part Number, (3) illustrations, and (4) literature/description per Special Note 6 — quoting a generic or made-to-order item without an established MFG part number creates a technical acceptability risk; if you are the manufacturer, you still need a documented PN and product literature pre-existing the bid.",
+          "Items must be 'fully assembled and ready for use upon delivery' (Note 7) and 'fully operational at completion of work' (Note 8) — this language treats commercial covers/plugs as a deliverable assembly, meaning any field-fit issue at JBSA Randolph Hangar 3 acceptance becomes a rework obligation at contractor cost.",
+          "Insignia and Markings attachment implies unit-specific markings (likely 12 FTW / AETC) — silkscreen or embroidered logos require artwork approval cycles that are not scheduled in the RFQ and can slip the 03 Aug delivery."
+        ],
+        "schedule_risks": [
+          "Award likely late April/early May 2026 with hard delivery NLT 03 Aug 2026 for 80 sets of intake plugs + 80 exhaust covers — roughly 90–100 days from award to FOB Destination JBSA Randolph for a custom-marked, aircraft-specific product; any fabric/insignia lead time over 8 weeks puts default at risk.",
+          "Delivery is 'On Or Before 03 Aug 2026' as a single drop with no partial-delivery provision — late delivery of even one CLIN exposes contractor to T4D under FAR 52.212-4(m) since this is a commercial FFP with no liquidated-damages cure path.",
+          "Site visit (15 Apr) and questions cutoff (16 Apr) are tight against the 27 Apr quote due date — only 11 days to translate SoN clarifications into a compliant, priced quote."
+        ],
+        "price_risks": [
+          "Three CLINs are all Firm Fixed Price including a separate Shipping CLIN 0003 — but Note 7 states 'Delivery shall be FOB Destination and include in price of each CLIN... unless otherwise and clearly stated by quoter'; ambiguity between CLIN 0003 (shipping) and the FOB-Destination-baked-in instruction can cause a non-conforming quote if not explicitly reconciled in your cover letter.",
+          "FOB Destination on CLIN 0001 (page 6 lists 'Government Destination' for 0001 but 'Contractor Destination' for 0002 and 0003) — this is an internal inconsistency in the solicitation; bidder bears all freight, loss, and damage risk to JBSA Randolph regardless, and must price LTL freight + inside delivery to Hangar 3.",
+          "LPTA evaluation means zero margin tolerance — any pricing above the lowest technically acceptable competitor loses; aerospace-marked covers from established T-38 vendors (Aircraft Covers Inc., Aero Specialties) set the price floor.",
+          "FAR 52.232-40 requires accelerated payment to small business subs — cash flow neutral for prime but a documentation burden."
+        ],
+        "evaluation_risks": [
+          "LPTA with binary Acceptable/Unacceptable — no credit for superior product, past performance, or delivery; one missed SoN line item makes the entire quote Unacceptable across all CLINs (Evaluation Factors page states 'all CLINS/items must be found technically acceptable').",
+          "Government 'reserves the right to only hold interchanges if considered necessary' — do not assume you will get a chance to fix omissions; submit as if no clarifications will be requested.",
+          "DFARS 252.204-7024 SPRS — supplier performance score will be pulled; a low or N/A SPRS record on a small business with thin DoD history can trigger a non-responsibility determination even after technical acceptability is achieved.",
+          "Buy American 52.225-1 (Deviation 2026-O0038) Certificate at 52.225-4 must be completed — failure to list foreign components or to certify domestic end product is a common LPTA disqualifier for textile/elastomer covers sourced offshore."
+        ],
+        "severity_score": 5,
+        "top_3_risks": [
+          "LPTA + binary technical acceptability + 90-day delivery for unit-marked aircraft covers means a single SoN omission (material spec, marking, or part-number documentation) eliminates the bid with no tradeoff opportunity.",
+          "Buy American certification (52.225-4 Deviation 2026-O0038) is a hard trap for textile/elastomer aviation covers — most commercial intake plug fabric (Cordura, neoprene-coated nylon) is foreign-origin and requires either a domestic-component certification or listing as 'Other Foreign End Product,' which can render the quote non-compliant under a SBA set-aside if not properly handled.",
+          "AF base access clause 5352.242-9000 plus FOB Destination delivery to JBSA Randolph Hangar 3 means contractor must coordinate gate access, vehicle pass, and inside delivery — failure to pre-stage credentials can cause delivery refusal at the gate on 03 Aug and trigger a default."
+        ],
+        "dfars_trap_risks": [
+          {
+            "clause": "252.223-7008",
+            "trap_name": "Prohibition of Hexavalent Chromium",
+            "specific_risk": "Aircraft intake plugs and exhaust covers commonly include metal grommets, D-rings, snap hardware, or exhaust cover frames that may be passivated or coated with Cr(VI); foreign textile suppliers routinely use Cr(VI) in dye fixatives. The clause prohibits delivery of any item with >0.1% Cr(VI) by weight without a written exception.",
+            "required_verification": "Obtain RoHS / Cr(VI)-free certifications from every hardware and fabric supplier in the BOM; document mill certs for any metal components; flow the clause to all subs.",
+            "consequence_if_missed": "Latent non-compliance discovered at acceptance or in service results in rejection of all 80 sets, full replacement at contractor cost, and negative CPARS/SPRS rating."
+          },
+          {
+            "clause": "252.204-7018",
+            "trap_name": "Covered Defense Telecommunications Equipment Prohibition (Section 889)",
+            "specific_risk": "Standard Section 889 representation — low risk for a textile/elastomer product but the offeror's own corporate IT/comms must be Huawei/ZTE/Hikvision-free.",
+            "required_verification": "Confirm SAM.gov 252.204-7016 representation is current and reads 'does not provide.'",
+            "consequence_if_missed": "Award ineligibility; false certification = False Claims Act exposure."
+          },
+          {
+            "clause": "252.225-7060",
+            "trap_name": "Xinjiang Uyghur Autonomous Region Procurement Prohibition",
+            "specific_risk": "High-relevance trap for textile products — cotton and polyester fabric sourced from XUAR is prohibited. Cordura, canvas, and webbing supply chains routinely trace to XUAR.",
+            "required_verification": "Obtain country-of-origin and country-of-cotton-harvest declarations from fabric mill; confirm 252.225-7059 representation.",
+            "consequence_if_missed": "Termination for cause and FCA exposure; this is a current DOJ enforcement priority."
+          },
+          {
+            "clause": "5352.242-9000",
+            "trap_name": "AF Base Access — JBSA Randolph",
+            "specific_risk": "Delivery, inspection, and acceptance occur at 11090 5th St East Hangar 3 inside JBSA Randolph; driver and vehicle must clear gate and have pre-coordinated pass. No unescorted access authorized.",
+            "required_verification": "Submit Base Access Request Form (Attachment 3) listing driver, vehicle reg, and insurance no later than 2 weeks before delivery; coordinate with Tim Kilford (timothy.kilford@us.af.mil, 210-652-1325) for hangar escort.",
+            "consequence_if_missed": "Driver turned away at gate, missed 03 Aug 2026 delivery date, T4D under FAR 52.212-4(m)."
+          },
+          {
+            "clause": "252.232-7006",
+            "trap_name": "WAWF / iRAPT Invoicing",
+            "specific_risk": "Payment requires Combo invoice (Invoice + Receiving Report) routed Pay F87700, Issue/Admin FA3016, Inspect/Ship/Acceptor F3PT73; first-time WAWF users typically take 30–45 days to register and self-test.",
+            "required_verification": "Confirm SAM EFT POC, register at wawf.eb.mil, and run a practice submission before first invoice.",
+            "consequence_if_missed": "60–90 day payment delays, cash flow strain on FFP small business."
+          }
+        ],
+        "base_access_risk": "5352.242-9000 applies. Delivery is to JBSA Randolph Hangar 3 (a controlled installation). Contractor must complete the attached Base Access Request Form, list driver name, current driver's license, vehicle registration, and proof of insurance, and route through the Contracting Officer for Security Forces processing. For small business non-cleared drivers, allow 2–4 weeks for vehicle pass; if using a common carrier (LTL freight), the carrier driver also needs day-of access. Risk: delivery on 03 Aug 2026 is rejected at the gate if access is not pre-coordinated, triggering missed delivery and exposure to default termination under FAR 52.212-4(m).",
+        "hex_chrome_risk": "252.223-7008 fires. Even though the deliverable is primarily fabric/elastomer, intake plugs and exhaust covers contain metal hardware (grommets, D-rings, snap fasteners, stiffener wire, exhaust cover steel/aluminum frames) that historically use Cr(VI) passivation. The contractor must collect Cr(VI)-free certifications from every hardware vendor and any coated-fabric supplier prior to acceptance. Plan 3–4 weeks for supply-chain certification letters and BOM-level documentation. If a supplier cannot certify, alternate finishes (zinc, trivalent chromium, electroless nickel) must be specified in the quote — substitutions discovered post-award require an ECP and risk schedule slip.",
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — Low-dollar simplified-acquisition LPTA is winnable for an established T-38 cover vendor, but only if the bidder already has documented domestic supply chain (Buy American + XUAR + Cr(VI)), an existing SoN-conforming product with established MFG part numbers, and a JBSA base access pathway; first-time bidders should NO_BID due to the 90-day delivery clock against access, certification, and marking lead times.",
+        "executive_risk_summary": "This is an Air Force simplified-acquisition RFQ (FA301626Q0068) issued by 502 CONS at JBSA Lackland for 80 sets of T-38 Talon engine intake plugs and 80 exhaust covers, 100% small business set-aside under NAICS 336413, FFP, lowest-price-technically-acceptable, with delivery FOB Destination to JBSA Randolph Hangar 3 NLT 03 August 2026. This is a low-dollar, recurring textile/aerospace accessory buy — winnable for a vendor already in this product line, but unforgiving for newcomers.\n\nThe top three risks: (1) The evaluation is binary acceptable/unacceptable — any line in the Statement of Need or Insignia/Markings attachment that your quote fails to address will eliminate you with no chance to fix it, since the Government has reserved the right to skip clarifications; consequence is loss of the bid, not a cure notice. (2) DFARS 252.225-7060 (Xinjiang) and 252.223-7008 (hexavalent chromium) are live traps for textile + metal-hardware products like these; missing certifications at delivery means rejected goods, T4D, FCA exposure, and a negative SPRS/CPARS record that hurts the next 5 years of bids. (3) AF Form base access clause 5352.242-9000 plus FOB Destination to a controlled hangar means your delivery driver gets turned away at the gate on 03 Aug if access is not pre-coordinated 2–4 weeks in advance — a logistics miss equals a default termination under FAR 52.212-4(m).\n\nRecommended actions, ranked by calendar: (a) By 9 April — submit the Base Access Request Form and attend the 15 April site visit to physically see Hangar 3, confirm exhaust cover geometry against current T-38 fleet config, and meet Tim Kilford. (b) By 16 April — submit any SoN ambiguity questions in writing to both POCs. (c) By 22 April — collect Buy American, XUAR, and Cr(VI) certifications from fabric mill and hardware suppliers, document MFG part numbers and product literature, and finalize quote with explicit FOB Destination + freight reconciliation language for CLIN 0003. (d) By 27 April 12:00 CDT — submit complete quote with insignia mockups and SoN compliance matrix line-by-line. (e) Upon award — initiate WAWF registration immediately and schedule base access for the delivery driver no later than 15 July 2026 to protect the 03 Aug delivery date.",
+        "prioritized_risks": [
+          {
+            "text": "LPTA + binary technical acceptability + 90-day delivery for unit-marked aircraft covers means a single SoN omission (material spec, marking, or part-number documentation) eliminates the bid with no tradeoff opportunity.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Buy American certification (52.225-4 Deviation 2026-O0038) is a hard trap for textile/elastomer aviation covers — most commercial intake plug fabric (Cordura, neoprene-coated nylon) is foreign-origin and requires either a domestic-component certification or listing as 'Other Foreign End Product,' which can render the quote non-compliant under a SBA set-aside if not properly handled.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "AF base access clause 5352.242-9000 plus FOB Destination delivery to JBSA Randolph Hangar 3 means contractor must coordinate gate access, vehicle pass, and inside delivery — failure to pre-stage credentials can cause delivery refusal at the gate on 03 Aug and trigger a default.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Statement of Need (Attachment 1) and Insignia/Markings (Attachment 2) drive technical acceptability but the Section C narrative on the contract face is one line ('Intake Plugs and Exhaust Covers') — all real specifications (materials, dimensions, fit to T-38 nacelle/exhaust geometry, REMOVE BEFORE FLIGHT streamer requirements, color/insignia) live in the attachments; failure to mirror every SoN bullet in the quote will draw an 'Unacceptable' technical rating since the evaluation is binary acceptable/unacceptable with no tradeoff.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Quote MUST include (1) MFG name, (2) Part Number, (3) illustrations, and (4) literature/description per Special Note 6 — quoting a generic or made-to-order item without an established MFG part number creates a technical acceptability risk; if you are the manufacturer, you still need a documented PN and product literature pre-existing the bid.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Items must be 'fully assembled and ready for use upon delivery' (Note 7) and 'fully operational at completion of work' (Note 8) — this language treats commercial covers/plugs as a deliverable assembly, meaning any field-fit issue at JBSA Randolph Hangar 3 acceptance becomes a rework obligation at contractor cost.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Insignia and Markings attachment implies unit-specific markings (likely 12 FTW / AETC) — silkscreen or embroidered logos require artwork approval cycles that are not scheduled in the RFQ and can slip the 03 Aug delivery.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Award likely late April/early May 2026 with hard delivery NLT 03 Aug 2026 for 80 sets of intake plugs + 80 exhaust covers — roughly 90–100 days from award to FOB Destination JBSA Randolph for a custom-marked, aircraft-specific product; any fabric/insignia lead time over 8 weeks puts default at risk.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Delivery is 'On Or Before 03 Aug 2026' as a single drop with no partial-delivery provision — late delivery of even one CLIN exposes contractor to T4D under FAR 52.212-4(m) since this is a commercial FFP with no liquidated-damages cure path.",
+            "priority": "P1",
+            "category": "Schedule",
+            "citation": "FAR 52.212-4"
+          },
+          {
+            "text": "Site visit (15 Apr) and questions cutoff (16 Apr) are tight against the 27 Apr quote due date — only 11 days to translate SoN clarifications into a compliant, priced quote.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Three CLINs are all Firm Fixed Price including a separate Shipping CLIN 0003 — but Note 7 states 'Delivery shall be FOB Destination and include in price of each CLIN... unless otherwise and clearly stated by quoter'; ambiguity between CLIN 0003 (shipping) and the FOB-Destination-baked-in instruction can cause a non-conforming quote if not explicitly reconciled in your cover letter.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "FOB Destination on CLIN 0001 (page 6 lists 'Government Destination' for 0001 but 'Contractor Destination' for 0002 and 0003) — this is an internal inconsistency in the solicitation; bidder bears all freight, loss, and damage risk to JBSA Randolph regardless, and must price LTL freight + inside delivery to Hangar 3.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "LPTA evaluation means zero margin tolerance — any pricing above the lowest technically acceptable competitor loses; aerospace-marked covers from established T-38 vendors (Aircraft Covers Inc., Aero Specialties) set the price floor.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "FAR 52.232-40 requires accelerated payment to small business subs — cash flow neutral for prime but a documentation burden.",
+            "priority": "P1",
+            "category": "Price",
+            "citation": "FAR 52.232-40"
+          },
+          {
+            "text": "LPTA with binary Acceptable/Unacceptable — no credit for superior product, past performance, or delivery; one missed SoN line item makes the entire quote Unacceptable across all CLINs (Evaluation Factors page states 'all CLINS/items must be found technically acceptable').",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "Government 'reserves the right to only hold interchanges if considered necessary' — do not assume you will get a chance to fix omissions; submit as if no clarifications will be requested.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "DFARS 252.204-7024 SPRS — supplier performance score will be pulled; a low or N/A SPRS record on a small business with thin DoD history can trigger a non-responsibility determination even after technical acceptability is achieved.",
+            "priority": "P2",
+            "category": "Evaluation",
+            "citation": "DFARS 252.204-7024"
+          },
+          {
+            "text": "Buy American 52.225-1 (Deviation 2026-O0038) Certificate at 52.225-4 must be completed — failure to list foreign components or to certify domestic end product is a common LPTA disqualifier for textile/elastomer covers sourced offshore.",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 35,
+    "recommendation": "DECLINE",
+    "bid_recommendation": "DECLINE. Score 35/100. Top risk: LPTA + binary technical acceptability + 90-day delivery for unit-marked aircraft covers means a single SoN omission (material spec, marking, or part-number documentation) eliminates the bid with no tr.",
+    "classification": {
+      "document_type": "RFQ",
+      "rationale": "The SF 1449 form has 'REQUEST FOR QUOTE (RFQ)' marked as the method of solicitation, and the document repeatedly references 'Quote', 'Quoter', and 'Quotation Submissions' with FAR 52.212-1 instructions for commercial items.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 47951,
+      "output_tokens": 126,
+      "ms": 12852
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 47727,
+      "output_tokens": 634,
+      "ms": 19928
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 49037,
+      "output_tokens": 4626,
+      "ms": 79155
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 48869,
+      "output_tokens": 4791,
+      "ms": 99096
+    }
+  ],
+  "wallMs": 112270,
+  "error": null,
+  "pdfBytes": 683091,
+  "pdfSrc": "local"
+}

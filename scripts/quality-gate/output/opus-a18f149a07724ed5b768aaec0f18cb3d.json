@@ -1,0 +1,293 @@
+{
+  "tc": {
+    "notice_id": "a18f149a07724ed5b768aaec0f18cb3d",
+    "label": "NAICS 238210 · electrical",
+    "naics": "238210"
+  },
+  "model": "claude-opus-4-7",
+  "audit": {
+    "overview": {
+      "summary": "The National Park Service is procuring wiring replacement services for the Reconstruction Era National Historical Park in Beaufort County, South Carolina. This is a Combined Synopsis/Solicitation set aside for Small Business under NAICS 238210 (Electrical Contractors). The attached document is a Department of Labor Service Contract Act Wage Determination (WD 2015-5799, Rev. 32) listing prevailing wage rates and fringe benefits applicable to service employees in Beaufort County, SC.",
+      "json": {
+        "summary": "The National Park Service is procuring wiring replacement services for the Reconstruction Era National Historical Park in Beaufort County, South Carolina. This is a Combined Synopsis/Solicitation set aside for Small Business under NAICS 238210 (Electrical Contractors). The attached document is a Department of Labor Service Contract Act Wage Determination (WD 2015-5799, Rev. 32) listing prevailing wage rates and fringe benefits applicable to service employees in Beaufort County, SC.",
+        "scope": "Replacement of wiring (electrical work) at the Reconstruction Era National Historical Park. Specific technical scope details are not contained in the attached wage determination document; the WD only establishes minimum hourly wage rates, health & welfare ($5.55/hr), vacation, and holiday fringe benefits applicable to covered service employees performing on the contract.",
+        "primary_objective": "Replacement/upgrade of electrical wiring infrastructure at NPS Reconstruction Era National Historical Park to ensure facility electrical systems are functional and code-compliant.",
+        "customer": "U.S. Department of the Interior, National Park Service (NPS) - Reconstruction Era National Historical Park",
+        "contract_type": "Likely Firm-Fixed-Price (FFP) - typical for construction/Combined Synopsis/Solicitation under NAICS 238210; not explicitly stated in the wage determination attachment",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "Not specified in the attached wage determination document. Solicitation posted 2026-05-03 with response deadline 2026-05-25T17:00:00-04:00; performance period to be defined in the full solicitation."
+      }
+    },
+    "compliance": {
+      "summary": "0 FAR · 0 DFARS · 0 certifications · 0 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [],
+        "dfars_clauses": [],
+        "required_certifications": [],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes - NAICS 238210 (Electrical Contractors and Other Wiring Installation Contractors), SBA set-aside per SAM.gov metadata. Size standard for NAICS 238210 is $19M average annual receipts.",
+        "key_compliance_actions": [
+          "Maintain active SAM.gov registration prior to proposal submission",
+          "Verify small business size status under NAICS 238210 ($19M size standard)",
+          "Comply with Service Contract Act Wage Determination 2015-5799 Rev. 32 (Beaufort County, SC) - Note: SCA typically does not apply to construction; Davis-Bacon Act likely applies for wiring replacement at NPS Reconstruction Era NHP - verify correct wage determination with Contracting Officer",
+          "Pay applicable prevailing wage rates per attached wage determination",
+          "Provide Health & Welfare fringe benefits at $5.55/hr (or $5.09/hr if EO 13706 applies)",
+          "Provide minimum 11 paid holidays and vacation per SCA requirements if SCA applies",
+          "Comply with EO 13706 Paid Sick Leave (1 hour per 30 hours worked, up to 56 hours annually)",
+          "Comply with EO 13658 minimum wage ($13.30/hr in 2025) if applicable",
+          "Furnish uniforms at no cost to employees or reimburse $3.35/week maintenance",
+          "Submit SF-1444 conformance request for any unlisted labor classifications within 30 days of unlisted work performance",
+          "Post wage determination at worksite and provide written copy to affected employees",
+          "Submit quote by response deadline 2026-05-25 17:00 EDT"
+        ],
+        "deadlines": [
+          "Proposal Due: 2026-05-25",
+          "Wage Determination Last Revision: 2026-03-30"
+        ],
+        "clins": [],
+        "section_l_summary": "",
+        "section_m_summary": "",
+        "dfars_traps": [],
+        "fob_conflicts": [],
+        "wawf_routing": {},
+        "section_l_requirements": [],
+        "section_m_factors": [],
+        "_audit_notes": {
+          "document_classification": "UNCERTAIN - Document provided is solely the SCA Wage Determination 2015-5799 Rev. 32 for Beaufort County, SC. The actual solicitation document (140P5126Q0029) for NPS Reconstruction Era NHP wiring replacement was NOT provided - only an attached wage determination was reviewed.",
+          "critical_risks": [
+            "P0: SCA wage determination attached to a CONSTRUCTION solicitation (wiring replacement, NAICS 238210). Construction contracts are typically covered by Davis-Bacon Act (DBA), NOT Service Contract Act (SCA). This is a potential solicitation defect - bidder should submit a question to the CO requesting clarification on whether DBA wage determination should apply instead of/in addition to SCA WD 2015-5799.",
+            "P1: No FAR/DFARS clauses, CLINs, Section L, or Section M visible because only the wage determination attachment was provided for review. Full solicitation document must be obtained from SAM.gov (noticeId a18f149a07724ed5b768aaec0f18cb3d) to complete compliance audit.",
+            "P1: Department of Interior/National Park Service procurement (solicitation prefix 140P) - DFARS does NOT apply; FAR and DIAR (Department of Interior Acquisition Regulation) supplements apply instead.",
+            "P2: Bidder must verify whether EO 13706 (Paid Sick Leave) applies based on contract award date and whether EO 14026 (currently $17.75/hr in 2025, succeeding EO 13658) applies rather than the older EO 13658 reference."
+          ],
+          "recommended_next_steps": [
+            "Download full solicitation PDF and all attachments from SAM.gov",
+            "Submit question to CO regarding SCA vs. Davis-Bacon applicability for wiring/electrical construction work",
+            "Request Davis-Bacon wage determination if construction classification confirmed",
+            "Re-run compliance audit against complete solicitation document"
+          ]
+        },
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 7/10 · 17 prioritized · top: Proposal response window is only 22 days (posted 2026-05-03, due 2026-05-25) for",
+      "json": {
+        "technical_risks": [
+          "[Inferred from typical patterns] Solicitation is for wiring replacement at NPS Reconstruction Era NHP (NAICS 238210 - Electrical Contractors), but the only document provided is the SCA Wage Determination 2015-5799 (Beaufort County, SC) — the actual SOW, drawings, single-line diagrams, and technical specifications were not included in this package, so scope ambiguity (conduit routing, panel schedules, voltage class, demolition extent) is high and any bid will rest on assumptions that may be challenged at award.",
+          "[Inferred from typical patterns] Work on a National Historic Park (Reconstruction Era NHP) typically triggers Section 106 NHPA compliance, NPS Historic Preservation standards, and constraints on surface-mounted conduit, fastener penetrations, and material finishes in historic structures — failure to price preservation-grade workmanship and NPS COR coordination will produce rework and non-conformance findings.",
+          "Davis-Bacon Act construction wage rates (not the SCA WD attached) almost certainly govern this electrical construction project under NAICS 238210; the bidder must confirm whether the attached SCA WD 2015-5799 applies to any incidental service labor (e.g., janitorial, security) or whether it was attached in error — misapplication of wage schedules creates DOL back-wage liability.",
+          "Beaufort County, SC coastal environment requires corrosion-resistant materials (NEMA 4X enclosures, stainless hardware, tinned conductors) for any exterior or unconditioned-space wiring — generic copper/steel pricing will be under-bid."
+        ],
+        "schedule_risks": [
+          "Response deadline is 2026-05-25 17:00 ET against a 2026-05-03 posting — a 22-day proposal window for a construction RFQ requiring site visit, historic-property survey, subcontractor quotes, and bonding is tight for an out-of-region (TX/OK) bidder.",
+          "[Inferred from typical patterns] NPS construction at a visitor-accessible historic park typically restricts work to off-season or off-hours windows (no work during peak visitation, special events, or living-history programs); if the period of performance straddles summer 2026 visitor season, productive work hours may be cut 30–50%.",
+          "Mobilization from TX/OK to Beaufort, SC adds 2–3 weeks of crew travel, lodging, and per-diem logistics that compress the on-site execution window."
+        ],
+        "price_risks": [
+          "[Inferred from typical patterns] Likely a Firm-Fixed-Price construction contract — all cost growth from differing site conditions, hidden historic-fabric conditions, and lead-time-driven escalation on switchgear/conductors falls on the contractor with no economic price adjustment clause.",
+          "Out-of-region bidder (TX/OK to SC) carries travel, lodging, per-diem, and equipment-mobilization costs that local Beaufort-area electrical contractors will not — margin compression of 8–15% versus local competition is likely.",
+          "[Inferred from typical patterns] Performance and payment bonds (Miller Act, >$150K construction) will be required; small-business bonding capacity and 1–3% bond premium must be confirmed and priced.",
+          "SCA wage rates listed (e.g., Electrician Maintenance $23.24, General Maintenance Worker $20.80) are LOWER than typical Davis-Bacon SC electrical journeyman rates — if DBA actually applies, any pricing built off the attached SCA WD will be under-bid on labor by 15–30%."
+        ],
+        "evaluation_risks": [
+          "[Inferred from typical patterns] Combined Synopsis/Solicitation under SBA set-aside typically uses LPTA or simplified trade-off — without the Section M factors in hand, the bidder cannot confirm whether past performance on NPS/historic-property electrical work is a pass/fail gate or a trade-off factor; lack of NPS-specific past performance is a major scoring loss.",
+          "[Inferred from typical patterns] Site visit attendance is commonly mandatory or heavily favored on NPS construction RFQs — failure to attend (or to document attendance) typically results in proposal exclusion or a non-responsibility finding.",
+          "Document classification was uncertain — only the SCA Wage Determination was machine-readable in this package; the full RFQ, SOW, drawings, and Section L/M instructions were not provided, creating high risk of missing a mandatory submittal (e.g., bonding letter, SF 1442, bid schedule, MPP)."
+        ],
+        "severity_score": 7,
+        "top_3_risks": [
+          "Proposal response window is only 22 days (posted 2026-05-03, due 2026-05-25) for an out-of-region TX/OK bidder on a historic-property electrical construction project requiring site visit, bonding, and SC-licensed subs — insufficient capture runway.",
+          "The full solicitation package (SOW, drawings, Section L/M, wage schedule applicability) was not captured in this review — only the SCA Wage Determination was visible, meaning critical compliance traps (bonding, DBA vs SCA, NHPA Section 106, mandatory site visit) are unverified and a non-responsive proposal is a real possibility.",
+          "Out-of-region bidder with no demonstrated NPS or Reconstruction Era NHP past performance faces both pricing disadvantage (travel/per-diem/mobilization) and likely past-performance scoring loss against local Beaufort-area SBA-set-aside competitors."
+        ],
+        "dfars_trap_risks": [],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — Opportunity is a legitimate SBA set-aside in our NAICS, but the 22-day window, out-of-region geography, missing solicitation attachments, and absence of NPS/historic past performance mean we should only proceed if a teaming partner with a Beaufort-area SC electrical license and NPS CPARS history can be secured by Day 5.",
+        "executive_risk_summary": "This is a SBA-set-aside Combined Synopsis/Solicitation (140P5126Q0029) for electrical wiring replacement at the National Park Service Reconstruction Era National Historical Park in Beaufort County, South Carolina, under NAICS 238210 (Electrical Contractors). In plain terms: NPS wants a small-business electrical contractor to rip out and replace existing wiring inside historic-park structures, with the proposal due 2026-05-25.\n\nThree risks dominate. First, the proposal window is only 22 days from posting, and as a TX/OK-based subcontractor we have no Beaufort-area site presence, no current SC electrical license on file, and no documented NPS past performance — missing a mandatory site visit or bonding letter would render the bid non-responsive and waste B&P dollars. Second, the only document captured in this review was the SCA Wage Determination, but NAICS 238210 construction work is almost certainly governed by Davis-Bacon Act construction wages, not SCA — if we price labor off the attached SCA rates we will be 15–30% under on labor and face DOL back-wage liability and a likely cure notice within the first payroll cycle. Third, work inside a Reconstruction Era historic park triggers NHPA Section 106 review, NPS preservation standards, and visitor-season work restrictions that local competitors have priced before and we have not — under-pricing these constraints leads to schedule slip, liquidated damages, and in the worst case termination for default on a federal CPARS record.\n\nRecommended actions, ranked: (1) By Day 3 (2026-05-06), pull the full solicitation package from SAM.gov including SOW, drawings, Section L/M, wage schedule, and amendment list — confirm DBA vs SCA applicability and mandatory site visit date. (2) By Day 5 (2026-05-08), identify and sign an NDA/teaming agreement with a Beaufort-area SC-licensed small-business electrical prime or 1st-tier sub with NPS CPARS — if no partner secured, convert to NO_BID. (3) By Day 10 (2026-05-13), attend site visit (mandatory in our assumption) and lock in bonding letter from surety. (4) By Day 17 (2026-05-20), complete pricing using DBA wages, coastal-grade materials, mobilization/per-diem, and 8% historic-preservation contingency. (5) By Day 21 (2026-05-24), red-team review and submit no later than 24 hours before the 2026-05-25 17:00 ET deadline.",
+        "prioritized_risks": [
+          {
+            "text": "Proposal response window is only 22 days (posted 2026-05-03, due 2026-05-25) for an out-of-region TX/OK bidder on a historic-property electrical construction project requiring site visit, bonding, and SC-licensed subs — insufficient capture runway.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "The full solicitation package (SOW, drawings, Section L/M, wage schedule applicability) was not captured in this review — only the SCA Wage Determination was visible, meaning critical compliance traps (bonding, DBA vs SCA, NHPA Section 106, mandatory site visit) are unverified and a non-responsive proposal is a real possibility.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "Out-of-region bidder with no demonstrated NPS or Reconstruction Era NHP past performance faces both pricing disadvantage (travel/per-diem/mobilization) and likely past-performance scoring loss against local Beaufort-area SBA-set-aside competitors.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "[Inferred from typical patterns] Solicitation is for wiring replacement at NPS Reconstruction Era NHP (NAICS 238210 - Electrical Contractors), but the only document provided is the SCA Wage Determination 2015-5799 (Beaufort County, SC) — the actual SOW, drawings, single-line diagrams, and technical specifications were not included in this package, so scope ambiguity (conduit routing, panel schedules, voltage class, demolition extent) is high and any bid will rest on assumptions that may be challenged at award.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns] Work on a National Historic Park (Reconstruction Era NHP) typically triggers Section 106 NHPA compliance, NPS Historic Preservation standards, and constraints on surface-mounted conduit, fastener penetrations, and material finishes in historic structures — failure to price preservation-grade workmanship and NPS COR coordination will produce rework and non-conformance findings.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Davis-Bacon Act construction wage rates (not the SCA WD attached) almost certainly govern this electrical construction project under NAICS 238210; the bidder must confirm whether the attached SCA WD 2015-5799 applies to any incidental service labor (e.g., janitorial, security) or whether it was attached in error — misapplication of wage schedules creates DOL back-wage liability.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Beaufort County, SC coastal environment requires corrosion-resistant materials (NEMA 4X enclosures, stainless hardware, tinned conductors) for any exterior or unconditioned-space wiring — generic copper/steel pricing will be under-bid.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Response deadline is 2026-05-25 17:00 ET against a 2026-05-03 posting — a 22-day proposal window for a construction RFQ requiring site visit, historic-property survey, subcontractor quotes, and bonding is tight for an out-of-region (TX/OK) bidder.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] NPS construction at a visitor-accessible historic park typically restricts work to off-season or off-hours windows (no work during peak visitation, special events, or living-history programs); if the period of performance straddles summer 2026 visitor season, productive work hours may be cut 30–50%.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "Mobilization from TX/OK to Beaufort, SC adds 2–3 weeks of crew travel, lodging, and per-diem logistics that compress the on-site execution window.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] Likely a Firm-Fixed-Price construction contract — all cost growth from differing site conditions, hidden historic-fabric conditions, and lead-time-driven escalation on switchgear/conductors falls on the contractor with no economic price adjustment clause.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "Out-of-region bidder (TX/OK to SC) carries travel, lodging, per-diem, and equipment-mobilization costs that local Beaufort-area electrical contractors will not — margin compression of 8–15% versus local competition is likely.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "[Inferred from typical patterns] Performance and payment bonds (Miller Act, >$150K construction) will be required; small-business bonding capacity and 1–3% bond premium must be confirmed and priced.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "SCA wage rates listed (e.g., Electrician Maintenance $23.24, General Maintenance Worker $20.80) are LOWER than typical Davis-Bacon SC electrical journeyman rates — if DBA actually applies, any pricing built off the attached SCA WD will be under-bid on labor by 15–30%.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "[Inferred from typical patterns] Combined Synopsis/Solicitation under SBA set-aside typically uses LPTA or simplified trade-off — without the Section M factors in hand, the bidder cannot confirm whether past performance on NPS/historic-property electrical work is a pass/fail gate or a trade-off factor; lack of NPS-specific past performance is a major scoring loss.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns] Site visit attendance is commonly mandatory or heavily favored on NPS construction RFQs — failure to attend (or to document attendance) typically results in proposal exclusion or a non-responsibility finding.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "Document classification was uncertain — only the SCA Wage Determination was machine-readable in this package; the full RFQ, SOW, drawings, and Section L/M instructions were not provided, creating high risk of missing a mandatory submittal (e.g., bonding letter, SF 1442, bid schedule, MPP).",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 65,
+    "recommendation": "PROCEED_WITH_CAUTION",
+    "bid_recommendation": "PROCEED_WITH_CAUTION. Score 65/100. Top risk: Proposal response window is only 22 days (posted 2026-05-03, due 2026-05-25) for an out-of-region TX/OK bidder on a historic-property electrical construction project requiring site visit, bonding, and.",
+    "classification": {
+      "document_type": "Other",
+      "rationale": "This document is a Department of Labor Service Contract Act Wage Determination (No. 2015-5799, Rev. 32) listing prevailing wage rates and fringe benefits for occupations in Beaufort County, SC. It is a regulatory wage reference attachment, not a solicitation type like SOW/PWS/RFP/RFQ.",
+      "confidence": "high"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 30919,
+      "output_tokens": 140,
+      "ms": 8267
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 30629,
+      "output_tokens": 571,
+      "ms": 13985
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 31939,
+      "output_tokens": 1464,
+      "ms": 28876
+    },
+    {
+      "model": "claude-opus-4-7",
+      "input_tokens": 31771,
+      "output_tokens": 2880,
+      "ms": 57312
+    }
+  ],
+  "wallMs": 66855,
+  "error": null,
+  "pdfBytes": 75062,
+  "pdfSrc": "sam.gov"
+}

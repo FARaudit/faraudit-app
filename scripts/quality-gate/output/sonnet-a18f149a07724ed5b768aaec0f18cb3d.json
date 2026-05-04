@@ -1,0 +1,289 @@
+{
+  "tc": {
+    "notice_id": "a18f149a07724ed5b768aaec0f18cb3d",
+    "label": "NAICS 238210 · electrical",
+    "naics": "238210"
+  },
+  "model": "claude-sonnet-4-6",
+  "audit": {
+    "overview": {
+      "summary": "The National Park Service (NPS) is soliciting quotations for wiring replacement at the Reconstruction Era National Historical Park in Beaufort, South Carolina. This is a combined synopsis/solicitation under simplified acquisition procedures (FAR Part 13) set aside for small businesses under NAICS code 238210 (Electrical Contractors). Work is governed by the Service Contract Act wage determination 2015-5799, Revision 32, applicable to Beaufort County, South Carolina.",
+      "json": {
+        "summary": "The National Park Service (NPS) is soliciting quotations for wiring replacement at the Reconstruction Era National Historical Park in Beaufort, South Carolina. This is a combined synopsis/solicitation under simplified acquisition procedures (FAR Part 13) set aside for small businesses under NAICS code 238210 (Electrical Contractors). Work is governed by the Service Contract Act wage determination 2015-5799, Revision 32, applicable to Beaufort County, South Carolina.",
+        "scope": "Electrical wiring replacement services at the NPS Reconstruction Era National Historical Park (NHP) located in Beaufort, South Carolina, performed in accordance with applicable electrical codes and NPS requirements. Workers must be compensated at or above the SCA wage rates specified in WD 2015-5799 Rev. 32 for Beaufort County, SC.",
+        "primary_objective": "Complete replacement of electrical wiring at the Reconstruction Era NHP facility, delivering a fully functional and code-compliant electrical system.",
+        "customer": "National Park Service (NPS), Reconstruction Era National Historical Park",
+        "contract_type": "FFP",
+        "ceiling_value_estimate": null,
+        "period_of_performance": "Not explicitly stated in the provided document; response deadline is 2026-05-25T17:00:00-04:00, with award anticipated thereafter"
+      }
+    },
+    "compliance": {
+      "summary": "0 FAR · 0 DFARS · 2 certifications · 0 CLIN · Total Small Business",
+      "json": {
+        "far_clauses": [],
+        "dfars_clauses": [],
+        "required_certifications": [
+          "SAM.gov registration (implied by SAM.gov solicitation posting and set-aside designation)",
+          "Small Business Administration (SBA) size standard eligibility under NAICS 238210"
+        ],
+        "set_aside_type": "Total Small Business",
+        "small_business_eligibility": "yes — NAICS 238210 (Electrical Contractors and Other Wiring Installation Contractors); SBA size standard is $19.0 million average annual receipts; set-aside type listed as 'SBA' (Total Small Business) in SAM.gov metadata",
+        "key_compliance_actions": [
+          "Verify active SAM.gov registration with valid UEI prior to submission",
+          "Confirm compliance with SCA Wage Determination No. 2015-5799, Revision 32, dated 3/30/2026, covering Beaufort County, South Carolina",
+          "Pay all covered workers minimum wage rates per SCA WD 2015-5799 for applicable occupation codes",
+          "Provide Health and Welfare fringe benefits: $5.55/hour (standard) or $5.09/hour (EO 13706 rate) up to 40 hours/week",
+          "Provide minimum 2 weeks paid vacation after 1 year of service, 3 weeks after 8 years, 4 weeks after 15 years per 29 CFR 4.173",
+          "Provide minimum 11 paid federal holidays per year per 29 CFR 4.174",
+          "Comply with Executive Order 13706 (Paid Sick Leave): 1 hour paid sick leave per 30 hours worked, up to 56 hours/year, for contracts awarded on or after January 1, 2017",
+          "Assess applicability of Executive Order 13658 minimum wage ($13.30/hour in 2025) for contracts awarded January 1, 2015 through January 29, 2022 not renewed/extended on or after January 30, 2022",
+          "Furnish uniforms at no cost to employees or reimburse actual uniform cost; reimburse uniform cleaning at $3.35/week ($0.67/day) unless wash-and-wear exception applies",
+          "Initiate SF-1444 conformance process prior to performance if any required occupation is not listed in WD 2015-5799",
+          "Submit SF-1444 conformance report to contracting officer within 30 days after unlisted class of employee performs contract work",
+          "Apply 8% hazardous pay differential for employees in high-degree-of-hazard positions involving ordnance/explosives/incendiary materials if designated by agency",
+          "Apply 4% hazardous pay differential for employees in low-degree-of-hazard positions involving ordnance/explosives/incendiary materials if designated by agency",
+          "For Air Traffic Control Specialists and Weather Observers: pay 10% night differential for hours worked 6pm–6am and 25% Sunday premium for regularly scheduled Sunday hours",
+          "Assess computer employee exemption status under 29 CFR Part 541 and FLSA 213(a)(1)/(17) for any IT occupations (footnote 1 occupations)",
+          "Submit quotation by response deadline of May 25, 2026 at 5:00 PM EDT",
+          "Ensure NAICS 238210 size eligibility does not exceed $19.0 million average annual receipts"
+        ],
+        "deadlines": [
+          "Response/Quotation Due: 2026-05-25T17:00:00-04:00",
+          "Solicitation Posted: 2026-05-03",
+          "SCA Wage Determination Last Revision: 2026-03-30",
+          "SF-1444 Conformance Report Due: within 30 days after unlisted employee class performs contract work"
+        ],
+        "clins": [],
+        "section_l_summary": "The document provided is exclusively the Service Contract Act Wage Determination No. 2015-5799, Revision 32 for Beaufort County, South Carolina — no Section L proposal preparation instructions are contained in the uploaded document. The full solicitation body (Sections B through M) was not provided; therefore no Section L instructions can be extracted.",
+        "section_m_summary": "No Section M evaluation criteria are contained in the uploaded document, which consists solely of SCA Wage Determination No. 2015-5799, Revision 32. The full solicitation body including evaluation factors was not provided for review.",
+        "dfars_traps": [],
+        "fob_conflicts": [],
+        "wawf_routing": {},
+        "section_l_requirements": [],
+        "section_m_factors": [],
+        "dfars_flags": [
+          {
+            "clause": "252.223-7008",
+            "title": "Hexavalent Chromium",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7018",
+            "title": "Covered Telecom",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.204-7021",
+            "title": "CMMC",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7060",
+            "title": "Xinjiang Forced Labor",
+            "detected": false,
+            "severity": "P0"
+          },
+          {
+            "clause": "252.232-7006",
+            "title": "WAWF Payment Routing",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "5352.242-9000",
+            "title": "Air Force Base Access",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.225-7001",
+            "title": "Buy American / Balance of Payments",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.215-7010",
+            "title": "Certified Cost or Pricing Data",
+            "detected": false,
+            "severity": "P1"
+          },
+          {
+            "clause": "252.247-7023",
+            "title": "Transportation by Sea",
+            "detected": false,
+            "severity": "P2"
+          }
+        ]
+      }
+    },
+    "risks": {
+      "summary": "Severity 6/10 · 17 prioritized · top: Historic preservation compliance at Reconstruction Era NHP is the single highest",
+      "json": {
+        "technical_risks": [
+          "NAICS 238210 (Electrical Contractors) wiring replacement at a National Historic Landmark (Reconstruction Era NHP, Beaufort SC) almost certainly requires Secretary of the Interior Standards for Historic Preservation compliance — any scope ambiguity on concealment methods, conduit routing, junction box placement, or surface penetration could trigger a stop-work or rework order if the NPS Historic Preservation Officer rejects the approach after award; the RFQ/SAM notice does not specify these constraints upfront.",
+          "The solicitation references a Beaufort County, SC location covered by SCA WD 2015-5799 Rev 32 (effective 3/30/2026); if the wiring replacement requires Electrician, Maintenance (code 23160, $23.24/hr) or Electronics Technician classifications, the contractor must correctly classify all labor under the WD — misclassification of journeyman electricians as a lower SCA category is a common audit trigger and back-pay liability for NPS service contracts.",
+          "[Inferred from typical patterns] NPS facilities at historic properties frequently have pre-existing knob-and-tube, aluminum wiring, or non-standard conduit systems whose actual condition is unknown until walls or ceilings are opened — the RFQ likely lacks an as-built drawing set or provides only conceptual drawings, creating significant scope-creep exposure on a fixed-price simplified acquisition.",
+          "[Inferred from typical patterns] The combined synopsis/solicitation format (FAR 13 simplified acquisition) typically does not include a pre-proposal site visit as mandatory; a TX/OK-corridor subcontractor bidding without a physical site walk at this historic property risks misquoting labor hours, equipment access constraints (scaffold, lift restrictions inside historic structures), and material quantities by 20-40%."
+        ],
+        "schedule_risks": [
+          "Response deadline is 2026-05-25T17:00:00-04:00 (Eastern), posted 2026-05-03 — that is a 22-calendar-day bid window, which is tight for a wiring replacement requiring site assessment, SCA-compliant labor pricing, subcontractor teaming (if needed), and bonding/insurance verification; a TX/OK-corridor firm must account for travel time to Beaufort SC for any site visit within this window.",
+          "[Inferred from typical patterns] NPS construction contracts at historic properties require coordination with park operations, visitor schedules, and seasonal programming — period of performance start dates may be constrained to non-peak visitor seasons or require phased outages, none of which are specified in the notice, creating risk of a compressed execution window after award.",
+          "[Inferred from typical patterns] SBA set-aside awards under FAR 13 can be protested; a protest stay could delay Notice to Proceed by 30-65 days, compressing the actual execution window and potentially pushing work into winter months in coastal South Carolina, affecting exterior work access."
+        ],
+        "price_risks": [
+          "This is a firm-fixed-price simplified acquisition (RFQ, not RFP); all cost risk for unknown existing conditions, historic preservation compliance rework, and SCA wage escalation sits entirely with the contractor — there is no mechanism for equitable adjustment unless a formal differing site conditions clause is included, which FAR 13 actions frequently omit.",
+          "SCA WD 2015-5799 Rev 32 mandates Health & Welfare of $5.55/hr (or $5.09/hr under EO 13706), 11 paid federal holidays, and accruing vacation — a subcontractor pricing labor without fully burdening all SCA fringe costs will underprice the job; the H&W alone adds approximately $11,544 per FTE per year on top of the base wage rate, a margin killer on a small wiring job.",
+          "[Inferred from typical patterns] Beaufort SC is a high-cost coastal market; material costs (wire, conduit, panels, breakers) sourced locally near Parris Island/Marine Corps installations may carry military-base-area premiums; a TX/OK firm relying on home-market material pricing without a local supplier quote will experience 10-20% material cost variance at purchase order.",
+          "The SBA set-aside designation means the awardee must comply with FAR 52.219-14 (Limitations on Subcontracting) — for a construction NAICS, the prime must perform at least 15% of the cost of the contract with its own employees; a TX/OK subcontractor acting as prime who plans to 1099 local electricians risks violating this clause, triggering a false claims exposure."
+        ],
+        "evaluation_risks": [
+          "Combined Synopsis/Solicitation under FAR 13 simplified acquisition typically uses lowest-price technically acceptable (LPTA) or 'best value' with price as predominant factor — without seeing the full evaluation criteria in the solicitation body, a TX/OK firm with no NPS or historic preservation past performance is at severe risk of technical unacceptability if the agency requires demonstrated experience with Secretary of the Interior Standards or historic structure electrical work.",
+          "[Inferred from typical patterns] FAR 13 RFQs for construction work frequently request a brief technical approach narrative and past performance references (3 projects, similar scope/dollar value, within 5 years) — a firm with strong commercial electrical experience but zero federal historic preservation references may be rated 'Acceptable' technically but lose on past performance relevance scoring.",
+          "[Inferred from typical patterns] Price realism is rarely evaluated on FFP simplified acquisitions, but an unrealistically low price (from failing to include SCA fringes, travel to Beaufort SC, or historic preservation compliance costs) will win the award and then drive the contractor into a loss position, cure notice, or termination for default when cash runs out mid-project."
+        ],
+        "severity_score": 6,
+        "top_3_risks": [
+          "Historic preservation compliance at Reconstruction Era NHP is the single highest technical risk — failure to obtain NPS Historic Preservation Officer approval for routing, penetration, and finish methods before starting work can result in a stop-work order and mandatory rework at contractor expense on a fixed-price contract with no equitable adjustment mechanism.",
+          "SCA WD 2015-5799 Rev 32 full fringe burden (H&W $5.55/hr + 11 holidays + vacation accrual) is a price risk that will destroy margin if not fully loaded into the FFP quote, and misclassification of electricians under a lower SCA code is an audit trigger that can result in back-pay liability, debarment referral, and contract termination.",
+          "A TX/OK-corridor firm bidding without a physical site walk at the Beaufort SC historic property within the 22-day bid window risks a 20-40% labor and material quantity error on a fixed-price award, with no differing site conditions relief available under FAR 13 simplified acquisition, creating direct termination-for-default exposure if the underfunded contract cannot be completed."
+        ],
+        "dfars_trap_risks": [],
+        "base_access_risk": null,
+        "hex_chrome_risk": null,
+        "cmmc_risk": null,
+        "bid_no_bid_recommendation": "BID_WITH_CAUTION — The opportunity is a legitimate SBA set-aside with a defined scope, but a TX/OK-corridor firm must physically walk the Beaufort SC site before pricing, fully load SCA WD 2015-5799 Rev 32 fringes, and confirm it has or can team with a firm holding documented NPS/historic preservation electrical experience, or it will either lose on evaluation or win and default.",
+        "executive_risk_summary": "The National Park Service is buying wiring replacement work at the Reconstruction Era National Historical Park in Beaufort, South Carolina — an SBA-set-aside, firm-fixed-price simplified acquisition under NAICS 238210 with quotes due May 25, 2026.\n\nThree risks can break this bid or the resulting contract. First, historic preservation compliance: NPS will require all electrical work to conform to the Secretary of the Interior's Standards, and any routing, penetration, or finish approach rejected post-award triggers a mandatory stop-work and rework at the contractor's sole expense on a fixed-price vehicle — there is no equitable adjustment path. Second, SCA wage determination mispricing: WD 2015-5799 Rev 32 requires H&W fringes of $5.55/hr, 11 federal holidays, and accruing vacation on top of the $23.24/hr Electrician Maintenance base rate; failure to fully burden these costs in the FFP price produces a loss contract within weeks of mobilization and, if the contractor cannot complete, results in termination for default. Third, no-site-walk quantity error: bidding from desk research without physically inspecting the historic structure's existing wiring, conduit access, and wall/ceiling conditions will produce labor and material estimates 20-40% below actual, again with no differing site conditions relief available under FAR 13.\n\nImmediate actions ranked by urgency: (1) By May 10, 2026 — book travel and conduct a site visit at the Beaufort SC park; if the agency has not posted a formal site visit notice, contact the contracting officer directly and request one or permission to visit independently. (2) By May 12, 2026 — confirm SCA WD 2015-5799 Rev 32 is the correct WD incorporated and build a fully-burdened labor rate sheet for all anticipated SCA classifications including Electrician Maintenance at $23.24/hr plus $5.55/hr H&W plus holiday/vacation cost. (3) By May 15, 2026 — identify a teaming partner or key subcontractor with documented NPS or historic structure electrical past performance and obtain a signed teaming agreement or letter of commitment before proposal submission to mitigate evaluation risk on past performance relevance.",
+        "prioritized_risks": [
+          {
+            "text": "Historic preservation compliance at Reconstruction Era NHP is the single highest technical risk — failure to obtain NPS Historic Preservation Officer approval for routing, penetration, and finish methods before starting work can result in a stop-work order and mandatory rework at contractor expense on a fixed-price contract with no equitable adjustment mechanism.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "SCA WD 2015-5799 Rev 32 full fringe burden (H&W $5.55/hr + 11 holidays + vacation accrual) is a price risk that will destroy margin if not fully loaded into the FFP quote, and misclassification of electricians under a lower SCA code is an audit trigger that can result in back-pay liability, debarment referral, and contract termination.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "A TX/OK-corridor firm bidding without a physical site walk at the Beaufort SC historic property within the 22-day bid window risks a 20-40% labor and material quantity error on a fixed-price award, with no differing site conditions relief available under FAR 13 simplified acquisition, creating direct termination-for-default exposure if the underfunded contract cannot be completed.",
+            "priority": "P0",
+            "category": "Deal-breaker"
+          },
+          {
+            "text": "NAICS 238210 (Electrical Contractors) wiring replacement at a National Historic Landmark (Reconstruction Era NHP, Beaufort SC) almost certainly requires Secretary of the Interior Standards for Historic Preservation compliance — any scope ambiguity on concealment methods, conduit routing, junction box placement, or surface penetration could trigger a stop-work or rework order if the NPS Historic Preservation Officer rejects the approach after award; the RFQ/SAM notice does not specify these constraints upfront.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "The solicitation references a Beaufort County, SC location covered by SCA WD 2015-5799 Rev 32 (effective 3/30/2026); if the wiring replacement requires Electrician, Maintenance (code 23160, $23.24/hr) or Electronics Technician classifications, the contractor must correctly classify all labor under the WD — misclassification of journeyman electricians as a lower SCA category is a common audit trigger and back-pay liability for NPS service contracts.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns] NPS facilities at historic properties frequently have pre-existing knob-and-tube, aluminum wiring, or non-standard conduit systems whose actual condition is unknown until walls or ceilings are opened — the RFQ likely lacks an as-built drawing set or provides only conceptual drawings, creating significant scope-creep exposure on a fixed-price simplified acquisition.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "[Inferred from typical patterns] The combined synopsis/solicitation format (FAR 13 simplified acquisition) typically does not include a pre-proposal site visit as mandatory; a TX/OK-corridor subcontractor bidding without a physical site walk at this historic property risks misquoting labor hours, equipment access constraints (scaffold, lift restrictions inside historic structures), and material quantities by 20-40%.",
+            "priority": "P1",
+            "category": "Technical"
+          },
+          {
+            "text": "Response deadline is 2026-05-25T17:00:00-04:00 (Eastern), posted 2026-05-03 — that is a 22-calendar-day bid window, which is tight for a wiring replacement requiring site assessment, SCA-compliant labor pricing, subcontractor teaming (if needed), and bonding/insurance verification; a TX/OK-corridor firm must account for travel time to Beaufort SC for any site visit within this window.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] NPS construction contracts at historic properties require coordination with park operations, visitor schedules, and seasonal programming — period of performance start dates may be constrained to non-peak visitor seasons or require phased outages, none of which are specified in the notice, creating risk of a compressed execution window after award.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "[Inferred from typical patterns] SBA set-aside awards under FAR 13 can be protested; a protest stay could delay Notice to Proceed by 30-65 days, compressing the actual execution window and potentially pushing work into winter months in coastal South Carolina, affecting exterior work access.",
+            "priority": "P1",
+            "category": "Schedule"
+          },
+          {
+            "text": "This is a firm-fixed-price simplified acquisition (RFQ, not RFP); all cost risk for unknown existing conditions, historic preservation compliance rework, and SCA wage escalation sits entirely with the contractor — there is no mechanism for equitable adjustment unless a formal differing site conditions clause is included, which FAR 13 actions frequently omit.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "SCA WD 2015-5799 Rev 32 mandates Health & Welfare of $5.55/hr (or $5.09/hr under EO 13706), 11 paid federal holidays, and accruing vacation — a subcontractor pricing labor without fully burdening all SCA fringe costs will underprice the job; the H&W alone adds approximately $11,544 per FTE per year on top of the base wage rate, a margin killer on a small wiring job.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "[Inferred from typical patterns] Beaufort SC is a high-cost coastal market; material costs (wire, conduit, panels, breakers) sourced locally near Parris Island/Marine Corps installations may carry military-base-area premiums; a TX/OK firm relying on home-market material pricing without a local supplier quote will experience 10-20% material cost variance at purchase order.",
+            "priority": "P1",
+            "category": "Price"
+          },
+          {
+            "text": "The SBA set-aside designation means the awardee must comply with FAR 52.219-14 (Limitations on Subcontracting) — for a construction NAICS, the prime must perform at least 15% of the cost of the contract with its own employees; a TX/OK subcontractor acting as prime who plans to 1099 local electricians risks violating this clause, triggering a false claims exposure.",
+            "priority": "P1",
+            "category": "Price",
+            "citation": "FAR 52.219-14"
+          },
+          {
+            "text": "Combined Synopsis/Solicitation under FAR 13 simplified acquisition typically uses lowest-price technically acceptable (LPTA) or 'best value' with price as predominant factor — without seeing the full evaluation criteria in the solicitation body, a TX/OK firm with no NPS or historic preservation past performance is at severe risk of technical unacceptability if the agency requires demonstrated experience with Secretary of the Interior Standards or historic structure electrical work.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns] FAR 13 RFQs for construction work frequently request a brief technical approach narrative and past performance references (3 projects, similar scope/dollar value, within 5 years) — a firm with strong commercial electrical experience but zero federal historic preservation references may be rated 'Acceptable' technically but lose on past performance relevance scoring.",
+            "priority": "P2",
+            "category": "Evaluation"
+          },
+          {
+            "text": "[Inferred from typical patterns] Price realism is rarely evaluated on FFP simplified acquisitions, but an unrealistically low price (from failing to include SCA fringes, travel to Beaufort SC, or historic preservation compliance costs) will win the award and then drive the contractor into a loss position, cure notice, or termination for default when cash runs out mid-project.",
+            "priority": "P2",
+            "category": "Evaluation"
+          }
+        ]
+      }
+    },
+    "compliance_score": 67,
+    "recommendation": "PROCEED_WITH_CAUTION",
+    "bid_recommendation": "PROCEED_WITH_CAUTION. Score 67/100. Top risk: Historic preservation compliance at Reconstruction Era NHP is the single highest technical risk — failure to obtain NPS Historic Preservation Officer approval for routing, penetration, and finish meth.",
+    "classification": {
+      "document_type": "RFQ",
+      "rationale": "The SAM.gov metadata shows type 'Combined Synopsis/Solicitation' with NAICS code 238210 (electrical contractors) and solicitation number 140P5126Q0029. The attached document is a DOL Wage Determination under the Service Contract Act, which is a standard attachment to simplified acquisitions (FAR 13) RFQs, and the Combined Synopsis/Solicitation format with a short response window (22 days) is consistent with an RFQ rather than a full RFP.",
+      "confidence": "medium"
+    }
+  },
+  "usage": [
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27385,
+      "output_tokens": 138,
+      "ms": 6116
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 27199,
+      "output_tokens": 326,
+      "ms": 9234
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 28168,
+      "output_tokens": 1164,
+      "ms": 24854
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "input_tokens": 28028,
+      "output_tokens": 2315,
+      "ms": 57803
+    }
+  ],
+  "wallMs": 65055,
+  "error": null,
+  "pdfBytes": 75062,
+  "pdfSrc": "sam.gov"
+}
