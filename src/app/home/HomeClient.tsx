@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import type {
   HeaderCounter,
   OpportunityRow,
@@ -717,6 +718,7 @@ function riskFromScore(score: number | null): { cls: "rk0" | "rk1" | "rkw"; labe
 }
 
 function RunAuditPanel() {
+  const router = useRouter();
   const [noticeId, setNoticeId] = useState("");
   const [pdf, setPdf] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -736,6 +738,10 @@ function RunAuditPanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `audit failed (${res.status})`);
       setResult(json);
+      if (json.auditId) {
+        // Brief delay so user sees the success state before navigating to the report.
+        setTimeout(() => router.push("/audit/" + json.auditId), 800);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
