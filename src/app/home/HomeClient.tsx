@@ -1959,7 +1959,15 @@ function CapabilityPanel() {
             <a className="action-btn primary" href="/api/capability-statement/pdf" download style={{ marginRight: 8 }}>
               ↓ Export PDF
             </a>
-            <span>{stmt.stub ? "Draft (not yet saved)" : "Synced"}</span>
+            <span>
+              {save === "error"
+                ? "⚠ Not saved"
+                : save === "saving"
+                ? "● Saving…"
+                : stmt.stub
+                ? "Draft (not yet saved)"
+                : "Synced"}
+            </span>
           </div>
         </div>
 
