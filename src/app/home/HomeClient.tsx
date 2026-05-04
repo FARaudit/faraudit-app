@@ -1604,6 +1604,7 @@ interface NewsItemRow {
   summary: string;
   tag: string;
   relevance: string;
+  ai_insight?: string | null;
 }
 
 function DefenseNewsPanel() {
@@ -1689,14 +1690,21 @@ function DefenseNewsPanel() {
               <div style={{ fontFamily: "var(--serif)", fontSize: 14, fontWeight: 700, color: "var(--text)", lineHeight: 1.3, marginBottom: 8 }}>
                 {n.title}
               </div>
+              {n.ai_insight ? (
+                <div style={{ marginTop: 4, marginBottom: 10, padding: "10px 12px", background: "rgba(24,95,165,.08)", borderLeft: "2px solid var(--mid)", borderRadius: 2, fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--mid)", marginBottom: 4 }}>AI Insight</div>
+                  {n.ai_insight}
+                </div>
+              ) : (
+                <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", lineHeight: 1.5 }}>
+                  <strong style={{ color: "var(--gold)" }}>How this affects your bids:</strong> {n.relevance}
+                </div>
+              )}
               {n.summary && (
                 <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5, marginBottom: 8 }}>
                   {n.summary.slice(0, 200)}{n.summary.length > 200 ? "…" : ""}
                 </div>
               )}
-              <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", lineHeight: 1.5 }}>
-                <strong style={{ color: "var(--gold)" }}>How this affects your bids:</strong> {n.relevance}
-              </div>
             </a>
           ))}
         </div>
