@@ -1738,8 +1738,8 @@ interface SamEntityRow {
   registration_expiration: string | null;
 }
 
-function TeamingPartnersPanel({ naicsOptions }: { naicsOptions: string[] }) {
-  const [naics, setNaics] = useState<string>(naicsOptions[0] || "");
+function TeamingPartnersPanel(_props: { naicsOptions: string[] }) {
+  const [naics, setNaics] = useState<string>("");
   const [state, setState] = useState<string>("");
   const [setAside, setSetAside] = useState<string>("");
   const [partners, setPartners] = useState<SamEntityRow[]>([]);
@@ -1801,7 +1801,7 @@ function TeamingPartnersPanel({ naicsOptions }: { naicsOptions: string[] }) {
         >
           <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)} required>
             <option value="">Choose NAICS…</option>
-            {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
           </select>
           <input
             type="text"
@@ -2278,7 +2278,7 @@ function ProtestPanel() {
               <div className="sam-th" style={{ gridTemplateColumns: "100px 130px 1fr 130px 90px" }}>
                 <span>Decision</span><span>Docket</span><span>Protester / ground</span><span>Agency</span><span>Outcome</span>
               </div>
-              {data.decisions.length === 0 && <div className="empty-state">GAO RSS feed temporarily unavailable · cache refreshes every 6 hours</div>}
+              {data.decisions.length === 0 && <div className="empty-state">Awaiting GAO refresh — decisions surface here as they're published. Cache rebuilds every 6 hours from gao.gov.</div>}
               {data.decisions.map((d) => {
                 const out = (d.outcome || "").toLowerCase();
                 const color = out === "sustained" ? "var(--red)" : out === "denied" ? "var(--green)" : "var(--t60)";
@@ -2473,7 +2473,7 @@ function CMMCPanel() {
 
 interface LaborRow { category: string; naics_codes: string[]; rate_low: number; rate_median: number; rate_high: number; source: string; curated: boolean }
 
-function LaborRatesPanel({ naicsOptions }: { naicsOptions: string[] }) {
+function LaborRatesPanel(_props: { naicsOptions: string[] }) {
   const [naics, setNaics] = useState<string>("");
   const [q, setQ] = useState<string>("");
   const [rows, setRows] = useState<LaborRow[]>([]);
@@ -2503,7 +2503,7 @@ function LaborRatesPanel({ naicsOptions }: { naicsOptions: string[] }) {
           <div className="is-refresh">
             <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
               <option value="">All NAICS</option>
-              {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+              {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
             </select>
             <input
               type="text"
