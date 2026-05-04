@@ -3,7 +3,8 @@ import { createServerClient } from "@/lib/supabase-server";
 
 // Target NAICS codes — TX/OK aerospace + machining corridor focus.
 const NAICS_CODES = "336413,332710,332721";
-const SAM_SEARCH_URL = "https://api.sam.gov/opportunities/v2/search";
+// sam.gov/api/prod, NOT api.sam.gov (the latter 404s). Same fix in agents/sam-ingest/sam-client.ts and src/lib/sam.ts.
+const SAM_SEARCH_URL = "https://sam.gov/api/prod/opportunities/v2/search";
 const LOOKBACK_DAYS = 7;
 const RESULT_LIMIT = 10;
 

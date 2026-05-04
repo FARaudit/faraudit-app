@@ -109,19 +109,27 @@ async function main() {
     return null;
   };
 
-  // Map SAM opportunities → pending_audits rows.
-  const rows = Array.from(seen.values()).map((o) => ({
-    notice_id: o.noticeId,
-    title: o.title || null,
-    agency: o.department || null,
-    naics_code: o.naicsCode || null,
-    set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
-    notice_type: classifyNoticeType(o.type),
-    document_type: classifyDocType(o.type),
-    pdf_url: o.resourceLinks?.[0] || null,
-    source: "sam_live" as const,
-    notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`
-  }));
+  // Map SAM opportunities → pending_audits rows. notice_type is NOT a column
+  // on pending_audits in apex-production (schema check 2026-05-04). Dropping it
+  // from the insert; downstream filters fall back to inspecting `notes` or the
+  // SAM type embedded in metadata. Phase 2 ticket: add notice_type column via
+  // migration if needed for first-class filtering. classifyNoticeType call
+  // retained but its result is discarded — keeps the function eligible for
+  // re-introduction without churn.
+  const rows = Array.from(seen.values()).map((o) => {
+    void classifyNoticeType(o.type);
+    return {
+      notice_id: o.noticeId,
+      title: o.title || null,
+      agency: o.department || null,
+      naics_code: o.naicsCode || null,
+      set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
+      document_type: classifyDocType(o.type),
+      pdf_url: o.resourceLinks?.[0] || null,
+      source: "sam_live" as const,
+      notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`
+    };
+  });
 
   if (DRY_RUN) {
     console.log("[DRY_RUN] sample of first 5 rows that would be inserted:");

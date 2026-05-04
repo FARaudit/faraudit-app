@@ -19,7 +19,9 @@ export async function fetchSolicitationByNoticeId(
 ): Promise<Solicitation | null> {
   if (!SAM_API_KEY) return null;
 
-  const url = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&noticeid=${encodeURIComponent(
+  // Host: sam.gov/api/prod, NOT api.sam.gov — the latter returns 404. See
+  // agents/sam-ingest/sam-client.ts for the same fix applied to the cron.
+  const url = `https://sam.gov/api/prod/opportunities/v2/search?api_key=${SAM_API_KEY}&noticeid=${encodeURIComponent(
     noticeId
   )}&limit=1`;
 

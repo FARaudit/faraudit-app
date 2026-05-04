@@ -1,6 +1,11 @@
 // SAM.gov opportunities API v2 client.
 // Docs: https://open.gsa.gov/api/get-opportunities-public-api/
 //
+// Host: sam.gov/api/prod/opportunities/v2/search (NOT api.sam.gov — that host
+// returns 404 across every path despite being referenced in older docs). The
+// internal noticedesc/award refs in returned payloads still use api.sam.gov;
+// only the search endpoint is hosted at sam.gov/api/prod.
+//
 // Filters: naicsCode (one per call), typeOfSetAside (one per call), postedFrom,
 // postedTo, limit, offset. Date format: MM/dd/yyyy. Limit max 1000, offset max
 // 9000 (so ~10K results per filter combo before pagination breaks down — fine
@@ -59,7 +64,7 @@ async function searchPage(p: SamSearchParams): Promise<{ items: SamOpportunity[]
     offset: String(p.offset),
     ptype: "o,p,k,r,s"   // opportunity / pre-solicitation / combined / sources sought / special notice
   });
-  const url = `https://api.sam.gov/opportunities/v2/search?${params.toString()}`;
+  const url = `https://sam.gov/api/prod/opportunities/v2/search?${params.toString()}`;
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(30000)

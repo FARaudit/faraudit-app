@@ -52,7 +52,8 @@ export async function GET(req: Request) {
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400000);
     const dateStr = thirtyDaysAgo.toISOString().split("T")[0].replace(/-/g, "");
 
-    const url = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&limit=${limit}&postedFrom=${dateStr}&active=Yes&setAside=SBA`;
+    // sam.gov/api/prod, NOT api.sam.gov (the latter 404s).
+    const url = `https://sam.gov/api/prod/opportunities/v2/search?api_key=${SAM_API_KEY}&naicsCode=${naics}&limit=${limit}&postedFrom=${dateStr}&active=Yes&setAside=SBA`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`SAM.gov API error: ${res.status}`);
