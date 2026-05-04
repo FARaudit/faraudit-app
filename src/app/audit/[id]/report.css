@@ -7,6 +7,17 @@
   font-family: var(--serif);
 }
 
+/* Clears AuthShell fixed sidebar (Navigation.tsx · 220px expanded · 52px collapsed).
+   Mirrors the P0-2 fix in src/app/settings/page.tsx — Tailwind v4 + @theme bridge
+   silently dropped the layout's md:pl-[var(--sidebar-w)] utility, so the audit
+   detail page rendered behind the sidebar with the title clipped. !important
+   guarantees the override regardless of utility class resolution order. F-18. */
+@media (min-width: 768px) {
+  .report-page {
+    padding-left: calc(var(--sidebar-w, 220px)) !important;
+  }
+}
+
 .report-header {
   position: sticky;
   top: 0;
