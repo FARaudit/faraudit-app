@@ -28,13 +28,51 @@ const ALLOWED_FIELDS = new Set<keyof PatchBody>([
   "past_performance"
 ]);
 
-async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClient>>, userId: string) {
-  // Pull won audits for this user → past_performance JSON; aggregate distinct NAICS codes.
-  // Two sources of "won" status now coexist:
-  //   audits.outcome = 'won' (legacy lifecycle vocabulary)
-  //   audit_outcomes.outcome = 'awarded' (Layer 3 rich-data vocabulary)
-  // Union both, then enrich each row with audit_outcomes rich data when present
-  // (contract_value_actual, cpars_rating, customer_relationship_strength).
+interface AuditCore {
+  id: string;
+  notice_id: string | null;
+  title: string | null;
+  agency: string | null;
+  naics_code: string | null;
+  outcome_date: string | null;
+  overview_json: Record<string, unknown> | null;
+}
+
+interface AwardedOutcomeCore {
+  audit_id: string;
+  contract_value_actual: number | null;
+  cpars_rating: number | null;
+  customer_relationship_strength: string | null;
+  outcome_recorded_at: string | null;
+}
+
+type Past = {
+  audit_id: string;
+  notice_id: string | null;
+  title: string | null;
+  agency: string | null;
+  naics_code: string | null;
+  contract_value: string | number | null;
+  period: string | null;
+  awarded_at: string | null;
+  cpars_rating: number | null;
+  customer_relationship: string | null;
+};
+
+async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClient>>, _userId: string) {
+  // Two sources of "won" status coexist; union both into past_performance.
+  //   audits.outcome = 'won'              (legacy lifecycle vocabulary)
+  //   audit_outcomes.outcome = 'awarded'  (Layer 3 rich-data vocabulary)
+  //
+  // Enrich each row with audit_outcomes rich fields when present:
+  // contract_value_actual, cpars_rating, customer_relationship_strength.
+  //
+  // We deliberately use TWO queries rather than a PostgREST audits!inner()
+  // embed because the cross-table join silently drops rows whenever the
+  // RLS policies on audits and audit_outcomes don't both pass for the
+  // calling user's auth context. The two-query split runs each select
+  // through its own RLS gate independently, then we merge in TS.
+
   const [wonAuditsRes, awardedOutcomesRes] = await Promise.all([
     supabase
       .from("audits")
@@ -42,27 +80,37 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
       .eq("outcome", "won"),
     supabase
       .from("audit_outcomes")
-      .select("audit_id, contract_value_actual, cpars_rating, customer_relationship_strength, outcome_recorded_at, audits!inner(id, notice_id, title, agency, naics_code, outcome_date, overview_json)")
+      .select("audit_id, contract_value_actual, cpars_rating, customer_relationship_strength, outcome_recorded_at")
       .eq("outcome", "awarded")
   ]);
 
-  // Build a map of audit-id → row payload, preferring outcomes-table data when present.
-  type Past = {
-    audit_id: string;
-    notice_id: string | null;
-    title: string | null;
-    agency: string | null;
-    naics_code: string | null;
-    contract_value: string | number | null;
-    period: string | null;
-    awarded_at: string | null;
-    cpars_rating: number | null;
-    customer_relationship: string | null;
-  };
+  const wonAudits = (wonAuditsRes.data || []) as AuditCore[];
+  const awardedOutcomes = (awardedOutcomesRes.data || []) as AwardedOutcomeCore[];
+
+  // Hydrate audit-side fields for the audit_ids referenced by awarded outcomes
+  // that aren't already covered by the wonAudits query. Skip the second
+  // round-trip when no Layer 3 rows exist.
+  const wonIds = new Set(wonAudits.map((a) => a.id));
+  const missingIds = awardedOutcomes
+    .map((o) => o.audit_id)
+    .filter((id) => !wonIds.has(id));
+
+  let extraAudits: AuditCore[] = [];
+  if (missingIds.length > 0) {
+    const { data } = await supabase
+      .from("audits")
+      .select("id, notice_id, title, agency, naics_code, outcome_date, overview_json")
+      .in("id", missingIds);
+    extraAudits = (data || []) as AuditCore[];
+  }
+  const auditsById = new Map<string, AuditCore>();
+  for (const a of wonAudits) auditsById.set(a.id, a);
+  for (const a of extraAudits) auditsById.set(a.id, a);
+
   const byId = new Map<string, Past>();
 
-  for (const a of wonAuditsRes.data || []) {
-    const ov = (a.overview_json as Record<string, unknown> | null) || {};
+  for (const a of wonAudits) {
+    const ov = a.overview_json || {};
     byId.set(a.id, {
       audit_id: a.id,
       notice_id: a.notice_id,
@@ -77,31 +125,23 @@ async function autopopulate(supabase: Awaited<ReturnType<typeof createServerClie
     });
   }
 
-  for (const o of awardedOutcomesRes.data || []) {
-    const oa = o as unknown as {
-      audit_id: string;
-      contract_value_actual: number | null;
-      cpars_rating: number | null;
-      customer_relationship_strength: string | null;
-      outcome_recorded_at: string | null;
-      audits: { id: string; notice_id: string | null; title: string | null; agency: string | null; naics_code: string | null; outcome_date: string | null; overview_json: Record<string, unknown> | null } | null;
-    };
-    const a = oa.audits;
-    if (!a) continue;
-    const existing = byId.get(oa.audit_id);
+  for (const o of awardedOutcomes) {
+    const a = auditsById.get(o.audit_id);
+    if (!a) continue; // outcome row references an audit the caller can't see
+    const existing = byId.get(o.audit_id);
     const ov = a.overview_json || {};
     const fallbackValue = (ov.ceiling_value_estimate as string | number | null) ?? null;
-    byId.set(oa.audit_id, {
-      audit_id: oa.audit_id,
+    byId.set(o.audit_id, {
+      audit_id: o.audit_id,
       notice_id: existing?.notice_id ?? a.notice_id,
       title: existing?.title ?? a.title,
       agency: existing?.agency ?? a.agency,
       naics_code: existing?.naics_code ?? a.naics_code,
-      contract_value: oa.contract_value_actual ?? existing?.contract_value ?? fallbackValue,
+      contract_value: o.contract_value_actual ?? existing?.contract_value ?? fallbackValue,
       period: existing?.period ?? ((ov.period_of_performance as string | null) ?? null),
-      awarded_at: oa.outcome_recorded_at ?? existing?.awarded_at ?? a.outcome_date,
-      cpars_rating: oa.cpars_rating ?? existing?.cpars_rating ?? null,
-      customer_relationship: oa.customer_relationship_strength ?? existing?.customer_relationship ?? null
+      awarded_at: o.outcome_recorded_at ?? existing?.awarded_at ?? a.outcome_date,
+      cpars_rating: o.cpars_rating ?? existing?.cpars_rating ?? null,
+      customer_relationship: o.customer_relationship_strength ?? existing?.customer_relationship ?? null
     });
   }
 
@@ -123,22 +163,31 @@ export async function GET(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from("capability_statements")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Always recompute past_performance from won audits + audit_outcomes on
+  // every GET. Past performance is auto-pulled by definition (per the UI
+  // label) and the persisted snapshot goes stale the moment a new outcome
+  // is recorded. Computing fresh every load surfaces newly-won audits
+  // immediately without requiring a PATCH cycle to refresh.
+  const [stmtRes, autoRes] = await Promise.all([
+    supabase
+      .from("capability_statements")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    autopopulate(supabase, user.id)
+  ]);
 
-  if (error) {
+  if (stmtRes.error) {
     return NextResponse.json(
-      { error: `lookup failed: ${error.message} — run migration 004_incumbent_capability.sql` },
+      { error: `lookup failed: ${stmtRes.error.message}` },
       { status: 503 }
     );
   }
 
-  // First-time visit — return a draft populated from past performance.
-  if (!data) {
-    const { past, naics } = await autopopulate(supabase, user.id);
+  const { past, naics } = autoRes;
+
+  // First-time visit — no saved row yet. Return a stub seeded from autopopulate.
+  if (!stmtRes.data) {
     return NextResponse.json({
       statement: {
         user_id: user.id,
@@ -162,7 +211,17 @@ export async function GET(_req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ statement: data, stub: false });
+  // Existing row: keep customer-edited fields, overlay fresh past_performance.
+  // For naics_codes, customer may have added their own — only seed from
+  // autopopulate when the saved list is empty.
+  const savedNaics = Array.isArray(stmtRes.data.naics_codes) ? stmtRes.data.naics_codes : [];
+  const merged = {
+    ...stmtRes.data,
+    past_performance: past,
+    naics_codes: savedNaics.length > 0 ? savedNaics : naics
+  };
+
+  return NextResponse.json({ statement: merged, stub: false });
 }
 
 export async function PATCH(req: NextRequest) {
