@@ -639,7 +639,7 @@ JSON only.`;
   else recommendation = "DECLINE";
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
-  const bid_recommendation = `${recommendation}. Score ${compliance_score}/100. Top risk: ${topRisk.slice(0, 200)}.`;
+  const bid_recommendation = `${recommendation}. Score ${compliance_score}/100. Top risk: ${topRisk}`;
 
   return {
     overview: {
