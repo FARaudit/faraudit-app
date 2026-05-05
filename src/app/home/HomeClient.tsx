@@ -555,10 +555,17 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   <PipelineKanban audits={recentAudits} />
                 </div>
                 <div className="intel-section">
-                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Coming soon</div></div>
-                  <div className="empty-block" style={{ padding: "24px 16px", textAlign: "center" }}>
-                    Deadline calendar — coming with sam-ingest deadline parsing.
-                  </div>
+                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Audited solicitations · real response deadlines from SAM</div></div>
+                  <DeadlineCalendar
+                    rows={recentAudits.map((a) => ({
+                      id: a.id,
+                      notice_id: a.notice_id,
+                      title: a.title,
+                      response_deadline: a.response_deadline ?? null,
+                      created_at: a.created_at
+                    }))}
+                    onPick={(r) => router.push(`/audit/${r.id}`)}
+                  />
                 </div>
               </div>
             </div>
@@ -966,12 +973,15 @@ function PastAuditsPanel({ audits }: { audits: AuditRow[] }) {
   );
 }
 
-interface CalendarCell {
-  date: Date;
-  rows: OpportunityRow[];
+interface CalendarRow {
+  id: string;
+  notice_id: string | null;
+  title: string | null;
+  response_deadline: string | null;
+  created_at: string;
 }
 
-function DeadlineCalendar({ rows, onPick }: { rows: OpportunityRow[]; onPick: (row: OpportunityRow) => void }) {
+function DeadlineCalendar({ rows, onPick }: { rows: CalendarRow[]; onPick: (row: CalendarRow) => void }) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -979,7 +989,7 @@ function DeadlineCalendar({ rows, onPick }: { rows: OpportunityRow[]; onPick: (r
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
 
-  const cells: CalendarCell[] = [];
+  const cells: Array<{ date: Date; rows: CalendarRow[] }> = [];
   // Pad leading blanks for week start (Sun-based grid).
   for (let i = 0; i < first.getDay(); i++) {
     cells.push({ date: new Date(year, month, -first.getDay() + i + 1), rows: [] });
@@ -988,17 +998,28 @@ function DeadlineCalendar({ rows, onPick }: { rows: OpportunityRow[]; onPick: (r
     cells.push({ date: new Date(year, month, d), rows: [] });
   }
 
-  // Synthetic deadline = created_at + 30 days. Slot each row into its cell if in this month.
+  // Slot each row into its deadline cell if in this month. Uses real
+  // response_deadline when present (audits sourced from SAM via /api/audit
+  // route or audit-ai/corpus.ts have it populated). Falls back to
+  // created_at + 30 days only when deadline is null — keeps stale rows
+  // visible without false-positive precision claims.
   for (const r of rows) {
-    const created = new Date(r.created_at);
-    if (isNaN(created.getTime())) continue;
-    const deadline = new Date(created);
-    deadline.setDate(deadline.getDate() + 30);
+    let deadline: Date | null = null;
+    if (r.response_deadline) {
+      const parsed = new Date(r.response_deadline);
+      if (!isNaN(parsed.getTime())) deadline = parsed;
+    }
+    if (!deadline) {
+      const created = new Date(r.created_at);
+      if (isNaN(created.getTime())) continue;
+      deadline = new Date(created);
+      deadline.setDate(deadline.getDate() + 30);
+    }
     if (deadline.getFullYear() !== year || deadline.getMonth() !== month) continue;
     const cell = cells.find((c) =>
-      c.date.getFullYear() === deadline.getFullYear() &&
-      c.date.getMonth() === deadline.getMonth() &&
-      c.date.getDate() === deadline.getDate()
+      c.date.getFullYear() === deadline!.getFullYear() &&
+      c.date.getMonth() === deadline!.getMonth() &&
+      c.date.getDate() === deadline!.getDate()
     );
     if (cell) cell.rows.push(r);
   }
