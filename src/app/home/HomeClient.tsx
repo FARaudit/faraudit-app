@@ -2026,7 +2026,15 @@ function CapabilityPanel() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/capability-statement");
+        // Bypass any browser/edge cache so newly-logged outcomes show up
+        // immediately. The API route is force-dynamic on the server side;
+        // pairing that with cache:'no-store' + a cache-bust query param
+        // ensures intermediate caches (browser, Vercel edge, service
+        // worker) never serve a stale snapshot of past_performance.
+        const res = await fetch(`/api/capability-statement?t=${Date.now()}`, {
+          cache: "no-store",
+          credentials: "include"
+        });
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -2158,7 +2166,7 @@ function CapabilityPanel() {
           <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10 }}>
             Past performance · auto-pulled from won audits
           </div>
-          {stmt.past_performance.length === 0 ? (
+          {!Array.isArray(stmt.past_performance) || stmt.past_performance.length === 0 ? (
             <div className="empty-block">No won audits yet. Outcomes you mark "won" on /audit/[id] will appear here automatically.</div>
           ) : (
             stmt.past_performance.map((p, i) => (
