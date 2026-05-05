@@ -54,7 +54,7 @@ export async function PATCH(
   const { error } = await supabase.from("audits").update(update).eq("id", id);
   if (error) {
     return NextResponse.json(
-      { error: `lifecycle save failed: ${error.message} — run migration 002_audits_lockin.sql` },
+      { error: `lifecycle save failed: ${error.message}` },
       { status: 503 }
     );
   }

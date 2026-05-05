@@ -366,6 +366,10 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                     team_assignee: (audit.team_assignee as string) || ""
                   }}
                 />
+                <RichOutcomeCapture
+                  auditId={id}
+                  outcome={(audit.outcome as string) || null}
+                />
               </section>
             </>
           )}
@@ -787,6 +791,264 @@ function OutcomeTracker({ auditId, initial }: { auditId: string; initial: Outcom
           />
         </div>
       </div>
+      <div className={`notes-status ${indicator.cls}`}>{indicator.txt}</div>
+    </div>
+  );
+}
+
+interface RichOutcomeRow {
+  outcome?: string | null;
+  margin_estimated_pct?: number | null;
+  margin_actual_pct?: number | null;
+  contract_value_actual?: number | null;
+  cpars_rating?: number | null;
+  customer_relationship_strength?: string | null;
+  win_reason?: string | null;
+  lost_to_competitor?: string | null;
+  lost_reason_category?: string | null;
+  lessons_learned?: string | null;
+}
+
+const RELATIONSHIP_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "cold", label: "Cold" },
+  { value: "warm", label: "Warm" },
+  { value: "strong", label: "Strong" },
+  { value: "strategic", label: "Strategic" }
+];
+
+const LOST_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "price", label: "Price" },
+  { value: "technical", label: "Technical" },
+  { value: "past_performance", label: "Past performance" },
+  { value: "timing", label: "Timing" },
+  { value: "relationships", label: "Relationships" },
+  { value: "other", label: "Other" }
+];
+
+function RichOutcomeCapture({ auditId, outcome }: { auditId: string; outcome: string | null }) {
+  const isAwarded = outcome === "won";
+  const isLost = outcome === "lost";
+  const visible = isAwarded || isLost;
+
+  const [row, setRow] = useState<RichOutcomeRow>({});
+  const [loaded, setLoaded] = useState(false);
+  const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/audit/${auditId}/outcome-detail`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled && data.row) setRow(data.row);
+      } catch {
+        // soft-fail: form just stays empty
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [auditId, visible]);
+
+  function patch(update: Partial<RichOutcomeRow>) {
+    const next = { ...row, ...update };
+    setRow(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void persist(next);
+    }, 800);
+  }
+
+  async function persist(payload: RichOutcomeRow) {
+    setSave("saving");
+    try {
+      const body = {
+        outcome: isAwarded ? "awarded" : "lost",
+        margin_estimated_pct: payload.margin_estimated_pct ?? null,
+        margin_actual_pct: payload.margin_actual_pct ?? null,
+        contract_value_actual: payload.contract_value_actual ?? null,
+        cpars_rating: payload.cpars_rating ?? null,
+        customer_relationship_strength: payload.customer_relationship_strength ?? null,
+        win_reason: payload.win_reason ?? null,
+        lost_to_competitor: payload.lost_to_competitor ?? null,
+        lost_reason_category: payload.lost_reason_category ?? null,
+        lessons_learned: payload.lessons_learned ?? null
+      };
+      const res = await fetch(`/api/audit/${auditId}/outcome-detail`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSave("saved");
+      setSavedAt(new Date());
+    } catch (err) {
+      setSave("error");
+      setErrMsg(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (!visible) return null;
+
+  const indicator = (() => {
+    if (!loaded) return { cls: "", txt: "Loading rich outcome…" };
+    if (save === "saving") return { cls: "saving", txt: "● Saving rich outcome…" };
+    if (save === "error")  return { cls: "error",  txt: `! ${errMsg || "Save failed"}` };
+    if (save === "saved" && savedAt) return { cls: "saved", txt: `✓ Rich outcome saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` };
+    return { cls: "", txt: "Rich-outcome fields save 0.8s after typing" };
+  })();
+
+  return (
+    <div className="notes-area" style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border2)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: isAwarded ? "var(--green)" : "var(--red)" }}>
+          {isAwarded ? "▸ Award details — feed the moat" : "▸ Loss details — feed the moat"}
+        </span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t40)" }}>
+          contributes to your win-probability data
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+
+        {/* Margin estimated — both awarded + lost */}
+        <div>
+          <label style={fieldLabelStyle}>Margin estimated (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            value={row.margin_estimated_pct ?? ""}
+            onChange={(e) => patch({ margin_estimated_pct: e.target.value === "" ? null : Number(e.target.value) })}
+            style={inputStyle}
+          />
+        </div>
+
+        {isAwarded && (
+          <>
+            <div>
+              <label style={fieldLabelStyle}>Margin actual (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={row.margin_actual_pct ?? ""}
+                onChange={(e) => patch({ margin_actual_pct: e.target.value === "" ? null : Number(e.target.value) })}
+                placeholder="fill once project margin is known"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>Contract value actual ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={row.contract_value_actual ?? ""}
+                onChange={(e) => patch({ contract_value_actual: e.target.value === "" ? null : Number(e.target.value) })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>CPARS rating (1-5)</label>
+              <select
+                value={row.cpars_rating ?? ""}
+                onChange={(e) => patch({ cpars_rating: e.target.value === "" ? null : Number(e.target.value) })}
+                style={selectStyle}
+              >
+                <option value="">— Not yet —</option>
+                <option value="1">1 — Unsatisfactory</option>
+                <option value="2">2 — Marginal</option>
+                <option value="3">3 — Satisfactory</option>
+                <option value="4">4 — Very good</option>
+                <option value="5">5 — Exceptional</option>
+              </select>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={fieldLabelStyle}>Customer relationship</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {RELATIONSHIP_OPTIONS.map((opt) => {
+                  const active = row.customer_relationship_strength === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => patch({ customer_relationship_strength: active ? null : opt.value })}
+                      style={{
+                        ...inputStyle,
+                        cursor: "pointer",
+                        background: active ? "var(--green)" : "rgba(3,8,16,.6)",
+                        color: active ? "var(--void)" : "var(--text)",
+                        borderColor: active ? "var(--green)" : "var(--border2)",
+                        fontWeight: active ? 700 : 400,
+                        padding: "6px 14px"
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={fieldLabelStyle}>What gave you the edge</label>
+              <textarea
+                value={row.win_reason ?? ""}
+                onChange={(e) => patch({ win_reason: e.target.value || null })}
+                placeholder="1-3 sentences: why you won (CMMC readiness, incumbent relationship, lowest price, etc.)"
+                style={{ ...inputStyle, width: "100%", minHeight: 64, resize: "vertical", fontFamily: "var(--serif)" }}
+              />
+            </div>
+          </>
+        )}
+
+        {isLost && (
+          <>
+            <div>
+              <label style={fieldLabelStyle}>Lost to competitor</label>
+              <input
+                type="text"
+                value={row.lost_to_competitor ?? ""}
+                onChange={(e) => patch({ lost_to_competitor: e.target.value || null })}
+                placeholder="who won it (optional)"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>Why lost</label>
+              <select
+                value={row.lost_reason_category ?? ""}
+                onChange={(e) => patch({ lost_reason_category: e.target.value || null })}
+                style={selectStyle}
+              >
+                <option value="">— Not set —</option>
+                {LOST_CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={fieldLabelStyle}>Lessons learned</label>
+          <textarea
+            value={row.lessons_learned ?? ""}
+            onChange={(e) => patch({ lessons_learned: e.target.value || null })}
+            placeholder={isAwarded ? "what to repeat next time" : "what to do differently next time"}
+            style={{ ...inputStyle, width: "100%", minHeight: 64, resize: "vertical", fontFamily: "var(--serif)" }}
+          />
+        </div>
+      </div>
+
       <div className={`notes-status ${indicator.cls}`}>{indicator.txt}</div>
     </div>
   );
