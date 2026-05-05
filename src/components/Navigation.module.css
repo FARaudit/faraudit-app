@@ -1,0 +1,243 @@
+/* Navigation.module.css
+ *
+ * Co-located CSS Module for Navigation.tsx — the sidebar shown on
+ * every non-/home authed route (/settings, /audit/[id], /pricing, 404,
+ * etc.). Auto-bundled by Next.js on every route that imports
+ * Navigation, so styles travel with the component without per-route
+ * CSS imports.
+ *
+ * Token block + per-element rules below are direct ports of the
+ * .bd-home .sidebar / .nav-* / .sb-* blocks from
+ * src/app/home/home.css. Same property values; just rescoped under
+ * module-hashed class names. /home and home.css are NOT touched —
+ * Navigation.tsx renders OUTSIDE .bd-home, so the .bd-home universal
+ * reset that broke the previous attempt never reaches us.
+ *
+ * EXPLICIT NON-RULE: there is no universal reset (`.root *` block)
+ * in this file. The previous unified-sidebar branch shipped one and
+ * it tied / beat the per-element padding rules in the cascade,
+ * zeroing out .navItem padding. We rely on per-element rules alone,
+ * matching home.css's own pattern.
+ */
+
+.root {
+  /* Design tokens — values copied verbatim from .bd-home in home.css line 7-14. */
+  --void: #030810;
+  --void2: #060F1C;
+  --void3: #0A1628;
+  --gold: #C9A84C;
+  --gold2: #DFB96A;
+  --gold3: #F0D48E;
+  --text: #F5F0E8;
+  --text2: #E8E2D4;
+  --t80: rgba(245, 240, 232, 0.80);
+  --t60: rgba(245, 240, 232, 0.60);
+  --t40: rgba(245, 240, 232, 0.40);
+  --t25: rgba(245, 240, 232, 0.25);
+  --t12: rgba(245, 240, 232, 0.12);
+  --red: #EF4444;
+  --green: #4ADE80;
+  --border: rgba(201, 168, 76, 0.10);
+  --border2: rgba(201, 168, 76, 0.20);
+  --mono: 'JetBrains Mono', monospace;
+  --serif: 'Fraunces', Georgia, serif;
+
+  /* Sidebar shell — combines .bd-home .sidebar (background, border-right,
+     flex column, overflow, padding) with the position:fixed / 220px / z-30
+     positioning Navigation.tsx needs to live OUTSIDE the .bd-home grid. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 220px;
+  z-index: 30;
+  background: var(--void2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px 0;
+  font-family: var(--serif);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+/* Brand row at top — wordmark + shield. Positioned to mimic /home's
+   tb-brand cell (which sits in /home's topbar, 220px wide with a
+   right border). Here we don't have a topbar, so the brand goes
+   inside the sidebar instead. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+.shield {
+  flex-shrink: 0;
+}
+.wordmark {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.wordmarkAccent {
+  color: var(--gold);
+}
+
+/* Scrollable nav region. */
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.nav::-webkit-scrollbar {
+  width: 3px;
+}
+.nav::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 2px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Section eyebrow — verbatim from .bd-home .nav-label. */
+.navLabel {
+  font-family: var(--mono);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t25);
+  padding: 12px 16px 5px;
+  margin: 0;
+}
+
+/* Nav item button — verbatim from .bd-home .nav-item. */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--t40);
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  position: relative;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  margin: 0;
+}
+.navItem:hover {
+  color: var(--text2);
+  background: rgba(201, 168, 76, 0.03);
+}
+.navItem.active {
+  color: var(--gold2);
+  background: rgba(201, 168, 76, 0.07);
+  border-left-color: var(--gold);
+}
+
+.navIcon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.55;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.navIcon svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+.navItem.active .navIcon {
+  opacity: 0.9;
+}
+
+.navItemLabel {
+  flex: 1;
+}
+
+/* Badge pills — verbatim from .bd-home .nav-ct + .ct-* variants. */
+.badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+.badgeRed {
+  background: rgba(220, 38, 38, 0.16);
+  color: var(--red);
+  border: 1px solid rgba(220, 38, 38, 0.22);
+}
+.badgeGold {
+  background: rgba(201, 168, 76, 0.12);
+  color: var(--gold);
+  border: 1px solid rgba(201, 168, 76, 0.20);
+}
+.badgeGreen {
+  background: rgba(74, 222, 128, 0.10);
+  color: var(--green);
+  border: 1px solid rgba(74, 222, 128, 0.18);
+}
+
+/* Footer card — verbatim from .bd-home .sb-footer / .sb-plan / .sb-days / .sb-upgrade. */
+.footer {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.plan {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--t25);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.days {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gold);
+  opacity: 0.65;
+}
+.upgrade {
+  margin-top: 8px;
+  display: block;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--void);
+  background: var(--gold);
+  padding: 7px 12px;
+  border-radius: 2px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.8;
+  text-decoration: none;
+}
+.upgrade:hover {
+  opacity: 1;
+}
