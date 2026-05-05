@@ -3,16 +3,19 @@
 # any solicitations posted overnight land in pending_audits before the
 # auditor wakes up.
 #
-# Service is configured with Root Directory = /  (repo root) and Watch Paths
-# scoped to agents/sam-ingest/** so the deploy is monorepo-friendly.
+# Service is configured with Root Directory = agents/sam-ingest (set in Railway
+# dashboard May 4 2026 · Sprint 2.2.0). Watch Paths scoped to agents/sam-ingest/**.
 
 [build]
-# Empty build command — repo-root nixpacks.toml also disables the build
-# phase so Nixpacks won't try `next build` even though Root Directory = /.
+# Empty build command — agent-scoped nixpacks.toml in this directory disables
+# the build phase so Nixpacks won't try `next build`.
 buildCommand = ""
 
 [deploy]
-startCommand = "npx tsx agents/sam-ingest/index.ts"
+# Path is relative to /app (= agents/sam-ingest/ post-rootDirectory-fix). The
+# previous "npx tsx agents/sam-ingest/index.ts" would have caused
+# ERR_MODULE_NOT_FOUND on next cron tick (same bug Audit-AI hit and surfaced).
+startCommand = "npx tsx index.ts"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 cronSchedule = "0 11 * * *"  # 11:00 UTC = 06:00 CDT
