@@ -1,121 +1,208 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import * as TooltipP from "@radix-ui/react-tooltip";
-import {
-  LayoutDashboard,
-  FileSearch,
-  Clock,
-  Activity,
-  FileText,
-  Target,
-  BarChart3,
-  Newspaper,
-  UserCircle,
-  Building2,
-  Scale,
-  Scroll,
-  Shield,
-  TrendingUp,
-  Users,
-  Settings2,
-  LogOut,
-  Pin,
-  PinOff,
-  type LucideIcon
-} from "lucide-react";
+// Navigation.tsx — sidebar shown on every authed non-/home route
+// (/settings, /audit/[id], /pricing, 404, etc.). Renders the same
+// gold wordmark + shield, JetBrains-Mono nav rows, custom SVG icons,
+// badges, gold-fill active state, and UPGRADE TO STANDARD card that
+// /home's existing inline sidebar already renders.
+//
+// Architecture: co-located CSS Module (Navigation.module.css). Per
+// Next.js App Router behavior, modules imported by a client component
+// auto-bundle on every route that renders the component, so styles
+// travel with Navigation without per-route CSS imports.
+//
+// /home is NOT touched by this work. HomeClient.tsx renders its own
+// inline sidebar inside .bd-home — we explicitly suppress Navigation
+// on /home (line below) to avoid double-rendering.
+//
+// SVGs in ICONS map are byte-equivalent copies of the inline <svg>
+// elements in HomeClient.tsx's nav buttons. No redraws, no
+// optimization — exact ports keep the visual identity unchanged.
+
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserClient } from "@/lib/supabase-browser";
+import styles from "./Navigation.module.css";
 
-interface NavItem {
+type IconName =
+  | "today"
+  | "audit"
+  | "past-audits"
+  | "pipeline"
+  | "capability"
+  | "opportunities"
+  | "defense-spending"
+  | "news"
+  | "contracting-officers"
+  | "agencies"
+  | "protests"
+  | "regulatory"
+  | "cmmc"
+  | "wages"
+  | "teaming"
+  | "settings"
+  | "signout";
+
+const ICONS: Record<IconName, ReactNode> = {
+  today: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  ),
+  audit: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M4 2h8l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      <line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1" strokeOpacity=".5" />
+      <line x1="6" y1="10" x2="10" y2="10" stroke="currentColor" strokeWidth="1" strokeOpacity=".5" />
+    </svg>
+  ),
+  "past-audits": (
+    <svg viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="8" y1="8" x2="11" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  pipeline: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  capability: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="5" y1="10" x2="11" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="5" y1="13" x2="9" y2="13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  opportunities: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  "defense-spending": (
+    <svg viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  ),
+  news: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  "contracting-officers": (
+    <svg viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 14c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  agencies: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  protests: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  ),
+  regulatory: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  cmmc: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M8 2L13 4V8C13 11 11 13 8 14C5 13 3 11 3 8V4L8 2Z" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M6 8l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  wages: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  teaming: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <circle cx="5" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="11" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 13c0-2 1.5-3 3-3s3 1 3 3M8 13c0-2 1.5-3 3-3s3 1 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  settings: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  ),
+  signout: (
+    <svg viewBox="0 0 16 16" fill="none">
+      <path d="M10 12l3-4-3-4M5 8h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+};
+
+interface NavBadge {
+  text: string;
+  variant: "red" | "gold" | "green";
+}
+
+interface NavItemDef {
+  id: string;
   label: string;
-  href: string;
-  icon: LucideIcon;
-  description: string;
+  icon: IconName;
+  onClick: () => void;
+  isActive: boolean;
+  badge?: NavBadge | null;
 }
+
 interface NavSection {
-  eyebrow: string;
-  items: NavItem[];
+  label: string;
+  items: NavItemDef[];
 }
 
-// Mirrors the home internal sidebar IA shipped in Prompt 8. Workspace + Intelligence
-// items deep-link to /home#<hash>; the home page's hashchange handler picks the hash
-// up and switches the right tab. Active highlight matches the path (not the hash —
-// Navigation hides on /home anyway, so /home#... links never need to highlight here).
-const SECTIONS: NavSection[] = [
-  {
-    eyebrow: "Workspace",
-    items: [
-      { label: "Today", href: "/home", icon: LayoutDashboard, description: "Action board · today's signals" },
-      { label: "Run Audit", href: "/home#audit", icon: FileSearch, description: "Score a solicitation" },
-      { label: "Past Audits", href: "/home#past-audits", icon: Clock, description: "Audit history" },
-      { label: "Pipeline", href: "/home#pipeline", icon: Activity, description: "Bid workflow stages" },
-      { label: "Capability Statement", href: "/home#capability", icon: FileText, description: "Your firm's profile" }
-    ]
-  },
-  {
-    eyebrow: "Intelligence",
-    items: [
-      { label: "Opportunities", href: "/home#opportunities", icon: Target, description: "Live SAM.gov solicitations" },
-      { label: "Defense Spending", href: "/home#defense-spending", icon: BarChart3, description: "DoD obligations by NAICS" },
-      { label: "Defense News", href: "/home#news", icon: Newspaper, description: "AI-curated defense feed" },
-      { label: "Contracting Officers", href: "/home#contracting-officers", icon: UserCircle, description: "KO award patterns" },
-      { label: "Agencies", href: "/home#agencies", icon: Building2, description: "Win-rate by agency" },
-      { label: "GAO Protests", href: "/home#protests", icon: Scale, description: "Decision history" },
-      { label: "FAR/DFARS Updates", href: "/home#regulatory", icon: Scroll, description: "Clause changes" },
-      { label: "CMMC Readiness", href: "/home#cmmc", icon: Shield, description: "Cyber compliance levels" },
-      { label: "Wage Benchmarks", href: "/home#wages", icon: TrendingUp, description: "SCA + DBA rates" },
-      { label: "Teaming Partners", href: "/home#teaming", icon: Users, description: "SAM-registered partners" }
-    ]
-  }
-];
+const BADGE_VARIANT_CLASS: Record<NavBadge["variant"], string> = {
+  red: styles.badgeRed,
+  gold: styles.badgeGold,
+  green: styles.badgeGreen
+};
 
-const ACCOUNT: NavItem[] = [
-  { label: "Profile & Settings", href: "/settings", icon: Settings2, description: "Account · preferences · billing" }
-];
-
-export default function Navigation({ initialPinned }: { initialPinned: boolean }) {
+export default function Navigation(_: { initialPinned: boolean }) {
+  const router = useRouter();
   const pathname = usePathname() || "";
-  const [pinned, setPinned] = useState(initialPinned);
-  const [hovering, setHovering] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const expanded = pinned || hovering;
-  const ref = useRef<HTMLElement>(null);
 
+  // Reserve --sidebar-w for the layout's main column. /home renders
+  // its own inline sidebar, and Navigation suppresses itself there
+  // (return null below), so --sidebar-w must be 0 on /home to avoid
+  // double-padding the main column.
   useEffect(() => {
     if (pathname.startsWith("/home")) {
       document.documentElement.style.setProperty("--sidebar-w", "0px");
-      return () => { document.documentElement.style.removeProperty("--sidebar-w"); };
+    } else {
+      document.documentElement.style.setProperty("--sidebar-w", "220px");
     }
+    return () => {
+      document.documentElement.style.removeProperty("--sidebar-w");
+    };
   }, [pathname]);
-
-  // iPad responsive (Prompt 14): default to collapsed 52px at viewports under
-  // 1024px so the sidebar doesn't eat half the content area. User's explicit
-  // pin click still wins (writes localStorage + /api/preferences sidebar_pinned).
-  // Runs once on mount — does NOT fight subsequent togglePin updates.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.innerWidth < 1024) setPinned(false);
-  }, []);
 
   if (pathname.startsWith("/home")) return null;
 
-  async function togglePin() {
-    const next = !pinned;
-    setPinned(next);
-    try {
-      await fetch("/api/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sidebar_pinned: next })
-      });
-    } catch {
-      /* silent */
-    }
-  }
-
   async function onSignOut() {
+    if (signingOut) return;
     setSigningOut(true);
     try {
       const sb = createBrowserClient();
@@ -126,185 +213,124 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
     }
   }
 
-  useEffect(() => {
-    const w = expanded ? 220 : 52;
-    document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
-    return () => {
-      document.documentElement.style.removeProperty("--sidebar-w");
-    };
-  }, [expanded]);
+  const workspaceDefs: Array<{
+    id: string;
+    label: string;
+    icon: IconName;
+    href: string;
+    badge?: NavBadge;
+  }> = [
+    { id: "today", label: "Today", icon: "today", href: "/home" },
+    { id: "audit", label: "Run Audit", icon: "audit", href: "/home#audit", badge: { text: "New", variant: "gold" } },
+    { id: "past-audits", label: "Past Audits", icon: "past-audits", href: "/home#past-audits" },
+    { id: "pipeline", label: "Pipeline", icon: "pipeline", href: "/home#pipeline" },
+    { id: "capability", label: "Capability Statement", icon: "capability", href: "/home#capability" }
+  ];
 
-  // An item is active when pathname matches its href, ignoring the hash. Items
-  // pointing at /home#... can never be active (Navigation hides on /home), so
-  // only /settings and any other non-/home routes ever highlight.
-  function isItemActive(href: string): boolean {
-    const path = href.split("#")[0];
-    return pathname === path || pathname.startsWith(path + "/");
-  }
+  const intelligenceDefs: Array<{
+    id: string;
+    label: string;
+    icon: IconName;
+    href: string;
+    badge?: NavBadge;
+  }> = [
+    { id: "opportunities", label: "Opportunities", icon: "opportunities", href: "/home#opportunities", badge: { text: "Live", variant: "green" } },
+    { id: "defense-spending", label: "Defense Spending", icon: "defense-spending", href: "/home#defense-spending" },
+    { id: "news", label: "Defense News", icon: "news", href: "/home#news" },
+    { id: "contracting-officers", label: "Contracting Officers", icon: "contracting-officers", href: "/home#contracting-officers" },
+    { id: "agencies", label: "Agencies", icon: "agencies", href: "/home#agencies" },
+    { id: "protests", label: "GAO Protests", icon: "protests", href: "/home#protests" },
+    { id: "regulatory", label: "FAR/DFARS Updates", icon: "regulatory", href: "/home#regulatory" },
+    { id: "cmmc", label: "CMMC Readiness", icon: "cmmc", href: "/home#cmmc" },
+    { id: "wages", label: "Wage Benchmarks", icon: "wages", href: "/home#wages" },
+    { id: "teaming", label: "Teaming Partners", icon: "teaming", href: "/home#teaming" }
+  ];
 
-  function renderItem(it: NavItem) {
-    const active = isItemActive(it.href);
-    return (
-      <li key={it.href}>
-        {expanded ? (
-          <Link
-            href={it.href}
-            className={`flex items-center gap-3 px-3 py-2 text-[13px] hover:bg-surface-2 ${
-              active ? "text-text border-l-2 border-accent bg-surface-2" : "text-text-2"
-            }`}
-          >
-            <it.icon size={16} />
-            <span className="flex-1 truncate">{it.label}</span>
-          </Link>
-        ) : (
-          <TooltipP.Root>
-            <TooltipP.Trigger asChild>
-              <Link
-                href={it.href}
-                className={`flex items-center justify-center w-full py-2 hover:bg-surface-2 ${
-                  active ? "text-text border-l-2 border-accent bg-surface-2" : "text-text-2"
-                }`}
-                aria-label={it.label}
-              >
-                <it.icon size={16} />
-              </Link>
-            </TooltipP.Trigger>
-            <TooltipP.Portal>
-              <TooltipP.Content
-                side="right"
-                sideOffset={6}
-                className="bg-surface-2 border border-border-2 px-3 py-2 text-xs z-50"
-                style={{ borderRadius: 4 }}
-              >
-                <p className="text-text font-medium">{it.label}</p>
-                <p className="text-text-3 text-[11px] mt-0.5">{it.description}</p>
-              </TooltipP.Content>
-            </TooltipP.Portal>
-          </TooltipP.Root>
-        )}
-      </li>
-    );
-  }
+  const toItem = (def: { id: string; label: string; icon: IconName; href: string; badge?: NavBadge }): NavItemDef => ({
+    id: def.id,
+    label: def.label,
+    icon: def.icon,
+    onClick: () => router.push(def.href),
+    isActive: false, // workspace items can't be active here — Navigation hides on /home
+    badge: def.badge ?? null
+  });
+
+  const sections: NavSection[] = [
+    { label: "Workspace", items: workspaceDefs.map(toItem) },
+    { label: "Intelligence", items: intelligenceDefs.map(toItem) },
+    {
+      label: "Account",
+      items: [
+        {
+          id: "settings",
+          label: "Profile & Settings",
+          icon: "settings",
+          onClick: () => router.push("/settings"),
+          isActive: pathname === "/settings",
+          badge: null
+        },
+        {
+          id: "signout",
+          label: signingOut ? "Signing out…" : "Sign out",
+          icon: "signout",
+          onClick: () => { void onSignOut(); },
+          isActive: false,
+          badge: null
+        }
+      ]
+    }
+  ];
 
   return (
-    <TooltipP.Provider delayDuration={0} skipDelayDuration={0}>
-      <aside
-        ref={ref}
-        data-faraudit-sidebar
-        onMouseEnter={() => !pinned && setHovering(true)}
-        onMouseLeave={() => !pinned && setHovering(false)}
-        className="hidden md:flex fixed top-0 bottom-0 left-0 z-30 flex-col border-r border-border bg-surface transition-[width] duration-150 overflow-hidden"
-        style={{ width: expanded ? 220 : 52 }}
-      >
-        <div className="flex items-center justify-between px-3 py-3 border-b border-border h-[52px]">
-          {expanded ? (
-            <>
-              <Link href="/home" className="font-bold tracking-wide text-sm" style={{ color: "#C9A84C", letterSpacing: "0.02em" }}>FARaudit</Link>
-              <button
-                type="button"
-                onClick={togglePin}
-                className="text-text-3 hover:text-text-2 p-1"
-                title={pinned ? "Unpin" : "Pin"}
-              >
-                {pinned ? <PinOff size={14} /> : <Pin size={14} />}
-              </button>
-            </>
-          ) : (
-            <Link href="/home" className="font-bold mx-auto" style={{ color: "#C9A84C" }} title="FARaudit">FA</Link>
-          )}
-        </div>
+    <aside className={styles.root}>
+      <div className={styles.brand}>
+        <svg className={styles.shield} width="22" height="22" viewBox="0 0 28 28" fill="none">
+          <path
+            d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z"
+            stroke="#C9A84C"
+            strokeWidth="1.4"
+            fill="rgba(201,168,76,.1)"
+            opacity=".9"
+          />
+          <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" strokeWidth=".9" opacity=".7" />
+          <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" strokeWidth=".9" opacity=".5" />
+        </svg>
+        <span className={styles.wordmark}>
+          FAR<span className={styles.wordmarkAccent}>audit</span>
+        </span>
+      </div>
 
-        <nav className="flex-1 overflow-y-auto py-2">
-          {SECTIONS.map((section) => (
-            <div key={section.eyebrow} className="mb-2">
-              {expanded && (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-semibold tracking-[0.14em] uppercase text-text-3">
-                  {section.eyebrow}
-                </div>
-              )}
-              <ul>{section.items.map(renderItem)}</ul>
-            </div>
-          ))}
-          <div className="mb-2 border-t border-border pt-2">
-            {expanded && (
-              <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-semibold tracking-[0.14em] uppercase text-text-3">
-                Account
-              </div>
-            )}
-            <ul>{ACCOUNT.map(renderItem)}</ul>
-            <ul>
-              <li>
-                {expanded ? (
-                  <button
-                    type="button"
-                    onClick={onSignOut}
-                    disabled={signingOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-[13px] text-text-2 hover:bg-surface-2 disabled:opacity-50"
-                  >
-                    <LogOut size={16} />
-                    <span className="flex-1 truncate text-left">{signingOut ? "Signing out…" : "Sign out"}</span>
-                  </button>
-                ) : (
-                  <TooltipP.Root>
-                    <TooltipP.Trigger asChild>
-                      <button
-                        type="button"
-                        onClick={onSignOut}
-                        disabled={signingOut}
-                        className="w-full flex items-center justify-center py-2 text-text-2 hover:bg-surface-2 disabled:opacity-50"
-                        aria-label="Sign out"
-                      >
-                        <LogOut size={16} />
-                      </button>
-                    </TooltipP.Trigger>
-                    <TooltipP.Portal>
-                      <TooltipP.Content
-                        side="right"
-                        sideOffset={6}
-                        className="bg-surface-2 border border-border-2 px-3 py-2 text-xs z-50"
-                        style={{ borderRadius: 4 }}
-                      >
-                        <p className="text-text font-medium">Sign out</p>
-                        <p className="text-text-3 text-[11px] mt-0.5">Return to /sign-in</p>
-                      </TooltipP.Content>
-                    </TooltipP.Portal>
-                  </TooltipP.Root>
+      <div className={styles.nav}>
+        {sections.map((section) => (
+          <div key={section.label} className={styles.section}>
+            <div className={styles.navLabel}>{section.label}</div>
+            {section.items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`${styles.navItem} ${item.isActive ? styles.active : ""}`}
+                onClick={item.onClick}
+              >
+                <span className={styles.navIcon}>{ICONS[item.icon]}</span>
+                <span className={styles.navItemLabel}>{item.label}</span>
+                {item.badge && (
+                  <span className={`${styles.badge} ${BADGE_VARIANT_CLASS[item.badge.variant]}`}>
+                    {item.badge.text}
+                  </span>
                 )}
-              </li>
-            </ul>
+              </button>
+            ))}
           </div>
-        </nav>
-        {expanded && (
-          <div style={{ borderTop: "1px solid rgba(201, 168, 76, 0.1)", padding: "12px 14px" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 8, color: "rgba(245, 240, 232, 0.4)", letterSpacing: "0.05em", marginBottom: 4 }}>
-              Design Partner · $1,250/mo
-            </div>
-            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 10, fontWeight: 700, color: "#C9A84C", opacity: 0.65, marginBottom: 8 }}>
-              Free during T1 sprint
-            </div>
-            <Link
-              href="/pricing"
-              style={{
-                display: "block",
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                fontSize: 8,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "#030810",
-                background: "#C9A84C",
-                padding: "7px 12px",
-                borderRadius: 2,
-                textAlign: "center",
-                textDecoration: "none",
-                opacity: 0.85
-              }}
-            >
-              Upgrade to Standard
-            </Link>
-          </div>
-        )}
-      </aside>
-    </TooltipP.Provider>
+        ))}
+      </div>
+
+      <div className={styles.footer}>
+        <div className={styles.plan}>Design Partner · $1,250/mo</div>
+        <div className={styles.days}>Free during T1 sprint</div>
+        <a href="/pricing" className={styles.upgrade}>
+          Upgrade to Standard
+        </a>
+      </div>
+    </aside>
   );
 }
