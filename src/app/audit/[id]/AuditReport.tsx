@@ -111,7 +111,7 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
   const verdictColor = verdictKind === "bid" ? "var(--green)" : verdictKind === "decline" ? "var(--red)" : "var(--amber)";
 
   return (
-    <div className="bd-home">
+    <div className="bd-home audit-detail">
       <div className="report-page">
         <header className="report-header">
           <a className="report-back" href="/home">← Intelligence Home</a>

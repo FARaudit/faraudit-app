@@ -15,6 +15,11 @@
   --sidebar:220px;--topbar:52px;
   background:var(--void);color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;
 }
+.bd-home.audit-detail {
+  height: auto;
+  overflow: visible;
+  overflow-y: visible;
+}
 .bd-home *,.bd-home *::before,.bd-home *::after{box-sizing:border-box;margin:0;padding:0}
 
 /* APP SHELL */
