@@ -1,34 +1,88 @@
 "use client";
 
-// Navigation.tsx is now a thin wrapper around <AppSidebar>. The Tailwind
-// aside it used to render (cool-blue palette, Lucide icons, collapse-on-
-// hover, Radix tooltips) is replaced by the same warm-cream chrome /home
-// uses, so /home and every non-/home route render visually-identical
-// sidebar surfaces. Items here deep-link via /home#<hash> so HomeClient's
-// hashchange listener picks them up and switches the workspace tab.
-//
-// Design simplifications baked in:
-// · No collapse / pin / hover-expand. Always 220px. The pinned/initialPinned
-//   prop and /api/preferences sidebar_pinned record are now no-ops here —
-//   keeping the prop signature so AuthShell continues to compile.
-// · No Lucide. Icons live inside AppSidebar's typed IconName map and match
-//   the SVGs used by /home's inline sidebar.
-// · No Radix tooltip portal. The sidebar is always expanded; tooltips were
-//   only meaningful when collapsed to icons.
-
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import * as TooltipP from "@radix-ui/react-tooltip";
+import {
+  LayoutDashboard,
+  FileSearch,
+  Clock,
+  Activity,
+  FileText,
+  Target,
+  BarChart3,
+  Newspaper,
+  UserCircle,
+  Building2,
+  Scale,
+  Scroll,
+  Shield,
+  TrendingUp,
+  Users,
+  Settings2,
+  LogOut,
+  Pin,
+  PinOff,
+  type LucideIcon
+} from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase-browser";
-import AppSidebar, { type SidebarItem, type SidebarSection } from "./AppSidebar";
 
-export default function Navigation(_: { initialPinned: boolean }) {
-  const router = useRouter();
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  description: string;
+}
+interface NavSection {
+  eyebrow: string;
+  items: NavItem[];
+}
+
+// Mirrors the home internal sidebar IA shipped in Prompt 8. Workspace + Intelligence
+// items deep-link to /home#<hash>; the home page's hashchange handler picks the hash
+// up and switches the right tab. Active highlight matches the path (not the hash —
+// Navigation hides on /home anyway, so /home#... links never need to highlight here).
+const SECTIONS: NavSection[] = [
+  {
+    eyebrow: "Workspace",
+    items: [
+      { label: "Today", href: "/home", icon: LayoutDashboard, description: "Action board · today's signals" },
+      { label: "Run Audit", href: "/home#audit", icon: FileSearch, description: "Score a solicitation" },
+      { label: "Past Audits", href: "/home#past-audits", icon: Clock, description: "Audit history" },
+      { label: "Pipeline", href: "/home#pipeline", icon: Activity, description: "Bid workflow stages" },
+      { label: "Capability Statement", href: "/home#capability", icon: FileText, description: "Your firm's profile" }
+    ]
+  },
+  {
+    eyebrow: "Intelligence",
+    items: [
+      { label: "Opportunities", href: "/home#opportunities", icon: Target, description: "Live SAM.gov solicitations" },
+      { label: "Defense Spending", href: "/home#defense-spending", icon: BarChart3, description: "DoD obligations by NAICS" },
+      { label: "Defense News", href: "/home#news", icon: Newspaper, description: "AI-curated defense feed" },
+      { label: "Contracting Officers", href: "/home#contracting-officers", icon: UserCircle, description: "KO award patterns" },
+      { label: "Agencies", href: "/home#agencies", icon: Building2, description: "Win-rate by agency" },
+      { label: "GAO Protests", href: "/home#protests", icon: Scale, description: "Decision history" },
+      { label: "FAR/DFARS Updates", href: "/home#regulatory", icon: Scroll, description: "Clause changes" },
+      { label: "CMMC Readiness", href: "/home#cmmc", icon: Shield, description: "Cyber compliance levels" },
+      { label: "Wage Benchmarks", href: "/home#wages", icon: TrendingUp, description: "SCA + DBA rates" },
+      { label: "Teaming Partners", href: "/home#teaming", icon: Users, description: "SAM-registered partners" }
+    ]
+  }
+];
+
+const ACCOUNT: NavItem[] = [
+  { label: "Profile & Settings", href: "/settings", icon: Settings2, description: "Account · preferences · billing" }
+];
+
+export default function Navigation({ initialPinned }: { initialPinned: boolean }) {
   const pathname = usePathname() || "";
+  const [pinned, setPinned] = useState(initialPinned);
+  const [hovering, setHovering] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [hash, setHash] = useState("");
+  const expanded = pinned || hovering;
+  const ref = useRef<HTMLElement>(null);
 
-  // /home renders its own AppSidebar inline (workspace tab pattern).
-  // Hide the global sidebar there to avoid double-rendering.
   useEffect(() => {
     if (pathname.startsWith("/home")) {
       document.documentElement.style.setProperty("--sidebar-w", "0px");
@@ -36,19 +90,30 @@ export default function Navigation(_: { initialPinned: boolean }) {
     }
   }, [pathname]);
 
-  // Track current location.hash for active-state highlighting on workspace
-  // items. Items pointing at /home#audit highlight only when the user is
-  // already on /home (Navigation hides on /home, so this only matters
-  // visually mid-deep-link click animation).
+  // iPad responsive (Prompt 14): default to collapsed 52px at viewports under
+  // 1024px so the sidebar doesn't eat half the content area. User's explicit
+  // pin click still wins (writes localStorage + /api/preferences sidebar_pinned).
+  // Runs once on mount — does NOT fight subsequent togglePin updates.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setHash(window.location.hash);
-    const handle = () => setHash(window.location.hash);
-    window.addEventListener("hashchange", handle);
-    return () => window.removeEventListener("hashchange", handle);
+    if (window.innerWidth < 1024) setPinned(false);
   }, []);
 
   if (pathname.startsWith("/home")) return null;
+
+  async function togglePin() {
+    const next = !pinned;
+    setPinned(next);
+    try {
+      await fetch("/api/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sidebar_pinned: next })
+      });
+    } catch {
+      /* silent */
+    }
+  }
 
   async function onSignOut() {
     setSigningOut(true);
@@ -61,78 +126,185 @@ export default function Navigation(_: { initialPinned: boolean }) {
     }
   }
 
-  // Build nav items. onClick is router.push for non-/home callers, so
-  // workspace items deep-link to /home#<hash> and HomeClient's hashchange
-  // listener resolves to the right tab on landing.
-  const isWorkspaceActive = (target: string) =>
-    pathname === "/home" && hash === `#${target}`;
+  useEffect(() => {
+    const w = expanded ? 220 : 52;
+    document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
+    return () => {
+      document.documentElement.style.removeProperty("--sidebar-w");
+    };
+  }, [expanded]);
 
-  const sections: SidebarSection[] = [
-    {
-      label: "Workspace",
-      items: (
-        [
-          { id: "today", label: "Today", icon: "today", href: "/home" },
-          { id: "audit", label: "Run Audit", icon: "audit", href: "/home#audit", badge: { text: "New", variant: "gold" } },
-          { id: "past-audits", label: "Past Audits", icon: "past-audits", href: "/home#past-audits" },
-          { id: "pipeline", label: "Pipeline", icon: "pipeline", href: "/home#pipeline" },
-          { id: "capability", label: "Capability Statement", icon: "capability", href: "/home#capability" }
-        ] as Array<{ id: string; label: string; icon: SidebarItem["icon"]; href: string; badge?: SidebarItem["badge"] }>
-      ).map<SidebarItem>((it) => ({
-        id: it.id,
-        label: it.label,
-        icon: it.icon,
-        onClick: () => router.push(it.href),
-        isActive: isWorkspaceActive(it.id),
-        badge: it.badge ?? null
-      }))
-    },
-    {
-      label: "Intelligence",
-      items: (
-        [
-          { id: "opportunities", label: "Opportunities", icon: "opportunities", href: "/home#opportunities", badge: { text: "Live", variant: "green" } },
-          { id: "defense-spending", label: "Defense Spending", icon: "defense-spending", href: "/home#defense-spending" },
-          { id: "news", label: "Defense News", icon: "news", href: "/home#news" },
-          { id: "contracting-officers", label: "Contracting Officers", icon: "contracting-officers", href: "/home#contracting-officers" },
-          { id: "agencies", label: "Agencies", icon: "agencies", href: "/home#agencies" },
-          { id: "protests", label: "GAO Protests", icon: "protests", href: "/home#protests" },
-          { id: "regulatory", label: "FAR/DFARS Updates", icon: "regulatory", href: "/home#regulatory" },
-          { id: "cmmc", label: "CMMC Readiness", icon: "cmmc", href: "/home#cmmc" },
-          { id: "wages", label: "Wage Benchmarks", icon: "wages", href: "/home#wages" },
-          { id: "teaming", label: "Teaming Partners", icon: "teaming", href: "/home#teaming" }
-        ] as Array<{ id: string; label: string; icon: SidebarItem["icon"]; href: string; badge?: SidebarItem["badge"] }>
-      ).map<SidebarItem>((it) => ({
-        id: it.id,
-        label: it.label,
-        icon: it.icon,
-        onClick: () => router.push(it.href),
-        isActive: isWorkspaceActive(it.id),
-        badge: it.badge ?? null
-      }))
-    },
-    {
-      label: "Account",
-      items: [
-        {
-          id: "settings",
-          label: "Profile & Settings",
-          icon: "settings",
-          onClick: () => router.push("/settings"),
-          isActive: pathname === "/settings",
-          badge: null
-        },
-        {
-          id: "signout",
-          label: signingOut ? "Signing out…" : "Sign out",
-          icon: "signout",
-          onClick: () => { if (!signingOut) void onSignOut(); },
-          isActive: false,
-          badge: null
-        }
-      ]
-    }
-  ];
+  // An item is active when pathname matches its href, ignoring the hash. Items
+  // pointing at /home#... can never be active (Navigation hides on /home), so
+  // only /settings and any other non-/home routes ever highlight.
+  function isItemActive(href: string): boolean {
+    const path = href.split("#")[0];
+    return pathname === path || pathname.startsWith(path + "/");
+  }
 
-  return <AppSidebar sections={sections} mode="fixed" showWordmark={true} showUpgradeCTA={true} />;
+  function renderItem(it: NavItem) {
+    const active = isItemActive(it.href);
+    return (
+      <li key={it.href}>
+        {expanded ? (
+          <Link
+            href={it.href}
+            className={`flex items-center gap-3 px-3 py-2 text-[13px] hover:bg-surface-2 ${
+              active ? "text-text border-l-2 border-accent bg-surface-2" : "text-text-2"
+            }`}
+          >
+            <it.icon size={16} />
+            <span className="flex-1 truncate">{it.label}</span>
+          </Link>
+        ) : (
+          <TooltipP.Root>
+            <TooltipP.Trigger asChild>
+              <Link
+                href={it.href}
+                className={`flex items-center justify-center w-full py-2 hover:bg-surface-2 ${
+                  active ? "text-text border-l-2 border-accent bg-surface-2" : "text-text-2"
+                }`}
+                aria-label={it.label}
+              >
+                <it.icon size={16} />
+              </Link>
+            </TooltipP.Trigger>
+            <TooltipP.Portal>
+              <TooltipP.Content
+                side="right"
+                sideOffset={6}
+                className="bg-surface-2 border border-border-2 px-3 py-2 text-xs z-50"
+                style={{ borderRadius: 4 }}
+              >
+                <p className="text-text font-medium">{it.label}</p>
+                <p className="text-text-3 text-[11px] mt-0.5">{it.description}</p>
+              </TooltipP.Content>
+            </TooltipP.Portal>
+          </TooltipP.Root>
+        )}
+      </li>
+    );
+  }
+
+  return (
+    <TooltipP.Provider delayDuration={0} skipDelayDuration={0}>
+      <aside
+        ref={ref}
+        data-faraudit-sidebar
+        onMouseEnter={() => !pinned && setHovering(true)}
+        onMouseLeave={() => !pinned && setHovering(false)}
+        className="hidden md:flex fixed top-0 bottom-0 left-0 z-30 flex-col border-r border-border bg-surface transition-[width] duration-150 overflow-hidden"
+        style={{ width: expanded ? 220 : 52 }}
+      >
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border h-[52px]">
+          {expanded ? (
+            <>
+              <Link href="/home" className="font-bold tracking-wide text-sm" style={{ color: "#C9A84C", letterSpacing: "0.02em" }}>FARaudit</Link>
+              <button
+                type="button"
+                onClick={togglePin}
+                className="text-text-3 hover:text-text-2 p-1"
+                title={pinned ? "Unpin" : "Pin"}
+              >
+                {pinned ? <PinOff size={14} /> : <Pin size={14} />}
+              </button>
+            </>
+          ) : (
+            <Link href="/home" className="font-bold mx-auto" style={{ color: "#C9A84C" }} title="FARaudit">FA</Link>
+          )}
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-2">
+          {SECTIONS.map((section) => (
+            <div key={section.eyebrow} className="mb-2">
+              {expanded && (
+                <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-semibold tracking-[0.14em] uppercase text-text-3">
+                  {section.eyebrow}
+                </div>
+              )}
+              <ul>{section.items.map(renderItem)}</ul>
+            </div>
+          ))}
+          <div className="mb-2 border-t border-border pt-2">
+            {expanded && (
+              <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-semibold tracking-[0.14em] uppercase text-text-3">
+                Account
+              </div>
+            )}
+            <ul>{ACCOUNT.map(renderItem)}</ul>
+            <ul>
+              <li>
+                {expanded ? (
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    disabled={signingOut}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-[13px] text-text-2 hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    <LogOut size={16} />
+                    <span className="flex-1 truncate text-left">{signingOut ? "Signing out…" : "Sign out"}</span>
+                  </button>
+                ) : (
+                  <TooltipP.Root>
+                    <TooltipP.Trigger asChild>
+                      <button
+                        type="button"
+                        onClick={onSignOut}
+                        disabled={signingOut}
+                        className="w-full flex items-center justify-center py-2 text-text-2 hover:bg-surface-2 disabled:opacity-50"
+                        aria-label="Sign out"
+                      >
+                        <LogOut size={16} />
+                      </button>
+                    </TooltipP.Trigger>
+                    <TooltipP.Portal>
+                      <TooltipP.Content
+                        side="right"
+                        sideOffset={6}
+                        className="bg-surface-2 border border-border-2 px-3 py-2 text-xs z-50"
+                        style={{ borderRadius: 4 }}
+                      >
+                        <p className="text-text font-medium">Sign out</p>
+                        <p className="text-text-3 text-[11px] mt-0.5">Return to /sign-in</p>
+                      </TooltipP.Content>
+                    </TooltipP.Portal>
+                  </TooltipP.Root>
+                )}
+              </li>
+            </ul>
+          </div>
+        </nav>
+        {expanded && (
+          <div style={{ borderTop: "1px solid rgba(201, 168, 76, 0.1)", padding: "12px 14px" }}>
+            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 8, color: "rgba(245, 240, 232, 0.4)", letterSpacing: "0.05em", marginBottom: 4 }}>
+              Design Partner · $1,250/mo
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 10, fontWeight: 700, color: "#C9A84C", opacity: 0.65, marginBottom: 8 }}>
+              Free during T1 sprint
+            </div>
+            <Link
+              href="/pricing"
+              style={{
+                display: "block",
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "#030810",
+                background: "#C9A84C",
+                padding: "7px 12px",
+                borderRadius: 2,
+                textAlign: "center",
+                textDecoration: "none",
+                opacity: 0.85
+              }}
+            >
+              Upgrade to Standard
+            </Link>
+          </div>
+        )}
+      </aside>
+    </TooltipP.Provider>
+  );
 }
