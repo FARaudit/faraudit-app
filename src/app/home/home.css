@@ -207,12 +207,12 @@
 .bd-home .ss-n{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold2);line-height:1;margin-bottom:4px;}
 .bd-home .ss-l{font-family:var(--mono);font-size:7.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t25);}
 .bd-home .sam-table{width:100%;border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:20px;}
-.bd-home .sam-th{display:grid;grid-template-columns:80px 1fr 140px 80px 70px;gap:0 12px;padding:6px 16px;background:rgba(201,168,76,.04);border-bottom:1px solid var(--border);}
-.bd-home .sam-th span{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t25);}
-.bd-home .sam-row{display:grid;grid-template-columns:80px 1fr 140px 80px 70px;gap:0 12px;padding:10px 16px;border-bottom:1px solid rgba(201,168,76,.04);align-items:center;cursor:pointer;transition:background .12s;}
+.bd-home .sam-th{display:grid;grid-template-columns:160px 1fr 140px 80px 70px;gap:0 12px;padding:6px 16px;background:rgba(201,168,76,.04);border-bottom:1px solid var(--border);}
+.bd-home .sam-th span{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t25);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-home .sam-row{display:grid;grid-template-columns:160px 1fr 140px 80px 70px;gap:0 12px;padding:10px 16px;border-bottom:1px solid rgba(201,168,76,.04);align-items:center;cursor:pointer;transition:background .12s;}
 .bd-home .sam-row:hover{background:rgba(201,168,76,.04);}
 .bd-home .sam-row:last-child{border-bottom:none;}
-.bd-home .sr-num{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.06em;}
+.bd-home .sr-num{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.06em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bd-home .sr-title{font-size:11px;font-weight:600;color:var(--t80);font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bd-home .sr-agency{font-family:var(--mono);font-size:8px;color:var(--t40);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bd-home .sr-date{font-family:var(--mono);font-size:9px;color:var(--t60);}

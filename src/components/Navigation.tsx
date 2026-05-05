@@ -199,7 +199,7 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
         <div className="flex items-center justify-between px-3 py-3 border-b border-border h-[52px]">
           {expanded ? (
             <>
-              <Link href="/home" className="text-text font-medium tracking-wide text-sm">FARaudit</Link>
+              <Link href="/home" className="font-bold tracking-wide text-sm" style={{ color: "#C9A84C", letterSpacing: "0.02em" }}>FARaudit</Link>
               <button
                 type="button"
                 onClick={togglePin}
@@ -210,7 +210,7 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
               </button>
             </>
           ) : (
-            <Link href="/home" className="text-accent font-bold mx-auto" title="FARaudit">FA</Link>
+            <Link href="/home" className="font-bold mx-auto" style={{ color: "#C9A84C" }} title="FARaudit">FA</Link>
           )}
         </div>
 
@@ -274,6 +274,36 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
             </ul>
           </div>
         </nav>
+        {expanded && (
+          <div style={{ borderTop: "1px solid rgba(201, 168, 76, 0.1)", padding: "12px 14px" }}>
+            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 8, color: "rgba(245, 240, 232, 0.4)", letterSpacing: "0.05em", marginBottom: 4 }}>
+              Design Partner · $1,250/mo
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 10, fontWeight: 700, color: "#C9A84C", opacity: 0.65, marginBottom: 8 }}>
+              Free during T1 sprint
+            </div>
+            <Link
+              href="/pricing"
+              style={{
+                display: "block",
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "#030810",
+                background: "#C9A84C",
+                padding: "7px 12px",
+                borderRadius: 2,
+                textAlign: "center",
+                textDecoration: "none",
+                opacity: 0.85
+              }}
+            >
+              Upgrade to Standard
+            </Link>
+          </div>
+        )}
       </aside>
     </TooltipP.Provider>
   );

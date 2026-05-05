@@ -52,10 +52,12 @@ const TAB_KEYS: TabKey[] = [
 ];
 
 export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
+  const router = useRouter();
   const [tab, setTabState] = useState<TabKey>("home");
   const [filter, setFilter] = useState<FilterKey>("All");
   const [naics, setNaics] = useState<string>("all");
   const [feedTs, setFeedTs] = useState<string>("just now");
+  const [auditPrefill, setAuditPrefill] = useState<{ notice_id: string; title: string | null; agency: string | null; naics_code: string | null } | null>(null);
 
   const setTab = (next: TabKey) => {
     setTabState(next);
@@ -294,7 +296,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
           </button>
 
           <div className="nav-label">Account</div>
-          <button className="nav-item" onClick={() => alert("Profile & Settings — V2 lives here. Email: " + user.email)}>
+          <button className="nav-item" onClick={() => router.push("/settings")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
               <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -475,7 +477,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
             {/* AUDIT */}
             <div className={`tab-panel ${tab === "audit" ? "active" : ""}`}>
-              <RunAuditPanel />
+              <RunAuditPanel prefill={auditPrefill} />
             </div>
 
             {/* SAM */}
@@ -513,7 +515,15 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : "var(--gold)";
                       const bg = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
                       return (
-                        <div key={r.row.id} className="sam-row" onClick={() => setTab("audit")}>
+                        <div key={r.row.id} className="sam-row" onClick={() => {
+                          setAuditPrefill({
+                            notice_id: r.row.notice_id,
+                            title: r.row.title ?? null,
+                            agency: r.row.agency ?? null,
+                            naics_code: r.row.naics_code ?? null
+                          });
+                          setTab("audit");
+                        }}>
                           <span className="sr-num">{r.row.notice_id}</span>
                           <span className="sr-title" title={r.row.title || ""}>{r.row.title || "—"}</span>
                           <span className="sr-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
@@ -545,8 +555,10 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   <PipelineKanban audits={recentAudits} />
                 </div>
                 <div className="intel-section">
-                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Synthetic +30d window from posted date · sam-ingest will populate response_deadline once column wired</div></div>
-                  <DeadlineCalendar rows={enriched.map((e) => e.row)} onPick={() => setTab("audit")} />
+                  <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Coming soon</div></div>
+                  <div className="empty-block" style={{ padding: "24px 16px", textAlign: "center" }}>
+                    Deadline calendar — coming with sam-ingest deadline parsing.
+                  </div>
                 </div>
               </div>
             </div>
@@ -707,13 +719,24 @@ function riskFromScore(score: number | null): { cls: "rk0" | "rk1" | "rkw"; labe
   return { cls: "rkw", label: "P2" };
 }
 
-function RunAuditPanel() {
+interface RunAuditPrefill {
+  notice_id: string;
+  title: string | null;
+  agency: string | null;
+  naics_code: string | null;
+}
+
+function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
   const router = useRouter();
   const [noticeId, setNoticeId] = useState("");
   const [pdf, setPdf] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
+
+  useEffect(() => {
+    if (prefill?.notice_id) setNoticeId(prefill.notice_id);
+  }, [prefill?.notice_id]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -750,6 +773,31 @@ function RunAuditPanel() {
         </div>
         <div className="audit-hero-title">Run a New Audit</div>
         <div className="audit-hero-sub">Upload any federal solicitation PDF. FARaudit runs three sequential intelligence calls — Overview · FAR/DFARS Compliance · Risk Extraction — and delivers a ranked report with a KO clarification email drafted and ready to send.</div>
+        {prefill?.notice_id && (
+          <div style={{
+            background: "rgba(201,168,76,0.06)",
+            border: "1px solid rgba(201,168,76,0.25)",
+            borderRadius: 3,
+            padding: "10px 14px",
+            marginBottom: 14,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4
+          }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)" }}>
+              ▸ Prefilled from Opportunities
+            </div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, color: "var(--gold)", opacity: 0.85, letterSpacing: ".04em" }}>
+              {prefill.notice_id}
+            </div>
+            {prefill.title && (
+              <div style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{prefill.title}</div>
+            )}
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)" }}>
+              {prefill.agency || "—"}{prefill.naics_code ? ` · NAICS ${prefill.naics_code}` : ""}
+            </div>
+          </div>
+        )}
         <label className="audit-drop-zone" style={{ display: "block" }}>
           <div className="adz-title">Drop your solicitation PDF here</div>
           <div className="adz-sub">{pdf ? pdf.name : "Or click to browse · Any page count · Any agency · Any format"}</div>
@@ -1248,8 +1296,25 @@ function stageOf(a: AuditRow): KanbanStage {
 
 function PipelineKanban({ audits }: { audits: AuditRow[] }) {
   const [grouped, setGrouped] = useState<Record<KanbanStage, AuditRow[]>>(() => {
+    // BUG 6: filter out failed audits (status='failed' or no compliance score).
+    // BUG 7: dedupe by notice_id, keeping the most-recent successful audit per
+    //        notice_id. Failed audits are already removed so a re-audit only
+    //        survives if it succeeded.
+    const successful = audits.filter(
+      (a) => a.status !== "failed" && a.compliance_score != null
+    );
+    const sortedDesc = [...successful].sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
+    const dedupedByNotice = new Map<string, AuditRow>();
+    for (const a of sortedDesc) {
+      const key = a.notice_id ?? `_id_${a.id}`; // null notice_id → keep all by id
+      if (!dedupedByNotice.has(key)) dedupedByNotice.set(key, a);
+    }
     const buckets: Record<KanbanStage, AuditRow[]> = { tracking: [], bidding: [], submitted: [], awarded: [], lost: [] };
-    for (const a of audits) buckets[stageOf(a)].push(a);
+    for (const a of dedupedByNotice.values()) buckets[stageOf(a)].push(a);
     return buckets;
   });
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -1915,6 +1980,8 @@ interface CapStatement {
     naics_code?: string | null;
     contract_value?: string | number | null;
     period?: string | null;
+    cpars_rating?: number | null;
+    customer_relationship?: string | null;
   }>;
   updated_at?: string | null;
   stub?: boolean;
@@ -2098,10 +2165,20 @@ function CapabilityPanel() {
               <div key={i} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderLeft: "3px solid var(--gold)", borderRadius: 2, padding: "10px 14px", marginBottom: 8 }}>
                 <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{p.title || p.notice_id || "—"}</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", marginTop: 4 }}>
-                  {p.agency || "—"}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
-                  {p.contract_value ? ` · ${p.contract_value}` : ""}
+                  {p.notice_id || "—"}
+                  {p.agency ? ` · ${p.agency}` : ""}
+                  {p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
                   {p.period ? ` · ${p.period}` : ""}
                 </div>
+                {(p.contract_value || p.cpars_rating != null || p.customer_relationship) && (
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", opacity: 0.85, marginTop: 6, display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    {p.contract_value && (
+                      <span>Contract value: {typeof p.contract_value === "number" ? `$${p.contract_value.toLocaleString()}` : p.contract_value}</span>
+                    )}
+                    {p.cpars_rating != null && <span>CPARS: {p.cpars_rating}</span>}
+                    {p.customer_relationship && <span>Relationship: {p.customer_relationship}</span>}
+                  </div>
+                )}
               </div>
             ))
           )}
