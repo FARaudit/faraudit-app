@@ -14,17 +14,34 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme, type Theme } from "@/lib/theme";
 import { createBrowserClient } from "@/lib/supabase-browser";
+import "./settings.css";
 
-const BG = "#050D1A";
-const SURFACE = "#091322";
-const SURFACE_2 = "#0D1C30";
-const BORDER = "#122240";
-const BORDER_2 = "#1a3560";
-const TEXT_1 = "#EDF4FF";
-const TEXT_2 = "#5B8AB8";
-const TEXT_3 = "#2D5280";
-const ACCENT = "#378ADD";
+// Palette matched to /home (.bd-home in src/app/home/home.css). The
+// previous values were the cool-blue Tailwind theme tokens; switched
+// to the warm cream-on-dark-navy + gold-accent identity /home uses
+// everywhere. Mapping:
+//   BG       --void  #030810      (was #050D1A · cool blue)
+//   SURFACE  --void2 #060F1C      (was #091322)
+//   SURFACE_2 --void3 #0A1628     (was #0D1C30)
+//   BORDER   rgba(201,168,76,.10) (was #122240 · cool)
+//   BORDER_2 rgba(201,168,76,.20) (was #1a3560)
+//   TEXT_1   --text  #F5F0E8      (was #EDF4FF · cool white)
+//   TEXT_2   --t60   60% cream    (was #5B8AB8)
+//   TEXT_3   --t40   40% cream    (was #2D5280)
+//   ACCENT   --gold  #C9A84C      (was #378ADD · cool blue)
+//   GOLD     unchanged (already gold)
+const BG = "#030810";
+const SURFACE = "#060F1C";
+const SURFACE_2 = "#0A1628";
+const BORDER = "rgba(201, 168, 76, 0.10)";
+const BORDER_2 = "rgba(201, 168, 76, 0.20)";
+const TEXT_1 = "#F5F0E8";
+const TEXT_2 = "rgba(245, 240, 232, 0.60)";
+const TEXT_3 = "rgba(245, 240, 232, 0.40)";
+const ACCENT = "#C9A84C";
 const GOLD = "#C9A84C";
+
+const SERIF = "Fraunces, Georgia, serif";
 
 type Profile = {
   email: string | null;
@@ -147,7 +164,7 @@ export default function SettingsPage() {
         </Link>
 
         {/* Header */}
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: TEXT_1, margin: "0 0 6px", letterSpacing: "-0.01em" }}>
+        <h1 style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 900, color: TEXT_1, margin: "0 0 6px", letterSpacing: "-0.02em" }}>
           Profile &amp; Settings
         </h1>
         <p style={{ fontSize: 13, color: TEXT_2, lineHeight: 1.6, marginBottom: 32 }}>
@@ -239,7 +256,7 @@ export default function SettingsPage() {
           <div style={{ fontFamily: "JetBrains Mono, ui-monospace, monospace", fontSize: 10, color: TEXT_3, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 8 }}>
             Preferences
           </div>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: TEXT_1, margin: "0 0 6px" }}>Theme</h2>
+          <h2 style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 700, color: TEXT_1, margin: "0 0 6px", letterSpacing: "-0.01em" }}>Theme</h2>
           <p style={{ fontSize: 12.5, color: TEXT_2, lineHeight: 1.55, margin: "0 0 16px" }}>
             Choose how FARaudit looks. <strong style={{ color: TEXT_1 }}>Auto</strong> follows your OS preference.
           </p>
@@ -268,14 +285,15 @@ export default function SettingsPage() {
                   style={{
                     padding: "9px 18px",
                     fontSize: 13,
-                    fontWeight: 600,
                     border: "none",
                     borderRight: idx < arr.length - 1 ? `1px solid ${BORDER_2}` : "none",
                     background: active ? ACCENT : "transparent",
-                    color: active ? "#FFFFFF" : TEXT_2,
+                    color: active ? BG : TEXT_2,
+                    fontWeight: active ? 700 : 600,
                     cursor: "pointer",
-                    fontFamily: "Inter, system-ui, sans-serif",
-                    textTransform: "capitalize",
+                    fontFamily: "JetBrains Mono, ui-monospace, monospace",
+                    letterSpacing: active ? "0.06em" : "0.04em",
+                    textTransform: "uppercase",
                     transition: "background 0.12s, color 0.12s"
                   }}
                 >
