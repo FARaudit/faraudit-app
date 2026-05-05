@@ -155,3 +155,27 @@ body {
 ::-webkit-scrollbar-track { background: var(--fa-bg); }
 ::-webkit-scrollbar-thumb { background: var(--fa-border-2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--fa-text-3); }
+
+/* ─── Sidebar tint harmonization · matches /home .bd-home .sidebar palette ───
+ * Navigation.tsx aside ships with cool-blue Tailwind tokens (bg-surface,
+ * text-text-*, border-border) which clash with the warm cream-on-dark-navy
+ * palette of the /home app shell. This scopes warm overrides ONLY to the
+ * sidebar via [data-faraudit-sidebar] so the rest of the app (which was
+ * designed against the cool palette) is unaffected. Mirrors the values
+ * baked into src/app/home/home.css :root variables. */
+[data-faraudit-sidebar] {
+  background: #060F1C !important;             /* matches --void2 from home.css */
+  color: #F5F0E8;                              /* matches --text from home.css */
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  border-right-color: rgba(201, 168, 76, 0.1) !important;
+}
+[data-faraudit-sidebar] .border-border   { border-color: rgba(201, 168, 76, 0.1); }
+[data-faraudit-sidebar] .border-border-2 { border-color: rgba(201, 168, 76, 0.2); }
+[data-faraudit-sidebar] .text-text       { color: #F5F0E8; }
+[data-faraudit-sidebar] .text-text-2     { color: rgba(245, 240, 232, 0.6); }
+[data-faraudit-sidebar] .text-text-3     { color: rgba(245, 240, 232, 0.4); }
+[data-faraudit-sidebar] .text-accent     { color: #C9A84C; }
+[data-faraudit-sidebar] .border-accent   { border-color: #C9A84C; }
+[data-faraudit-sidebar] .bg-surface-2    { background-color: rgba(201, 168, 76, 0.06); }
+[data-faraudit-sidebar] .hover\:bg-surface-2:hover { background-color: rgba(201, 168, 76, 0.06); }
+[data-faraudit-sidebar] .hover\:text-text-2:hover  { color: rgba(245, 240, 232, 0.6); }

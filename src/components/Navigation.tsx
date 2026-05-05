@@ -190,6 +190,7 @@ export default function Navigation({ initialPinned }: { initialPinned: boolean }
     <TooltipP.Provider delayDuration={0} skipDelayDuration={0}>
       <aside
         ref={ref}
+        data-faraudit-sidebar
         onMouseEnter={() => !pinned && setHovering(true)}
         onMouseLeave={() => !pinned && setHovering(false)}
         className="hidden md:flex fixed top-0 bottom-0 left-0 z-30 flex-col border-r border-border bg-surface transition-[width] duration-150 overflow-hidden"
