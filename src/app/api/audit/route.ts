@@ -253,6 +253,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[audit POST] failed", { auditId: audit.id, message });
     await supabase
       .from("audits")
       .update({ status: "failed", error_message: message })
