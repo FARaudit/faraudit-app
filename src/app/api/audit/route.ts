@@ -10,7 +10,13 @@ import {
 } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 
+// Force Node.js runtime explicitly · Edge caps maxDuration well below
+// the 300s the 3-call audit pipeline can need on a 20+ page IDIQ, and
+// lacks the Buffer / pdf-parse APIs the audit engine relies on.
+// force-dynamic ensures every audit POST gets a fresh invocation.
 export const maxDuration = 300;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // PDF magic bytes — first four bytes of every PDF are %PDF (0x25 0x50 0x44 0x46).
 const PDF_MAGIC = Buffer.from("%PDF", "ascii");
