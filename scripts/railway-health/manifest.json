@@ -1,0 +1,44 @@
+{
+  "Audit-AI": {
+    "rootDirectory": "agents/audit-ai",
+    "cronSchedule": "30 11 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 06:30 CDT = 11:30 UTC · processes pending_audits queue with Sonnet 4.6"
+  },
+  "Email-AI": {
+    "rootDirectory": "agents/email-ai",
+    "cronSchedule": "*/30 * * * *",
+    "max_minutes_since_last_success": 60,
+    "_notes": "Every 30 min · Gmail organize"
+  },
+  "QA-AI": {
+    "rootDirectory": "agents/qa-ai",
+    "cronSchedule": "*/30 * * * *",
+    "max_minutes_since_last_success": 60,
+    "_notes": "Every 30 min · route health probes"
+  },
+  "Recompete-AI": {
+    "rootDirectory": "agents/recompete-ai",
+    "cronSchedule": "0 12 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 07:00 CDT = 12:00 UTC · upcoming-recompete digest"
+  },
+  "Regulatory-AI": {
+    "rootDirectory": "agents/regulatory-ai",
+    "cronSchedule": "0 13 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 08:00 CDT = 13:00 UTC · FAR/DFARS digest"
+  },
+  "Sam-Ingest": {
+    "rootDirectory": "agents/sam-ingest",
+    "cronSchedule": "0 11 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Daily 06:00 CDT = 11:00 UTC · pending_audits queue feed"
+  },
+  "apex-intel-pipeline": {
+    "rootDirectory": null,
+    "cronSchedule": "15 12 * * *",
+    "max_minutes_since_last_success": 1500,
+    "_notes": "Cross-platform intelligence cron · root-level service"
+  }
+}
