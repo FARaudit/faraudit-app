@@ -16,14 +16,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Accept auditId in any of: { auditId } | { audit_id } | { id }; numeric or string.
+  // Accept auditId in any of: { auditId } | { audit_id } | { id }.
+  // audits.id is uuid (post-migration 001); the legacy numeric-only
+  // validator was rejecting valid UUIDs with /^\d+$/.test() returning
+  // false. Coerce to non-empty string and let the DB lookup reject
+  // malformed inputs with a clearer error than a regex mismatch.
   const body = await req.json().catch(() => ({}));
   const raw = body.auditId ?? body.audit_id ?? body.id;
   const auditId =
-    typeof raw === "number" && Number.isFinite(raw)
-      ? raw
-      : typeof raw === "string" && raw.trim() && /^\d+$/.test(raw.trim())
-      ? Number(raw.trim())
+    typeof raw === "string" && raw.trim()
+      ? raw.trim()
+      : typeof raw === "number" && Number.isFinite(raw)
+      ? String(raw)
       : null;
 
   if (!auditId) {

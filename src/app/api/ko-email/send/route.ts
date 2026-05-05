@@ -31,10 +31,10 @@ export async function POST(req: NextRequest) {
   const body: SendBody = await req.json().catch(() => ({}));
   const raw = body.auditId;
   const auditId =
-    typeof raw === "number" && Number.isFinite(raw)
-      ? raw
-      : typeof raw === "string" && /^\d+$/.test(raw.trim())
-      ? Number(raw.trim())
+    typeof raw === "string" && raw.trim()
+      ? raw.trim()
+      : typeof raw === "number" && Number.isFinite(raw)
+      ? String(raw)
       : null;
 
   if (!auditId) return NextResponse.json({ error: "auditId required" }, { status: 400 });
