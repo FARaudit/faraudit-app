@@ -1,0 +1,7 @@
+/* /settings palette match · imports Fraunces from Google Fonts so the
+   page's headings render with the same serif /home uses. JetBrains
+   Mono and Inter are already loaded globally via globals.css; only
+   Fraunces was missing on this route (home.css's @import is route-
+   scoped to /home and never loaded elsewhere).
+*/
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&display=swap');
