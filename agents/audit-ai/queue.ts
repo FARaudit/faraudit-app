@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -8,7 +9,15 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 export const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
+  auth: { persistSession: false, autoRefreshToken: false },
+  realtime: {
+    // Node 18 lacks native WebSocket. realtime-js's getWebSocketConstructor
+    // throws at module-load when no transport is supplied. The agent never
+    // uses realtime channels (table CRUD only) but the SupabaseClient
+    // constructor instantiates RealtimeClient unconditionally, so we hand
+    // it the `ws` package to satisfy the constructor lookup.
+    transport: WebSocket as unknown as typeof globalThis.WebSocket
+  }
 });
 
 export interface PendingAudit {
