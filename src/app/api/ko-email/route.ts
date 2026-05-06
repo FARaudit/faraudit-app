@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { displaySolicitationId } from "@/lib/audit-display";
 
 export const maxDuration = 60;
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { data: audit } = await supabase
     .from("audits")
-    .select("notice_id, title, agency, compliance_json, risks_json, recommendation, bid_recommendation")
+    .select("notice_id, solicitation_number, title, agency, compliance_json, risks_json, recommendation, bid_recommendation")
     .eq("id", auditId)
     .single();
 
@@ -59,11 +60,13 @@ export async function POST(req: NextRequest) {
     .join("\n") ||
     "1. [Question 1 — pulled from highest-priority risk identified]\n2. [Question 2]\n3. [Question 3]";
 
-  const draft = `Subject: Clarification request — ${audit.notice_id}${audit.title ? " · " + audit.title : ""}
+  const displayId = displaySolicitationId(audit);
+
+  const draft = `Subject: Clarification request — ${displayId}${audit.title ? " · " + audit.title : ""}
 
 Dear Contracting Officer,
 
-I am writing on behalf of [COMPANY NAME] regarding solicitation ${audit.notice_id}${audit.agency ? " issued by " + audit.agency : ""}. After a thorough review of the requirement we would appreciate clarification on the following items before proceeding with our proposal:
+I am writing on behalf of [COMPANY NAME] regarding solicitation ${displayId}${audit.agency ? " issued by " + audit.agency : ""}. After a thorough review of the requirement we would appreciate clarification on the following items before proceeding with our proposal:
 
 ${topThree}
 

@@ -9,6 +9,7 @@ import type {
   KORow,
   AgencyRow
 } from "@/lib/bd-os/queries";
+import { displaySolicitationId } from "@/lib/audit-display";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
@@ -130,6 +131,15 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
     const exp = enriched.filter((r) => r.daysNum != null && r.daysNum <= 7).length;
     return { total, p0, exp };
   }, [enriched]);
+
+  // Audit-derived P0 count for the situation card header. Different data
+  // source than stats.p0 (which counts queue opportunities); the cards
+  // below render badges from recentAudits, so the counter must read the
+  // same source to stay consistent.
+  const auditP0Count = useMemo(
+    () => recentAudits.filter((a) => a.compliance_score != null && a.compliance_score < 40).length,
+    [recentAudits]
+  );
 
   const initials = (user.email[0] || "?").toUpperCase() + (user.email.split("@")[0]?.[1] || "").toUpperCase();
   const handle = (user.email.split("@")[0] || "").slice(0, 18);
@@ -345,10 +355,12 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <div className="situation-board">
                 <button className="sit-card urgent" onClick={() => setFilter("P0 · P1")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--red)", marginBottom: 8 }}>⚠ Critical — Act Today</div>
-                  {stats.p0 === 0 ? (
-                    <div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--green)", lineHeight: 1.4, padding: "8px 0" }}>0 traps detected · feed is clean</div>
+                  {auditP0Count === 0 && recentAudits.length === 0 ? (
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--gold)", lineHeight: 1.4, padding: "8px 0" }}>Run your first audit to see traps.</div>
+                  ) : auditP0Count === 0 ? (
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--green)", lineHeight: 1.4, padding: "8px 0" }}>0 high-severity traps in your recent audits.</div>
                   ) : (
-                    <div className="sit-value red">{stats.p0}</div>
+                    <div className="sit-value red">{auditP0Count}</div>
                   )}
                   <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--red)", marginTop: 10, borderTop: "1px solid rgba(220,38,38,.15)", paddingTop: 8 }}>Review P0 Flags →</div>
@@ -447,7 +459,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                             <div className="ai-title">{a.title || a.notice_id || "Untitled audit"}</div>
                             <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{r.label}</span>
                           </div>
-                          <div className="ai-meta">{a.notice_id || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                          <div className="ai-meta">{displaySolicitationId(a) || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                           <div className="ai-btns">
                             <span className="ai-btn pri">View Report</span>
                             <span className="ai-btn">PDF</span>

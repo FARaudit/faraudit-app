@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import React from "react";
+import { displaySolicitationId } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -76,6 +77,11 @@ interface AuditDocProps {
 
 function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
   const noticeId = (audit.notice_id as string) || "—";
+  const displayId = displaySolicitationId({
+    solicitation_number: audit.solicitation_number as string | null | undefined,
+    notice_id: audit.notice_id as string | null | undefined,
+    title: audit.title as string | null | undefined
+  });
   const title = (audit.title as string) || "Untitled solicitation";
   const agency = (audit.agency as string) || "—";
   const naics = (audit.naics_code as string) || "";
@@ -105,11 +111,11 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
           </View>
           <View style={styles.meta}>
             <Text>{generatedAt}</Text>
-            <Text>{noticeId}</Text>
+            <Text>{displayId}</Text>
           </View>
         </View>
 
-        <Text style={styles.noticeId}>{noticeId} · {docType}</Text>
+        <Text style={styles.noticeId}>{displayId} · {docType}</Text>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.agency}>
           {agency}{naics ? ` · NAICS ${naics}` : ""}{setAside ? ` · ${setAside}` : ""}
@@ -131,19 +137,27 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
         <Text style={styles.body}>{summary || "No overview summary."}</Text>
 
         <Text style={styles.sectionEyebrow}>SECTION 3 · COMPLIANCE</Text>
-        <Text style={styles.sectionTitle}>FAR ({farClauses.length}) · DFARS ({dfarsClauses.length})</Text>
-        {farClauses.slice(0, 30).map((c, i) => (
-          <View key={`far-${i}`} style={styles.clauseRow}>
-            <Text style={styles.clauseText}>{c}</Text>
-            <Text style={styles.clauseTag}>FAR</Text>
-          </View>
-        ))}
-        {dfarsClauses.slice(0, 30).map((c, i) => (
-          <View key={`dfars-${i}`} style={styles.clauseRow}>
-            <Text style={styles.clauseText}>{c}</Text>
-            <Text style={styles.clauseTag}>DFARS</Text>
-          </View>
-        ))}
+        {farClauses.length === 0 && dfarsClauses.length === 0 ? (
+          <Text style={styles.body}>
+            Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
+          </Text>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>FAR ({farClauses.length}) · DFARS ({dfarsClauses.length})</Text>
+            {farClauses.slice(0, 30).map((c, i) => (
+              <View key={`far-${i}`} style={styles.clauseRow}>
+                <Text style={styles.clauseText}>{c}</Text>
+                <Text style={styles.clauseTag}>FAR</Text>
+              </View>
+            ))}
+            {dfarsClauses.slice(0, 30).map((c, i) => (
+              <View key={`dfars-${i}`} style={styles.clauseRow}>
+                <Text style={styles.clauseText}>{c}</Text>
+                <Text style={styles.clauseTag}>DFARS</Text>
+              </View>
+            ))}
+          </>
+        )}
 
         <Text style={styles.sectionEyebrow}>SECTION 4 · RISKS</Text>
         <Text style={styles.sectionTitle}>P0 · P1 · P2 register ({risks.length})</Text>
@@ -179,7 +193,7 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
         <Text
           style={styles.pageNum}
           fixed
-          render={({ pageNumber, totalPages }) => `${noticeId} · Page ${pageNumber} of ${totalPages}`}
+          render={({ pageNumber, totalPages }) => `${displayId} · Page ${pageNumber} of ${totalPages}`}
         />
       </Page>
     </Document>
@@ -207,8 +221,13 @@ export async function GET(
   const ab = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(ab).set(buffer);
 
-  const noticeId = String((audit as Record<string, unknown>).notice_id ?? "audit").replace(/[^A-Za-z0-9_-]+/g, "_");
-  const filename = `FARaudit-${noticeId}-${generatedAt}.pdf`;
+  const filenameSafeId =
+    (displaySolicitationId({
+      solicitation_number: (audit as Record<string, unknown>).solicitation_number as string | null | undefined,
+      notice_id: (audit as Record<string, unknown>).notice_id as string | null | undefined,
+      title: (audit as Record<string, unknown>).title as string | null | undefined
+    }).replace(/[^A-Za-z0-9_-]+/g, "_")) || "audit";
+  const filename = `FARaudit-${filenameSafeId}-${generatedAt}.pdf`;
 
   return new Response(ab, {
     status: 200,

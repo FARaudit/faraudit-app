@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { displaySolicitationId } from "@/lib/audit-display";
 
 interface PrioritizedRisk {
   text: string;
@@ -78,6 +79,11 @@ function deriveRisks(risks: Record<string, unknown>): PrioritizedRisk[] {
 export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
   const id = String(audit.id ?? "");
   const noticeId = (audit.notice_id as string) || "—";
+  const displayId = displaySolicitationId({
+    solicitation_number: audit.solicitation_number as string | null | undefined,
+    notice_id: audit.notice_id as string | null | undefined,
+    title: audit.title as string | null | undefined
+  });
   const title = (audit.title as string) || "Untitled solicitation";
   const agency = (audit.agency as string) || "—";
   const naics = (audit.naics_code as string) || "";
@@ -116,7 +122,7 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
         <header className="report-header">
           <a className="report-back" href="/home">← Intelligence Home</a>
           <div className="report-title">
-            <div className="report-title-id">{noticeId}</div>
+            <div className="report-title-id">{displayId}</div>
             <div className="report-title-agency">
               {agency}{naics ? ` · NAICS ${naics}` : ""}{setAside ? ` · ${setAside}` : ""}
             </div>
@@ -216,6 +222,12 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
               <section className="report-section">
                 <div className="report-section-eyebrow">Section 3 · Compliance</div>
                 <h2 className="report-section-title">FAR / DFARS</h2>
+                {farClauses.length === 0 && dfarsClauses.length === 0 ? (
+                  <p className="empty-block" style={{ marginTop: 12, lineHeight: 1.55 }}>
+                    Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
+                  </p>
+                ) : (
+                  <>
                 <div className="compliance-summary">
                   <span className="compliance-pill far">{farClauses.length} FAR</span>
                   <span className="compliance-pill dfars">{dfarsClauses.length} DFARS</span>
@@ -274,6 +286,8 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                       })}
                     </div>
                   </div>
+                )}
+                  </>
                 )}
               </section>
 
