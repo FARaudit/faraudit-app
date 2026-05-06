@@ -286,13 +286,18 @@ async function run() {
   }
 
   // ── Persist log + advance watermark + accumulate today's set ─────
+  // Audit log writes unconditionally (was_dry_run column distinguishes), but
+  // watermark + processed_today advance only on LIVE runs. Dry-runs must be
+  // safely repeatable against the same inbox window.
   await logProcessed(logRows);
-  const processedIds = toProcess.map((t) => t.id);
-  await appendProcessedToday(processedIds);
-  if (latestInternalDate > 0) {
-    await updateWatermark(new Date(latestInternalDate * 1000));
-  } else if (toProcess.length > 0) {
-    await updateWatermark(new Date());
+  if (!DRY_RUN) {
+    const processedIds = toProcess.map((t) => t.id);
+    await appendProcessedToday(processedIds);
+    if (latestInternalDate > 0) {
+      await updateWatermark(new Date(latestInternalDate * 1000));
+    } else if (toProcess.length > 0) {
+      await updateWatermark(new Date());
+    }
   }
 
   // ── Daily brief (07:00 CT, idempotent via last_brief_date) ───────

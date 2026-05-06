@@ -87,11 +87,13 @@ export const rules = [
   },
 
   // ── Stripe — finance ─────────────────────────────────────────────
+  // Default tier is monitor (not archive) — receipts need eyeball for anomaly
+  // detection (unexpected charges, surprise sub renewals).
   {
     name: 'Stripe — finance',
     match: (m) => fromIs(m, 'stripe.com'),
     category: 'finance',
-    tier: (m) => (subjectHas(m, 'failed', 'declined', 'unrecognized', 'verify', 'action required') ? 'action' : 'archive'),
+    tier: (m) => (subjectHas(m, 'failed', 'declined', 'unrecognized', 'verify', 'action required') ? 'action' : 'monitor'),
   },
 
   // ── Provider billing receipts ────────────────────────────────────
@@ -135,17 +137,20 @@ export const rules = [
   },
 
   // ── Infrastructure alerts (operational, not billing) ─────────────
+  // Deploy crashes / build failures are duplicate, self-resolving system noise
+  // — they belong at monitor, not action. Only true security incidents
+  // (vulnerability / breach / exposed) escalate to action tier.
   {
     name: 'Railway — infrastructure',
     match: (m) => fromIs(m, 'notify.railway.app', 'railway.app'),
     category: 'infra',
-    tier: (m) => (subjectHas(m, 'failed', 'build failed', 'crashed', 'error') ? 'action' : 'monitor'),
+    tier: (m) => (subjectHas(m, 'security', 'vulnerability', 'breach', 'exposed') ? 'action' : 'monitor'),
   },
   {
     name: 'Vercel — infrastructure',
     match: (m) => fromIs(m, 'vercel.com'),
     category: 'infra',
-    tier: (m) => (subjectHas(m, 'failed', 'error', 'warning') ? 'action' : 'monitor'),
+    tier: (m) => (subjectHas(m, 'security', 'vulnerability', 'breach', 'exposed') ? 'action' : 'monitor'),
   },
   {
     name: 'GitHub — infrastructure',
@@ -167,7 +172,20 @@ export const rules = [
     name: 'Google Workspace — admin / forwarding',
     match: (m) => fromIs(m, 'forwarding-noreply@google.com', 'workspace-noreply@google.com', 'admin-noreply@google.com'),
     category: 'infra',
-    tier: (m) => (subjectHas(m, 'verify', 'confirm', 'action required') ? 'action' : 'archive'),
+    tier: (m) => (subjectHas(m, 'verify', 'confirm', 'action required') ? 'action' : 'monitor'),
+  },
+
+  // ── Notion — workspace digest (non-billing, non-auth) ────────────
+  // Placed AFTER the Notion billing rule so invoice/receipt emails win first.
+  // Excludes transactional auth flows (login codes, magic links) — those
+  // remain skip so the brief doesn't pile up on 2FA noise.
+  {
+    name: 'Notion — workspace digest',
+    match: (m) =>
+      fromIs(m, 'notify@updates.notion.so', '@updates.notion.so') &&
+      !subjectHas(m, 'login code', 'magic link', 'temporary', 'reset password', 'verify your email'),
+    category: 'infra',
+    tier: 'monitor',
   },
 
   // ── Vendor welcomes & API onboarding (one-shot, archive) ─────────
