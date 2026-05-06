@@ -11,6 +11,7 @@
 
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 import { sendAlert } from "./telegram.js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,7 +25,15 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
+  auth: { persistSession: false, autoRefreshToken: false },
+  realtime: {
+    // Node 18 lacks native WebSocket. realtime-js's getWebSocketConstructor
+    // throws at module-load when no transport is supplied. The agent never
+    // uses realtime channels (table CRUD only) but the SupabaseClient
+    // constructor instantiates RealtimeClient unconditionally, so we hand
+    // it the `ws` package to satisfy the constructor lookup.
+    transport: WebSocket as unknown as typeof globalThis.WebSocket
+  }
 });
 
 interface WonAudit {
@@ -37,7 +46,6 @@ interface WonAudit {
   bid_submit_date: string | null;
   outcome_date: string | null;
   overview_json: Record<string, unknown> | null;
-  pdf_url: string | null;
 }
 
 // Parse "12 months", "1 year", "Base year + 4 option years", "36 months"
@@ -73,7 +81,7 @@ async function run() {
   // 1. Pull all won audits with a submission/outcome anchor.
   const { data: won, error: wonErr } = await supabase
     .from("audits")
-    .select("id, notice_id, title, agency, naics_code, set_aside, bid_submit_date, outcome_date, overview_json, pdf_url")
+    .select("id, notice_id, title, agency, naics_code, set_aside, bid_submit_date, outcome_date, overview_json")
     .eq("outcome", "won");
   if (wonErr) {
     console.error("[recompete-ai] failed to query audits:", wonErr.message);
@@ -106,7 +114,6 @@ async function run() {
     agency: string | null;
     naics_code: string | null;
     set_aside: string | null;
-    pdf_url: string | null;
     source: "recompete";
     notice_type: "recompete";
     notes: string;
@@ -143,7 +150,6 @@ async function run() {
       agency: a.agency,
       naics_code: a.naics_code,
       set_aside: a.set_aside,
-      pdf_url: a.pdf_url,
       source: "recompete",
       notice_type: "recompete",
       notes: `Origin audit ${a.id} · estimated ${months}-month PoP · expires ${expires.toISOString().slice(0, 10)} · ${daysToExpiry}d remaining`,
