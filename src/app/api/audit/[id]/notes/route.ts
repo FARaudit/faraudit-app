@@ -38,7 +38,8 @@ export async function PATCH(
   const { error } = await supabase
     .from("audits")
     .update({ notes, notes_updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json(

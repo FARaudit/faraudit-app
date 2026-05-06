@@ -51,7 +51,7 @@ export async function PATCH(
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("audits").update(update).eq("id", id);
+  const { error } = await supabase.from("audits").update(update).eq("id", id).eq("user_id", user.id);
   if (error) {
     return NextResponse.json(
       { error: `lifecycle save failed: ${error.message}` },

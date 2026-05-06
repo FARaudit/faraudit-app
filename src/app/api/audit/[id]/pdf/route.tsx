@@ -197,7 +197,7 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: audit, error } = await supabase.from("audits").select("*").eq("id", id).single();
+  const { data: audit, error } = await supabase.from("audits").select("*").eq("id", id).eq("user_id", user.id).single();
   if (error || !audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
 
   const generatedAt = new Date().toISOString().slice(0, 10);
