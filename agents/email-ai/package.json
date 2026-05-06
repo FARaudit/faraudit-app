@@ -1,7 +1,7 @@
 {
   "name": "email-ai",
   "version": "0.1.0",
-  "description": "Gmail Email AI agent — auto-labels and organizes jose@faraudit.com inbox every 30 minutes.",
+  "description": "Gmail Email AI v2 — incremental triage, 3-tier classification, daily brief draft, unsubscribe candidate queue. gmail.modify scope only (no send).",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
     "googleapis": "^144.0.0",
     "dotenv": "^16.4.5"
   }
