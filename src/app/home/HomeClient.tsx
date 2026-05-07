@@ -2298,14 +2298,14 @@ function CapabilityPanel() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <CapField label="Company name" value={stmt.company_name || ""} onChange={(v) => update("company_name", v)} />
-          <CapField label="Contact name" value={stmt.contact_name || ""} onChange={(v) => update("contact_name", v)} />
+          <CapField label="Company name" value={stmt.company_name || ""} onChange={(v) => update("company_name", v)} placeholder="Your company name" />
+          <CapField label="Contact name" value={stmt.contact_name || ""} onChange={(v) => update("contact_name", v)} placeholder="Primary BD contact" />
           <CapField label="UEI" value={stmt.uei || ""} onChange={(v) => update("uei", v)} placeholder="12-character SAM UEI" />
-          <CapField label="CAGE code" value={stmt.cage_code || ""} onChange={(v) => update("cage_code", v)} />
-          <CapField label="Contact email" value={stmt.contact_email || ""} onChange={(v) => update("contact_email", v)} />
-          <CapField label="Contact phone" value={stmt.contact_phone || ""} onChange={(v) => update("contact_phone", v)} />
-          <CapField label="Website" value={stmt.contact_website || ""} onChange={(v) => update("contact_website", v)} />
-          <CapField label="Address" value={stmt.contact_address || ""} onChange={(v) => update("contact_address", v)} />
+          <CapField label="CAGE code" value={stmt.cage_code || ""} onChange={(v) => update("cage_code", v)} placeholder="5-character CAGE code" />
+          <CapField label="Contact email" value={stmt.contact_email || ""} onChange={(v) => update("contact_email", v)} placeholder="bd@yourcompany.com" />
+          <CapField label="Contact phone" value={stmt.contact_phone || ""} onChange={(v) => update("contact_phone", v)} placeholder="(xxx) xxx-xxxx" />
+          <CapField label="Website" value={stmt.contact_website || ""} onChange={(v) => update("contact_website", v)} placeholder="https://yourcompany.com" />
+          <CapField label="Address" value={stmt.contact_address || ""} onChange={(v) => update("contact_address", v)} placeholder="Street, City, State ZIP" />
         </div>
 
         <div style={{ marginTop: 18 }}>
