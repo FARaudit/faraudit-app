@@ -73,7 +73,8 @@ const riskCases: Case<any, string>[] = [
   { label: "P0 · CMMC level 2",                  input: { ...baseOpp, description: "Contractor must achieve CMMC Level 2 per 252.204-7021." }, expected: "P0" },
   { label: "P1 · deadline 5d (no DFARS hits)",   input: { ...baseOpp, responseDeadLine: inDays(5) },                                expected: "P1" },
   { label: "P1 · IDIQ document_type complexity", input: { ...baseOpp, type: "Solicitation (IDIQ)" },                                expected: "P1" },
-  { label: "P1 · Combined Synopsis (proxy)",     input: { ...baseOpp, type: "Combined Synopsis/Solicitation" },                     expected: "P1" },
+  { label: "P1 · BPA document_type complexity",  input: { ...baseOpp, type: "BPA Call" },                                           expected: "P1" },
+  { label: "Watch · Combined Synopsis is NOT P1 (SAM default for commercial-item small-biz RFQs)", input: { ...baseOpp, type: "Combined Synopsis/Solicitation" }, expected: "Watch" },
   { label: "P2 · sole-source intent in description", input: { ...baseOpp, description: "Government intends to sole source this requirement to incumbent." }, expected: "P2" },
   { label: "P2 · sources sought + matching title", input: { ...baseOpp, type: "Sources Sought", title: "RFI for advanced manufacturing" }, expected: "P2" },
   { label: "Watch · vanilla solicitation, no triggers", input: { ...baseOpp, responseDeadLine: inDays(30) },                        expected: "Watch" },
@@ -83,7 +84,21 @@ const riskCases: Case<any, string>[] = [
   // future refactor can't silently flood P0 with dead notices again.
   { label: "Boundary · expired deadline (-3d) does NOT fire P0/P1, falls through to Watch", input: { ...baseOpp, responseDeadLine: inDays(-3) }, expected: "Watch" },
   { label: "Boundary · null deadline does NOT fire P0/P1 (vanilla solicitation falls to Watch)", input: { ...baseOpp, responseDeadLine: null },  expected: "Watch" },
-  { label: "Boundary · deadline=0d (due now) DOES fire P0",                                  input: { ...baseOpp, responseDeadLine: inDays(0) },  expected: "P0"    }
+  { label: "Boundary · deadline=0d (due now) DOES fire P0",                                  input: { ...baseOpp, responseDeadLine: inDays(0) },  expected: "P0"    },
+  // Regression-lock: every DoD supply solicitation cites these clause numbers
+  // prophylactically as mandatory flow-downs (per DFARS 223.73 / 204.7503 /
+  // 225.7706). Matching on the bare clause number floods P0 with boilerplate.
+  // We match on substantive keywords instead. This test makes the bug
+  // impossible to silently re-introduce.
+  {
+    label: "Regression · flow-down clause numbers without substantive keyword does NOT fire P0",
+    input: {
+      ...baseOpp,
+      typeOfSetAside: "SBA",
+      description: "This solicitation incorporates standard DFARS flow-down clauses including 252.223-7008, 252.204-7021, and 252.225-7060 by reference."
+    },
+    expected: "Watch"
+  }
 ];
 
 console.log("── classifyDocType ──");

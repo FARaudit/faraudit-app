@@ -48,12 +48,23 @@ export function resolveAgency(o: SamOpportunity & { fullParentPathName?: string 
 // Returns one of: "P0" | "P1" | "P2" | "Watch".
 export type RiskLevel = "P0" | "P1" | "P2" | "Watch";
 
-const HEX_CHROME_RE = /hexavalent|hex.chrome|252\.223.?7008/i;
-const XINJIANG_RE = /xinjiang|forced labor|252\.225.?7060/i;
-const CMMC_RE = /CMMC.{0,30}level\s*[23]|252\.204.?7021/i;
+// Substantive-keyword matching only — bare DFARS clause numbers (252.223-7008,
+// 252.204-7021, 252.225-7060) are MANDATORY flow-down clauses that DoD
+// prescribes on essentially every supply solicitation per Acquisition.gov.
+// Citing the number doesn't mean the clause's substantive trap applies. We
+// match on the trap's actual subject matter instead, which is the signal
+// that distinguishes a real deal-breaker from boilerplate.
+const HEX_CHROME_RE = /hexavalent\s+chromium|hex.chrome/i;
+const XINJIANG_RE = /xinjiang|uyghur/i;
+const CMMC_RE = /CMMC.{0,40}level\s*[23]/i;
 const SOLE_SOURCE_RE = /sole.source|intent to (sole.|)?award without (full and open )?competition/i;
 const SRC_SOUGHT_TITLE_RE = /\b(special notice|RFI|sources sought)\b/i;
-const COMPLEX_DOC_TYPES = new Set(["Combined", "IDIQ", "BPA", "TaskOrd"]);
+// "Combined Synopsis/Solicitation" is SAM's default notice type for
+// commercial-item acquisitions under FAR Parts 12/13 — fires on virtually
+// every small-biz RFQ. Not a complexity signal; excluded. IDIQ / BPA /
+// TaskOrd are real contract-structure complexity that demand more proposal
+// effort.
+const COMPLEX_DOC_TYPES = new Set(["IDIQ", "BPA", "TaskOrd"]);
 
 export function classifyRisk(
   o: SamOpportunity & { fullParentPathName?: string | null },
