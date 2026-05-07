@@ -1194,7 +1194,8 @@ function DeadlineCalendar({ rows, onPick }: { rows: CalendarRow[]; onPick: (row:
                 opacity: inMonth ? 1 : 0.25,
                 display: "flex",
                 flexDirection: "column",
-                gap: 4
+                gap: 4,
+                minWidth: 0
               }}
             >
               <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textAlign: "right" }}>{c.date.getDate()}</div>
@@ -1212,7 +1213,10 @@ function DeadlineCalendar({ rows, onPick }: { rows: CalendarRow[]; onPick: (row:
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    width: "100%",
+                    minWidth: 0,
+                    boxSizing: "border-box"
                   }}
                   title={`${displaySolicitationId(r)} — ${r.title || ""}`}
                 >
