@@ -1,6 +1,7 @@
-// One-shot: backfill agency + solicitation_number + document_type on existing
-// pending_audits rows that pre-date migration 019, the resolveAgency precedence
-// chain, and the broadened classifyDocType normalization.
+// One-shot: backfill agency + solicitation_number + document_type +
+// risk_level + response_deadline on existing pending_audits rows that pre-date
+// migrations 019/020, the resolveAgency precedence chain, the broadened
+// classifyDocType normalization, and the deterministic classifyRisk verdict.
 //
 // Strategy: re-run the standard SAM search across all configured
 // (NAICS × set-aside) combos for BACKFILL_DAYS. For each opportunity returned,
@@ -35,7 +36,7 @@ const { supabase } = queueNs.default ?? queueNs;
 // @ts-expect-error tsx
 const helpersNs: any = await import("./helpers.ts");
 const helpers = helpersNs.default ?? helpersNs;
-const { resolveAgency, classifyDocType } = helpers;
+const { resolveAgency, classifyDocType, classifyRisk } = helpers;
 
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
@@ -50,6 +51,8 @@ interface PendingRow {
   agency: string | null;
   solicitation_number: string | null;
   document_type: string | null;
+  risk_level: string | null;
+  response_deadline: string | null;
 }
 
 async function main() {
@@ -67,9 +70,9 @@ async function main() {
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error: fetchErr } = await supabase
       .from("pending_audits")
-      .select("id, notice_id, agency, solicitation_number, document_type")
+      .select("id, notice_id, agency, solicitation_number, document_type, risk_level, response_deadline")
       .eq("source", "sam_live")
-      .or("agency.is.null,solicitation_number.is.null,document_type.is.null")
+      .or("agency.is.null,solicitation_number.is.null,document_type.is.null,risk_level.is.null,response_deadline.is.null")
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (fetchErr) throw new Error(`fetch pending_audits: ${fetchErr.message}`);
@@ -77,7 +80,7 @@ async function main() {
     needy.push(...batch);
     if (batch.length < PAGE_SIZE) break;
   }
-  console.log(`[backfill-fields] ${needy.length} rows missing agency, solicitation_number, or document_type`);
+  console.log(`[backfill-fields] ${needy.length} rows missing agency, solicitation_number, document_type, risk_level, or response_deadline`);
   if (needy.length === 0) {
     console.log("[backfill-fields] nothing to do");
     return;
@@ -131,9 +134,21 @@ async function main() {
   }
 
   // Build update plan — only fill NULLs, never overwrite existing values.
+  // The classifyRisk verdict is computed against `now` so rule firing reflects
+  // the current calendar (matters for the deadline tier).
+  const now = new Date();
   let matched = 0;
   let unmatched = 0;
-  const updates: Array<{ id: string; agency: string | null; solicitation_number: string | null; document_type: string | null }> = [];
+  const updates: Array<{
+    id: string;
+    agency: string | null;
+    solicitation_number: string | null;
+    document_type: string | null;
+    risk_level: string | null;
+    response_deadline: string | null;
+  }> = [];
+  // Per-tier hit counters for the DRY_RUN sanity check before live write.
+  const riskHits: Record<string, number> = { P0: 0, P1: 0, P2: 0, Watch: 0 };
   for (const row of needy) {
     const samRow = samMap.get(row.notice_id);
     if (!samRow) { unmatched++; continue; }
@@ -141,15 +156,39 @@ async function main() {
     const newAgency = row.agency ?? resolveAgency(samRow);
     const newSolNum = row.solicitation_number ?? (samRow.solicitationNumber || null);
     const newDocType = row.document_type ?? classifyDocType(samRow.type);
-    if (newAgency === row.agency && newSolNum === row.solicitation_number && newDocType === row.document_type) continue;
-    updates.push({ id: row.id, agency: newAgency, solicitation_number: newSolNum, document_type: newDocType });
+    const newRisk: string = row.risk_level ?? classifyRisk(samRow, now);
+    const newDeadline = row.response_deadline ?? (samRow.responseDeadLine || null);
+    riskHits[newRisk] = (riskHits[newRisk] || 0) + 1;
+    if (
+      newAgency === row.agency &&
+      newSolNum === row.solicitation_number &&
+      newDocType === row.document_type &&
+      newRisk === row.risk_level &&
+      newDeadline === row.response_deadline
+    ) continue;
+    updates.push({
+      id: row.id,
+      agency: newAgency,
+      solicitation_number: newSolNum,
+      document_type: newDocType,
+      risk_level: newRisk,
+      response_deadline: newDeadline
+    });
   }
   console.log(`[backfill-fields] matched ${matched} · unmatched ${unmatched} (likely outside ${BACKFILL_DAYS}d window)`);
   console.log(`[backfill-fields] ${updates.length} rows have new field data to write`);
+  const total = matched || 1;
+  console.log(`[backfill-fields] risk hit-rate (over matched=${matched}):`);
+  for (const tier of ["P0", "P1", "P2", "Watch"]) {
+    const n = riskHits[tier] || 0;
+    console.log(`  ${tier.padEnd(5)} ${String(n).padStart(4)}  ${(n * 100 / total).toFixed(1)}%`);
+  }
 
   if (DRY_RUN) {
     console.log("[DRY_RUN] sample of first 5 updates:");
-    updates.slice(0, 5).forEach((u) => console.log(`  · ${u.id} → agency=${u.agency} sol#=${u.solicitation_number} type=${u.document_type}`));
+    updates.slice(0, 5).forEach((u) =>
+      console.log(`  · ${u.id} → agency=${u.agency} sol#=${u.solicitation_number} type=${u.document_type} risk=${u.risk_level} deadline=${u.response_deadline}`)
+    );
     console.log("[DRY_RUN] no DB write — set DRY_RUN=false to persist");
     return;
   }
@@ -158,7 +197,13 @@ async function main() {
   for (const u of updates) {
     const { error: upErr } = await supabase
       .from("pending_audits")
-      .update({ agency: u.agency, solicitation_number: u.solicitation_number, document_type: u.document_type })
+      .update({
+        agency: u.agency,
+        solicitation_number: u.solicitation_number,
+        document_type: u.document_type,
+        risk_level: u.risk_level,
+        response_deadline: u.response_deadline
+      })
       .eq("id", u.id);
     if (upErr) console.warn(`  ✗ update ${u.id}: ${upErr.message}`);
     else written++;
