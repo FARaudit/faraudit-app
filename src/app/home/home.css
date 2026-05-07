@@ -149,6 +149,7 @@
 .bd-home .f-days.urg{color:var(--red);}
 .bd-home .f-days.soon{color:var(--amber);}
 .bd-home .f-days.ok{color:var(--green);}
+.bd-home .f-days.exp{color:var(--t40);font-weight:600;}
 .bd-home .f-type{font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(201,168,76,.5);letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bd-home .f-sa{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 6px;border-radius:2px;}
 .bd-home .sa-sb{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);color:var(--gold);}

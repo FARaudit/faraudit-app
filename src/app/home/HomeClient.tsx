@@ -113,7 +113,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
     return enriched.filter((r) => {
       if (naics !== "all" && r.row.naics_code !== naics) return false;
       if (filter === "P0 · P1") return r.risk === "rp0" || r.risk === "rp1";
-      if (filter === "≤7 Days") return r.daysNum != null && r.daysNum <= 7;
+      if (filter === "≤7 Days") return r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7;
       if (filter === "Small Business") return ["SB", "SDVOSB", "WOSB", "8(a)"].includes(r.saLabel);
       if (filter === "IDIQ") {
         const dt = (r.row.document_type || "").toUpperCase();
@@ -133,7 +133,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
   const stats = useMemo(() => {
     const total = enriched.length;
     const p0 = enriched.filter((r) => r.risk === "rp0").length;
-    const exp = enriched.filter((r) => r.daysNum != null && r.daysNum <= 7).length;
+    const exp = enriched.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7).length;
     return { total, p0, exp };
   }, [enriched]);
 
@@ -528,7 +528,14 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                           : "No rows match this NAICS filter."}
                       </div>
                     )}
-                    {[...filtered].sort((a, b) => (a.daysNum ?? 9999) - (b.daysNum ?? 9999)).map((r) => {
+                    {[...filtered].sort((a, b) => {
+                      // Sort key: imminent (0..N) at top, expired (negative) pushed
+                      // to 9998 so they fall just above null (9999) — mental model
+                      // is "active opportunities up top, dead ones out of sight".
+                      const ka = a.daysNum == null ? 9999 : a.daysNum < 0 ? 9998 : a.daysNum;
+                      const kb = b.daysNum == null ? 9999 : b.daysNum < 0 ? 9998 : b.daysNum;
+                      return ka - kb;
+                    }).map((r) => {
                       const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : r.risk === "rp2" ? "var(--blue)" : "var(--gold)";
                       const bg = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(201,168,76,.08)";
                       return (
@@ -641,7 +648,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 interface Enriched {
   row: OpportunityRow;
   daysNum: number | null;
-  daysCls: "urg" | "soon" | "ok" | "none";
+  daysCls: "urg" | "soon" | "ok" | "exp" | "none";
   daysLabel: string;
   risk: "rp0" | "rp1" | "rp2" | "";
   riskLabel: string;
@@ -663,10 +670,32 @@ function hoursUntilNextSamIngest(): number {
 }
 
 function enrichRow(row: OpportunityRow): Enriched {
-  const daysSince = Math.floor((Date.now() - new Date(row.created_at).getTime()) / 86400_000);
-  const daysNum = isFinite(daysSince) ? daysSince : null;
-  const daysCls = daysNum == null ? "none" : daysNum <= 7 ? "urg" : daysNum <= 21 ? "soon" : "ok";
-  const daysLabel = daysNum == null ? "—" : `${daysNum}d`;
+  // Days column shows time-to-deadline (calendar days from now until
+  // response_deadline). Was incorrectly computing days-since-creation, so every
+  // row read "3d" because the recent backfill burst ingested most of the
+  // corpus three days ago. Mirrors the daysOut math the risk classifier uses
+  // so risk tier and Days display agree on the same calendar.
+  // TODO(v1): classifier uses fractional daysOut, display uses Math.floor —
+  // boundary rows (e.g., 3.08 days) show "3d" but classify as P1. Reconcile in
+  // v1 alongside the archived_at column work for expired notices.
+  const daysNum: number | null = (() => {
+    if (!row.response_deadline) return null;
+    const dl = Date.parse(row.response_deadline);
+    if (Number.isNaN(dl)) return null;
+    return Math.floor((dl - Date.now()) / 86400_000);
+  })();
+  const daysCls: Enriched["daysCls"] =
+    daysNum == null ? "none" :
+    daysNum < 0     ? "exp"  :
+    daysNum <= 3    ? "urg"  :
+    daysNum <= 7    ? "soon" :
+                      "ok";
+  const daysLabel =
+    daysNum == null ? "—" :
+    daysNum < 0     ? "expired" :
+    daysNum === 0   ? "today" :
+    daysNum === 1   ? "1d" :
+                      `${daysNum}d`;
 
   // Risk verdict — three layers in priority order:
   //   1. Persisted classifyRisk verdict from sam-ingest / backfill (row.risk_level)
