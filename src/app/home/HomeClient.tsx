@@ -9,7 +9,7 @@ import type {
   KORow,
   AgencyRow
 } from "@/lib/bd-os/queries";
-import { displaySolicitationId } from "@/lib/audit-display";
+import { auditDisplayName, displaySolicitationId } from "@/lib/audit-display";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
@@ -461,7 +461,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       return (
                         <a key={a.id} className="audit-item" href={`/audit/${a.id}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
                           <div className="ai-top">
-                            <div className="ai-title">{a.title || a.notice_id || "Untitled audit"}</div>
+                            <div className="ai-title">{auditDisplayName(a)}</div>
                             <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{r.label}</span>
                           </div>
                           <div className="ai-meta">{displaySolicitationId(a) || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
@@ -1090,8 +1090,8 @@ function PastAuditsPanel({
                 style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
               >
                 <span className="sr-date">{new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                <span className="sr-num">{a.notice_id || "—"}</span>
-                <span className="sr-title" title={a.title || ""}>{a.title || "—"}</span>
+                <span className="sr-num">{displaySolicitationId(a)}</span>
+                <span className="sr-title" title={a.title || ""}>{auditDisplayName(a)}</span>
                 <span className="sr-agency" title={a.agency || ""}>{a.agency || "—"}</span>
                 <span className="sr-badge" style={{ background: a.audit_source === "audit_ai" ? "rgba(96,165,250,.10)" : "rgba(148,163,184,.06)", color: a.audit_source === "audit_ai" ? "var(--blue)" : "var(--t40)", border: "1px solid var(--border)" }}>
                   {a.audit_source === "audit_ai" ? "AI" : "USER"}
@@ -1579,7 +1579,7 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                       <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {a.notice_id || "—"}
+                        {displaySolicitationId(a)}
                       </span>
                       {a.compliance_score != null && (
                         <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, color: rc, border: `1px solid ${rc}40` }}>
@@ -1588,7 +1588,7 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                       )}
                     </div>
                     <div style={{ fontFamily: "var(--serif)", fontSize: 11, fontWeight: 500, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                      {a.title || "—"}
+                      {auditDisplayName(a)}
                     </div>
                     <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)" }}>
                       {a.agency || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -2330,9 +2330,9 @@ function CapabilityPanel() {
           ) : (
             stmt.past_performance.map((p, i) => (
               <div key={i} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderLeft: "3px solid var(--gold)", borderRadius: 2, padding: "10px 14px", marginBottom: 8 }}>
-                <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{p.title || p.notice_id || "—"}</div>
+                <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{auditDisplayName(p)}</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", marginTop: 4 }}>
-                  {p.notice_id || "—"}
+                  {displaySolicitationId(p)}
                   {p.agency ? ` · ${p.agency}` : ""}
                   {p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
                   {p.period ? ` · ${p.period}` : ""}
@@ -2705,7 +2705,7 @@ function CMMCPanel() {
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Recent Level {activeLevel} solicitations from your audits</div>
             {data.recent_by_level[activeLevel].map((a) => (
               <a key={a.id} href={`/audit/${a.id}`} style={{ display: "block", padding: "8px 12px", borderLeft: "2px solid var(--gold)", marginBottom: 6, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", textDecoration: "none" }}>
-                {a.notice_id || "—"} <span style={{ color: "var(--t40)" }}>· {a.agency || "—"}</span>
+                {displaySolicitationId(a)} <span style={{ color: "var(--t40)" }}>· {a.agency || "—"}</span>
               </a>
             ))}
           </div>
