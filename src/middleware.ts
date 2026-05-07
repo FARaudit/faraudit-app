@@ -20,6 +20,14 @@ const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots", "/
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Defense-in-depth: hard 404 for CEO/private file paths.
+  // Matches doctrine: CEO files exist only in (1) ~/faraudit-app/ceo/ local,
+  // (2) Notion, (3) private Drive — never on public web.
+  const CEO_PATHS = /^\/(ceo|hub|org-chart|one-pager|session-handoff|protocols|faraudit-bookmarks|digest|ceo-digest)(\b|\/|\.|$)/i;
+  if (CEO_PATHS.test(pathname)) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (PUBLIC.includes(pathname) || PUBLIC_PREFIX.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
