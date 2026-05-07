@@ -19,6 +19,7 @@ export interface SamOpportunity {
   solicitationNumber: string | null;
   department: string | null;
   subTier: string | null;
+  fullParentPathName: string | null;
   naicsCode: string | null;
   type: string | null;
   typeOfSetAside: string | null;
@@ -81,6 +82,7 @@ async function searchPage(p: SamSearchParams): Promise<{ items: SamOpportunity[]
     solicitationNumber: o.solicitationNumber ?? null,
     department: o.department ?? null,
     subTier: o.subTier ?? null,
+    fullParentPathName: o.fullParentPathName ?? null,
     naicsCode: o.naicsCode ?? null,
     type: o.type ?? null,
     typeOfSetAside: o.typeOfSetAside ?? null,
