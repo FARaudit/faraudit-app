@@ -48,6 +48,15 @@ const displaySolCases: Case[] = [
     expected: "—" },
   { label: "T12 · displaySolicitationId real solicitation_number wins",
     input: { solicitation_number: "FA301626Q0068" },
+    expected: "FA301626Q0068" },
+  // T13 locks in the runtime contract that CalendarRow (which has no
+  // solicitation_number field at all) flows through the helper cleanly:
+  // missing field → undefined → priority chain skips the sn step → falls
+  // through to notice_id. Without this test, a future refactor making
+  // solicitation_number REQUIRED on AuditLike could silently break the
+  // calendar without tsc complaining.
+  { label: "T13 · row without solicitation_number field falls through to notice_id",
+    input: { title: null, notice_id: "FA301626Q0068", created_at: null },
     expected: "FA301626Q0068" }
 ];
 

@@ -548,7 +548,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                           });
                           setTab("audit");
                         }}>
-                          <span className="sr-num" title={r.row.notice_id}>{r.row.solicitation_number || r.row.notice_id}</span>
+                          <span className="sr-num" title={r.row.title || displaySolicitationId(r.row)}>{displaySolicitationId(r.row)}</span>
                           <span className="sr-title" title={r.row.title || ""}>{r.row.title || "—"}</span>
                           <span className="sr-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
                           <span className="sr-date">{new Date(r.row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
@@ -1214,9 +1214,9 @@ function DeadlineCalendar({ rows, onPick }: { rows: CalendarRow[]; onPick: (row:
                     whiteSpace: "nowrap",
                     cursor: "pointer"
                   }}
-                  title={`${r.notice_id} — ${r.title || ""}`}
+                  title={`${displaySolicitationId(r)} — ${r.title || ""}`}
                 >
-                  {r.notice_id}
+                  {auditDisplayName(r)}
                 </button>
               ))}
               {c.rows.length > 3 && (
