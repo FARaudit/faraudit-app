@@ -236,6 +236,11 @@
 .bd-home .adz-btn:disabled{opacity:.5;cursor:wait;}
 .bd-home .audit-formats{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
 .bd-home .af{font-family:var(--mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:2px;background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);letter-spacing:.06em;}
+.bd-home .audit-mode-pills{display:flex;gap:8px;justify-content:center;margin-bottom:24px;}
+.bd-home .audit-mode-pill{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:3px;border:1px solid var(--border2);background:rgba(3,8,16,.4);color:var(--t40);cursor:pointer;transition:all .15s;}
+.bd-home .audit-mode-pill:hover{color:var(--t60);border-color:rgba(201,168,76,.25);}
+.bd-home .audit-mode-pill.active{color:var(--gold);border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.08);box-shadow:inset 0 -2px 0 var(--gold);}
+.bd-home .amp-glyph{font-size:12px;line-height:1;}
 .bd-home .audit-input{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
 .bd-home .audit-input input{flex:1;min-width:240px;background:rgba(3,8,16,.6);border:1px solid var(--border2);border-radius:2px;padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;}
 .bd-home .audit-input input:focus{border-color:var(--gold);}

@@ -799,8 +799,16 @@ interface RunAuditPrefill {
   naics_code: string | null;
 }
 
+type RunAuditMode = "notice" | "pdf";
+
 function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
   const router = useRouter();
+  // Architectural mutual exclusion: user picks a mode FIRST, only that mode's
+  // input renders. Submit handler sends only the active mode's field by
+  // construction — no way to submit both. /api/audit's "PDF wins for clauses,
+  // SAM wins for metadata" merge logic stays correct but never triggers from
+  // the UI now.
+  const [mode, setMode] = useState<RunAuditMode>("notice");
   const [noticeId, setNoticeId] = useState("");
   const [pdf, setPdf] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -808,18 +816,34 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
 
   useEffect(() => {
-    if (prefill?.notice_id) setNoticeId(prefill.notice_id);
+    if (prefill?.notice_id) {
+      setMode("notice");
+      setNoticeId(prefill.notice_id);
+      setPdf(null);
+    }
   }, [prefill?.notice_id]);
+
+  function switchMode(next: RunAuditMode) {
+    if (next === mode) return;
+    // Clear the OTHER mode's state on switch so submit can never accidentally
+    // see stale input from a mode the user already abandoned.
+    if (next === "notice") setPdf(null);
+    else setNoticeId("");
+    setError(null);
+    setResult(null);
+    setMode(next);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setResult(null);
-    if (!noticeId && !pdf) { setError("Provide a notice ID or PDF."); return; }
+    if (mode === "notice" && !noticeId) { setError("Paste a SAM Notice ID."); return; }
+    if (mode === "pdf" && !pdf) { setError("Select a PDF to upload."); return; }
     setSubmitting(true);
     try {
       const fd = new FormData();
-      if (noticeId) fd.set("noticeId", noticeId);
-      if (pdf) fd.set("pdf", pdf);
+      if (mode === "notice") fd.set("noticeId", noticeId);
+      else if (pdf) fd.set("pdf", pdf);
       const res = await fetch("/api/audit", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `audit failed (${res.status})`);
@@ -834,6 +858,13 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
       setSubmitting(false);
     }
   }
+
+  const submitLabel = submitting
+    ? "Auditing…"
+    : mode === "notice"
+      ? "Run Audit · Notice ID →"
+      : "Run Audit · PDF →";
+  const submitDisabled = submitting || (mode === "notice" ? !noticeId : !pdf);
 
   return (
     <div className="audit-tab">
@@ -871,29 +902,63 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
             </div>
           </div>
         )}
-        <label className="audit-drop-zone" style={{ display: "block" }}>
-          <div className="adz-title">Drop your solicitation PDF here</div>
-          <div className="adz-sub">{pdf ? pdf.name : "Or click to browse · Any page count · Any agency · Any format"}</div>
-          <input type="file" accept="application/pdf" onChange={(e) => setPdf(e.target.files?.[0] || null)} style={{ display: "none" }} />
-          <span className="adz-btn" style={{ marginTop: 18 }}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2v9M4 7l4-5 4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Select PDF to Audit
-          </span>
-        </label>
-        <div className="audit-input">
-          <input
-            type="text"
-            value={noticeId}
-            onChange={(e) => setNoticeId(e.target.value.trim())}
-            placeholder="Or paste a SAM.gov Notice ID — e.g. FA301626Q0068"
-          />
-          <button type="submit" className="adz-btn" style={{ marginTop: 0 }} disabled={submitting}>
-            {submitting ? "Auditing…" : "Run Audit →"}
+        <div className="audit-mode-pills" role="tablist" aria-label="Run Audit input mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "notice"}
+            className={`audit-mode-pill ${mode === "notice" ? "active" : ""}`}
+            onClick={() => switchMode("notice")}
+          >
+            <span className="amp-glyph" aria-hidden="true">⌖</span>
+            <span>SAM Notice ID</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "pdf"}
+            className={`audit-mode-pill ${mode === "pdf" ? "active" : ""}`}
+            onClick={() => switchMode("pdf")}
+          >
+            <span className="amp-glyph" aria-hidden="true">▤</span>
+            <span>Upload PDF</span>
           </button>
         </div>
+
+        {mode === "notice" ? (
+          <div className="audit-input">
+            <input
+              type="text"
+              value={noticeId}
+              onChange={(e) => setNoticeId(e.target.value.trim())}
+              placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068"
+              autoFocus
+            />
+            <button type="submit" className="adz-btn" style={{ marginTop: 0 }} disabled={submitDisabled}>
+              {submitLabel}
+            </button>
+          </div>
+        ) : (
+          <>
+            <label className="audit-drop-zone" style={{ display: "block" }}>
+              <div className="adz-title">Drop your solicitation PDF here</div>
+              <div className="adz-sub">{pdf ? pdf.name : "Or click to browse · Any page count · Any agency · Any format"}</div>
+              <input type="file" accept="application/pdf" onChange={(e) => setPdf(e.target.files?.[0] || null)} style={{ display: "none" }} />
+              <span className="adz-btn" style={{ marginTop: 18 }}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 2v9M4 7l4-5 4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                Select PDF to Audit
+              </span>
+            </label>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <button type="submit" className="adz-btn" style={{ marginTop: 0 }} disabled={submitDisabled}>
+                {submitLabel}
+              </button>
+            </div>
+          </>
+        )}
         <div className="audit-formats" style={{ marginTop: 22 }}>
           <span className="af">RFQ</span><span className="af">RFP</span><span className="af">IDIQ</span>
           <span className="af">IFB</span><span className="af">Sources Sought</span><span className="af">Pre-Sol Synopsis</span>
