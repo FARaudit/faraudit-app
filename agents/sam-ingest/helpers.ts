@@ -40,8 +40,15 @@ export function resolveAgency(o: SamOpportunity & { fullParentPathName?: string 
 // feed (plain "Solicitation" / "Combined Synopsis/Solicitation" entries) into
 // blank cells. Now falls back to a normalized short-form bucket so the Type
 // column is always populated.
+//
+// Priority: contract-structure markers first (IDIQ / BPA / Task Order / Mod
+// are more specific than the generic SAM "type" string and may co-occur with
+// it). Then SAM canonical type strings normalized per spec. Final fallback:
+// title-case the first word of the input (e.g. "RFI" → "Rfi", "Bid Notice"
+// → "Bid"); empty / null inputs return "Other".
 export function classifyDocType(t: string | null): string {
-  const s = (t || "").toLowerCase();
+  const raw = (t || "").trim();
+  const s = raw.toLowerCase();
   if (s.includes("idiq")) return "IDIQ";
   if (s.includes("bpa")) return "BPA";
   if (s.includes("task order")) return "TaskOrd";
@@ -49,8 +56,9 @@ export function classifyDocType(t: string | null): string {
   if (s.includes("sources sought")) return "SrcSght";
   if (s.includes("presolicitation") || s.includes("pre-sol") || s.includes("pre sol")) return "PreSol";
   if (s.includes("combined")) return "Combined";
-  if (s.includes("solicitation")) return "Sol";
-  if (s.includes("special notice")) return "Special";
   if (s.includes("award")) return "Award";
-  return "Other";
+  if (s.includes("solicitation")) return "RFQ"; // most common defense small-biz type
+  if (!raw) return "Other";
+  const first = raw.split(/[\s/,]+/)[0] || raw;
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
