@@ -185,7 +185,62 @@ async function main() {
   }
 
   if (DRY_RUN) {
-    console.log("[DRY_RUN] sample of first 5 updates:");
+    // ─── DRY_RUN-only diagnostic: P0 trigger breakdown ─────────────────
+    // Mirrors helpers.ts classifyRisk priority order. Re-declares the
+    // regexes locally to keep production logic untouched. If helpers.ts
+    // changes, these need to be kept in sync (or this block deleted).
+    const HEX_CHROME_RE_DIAG = /hexavalent\s+chromium|hex.chrome/i;
+    const XINJIANG_RE_DIAG = /xinjiang|uyghur/i;
+    const CMMC_RE_DIAG = /CMMC.{0,40}level\s*[23]/i;
+    const triggerCounts: Record<string, number> = { deadline_3d: 0, hex_chrome: 0, xinjiang: 0, cmmc_level23: 0 };
+    const examples: Record<string, Array<{ notice_id: string; excerpt: string }>> = {
+      deadline_3d: [], hex_chrome: [], xinjiang: [], cmmc_level23: []
+    };
+    const captureExcerpt = (text: string, re: RegExp): string => {
+      const m = text.match(re);
+      if (!m || m.index === undefined) return "";
+      const start = Math.max(0, m.index - 25);
+      const end = Math.min(text.length, m.index + m[0].length + 25);
+      return text.slice(start, end).replace(/\s+/g, " ");
+    };
+    for (const row of needy) {
+      const samRow = samMap.get(row.notice_id);
+      if (!samRow) continue;
+      const desc = samRow.description || "";
+      // Priority order matches classifyRisk — only count the first P0 trigger that fires.
+      let fired: keyof typeof triggerCounts | null = null;
+      if (samRow.responseDeadLine) {
+        const dl = Date.parse(samRow.responseDeadLine);
+        if (!Number.isNaN(dl)) {
+          const daysOut = (dl - now.getTime()) / 86400000;
+          if (daysOut >= 0 && daysOut <= 3) fired = "deadline_3d";
+        }
+      }
+      if (!fired && HEX_CHROME_RE_DIAG.test(desc)) fired = "hex_chrome";
+      if (!fired && XINJIANG_RE_DIAG.test(desc)) fired = "xinjiang";
+      if (!fired && CMMC_RE_DIAG.test(desc)) fired = "cmmc_level23";
+      if (fired) {
+        triggerCounts[fired]++;
+        if (examples[fired].length < 3) {
+          let excerpt = "";
+          if (fired === "deadline_3d") excerpt = `deadline ${samRow.responseDeadLine}`;
+          else if (fired === "hex_chrome") excerpt = captureExcerpt(desc, HEX_CHROME_RE_DIAG);
+          else if (fired === "xinjiang") excerpt = captureExcerpt(desc, XINJIANG_RE_DIAG);
+          else excerpt = captureExcerpt(desc, CMMC_RE_DIAG);
+          examples[fired].push({ notice_id: row.notice_id, excerpt });
+        }
+      }
+    }
+    console.log(`\n[DRY_RUN] P0 trigger breakdown (priority order; first match wins):`);
+    for (const trigger of ["deadline_3d", "hex_chrome", "xinjiang", "cmmc_level23"]) {
+      const n = triggerCounts[trigger] || 0;
+      console.log(`  ${trigger.padEnd(14)} ${String(n).padStart(4)}  ${(n * 100 / total).toFixed(1)}%`);
+      for (const ex of examples[trigger]) {
+        console.log(`     · ${ex.notice_id}: "${ex.excerpt}"`);
+      }
+    }
+
+    console.log("\n[DRY_RUN] sample of first 5 updates:");
     updates.slice(0, 5).forEach((u) =>
       console.log(`  · ${u.id} → agency=${u.agency} sol#=${u.solicitation_number} type=${u.document_type} risk=${u.risk_level} deadline=${u.response_deadline}`)
     );
