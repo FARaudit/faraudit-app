@@ -32,7 +32,7 @@ const { insertNew } = queue;
 // @ts-expect-error tsx
 const helpersNs: any = await import("./helpers.ts");
 const helpers = helpersNs.default ?? helpersNs;
-const { resolveAgency, classifyDocType } = helpers;
+const { resolveAgency, classifyDocType, classifyRisk } = helpers;
 
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
@@ -117,6 +117,8 @@ async function main() {
       naics_code: o.naicsCode || null,
       set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
       document_type: classifyDocType(o.type),
+      response_deadline: o.responseDeadLine || null,
+      risk_level: classifyRisk(o, new Date()),
       pdf_url: pdfUrl,
       source: "sam_live" as const,
       notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`

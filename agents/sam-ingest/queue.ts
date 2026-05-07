@@ -23,6 +23,8 @@ export interface PendingAuditInsert {
   naics_code?: string | null;
   set_aside?: string | null;
   document_type?: string | null;
+  risk_level?: string | null;
+  response_deadline?: string | null;
   pdf_url?: string | null;
   source: "sam_live";
   notes?: string | null;

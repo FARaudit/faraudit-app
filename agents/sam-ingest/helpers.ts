@@ -35,6 +35,69 @@ export function resolveAgency(o: SamOpportunity & { fullParentPathName?: string 
   return cleaned.length > 0 ? cleaned.join(" · ") : null;
 }
 
+// Risk classifier — deterministic v0. Runs at ingest time on the SAM payload.
+// Persisted into pending_audits.risk_level (migration 020). The UI combines
+// this static verdict with response_deadline at render time to escalate
+// ≤7d / ≤3d rows in real time (so a row that was P2 at ingest correctly
+// becomes P0 as its deadline approaches without a re-classify pass).
+//
+// Rule precedence: P0 > P1 > P2 > Watch. First-match wins within each tier.
+// All description matching uses the 4KB excerpt SAM returns — sufficient for
+// keyword regex hits even though full SOWs are longer.
+//
+// Returns one of: "P0" | "P1" | "P2" | "Watch".
+export type RiskLevel = "P0" | "P1" | "P2" | "Watch";
+
+const HEX_CHROME_RE = /hexavalent|hex.chrome|252\.223.?7008/i;
+const XINJIANG_RE = /xinjiang|forced labor|252\.225.?7060/i;
+const CMMC_RE = /CMMC.{0,30}level\s*[23]|252\.204.?7021/i;
+const SOLE_SOURCE_RE = /sole.source|intent to (sole.|)?award without (full and open )?competition/i;
+const SRC_SOUGHT_TITLE_RE = /\b(special notice|RFI|sources sought)\b/i;
+const COMPLEX_DOC_TYPES = new Set(["Combined", "IDIQ", "BPA", "TaskOrd"]);
+
+export function classifyRisk(
+  o: SamOpportunity & { fullParentPathName?: string | null },
+  now: Date = new Date()
+): RiskLevel {
+  const desc = o.description || "";
+  const title = o.title || "";
+
+  // ─── P0 (deal-breaker) ─────────────────────────────────────────────────
+  // Deadline window — proximate-impact: a closing-tomorrow opportunity is
+  // P0 regardless of what's in the SOW.
+  if (o.responseDeadLine) {
+    const deadline = Date.parse(o.responseDeadLine);
+    if (!Number.isNaN(deadline)) {
+      const daysOut = (deadline - now.getTime()) / 86400000;
+      if (daysOut <= 3) return "P0";
+    }
+  }
+  // DFARS trap clauses cited in description excerpt. These disqualify a
+  // non-compliant bidder regardless of set-aside type.
+  if (HEX_CHROME_RE.test(desc)) return "P0";
+  if (XINJIANG_RE.test(desc)) return "P0";
+  if (CMMC_RE.test(desc)) return "P0";
+
+  // ─── P1 (major risk) ───────────────────────────────────────────────────
+  if (o.responseDeadLine) {
+    const deadline = Date.parse(o.responseDeadLine);
+    if (!Number.isNaN(deadline)) {
+      const daysOut = (deadline - now.getTime()) / 86400000;
+      if (daysOut <= 7) return "P1";
+    }
+  }
+  // Proposal-effort proxy: complex contract structures eat capture-team time.
+  // classifyDocType() is the source of truth for these buckets.
+  const docType = classifyDocType(o.type);
+  if (COMPLEX_DOC_TYPES.has(docType)) return "P1";
+
+  // ─── P2 (notable) ──────────────────────────────────────────────────────
+  if (SOLE_SOURCE_RE.test(desc)) return "P2";
+  if (docType === "SrcSght" && SRC_SOUGHT_TITLE_RE.test(title)) return "P2";
+
+  return "Watch";
+}
+
 // Document-type classifier. Previously returned null for everything except
 // IDIQ / BPA / Task Order / Modification — which dropped 90%+ of the daily
 // feed (plain "Solicitation" / "Combined Synopsis/Solicitation" entries) into

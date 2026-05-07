@@ -5,7 +5,7 @@
 
 // @ts-expect-error tsx
 const helpersNs: any = await import("./helpers.ts");
-const { classifyDocType, resolveAgency } = helpersNs.default ?? helpersNs;
+const { classifyDocType, resolveAgency, classifyRisk } = helpersNs.default ?? helpersNs;
 
 interface Case<I, O> { label: string; input: I; expected: O }
 
@@ -44,10 +44,49 @@ const run = (label: string, got: any, expected: any) => {
   if (!ok) console.log(`        expected: ${JSON.stringify(expected)} · got: ${JSON.stringify(got)}`);
 };
 
+// classifyRisk uses a fixed "now" so deadline math is reproducible.
+const NOW = new Date("2026-05-07T12:00:00Z");
+const inDays = (d: number) => new Date(NOW.getTime() + d * 86400000).toISOString();
+
+const baseOpp = {
+  noticeId: "test",
+  title: "test",
+  solicitationNumber: null,
+  department: null,
+  subTier: null,
+  fullParentPathName: null,
+  naicsCode: null,
+  type: "Solicitation",
+  typeOfSetAside: null,
+  typeOfSetAsideDescription: null,
+  postedDate: null,
+  responseDeadLine: null,
+  description: "",
+  resourceLinks: [] as string[],
+  uiLink: null
+};
+
+const riskCases: Case<any, string>[] = [
+  { label: "P0 · deadline ≤3d (1d out)",         input: { ...baseOpp, responseDeadLine: inDays(1) },                                expected: "P0" },
+  { label: "P0 · hex chrome regardless of set-aside", input: { ...baseOpp, description: "...DFARS 252.223-7008 Hexavalent Chromium..." }, expected: "P0" },
+  { label: "P0 · Xinjiang / forced labor",       input: { ...baseOpp, description: "Compliance with 252.225-7060 (Xinjiang)." },   expected: "P0" },
+  { label: "P0 · CMMC level 2",                  input: { ...baseOpp, description: "Contractor must achieve CMMC Level 2 per 252.204-7021." }, expected: "P0" },
+  { label: "P1 · deadline 5d (no DFARS hits)",   input: { ...baseOpp, responseDeadLine: inDays(5) },                                expected: "P1" },
+  { label: "P1 · IDIQ document_type complexity", input: { ...baseOpp, type: "Solicitation (IDIQ)" },                                expected: "P1" },
+  { label: "P1 · Combined Synopsis (proxy)",     input: { ...baseOpp, type: "Combined Synopsis/Solicitation" },                     expected: "P1" },
+  { label: "P2 · sole-source intent in description", input: { ...baseOpp, description: "Government intends to sole source this requirement to incumbent." }, expected: "P2" },
+  { label: "P2 · sources sought + matching title", input: { ...baseOpp, type: "Sources Sought", title: "RFI for advanced manufacturing" }, expected: "P2" },
+  { label: "Watch · vanilla solicitation, no triggers", input: { ...baseOpp, responseDeadLine: inDays(30) },                        expected: "Watch" },
+  { label: "Precedence · deadline≤3d AND CMMC text → still P0 (one verdict)", input: { ...baseOpp, responseDeadLine: inDays(2), description: "CMMC Level 2 required" }, expected: "P0" },
+  { label: "Precedence · deadline=10d AND IDIQ → P1 (deadline rule skipped, doc_type fires)", input: { ...baseOpp, responseDeadLine: inDays(10), type: "IDIQ Solicitation" }, expected: "P1" }
+];
+
 console.log("── classifyDocType ──");
 for (const c of docTypeCases) run(c.label, classifyDocType(c.input), c.expected);
 console.log("\n── resolveAgency ──");
 for (const c of agencyCases) run(c.label, resolveAgency(c.input), c.expected);
+console.log("\n── classifyRisk ──");
+for (const c of riskCases) run(c.label, classifyRisk(c.input, NOW), c.expected);
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);
