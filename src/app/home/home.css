@@ -141,6 +141,7 @@
 .bd-home .feed-row:hover{background:rgba(201,168,76,.05);}
 .bd-home .feed-row.rp0{border-left-color:rgba(220,38,38,.55);}
 .bd-home .feed-row.rp1{border-left-color:rgba(245,158,11,.45);}
+.bd-home .feed-row.rp2{border-left-color:rgba(96,165,250,.40);}
 .bd-home .f-naics{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--gold);opacity:.6;letter-spacing:.06em;}
 .bd-home .f-title{font-size:11px;font-weight:600;color:rgba(245,240,232,.94);font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
 .bd-home .f-agency{font-family:var(--mono);font-size:7.5px;color:var(--t60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -158,6 +159,7 @@
 .bd-home .f-risk{font-family:var(--mono);font-size:7.5px;font-weight:700;padding:2px 7px;border-radius:2px;}
 .bd-home .rk0{background:rgba(220,38,38,.14);border:1px solid rgba(220,38,38,.28);color:var(--red);}
 .bd-home .rk1{background:rgba(245,158,11,.11);border:1px solid rgba(245,158,11,.22);color:var(--amber);}
+.bd-home .rk2{background:rgba(96,165,250,.10);border:1px solid rgba(96,165,250,.24);color:var(--blue);}
 .bd-home .rkw{background:rgba(201,168,76,.08);border:1px solid var(--border2);color:var(--gold);}
 
 /* RIGHT PANEL */

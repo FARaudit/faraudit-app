@@ -529,8 +529,8 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       </div>
                     )}
                     {[...filtered].sort((a, b) => (a.daysNum ?? 9999) - (b.daysNum ?? 9999)).map((r) => {
-                      const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : "var(--gold)";
-                      const bg = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
+                      const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : r.risk === "rp2" ? "var(--blue)" : "var(--gold)";
+                      const bg = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(201,168,76,.08)";
                       return (
                         <div key={r.row.id} className="sam-row" onClick={() => {
                           setAuditPrefill({
@@ -643,7 +643,7 @@ interface Enriched {
   daysNum: number | null;
   daysCls: "urg" | "soon" | "ok" | "none";
   daysLabel: string;
-  risk: "rp0" | "rp1" | "";
+  risk: "rp0" | "rp1" | "rp2" | "";
   riskLabel: string;
   saCls: "sb" | "sd" | "wo" | "a8" | "un";
   saLabel: string;
@@ -668,15 +668,36 @@ function enrichRow(row: OpportunityRow): Enriched {
   const daysCls = daysNum == null ? "none" : daysNum <= 7 ? "urg" : daysNum <= 21 ? "soon" : "ok";
   const daysLabel = daysNum == null ? "—" : `${daysNum}d`;
 
-  let risk: "rp0" | "rp1" | "" = "";
-  let riskLabel = "Watch";
-  if (row.compliance_score != null) {
-    if (row.compliance_score < 40) { risk = "rp0"; riskLabel = "P0"; }
-    else if (row.compliance_score < 70) { risk = "rp1"; riskLabel = "P1"; }
-    else { riskLabel = "P2"; }
+  // Risk verdict — three layers in priority order:
+  //   1. Persisted classifyRisk verdict from sam-ingest / backfill (row.risk_level)
+  //   2. View-time deadline escalation: ≤3d → P0, ≤7d → at least P1
+  //      (mirrors helpers.ts daysOut >= 0 gate so expired deadlines don't fire;
+  //      escalation only PROMOTES, never demotes)
+  //   3. Audited rows w/o persisted risk_level fall back to compliance_score
+  let label: "P0" | "P1" | "P2" | "Watch" = "Watch";
+  if (row.risk_level === "P0" || row.risk_level === "P1" || row.risk_level === "P2" || row.risk_level === "Watch") {
+    label = row.risk_level;
+  } else if (row.compliance_score != null) {
+    if (row.compliance_score < 40) label = "P0";
+    else if (row.compliance_score < 70) label = "P1";
+    else label = "P2";
   } else if (row.recommendation === "DECLINE") {
-    risk = "rp0"; riskLabel = "P0";
+    label = "P0";
   }
+  if (row.response_deadline) {
+    const dl = Date.parse(row.response_deadline);
+    if (!Number.isNaN(dl)) {
+      const daysOut = (dl - Date.now()) / 86400000;
+      if (daysOut >= 0 && daysOut <= 3) {
+        label = "P0";
+      } else if (daysOut >= 0 && daysOut <= 7 && (label === "Watch" || label === "P2")) {
+        label = "P1";
+      }
+    }
+  }
+  const risk: Enriched["risk"] =
+    label === "P0" ? "rp0" : label === "P1" ? "rp1" : label === "P2" ? "rp2" : "";
+  const riskLabel = label;
 
   const sa = (row.set_aside || "").toLowerCase();
   let saCls: Enriched["saCls"] = "un";
@@ -690,7 +711,7 @@ function enrichRow(row: OpportunityRow): Enriched {
 }
 
 function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
-  const riskCls = r.risk === "rp0" ? "rk0" : r.risk === "rp1" ? "rk1" : "rkw";
+  const riskCls = r.risk === "rp0" ? "rk0" : r.risk === "rp1" ? "rk1" : r.risk === "rp2" ? "rk2" : "rkw";
   const nt = (r.row.notice_type || "").toLowerCase();
   const isPreSol = nt === "pre_sol" || nt === "sources_sought";
   return (

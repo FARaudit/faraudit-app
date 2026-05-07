@@ -83,6 +83,11 @@ export interface OpportunityRow {
   compliance_score: number | null;
   bid_no_bid: string | null;
   pdf_url: string | null;
+  // Migration 020: deterministic risk classifier verdict (sam-ingest stamps
+  // at write time; backfill-fields reconciles existing rows). UI combines
+  // this static verdict with response_deadline at render time.
+  risk_level: string | null;
+  response_deadline: string | null;
   created_at: string;
   processed_at: string | null;
 }
@@ -99,7 +104,10 @@ export async function fetchOpportunities(
   // solicitation_number was added in migration 019 (2026-05-07); RICH includes
   // it · BASIC stays without it so the page renders even if 019 hasn't been
   // applied yet (graceful degradation to notice_id fallback in the UI binding).
-  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  // risk_level + response_deadline added in migration 020 (2026-05-07); same
+  // graceful-degradation pattern — RICH includes them, BASIC stays without
+  // them, falls through if either migration is unapplied.
+  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   for (const cols of [RICH, BASIC]) {
     let q = client
@@ -114,7 +122,7 @@ export async function fetchOpportunities(
       if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
       throw new Error(`fetchOpportunities: ${error.message}`);
     }
-    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, ...(r as object) })) as OpportunityRow[];
+    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, ...(r as object) })) as OpportunityRow[];
   }
   return [];
 }
