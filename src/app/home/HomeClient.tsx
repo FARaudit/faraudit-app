@@ -728,7 +728,7 @@ function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
       </div>
       <span className="f-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
       <span className={`f-days ${r.daysCls === "none" ? "" : r.daysCls}`}>{r.daysLabel}</span>
-      <span className="f-type">{(r.row.document_type || "—").toUpperCase().slice(0, 6)}</span>
+      <span className="f-type" title={r.row.document_type || ""}>{r.row.document_type || "—"}</span>
       <span className={`f-sa sa-${r.saCls}`}>{r.saLabel}</span>
       <span className={`f-risk ${riskCls}`}>{r.riskLabel}</span>
     </div>
