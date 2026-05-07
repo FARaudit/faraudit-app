@@ -29,6 +29,11 @@ const queueNs: any = await import("./queue.ts");
 const queue = queueNs.default ?? queueNs;
 const { insertNew } = queue;
 
+// @ts-expect-error tsx
+const helpersNs: any = await import("./helpers.ts");
+const helpers = helpersNs.default ?? helpersNs;
+const { resolveAgency, classifyDocType } = helpers;
+
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
   .split(",").map((s) => s.trim()).filter(Boolean);
@@ -88,35 +93,6 @@ async function main() {
     return;
   }
 
-  // Map SAM.gov "type" string into our 3-bucket notice_type taxonomy.
-  // SAM strings observed: "Solicitation", "Combined Synopsis/Solicitation",
-  // "Presolicitation", "Sources Sought", "Special Notice", "Award Notice".
-  const classifyNoticeType = (t: string | null): "solicitation" | "pre_sol" | "sources_sought" => {
-    const s = (t || "").toLowerCase();
-    if (s.includes("sources sought")) return "sources_sought";
-    if (s.includes("presolicitation") || s.includes("pre-sol") || s.includes("pre sol")) return "pre_sol";
-    return "solicitation";
-  };
-
-  // Map a SAM opportunity "type" string to our document_type bucket if the
-  // string already encodes contract structure (IDIQ / BPA / Modification etc).
-  const classifyDocType = (t: string | null): string | null => {
-    const s = (t || "").toLowerCase();
-    if (s.includes("idiq")) return "IDIQ";
-    if (s.includes("bpa"))  return "BPA";
-    if (s.includes("task order")) return "Task Order";
-    if (s.includes("modification")) return "Modification";
-    return null;
-  };
-
-  // Map SAM opportunities → pending_audits rows. notice_type is NOT a column
-  // on pending_audits in apex-production (schema check 2026-05-04). Dropping it
-  // from the insert; downstream filters fall back to inspecting `notes` or the
-  // SAM type embedded in metadata. Phase 2 ticket: add notice_type column via
-  // migration if needed for first-class filtering. classifyNoticeType call
-  // retained but its result is discarded — keeps the function eligible for
-  // re-introduction without churn.
-  //
   // Filter (May 4 2026 · audit-ai crash diagnosis): skip opportunities where
   // resourceLinks is empty/null. These are typically NSN-prefixed DLA tiny
   // purchase orders ("61--MOTOR,ALTERNATING C") whose full description lives
@@ -128,7 +104,6 @@ async function main() {
   const audited: any[] = [];
   let droppedNoPdf = 0;
   for (const o of seenArr) {
-    void classifyNoticeType(o.type);
     const pdfUrl = o.resourceLinks?.[0] || null;
     if (!pdfUrl) {
       droppedNoPdf++;
@@ -136,8 +111,9 @@ async function main() {
     }
     audited.push({
       notice_id: o.noticeId,
+      solicitation_number: o.solicitationNumber || null,
       title: o.title || null,
-      agency: o.department || null,
+      agency: resolveAgency(o),
       naics_code: o.naicsCode || null,
       set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
       document_type: classifyDocType(o.type),

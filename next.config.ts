@@ -4,9 +4,13 @@ import type { NextConfig } from "next";
 // Tailwind v4 generates dynamic styles at runtime — 'unsafe-inline' style is required.
 // Next.js hydration ships inline scripts; without nonces we must allow 'unsafe-inline' script.
 // Anthropic + SAM.gov are called server-side only — never in connect-src.
+// Dev-only: React Refresh + Next.js Fast Refresh use eval() — gated to NODE_ENV=development
+// so production CSP stays strict.
+const isDev = process.env.NODE_ENV === "development";
+const scriptSrc = `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval' " : ""}https://va.vercel-scripts.com https://vercel.live`;
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://vercel.live",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",

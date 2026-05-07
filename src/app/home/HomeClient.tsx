@@ -59,6 +59,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
   const [naics, setNaics] = useState<string>("all");
   const [feedTs, setFeedTs] = useState<string>("just now");
   const [auditPrefill, setAuditPrefill] = useState<{ notice_id: string; title: string | null; agency: string | null; naics_code: string | null } | null>(null);
+  // Lifted so the Today tab's "Critical — Act Today" card can pre-apply the
+  // P0 filter when it switches to past-audits. Counter (auditP0Count) and
+  // PastAuditsPanel's "p0" filter both use compliance_score < 40 so the math
+  // is identical · numbers stay consistent across the click.
+  const [pastAuditsFilter, setPastAuditsFilter] = useState<"all" | "p0" | "ai" | "user">("all");
 
   const setTab = (next: TabKey) => {
     setTabState(next);
@@ -353,7 +358,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             {/* HOME */}
             <div className={`tab-panel ${tab === "home" ? "active" : ""}`}>
               <div className="situation-board">
-                <button className="sit-card urgent" onClick={() => setFilter("P0 · P1")}>
+                <button className="sit-card urgent" onClick={() => { setPastAuditsFilter("p0"); setTab("past-audits"); }}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--red)", marginBottom: 8 }}>⚠ Critical — Act Today</div>
                   {auditP0Count === 0 && recentAudits.length === 0 ? (
                     <div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--gold)", lineHeight: 1.4, padding: "8px 0" }}>Run your first audit to see traps.</div>
@@ -420,9 +425,9 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   </div>
                   <div className="feed-cols">
                     <div className="fcol">NAICS</div><div className="fcol">Solicitation</div>
-                    <div className="fcol">Agency</div><div className="fcol">Est. Value</div>
-                    <div className="fcol">Days</div><div className="fcol">Type</div>
-                    <div className="fcol">Set-Aside</div><div className="fcol">Risk</div>
+                    <div className="fcol">Agency</div><div className="fcol">Days</div>
+                    <div className="fcol">Type</div><div className="fcol">Set-Aside</div>
+                    <div className="fcol">Risk</div>
                   </div>
                   <div className="feed-scroll">
                     {filtered.length === 0 && (
@@ -536,7 +541,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                           });
                           setTab("audit");
                         }}>
-                          <span className="sr-num">{r.row.notice_id}</span>
+                          <span className="sr-num" title={r.row.notice_id}>{r.row.solicitation_number || r.row.notice_id}</span>
                           <span className="sr-title" title={r.row.title || ""}>{r.row.title || "—"}</span>
                           <span className="sr-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
                           <span className="sr-date">{new Date(r.row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
@@ -584,7 +589,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
             {/* PAST AUDITS */}
             <div className={`tab-panel ${tab === "past-audits" ? "active" : ""}`}>
-              <PastAuditsPanel audits={recentAudits} />
+              <PastAuditsPanel audits={recentAudits} filter={pastAuditsFilter} onFilterChange={setPastAuditsFilter} />
             </div>
 
             {/* CONTRACTING OFFICERS */}
@@ -722,7 +727,6 @@ function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
         </div>
       </div>
       <span className="f-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
-      <span className="f-val">—</span>
       <span className={`f-days ${r.daysCls === "none" ? "" : r.daysCls}`}>{r.daysLabel}</span>
       <span className="f-type">{(r.row.document_type || "—").toUpperCase().slice(0, 6)}</span>
       <span className={`f-sa sa-${r.saCls}`}>{r.saLabel}</span>
@@ -878,8 +882,15 @@ function SignOutButton() {
   );
 }
 
-function PastAuditsPanel({ audits }: { audits: AuditRow[] }) {
-  const [filter, setFilter] = useState<"all" | "p0" | "ai" | "user">("all");
+function PastAuditsPanel({
+  audits,
+  filter,
+  onFilterChange
+}: {
+  audits: AuditRow[];
+  filter: "all" | "p0" | "ai" | "user";
+  onFilterChange: (f: "all" | "p0" | "ai" | "user") => void;
+}) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     return audits.filter((a) => {
@@ -917,7 +928,7 @@ function PastAuditsPanel({ audits }: { audits: AuditRow[] }) {
             return (
               <button
                 key={f.k}
-                onClick={() => setFilter(f.k)}
+                onClick={() => onFilterChange(f.k)}
                 style={{
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",

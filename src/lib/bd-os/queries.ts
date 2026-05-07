@@ -69,6 +69,7 @@ export async function fetchCorpusStats(client: SupabaseClient): Promise<CorpusSt
 export interface OpportunityRow {
   id: string;
   notice_id: string;
+  solicitation_number: string | null;
   title: string | null;
   agency: string | null;
   naics_code: string | null;
@@ -95,7 +96,10 @@ export async function fetchOpportunities(
   // BASIC on every page load. Dropped from RICH; if/when migration 003 is
   // applied, add it back here. document_type and incumbent_name DO exist on
   // production (migrations 002 + 004 applied · schema probed 2026-05-04).
-  const RICH = "id, notice_id, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  // solicitation_number was added in migration 019 (2026-05-07); RICH includes
+  // it · BASIC stays without it so the page renders even if 019 hasn't been
+  // applied yet (graceful degradation to notice_id fallback in the UI binding).
+  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   for (const cols of [RICH, BASIC]) {
     let q = client
@@ -110,7 +114,7 @@ export async function fetchOpportunities(
       if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
       throw new Error(`fetchOpportunities: ${error.message}`);
     }
-    return ((data || []) as unknown[]).map((r) => ({ document_type: null, notice_type: null, incumbent_name: null, ...(r as object) })) as OpportunityRow[];
+    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, ...(r as object) })) as OpportunityRow[];
   }
   return [];
 }

@@ -17,6 +17,7 @@ export const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 
 export interface PendingAuditInsert {
   notice_id: string;
+  solicitation_number?: string | null;
   title?: string | null;
   agency?: string | null;
   naics_code?: string | null;
