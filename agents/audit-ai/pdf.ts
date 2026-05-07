@@ -1,3 +1,16 @@
+// Cron worker PDF helpers.
+//
+// IMPORTANT: fetchPdfFromSam below mirrors src/lib/sam-pdf.ts:fetchPdfFromSamUrl.
+// The two paths must stay in sync — both perform api-key auth, magic-byte
+// verification, redirect: "follow", and a 30s timeout. Do not edit one
+// without updating the other.
+//
+// We keep this copy local rather than importing from src/lib/ because the
+// Railway audit-ai service's module resolution for cross-folder static
+// imports is not battle-tested (existing src/lib/ imports in index.ts are
+// dynamic via tsx). Avoiding deploy risk on a daily cron is worth the
+// 15 lines of duplication.
+
 import { readFile } from "node:fs/promises";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
@@ -8,7 +21,6 @@ export interface PdfFetchResult {
   source: "local" | "sam.gov";
 }
 
-// Magic-byte verification — defense in depth against rename attacks.
 const PDF_MAGIC = Buffer.from("%PDF", "ascii");
 function isPdfMagicValid(buf: Buffer): boolean {
   return buf.length >= 4 && buf.subarray(0, 4).equals(PDF_MAGIC);

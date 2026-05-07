@@ -98,6 +98,7 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
   const risks = deriveRisks(risksJson);
   const summary = String(overviewJson.summary || "");
   const notes = (audit.notes as string) || "";
+  const isMetadataOnly = (compJson.pdf_source as string | undefined) === "sam_unavailable";
 
   const verdictColor = recommendation === "PROCEED" ? "#10B981" : recommendation === "DECLINE" ? "#EF4444" : "#F59E0B";
 
@@ -128,6 +129,14 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
           <Text style={[styles.scorePill, { color: "#0f172a", borderColor: "#94a3b8" }]}>SCORE {score}/100</Text>
         </View>
 
+        {isMetadataOnly && (
+          <View style={{ marginBottom: 14, padding: "8pt 10pt", border: "1pt solid #F59E0B", backgroundColor: "#FEF6E1" }}>
+            <Text style={{ fontSize: 9, color: "#B45309", lineHeight: 1.5 }}>
+              Metadata-only audit · Solicitation document not retrievable from SAM. Upload PDF to unlock full FAR/DFARS clause inventory.
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.sectionEyebrow}>SECTION 1 · CLASSIFICATION</Text>
         <Text style={styles.sectionTitle}>Document type: {docType}</Text>
         <Text style={styles.body}>{(audit.document_type_rationale as string) || "No rationale recorded."}</Text>
@@ -138,9 +147,15 @@ function AuditDoc({ audit, generatedAt }: AuditDocProps): React.ReactElement {
 
         <Text style={styles.sectionEyebrow}>SECTION 3 · COMPLIANCE</Text>
         {farClauses.length === 0 && dfarsClauses.length === 0 ? (
-          <Text style={styles.body}>
-            Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
-          </Text>
+          isMetadataOnly ? (
+            <Text style={styles.body}>
+              Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
+            </Text>
+          ) : (
+            <Text style={styles.body}>
+              No FAR or DFARS clauses were extracted from this document. The audit ran with a PDF, so the engine attempted full clause extraction — review the PDF directly to confirm.
+            </Text>
+          )
         ) : (
           <>
             <Text style={styles.sectionTitle}>FAR ({farClauses.length}) · DFARS ({dfarsClauses.length})</Text>

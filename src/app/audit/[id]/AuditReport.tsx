@@ -105,6 +105,8 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
     ? (compJson.dfars_flags as DFARSFlag[])
     : [];
   const trapCount = dfarsFlags.filter((f) => f.detected).length;
+  const pdfSource = (compJson.pdf_source as string | undefined) || undefined;
+  const isMetadataOnly = pdfSource === "sam_unavailable";
 
   const clins: CLIN[] = Array.isArray(compJson.clins) ? (compJson.clins as CLIN[]) : [];
 
@@ -139,6 +141,26 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
             <KOEmailButton auditId={id} />
           </div>
         </header>
+
+        {isMetadataOnly && (
+          <div
+            style={{
+              margin: "0 0 18px",
+              padding: "10px 14px",
+              border: "1px solid var(--amber)",
+              background: "rgba(245,158,11,.06)",
+              color: "var(--amber)",
+              borderRadius: 4,
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              lineHeight: 1.5,
+              fontWeight: 600,
+              letterSpacing: ".02em"
+            }}
+          >
+            Metadata-only audit · Solicitation document not retrievable from SAM. Upload PDF to unlock full FAR/DFARS clause inventory.
+          </div>
+        )}
 
         <div className="report-body">
           {/* Title + meta */}
@@ -223,9 +245,15 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                 <div className="report-section-eyebrow">Section 3 · Compliance</div>
                 <h2 className="report-section-title">FAR / DFARS</h2>
                 {farClauses.length === 0 && dfarsClauses.length === 0 ? (
-                  <p className="empty-block" style={{ marginTop: 12, lineHeight: 1.55 }}>
-                    Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
-                  </p>
+                  isMetadataOnly ? (
+                    <p className="empty-block" style={{ marginTop: 12, lineHeight: 1.55 }}>
+                      Clause inventory requires the full RFP PDF. Download the solicitation from SAM.gov and re-upload here for clause-by-clause compliance audit.
+                    </p>
+                  ) : (
+                    <p className="empty-block" style={{ marginTop: 12, lineHeight: 1.55 }}>
+                      No FAR or DFARS clauses were extracted from this document. The audit ran with a PDF, so the engine attempted full clause extraction — review the PDF directly to confirm.
+                    </p>
+                  )
                 ) : (
                   <>
                 <div className="compliance-summary">

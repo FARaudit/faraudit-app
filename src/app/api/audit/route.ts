@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
-import { runAudit } from "@/lib/audit-engine";
+import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
+import { runAudit, type PdfSource } from "@/lib/audit-engine";
 import {
   noticeIdSchema,
   pdfFileSchema,
@@ -148,7 +149,8 @@ export async function POST(req: NextRequest) {
       typeOfSetAside: null,
       postedDate: null,
       responseDeadLine: null,
-      description: `(PDF upload: ${safeName}, ${(pdf.size / 1024).toFixed(0)} KB — Claude reads attached document directly.)`
+      description: `(PDF upload: ${safeName}, ${(pdf.size / 1024).toFixed(0)} KB — Claude reads attached document directly.)`,
+      resourceLinks: []
     };
   }
 
@@ -157,7 +159,35 @@ export async function POST(req: NextRequest) {
   }
 
   // ━━ PDF base64 for Claude document content block ━━
-  const pdfBase64 = pdfBuffer ? pdfBuffer.toString("base64") : null;
+  // Three sources, in priority order:
+  //   1. User upload (pdfBuffer set above) → pdfSource="uploaded"
+  //   2. Notice ID + no upload + SAM resourceLinks present → fetch the PDF
+  //      → pdfSource="sam_fetched"
+  //   3. Notice ID + no upload + (no resourceLinks OR fetch fails OR magic
+  //      bytes invalid OR oversize) → pdfSource="sam_unavailable" with
+  //      reason captured for diagnostics. Audit still runs metadata-only.
+  let pdfBase64 = pdfBuffer ? pdfBuffer.toString("base64") : null;
+  let pdfSource: PdfSource = pdfBase64 ? "uploaded" : "sam_unavailable";
+  let pdfUnavailableReason: string | null = null;
+
+  if (!pdfBase64 && noticeId && solicitation.resourceLinks.length > 0) {
+    try {
+      const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
+      if (fetched.bytes > MAX_PDF_BYTES) {
+        pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
+      } else {
+        pdfBase64 = fetched.base64;
+        pdfSource = "sam_fetched";
+      }
+    } catch (err) {
+      pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+    }
+  } else if (!pdfBase64 && noticeId) {
+    pdfUnavailableReason =
+      solicitation.resourceLinks.length === 0
+        ? "no resourceLinks on SAM opportunity"
+        : "missing PDF source";
+  }
 
   // ━━ Insert pending audit row ━━
   const { data: audit, error: insertError } = await supabase
@@ -186,7 +216,7 @@ export async function POST(req: NextRequest) {
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   try {
-    const result = await runAudit({ solicitation, pdfBase64 });
+    const result = await runAudit({ solicitation, pdfBase64, pdfSource, pdfUnavailableReason });
 
     const { error: updateError } = await supabase
       .from("audits")

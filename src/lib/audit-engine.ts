@@ -103,7 +103,17 @@ export interface ComplianceJSON {
   clins?: CLIN[];
   section_l_summary?: string;
   section_m_summary?: string;
+  // Stamped by runAudit so the report renderer can show a "metadata-only"
+  // partial badge when SAM didn't have a PDF for the notice. JSONB carries
+  // it without a schema migration.
+  pdf_source?: PdfSource;
+  pdf_unavailable_reason?: string | null;
 }
+
+// PdfSource indicates where the audit's PDF context came from. The report
+// renderer reads this to decide whether to surface a partial-audit badge
+// and gate the "requires the full RFP PDF" placeholder.
+export type PdfSource = "uploaded" | "sam_fetched" | "sam_unavailable";
 
 export interface RisksJSON {
   technical_risks?: string[];
@@ -250,6 +260,10 @@ export interface AuditResult {
 export interface AuditInput {
   solicitation: unknown;
   pdfBase64?: string | null;
+  // Provenance of the PDF (or lack thereof) the audit ran with. The route
+  // sets this; runAudit stamps it onto compliance.json.pdf_source.
+  pdfSource?: PdfSource;
+  pdfUnavailableReason?: string | null;
 }
 
 const DOC_TYPE_HINTS: Record<DocumentType, string> = {
@@ -486,6 +500,8 @@ JSON only, no prose.`;
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64 } = input;
+  const pdfSource: PdfSource = input.pdfSource ?? (pdfBase64 ? "uploaded" : "sam_unavailable");
+  const pdfUnavailableReason = input.pdfUnavailableReason ?? null;
   const rawText = JSON.stringify(solicitation).slice(0, 4000);
   const { sanitized: solText, redactionCount } = sanitizePdfText(rawText);
   if (redactionCount > 0) {
@@ -614,6 +630,8 @@ JSON only.`;
 
   // Engine post-processing
   complianceJson.dfars_flags = parseDFARSTraps(complianceJson);
+  complianceJson.pdf_source = pdfSource;
+  complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
   let prioritized = assignRiskPriority(risksJson);
 
   // Fallback — never let prioritized_risks be empty. Synthesize one entry that
@@ -631,7 +649,12 @@ JSON only.`;
 
   const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
   const riskPenalty = severity * 5;
-  const compliance_score = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // Truthful capping: a metadata-only audit can't competently say "Acceptable"
+  // because it never read the SOW. Cap at 60 so recommendation falls into
+  // CAUTION or worse — prevents false positives that could mislead a
+  // customer into a bad bid. Honest data over flattering data.
+  const compliance_score = pdfSource === "sam_unavailable" ? Math.min(rawScore, 60) : rawScore;
 
   let recommendation: AuditResult["recommendation"];
   if (compliance_score >= 70) recommendation = "PROCEED";

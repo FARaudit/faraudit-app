@@ -12,6 +12,11 @@ export interface Solicitation {
   postedDate: string | null;
   responseDeadLine: string | null;
   description: string;
+  // SAM v2 returns resourceLinks for opportunities that have an attached PDF
+  // (Solicitation, Combined Synopsis/Solicitation). Captured here so the
+  // /api/audit Notice ID path can auto-download the PDF and run the full
+  // 4-call audit instead of the metadata-only degraded path.
+  resourceLinks: string[];
 }
 
 export async function fetchSolicitationByNoticeId(
@@ -43,7 +48,8 @@ export async function fetchSolicitationByNoticeId(
       typeOfSetAside: o.typeOfSetAside ?? null,
       postedDate: o.postedDate ?? null,
       responseDeadLine: o.responseDeadLine ?? null,
-      description: (o.description || "").slice(0, 4000)
+      description: (o.description || "").slice(0, 4000),
+      resourceLinks: Array.isArray(o.resourceLinks) ? (o.resourceLinks as string[]) : []
     };
   } catch {
     return null;
