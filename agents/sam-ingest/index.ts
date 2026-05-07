@@ -43,6 +43,12 @@ const DAILY_WINDOW_DAYS = Number(process.env.BACKFILL_DAYS) || Number(process.en
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
 const DRY_RUN = process.env.DRY_RUN === "true";
 
+// TODO(v1): Add archived_at column to pending_audits and have cron mark
+// notices as archived when responseDeadLine has passed. Currently the feed
+// shows expired notices as live opportunities, which is a demo-killer for
+// prospects. Risk classifier already excludes expired deadlines from P0/P1
+// (helpers.ts daysOut >= 0 gate) but the rows themselves remain in the feed.
+
 async function main() {
   const startedAt = new Date();
   console.log(`[sam-ingest] start ${startedAt.toISOString()} · DRY_RUN=${DRY_RUN}`);

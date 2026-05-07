@@ -78,7 +78,12 @@ const riskCases: Case<any, string>[] = [
   { label: "P2 · sources sought + matching title", input: { ...baseOpp, type: "Sources Sought", title: "RFI for advanced manufacturing" }, expected: "P2" },
   { label: "Watch · vanilla solicitation, no triggers", input: { ...baseOpp, responseDeadLine: inDays(30) },                        expected: "Watch" },
   { label: "Precedence · deadline≤3d AND CMMC text → still P0 (one verdict)", input: { ...baseOpp, responseDeadLine: inDays(2), description: "CMMC Level 2 required" }, expected: "P0" },
-  { label: "Precedence · deadline=10d AND IDIQ → P1 (deadline rule skipped, doc_type fires)", input: { ...baseOpp, responseDeadLine: inDays(10), type: "IDIQ Solicitation" }, expected: "P1" }
+  { label: "Precedence · deadline=10d AND IDIQ → P1 (deadline rule skipped, doc_type fires)", input: { ...baseOpp, responseDeadLine: inDays(10), type: "IDIQ Solicitation" }, expected: "P1" },
+  // Boundary tests — lock in the expired/null/zero-day deadline behavior so a
+  // future refactor can't silently flood P0 with dead notices again.
+  { label: "Boundary · expired deadline (-3d) does NOT fire P0/P1, falls through to Watch", input: { ...baseOpp, responseDeadLine: inDays(-3) }, expected: "Watch" },
+  { label: "Boundary · null deadline does NOT fire P0/P1 (vanilla solicitation falls to Watch)", input: { ...baseOpp, responseDeadLine: null },  expected: "Watch" },
+  { label: "Boundary · deadline=0d (due now) DOES fire P0",                                  input: { ...baseOpp, responseDeadLine: inDays(0) },  expected: "P0"    }
 ];
 
 console.log("── classifyDocType ──");

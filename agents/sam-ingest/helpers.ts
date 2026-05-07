@@ -64,12 +64,14 @@ export function classifyRisk(
 
   // ─── P0 (deal-breaker) ─────────────────────────────────────────────────
   // Deadline window — proximate-impact: a closing-tomorrow opportunity is
-  // P0 regardless of what's in the SOW.
+  // P0 regardless of what's in the SOW. Lower-bounded at 0 so expired
+  // deadlines (negative daysOut) fall through to other rules. Without this
+  // bound the corpus floods P0 with dead notices the cron never archived.
   if (o.responseDeadLine) {
     const deadline = Date.parse(o.responseDeadLine);
     if (!Number.isNaN(deadline)) {
       const daysOut = (deadline - now.getTime()) / 86400000;
-      if (daysOut <= 3) return "P0";
+      if (daysOut >= 0 && daysOut <= 3) return "P0";
     }
   }
   // DFARS trap clauses cited in description excerpt. These disqualify a
@@ -79,11 +81,12 @@ export function classifyRisk(
   if (CMMC_RE.test(desc)) return "P0";
 
   // ─── P1 (major risk) ───────────────────────────────────────────────────
+  // Same lower bound as P0 — expired deadlines don't trip P1 either.
   if (o.responseDeadLine) {
     const deadline = Date.parse(o.responseDeadLine);
     if (!Number.isNaN(deadline)) {
       const daysOut = (deadline - now.getTime()) / 86400000;
-      if (daysOut <= 7) return "P1";
+      if (daysOut >= 0 && daysOut <= 7) return "P1";
     }
   }
   // Proposal-effort proxy: complex contract structures eat capture-team time.
