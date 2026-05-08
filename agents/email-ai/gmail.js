@@ -6,10 +6,12 @@ export class GmailClient {
     this.labelCache = null;
   }
 
-  async listInboxThreads(maxResults = 100, watermarkUnixSec = null) {
+  async listInboxThreads(maxResults = 100, watermarkUnixSec = null, queryOverride = null) {
     // Watermark uses Gmail's `after:<unix-seconds>` operator. When null, fetch
     // the entire inbox (capped at maxResults) — used for first-run backfill.
-    const q = watermarkUnixSec ? `in:inbox after:${watermarkUnixSec}` : 'in:inbox';
+    // queryOverride lets the caller force a specific Gmail search (e.g. the
+    // dry-run "all unread regardless of watermark" mode).
+    const q = queryOverride || (watermarkUnixSec ? `in:inbox after:${watermarkUnixSec}` : 'in:inbox');
     const res = await this.gmail.users.threads.list({
       userId: 'me',
       q,

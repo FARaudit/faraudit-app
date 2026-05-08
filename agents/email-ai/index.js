@@ -33,6 +33,10 @@ const GMAIL_USER = (process.env.GMAIL_USER || 'jose@faraudit.com').toLowerCase()
 const DRY_RUN_REPORT_PATH = process.env.DRY_RUN_REPORT_PATH || '/tmp/email-ai-dry-run.md';
 const WAITING_PROMOTION_AGE_HOURS = 72;
 const READ_AUTO_ARCHIVE_DAYS = 7;
+// Phase-3-only override: classify the entire current unread inbox in one shot,
+// ignoring the watermark. Used to satisfy the spec's "classify all ~57+ unread"
+// audit before flipping DRY_RUN=false. Has no effect outside DRY_RUN.
+const FRESH_SCAN = process.env.FRESH_SCAN === 'true';
 
 function bootDiagnostics() {
   const have = (k) => {
@@ -325,12 +329,14 @@ async function run() {
   }
 
   // ── Fetch unread inbox window ──────────────────────────────────────
-  const watermark = state.last_run_at ? Math.floor(new Date(state.last_run_at).getTime() / 1000) : null;
-  const cap = watermark ? RUN_CAP : FIRST_RUN_CAP;
+  const useFreshScan = DRY_RUN && FRESH_SCAN;
+  const watermark = (!useFreshScan && state.last_run_at) ? Math.floor(new Date(state.last_run_at).getTime() / 1000) : null;
+  const cap = (useFreshScan || !watermark) ? FIRST_RUN_CAP : RUN_CAP;
+  const queryOverride = useFreshScan ? 'in:inbox is:unread' : null;
 
   let threadStubs;
   try {
-    threadStubs = await client.listInboxThreads(cap + 1, watermark);
+    threadStubs = await client.listInboxThreads(cap + 1, watermark, queryOverride);
   } catch (e) {
     const msg = String(e?.message || e);
     if (/invalid_grant|invalid_token|unauthorized_client/i.test(msg)) {
@@ -490,10 +496,20 @@ async function run() {
         reason: verdict.reason,
       });
 
+      // Map new 6-bucket label → legacy email_processing_log.tier value the
+      // existing CHECK constraint accepts (action|monitor|archive|skip). The
+      // real label lives on the Gmail thread + in rule_name; this is just to
+      // keep the legacy audit table appendable until its tier constraint is
+      // dropped in a follow-up migration.
+      const legacyTier = ({
+        NOW: 'action', WAITING: 'action',
+        THIS_WEEK: 'monitor', READ: 'monitor',
+        ARCHIVE: 'archive', DELETE: 'archive',
+      })[verdict.label] || 'archive';
       logRows.push({
         thread_id: t.id,
         rule_name: `claude:${verdict.label}`,
-        tier: verdict.label.toLowerCase(),
+        tier: legacyTier,
         category: verdict.label.toLowerCase(),
         labels_added: addLabelIds,
         labels_removed: removeLabelIds,
@@ -531,7 +547,9 @@ async function run() {
     });
   }
 
-  // ── DRY_RUN report (filesystem only; not pushed to DB) ─────────────
+  // ── DRY_RUN report (filesystem + stdout) ───────────────────────────
+  // Stdout copy is for Railway log capture — container /tmp is ephemeral
+  // and `railway logs` is the only readable surface in production.
   if (DRY_RUN) {
     try {
       const md = buildDryRunReport({
@@ -543,6 +561,9 @@ async function run() {
       });
       writeFileSync(DRY_RUN_REPORT_PATH, md);
       console.log(`[email-ai DRY_RUN] report written to ${DRY_RUN_REPORT_PATH}`);
+      console.log('───── BEGIN DRY_RUN REPORT ─────');
+      console.log(md);
+      console.log('───── END DRY_RUN REPORT ─────');
     } catch (e) {
       console.error('[email-ai DRY_RUN] report write FAIL:', e.message);
     }
