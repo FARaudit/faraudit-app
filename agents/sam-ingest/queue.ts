@@ -41,6 +41,15 @@ export interface PendingAuditInsert {
 // hit "existence check:" with no error body when passing 2539 IDs at once.
 const BATCH = 100;
 
+// Doctrine cap (P0-1, 2026-05-08): pending_audits queue must not exceed
+// PENDING_QUEUE_CAP rows in status='pending'. Audit-AI processes 50/day,
+// so anything beyond this just sits until its response deadline passes
+// and becomes irrelevant — and it falsely inflates the "1,200 pending"
+// alarm count on dashboards. Cap is enforced at insert time. Existing
+// excess (1,125 rows when this shipped) is trimmed via a one-shot SQL
+// purge applied separately via Supabase Studio.
+export const PENDING_QUEUE_CAP = 100;
+
 export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted: number; skipped: number }> {
   if (rows.length === 0) return { inserted: 0, skipped: 0 };
 
@@ -58,9 +67,31 @@ export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted:
   const fresh = rows.filter((r) => !existingSet.has(r.notice_id));
   if (fresh.length === 0) return { inserted: 0, skipped: rows.length };
 
+  // Cap enforcement: never push the queue past PENDING_QUEUE_CAP. Query
+  // current pending count and slice fresh accordingly. If queue is already
+  // at/over cap, insert nothing this run.
+  const { count: currentPending, error: countErr } = await supabase
+    .from("pending_audits")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (countErr) {
+    throw new Error(`pending count check: ${countErr.message || JSON.stringify(countErr)}`);
+  }
+  const capacity = Math.max(0, PENDING_QUEUE_CAP - (currentPending ?? 0));
+  const droppedToCap = Math.max(0, fresh.length - capacity);
+  const capped = fresh.slice(0, capacity);
+
+  if (droppedToCap > 0) {
+    console.log(`[sam-ingest queue] cap enforced · current_pending=${currentPending} cap=${PENDING_QUEUE_CAP} capacity=${capacity} dropped_to_cap=${droppedToCap} · inserting ${capped.length} of ${fresh.length} fresh rows`);
+  }
+
+  if (capped.length === 0) {
+    return { inserted: 0, skipped: rows.length };
+  }
+
   let inserted = 0;
-  for (let i = 0; i < fresh.length; i += BATCH) {
-    const slice = fresh.slice(i, i + BATCH);
+  for (let i = 0; i < capped.length; i += BATCH) {
+    const slice = capped.slice(i, i + BATCH);
     const { error: insertErr, count } = await supabase
       .from("pending_audits")
       .insert(slice.map((r) => ({ ...r, status: "pending" })), { count: "exact" });
@@ -68,5 +99,5 @@ export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted:
     inserted += count ?? slice.length;
   }
 
-  return { inserted, skipped: existingSet.size };
+  return { inserted, skipped: existingSet.size + droppedToCap };
 }
