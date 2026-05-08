@@ -1,6 +1,9 @@
 import { supabase } from "./queue.js";
-import type { AuditResult } from "../../src/lib/audit-engine.ts";
-import type { Solicitation } from "../../src/lib/sam.ts";
+// Type-only imports use the vendored siblings (parity-locked with src/lib/).
+// `import type` is erased at runtime by tsx so it wouldn't crash on Railway,
+// but pointing at siblings keeps the agent self-contained at compile time too.
+import type { AuditResult } from "./audit-engine.ts";
+import type { Solicitation } from "./sam.ts";
 
 // Bot-driven audit row source — keeps Audit AI runs distinguishable from
 // CEO-uploaded audits in the same `audits` table. The route.ts uploads use

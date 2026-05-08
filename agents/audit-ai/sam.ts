@@ -1,7 +1,16 @@
-// PARITY NOTE: agents/audit-ai/sam.ts is a byte-equivalent vendored copy of
-// this file. Any edit here MUST be applied to that file in the same commit.
-// The Audit-AI cron can't import from src/lib/ at runtime (Railway Root
-// Directory = agents/audit-ai/ means src/ isn't in the container).
+// PARITY-LOCKED VENDOR COPY of src/lib/sam.ts.
+//
+// Why this duplicate exists: Railway's Audit-AI service is configured with
+// Root Directory = agents/audit-ai/. That means the deployed container has
+// /app/index.ts but no /app/src/. Cross-folder imports like
+// `../../src/lib/sam.ts` resolve to the filesystem root /src/... at runtime
+// and crash with ERR_MODULE_NOT_FOUND. Locally it works because the dev tree
+// has src/ alongside agents/, but Railway's image doesn't ship it.
+//
+// IMPORTANT: keep in sync with src/lib/sam.ts. The two files MUST stay
+// byte-equivalent below this header. Any edit must be applied to both files
+// in the same commit. Same parity-pattern as agents/audit-ai/pdf.ts ↔
+// src/lib/sam-pdf.ts established during P0-A.
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 

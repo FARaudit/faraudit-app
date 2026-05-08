@@ -32,10 +32,16 @@ const corpusNs: any = await import("./corpus.ts");
 const corpus = corpusNs.default ?? corpusNs;
 const recordAudit = corpus.recordAudit;
 
+// Engine + sam are vendored as sibling files (agents/audit-ai/audit-engine.ts
+// and agents/audit-ai/sam.ts) because Railway's Root Directory = agents/audit-ai/
+// means /app/ ships only this folder — no /app/src/ exists in the container.
+// Cross-folder `../../src/lib/...` imports resolved to /src/lib/... and threw
+// ERR_MODULE_NOT_FOUND at module load. Parity-locked with src/lib/ via header
+// comments in the vendor files.
 // @ts-expect-error see above
-const engineNs: any = await import("../../src/lib/audit-engine.ts");
+const engineNs: any = await import("./audit-engine.ts");
 // @ts-expect-error see above
-const samNs: any = await import("../../src/lib/sam.ts");
+const samNs: any = await import("./sam.ts");
 
 // Handle ESM/CJS interop quirk under tsx — runAudit and fetchSolicitationByNoticeId
 // may be on .default depending on how tsx loaded the module.
