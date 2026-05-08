@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const token = searchParams.get("token");
-  const digestToken = process.env.DIGEST_ACCESS_TOKEN || "apex-digest-2026";
+  const digestToken = process.env.CRON_SECRET || "apex-digest-2026";
 
   if (token !== digestToken) {
     return new NextResponse("Access denied", { status: 401 });
