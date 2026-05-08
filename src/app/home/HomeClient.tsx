@@ -2567,7 +2567,7 @@ function ProtestPanel() {
 }
 
 function RegulatoryPanel() {
-  const [data, setData] = useState<{ updates: Array<{ source: string; clause: string | null; title: string; summary: string | null; link: string; published_at: string | null; affects_clauses: string[] }> } | null>(null);
+  const [data, setData] = useState<{ updates: Array<{ source: string; clause: string | null; title: string; summary: string | null; link: string; published_at: string | null; affects_clauses: string[] }>; fetched_at?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [filterClause, setFilterClause] = useState("");
@@ -2605,7 +2605,13 @@ function RegulatoryPanel() {
         </div>
         {loading && <div className="empty-block">Loading regulatory feeds…</div>}
         {err && <div className="ko-status error">{err}</div>}
-        {data && data.updates.length === 0 && <div className="empty-state">No updates match this filter.</div>}
+        {data && data.updates.length === 0 && (
+          <div className="empty-state">
+            {filterClause
+              ? `No updates match "${filterClause}". Clear the filter to see the full feed.`
+              : "Awaiting first regulatory refresh — pulls FAR · DFARS · Federal Register on demand and caches 6h. Reload after the next fetch window if this stays empty."}
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 14 }}>
           {data?.updates.map((u, i) => (
             <a key={i} href={u.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px", textDecoration: "none", color: "inherit" }}>
