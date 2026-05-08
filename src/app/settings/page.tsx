@@ -218,7 +218,9 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <Row label="User ID" value={profile.id ? profile.id.slice(0, 8) + "…" + profile.id.slice(-4) : "—"} mono />
+          {/* User UUID hidden — partial display ("135cb5c6…c797") leaks
+              internal identifiers without giving the user anything actionable.
+              Email already uniquely identifies the account on this page. */}
           <Row label="Member since" value={memberSince ?? "—"} />
           <div style={{ marginTop: 16, borderTop: `1px solid ${BORDER}`, paddingTop: 14 }}>
             <button
