@@ -96,11 +96,11 @@ export async function GET(req: NextRequest) {
   // Aggregate: CMMC distribution across all audits.
   const { data: audits } = await supabase
     .from("audits")
-    .select("id, notice_id, agency, compliance_json")
+    .select("id, notice_id, solicitation_number, agency, compliance_json")
     .limit(500);
 
   const distribution: Record<"0" | "1" | "2" | "3", number> = { "0": 0, "1": 0, "2": 0, "3": 0 };
-  const recentByLevel: Record<"1" | "2" | "3", Array<{ id: string; notice_id: string | null; agency: string | null }>> = { "1": [], "2": [], "3": [] };
+  const recentByLevel: Record<"1" | "2" | "3", Array<{ id: string; notice_id: string | null; solicitation_number: string | null; agency: string | null }>> = { "1": [], "2": [], "3": [] };
   for (const a of (audits || []) as Array<Record<string, unknown>>) {
     const level = inferLevel(a);
     distribution[level] += 1;
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
       recentByLevel[level].push({
         id: String(a.id),
         notice_id: (a.notice_id as string) || null,
+        solicitation_number: (a.solicitation_number as string) || null,
         agency: (a.agency as string) || null
       });
     }

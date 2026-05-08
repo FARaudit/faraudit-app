@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase-server";
 import StreamingText from "@/components/StreamingText";
+import { auditHref } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 
 interface AuditRow {
-  id: number;
+  id: string;
   notice_id: string;
+  solicitation_number: string | null;
   title: string | null;
   document_type: string | null;
   recommendation: string | null;
@@ -27,7 +29,7 @@ export default async function DashboardPage() {
   const [{ data: audits }, { count: emails }, { count: solicitationsCount }] = await Promise.all([
     sb
       .from("audits")
-      .select("id, notice_id, title, document_type, recommendation, compliance_score, ko_email_sent, status, created_at")
+      .select("id, notice_id, solicitation_number, title, document_type, recommendation, compliance_score, ko_email_sent, status, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
     sb.from("audits").select("id", { count: "exact", head: true }).eq("ko_email_sent", true),
@@ -125,7 +127,7 @@ No preamble. Bullets only. Each ≤25 words.`;
                       </td>
                       <td className="px-4 py-2 text-xs text-text-3 uppercase">{a.status}</td>
                       <td className="px-4 py-2 text-right">
-                        <Link href={`/audit/${a.id}`} className="text-xs text-accent hover:text-mid">
+                        <Link href={auditHref(a)} className="text-xs text-accent hover:text-mid">
                           View
                         </Link>
                       </td>

@@ -194,14 +194,14 @@ export interface AgencyRow {
   avg_score: number | null;
   top_traps: { clause: string; count: number }[];
   top_naics: { code: string; count: number }[];
-  recent: { id: string; notice_id: string | null; title: string | null; compliance_score: number | null; created_at: string }[];
+  recent: { id: string; notice_id: string | null; solicitation_number: string | null; title: string | null; compliance_score: number | null; created_at: string }[];
   win_rate: number | null;
 }
 
 export async function fetchAgencyStats(client: SupabaseClient): Promise<AgencyRow[]> {
   const { data: audits } = await client
     .from("audits")
-    .select("id, agency, notice_id, title, naics_code, compliance_score, outcome, created_at")
+    .select("id, agency, notice_id, solicitation_number, title, naics_code, compliance_score, outcome, created_at")
     .not("agency", "is", null)
     .order("created_at", { ascending: false })
     .limit(2000);
@@ -223,6 +223,7 @@ export async function fetchAgencyStats(client: SupabaseClient): Promise<AgencyRo
       row.recent.push({
         id: String(a.id),
         notice_id: (a.notice_id as string) ?? null,
+        solicitation_number: (a.solicitation_number as string) ?? null,
         title: (a.title as string) ?? null,
         compliance_score: typeof a.compliance_score === "number" ? (a.compliance_score as number) : null,
         created_at: String(a.created_at)

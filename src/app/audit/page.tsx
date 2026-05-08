@@ -56,7 +56,8 @@ export default function AuditPage() {
         return;
       }
 
-      router.push(`/audit/${data.auditId}`);
+      const slug = (data.solicitationNumber as string | null)?.trim();
+      router.push(`/audit/${slug ? slug.toLowerCase() : data.auditId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setSubmitting(false);

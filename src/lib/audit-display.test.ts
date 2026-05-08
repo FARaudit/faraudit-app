@@ -3,7 +3,7 @@
 // synthetic-ID edge case so future refactors can't silently re-introduce
 // UUID/hex/pdf-timestamp leaks across Pipeline / Recent Audits / Past Audits.
 
-import { auditDisplayName, displaySolicitationId } from "./audit-display";
+import { auditDisplayName, auditHref, displaySolicitationId } from "./audit-display";
 
 interface Case<T = string | RegExp> { label: string; input: any; expected: T }
 
@@ -68,10 +68,27 @@ const run = (label: string, got: string, expected: string | RegExp) => {
   if (!ok) console.log(`        expected: ${expected instanceof RegExp ? expected.toString() : JSON.stringify(expected)} · got: ${JSON.stringify(got)}`);
 };
 
+// auditHref locks in slug-preference: solicitation_number lowercased wins;
+// missing or blank sol# falls through to UUID id. Future regressions on the
+// /audit/[id] slug route would let internal UUIDs leak back into share URLs.
+const auditHrefCases: Case[] = [
+  { label: "T14 · auditHref lowercases solicitation_number slug",
+    input: { id: "abc-uuid", solicitation_number: "FA301626Q0068" },
+    expected: "/audit/fa301626q0068" },
+  { label: "T15 · auditHref falls back to UUID when sol# null",
+    input: { id: "11111111-2222-3333-4444-555555555555", solicitation_number: null },
+    expected: "/audit/11111111-2222-3333-4444-555555555555" },
+  { label: "T16 · auditHref falls back to UUID when sol# is blank string",
+    input: { id: "abc", solicitation_number: "  " },
+    expected: "/audit/abc" }
+];
+
 console.log("── auditDisplayName ──");
 for (const c of auditDisplayNameCases) run(c.label, auditDisplayName(c.input), c.expected);
 console.log("\n── displaySolicitationId ──");
 for (const c of displaySolCases) run(c.label, displaySolicitationId(c.input), c.expected);
+console.log("\n── auditHref ──");
+for (const c of auditHrefCases) run(c.label, auditHref(c.input), c.expected);
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

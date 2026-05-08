@@ -275,6 +275,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         auditId: audit.id,
+        // Slug for the /audit/[id] route — clients should prefer this over
+        // auditId in URL construction so paste-shares don't leak the UUID.
+        solicitationNumber: solicitation.solicitationNumber,
         status: "complete",
         recommendation: result.recommendation,
         score: result.compliance_score

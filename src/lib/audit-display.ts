@@ -68,3 +68,12 @@ export function auditDisplayName(
   }
   return "Untitled audit";
 }
+
+// URL builder for audit detail links. Prefers solicitation_number (slug form)
+// over the UUID id so external paste-shares look like /audit/fa301626q0068
+// instead of /audit/{uuid}. Lowercases for URL hygiene; the /audit/[id] route
+// matches case-insensitive so any cased paste still resolves.
+export function auditHref(a: { id: string; solicitation_number?: string | null }): string {
+  const sn = a.solicitation_number?.trim();
+  return `/audit/${sn ? sn.toLowerCase() : a.id}`;
+}

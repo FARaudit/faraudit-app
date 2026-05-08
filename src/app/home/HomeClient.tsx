@@ -9,7 +9,7 @@ import type {
   KORow,
   AgencyRow
 } from "@/lib/bd-os/queries";
-import { auditDisplayName, displaySolicitationId } from "@/lib/audit-display";
+import { auditDisplayName, auditHref, displaySolicitationId } from "@/lib/audit-display";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
@@ -459,7 +459,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
                       const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
                       return (
-                        <a key={a.id} className="audit-item" href={`/audit/${a.id}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                        <a key={a.id} className="audit-item" href={auditHref(a)} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
                           <div className="ai-top">
                             <div className="ai-title">{auditDisplayName(a)}</div>
                             <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{r.label}</span>
@@ -584,11 +584,12 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                     rows={recentAudits.map((a) => ({
                       id: a.id,
                       notice_id: a.notice_id,
+                      solicitation_number: a.solicitation_number ?? null,
                       title: a.title,
                       response_deadline: a.response_deadline ?? null,
                       created_at: a.created_at
                     }))}
-                    onPick={(r) => router.push(`/audit/${r.id}`)}
+                    onPick={(r) => router.push(auditHref(r))}
                   />
                 </div>
               </div>
@@ -849,8 +850,12 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
       if (!res.ok) throw new Error(json.error || `audit failed (${res.status})`);
       setResult(json);
       if (json.auditId) {
-        // Brief delay so user sees the success state before navigating to the report.
-        setTimeout(() => router.push("/audit/" + json.auditId), 800);
+        // Prefer slug (solicitationNumber) over UUID so the URL bar shows the
+        // canonical sol# instead of an internal ID. Brief delay so user sees
+        // the success state before navigating to the report.
+        const slug = (json.solicitationNumber as string | null)?.trim();
+        const dest = `/audit/${slug ? slug.toLowerCase() : json.auditId}`;
+        setTimeout(() => router.push(dest), 800);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1085,7 +1090,7 @@ function PastAuditsPanel({
             return (
               <a
                 key={a.id}
-                href={`/audit/${a.id}`}
+                href={auditHref(a)}
                 className="sam-row"
                 style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
               >
@@ -1114,6 +1119,7 @@ function PastAuditsPanel({
 interface CalendarRow {
   id: string;
   notice_id: string | null;
+  solicitation_number: string | null;
   title: string | null;
   response_deadline: string | null;
   created_at: string;
@@ -1388,7 +1394,7 @@ function AgencyIntelPanel({ agencies }: { agencies: AgencyRow[] }) {
                   <div>
                     <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 6 }}>Recent solicitations</div>
                     {a.recent.slice(0, 3).map((r) => (
-                      <a key={r.id} href={`/audit/${r.id}`} style={{ display: "block", textDecoration: "none", padding: "4px 0", borderBottom: "1px solid rgba(201,168,76,.05)" }}>
+                      <a key={r.id} href={auditHref(r)} style={{ display: "block", textDecoration: "none", padding: "4px 0", borderBottom: "1px solid rgba(201,168,76,.05)" }}>
                         <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.notice_id || "—"}</span>
                         <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", marginLeft: 8 }}>
                           {r.title ? r.title.slice(0, 50) + (r.title.length > 50 ? "…" : "") : "—"}
@@ -1567,7 +1573,7 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                       setDraggingId(a.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    onClick={() => { window.location.href = `/audit/${a.id}`; }}
+                    onClick={() => { window.location.href = auditHref(a); }}
                     style={{
                       background: "var(--void3)",
                       border: `1px solid ${isDragging ? "rgba(201,168,76,.6)" : "var(--border)"}`,
@@ -2617,7 +2623,7 @@ function RegulatoryPanel() {
 interface CmmcLevel { label: string; practices: number; summary: string; triggers: string[]; checklist: string[] }
 
 function CMMCPanel() {
-  const [data, setData] = useState<{ reference: Record<string, CmmcLevel>; distribution: Record<string, number>; recent_by_level: Record<string, Array<{ id: string; notice_id: string | null; agency: string | null }>>; total_audited: number } | null>(null);
+  const [data, setData] = useState<{ reference: Record<string, CmmcLevel>; distribution: Record<string, number>; recent_by_level: Record<string, Array<{ id: string; notice_id: string | null; solicitation_number: string | null; agency: string | null }>>; total_audited: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeLevel, setActiveLevel] = useState<"1" | "2" | "3">("2");
 
@@ -2708,7 +2714,7 @@ function CMMCPanel() {
           <div style={{ marginTop: 16 }}>
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Recent Level {activeLevel} solicitations from your audits</div>
             {data.recent_by_level[activeLevel].map((a) => (
-              <a key={a.id} href={`/audit/${a.id}`} style={{ display: "block", padding: "8px 12px", borderLeft: "2px solid var(--gold)", marginBottom: 6, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", textDecoration: "none" }}>
+              <a key={a.id} href={auditHref(a)} style={{ display: "block", padding: "8px 12px", borderLeft: "2px solid var(--gold)", marginBottom: 6, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", textDecoration: "none" }}>
                 {displaySolicitationId(a)} <span style={{ color: "var(--t40)" }}>· {a.agency || "—"}</span>
               </a>
             ))}
