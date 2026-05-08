@@ -32,7 +32,7 @@ const { insertNew } = queue;
 // @ts-expect-error tsx
 const helpersNs: any = await import("./helpers.ts");
 const helpers = helpersNs.default ?? helpersNs;
-const { resolveAgency, classifyDocType, classifyRisk } = helpers;
+const { resolveAgency, classifyDocType, classifyRisk, sanitizeSolicitationNumber } = helpers;
 
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
@@ -117,7 +117,7 @@ async function main() {
     }
     audited.push({
       notice_id: o.noticeId,
-      solicitation_number: o.solicitationNumber || null,
+      solicitation_number: sanitizeSolicitationNumber(o.solicitationNumber),
       title: o.title || null,
       agency: resolveAgency(o),
       naics_code: o.naicsCode || null,

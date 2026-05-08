@@ -39,6 +39,25 @@ export interface Solicitation {
   resourceLinks: string[];
 }
 
+// SAM.gov occasionally puts a PSC code + product name into the
+// solicitationNumber field on sources-sought / RFI / special notices that
+// don't have a real sol#. PSC-shaped leaks always start with 4 digits
+// followed by "--" (e.g. "3990--COMPACT TRACK LOADER, FULLY ENCLOSED CAB,
+// 12-15K LB CLASS"). Real sol#s are alphanumeric tokens ≤25 chars with no
+// internal whitespace. This sanitizer returns null for anything that doesn't
+// look like a real sol#, so downstream display falls back to notice_id /
+// title cleanly. Mirrors agents/sam-ingest/helpers.ts:sanitizeSolicitationNumber.
+export function sanitizeSolicitationNumber(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^\d{4}--/.test(t)) return null;
+  if (t.includes("--") && /\s/.test(t)) return null;
+  if (/\s/.test(t)) return null;
+  if (t.length > 25) return null;
+  return t;
+}
+
 // Agency resolver. Mirrors agents/sam-ingest/helpers.ts:resolveAgency to keep
 // the audit and SAM-ingest paths consistent. Behavior:
 //   1. Pick fullParentPathName first; fall back to department / subTier for
@@ -80,7 +99,7 @@ export async function fetchSolicitationByNoticeId(
 
     return {
       noticeId: o.noticeId,
-      solicitationNumber: o.solicitationNumber ?? null,
+      solicitationNumber: sanitizeSolicitationNumber(o.solicitationNumber),
       title: o.title ?? "",
       department: o.department ?? null,
       subTier: o.subTier ?? null,

@@ -4,6 +4,35 @@
 
 import type { SamOpportunity } from "./sam-client.ts";
 
+// SAM.gov occasionally puts a PSC code + product name into the
+// solicitationNumber field on sources-sought / RFI / special notices that
+// don't have a real sol#. Visible symptom in production: row #1 of the
+// Defense Spending / SAM Opportunities table showed "3990--COMPACT TRACK
+// LOADER, FULLY ENCLOSED CAB, 12-15K LB CLASS" as the Sol. Number — that's
+// PSC 3990 (Misc Material Handling Equipment) + the upper-cased item title,
+// not an actual contract identifier.
+//
+// Real solicitation numbers are alphanumeric tokens ≤25 chars with no
+// spaces and no "--" sentinel. PSC-shaped leaks always start with 4 digits
+// followed by "--". This sanitizer returns null for anything that doesn't
+// look like a real sol#, so the UI falls through to notice_id / title via
+// displaySolicitationId() instead of leaking the PSC token.
+export function sanitizeSolicitationNumber(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  // PSC-prefix leak ("3990--COMPACT TRACK LOADER…")
+  if (/^\d{4}--/.test(t)) return null;
+  // Anything that contains a "--" with surrounding non-token whitespace is
+  // descriptive text, not a sol#.
+  if (t.includes("--") && /\s/.test(t)) return null;
+  // Sol#s have no internal whitespace and are bounded length. Real ones we've
+  // seen: FA301626Q0068, W912DY24R0042, N0040626Q0045 — all ≤16 chars.
+  if (/\s/.test(t)) return null;
+  if (t.length > 25) return null;
+  return t;
+}
+
 // Agency resolution. SAM v2 search payloads no longer return department or
 // subTier as standalone fields (probed 2026-05-07) — agency now arrives only
 // as fullParentPathName, a dotted hierarchy like

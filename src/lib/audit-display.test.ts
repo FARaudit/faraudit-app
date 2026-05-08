@@ -80,7 +80,28 @@ const auditHrefCases: Case[] = [
     expected: "/audit/11111111-2222-3333-4444-555555555555" },
   { label: "T16 · auditHref falls back to UUID when sol# is blank string",
     input: { id: "abc", solicitation_number: "  " },
+    expected: "/audit/abc" },
+  { label: "T17 · auditHref rejects PSC-leak sol# (3990--COMPACT TRACK LOADER)",
+    input: { id: "abc", solicitation_number: "3990--COMPACT TRACK LOADER, FULLY ENCLOSED CAB" },
+    expected: "/audit/abc" },
+  { label: "T18 · auditHref rejects whitespace-containing sol# (descriptive title leak)",
+    input: { id: "abc", solicitation_number: "Some Description Title" },
     expected: "/audit/abc" }
+];
+
+// Lock in PSC-leak rejection at the display layer too — existing rows in DB
+// that pre-date the sanitizer carry leaks; render-time must still produce
+// clean output via fallback chain.
+const pscLeakDisplayCases: Case[] = [
+  { label: "T19 · displaySolicitationId rejects 3990-- PSC leak, falls to notice_id",
+    input: { solicitation_number: "3990--COMPACT TRACK LOADER, 12-15K LB", notice_id: "FA301626Q0068" },
+    expected: "FA301626Q0068" },
+  { label: "T20 · displaySolicitationId rejects long descriptive sol#, falls to notice_id",
+    input: { solicitation_number: "VERY LONG DESCRIPTIVE STRING THAT IS NOT A SOL NUMBER", notice_id: "FA301626Q0068" },
+    expected: "FA301626Q0068" },
+  { label: "T21 · auditDisplayName rejects PSC-leak sol#, falls to notice_id",
+    input: { title: null, solicitation_number: "3990--COMPACT TRACK LOADER", notice_id: "FA301626Q0068" },
+    expected: "FA301626Q0068" }
 ];
 
 console.log("── auditDisplayName ──");
@@ -89,6 +110,11 @@ console.log("\n── displaySolicitationId ──");
 for (const c of displaySolCases) run(c.label, displaySolicitationId(c.input), c.expected);
 console.log("\n── auditHref ──");
 for (const c of auditHrefCases) run(c.label, auditHref(c.input), c.expected);
+console.log("\n── PSC-leak rejection ──");
+for (const c of pscLeakDisplayCases) {
+  if (c.label.startsWith("T21")) run(c.label, auditDisplayName(c.input), c.expected);
+  else run(c.label, displaySolicitationId(c.input), c.expected);
+}
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);
