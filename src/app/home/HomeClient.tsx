@@ -169,13 +169,6 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
           </div>
           <div className="tb-right">
             <div className="tb-live"><div className="live-dot" />Live · <span>{stats.total}</span> Active</div>
-            <div className="tb-notif">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1a5 5 0 00-5 5v3l-1.5 2h13L13 9V6a5 5 0 00-5-5z" stroke="#C9A84C" strokeWidth="1.2" strokeOpacity=".6" fill="none"/>
-                <line x1="6.5" y1="14" x2="9.5" y2="14" stroke="#C9A84C" strokeWidth="1.2" strokeOpacity=".5" strokeLinecap="round"/>
-              </svg>
-              <div className="notif-badge" />
-            </div>
             <a className="tb-user" href="/home" title={user.email}>
               <div className="user-av">{initials || "U"}</div>
               <div className="user-nm">{handle || "user"}</div>
