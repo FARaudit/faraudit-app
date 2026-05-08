@@ -1007,7 +1007,7 @@ function SignOutButton() {
         <path d="M10 12l3-4-3-4M5 8h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
         <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
       </svg>
-      {busy ? "Signing out…" : "Sign Out"}
+      {busy ? "Signing out…" : "Sign out"}
     </button>
   );
 }

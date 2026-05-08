@@ -68,6 +68,25 @@ export class GmailClient {
     });
   }
 
+  // Move thread to Trash (recoverable for 30 days). Used for the DELETE
+  // bucket. Permanent delete (users.threads.delete) is intentionally NOT
+  // exposed — the spec mandates Trash-only deletion for safety.
+  async trashThread(threadId) {
+    return this.gmail.users.threads.trash({ userId: 'me', id: threadId });
+  }
+
+  // Full-thread fetch (format=full) including snippets and body fragments
+  // for every message. Used by the classifier to detect "CEO already replied"
+  // and to extract the inbound snippet for the system prompt.
+  async getThreadFull(threadId) {
+    const res = await this.gmail.users.threads.get({
+      userId: 'me',
+      id: threadId,
+      format: 'full',
+    });
+    return res.data;
+  }
+
   // Create a Gmail draft (saved, never sent). gmail.modify scope includes
   // drafts.create — no scope upgrade required. Returns the draft id.
   async createDraft({ to, subject, body }) {

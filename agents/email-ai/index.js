@@ -1,50 +1,38 @@
-// Email-AI v2 · Gmail organize cron (gmail.modify scope, no send).
+// Email-AI v3 · Autonomous Gmail triage cron.
 //
-// Pulls new INBOX threads since the last watermark, classifies into 3 tiers
-// (action / monitor / archive), labels them with the canonical 10-label
-// schema, archives the archive-tier ones, queues unsubscribe candidates,
-// migrates legacy 📥 Action Required threads to the canonical ⚠️ Action
-// Required, and at 07:00 CT drafts a daily brief.
+// Per CEO mandate (2026-05-08): every unread INBOX thread classified by
+// claude-opus-4-7 into one of six buckets — NOW · THIS_WEEK · WAITING ·
+// READ · ARCHIVE · DELETE. Labels applied via gmail.modify; ARCHIVE/DELETE
+// also strip INBOX; DELETE moves to Trash. WAITING threads tracked in
+// email_waiting_log and auto-promoted to NOW after 72h of silence. READ
+// threads auto-archived after 7 days of inactivity. Daily brief at 07:00 CT.
 //
-// Persistence: email_ai_state · email_processing_log · unsubscribe_candidates
-// · outreach_log (Supabase, service-role).
+// Persistence: email_ai_state (counters + brief jsonb) · email_processing_log
+// · email_waiting_log · prospects_email_log (Supabase, service-role).
 
 import 'dotenv/config';
+import { writeFileSync } from 'node:fs';
 import { getAuthClient } from './auth.js';
 import { GmailClient } from './gmail.js';
-import { evaluate } from './rules.js';
 import {
   getState, updateWatermark, rolloverProcessedToday, appendProcessedToday,
-  logProcessed, upsertUnsubscribeCandidate,
+  logProcessed, incrementStateCounters,
+  upsertWaitingLog, fetchPendingWaitingThreads, markWaitingPromoted,
+  markWaitingResolved, insertProspectLog,
 } from './db.js';
-import { extractEmail, parseListUnsubscribe, detectProspectReply, detectKoReply } from './detect.js';
+import { extractEmail, detectProspectReply, detectKoReply } from './detect.js';
+import { ensureSixLabels, buildIdToKey, LABEL_KEYS } from './labels.js';
+import { classifyThread } from './classify.js';
+import { isProspect, prospectDomain, prospectName } from './prospects.js';
 import { generateBriefIfDue, ctDateString } from './brief.js';
-
-// ── Canonical 10-label schema ──────────────────────────────────────
-// Label IDs are immutable in Gmail — using IDs avoids the ensureLabel
-// round-trip and prevents accidental sub-label re-creation. Names in
-// comments are CEO-curated (do not rename without coordinating).
-const LABEL_IDS = {
-  action:    'Label_2',                              // ⚠️ Action Required
-  monitor:   'Label_3190068954376551733',            // 👀 Monitor
-  archive:   'Label_143976743385970639',             // 🗄️ Archive
-  legal:     'Label_5829246309597873793',            // 🏛️ Legal & Entity
-  finance:   'Label_5704203879296068917',            // 💰 Finance
-  infra:     'Label_844720757590499152',             // 🔧 Infrastructure
-  prospects: 'Label_7847419524916820118',            // 👥 Prospects
-  linkedin:  'Label_6138916314518096505',            // 📣 LinkedIn
-  bullrize:  'Label_3',                              // 📥 Forwarded/Bullrize
-  lexanchor: 'Label_1',                              // 📥 Forwarded/LexAnchor
-};
-
-// Legacy label scheduled for retirement — threads carrying this get migrated
-// to LABEL_IDS.action on every cycle until the label is empty (CEO removes
-// the label via Gmail web UI after verification).
-const LEGACY_ACTION_REQUIRED = 'Label_5451607444722133154'; // 📥 Action Required (old)
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const RUN_CAP = 50;
-const FIRST_RUN_CAP = 200;        // backfill cap when watermark is null
+const FIRST_RUN_CAP = 200;
+const GMAIL_USER = (process.env.GMAIL_USER || 'jose@faraudit.com').toLowerCase();
+const DRY_RUN_REPORT_PATH = process.env.DRY_RUN_REPORT_PATH || '/tmp/email-ai-dry-run.md';
+const WAITING_PROMOTION_AGE_HOURS = 72;
+const READ_AUTO_ARCHIVE_DAYS = 7;
 
 function bootDiagnostics() {
   const have = (k) => {
@@ -59,6 +47,7 @@ function bootDiagnostics() {
     have('GMAIL_REFRESH_TOKEN'),
     have('NEXT_PUBLIC_SUPABASE_URL'),
     have('SUPABASE_SERVICE_ROLE_KEY'),
+    have('ANTHROPIC_API_KEY'),
   );
   console.log(`[email-ai] runtime · node=${process.version} · DRY_RUN=${DRY_RUN}`);
 }
@@ -75,52 +64,232 @@ function extractHeaders(thread) {
     date: get('Date'),
     listUnsubscribe: get('List-Unsubscribe'),
     internalDate: latest?.internalDate || null,
+    snippet: latest?.snippet || '',
   };
 }
 
-// One-time-ish migration: any thread carrying the legacy 📥 Action Required
-// label (Label_5451...) gets the canonical ⚠️ Action Required (Label_2)
-// added and the legacy one removed. Idempotent — once empty, this is a
-// single Gmail list call returning [].
-async function migrateLegacyActionRequired(client) {
-  let stubs;
-  try {
-    stubs = await client.listThreadsByLabel(LEGACY_ACTION_REQUIRED, 100);
-  } catch (e) {
-    console.error(`[email-ai] legacy-label scan FAIL: ${e.message}`);
-    return { found: 0, migrated: 0 };
+// Did the CEO send any message on this thread? Returns the timestamp (ISO)
+// of the most-recent CEO-from message, or null. Used both as the WAITING
+// hint flag and as the sent_at value when we log to email_waiting_log.
+function ceoLatestSentAt(thread) {
+  const messages = thread.messages || [];
+  let latestMs = 0;
+  for (const m of messages) {
+    const headers = (m.payload && m.payload.headers) || [];
+    const fromHdr = headers.find((h) => h.name.toLowerCase() === 'from');
+    if (!fromHdr) continue;
+    const fromEmail = extractEmail(fromHdr.value);
+    if (fromEmail !== GMAIL_USER) continue;
+    const idMs = parseInt(m.internalDate || '0', 10);
+    if (idMs > latestMs) latestMs = idMs;
   }
-  if (stubs.length === 0) return { found: 0, migrated: 0 };
-
-  if (DRY_RUN) {
-    const sample = stubs.slice(0, 5).map((t) => t.id).join(', ');
-    console.log(`\n[email-ai · DRY_RUN] legacy 📥 Action Required cleanup proposal`);
-    console.log(`  Found ${stubs.length} thread${stubs.length === 1 ? '' : 's'} on ${LEGACY_ACTION_REQUIRED}`);
-    console.log(`  Sample IDs: ${sample}${stubs.length > 5 ? ' …' : ''}`);
-    console.log(`  On first LIVE run: addLabelIds=[${LABEL_IDS.action}], removeLabelIds=[${LEGACY_ACTION_REQUIRED}]`);
-    console.log(`  Legacy label NOT deleted — CEO removes via Gmail web UI after verification.\n`);
-    return { found: stubs.length, migrated: 0 };
-  }
-
-  let migrated = 0;
-  for (const t of stubs) {
-    try {
-      await client.modifyThread(t.id, [LABEL_IDS.action], [LEGACY_ACTION_REQUIRED]);
-      migrated++;
-    } catch (e) {
-      console.error(`  · migrate FAIL thread=${t.id}: ${e.message}`);
-    }
-  }
-  console.log(`[email-ai] migrated ${migrated}/${stubs.length} thread(s) from legacy 📥 to ⚠️ Action Required`);
-  return { found: stubs.length, migrated };
+  return latestMs > 0 ? new Date(latestMs).toISOString() : null;
 }
 
+// Normalize a subject for duplicate-detection grouping.
+function normalizeSubject(s) {
+  return (s || '')
+    .toLowerCase()
+    .replace(/^\s*(re|fwd|fw):\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// In-batch duplicate detector. Builds groups keyed by (sender + normalized
+// subject) and flags any thread that is NOT the oldest in its group as a
+// duplicate of the oldest. Returns Map<thread_id, oldest_thread_id>.
+function detectInBatchDuplicates(threadsWithHeaders) {
+  const groups = new Map();
+  for (const t of threadsWithHeaders) {
+    const sender = extractEmail(t.headers.from) || '';
+    const subj = normalizeSubject(t.headers.subject);
+    if (!sender || !subj) continue;
+    const key = `${sender}|${subj}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+  const dupes = new Map();
+  for (const [, list] of groups) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => parseInt(a.headers.internalDate || '0', 10) - parseInt(b.headers.internalDate || '0', 10));
+    const oldest = list[0].id;
+    for (let i = 1; i < list.length; i++) dupes.set(list[i].id, oldest);
+  }
+  return dupes;
+}
+
+// ── WAITING auto-promotion sweep ─────────────────────────────────────
+// Pending email_waiting_log rows older than WAITING_PROMOTION_AGE_HOURS get
+// re-evaluated: if the Gmail thread has had no inbound message since sent_at,
+// strip WAITING and apply NOW. Skips threads that already received a reply
+// (those get marked resolved instead).
+async function sweepWaitingPromotions(client, labelIds) {
+  const cutoff = new Date(Date.now() - WAITING_PROMOTION_AGE_HOURS * 3600 * 1000).toISOString();
+  let pending;
+  try {
+    pending = await fetchPendingWaitingThreads(cutoff);
+  } catch (e) {
+    console.error('[email-ai] waiting sweep · fetch FAIL:', e.message);
+    return { promoted: 0, resolved: 0 };
+  }
+  if (pending.length === 0) return { promoted: 0, resolved: 0 };
+
+  let promoted = 0;
+  let resolved = 0;
+  for (const row of pending) {
+    try {
+      const thread = await client.getThreadFull(row.thread_id);
+      const sentAtMs = new Date(row.sent_at).getTime();
+      let inboundAfterSentAt = false;
+      for (const m of thread.messages || []) {
+        const fromHdr = (m.payload?.headers || []).find((h) => h.name.toLowerCase() === 'from');
+        if (!fromHdr) continue;
+        const fromEmail = extractEmail(fromHdr.value);
+        if (fromEmail === GMAIL_USER) continue;
+        if (parseInt(m.internalDate || '0', 10) > sentAtMs) {
+          inboundAfterSentAt = true;
+          break;
+        }
+      }
+      if (inboundAfterSentAt) {
+        // Reply arrived — leave classifier to handle the new inbound. Mark
+        // the WAITING row resolved here so the sweep doesn't keep retrying.
+        if (!DRY_RUN) await markWaitingResolved(row.thread_id);
+        resolved++;
+        continue;
+      }
+      // Stale — promote to NOW.
+      if (!DRY_RUN) {
+        await client.modifyThread(row.thread_id, [labelIds.NOW], [labelIds.WAITING]);
+        await markWaitingPromoted(row.thread_id);
+      }
+      promoted++;
+      console.log(`  · WAITING→NOW · thread=${row.thread_id} · subject="${(row.subject || '').slice(0, 60)}"`);
+    } catch (e) {
+      console.error(`[email-ai] waiting sweep · thread=${row.thread_id} FAIL: ${e.message}`);
+    }
+  }
+  return { promoted, resolved };
+}
+
+// ── READ auto-archive sweep ──────────────────────────────────────────
+// Threads carrying the READ label whose latest message is older than
+// READ_AUTO_ARCHIVE_DAYS get INBOX stripped (still discoverable by label).
+async function sweepReadAutoArchive(client, labelIds) {
+  let stubs;
+  try {
+    stubs = await client.listThreadsByLabel(labelIds.READ, 100);
+  } catch (e) {
+    console.error('[email-ai] read sweep · list FAIL:', e.message);
+    return { archived: 0 };
+  }
+  if (stubs.length === 0) return { archived: 0 };
+
+  const cutoffMs = Date.now() - READ_AUTO_ARCHIVE_DAYS * 24 * 3600 * 1000;
+  let archived = 0;
+  for (const stub of stubs) {
+    try {
+      const thread = await client.getThread(stub.id);
+      const messages = thread.messages || [];
+      const latest = messages[messages.length - 1];
+      const idMs = parseInt(latest?.internalDate || '0', 10);
+      if (idMs === 0 || idMs >= cutoffMs) continue;
+      const stillInInbox = (thread.messages || []).some((m) => (m.labelIds || []).includes('INBOX'));
+      if (!stillInInbox) continue;
+      if (!DRY_RUN) {
+        await client.modifyThread(stub.id, [], ['INBOX']);
+      }
+      archived++;
+    } catch (e) {
+      console.error(`[email-ai] read sweep · thread=${stub.id} FAIL: ${e.message}`);
+    }
+  }
+  return { archived };
+}
+
+// ── DRY_RUN report builder ───────────────────────────────────────────
+function buildDryRunReport({ proposals, distribution, drafts, sweeps, today }) {
+  const lines = [];
+  lines.push(`# Email-AI · DRY_RUN report · ${today}`);
+  lines.push('');
+  lines.push('## Bucket distribution');
+  lines.push('');
+  lines.push('| Label | Count | % |');
+  lines.push('|-------|------:|--:|');
+  const total = Object.values(distribution).reduce((a, b) => a + b, 0) || 1;
+  for (const k of LABEL_KEYS) {
+    const n = distribution[k] || 0;
+    lines.push(`| ${k} | ${n} | ${((n / total) * 100).toFixed(1)}% |`);
+  }
+  lines.push(`| **TOTAL** | **${total}** | 100% |`);
+  lines.push('');
+
+  lines.push('## DELETE candidates (every one — review)');
+  lines.push('');
+  const deletes = proposals.filter((p) => p.label === 'DELETE');
+  if (deletes.length === 0) lines.push('_(none)_');
+  else {
+    lines.push('| # | Sender | Subject | Confidence | Reason |');
+    lines.push('|---|--------|---------|-----------:|--------|');
+    deletes.forEach((p, i) => {
+      lines.push(`| ${i + 1} | ${(p.from || '').slice(0, 40)} | ${(p.subject || '').slice(0, 60)} | ${p.confidence.toFixed(2)} | ${p.reason} |`);
+    });
+  }
+  lines.push('');
+
+  const sample = (label) => {
+    lines.push(`## ${label} sample (up to 5)`);
+    lines.push('');
+    const items = proposals.filter((p) => p.label === label).slice(0, 5);
+    if (items.length === 0) lines.push('_(none)_');
+    else {
+      lines.push('| Sender | Subject | Reason |');
+      lines.push('|--------|---------|--------|');
+      items.forEach((p) => {
+        lines.push(`| ${(p.from || '').slice(0, 40)} | ${(p.subject || '').slice(0, 60)} | ${p.reason} |`);
+      });
+    }
+    lines.push('');
+  };
+  sample('NOW');
+  sample('ARCHIVE');
+
+  lines.push('## Drafts the agent would create');
+  lines.push('');
+  if (drafts.length === 0) lines.push('_(none)_');
+  else {
+    drafts.forEach((d, i) => {
+      lines.push(`### Draft ${i + 1} · to ${d.to}`);
+      lines.push('');
+      lines.push(`**Subject:** ${d.subject}`);
+      lines.push('');
+      lines.push('```');
+      lines.push(d.body);
+      lines.push('```');
+      lines.push('');
+    });
+  }
+
+  lines.push('## Sweeps');
+  lines.push('');
+  lines.push(`- WAITING→NOW promotions (proposed): **${sweeps.promoted}**`);
+  lines.push(`- WAITING resolved (inbound reply seen): **${sweeps.resolved}**`);
+  lines.push(`- READ auto-archive (proposed): **${sweeps.readArchived}**`);
+  lines.push('');
+  return lines.join('\n');
+}
+
+// ── Main ─────────────────────────────────────────────────────────────
 async function run() {
   const startedAt = new Date();
   console.log(`[email-ai] start ${startedAt.toISOString()}${DRY_RUN ? ' · DRY_RUN' : ''}`);
   bootDiagnostics();
 
-  // ── Auth + state ──────────────────────────────────────────────────
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('[email-ai] CONFIG FAIL · ANTHROPIC_API_KEY missing. Set it on Railway and redeploy.');
+    process.exit(1);
+  }
+
   let auth;
   try {
     auth = getAuthClient();
@@ -134,17 +303,28 @@ async function run() {
   try {
     state = await getState();
   } catch (e) {
-    console.error('[email-ai] state read FAIL — has migration 018 been applied?');
+    console.error('[email-ai] state read FAIL — has the 6-bucket migration been applied?');
     throw e;
   }
 
   const today = ctDateString();
   await rolloverProcessedToday(today);
 
-  // ── Legacy label migration (runs every cycle, no-op once empty) ──
-  const legacyResult = await migrateLegacyActionRequired(client);
+  const labelIds = await ensureSixLabels(client);
+  const idToKey = buildIdToKey(labelIds);
+  console.log(`[email-ai] labels resolved · ${LABEL_KEYS.map((k) => `${k}=${labelIds[k]}`).join(' · ')}`);
 
-  // ── Fetch threads ─────────────────────────────────────────────────
+  // ── Hourly sweeps (cheap; idempotent) ──────────────────────────────
+  const promo = await sweepWaitingPromotions(client, labelIds);
+  const readSweep = await sweepReadAutoArchive(client, labelIds);
+  if (promo.promoted > 0 || promo.resolved > 0) {
+    console.log(`[email-ai] waiting sweep · promoted=${promo.promoted} resolved=${promo.resolved}`);
+  }
+  if (readSweep.archived > 0) {
+    console.log(`[email-ai] read sweep · auto-archived=${readSweep.archived} (>${READ_AUTO_ARCHIVE_DAYS}d old)`);
+  }
+
+  // ── Fetch unread inbox window ──────────────────────────────────────
   const watermark = state.last_run_at ? Math.floor(new Date(state.last_run_at).getTime() / 1000) : null;
   const cap = watermark ? RUN_CAP : FIRST_RUN_CAP;
 
@@ -154,7 +334,7 @@ async function run() {
   } catch (e) {
     const msg = String(e?.message || e);
     if (/invalid_grant|invalid_token|unauthorized_client/i.test(msg)) {
-      console.error('[email-ai] OAUTH FAIL · refresh token rejected. Run scripts/get-token.js with the Desktop client to mint a fresh refresh token.');
+      console.error('[email-ai] OAUTH FAIL · refresh token rejected. Run scripts/get-token.js.');
     } else if (/insufficient.*scope|forbidden|permission/i.test(msg)) {
       console.error('[email-ai] SCOPE FAIL · token lacks gmail.modify or gmail.labels.');
     } else {
@@ -167,152 +347,221 @@ async function run() {
   const toProcess = threadStubs.slice(0, cap);
   console.log(`[email-ai] watermark=${watermark || 'null (first run)'} · fetched=${threadStubs.length} · cap=${cap}${burstDetected ? ' · BURST' : ''}`);
 
-  if (burstDetected) {
-    console.warn(`[email-ai] BURST ALERT · ${threadStubs.length} new threads since last watermark · capped at ${cap}, remaining will process next tick`);
+  // Pull full threads up front (one round-trip per thread). Headers + CEO-
+  // reply detection both need the full message list.
+  const threadsWithFull = [];
+  for (const stub of toProcess) {
+    try {
+      const full = await client.getThreadFull(stub.id);
+      threadsWithFull.push({ id: stub.id, full, headers: extractHeaders(full) });
+    } catch (e) {
+      console.error(`[email-ai] thread fetch FAIL · ${stub.id}: ${e.message}`);
+    }
   }
 
-  // ── Per-thread classify + apply ──────────────────────────────────
+  const inBatchDupes = detectInBatchDuplicates(threadsWithFull);
+
+  // ── Per-thread classify + apply ────────────────────────────────────
   const logRows = [];
-  let labeled = 0, archived = 0, flaggedAction = 0, flaggedMonitor = 0, skipped = 0, errors = 0;
+  const proposals = [];     // for DRY_RUN report
+  const draftsProposed = []; // for DRY_RUN report
+  const distribution = Object.fromEntries(LABEL_KEYS.map((k) => [k, 0]));
+  let labeled = 0, archived = 0, deleted = 0, draftsCreated = 0, errors = 0;
   let latestInternalDate = watermark || 0;
 
-  for (const t of toProcess) {
+  for (const t of threadsWithFull) {
     try {
-      const full = await client.getThread(t.id);
-      const message = extractHeaders(full);
+      const message = t.headers;
+      const fromEmail = extractEmail(message.from);
 
-      // Track most-recent internalDate seen, for watermark advancement.
       const idMs = parseInt(message.internalDate || '0', 10);
       if (idMs > 0 && Math.floor(idMs / 1000) > latestInternalDate) {
         latestInternalDate = Math.floor(idMs / 1000);
       }
 
-      const fromEmail = extractEmail(message.from);
+      // Hint flags fed into the classifier prompt.
+      const ceoSentAtIso = ceoLatestSentAt(t.full);
+      const isProspectMatch = isProspect(message.from);
+      let koMatch = null;
+      try { koMatch = await detectKoReply(message); } catch { /* non-fatal */ }
+      let prospectReplyHint = false;
+      try { prospectReplyHint = await detectProspectReply(message); } catch { /* non-fatal */ }
 
-      // 1. DB-driven detectors first (override pure rules on hit)
-      let classification = null;
-      const koMatch = await detectKoReply(message);
-      if (koMatch) {
-        classification = {
-          rule: `KO Reply · audit ${koMatch.notice_id || koMatch.id}`,
-          category: 'prospects',
-          tier: 'action',
-        };
-      } else if (await detectProspectReply(message)) {
-        classification = {
-          rule: 'Prospect Reply · matched outreach_log',
-          category: 'prospects',
-          tier: 'action',
+      // Deterministic dedup short-circuit. Skip the Claude call entirely.
+      const dupeOf = inBatchDupes.get(t.id);
+      let verdict;
+      if (dupeOf) {
+        verdict = {
+          label: 'DELETE',
+          confidence: 1,
+          reason: `Duplicate of thread ${dupeOf} (same sender + normalized subject in this batch)`,
+          recommended_action: null,
+          draft_reply: null,
+          is_duplicate_of_thread_id: dupeOf,
+          usage: { input_tokens: 0, output_tokens: 0, ms: 0 },
+          raw: '[deterministic dedup]',
         };
       } else {
-        classification = evaluate(message);
-      }
-
-      // 2. Unsubscribe candidate detection (archive-tier with List-Unsubscribe header)
-      if (classification && classification.tier === 'archive' && message.listUnsubscribe && fromEmail) {
-        const { url, mailto } = parseListUnsubscribe(message.listUnsubscribe);
-        if (url || mailto) {
-          await upsertUnsubscribeCandidate({ sender: fromEmail, unsubscribeUrl: url, unsubscribeMailto: mailto });
-        }
-      }
-
-      // 3. Skip when no rule + no detector matches
-      if (!classification) {
-        skipped++;
-        logRows.push({
-          thread_id: t.id,
-          rule_name: null,
-          tier: 'skip',
-          category: null,
-          labels_added: [],
-          labels_removed: [],
-          from_address: fromEmail,
-          subject: (message.subject || '').slice(0, 200),
-          was_dry_run: DRY_RUN,
-          tokens_input: 0,
-          tokens_output: 0,
-          model_name: null,
+        verdict = await classifyThread({
+          message,
+          snippet: message.snippet,
+          ceoRepliedRecently: !!ceoSentAtIso || prospectReplyHint,
+          isProspectMatch,
+          isKoMatch: !!koMatch,
         });
-        console.log(`  · skip · ${message.from} · ${message.subject}`);
-        continue;
       }
 
-      // 4. Apply 10-label canonical assignment by Label ID
-      const categoryLabelId = LABEL_IDS[classification.category];
-      if (!categoryLabelId) {
-        console.error(`  · CONFIG FAIL · unknown category="${classification.category}" for rule "${classification.rule}" — thread=${t.id}`);
-        errors++;
-        continue;
-      }
-      const addLabelIds = [categoryLabelId];
-      if (classification.tier === 'action') {
-        addLabelIds.push(LABEL_IDS.action);
-        flaggedAction++;
-      } else if (classification.tier === 'monitor') {
-        addLabelIds.push(LABEL_IDS.monitor);
-        flaggedMonitor++;
-      } else if (classification.tier === 'archive') {
-        addLabelIds.push(LABEL_IDS.archive);
-      }
-      const removeLabelIds = classification.tier === 'archive' ? ['INBOX'] : [];
+      distribution[verdict.label] = (distribution[verdict.label] || 0) + 1;
+
+      // Apply mapping per spec:
+      //   NOW / THIS_WEEK / WAITING / READ → add label, keep INBOX
+      //   ARCHIVE → add label + remove INBOX
+      //   DELETE  → add label + remove INBOX + trash
+      const targetLabelId = labelIds[verdict.label];
+      const addLabelIds = [targetLabelId];
+      const removeLabelIds = (verdict.label === 'ARCHIVE' || verdict.label === 'DELETE') ? ['INBOX'] : [];
 
       if (!DRY_RUN) {
         await client.modifyThread(t.id, addLabelIds, removeLabelIds);
+        if (verdict.label === 'DELETE') {
+          try { await client.trashThread(t.id); } catch (e) {
+            console.error(`  · trash FAIL thread=${t.id}: ${e.message}`);
+          }
+        }
       }
 
       labeled++;
-      if (classification.tier === 'archive') archived++;
+      if (verdict.label === 'ARCHIVE') archived++;
+      if (verdict.label === 'DELETE') deleted++;
+
+      // WAITING → log for the 72h promotion sweep.
+      if (verdict.label === 'WAITING') {
+        const sentAt = ceoSentAtIso || new Date(idMs || Date.now()).toISOString();
+        if (!DRY_RUN) {
+          try {
+            await upsertWaitingLog({
+              thread_id: t.id,
+              subject: (message.subject || '').slice(0, 200),
+              sent_to: message.to || null,
+              sent_at: sentAt,
+            });
+          } catch (e) {
+            console.error(`  · waiting log FAIL thread=${t.id}: ${e.message}`);
+          }
+        }
+      }
+
+      // Prospect → create draft + log.
+      if (isProspectMatch && verdict.draft_reply) {
+        const subject = `Re: ${(message.subject || '').replace(/^\s*re:\s*/i, '')}`.slice(0, 200);
+        let draftId = null;
+        if (!DRY_RUN) {
+          try {
+            draftId = await client.createDraft({
+              to: fromEmail || message.from,
+              subject,
+              body: verdict.draft_reply,
+            });
+            await insertProspectLog({
+              thread_id: t.id,
+              prospect_domain: prospectDomain(message.from) || 'unknown',
+              prospect_name: prospectName(message.from),
+              classification: verdict.label,
+              draft_id: draftId,
+            });
+          } catch (e) {
+            console.error(`  · prospect draft FAIL thread=${t.id}: ${e.message}`);
+          }
+        }
+        draftsCreated++;
+        draftsProposed.push({
+          to: fromEmail || message.from,
+          subject,
+          body: verdict.draft_reply,
+        });
+      }
+
+      proposals.push({
+        thread_id: t.id,
+        from: message.from,
+        subject: message.subject,
+        label: verdict.label,
+        confidence: verdict.confidence,
+        reason: verdict.reason,
+      });
 
       logRows.push({
         thread_id: t.id,
-        rule_name: classification.rule,
-        tier: classification.tier,
-        category: classification.category,
+        rule_name: `claude:${verdict.label}`,
+        tier: verdict.label.toLowerCase(),
+        category: verdict.label.toLowerCase(),
         labels_added: addLabelIds,
         labels_removed: removeLabelIds,
         from_address: fromEmail,
         subject: (message.subject || '').slice(0, 200),
         was_dry_run: DRY_RUN,
-        tokens_input: 0,
-        tokens_output: 0,
-        model_name: null,
+        tokens_input: verdict.usage?.input_tokens || 0,
+        tokens_output: verdict.usage?.output_tokens || 0,
+        model_name: 'claude-opus-4-7',
       });
 
-      console.log(`  · ${classification.rule} · ${classification.category}/${classification.tier} · from=${message.from} · subj=${message.subject}`);
+      console.log(`  · ${verdict.label} (${verdict.confidence.toFixed(2)}) · ${message.from} · ${message.subject}`);
     } catch (err) {
       errors++;
       console.error(`  · ERROR thread=${t.id} · ${err.message}`);
     }
   }
 
-  // ── Persist log + advance watermark + accumulate today's set ─────
-  // Audit log writes unconditionally (was_dry_run column distinguishes), but
-  // watermark + processed_today advance only on LIVE runs. Dry-runs must be
-  // safely repeatable against the same inbox window.
+  // ── Persist log + advance watermark ────────────────────────────────
   await logProcessed(logRows);
   if (!DRY_RUN) {
-    const processedIds = toProcess.map((t) => t.id);
+    const processedIds = threadsWithFull.map((t) => t.id);
     await appendProcessedToday(processedIds);
     if (latestInternalDate > 0) {
       await updateWatermark(new Date(latestInternalDate * 1000));
-    } else if (toProcess.length > 0) {
+    } else if (threadsWithFull.length > 0) {
       await updateWatermark(new Date());
+    }
+    await incrementStateCounters({
+      labels_applied_today: labeled,
+      drafts_created_today: draftsCreated,
+      auto_archived_today: archived + readSweep.archived,
+      auto_deleted_today: deleted,
+      waiting_thread_promotions_today: promo.promoted,
+    });
+  }
+
+  // ── DRY_RUN report (filesystem only; not pushed to DB) ─────────────
+  if (DRY_RUN) {
+    try {
+      const md = buildDryRunReport({
+        proposals,
+        distribution,
+        drafts: draftsProposed,
+        sweeps: { promoted: promo.promoted, resolved: promo.resolved, readArchived: readSweep.archived },
+        today,
+      });
+      writeFileSync(DRY_RUN_REPORT_PATH, md);
+      console.log(`[email-ai DRY_RUN] report written to ${DRY_RUN_REPORT_PATH}`);
+    } catch (e) {
+      console.error('[email-ai DRY_RUN] report write FAIL:', e.message);
     }
   }
 
-  // ── Daily brief (07:00 CT, idempotent via last_brief_date) ───────
+  // ── Daily brief (07:00 CT, idempotent) ─────────────────────────────
   let briefResult = { generated: false, reason: 'not attempted' };
   try {
     briefResult = await generateBriefIfDue({
       gmailClient: client,
       state: await getState(),
+      labelIds,
+      idToKey,
       dryRun: DRY_RUN,
-      briefStats: {
-        lastRunBurst: burstDetected ? threadStubs.length : 0,
-        oauthRefreshFailed: false,
-        pendingPhysicalMail: 0,                          // TODO v2.1: real query
-        legacyMigrationFound: legacyResult.found,
-        legacyMigrationApplied: legacyResult.migrated,
+      runStats: {
+        burstDetected,
+        burstSize: burstDetected ? threadStubs.length : 0,
+        promoted: promo.promoted,
+        readArchived: readSweep.archived,
       },
     });
   } catch (e) {
@@ -321,7 +570,7 @@ async function run() {
 
   const finishedAt = new Date();
   console.log(
-    `[email-ai] done ${finishedAt.toISOString()} · processed=${toProcess.length} labeled=${labeled} archived=${archived} action=${flaggedAction} monitor=${flaggedMonitor} skipped=${skipped} errors=${errors} burst=${burstDetected} legacy_found=${legacyResult.found} legacy_migrated=${legacyResult.migrated} brief=${briefResult.generated ? 'sent' : briefResult.reason} duration=${finishedAt - startedAt}ms`
+    `[email-ai] done ${finishedAt.toISOString()} · processed=${threadsWithFull.length} labeled=${labeled} archived=${archived} deleted=${deleted} drafts=${draftsCreated} promoted=${promo.promoted} read_archived=${readSweep.archived} errors=${errors} burst=${burstDetected} brief=${briefResult.generated ? 'sent' : briefResult.reason} duration=${finishedAt - startedAt}ms`
   );
 }
 

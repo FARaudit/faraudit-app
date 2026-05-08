@@ -35,13 +35,22 @@ export async function updateWatermark(lastRunAt) {
 }
 
 // Reset processed_today array if the CT date has rolled over since last run.
-// Returns the up-to-date set.
+// Also zeroes the five activity counters introduced in the 6-bucket migration
+// so per-day metrics are accurate. Returns the up-to-date thread-id set.
 export async function rolloverProcessedToday(currentCtDate) {
   const state = await getState();
   if (state.processed_today_date !== currentCtDate) {
     const { error } = await supabase
       .from('email_ai_state')
-      .update({ processed_today: [], processed_today_date: currentCtDate })
+      .update({
+        processed_today: [],
+        processed_today_date: currentCtDate,
+        labels_applied_today: 0,
+        drafts_created_today: 0,
+        auto_archived_today: 0,
+        auto_deleted_today: 0,
+        waiting_thread_promotions_today: 0,
+      })
       .eq('id', 1);
     if (error) throw new Error(`rolloverProcessedToday: ${error.message}`);
     return new Set();
@@ -150,6 +159,123 @@ export async function isKnownOutreachRecipient(emailAddress) {
 }
 
 // ── Audits table (KO-reply detection) ───────────────────────────────
+
+// ── 6-bucket triage state · counters + brief ─────────────────────────
+
+// Increment any combination of the five daily counters in a single update.
+// Uses read-modify-write — single-instance cron, no contention. Pass only
+// the counters that changed; missing keys are skipped.
+export async function incrementStateCounters(deltas) {
+  const keys = ['labels_applied_today', 'drafts_created_today', 'auto_archived_today', 'auto_deleted_today', 'waiting_thread_promotions_today'];
+  const filtered = Object.entries(deltas).filter(([k, v]) => keys.includes(k) && v > 0);
+  if (filtered.length === 0) return;
+
+  const { data, error: readErr } = await supabase
+    .from('email_ai_state')
+    .select(keys.join(','))
+    .eq('id', 1)
+    .single();
+  if (readErr) throw new Error(`incrementStateCounters read: ${readErr.message}`);
+
+  const update = {};
+  for (const [k, v] of filtered) update[k] = (data[k] || 0) + v;
+
+  const { error: writeErr } = await supabase
+    .from('email_ai_state')
+    .update(update)
+    .eq('id', 1);
+  if (writeErr) throw new Error(`incrementStateCounters write: ${writeErr.message}`);
+}
+
+// Persist the latest morning brief as a JSON document. The /home tab can
+// render it without a Gmail round-trip; daily refresh is sufficient.
+export async function saveDailyBriefJson(briefJson) {
+  const { error } = await supabase
+    .from('email_ai_state')
+    .update({ daily_brief: briefJson })
+    .eq('id', 1);
+  if (error) throw new Error(`saveDailyBriefJson: ${error.message}`);
+}
+
+// ── 6-bucket triage state · email_waiting_log ────────────────────────
+
+// Record a thread that's been parked in the WAITING bucket. Idempotent on
+// thread_id (UNIQUE) — repeat classifications update sent_at to the latest
+// observed timestamp without breaking the unique constraint.
+export async function upsertWaitingLog({ thread_id, subject, sent_to, sent_at }) {
+  // Try insert first; on conflict, update sent_at to the freshest value.
+  const { error: insErr } = await supabase
+    .from('email_waiting_log')
+    .insert({ thread_id, subject, sent_to, sent_at });
+  if (!insErr) return;
+  // 23505 = unique_violation. Anything else bubbles.
+  if (insErr.code !== '23505') throw new Error(`upsertWaitingLog insert: ${insErr.message}`);
+  const { error: updErr } = await supabase
+    .from('email_waiting_log')
+    .update({ sent_at })
+    .eq('thread_id', thread_id);
+  if (updErr) throw new Error(`upsertWaitingLog update: ${updErr.message}`);
+}
+
+// Pull pending WAITING rows where sent_at is older than `cutoffIso` and the
+// row hasn't been promoted or resolved yet. Caller (the hourly sweep) decides
+// per-thread whether to actually promote based on Gmail message activity.
+export async function fetchPendingWaitingThreads(cutoffIso) {
+  const { data, error } = await supabase
+    .from('email_waiting_log')
+    .select('id, thread_id, subject, sent_to, sent_at')
+    .is('promoted_to_now_at', null)
+    .is('resolved_at', null)
+    .lt('sent_at', cutoffIso)
+    .order('sent_at', { ascending: true })
+    .limit(100);
+  if (error) throw new Error(`fetchPendingWaitingThreads: ${error.message}`);
+  return data || [];
+}
+
+export async function markWaitingPromoted(threadId) {
+  const { error } = await supabase
+    .from('email_waiting_log')
+    .update({ promoted_to_now_at: new Date().toISOString() })
+    .eq('thread_id', threadId);
+  if (error) throw new Error(`markWaitingPromoted: ${error.message}`);
+}
+
+export async function markWaitingResolved(threadId) {
+  const { error } = await supabase
+    .from('email_waiting_log')
+    .update({ resolved_at: new Date().toISOString() })
+    .eq('thread_id', threadId);
+  if (error) throw new Error(`markWaitingResolved: ${error.message}`);
+}
+
+// Snapshot of all currently-pending (un-resolved) WAITING rows for the
+// morning brief. Includes promoted-but-unresolved entries so the brief can
+// surface "you've been ignoring this" threads.
+export async function fetchAllPendingWaiting() {
+  const { data, error } = await supabase
+    .from('email_waiting_log')
+    .select('thread_id, subject, sent_to, sent_at, promoted_to_now_at')
+    .is('resolved_at', null)
+    .order('sent_at', { ascending: true })
+    .limit(50);
+  if (error) throw new Error(`fetchAllPendingWaiting: ${error.message}`);
+  return data || [];
+}
+
+// ── 6-bucket triage state · prospects_email_log ──────────────────────
+
+export async function insertProspectLog({ thread_id, prospect_domain, prospect_name, classification, draft_id }) {
+  const { error } = await supabase
+    .from('prospects_email_log')
+    .insert({ thread_id, prospect_domain, prospect_name, classification, draft_id });
+  // 23505 = duplicate thread_id (same prospect, same thread, processed twice). Non-fatal.
+  if (error && error.code !== '23505') {
+    console.error('[email-ai] prospect log insert failed (non-fatal):', error.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
 
 // Look up an audit by KO email recipient — used to detect when a KO replies
 // to a clarification email we drafted earlier.
