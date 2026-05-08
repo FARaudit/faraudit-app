@@ -2473,7 +2473,7 @@ function MetricBlock({ label, value, pct, color, sub }: { label: string; value: 
 }
 
 function ProtestPanel() {
-  const [data, setData] = useState<{ decisions: Array<{ docket: string; agency: string | null; protester: string | null; outcome: string | null; ground: string | null; decision_date: string | null; decision_url: string | null }>; agencies: Array<{ agency: string; total: number; sustained: number; sustained_rate: number; recent_grounds: string[] }> } | null>(null);
+  const [data, setData] = useState<{ decisions: Array<{ docket: string; agency: string | null; protester: string | null; outcome: string | null; ground: string | null; decision_date: string | null; decision_url: string | null }>; agencies: Array<{ agency: string; total: number; sustained: number; sustained_rate: number; recent_grounds: string[] }>; fetched_at?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -2498,7 +2498,11 @@ function ProtestPanel() {
       <div className="intel-section">
         <div className="is-header">
           <div className="is-title">Protest Intelligence · GAO public decisions</div>
-          <div className="is-refresh">RSS-cached · 6h TTL</div>
+          <div className="is-refresh">
+            {data?.fetched_at
+              ? `Last fetch ${new Date(data.fetched_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · 6h cache`
+              : "RSS-cached · 6h TTL"}
+          </div>
         </div>
         {loading && <div className="empty-block">Loading GAO protest decisions…</div>}
         {err && <div className="ko-status error">{err}</div>}
@@ -2532,7 +2536,12 @@ function ProtestPanel() {
               <div className="sam-th" style={{ gridTemplateColumns: "100px 130px 1fr 130px 90px" }}>
                 <span>Decision</span><span>Docket</span><span>Protester / ground</span><span>Agency</span><span>Outcome</span>
               </div>
-              {data.decisions.length === 0 && <div className="empty-state">Awaiting GAO refresh — decisions surface here as they're published. Cache rebuilds every 6 hours from gao.gov.</div>}
+              {data.decisions.length === 0 && (
+                <div className="empty-state">
+                  Awaiting first GAO refresh — gao.gov RSS sometimes returns no items on quiet days.
+                  Cache rebuilds every 6 hours; reload after the next fetch window if this stays empty.
+                </div>
+              )}
               {data.decisions.map((d) => {
                 const out = (d.outcome || "").toLowerCase();
                 const color = out === "sustained" ? "var(--red)" : out === "denied" ? "var(--green)" : "var(--t60)";
