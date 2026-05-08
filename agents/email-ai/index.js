@@ -548,7 +548,7 @@ async function run() {
         was_dry_run: DRY_RUN,
         tokens_input: verdict.usage?.input_tokens || 0,
         tokens_output: verdict.usage?.output_tokens || 0,
-        model_name: 'claude-opus-4-7',
+        model_name: 'claude-sonnet-4-6',
       });
 
       console.log(`  · ${verdict.label} (${verdict.confidence.toFixed(2)}) · ${message.from} · ${message.subject}`);
