@@ -163,11 +163,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
             <div className="tb-wordmark">FAR<span>audit</span></div>
           </div>
           <div className="tb-center">
-            <div className="tb-search">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
-                <line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
+            <div className="tb-stats">
               {counter.audits.toLocaleString()} solicitations audited · {counter.traps.toLocaleString()} traps detected
             </div>
           </div>

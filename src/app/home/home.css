@@ -31,8 +31,10 @@
 .bd-home .tb-wordmark{font-family:var(--serif);font-size:16px;font-weight:900;letter-spacing:-.02em;color:var(--text);}
 .bd-home .tb-wordmark span{color:var(--gold);}
 .bd-home .tb-center{flex:1;display:flex;align-items:center;padding:0 20px;}
-.bd-home .tb-search{flex:1;max-width:400px;background:rgba(201,168,76,.04);border:1px solid var(--border);border-radius:3px;display:flex;align-items:center;gap:8px;padding:7px 12px;font-family:var(--mono);font-size:11px;color:var(--t25);cursor:text;transition:border-color .2s;}
-.bd-home .tb-search:hover{border-color:var(--border2);}
+/* Was a search-shaped pill that didn't actually search anything; replaced
+   with a non-interactive stats label so the topbar no longer promises
+   functionality it doesn't deliver. */
+.bd-home .tb-stats{flex:1;max-width:520px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--t40);text-transform:uppercase;}
 .bd-home .tb-right{display:flex;align-items:center;gap:12px;}
 .bd-home .tb-live{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;font-weight:700;color:rgba(74,222,128,.8);letter-spacing:.1em;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.15);border-radius:2px;padding:4px 10px;}
 .bd-home .live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:bdh-ldot 2s ease-in-out infinite;}
@@ -306,7 +308,7 @@
   .bd-home .app { grid-template-columns: 1fr; }
   .bd-home .sidebar { display: none; }
   .bd-home .tb-brand { width: auto; padding: 0 14px; border-right: none; }
-  .bd-home .tb-search { display: none; }
+  .bd-home .tb-stats { display: none; }
 
   /* Stack KPI grids 1-col */
   .bd-home .situation-board { grid-template-columns: 1fr; }
