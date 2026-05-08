@@ -1320,7 +1320,19 @@ function KOIntelPanel({ kos }: { kos: KORow[] }) {
           <div className="sam-th" style={{ gridTemplateColumns: "1fr 1.4fr 130px 100px 80px 110px" }}>
             <span>Name</span><span>Email</span><span>Agency</span><span>Solicitations</span><span>Avg Resp</span><span>Response Rate</span>
           </div>
-          {visible.length === 0 && <div className="empty-state">No KOs in your intelligence layer yet. Start auditing — auto-populates on draft.</div>}
+          {visible.length === 0 && (
+            <div className="empty-state" style={{ lineHeight: 1.6 }}>
+              {kos.length === 0 ? (
+                <>
+                  Audit AI populates this view when you send your first KO clarification email.
+                  Run the audit on <span style={{ fontFamily: "var(--mono)", color: "var(--gold)" }}>FA301626Q0068</span> to
+                  see it work — the KO email button on the audit detail page seeds this directory automatically.
+                </>
+              ) : (
+                <>No KOs match the current filters. Clear filters to see the full directory.</>
+              )}
+            </div>
+          )}
           {visible.map((k) => {
             const rate = k.questions_asked > 0 ? Math.round((k.questions_answered / k.questions_asked) * 100) : null;
             const rateColor = rate == null ? "var(--gold)" : rate >= 80 ? "var(--green)" : rate >= 50 ? "var(--amber)" : "var(--red)";
