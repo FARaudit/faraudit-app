@@ -1393,6 +1393,7 @@ function IncumbentCard({ noticeId, initial }: { noticeId: string; initial: Incum
 function WinProbabilityBadge({ auditId, cached, cachedBasis }: { auditId: string; cached: number | null; cachedBasis: number | null }) {
   const [pct, setPct] = useState<number | null>(cached);
   const [basis, setBasis] = useState<number>(cachedBasis ?? 0);
+  const [confidence, setConfidence] = useState<"tight" | "directional">("directional");
   const [reason, setReason] = useState<string>("");
   const [loading, setLoading] = useState(cached == null);
 
@@ -1407,6 +1408,7 @@ function WinProbabilityBadge({ auditId, cached, cachedBasis }: { auditId: string
         if (res.ok) {
           setPct(typeof data.probability === "number" ? data.probability : null);
           setBasis(data.basis ?? 0);
+          setConfidence(data.confidence === "tight" ? "tight" : "directional");
           setReason(data.reason || "");
         }
       } catch {
@@ -1425,23 +1427,33 @@ function WinProbabilityBadge({ auditId, cached, cachedBasis }: { auditId: string
       </span>
     );
   }
+  // Show "—" only when there's literally no historical data to compute from
+  // (basis === 0). Anything ≥1 outcome surfaces a directional probability with
+  // a `~` prefix and a tooltip explaining it tightens as the corpus grows.
   if (pct == null) {
     return (
       <span
         style={{ ...gaugePillBase, color: "var(--t40)", borderColor: "var(--border)" }}
-        title={reason || `Need ≥100 comparable audits in corpus. Current: ${basis}.`}
+        title={reason || "No outcomes logged yet — mark audits AWARDED or LOST to seed the model."}
       >
         WIN% · —
       </span>
     );
   }
   const color = pct >= 60 ? "var(--green)" : pct >= 35 ? "var(--amber)" : "var(--red)";
+  const directional = confidence === "directional";
   return (
     <span
-      style={{ ...gaugePillBase, color, borderColor: color, background: `${color}10` }}
-      title={`Based on ${basis} comparable audits in the corpus`}
+      style={{
+        ...gaugePillBase,
+        color,
+        borderColor: color,
+        background: `${color}10`,
+        ...(directional ? { borderStyle: "dashed" as const } : {})
+      }}
+      title={reason || `Based on ${basis} comparable audits in the corpus`}
     >
-      WIN · {pct}%
+      WIN · {directional ? "~" : ""}{pct}%
     </span>
   );
 }

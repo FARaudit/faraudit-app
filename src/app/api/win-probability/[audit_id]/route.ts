@@ -5,8 +5,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 interface WinProbabilityResult {
-  probability: number | null;     // 0–100, null if insufficient data
+  probability: number | null;     // 0–100, null only when basis === 0
   basis: number;                  // count of comparable outcomes
+  confidence: "directional" | "tight"; // tight when basis ≥ HIGH_CONFIDENCE_BASIS
   reason: string;
   benchmarks: {
     naics_win_rate: number | null;
@@ -17,7 +18,13 @@ interface WinProbabilityResult {
   insufficient_threshold: number;
 }
 
-const MIN_BASIS = 100; // require at least 100 comparable outcomes in the corpus
+// Confidence threshold — below this we still compute and surface a probability,
+// but the response carries `confidence: "directional"` so the UI can mark it.
+// Previously this was a hard floor that returned probability=null until the
+// corpus reached 100 outcomes; that meant every brand-new account saw a "—"
+// for months even after logging 5–10 outcomes that already say something
+// useful. Show "—" only when there's literally nothing to compute from.
+const HIGH_CONFIDENCE_BASIS = 100;
 
 interface OutcomeRow {
   outcome: string;                          // 'awarded' | 'lost'
@@ -74,12 +81,27 @@ export async function GET(
 
   let probability: number | null = null;
   let reason: string;
-  if (totalBasis >= MIN_BASIS) {
+  let confidence: "directional" | "tight" = "directional";
+  if (totalBasis > 0) {
+    // Match component to the strongest available slice. Below the per-slice
+    // floor (n>=10) we relax to anything ≥1 so a brand-new account with a
+    // few outcomes still sees a directional number instead of "—".
+    const slicesUsable = (n: number) => n >= 10;
+    const slicesDirectional = (n: number) => n >= 1;
     const components: Array<{ rate: number; weight: number }> = [];
-    if (sameNaics.rate    != null && sameNaics.n    >= 10) components.push({ rate: sameNaics.rate,    weight: 40 });
-    if (sameAgency.rate   != null && sameAgency.n   >= 10) components.push({ rate: sameAgency.rate,   weight: 35 });
-    if (sameSetAside.rate != null && sameSetAside.n >= 10) components.push({ rate: sameSetAside.rate, weight: 25 });
-    if (components.length === 0 && yours.rate != null) components.push({ rate: yours.rate, weight: 100 });
+
+    if (totalBasis >= HIGH_CONFIDENCE_BASIS) {
+      if (sameNaics.rate    != null && slicesUsable(sameNaics.n))    components.push({ rate: sameNaics.rate,    weight: 40 });
+      if (sameAgency.rate   != null && slicesUsable(sameAgency.n))   components.push({ rate: sameAgency.rate,   weight: 35 });
+      if (sameSetAside.rate != null && slicesUsable(sameSetAside.n)) components.push({ rate: sameSetAside.rate, weight: 25 });
+      if (components.length === 0 && yours.rate != null) components.push({ rate: yours.rate, weight: 100 });
+    } else {
+      // Directional path — accept thinner slices, fall back to overall rate.
+      if (sameNaics.rate    != null && slicesDirectional(sameNaics.n))    components.push({ rate: sameNaics.rate,    weight: 40 });
+      if (sameAgency.rate   != null && slicesDirectional(sameAgency.n))   components.push({ rate: sameAgency.rate,   weight: 35 });
+      if (sameSetAside.rate != null && slicesDirectional(sameSetAside.n)) components.push({ rate: sameSetAside.rate, weight: 25 });
+      if (components.length === 0 && yours.rate != null) components.push({ rate: yours.rate, weight: 100 });
+    }
 
     if (components.length > 0) {
       const wTotal = components.reduce((s, c) => s + c.weight, 0);
@@ -105,12 +127,15 @@ export async function GET(
       }
 
       probability = Math.max(2, Math.min(98, Math.round(wAvg + compAdj + marginAdj)));
-      reason = `Based on ${totalBasis} outcomes in your audit_outcomes corpus`;
+      confidence = totalBasis >= HIGH_CONFIDENCE_BASIS ? "tight" : "directional";
+      reason = totalBasis >= HIGH_CONFIDENCE_BASIS
+        ? `Based on ${totalBasis} outcomes in your audit_outcomes corpus`
+        : `Directional · ${totalBasis} outcomes logged so far. Tightens automatically once you log ≥${HIGH_CONFIDENCE_BASIS}.`;
     } else {
-      reason = `${totalBasis} outcomes in corpus but no slice has ≥10 comparable rows yet`;
+      reason = `${totalBasis} outcomes in corpus but no slice has comparable rows yet`;
     }
   } else {
-    reason = `${totalBasis} outcomes in your audit_outcomes corpus — need ≥${MIN_BASIS} to predict reliably. Each AWARDED or LOST you log compounds this.`;
+    reason = "No outcomes logged yet — mark audits AWARDED or LOST to seed the model.";
   }
 
   await supabase
@@ -125,6 +150,7 @@ export async function GET(
   const result: WinProbabilityResult = {
     probability,
     basis: totalBasis,
+    confidence,
     reason,
     benchmarks: {
       naics_win_rate: sameNaics.rate,
@@ -132,7 +158,7 @@ export async function GET(
       set_aside_win_rate: sameSetAside.rate,
       your_win_rate: yours.rate
     },
-    insufficient_threshold: MIN_BASIS
+    insufficient_threshold: HIGH_CONFIDENCE_BASIS
   };
 
   return NextResponse.json(result);
