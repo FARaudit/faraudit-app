@@ -6,7 +6,7 @@
 
 import { LABEL_KEYS } from './labels.js';
 
-const CLAUDE_MODEL = 'claude-opus-4-7';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const CLAUDE_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS) || 60000;
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
