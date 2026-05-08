@@ -48,7 +48,7 @@ const BATCH = 100;
 // alarm count on dashboards. Cap is enforced at insert time. Existing
 // excess (1,125 rows when this shipped) is trimmed via a one-shot SQL
 // purge applied separately via Supabase Studio.
-export const PENDING_QUEUE_CAP = 100;
+export const PENDING_QUEUE_CAP = 250;
 
 export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted: number; skipped: number }> {
   if (rows.length === 0) return { inserted: 0, skipped: 0 };
