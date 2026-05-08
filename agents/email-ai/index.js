@@ -312,7 +312,7 @@ async function run() {
   }
 
   const today = ctDateString();
-  await rolloverProcessedToday(today);
+  const processedToday = await rolloverProcessedToday(today);
 
   const labelIds = await ensureSixLabels(client);
   const idToKey = buildIdToKey(labelIds);
@@ -329,14 +329,28 @@ async function run() {
   }
 
   // ── Fetch unread inbox window ──────────────────────────────────────
+  // P0-3 fix (2026-05-08): drop watermark-based `after:{ts}` query in favor of
+  // `in:inbox is:unread`. The old query missed historical unread backlog —
+  // verified by FRESH_SCAN diagnostic finding 62 unread threads stuck in
+  // inbox (16 ARCHIVE-bound, 22 DELETE-bound) while normal cron returned
+  // fetched=0 every tick. Watermark is preserved in state for log/brief
+  // continuity but no longer gates the query.
+  //
+  // Two filter passes prevent re-classifying threads we've already actioned:
+  //   1. Drop stubs whose labelIds already include any of the 6 NOW/…/DELETE
+  //      labels (means we touched it on a prior tick).
+  //   2. Drop stubs in the processed_today set (today's earlier ticks).
+  // Result: cron self-cleans — every tick picks up only unprocessed unread
+  // threads. Once empty, fetched=0 is correct (not a bug, no work to do).
   const useFreshScan = DRY_RUN && FRESH_SCAN;
   const watermark = (!useFreshScan && state.last_run_at) ? Math.floor(new Date(state.last_run_at).getTime() / 1000) : null;
   const cap = (useFreshScan || !watermark) ? FIRST_RUN_CAP : RUN_CAP;
-  const queryOverride = useFreshScan ? 'in:inbox is:unread' : null;
+  const queryOverride = useFreshScan ? 'in:inbox is:unread' : 'in:inbox is:unread';
 
   let threadStubs;
   try {
-    threadStubs = await client.listInboxThreads(cap + 1, watermark, queryOverride);
+    // Pass null watermark — query is now `in:inbox is:unread` regardless.
+    threadStubs = await client.listInboxThreads(cap * 3, null, queryOverride);
   } catch (e) {
     const msg = String(e?.message || e);
     if (/invalid_grant|invalid_token|unauthorized_client/i.test(msg)) {
@@ -349,9 +363,25 @@ async function run() {
     throw e;
   }
 
-  const burstDetected = threadStubs.length > cap;
-  const toProcess = threadStubs.slice(0, cap);
-  console.log(`[email-ai] watermark=${watermark || 'null (first run)'} · fetched=${threadStubs.length} · cap=${cap}${burstDetected ? ' · BURST' : ''}`);
+  // Filter pass 1: drop threads that already carry one of our 6 buckets
+  // (means a prior tick or day already classified them). Stubs from
+  // threads.list include labelIds in some shapes — fall back to keeping
+  // the stub if labelIds is missing rather than dropping silently.
+  const ourLabelIds = new Set(Object.values(labelIds));
+  const unhandledStubs = threadStubs.filter((s) => {
+    if (!Array.isArray(s.labelIds)) return true; // unknown → keep, classify
+    return !s.labelIds.some((lid) => ourLabelIds.has(lid));
+  });
+
+  // Filter pass 2: drop today's already-processed thread IDs.
+  const remainingStubs = unhandledStubs.filter((s) => !processedToday.has(s.id));
+
+  const fetchedRaw = threadStubs.length;
+  const droppedAlreadyLabeled = threadStubs.length - unhandledStubs.length;
+  const droppedProcessedToday = unhandledStubs.length - remainingStubs.length;
+  const burstDetected = remainingStubs.length > cap;
+  const toProcess = remainingStubs.slice(0, cap);
+  console.log(`[email-ai] query=in:inbox is:unread · fetched=${fetchedRaw} · already_labeled=${droppedAlreadyLabeled} · processed_today=${droppedProcessedToday} · to_process=${toProcess.length}/${cap}${burstDetected ? ' · BURST' : ''}`);
 
   // Pull full threads up front (one round-trip per thread). Headers + CEO-
   // reply detection both need the full message list.
