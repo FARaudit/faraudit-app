@@ -20,6 +20,12 @@ export interface Solicitation {
   title: string;
   department: string | null;
   subTier: string | null;
+  // SAM v2 returns agency hierarchy as a dotted path string here (e.g.
+  // "INTERIOR, DEPARTMENT OF THE.NATIONAL PARK SERVICE.MWR MIDWEST REGION(60000)").
+  // department + subTier are no longer reliably populated — fullParentPathName
+  // is the canonical source. Probed 2026-05-07. resolveAgency() below uses
+  // this with fallbacks to handle legacy responses.
+  fullParentPathName: string | null;
   naicsCode: string | null;
   type: string | null;
   typeOfSetAside: string | null;
@@ -31,6 +37,27 @@ export interface Solicitation {
   // /api/audit Notice ID path can auto-download the PDF and run the full
   // 4-call audit instead of the metadata-only degraded path.
   resourceLinks: string[];
+}
+
+// Agency resolver. Mirrors agents/sam-ingest/helpers.ts:resolveAgency to keep
+// the audit and SAM-ingest paths consistent. Behavior:
+//   1. Pick fullParentPathName first; fall back to department / subTier for
+//      legacy responses or other endpoints that still emit them.
+//   2. If the value is dotted, take the first two segments (department · service).
+//   3. Strip trailing parenthetical org codes from each kept segment.
+//   4. Join with " · " (Unicode middle dot, surrounded by single spaces).
+//   5. Returns null only when SAM truly has nothing.
+export function resolveAgency(s: {
+  fullParentPathName?: string | null;
+  department?: string | null;
+  subTier?: string | null;
+}): string | null {
+  const raw = s.fullParentPathName || s.department || s.subTier || null;
+  if (!raw) return null;
+  const stripParens = (seg: string) => seg.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const segments = raw.includes(".") ? raw.split(".").slice(0, 2) : [raw];
+  const cleaned = segments.map(stripParens).filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join(" · ") : null;
 }
 
 export async function fetchSolicitationByNoticeId(
@@ -57,6 +84,7 @@ export async function fetchSolicitationByNoticeId(
       title: o.title ?? "",
       department: o.department ?? null,
       subTier: o.subTier ?? null,
+      fullParentPathName: o.fullParentPathName ?? null,
       naicsCode: o.naicsCode ?? null,
       type: o.type ?? null,
       typeOfSetAside: o.typeOfSetAside ?? null,

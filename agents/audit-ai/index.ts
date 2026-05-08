@@ -107,18 +107,22 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
     let solicitation = await fetchSolicitationByNoticeId(row.notice_id);
     if (!solicitation) {
       // Synthesize from queue row when SAM lookup fails (offline / fixture mode).
+      // Includes fullParentPathName + resourceLinks fields (added 2026-05-07
+      // for Solicitation interface parity post-P0-A / P0-G).
       solicitation = {
         noticeId: row.notice_id,
         solicitationNumber: null,
         title: row.title || row.notice_id,
         department: row.agency,
         subTier: null,
+        fullParentPathName: null,
         naicsCode: row.naics_code,
         type: null,
         typeOfSetAside: row.set_aside,
         postedDate: null,
         responseDeadLine: null,
-        description: row.notes || `(seed row · pdf=${row.pdf_path || row.pdf_url})`
+        description: row.notes || `(seed row · pdf=${row.pdf_path || row.pdf_url})`,
+        resourceLinks: []
       };
     }
 

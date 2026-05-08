@@ -4,6 +4,11 @@ import { supabase } from "./queue.js";
 // but pointing at siblings keeps the agent self-contained at compile time too.
 import type { AuditResult } from "./audit-engine.ts";
 import type { Solicitation } from "./sam.ts";
+// Runtime helper for agency resolution. tsx erases `import type` but needs
+// the full import to actually call the function. The path is sibling-relative
+// so it works in /app on Railway (Root Directory = agents/audit-ai/).
+// @ts-expect-error tsx
+import { resolveAgency } from "./sam.ts";
 
 // Bot-driven audit row source — keeps Audit AI runs distinguishable from
 // CEO-uploaded audits in the same `audits` table. The route.ts uploads use
@@ -32,7 +37,7 @@ export async function recordAudit(input: RecordAuditInput): Promise<RecordAuditO
     notice_id: solicitation.noticeId,
     solicitation_number: solicitation.solicitationNumber,
     title: solicitation.title,
-    agency: solicitation.department,
+    agency: resolveAgency(solicitation),
     naics_code: solicitation.naicsCode,
     set_aside: solicitation.typeOfSetAside,
     posted_date: solicitation.postedDate,

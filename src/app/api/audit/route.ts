@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { runAudit, type PdfSource } from "@/lib/audit-engine";
 import {
@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
       title: cleanedTitle || rawTitle || "Untitled solicitation",
       department: null,
       subTier: null,
+      fullParentPathName: null,
       naicsCode: null,
       type: null,
       typeOfSetAside: null,
@@ -190,13 +191,18 @@ export async function POST(req: NextRequest) {
   }
 
   // ━━ Insert pending audit row ━━
+  // resolveAgency() prefers fullParentPathName (the only field SAM v2 reliably
+  // populates as of 2026-05-07) and falls back to department/subTier for
+  // legacy responses. Without this, all post-2026-05 audits land with
+  // agency=NULL — the visible "agency=null" symptom across the existing 8
+  // rows that prompted P0-G.
   const { data: audit, error: insertError } = await supabase
     .from("audits")
     .insert({
       notice_id: solicitation.noticeId,
       solicitation_number: solicitation.solicitationNumber,
       title: solicitation.title,
-      agency: solicitation.department,
+      agency: resolveAgency(solicitation),
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,
