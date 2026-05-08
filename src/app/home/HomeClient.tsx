@@ -2020,9 +2020,16 @@ function TeamingPartnersPanel(_props: { naicsOptions: string[] }) {
 
         <form
           onSubmit={search}
+          noValidate
           style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14, padding: "12px 14px", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3 }}
         >
-          <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)} required>
+          <select
+            className="naics-select"
+            value={naics}
+            onChange={(e) => { setNaics(e.target.value); if (err) setErr(null); }}
+            aria-invalid={!!err && !naics}
+            style={!naics && err ? { borderColor: "var(--red)" } : undefined}
+          >
             <option value="">Choose NAICS…</option>
             {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
           </select>
@@ -2049,12 +2056,17 @@ function TeamingPartnersPanel(_props: { naicsOptions: string[] }) {
               fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)", outline: "none", flex: 1, minWidth: 200
             }}
           />
-          <button type="submit" className="action-btn primary" disabled={loading}>
+          <button
+            type="submit"
+            className="action-btn primary"
+            disabled={loading || !naics}
+            title={!naics ? "Select a NAICS to enable Search" : undefined}
+          >
             {loading ? "Searching…" : "Search"}
           </button>
         </form>
 
-        {err && <div className="ko-status error">{err}</div>}
+        {err && <div className="ko-status error" role="alert">{err}</div>}
         {reason && <div className="empty-block">{reason}</div>}
 
         {!loading && !err && partners.length === 0 && naics && (
