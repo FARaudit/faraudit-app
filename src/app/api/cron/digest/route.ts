@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
   try {
     const brief = await client.messages.create({
-      model: "claude-opus-4-7",
+      model: "claude-sonnet-4-6",
       max_tokens: 500,
       messages: [{ role: "user", content: briefPrompt }]
     });
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
       .trim();
 
     const edu = await client.messages.create({
-      model: "claude-opus-4-7",
+      model: "claude-sonnet-4-6",
       max_tokens: 300,
       messages: [
         {

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const revalidate = 0;
 export const maxDuration = 60;
 
-const CLAUDE_MODEL = "claude-opus-4-7";
+const CLAUDE_MODEL = "claude-sonnet-4-6";
 // Hard cap on per-request Claude calls. Most users see top 12 articles before
 // scrolling; bounding parallel Claude calls keeps p95 latency < 5s on first
 // load. Items beyond the cap fall back to the deterministic relevance string.

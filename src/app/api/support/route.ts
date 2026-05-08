@@ -88,7 +88,7 @@ export async function POST(req: Request) {
 
   try {
     const res = await client.messages.create({
-      model: "claude-opus-4-7",
+      model: "claude-sonnet-4-6",
       max_tokens: 700,
       system: SYSTEM_PROMPT,
       messages: trimmed
