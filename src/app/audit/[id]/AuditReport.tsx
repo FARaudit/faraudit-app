@@ -692,7 +692,7 @@ function NotesEditor({ auditId, initial }: { auditId: string; initial: string })
     if (state === "saving") return { cls: "saving", txt: "● Saving…" };
     if (state === "error") return { cls: "error", txt: `! ${errMsg || "Save failed"}` };
     if (state === "saved" && savedAt) return { cls: "saved", txt: `✓ Saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` };
-    return { cls: "", txt: "Auto-saves 1s after you stop typing" };
+    return { cls: "", txt: "Saves automatically" };
   }, [state, savedAt, errMsg]);
 
   return (
@@ -751,7 +751,7 @@ function OutcomeTracker({ auditId, initial }: { auditId: string; initial: Outcom
     if (save === "saving") return { cls: "saving", txt: "● Saving…" };
     if (save === "error")  return { cls: "error",  txt: `! ${errMsg || "Save failed"}` };
     if (save === "saved" && savedAt) return { cls: "saved", txt: `✓ Saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` };
-    return { cls: "", txt: "Changes save instantly" };
+    return { cls: "", txt: "Saves automatically" };
   })();
 
   return (
@@ -953,7 +953,7 @@ function RichOutcomeCapture({ auditId, outcome }: { auditId: string; outcome: st
     if (save === "saving") return { cls: "saving", txt: "● Saving rich outcome…" };
     if (save === "error")  return { cls: "error",  txt: `! ${errMsg || "Save failed"}` };
     if (save === "saved" && savedAt) return { cls: "saved", txt: `✓ Rich outcome saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` };
-    return { cls: "", txt: "Rich-outcome fields save 0.8s after typing" };
+    return { cls: "", txt: "Saves automatically" };
   })();
 
   return (

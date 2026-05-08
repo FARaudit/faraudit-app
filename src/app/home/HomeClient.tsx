@@ -2318,7 +2318,7 @@ function CapabilityPanel() {
   const indicator = save === "saving" ? { cls: "saving", txt: "● Saving…" }
     : save === "error"  ? { cls: "error",  txt: `! ${err || "Save failed"}` }
     : save === "saved" && savedAt ? { cls: "saved", txt: `✓ Saved ${savedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` }
-    : { cls: "", txt: "Auto-saves 1s after you stop typing" };
+    : { cls: "", txt: "Saves automatically" };
 
   return (
     <div className="intel-tab-content">
