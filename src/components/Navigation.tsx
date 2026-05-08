@@ -20,8 +20,7 @@
 // optimization — exact ports keep the visual identity unchanged.
 
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { createBrowserClient } from "@/lib/supabase-browser";
+import { useEffect, type ReactNode } from "react";
 import styles from "./Navigation.module.css";
 
 type IconName =
@@ -182,7 +181,6 @@ const BADGE_VARIANT_CLASS: Record<NavBadge["variant"], string> = {
 export default function Navigation(_: { initialPinned: boolean }) {
   const router = useRouter();
   const pathname = usePathname() || "";
-  const [signingOut, setSigningOut] = useState(false);
 
   // Reserve --sidebar-w for the layout's main column. /home renders
   // its own inline sidebar, and Navigation suppresses itself there
@@ -201,17 +199,11 @@ export default function Navigation(_: { initialPinned: boolean }) {
 
   if (pathname.startsWith("/home")) return null;
 
-  async function onSignOut() {
-    if (signingOut) return;
-    setSigningOut(true);
-    try {
-      const sb = createBrowserClient();
-      await sb.auth.signOut();
-      window.location.href = "/sign-in";
-    } catch {
-      setSigningOut(false);
-    }
-  }
+  // P0-J — sign-out is now form-POST to /api/auth/sign-out (server-side
+  // supabase.auth.signOut() + 303 redirect). Browser-side signOut() left the
+  // sb-* SSR cookie in place. The button below uses a <form> wrapper so the
+  // browser performs a real top-level navigation that follows the redirect
+  // and atomically commits the cookie deletions.
 
   const workspaceDefs: Array<{
     id: string;
@@ -271,9 +263,12 @@ export default function Navigation(_: { initialPinned: boolean }) {
         },
         {
           id: "signout",
-          label: signingOut ? "Signing out…" : "Sign out",
+          label: "Sign out",
           icon: "signout",
-          onClick: () => { void onSignOut(); },
+          // Rendered as a form-POST button below; this onClick is a no-op
+          // kept only because the NavItem type requires the field. The
+          // <form>'s submit drives the navigation.
+          onClick: () => {},
           isActive: false,
           badge: null
         }
@@ -304,22 +299,43 @@ export default function Navigation(_: { initialPinned: boolean }) {
         {sections.map((section) => (
           <div key={section.label} className={styles.section}>
             <div className={styles.navLabel}>{section.label}</div>
-            {section.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`${styles.navItem} ${item.isActive ? styles.active : ""}`}
-                onClick={item.onClick}
-              >
-                <span className={styles.navIcon}>{ICONS[item.icon]}</span>
-                <span className={styles.navItemLabel}>{item.label}</span>
-                {item.badge && (
-                  <span className={`${styles.badge} ${BADGE_VARIANT_CLASS[item.badge.variant]}`}>
-                    {item.badge.text}
-                  </span>
-                )}
-              </button>
-            ))}
+            {section.items.map((item) => {
+              if (item.id === "signout") {
+                return (
+                  <form
+                    key={item.id}
+                    action="/api/auth/sign-out"
+                    method="post"
+                    style={{ margin: 0 }}
+                  >
+                    <button
+                      type="submit"
+                      className={`${styles.navItem} ${item.isActive ? styles.active : ""}`}
+                      style={{ width: "100%" }}
+                    >
+                      <span className={styles.navIcon}>{ICONS[item.icon]}</span>
+                      <span className={styles.navItemLabel}>{item.label}</span>
+                    </button>
+                  </form>
+                );
+              }
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`${styles.navItem} ${item.isActive ? styles.active : ""}`}
+                  onClick={item.onClick}
+                >
+                  <span className={styles.navIcon}>{ICONS[item.icon]}</span>
+                  <span className={styles.navItemLabel}>{item.label}</span>
+                  {item.badge && (
+                    <span className={`${styles.badge} ${BADGE_VARIANT_CLASS[item.badge.variant]}`}>
+                      {item.badge.text}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         ))}
       </div>

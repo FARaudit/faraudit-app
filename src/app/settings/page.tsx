@@ -54,7 +54,6 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile>({ email: null, id: null, createdAt: null });
   const [displayName, setDisplayName] = useState<string>("");
   const [displayNameStatus, setDisplayNameStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,16 +108,9 @@ export default function SettingsPage() {
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
     : null;
 
-  async function onSignOut() {
-    setSigningOut(true);
-    try {
-      const sb = createBrowserClient();
-      await sb.auth.signOut();
-      window.location.href = "/sign-in";
-    } catch {
-      setSigningOut(false);
-    }
-  }
+  // P0-J — sign-out moved to server-side form-POST. Browser-side
+  // supabase.auth.signOut() left the sb-* SSR cookie in place; CEO observed
+  // url STILL /home + cookie STILL [sb-…-auth-token] 5s after click.
 
   return (
     <main
@@ -223,25 +215,24 @@ export default function SettingsPage() {
               Email already uniquely identifies the account on this page. */}
           <Row label="Member since" value={memberSince ?? "—"} />
           <div style={{ marginTop: 16, borderTop: `1px solid ${BORDER}`, paddingTop: 14 }}>
-            <button
-              type="button"
-              onClick={onSignOut}
-              disabled={signingOut}
-              style={{
-                background: "transparent",
-                border: `1px solid ${BORDER_2}`,
-                color: TEXT_2,
-                padding: "7px 14px",
-                borderRadius: 4,
-                fontSize: 12,
-                fontFamily: "JetBrains Mono, ui-monospace, monospace",
-                letterSpacing: "0.04em",
-                cursor: signingOut ? "wait" : "pointer",
-                opacity: signingOut ? 0.6 : 1
-              }}
-            >
-              {signingOut ? "Signing out…" : "Sign out"}
-            </button>
+            <form action="/api/auth/sign-out" method="post" style={{ margin: 0 }}>
+              <button
+                type="submit"
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${BORDER_2}`,
+                  color: TEXT_2,
+                  padding: "7px 14px",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontFamily: "JetBrains Mono, ui-monospace, monospace",
+                  letterSpacing: "0.04em",
+                  cursor: "pointer"
+                }}
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </section>
 

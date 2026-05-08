@@ -993,22 +993,25 @@ function RunAuditPanel({ prefill, active }: { prefill?: RunAuditPrefill | null; 
 }
 
 function SignOutButton() {
-  const [busy, setBusy] = useState(false);
-  async function go() {
-    setBusy(true);
-    try {
-      await fetch("/api/auth/signout", { method: "POST" });
-    } catch { /* swallow */ }
-    window.location.href = "/sign-in";
-  }
+  // P0-J — form-POST submits a real top-level navigation to /api/auth/sign-out,
+  // which clears the SSR cookie server-side and 303s to /sign-in. fetch-then-
+  // navigate left a race that let the sb-* auth cookie persist through the
+  // location change.
   return (
-    <button className="nav-item" onClick={go} disabled={busy} title="Sign out and return to sign-in">
-      <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-        <path d="M10 12l3-4-3-4M5 8h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-      </svg>
-      {busy ? "Signing out…" : "Sign out"}
-    </button>
+    <form action="/api/auth/sign-out" method="post" style={{ margin: 0 }}>
+      <button
+        type="submit"
+        className="nav-item"
+        title="Sign out and return to sign-in"
+        style={{ width: "100%", textAlign: "left" }}
+      >
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M10 12l3-4-3-4M5 8h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Sign out
+      </button>
+    </form>
   );
 }
 
