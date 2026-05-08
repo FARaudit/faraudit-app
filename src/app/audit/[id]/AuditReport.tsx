@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { displaySolicitationId } from "@/lib/audit-display";
+import { auditDisplayName, displaySolicitationId } from "@/lib/audit-display";
 
 interface PrioritizedRisk {
   text: string;
@@ -84,7 +84,16 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
     notice_id: audit.notice_id as string | null | undefined,
     title: audit.title as string | null | undefined
   });
-  const title = (audit.title as string) || "Untitled solicitation";
+  // auditDisplayName masks UUID/hex/pdf-timestamp leaks and falls back to a
+  // humanized "Untitled audit · {timestamp}" instead of bare "Untitled
+  // solicitation". Same helper used across Pipeline + Recent Audits + Past
+  // Audits + Capability past-perf surfaces (P0-D / P0-D.5).
+  const title = auditDisplayName({
+    title: audit.title as string | null | undefined,
+    notice_id: audit.notice_id as string | null | undefined,
+    solicitation_number: audit.solicitation_number as string | null | undefined,
+    created_at: audit.created_at as string | null | undefined
+  });
   const agency = (audit.agency as string) || "—";
   const naics = (audit.naics_code as string) || "";
   const setAside = (audit.set_aside as string) || "";
@@ -193,6 +202,7 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
                 auditId={id}
                 agency={agency}
                 noticeId={noticeId}
+                displayId={displayId}
                 koEmailFromAudit={(audit.ko_email_recipient as string) || (compJson.ko_email as string) || ""}
                 koNameFromAudit={(audit.ko_name as string) || (compJson.ko_name as string) || ""}
               />
@@ -1140,12 +1150,14 @@ function KOCard({
   auditId,
   agency,
   noticeId,
+  displayId,
   koEmailFromAudit,
   koNameFromAudit
 }: {
   auditId: string;
   agency: string;
   noticeId: string;
+  displayId: string;
   koEmailFromAudit: string;
   koNameFromAudit: string;
 }) {
@@ -1218,7 +1230,7 @@ function KOCard({
           <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Agency</div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{agency}</div>
           <div style={{ ...fieldLabelStyle, marginTop: 12 }}>Notice</div>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)" }}>{noticeId}</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)" }}>{displayId}</div>
         </div>
         <div>
           {loading && <div className="empty-block">Loading contact history…</div>}
