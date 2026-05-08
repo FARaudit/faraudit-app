@@ -26,6 +26,13 @@ function isPdfMagicValid(buf: Buffer): boolean {
   return buf.length >= 4 && buf.subarray(0, 4).equals(PDF_MAGIC);
 }
 
+// Error-message prefix exported so index.ts:isDataQualityFailure() can
+// classify these as data-quality failures (not engine bugs). SAM.gov's
+// /resources/files/.../download endpoint increasingly returns ZIP, DOC, or
+// JPG bytes when the upstream attachment isn't a PDF — a per-row data
+// quality issue, not a worker malfunction.
+export const kSamNonPdfError = "SAM.gov returned non-PDF";
+
 export async function fetchPdfFromPath(pdfPath: string): Promise<PdfFetchResult> {
   const buf = await readFile(pdfPath);
   if (!isPdfMagicValid(buf)) {
@@ -45,7 +52,7 @@ export async function fetchPdfFromSam(url: string): Promise<PdfFetchResult> {
   if (!res.ok) throw new Error(`SAM PDF fetch ${res.status}: ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
   if (!isPdfMagicValid(buf)) {
-    throw new Error(`SAM.gov returned non-PDF for ${url} (first bytes: ${buf.subarray(0, 8).toString("hex")})`);
+    throw new Error(`${kSamNonPdfError} for ${url} (first bytes: ${buf.subarray(0, 8).toString("hex")})`);
   }
   return { base64: buf.toString("base64"), bytes: buf.length, source: "sam.gov" };
 }

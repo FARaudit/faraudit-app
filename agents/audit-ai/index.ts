@@ -9,7 +9,7 @@
 //      SUPABASE_SERVICE_ROLE_KEY · DRY_RUN · QUEUE_BATCH_SIZE · CLAUDE_TIMEOUT_MS
 
 import dotenv from "dotenv";
-import { fetchPdfFromPath, fetchPdfFromSam } from "./pdf.js";
+import { fetchPdfFromPath, fetchPdfFromSam, kSamNonPdfError } from "./pdf.js";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
@@ -87,11 +87,21 @@ async function loadPdf(row: PendingAudit) {
 }
 
 // Data-quality failures = rows that should have been filtered upstream (no PDF,
-// PDF too large). These don't represent worker bugs · audit-ai exits 0 even
-// when only data-quality failures fired. Genuine engine errors (timeout, API
-// 4xx/5xx, schema mismatch) still exit 1 to surface as Railway alerts.
+// PDF too large, SAM.gov returning non-PDF bytes for the download URL). These
+// don't represent worker bugs · audit-ai exits 0 even when only data-quality
+// failures fired. Genuine engine errors (timeout, API 4xx/5xx, schema mismatch)
+// still exit 1 to surface as Railway alerts.
+//
+// kSamNonPdfError added 2026-05-08 (F-02): today's 06:30 CDT cron classified 12
+// SAM-non-PDF rows as engine-failed, exited 1, deployment showed CRASHED in
+// Railway despite ok=37/50. Prefix moved to pdf.ts so the sentinel string lives
+// next to the throw site that emits it.
 function isDataQualityFailure(message: string): boolean {
-  return message.includes(kNoPdfError) || message.includes(kPdfTooLargeError);
+  return (
+    message.includes(kNoPdfError) ||
+    message.includes(kPdfTooLargeError) ||
+    message.includes(kSamNonPdfError)
+  );
 }
 
 async function processOne(row: PendingAudit, i: number, total: number): Promise<{ ok: boolean; reason?: string }> {
