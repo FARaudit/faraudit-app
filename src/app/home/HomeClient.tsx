@@ -483,7 +483,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
             {/* AUDIT */}
             <div className={`tab-panel ${tab === "audit" ? "active" : ""}`}>
-              <RunAuditPanel prefill={auditPrefill} />
+              <RunAuditPanel prefill={auditPrefill} active={tab === "audit"} />
             </div>
 
             {/* SAM */}
@@ -791,7 +791,7 @@ interface RunAuditPrefill {
 
 type RunAuditMode = "notice" | "pdf";
 
-function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
+function RunAuditPanel({ prefill, active }: { prefill?: RunAuditPrefill | null; active?: boolean }) {
   const router = useRouter();
   // Architectural mutual exclusion: user picks a mode FIRST, only that mode's
   // input renders. Submit handler sends only the active mode's field by
@@ -804,6 +804,7 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
+  const noticeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (prefill?.notice_id) {
@@ -812,6 +813,25 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
       setPdf(null);
     }
   }, [prefill?.notice_id]);
+
+  // Focus the Notice ID input whenever this tab becomes active and we're in
+  // notice mode. Native autoFocus only fires on first mount; tab navigation
+  // re-shows the same already-mounted panel, so without this the input loses
+  // focus the second time the user clicks Run Audit. Skip if a result is on
+  // screen (would steal focus from the success block) or the user is mid-submit.
+  useEffect(() => {
+    if (!active) return;
+    if (mode !== "notice") return;
+    if (submitting || result) return;
+    const el = noticeInputRef.current;
+    if (!el) return;
+    // requestAnimationFrame: tab-panel transitions can briefly hide via CSS
+    // (.tab-panel:not(.active) { display: none }) so the input isn't focusable
+    // until the layout pass after `active` flips. rAF schedules focus for the
+    // next paint frame so it lands after the panel is visible.
+    const raf = requestAnimationFrame(() => { el.focus(); });
+    return () => cancelAnimationFrame(raf);
+  }, [active, mode, submitting, result]);
 
   function switchMode(next: RunAuditMode) {
     if (next === mode) return;
@@ -922,6 +942,7 @@ function RunAuditPanel({ prefill }: { prefill?: RunAuditPrefill | null }) {
         {mode === "notice" ? (
           <div className="audit-input">
             <input
+              ref={noticeInputRef}
               type="text"
               value={noticeId}
               onChange={(e) => setNoticeId(e.target.value.trim())}
