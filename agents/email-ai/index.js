@@ -345,11 +345,13 @@ async function run() {
   const useFreshScan = DRY_RUN && FRESH_SCAN;
   const watermark = (!useFreshScan && state.last_run_at) ? Math.floor(new Date(state.last_run_at).getTime() / 1000) : null;
   const cap = (useFreshScan || !watermark) ? FIRST_RUN_CAP : RUN_CAP;
-  const queryOverride = useFreshScan ? 'in:inbox is:unread' : 'in:inbox is:unread';
+  // Include Gmail's auto-categorized tabs (Promotions, Social, Updates, Purchases,
+  // Forums) so v2 sees the full unread surface — `in:inbox is:unread` alone
+  // missed ~200 messages routed to category tabs by Gmail's classifier.
+  const queryOverride = '(in:inbox OR category:promotions OR category:social OR category:updates OR category:purchases OR category:forums) is:unread -label:read -label:archive -label:delete -label:waiting -label:this_week -label:now';
 
   let threadStubs;
   try {
-    // Pass null watermark — query is now `in:inbox is:unread` regardless.
     threadStubs = await client.listInboxThreads(cap * 3, null, queryOverride);
   } catch (e) {
     const msg = String(e?.message || e);
@@ -381,7 +383,7 @@ async function run() {
   const droppedProcessedToday = unhandledStubs.length - remainingStubs.length;
   const burstDetected = remainingStubs.length > cap;
   const toProcess = remainingStubs.slice(0, cap);
-  console.log(`[email-ai] query=in:inbox is:unread · fetched=${fetchedRaw} · already_labeled=${droppedAlreadyLabeled} · processed_today=${droppedProcessedToday} · to_process=${toProcess.length}/${cap}${burstDetected ? ' · BURST' : ''}`);
+  console.log(`[email-ai] query=<inbox+5 categories, unread, no-existing-label> · fetched=${fetchedRaw} · already_labeled=${droppedAlreadyLabeled} · processed_today=${droppedProcessedToday} · to_process=${toProcess.length}/${cap}${burstDetected ? ' · BURST' : ''}`);
 
   // Pull full threads up front (one round-trip per thread). Headers + CEO-
   // reply detection both need the full message list.
