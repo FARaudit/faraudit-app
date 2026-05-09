@@ -1,0 +1,45 @@
+{
+  "issue": 4,
+  "title": "The 30-Day Window",
+  "subtitle": "Why every founder gets the same letter from the IRS — and why most ignore it until it costs them seven figures",
+  "publish": {
+    "date": "2026-05-11",
+    "time_local": "08:30",
+    "tz": "America/Chicago",
+    "iso_utc": "2026-05-11T13:30:00Z"
+  },
+  "channels": {
+    "linkedin_article": {
+      "status": "staged",
+      "file": "linkedin-article.md",
+      "action_required": "manually paste into LinkedIn Article composer and use built-in scheduler"
+    },
+    "email": {
+      "status": "staged",
+      "file": "email.md",
+      "action_required": "skip if no email list yet wired (per spec section 2.4)"
+    },
+    "twitter_thread": {
+      "status": "not_staged",
+      "note": "5-tweet condensation listed as separate distribution checklist item; not in scope of this staging task"
+    }
+  },
+  "source": {
+    "notion_spec": "https://www.notion.so/35bfaf5b93148143b516fda1cbb0f207",
+    "drafted_date": "2026-05-08"
+  },
+  "compliance_checks": {
+    "no_saas_term": true,
+    "no_ai_powered_term": true,
+    "legal_name_correct": true,
+    "no_personal_investment_disclosure": true,
+    "tone": "ceo-of-lockheed",
+    "source_material_footer_stripped": true
+  },
+  "notes": [
+    "Source-material footer (EINs, USPS tracking numbers) stripped from publish versions — internal-only.",
+    "Light tightening applied: dropped 'voluntarily' and 'tax experts recommend' meta-phrases; deleted hedge words; consolidated bullet preambles in email version.",
+    "No LinkedIn API tool available in this environment — scheduling must be done manually in LinkedIn composer.",
+    "Apostrophes normalized to ASCII for paste-safety."
+  ]
+}

@@ -1,0 +1,54 @@
+Twitter thread — Newsletter #4 (post Mon May 11 ~08:35 CT, ~5 min after LinkedIn goes live so the link works)
+
+Each tweet ≤280 chars. Final tweet has [LINK] placeholder — paste the LinkedIn Article URL after publishing.
+
+---
+
+[1/5] Most founders lose 6-7 figures of net worth before Series A — and never see it happen.
+
+The cause: one missed IRS form. The 83(b) election. 30 days from stock purchase. No extensions.
+
+What just cost four of my friends their first exit 🧵
+
+---
+
+[2/5] How it works:
+
+Buy founder stock at par ($0.0001/sh). IRS sees zero income.
+
+But your stock vests over 4 yrs. Default IRS treatment: tax you on FMV at each vest event.
+
+Year 2 vest worth $1M? You owe ordinary income on $1M — even though you can't sell to pay the bill.
+
+---
+
+[3/5] 83(b) flips it.
+
+You tell the IRS: "Recognize the income now — when it's zero. Don't tax me at vesting."
+
+All future appreciation = long-term capital gains.
+
+On a $50M exit, 37% ordinary vs 20% LTCG on the bulk of your equity = keeping your house vs selling it.
+
+---
+
+[4/5] The deadline:
+
+30 days from your stock purchase date. Not incorporation. Not the board resolution. The day the SPA was executed.
+
+IRS doesn't care that:
+— you didn't know
+— your lawyer "was going to handle it"
+— your CPA was on vacation
+
+Miss the window, miss it forever.
+
+---
+
+[5/5] This week Stripe Atlas filed 83(b)s for all three of my Delaware C-Corps — postmarked May 7, 4 weeks of buffer.
+
+Total time: zero. Total marginal cost: $0.
+
+If you incorporated in the last 30 days, check your filing today.
+
+Full piece: [LINK]
