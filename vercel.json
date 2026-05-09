@@ -13,5 +13,11 @@
     { "path": "/api/cron/marketing",      "schedule": "15 13 * * 1-5" },
     { "path": "/api/cron/digest",         "schedule": "0 12 * * 1-5"  },
     { "path": "/api/cron/digest",         "schedule": "0 13 * * 0,6"  }
+  ],
+  "_pendingPhaseC_activateDay2": [
+    { "path": "/api/cron/markets-brief",   "schedule": "0 11 * * *",  "ct": "06:00 CT daily" },
+    { "path": "/api/cron/defense-brief",   "schedule": "30 11 * * *", "ct": "06:30 CT daily" },
+    { "path": "/api/cron/education-drip",  "schedule": "0 12 * * *",  "ct": "07:00 CT daily" },
+    { "path": "/api/cron/sunday-deepdive", "schedule": "0 11 * * 0",  "ct": "Sun 06:00 CT" }
   ]
 }
