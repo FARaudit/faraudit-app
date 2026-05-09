@@ -25,14 +25,18 @@ export async function GET(req: NextRequest) {
   const notion = process.env.NOTION_TOKEN ? new NotionClient({ auth: process.env.NOTION_TOKEN }) : null;
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // TODO: Phase C Day 2 — implement actual generation logic
+  // Phase C Day 3 — wire after NOTION_TOKEN is added to .env.local. Day 2 wired
+  // education-drip only because its lesson fixture could be hardcoded; the Sunday
+  // deep-dive depends on Notion-stored API Tracker + Phase Plan + system prompt.
+  // TODO Day 3:
   // 1. Compute current Week N (program_started_at vs Sunday)
   // 2. Resolve API target + Feature target for Week N from API Tracker + Phase Plan
   // 3. Load Sunday Deep-Dive system prompt from Notion SYSTEM_PROMPTS_PAGE_ID
-  // 4. Call Sonnet 4.6 to synthesize Part 1 / Part 2 / Part 3 + competitive table + CEO decision prompt
+  // 4. Call claude-sonnet-4-6 to synthesize Part 1 / Part 2 / Part 3 + competitive table + CEO decision prompt
   // 5. Render via lib/email/templates/sunday-deepdive.tsx
-  // 6. Send via Resend
-  // 7. Archive to Notion INTELLIGENCE_ARCHIVE_DB_ID
+  // 6. Send via Resend (verified domain required — see Day 2 finding)
+  // 7. Insert agent_run_log row (mirror education-drip route pattern)
+  // 8. Archive to Notion INTELLIGENCE_ARCHIVE_DB_ID
 
   void anthropic; void notion; void resend;
 
@@ -40,7 +44,7 @@ export async function GET(req: NextRequest) {
     status: "stub",
     cron: "sunday-deepdive",
     schedule: "0 11 * * 0 (Sunday 06:00 CT)",
-    message: "Phase C Day 2 implementation pending",
+    message: "Phase C Day 3 implementation pending — needs NOTION_TOKEN + verified Resend domain",
   });
 }
 
