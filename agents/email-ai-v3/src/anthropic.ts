@@ -32,23 +32,46 @@ const VALID_BUCKETS: readonly Bucket[] = [
 const CLASSIFY_SYSTEM = `You are an email triage classifier for jose@faraudit.com. Output JSON only.
 
 Buckets:
-- NOW = needs CEO decision today (real human writing personally, customer reply, legal/financial deadline, infrastructure outage)
+- NOW = needs CEO decision today (real human writing personally, customer reply, legal/financial deadline that requires email response, infrastructure outage requiring CEO acknowledgement)
 - THIS WEEK = important but can wait days (prospect follow-ups, vendor decisions)
 - WAITING = CEO sent message and is waiting on reply
 - READ = ambient reading, opted-in newsletters
-- ARCHIVE = receipts, confirmations (Atlas filings, Stripe receipts, deploy success)
+- ARCHIVE = receipts, confirmations, automated alerts CEO acts on outside email (Atlas filings, Stripe receipts, deploy notifications, security alerts)
 - DELETE = uncertain noise (marketing, unknown senders, low confidence)
 
-Rules:
-- Real human writing personally → NOW
-- LinkedIn notification emails (notifications-noreply, jobs-noreply, updates-noreply) → DELETE
-- Direct LinkedIn DMs from named humans → NOW
+HARD RULE 1 — UNREPLYABLE SENDER GUARD (applies BEFORE all category rules):
+A 'no-reply sender' is any From address matching ANY of these patterns (case-insensitive substring match):
+  - contains 'noreply' or 'no-reply' or 'donotreply' or 'do-not-reply'
+  - starts with 'notifications@' or 'notification@'
+  - starts with 'alerts@' or 'alert@'
+  - starts with 'team@' or 'hello@' or 'info@' or 'updates@'
+  - domain segment after @ starts with 'notify.', 'email.', 'mailer.', 'bounce.', 'mail.', 'news.' (e.g. @notify.railway.app, @email.linkedin.com)
+  - contains 'mailer-daemon' or 'postmaster'
+  - any '*-noreply@' or '*-no-reply@' address (e.g. workspace-noreply@, jobs-noreply@)
+
+NOTE: 'support@' and 'help@' addresses are NOT auto-flagged — they are typically monitored human helpdesks. Apply category rules normally to them.
+
+If sender matches ANY of the unreplyable patterns above, the email is UNREPLYABLE:
+  - If content is confirmation/receipt/log → ARCHIVE
+  - If content is deadline/alert/failure CEO must act on outside email → ARCHIVE with reasoning prefix 'unreplyable but actionable —'
+  - NEVER NOW. NEVER WAITING. NEVER draft a reply. The agent on the other side cannot read replies.
+
+HARD RULE 2 — THREAD AGE GUARD:
+If 'last_message_age_days' value passed in user prompt is greater than 3, the email is stale:
+  - Cannot be NOW regardless of content
+  - Confirmations → ARCHIVE
+  - Anything else → READ or DELETE based on signal value
+
+CATEGORY RULES (applied AFTER hard rules above):
+- Real human writing personally to jose (sender is a named person at a real company domain, NOT a noreply pattern from Hard Rule 1) → NOW
+- LinkedIn DMs from named humans (sender contains person name + title + company in body) → NOW
 - Atlas/Stripe/Vercel/Railway/Anthropic confirmations → ARCHIVE
-- Atlas/Stripe ALERT emails (deadline, billing failure) → NOW
+- Atlas/Stripe billing failure or account-lock alerts → ARCHIVE (CEO acts in dashboard, not email reply)
+- Newsletters CEO opted into → READ
 - Cannot confidently bucket → DELETE with low confidence
 
 Output JSON:
-{"bucket":"...","confidence":0.0-1.0,"reasoning":"one sentence"}
+{"bucket":"NOW|THIS WEEK|WAITING|READ|ARCHIVE|DELETE","confidence":0.0-1.0,"reasoning":"one sentence including which hard rule applied if any"}
 
 No prose. No markdown.`;
 
@@ -59,6 +82,7 @@ interface ClassifyInput {
   subject: string;
   snippet: string;
   lastCeoMessageInThread: string | null; // ISO ts string or null
+  lastMessageAgeDays: number;            // age of most recent message (any sender) in days
 }
 
 interface UsageWithCache {
@@ -100,6 +124,7 @@ export async function classifyThread(input: ClassifyInput): Promise<ThreadClassi
     input.lastCeoMessageInThread
       ? `Last CEO message in thread: ${input.lastCeoMessageInThread}`
       : `Last CEO message in thread: none`,
+    `Last message age (days): ${input.lastMessageAgeDays}`,
     "",
     "Snippet (first 500 chars):",
     input.snippet.slice(0, 500),

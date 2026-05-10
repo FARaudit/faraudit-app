@@ -12,6 +12,7 @@ import {
 } from "./gmail";
 import { classifyThread, ACTIVE_MODEL } from "./anthropic";
 import { buildAndCreateDraft } from "./draft";
+import { isUnreplyable, isStale, ageInDays } from "./sender-guard";
 import {
   BUCKET_TO_GMAIL_LABEL,
   type Bucket,
@@ -58,12 +59,17 @@ function buildThreadSummary(thread: GmailThread): ThreadSummary {
     }
   }
 
+  // Last message in thread regardless of sender (for stale-thread guard)
+  const lastMs = parseInt(last?.internalDate || "0", 10);
+  const lastMessageDate = lastMs > 0 ? new Date(lastMs) : null;
+
   return {
     threadId: thread.id,
     fromEmail: extractEmail(fromHeader),
     subject,
     snippet,
     lastCeoMessageAt: lastCeoMs,
+    lastMessageDate,
     rawMessages: messages,
   };
 }
@@ -93,6 +99,8 @@ async function finalizeRun(runId: string, metrics: RunMetrics, status: "success"
       threads_classified: metrics.threadsClassified,
       threads_skipped_self_loop: metrics.threadsSkippedSelfLoop,
       threads_blacklisted: metrics.threadsBlacklisted,
+      threads_overridden_unreplyable: metrics.threadsOverriddenUnreplyable,
+      threads_skipped_stale: metrics.threadsSkippedStale,
       drafts_created: metrics.draftsCreated,
       errors_caught: metrics.errorsCaught,
       model_used: metrics.modelUsed,
@@ -116,7 +124,9 @@ async function persistClassification(
   confidence: number,
   reasoning: string,
   draftCreated: boolean,
-  draftId: string | null
+  draftId: string | null,
+  overridden = false,
+  overrideReason: string | null = null
 ): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from("email_thread_classifications").insert({
@@ -129,6 +139,8 @@ async function persistClassification(
     draft_created: draftCreated,
     draft_id: draftId,
     tick_id: runId,
+    overridden,
+    override_reason: overrideReason,
   });
   if (error) throw new Error(`persistClassification: ${error.message}`);
 }
@@ -140,6 +152,8 @@ async function persistClassification(
 interface ProcessOutcome {
   bucket: Bucket;
   draftCreated: boolean;
+  overriddenUnreplyable: boolean;
+  overriddenStale: boolean;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
@@ -159,13 +173,35 @@ async function processThread(
     lastCeoMessageInThread: thread.lastCeoMessageAt
       ? new Date(thread.lastCeoMessageAt).toISOString()
       : null,
+    lastMessageAgeDays: ageInDays(thread.lastMessageDate),
   });
 
   let totalInput = classification.input_tokens;
   let totalOutput = classification.output_tokens;
   let totalCost = classification.cost_usd;
 
-  // 2. Apply Gmail label (skip if SKIPPED — defensive; classifier shouldn't return SKIPPED)
+  // 2. HARD GUARDS — apply BEFORE any label or draft logic.
+  // The classifier prompt also enforces these, but the code guard is the
+  // belt-and-suspenders backstop in case the model ignores the rule.
+  let overriddenUnreplyable = false;
+  let overriddenStale = false;
+
+  if (classification.bucket === "NOW" && isUnreplyable(thread.fromEmail)) {
+    overriddenUnreplyable = true;
+    classification.reasoning = `[OVERRIDE: unreplyable sender] ${classification.reasoning}`;
+    classification.bucket = "ARCHIVE";
+    classification.overridden = true;
+    classification.override_reason = `unreplyable: ${thread.fromEmail}`;
+  } else if (classification.bucket === "NOW" && isStale(thread.lastMessageDate, 3)) {
+    overriddenStale = true;
+    const days = ageInDays(thread.lastMessageDate);
+    classification.reasoning = `[OVERRIDE: stale >3d] ${classification.reasoning}`;
+    classification.bucket = "ARCHIVE";
+    classification.overridden = true;
+    classification.override_reason = `stale: ${days}d old`;
+  }
+
+  // 3. Apply Gmail label (skip if SKIPPED — defensive; classifier shouldn't return SKIPPED)
   if (classification.bucket !== "SKIPPED") {
     const labelName = BUCKET_TO_GMAIL_LABEL[classification.bucket];
     const labelId = labelMap.get(labelName);
@@ -177,7 +213,7 @@ async function processThread(
     await applyLabel(thread.threadId, labelId);
   }
 
-  // 3. NOW bucket → generate draft reply
+  // 4. NOW bucket → generate draft reply (only reached if no override fired)
   let draftCreated = false;
   let draftId: string | null = null;
   if (classification.bucket === "NOW") {
@@ -189,7 +225,7 @@ async function processThread(
     totalCost += outcome.costUsd;
   }
 
-  // 4. Persist classification row
+  // 5. Persist classification row
   await persistClassification(
     runId,
     thread,
@@ -197,12 +233,16 @@ async function processThread(
     classification.confidence,
     classification.reasoning,
     draftCreated,
-    draftId
+    draftId,
+    classification.overridden ?? false,
+    classification.override_reason ?? null
   );
 
   return {
     bucket: classification.bucket,
     draftCreated,
+    overriddenUnreplyable,
+    overriddenStale,
     inputTokens: totalInput,
     outputTokens: totalOutput,
     costUsd: totalCost,
@@ -248,6 +288,8 @@ async function main(): Promise<void> {
     threadsClassified: 0,
     threadsSkippedSelfLoop: 0,
     threadsBlacklisted: 0,
+    threadsOverriddenUnreplyable: 0,
+    threadsSkippedStale: 0,
     draftsCreated: 0,
     errorsCaught: 0,
     inputTokens: 0,
@@ -327,13 +369,15 @@ async function main(): Promise<void> {
         continue;
       }
 
-      // 3. Process (classify + label + maybe draft + persist)
+      // 3. Process (classify + override-check + label + maybe draft + persist)
       const outcome = await processThread(runId, summary, labelMap);
       metrics.threadsClassified += 1;
       metrics.inputTokens += outcome.inputTokens;
       metrics.outputTokens += outcome.outputTokens;
       metrics.costUsd += outcome.costUsd;
       if (outcome.draftCreated) metrics.draftsCreated += 1;
+      if (outcome.overriddenUnreplyable) metrics.threadsOverriddenUnreplyable += 1;
+      if (outcome.overriddenStale) metrics.threadsSkippedStale += 1;
     } catch (e) {
       metrics.errorsCaught += 1;
       const entry: ErrorLogEntry = {
@@ -360,7 +404,7 @@ async function main(): Promise<void> {
   await finalizeRun(runId, metrics, status);
 
   console.log(
-    `[email-ai-v3] tick complete · status=${status} · processed=${metrics.threadsProcessed} · classified=${metrics.threadsClassified} · self-loop-skipped=${metrics.threadsSkippedSelfLoop} · blacklisted=${metrics.threadsBlacklisted} · drafts=${metrics.draftsCreated} · errors=${metrics.errorsCaught} · cost=$${metrics.costUsd.toFixed(4)}`
+    `[email-ai-v3] tick complete · status=${status} · processed=${metrics.threadsProcessed} · classified=${metrics.threadsClassified} · self-loop-skipped=${metrics.threadsSkippedSelfLoop} · blacklisted=${metrics.threadsBlacklisted} · overridden-unreplyable=${metrics.threadsOverriddenUnreplyable} · stale=${metrics.threadsSkippedStale} · drafts=${metrics.draftsCreated} · errors=${metrics.errorsCaught} · cost=$${metrics.costUsd.toFixed(4)}`
   );
 }
 

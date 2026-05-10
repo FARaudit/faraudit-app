@@ -24,6 +24,8 @@ export interface ThreadClassification {
   input_tokens: number;
   output_tokens: number;
   cost_usd: number;
+  overridden?: boolean;
+  override_reason?: string;
 }
 
 export interface GmailHeader {
@@ -60,6 +62,7 @@ export interface ThreadSummary {
   subject: string;
   snippet: string;
   lastCeoMessageAt: number | null; // unix ms; null if CEO never sent in thread
+  lastMessageDate: Date | null;    // last message in thread regardless of sender
   rawMessages: GmailMessage[];
 }
 
@@ -68,6 +71,8 @@ export interface RunMetrics {
   threadsClassified: number;
   threadsSkippedSelfLoop: number;
   threadsBlacklisted: number;
+  threadsOverriddenUnreplyable: number;
+  threadsSkippedStale: number;
   draftsCreated: number;
   errorsCaught: number;
   inputTokens: number;
