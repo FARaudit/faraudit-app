@@ -8,34 +8,38 @@ import {
   listUnreadThreads,
   getThread,
   applyLabel,
+  removeLabel,
   moveToTrash,
 } from "./gmail";
-import { classifyThread, ACTIVE_MODEL } from "./anthropic";
-import { buildAndCreateDraft } from "./draft";
-import { isUnreplyable, isStale, ageInDays } from "./sender-guard";
+import { classifyDeterministic } from "./deterministic";
+import { classifyLLM } from "./anthropic";
+import { tickOutbound, tickReplies, tickWaiting } from "./outbound-tracker";
+import { getGmail } from "./gmail";
+import { extractEmail, extractDomain, errorMessage } from "./utils";
+import senders from "./data/senders.json";
 import {
-  BUCKET_TO_GMAIL_LABEL,
-  type Bucket,
-  type ErrorLogEntry,
+  URGENCY_TO_GMAIL_LABEL,
+  DOMAIN_TO_GMAIL_LABEL,
+  COMPANY_TO_GMAIL_LABEL,
+  ALL_V3_URGENCY_LABELS,
+  type ClassificationResult,
+  type CompanyTag,
+  type EmailMeta,
   type GmailHeader,
   type GmailMessage,
   type GmailThread,
   type RunMetrics,
-  type ThreadSummary,
 } from "./types";
 
-const GMAIL_USER = (process.env.GMAIL_USER || "jose@faraudit.com").toLowerCase();
+// Self-loop filter is now domain-based (per Phase 2 spec) — handles plus-addressing
+// and Bullrize/LexAnchor self-forwards. Per-email match used to be GMAIL_USER but
+// senders.self_identity_domains is the canonical source of truth.
+const SELF_DOMAINS = new Set(senders.self_identity_domains.map((d) => d.toLowerCase()));
 const KILL_SWITCH = process.env.EMAIL_AI_ENABLED === "true";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────
-
-function extractEmail(headerValue: string | undefined): string {
-  if (!headerValue) return "";
-  const match = headerValue.match(/<([^>]+)>/);
-  return (match ? match[1] : headerValue).trim().toLowerCase();
-}
 
 function findHeader(headers: GmailHeader[] | undefined, name: string): string {
   if (!headers) return "";
@@ -43,46 +47,44 @@ function findHeader(headers: GmailHeader[] | undefined, name: string): string {
   return h ? h.value : "";
 }
 
-function buildThreadSummary(thread: GmailThread): ThreadSummary {
+function buildEmailMeta(thread: GmailThread): EmailMeta | null {
   const messages = thread.messages || [];
-  const last = messages[messages.length - 1] as GmailMessage | undefined;
-  const fromHeader = findHeader(last?.payload?.headers, "From");
-  const subject = findHeader(last?.payload?.headers, "Subject");
-  const snippet = last?.snippet || "";
+  if (messages.length === 0) return null;
+  const last = messages[messages.length - 1] as GmailMessage;
+  const headers = last.payload?.headers;
 
-  let lastCeoMs: number | null = null;
-  for (const m of messages) {
-    const fromEmail = extractEmail(findHeader(m.payload?.headers, "From"));
-    if (fromEmail === GMAIL_USER) {
-      const ms = parseInt(m.internalDate || "0", 10);
-      if (ms > 0 && (lastCeoMs === null || ms > lastCeoMs)) lastCeoMs = ms;
-    }
-  }
-
-  // Last message in thread regardless of sender (for stale-thread guard)
-  const lastMs = parseInt(last?.internalDate || "0", 10);
-  const lastMessageDate = lastMs > 0 ? new Date(lastMs) : null;
+  const fromValue = findHeader(headers, "From");
+  const senderEmail = extractEmail(fromValue);
+  const senderName = fromValue
+    .replace(/<[^>]+>/, "")
+    .trim()
+    .replace(/^"|"$/g, "");
+  const internalMs = parseInt(last.internalDate || "0", 10);
+  const ageDays = internalMs > 0 ? Math.floor((Date.now() - internalMs) / 86_400_000) : 0;
 
   return {
     threadId: thread.id,
-    fromEmail: extractEmail(fromHeader),
-    subject,
-    snippet,
-    lastCeoMessageAt: lastCeoMs,
-    lastMessageDate,
-    rawMessages: messages,
+    senderEmail,
+    senderName,
+    recipient: findHeader(headers, "To"),
+    subject: findHeader(headers, "Subject"),
+    snippet: last.snippet || "",
+    date: findHeader(headers, "Date"),
+    ageDays,
+    hasReply: messages.length > 1,
   };
 }
 
 // ────────────────────────────────────────────────────────────
 // Run-record lifecycle (one row per tick in email_ai_runs)
+// Schema mapped to v3 columns; shape evolved for Phase 2 metrics.
 // ────────────────────────────────────────────────────────────
 
 async function startRun(): Promise<string> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("email_ai_runs")
-    .insert({ status: "running", model_used: ACTIVE_MODEL })
+    .insert({ status: "running", model_used: process.env.ANTHROPIC_MODEL || "claude-opus-4-7" })
     .select("id")
     .single();
   if (error) throw new Error(`startRun: ${error.message}`);
@@ -96,158 +98,136 @@ async function finalizeRun(runId: string, metrics: RunMetrics, status: "success"
     .update({
       tick_ended_at: new Date().toISOString(),
       threads_processed: metrics.threadsProcessed,
-      threads_classified: metrics.threadsClassified,
-      threads_skipped_self_loop: metrics.threadsSkippedSelfLoop,
-      threads_blacklisted: metrics.threadsBlacklisted,
-      threads_overridden_unreplyable: metrics.threadsOverriddenUnreplyable,
-      threads_skipped_stale: metrics.threadsSkippedStale,
+      threads_classified: metrics.classifiedDeterministic + metrics.classifiedLLM,
       drafts_created: metrics.draftsCreated,
-      errors_caught: metrics.errorsCaught,
-      model_used: metrics.modelUsed,
-      input_tokens: metrics.inputTokens,
-      output_tokens: metrics.outputTokens,
-      cost_usd: Number(metrics.costUsd.toFixed(6)),
+      errors_caught: metrics.errors,
+      cost_usd: Number(metrics.totalCostUSD.toFixed(6)),
       error_log: metrics.errorLog,
       status,
     })
     .eq("id", runId);
+  // P1 fix: throw on metrics persist failure (was silent log; codereview L4)
   if (error) {
-    // Last-ditch: log to console; we cannot fail the cron after the work is done
-    console.error(`[email-ai-v3] finalizeRun failed: ${error.message}`);
+    console.error(`[email-ai-v3] finalizeRun FAILED — metrics row incomplete: ${error.message}`);
+    throw new Error(`finalizeRun: ${error.message}`);
   }
 }
 
 async function persistClassification(
   runId: string,
-  thread: ThreadSummary,
-  bucket: Bucket,
-  confidence: number,
-  reasoning: string,
+  meta: EmailMeta,
+  result: ClassificationResult,
   draftCreated: boolean,
   draftId: string | null,
-  overridden = false,
-  overrideReason: string | null = null
 ): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from("email_thread_classifications").insert({
-    thread_id: thread.threadId,
-    sender_email: thread.fromEmail,
-    subject: thread.subject,
-    bucket,
-    confidence: Number(confidence.toFixed(2)),
-    reasoning,
+    thread_id: meta.threadId,
+    sender_email: meta.senderEmail,
+    subject: meta.subject,
+    bucket: result.urgency,
+    confidence: Number(result.confidence.toFixed(2)),
+    reasoning: `[${result.stage}${result.rule_matched ? ":" + result.rule_matched : ""}] ${result.reasoning}`,
     draft_created: draftCreated,
     draft_id: draftId,
     tick_id: runId,
-    overridden,
-    override_reason: overrideReason,
+    overridden: false,
+    override_reason: null,
   });
   if (error) throw new Error(`persistClassification: ${error.message}`);
 }
 
 // ────────────────────────────────────────────────────────────
-// Per-thread processing
+// Outbound tracking stub (for WAITING auto-detect — Phase 2 SHIP wires)
+// For now, just no-op log. Phase 2 SHIP will write to outbound_tracking table.
+// ────────────────────────────────────────────────────────────
+
+function trackOutbound(meta: EmailMeta): void {
+  // TODO Phase 2 SHIP: persist {thread_id, recipient, sent_at} to outbound_tracking
+  // for downstream WAITING auto-detect (4hr threshold, 14d expiry)
+  console.log(`[email-ai-v3] outbound tracked (stub): ${meta.threadId} → ${extractEmail(meta.recipient)}`);
+}
+
+// ────────────────────────────────────────────────────────────
+// Per-thread processing: deterministic Stage 1 → LLM Stage 2
 // ────────────────────────────────────────────────────────────
 
 interface ProcessOutcome {
-  bucket: Bucket;
+  result: ClassificationResult;
   draftCreated: boolean;
-  overriddenUnreplyable: boolean;
-  overriddenStale: boolean;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  modelUsed: string;
+  draftId: string | null;
 }
 
 async function processThread(
-  runId: string,
-  thread: ThreadSummary,
-  labelMap: Map<string, string>
+  meta: EmailMeta,
+  labelMap: Map<string, string>,
 ): Promise<ProcessOutcome> {
-  // 1. Classify
-  const classification = await classifyThread({
-    senderEmail: thread.fromEmail,
-    subject: thread.subject,
-    snippet: thread.snippet,
-    lastCeoMessageInThread: thread.lastCeoMessageAt
-      ? new Date(thread.lastCeoMessageAt).toISOString()
-      : null,
-    lastMessageAgeDays: ageInDays(thread.lastMessageDate),
-  });
-
-  let totalInput = classification.input_tokens;
-  let totalOutput = classification.output_tokens;
-  let totalCost = classification.cost_usd;
-
-  // 2. HARD GUARDS — apply BEFORE any label or draft logic.
-  // The classifier prompt also enforces these, but the code guard is the
-  // belt-and-suspenders backstop in case the model ignores the rule.
-  let overriddenUnreplyable = false;
-  let overriddenStale = false;
-
-  if (classification.bucket === "NOW" && isUnreplyable(thread.fromEmail)) {
-    overriddenUnreplyable = true;
-    classification.reasoning = `[OVERRIDE: unreplyable sender] ${classification.reasoning}`;
-    classification.bucket = "ARCHIVE";
-    classification.overridden = true;
-    classification.override_reason = `unreplyable: ${thread.fromEmail}`;
-  } else if (classification.bucket === "NOW" && isStale(thread.lastMessageDate, 3)) {
-    overriddenStale = true;
-    const days = ageInDays(thread.lastMessageDate);
-    classification.reasoning = `[OVERRIDE: stale >3d] ${classification.reasoning}`;
-    classification.bucket = "ARCHIVE";
-    classification.overridden = true;
-    classification.override_reason = `stale: ${days}d old`;
+  // Self-domain filter (handles plus-addressing + Bullrize/LexAnchor self-forwards).
+  // Step A in deterministic.ts catches this too; this is the route for outbound tracking.
+  const senderDomain = extractDomain(meta.senderEmail);
+  if (SELF_DOMAINS.has(senderDomain)) {
+    trackOutbound(meta);
   }
 
-  // 3. Apply Gmail label (skip if SKIPPED — defensive; classifier shouldn't return SKIPPED)
-  if (classification.bucket !== "SKIPPED") {
-    const labelName = BUCKET_TO_GMAIL_LABEL[classification.bucket];
-    const labelId = labelMap.get(labelName);
-    if (!labelId) {
-      throw new Error(
-        `Gmail label '${labelName}' not found — create it in Gmail before next tick`
-      );
+  // Stage 1: deterministic
+  let result = classifyDeterministic(meta);
+
+  // Stage 2: LLM (only if Stage 1 returned null)
+  if (!result) {
+    const company: CompanyTag = deriveCompanyFromRecipient(meta.recipient);
+    result = await classifyLLM(meta, company);
+  }
+
+  // Idempotency strip: remove ALL prior v3 urgency labels before applying new ones
+  await stripPriorUrgencyLabels(meta.threadId, labelMap);
+
+  // Apply new urgency label
+  const urgencyLabelName = URGENCY_TO_GMAIL_LABEL[result.urgency];
+  const urgencyLabelId = labelMap.get(urgencyLabelName);
+  if (urgencyLabelId) {
+    await applyLabel(meta.threadId, urgencyLabelId);
+  } else {
+    console.warn(`[email-ai-v3] urgency label '${urgencyLabelName}' not in Gmail — skipping label apply`);
+  }
+
+  // Apply domain tag (if any)
+  if (result.domain) {
+    const domainLabelName = DOMAIN_TO_GMAIL_LABEL[result.domain];
+    const domainLabelId = labelMap.get(domainLabelName);
+    if (domainLabelId) await applyLabel(meta.threadId, domainLabelId);
+  }
+
+  // Apply company tag (always)
+  const companyLabelName = COMPANY_TO_GMAIL_LABEL[result.company];
+  const companyLabelId = labelMap.get(companyLabelName);
+  if (companyLabelId) await applyLabel(meta.threadId, companyLabelId);
+
+  // Phase 2 BUILD: drafts disabled. Phase 2 SHIP restores draft creation here.
+  // if (result.draft_recommended && result.urgency === "NOW") { ... }
+
+  return { result, draftCreated: false, draftId: null };
+}
+
+async function stripPriorUrgencyLabels(threadId: string, labelMap: Map<string, string>): Promise<void> {
+  for (const oldLabelName of ALL_V3_URGENCY_LABELS) {
+    const id = labelMap.get(oldLabelName);
+    if (!id) continue;
+    try {
+      await removeLabel(threadId, id);
+    } catch {
+      // Tolerate "label not on thread" — Gmail returns 200 anyway in practice
     }
-    await applyLabel(thread.threadId, labelId);
   }
+}
 
-  // 4. NOW bucket → generate draft reply (only reached if no override fired)
-  let draftCreated = false;
-  let draftId: string | null = null;
-  if (classification.bucket === "NOW") {
-    const outcome = await buildAndCreateDraft(thread);
-    draftId = outcome.draftId;
-    draftCreated = true;
-    totalInput += outcome.inputTokens;
-    totalOutput += outcome.outputTokens;
-    totalCost += outcome.costUsd;
-  }
-
-  // 5. Persist classification row
-  await persistClassification(
-    runId,
-    thread,
-    classification.bucket,
-    classification.confidence,
-    classification.reasoning,
-    draftCreated,
-    draftId,
-    classification.overridden ?? false,
-    classification.override_reason ?? null
-  );
-
-  return {
-    bucket: classification.bucket,
-    draftCreated,
-    overriddenUnreplyable,
-    overriddenStale,
-    inputTokens: totalInput,
-    outputTokens: totalOutput,
-    costUsd: totalCost,
-    modelUsed: classification.model_used,
-  };
+function deriveCompanyFromRecipient(recipient: string): CompanyTag {
+  const recipEmail = extractEmail(recipient);
+  const routing = (senders as { company_routing: Record<string, string> }).company_routing;
+  if (routing[recipEmail]) return routing[recipEmail] as CompanyTag;
+  const domain = extractDomain(recipEmail);
+  if (domain === "bullrize.com") return "Bullrize";
+  if (domain === "lexanchor.ai") return "LexAnchor";
+  return "FARaudit";
 }
 
 // ────────────────────────────────────────────────────────────
@@ -262,41 +242,33 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Boot: migration + blacklist + labels + run record
   await runMigrationCheck();
   await loadBlacklist();
   const labelMap = await listLabels();
 
-  // Validate all 6 active labels exist
-  const missingLabels: string[] = [];
-  for (const labelName of Object.values(BUCKET_TO_GMAIL_LABEL)) {
-    if (!labelMap.has(labelName)) missingLabels.push(labelName);
+  // Soft check on label coverage — warn but don't fail (Phase 2 may need new labels created)
+  for (const labelName of Object.values(URGENCY_TO_GMAIL_LABEL)) {
+    if (!labelMap.has(labelName)) console.warn(`[email-ai-v3] missing urgency label: ${labelName}`);
   }
-  if (missingLabels.length > 0) {
-    console.error(
-      `[email-ai-v3] missing Gmail labels: ${missingLabels.join(", ")} — create them in Gmail before next tick`
-    );
-    process.exit(1);
+  for (const labelName of Object.values(DOMAIN_TO_GMAIL_LABEL)) {
+    if (!labelMap.has(labelName)) console.warn(`[email-ai-v3] missing domain label: ${labelName}`);
   }
-  console.log(`[email-ai-v3] boot: 6 Gmail labels resolved`);
+  for (const labelName of Object.values(COMPANY_TO_GMAIL_LABEL)) {
+    if (!labelMap.has(labelName)) console.warn(`[email-ai-v3] missing company label: ${labelName}`);
+  }
 
   const runId = await startRun();
   console.log(`[email-ai-v3] run id: ${runId}`);
 
   const metrics: RunMetrics = {
+    runStart: new Date(),
     threadsProcessed: 0,
-    threadsClassified: 0,
-    threadsSkippedSelfLoop: 0,
-    threadsBlacklisted: 0,
-    threadsOverriddenUnreplyable: 0,
-    threadsSkippedStale: 0,
+    classifiedDeterministic: 0,
+    classifiedLLM: 0,
     draftsCreated: 0,
-    errorsCaught: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    costUsd: 0,
+    errors: 0,
+    totalCostUSD: 0,
     errorLog: [],
-    modelUsed: ACTIVE_MODEL,
   };
 
   let threadIds: string[] = [];
@@ -304,10 +276,12 @@ async function main(): Promise<void> {
     threadIds = await listUnreadThreads(50);
     console.log(`[email-ai-v3] fetched ${threadIds.length} unread threads`);
   } catch (e) {
-    metrics.errorsCaught += 1;
+    metrics.errors += 1;
     metrics.errorLog.push({
+      threadId: "",
+      senderEmail: "",
       step: "fetch-threads",
-      message: (e as Error).message,
+      message: errorMessage(e),
       ts: new Date().toISOString(),
     });
     await finalizeRun(runId, metrics, "failed");
@@ -316,100 +290,92 @@ async function main(): Promise<void> {
 
   for (const threadId of threadIds) {
     metrics.threadsProcessed += 1;
-    let summary: ThreadSummary | null = null;
+    let meta: EmailMeta | null = null;
 
     try {
       const thread = await getThread(threadId);
-      summary = buildThreadSummary(thread);
+      meta = buildEmailMeta(thread);
+      if (!meta) continue;
 
-      // 1. SELF-LOOP FILTER (line 1 of loop)
-      if (summary.fromEmail === GMAIL_USER) {
-        metrics.threadsSkippedSelfLoop += 1;
-        // No DB row needed for self-loop — it's a no-op skip
+      // Blacklist (legacy v3 hard filter — kept for backwards compat)
+      if (isBlacklisted(meta.senderEmail)) {
+        await moveToTrash(meta.threadId);
+        // Persist as ARCHIVE (not DELETE — DELETE is killed)
+        await persistClassification(
+          runId,
+          meta,
+          {
+            urgency: "ARCHIVE",
+            domain: null,
+            company: deriveCompanyFromRecipient(meta.recipient),
+            confidence: 1.0,
+            reasoning: "hard blacklist match — auto-trashed",
+            bypassLLM: true,
+            stage: "deterministic",
+            rule_matched: "blacklist",
+            draft_recommended: false,
+          },
+          false,
+          null,
+        );
         continue;
       }
 
-      // 2. BLACKLIST FILTER
-      if (isBlacklisted(summary.fromEmail)) {
-        try {
-          await moveToTrash(summary.threadId);
-        } catch (trashErr) {
-          metrics.errorsCaught += 1;
-          metrics.errorLog.push({
-            threadId: summary.threadId,
-            senderEmail: summary.fromEmail,
-            step: "trash-blacklist",
-            message: (trashErr as Error).message,
-            ts: new Date().toISOString(),
-          });
-          continue;
-        }
-        metrics.threadsBlacklisted += 1;
-        try {
-          await persistClassification(
-            runId,
-            summary,
-            "DELETE",
-            1.0,
-            "Hard blacklist match — auto-trashed",
-            false,
-            null
-          );
-        } catch (persistErr) {
-          // Persist failure is logged but not fatal
-          metrics.errorsCaught += 1;
-          metrics.errorLog.push({
-            threadId: summary.threadId,
-            senderEmail: summary.fromEmail,
-            step: "persist-blacklist",
-            message: (persistErr as Error).message,
-            ts: new Date().toISOString(),
-          });
-        }
-        continue;
-      }
+      const outcome = await processThread(meta, labelMap);
 
-      // 3. Process (classify + override-check + label + maybe draft + persist)
-      const outcome = await processThread(runId, summary, labelMap);
-      metrics.threadsClassified += 1;
-      metrics.inputTokens += outcome.inputTokens;
-      metrics.outputTokens += outcome.outputTokens;
-      metrics.costUsd += outcome.costUsd;
-      if (outcome.draftCreated) metrics.draftsCreated += 1;
-      if (outcome.overriddenUnreplyable) metrics.threadsOverriddenUnreplyable += 1;
-      if (outcome.overriddenStale) metrics.threadsSkippedStale += 1;
+      if (outcome.result.stage === "deterministic") metrics.classifiedDeterministic += 1;
+      else metrics.classifiedLLM += 1;
+
+      await persistClassification(runId, meta, outcome.result, outcome.draftCreated, outcome.draftId);
     } catch (e) {
-      metrics.errorsCaught += 1;
-      const entry: ErrorLogEntry = {
-        threadId: summary?.threadId || threadId,
-        senderEmail: summary?.fromEmail,
+      metrics.errors += 1;
+      metrics.errorLog.push({
+        threadId: meta?.threadId || threadId,
+        senderEmail: meta?.senderEmail || "",
         step: "process-thread",
-        message: (e as Error).message,
+        message: errorMessage(e),
         ts: new Date().toISOString(),
-      };
-      metrics.errorLog.push(entry);
-      console.error(
-        `[email-ai-v3] thread ${entry.threadId} failed (${entry.step}): ${entry.message}`
-      );
+      });
+      console.error(`[email-ai-v3] thread ${meta?.threadId || threadId} failed: ${errorMessage(e)}`);
     }
   }
 
+  // Outbound tracking: WAITING auto-detect (4hr threshold, 14d expiry)
+  // Each tick: ingest new SENT messages, check for replies, apply/remove WAITING.
+  // Errors here are logged but don't fail the run — observability only.
+  try {
+    const gmail = getGmail();
+    await tickOutbound(gmail);
+    await tickReplies(gmail, labelMap);
+    await tickWaiting(gmail, labelMap);
+  } catch (e) {
+    metrics.errors += 1;
+    metrics.errorLog.push({
+      threadId: "",
+      senderEmail: "",
+      step: "outbound-tracker",
+      message: errorMessage(e),
+      ts: new Date().toISOString(),
+    });
+    console.error(`[email-ai-v3] outbound tracker failed: ${errorMessage(e)}`);
+  }
+
   const status: "success" | "partial" | "failed" =
-    metrics.errorsCaught === 0
+    metrics.errors === 0
       ? "success"
-      : metrics.errorsCaught >= metrics.threadsProcessed && metrics.threadsProcessed > 0
+      : metrics.errors >= metrics.threadsProcessed && metrics.threadsProcessed > 0
         ? "failed"
         : "partial";
 
   await finalizeRun(runId, metrics, status);
 
   console.log(
-    `[email-ai-v3] tick complete · status=${status} · processed=${metrics.threadsProcessed} · classified=${metrics.threadsClassified} · self-loop-skipped=${metrics.threadsSkippedSelfLoop} · blacklisted=${metrics.threadsBlacklisted} · overridden-unreplyable=${metrics.threadsOverriddenUnreplyable} · stale=${metrics.threadsSkippedStale} · drafts=${metrics.draftsCreated} · errors=${metrics.errorsCaught} · cost=$${metrics.costUsd.toFixed(4)}`
+    `[email-ai-v3] tick complete · status=${status} · processed=${metrics.threadsProcessed} · det=${metrics.classifiedDeterministic} · llm=${metrics.classifiedLLM} · drafts=${metrics.draftsCreated} · errors=${metrics.errors} · cost=$${metrics.totalCostUSD.toFixed(4)}`
   );
 }
 
 main().catch((e: Error) => {
-  console.error(`[email-ai-v3] fatal: ${e.message}`);
+  console.error(`[email-ai-v3] fatal: ${errorMessage(e)}`);
   console.error(e.stack);
   process.exit(1);
 });

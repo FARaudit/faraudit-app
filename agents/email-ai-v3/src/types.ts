@@ -1,32 +1,99 @@
-// ────────────────────────────────────────────────────────────
-// Type definitions — Email-AI v3
-// ────────────────────────────────────────────────────────────
+// Orthogonal axis classification (Phase 2 — May 10 2026)
+// One thread can have: 1 urgency + 0-1 domain + 1 company
 
-export type Bucket =
+export type UrgencyBucket =
   | "NOW"
-  | "THIS WEEK"
+  | "THIS_WEEK"
   | "WAITING"
-  | "READ"
-  | "ARCHIVE"
-  | "DELETE"
-  | "SKIPPED";
+  | "REFERENCE"
+  | "ARCHIVE";
 
-export interface BlacklistEntry {
-  sender_email: string;
-  reason: string | null;
-}
+export type DomainTag =
+  | "PROSPECT"
+  | "ATLAS_LEGAL"
+  | "INFRA"
+  | null;
 
-export interface ThreadClassification {
-  bucket: Bucket;
+export type CompanyTag =
+  | "FARaudit"
+  | "Bullrize"
+  | "LexAnchor";
+
+export const VALID_URGENCY: UrgencyBucket[] = [
+  "NOW", "THIS_WEEK", "WAITING", "REFERENCE", "ARCHIVE"
+];
+
+export const URGENCY_TO_GMAIL_LABEL: Record<UrgencyBucket, string> = {
+  NOW: "🔴 NOW",
+  THIS_WEEK: "🟠 THIS WEEK",
+  WAITING: "🟡 WAITING",
+  REFERENCE: "🔵 REFERENCE",
+  ARCHIVE: "⚫ ARCHIVE",
+};
+
+export const DOMAIN_TO_GMAIL_LABEL: Record<Exclude<DomainTag, null>, string> = {
+  PROSPECT: "🟢 PROSPECT",
+  ATLAS_LEGAL: "🟣 ATLAS-LEGAL",
+  INFRA: "🟤 INFRA",
+};
+
+export const COMPANY_TO_GMAIL_LABEL: Record<CompanyTag, string> = {
+  FARaudit: "[FARaudit]",
+  Bullrize: "[Bullrize]",
+  LexAnchor: "[LexAnchor]",
+};
+
+// All v3 urgency labels (used for idempotency strip + DELETE migration)
+export const ALL_V3_URGENCY_LABELS = [
+  "🔴 NOW", "🟠 THIS WEEK", "🟡 WAITING", "🔵 REFERENCE", "⚫ ARCHIVE",
+  "🟡 THIS WEEK", "🔵 READ", "🟢 WAITING", "🗑️ DELETE",  // legacy v3
+];
+
+export interface ClassificationResult {
+  urgency: UrgencyBucket;
+  domain: DomainTag;
+  company: CompanyTag;
   confidence: number;
   reasoning: string;
-  model_used: string;
-  input_tokens: number;
-  output_tokens: number;
-  cost_usd: number;
-  overridden?: boolean;
-  override_reason?: string;
+  bypassLLM: boolean;
+  stage: "deterministic" | "llm";
+  rule_matched?: string;
+  draft_recommended: boolean;
 }
+
+export interface EmailMeta {
+  threadId: string;
+  senderEmail: string;
+  senderName: string;
+  recipient: string;
+  subject: string;
+  snippet: string;
+  date: string;
+  ageDays: number;
+  hasReply: boolean;
+}
+
+export interface RunMetrics {
+  runStart: Date;
+  threadsProcessed: number;
+  classifiedDeterministic: number;
+  classifiedLLM: number;
+  draftsCreated: number;
+  errors: number;
+  totalCostUSD: number;
+  errorLog: Array<{
+    threadId: string;
+    senderEmail: string;
+    step: string;
+    message: string;
+    ts: string;
+  }>;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Gmail SDK helper types (preserved from v3 — used by gmail.ts + index.ts)
+// Not part of the v3.1 design surface; SDK shape aliases only.
+// ─────────────────────────────────────────────────────────────
 
 export interface GmailHeader {
   name: string;
@@ -55,56 +122,3 @@ export interface GmailThread {
   historyId?: string;
   messages?: GmailMessage[];
 }
-
-export interface ThreadSummary {
-  threadId: string;
-  fromEmail: string;
-  subject: string;
-  snippet: string;
-  lastCeoMessageAt: number | null; // unix ms; null if CEO never sent in thread
-  lastMessageDate: Date | null;    // last message in thread regardless of sender
-  rawMessages: GmailMessage[];
-}
-
-export interface RunMetrics {
-  threadsProcessed: number;
-  threadsClassified: number;
-  threadsSkippedSelfLoop: number;
-  threadsBlacklisted: number;
-  threadsOverriddenUnreplyable: number;
-  threadsSkippedStale: number;
-  draftsCreated: number;
-  errorsCaught: number;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  errorLog: ErrorLogEntry[];
-  modelUsed: string | null;
-}
-
-export interface ErrorLogEntry {
-  threadId?: string;
-  senderEmail?: string;
-  step: string; // 'fetch' | 'classify' | 'label' | 'draft' | 'persist' | ...
-  message: string;
-  ts: string;
-}
-
-export const ALL_BUCKETS: readonly Bucket[] = [
-  "NOW",
-  "THIS WEEK",
-  "WAITING",
-  "READ",
-  "ARCHIVE",
-  "DELETE",
-] as const;
-
-// Display label names that already exist in the user's Gmail (carried from v2 for continuity)
-export const BUCKET_TO_GMAIL_LABEL: Record<Exclude<Bucket, "SKIPPED">, string> = {
-  NOW: "🔴 NOW",
-  "THIS WEEK": "🟡 THIS WEEK",
-  WAITING: "🟢 WAITING",
-  READ: "🔵 READ",
-  ARCHIVE: "⚫ ARCHIVE",
-  DELETE: "🗑️ DELETE",
-};
