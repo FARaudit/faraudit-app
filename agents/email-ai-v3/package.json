@@ -1,0 +1,26 @@
+{
+  "name": "email-ai-v3",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Email triage agent v3 — drafts-only, self-loop filter, hard blacklist, full token instrumentation",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "googleapis": "^144.0.0",
+    "dotenv": "^16.4.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
