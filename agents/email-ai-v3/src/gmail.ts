@@ -75,6 +75,15 @@ export async function applyLabel(threadId: string, addLabelId: string): Promise<
   });
 }
 
+export async function removeLabel(threadId: string, removeLabelId: string): Promise<void> {
+  const gmail = getGmail();
+  await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: { removeLabelIds: [removeLabelId] },
+  });
+}
+
 export async function moveToTrash(threadId: string): Promise<void> {
   const gmail = getGmail();
   await gmail.users.threads.trash({ userId: "me", id: threadId });

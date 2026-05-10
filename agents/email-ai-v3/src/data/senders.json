@@ -1,0 +1,113 @@
+{
+  "self_identity_emails": [
+    "jose@faraudit.com",
+    "jose@bullrize.com",
+    "jose@lexanchor.ai",
+    "support@faraudit.com",
+    "noreply@faraudit.com"
+  ],
+  "self_identity_domains": [
+    "faraudit.com",
+    "bullrize.com",
+    "lexanchor.ai"
+  ],
+  "personal_emails": [
+    "jar3006@gmail.com",
+    "rodriguezj11@att.net"
+  ],
+  "company_routing": {
+    "jose@faraudit.com": "FARaudit",
+    "support@faraudit.com": "FARaudit",
+    "noreply@faraudit.com": "FARaudit",
+    "jose@bullrize.com": "Bullrize",
+    "jose@lexanchor.ai": "LexAnchor"
+  },
+  "unreplyable_patterns": [
+    "^noreply@",
+    "^no-reply@",
+    "@noreply\\.",
+    "@no-reply\\.",
+    "^notifications?@",
+    "^notify@",
+    "@notify\\.",
+    "@notifications?\\.",
+    "^mailroom@",
+    "^messages-noreply@",
+    "^messaging-digest-noreply@",
+    "^calendar-notification@",
+    "^jobs-noreply@",
+    "^updates-noreply@",
+    "^notifications-noreply@",
+    "^workspace-noreply@",
+    "^payments-noreply@",
+    "^invitations@linkedin\\.com$",
+    "^newsletters-noreply@linkedin\\.com$",
+    "^donotreply@",
+    "^do-not-reply@",
+    "^team@notifications\\.",
+    "^hello@notify\\."
+  ],
+  "infra_senders": [
+    "hello@notify.railway.app",
+    "notifications@vercel.com",
+    "noreply@mail.app.supabase.io",
+    "ant.wilson@supabase.com",
+    "team@notifications.resend.com"
+  ],
+  "atlas_legal_senders": [
+    "atlas@stripe.com",
+    "notifications@stripe.com",
+    "payments-noreply@google.com",
+    "google-workspace-alerts-noreply@google.com",
+    "workspace@google.com",
+    "no-reply@accounts.google.com",
+    "noreply@google.com",
+    "forwarding-noreply@google.com",
+    "donotreply@sam.gov",
+    "mailer-daemon@googlemail.com"
+  ],
+  "stable_senders": {
+    "priority@usestable.com": "NOW",
+    "mailroom@email.usestable.com": "THIS_WEEK",
+    "collin.pham@email.usestable.com": "ARCHIVE"
+  },
+  "prospects_positive_people": [
+    "rachel.prevost",
+    "john.kratzert",
+    "chad.parsons",
+    "frank.burch",
+    "tj.murray",
+    "tim.rueter",
+    "jon.billow"
+  ],
+  "prospects_positive_domains": [
+    "snoeinc.com",
+    "pmrglobal.com",
+    "southernmachineworks.com",
+    "americanvalmark.com",
+    "centerlinemfg.com",
+    "centerlinemanufacturing.com",
+    "worldwidemissioncritical.com"
+  ],
+  "prospects_negative": [
+    "every.io",
+    "fsandin@every.io",
+    "formspree.io",
+    "cole@formspree.io",
+    "tradier.com",
+    "referralhero.com",
+    "ngrok.com",
+    "team@m.ngrok.com",
+    "financialmodelingprep.com",
+    "welcome@mail.financialmodelingprep.com",
+    "opensecrets.org",
+    "info@opensecrets.org",
+    "free.law",
+    "memberships@free.law",
+    "unusualwhales@substack.com",
+    "noreply@reply.telegram.com",
+    "noreply@redditmail.com",
+    "no-reply@massive.com",
+    "team@notifications.resend.com"
+  ]
+}
