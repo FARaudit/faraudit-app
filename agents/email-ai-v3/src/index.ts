@@ -202,6 +202,17 @@ async function processThread(
   const companyLabelId = labelMap.get(companyLabelName);
   if (companyLabelId) await applyLabel(meta.threadId, companyLabelId);
 
+  // Auto-archive: REFERENCE / WAITING / ARCHIVE remove INBOX (matches L3 taxonomy intent).
+  // NOW + THIS_WEEK stay in INBOX (action-required buckets).
+  if (result.urgency === "REFERENCE" || result.urgency === "WAITING" || result.urgency === "ARCHIVE") {
+    try {
+      await removeLabel(meta.threadId, "INBOX");
+      console.log(`[email-ai-v3] inbox-removed thread=${meta.threadId} urgency=${result.urgency}`);
+    } catch (e) {
+      console.warn(`[email-ai-v3] inbox-remove failed thread=${meta.threadId}: ${errorMessage(e)}`);
+    }
+  }
+
   // Phase 2 BUILD: drafts disabled. Phase 2 SHIP restores draft creation here.
   // if (result.draft_recommended && result.urgency === "NOW") { ... }
 
