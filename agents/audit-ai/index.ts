@@ -24,7 +24,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
 // @ts-expect-error tsx runtime resolves .ts; tsc strict imports forbid the extension
 const queueNs: any = await import("./queue.ts");
 const queue = queueNs.default ?? queueNs;
-const { fetchPending, markProcessing, markProcessed, markFailed } = queue;
+const {fetchPending, markProcessing, markProcessed, markFailed, getCompletedCount } = queue;
 type PendingAudit = import("./queue.ts").PendingAudit;
 
 // @ts-expect-error see above
@@ -60,6 +60,16 @@ if (typeof runAudit !== "function" || typeof fetchSolicitationByNoticeId !== "fu
 
 const DRY_RUN = process.env.DRY_RUN !== "false";  // default ON for safety
 const BATCH_SIZE = Number(process.env.QUEUE_BATCH_SIZE) || 10;
+
+  // ── CORPUS CEILING CHECK (added May 10 2026) ──
+  const CORPUS_TARGET = Number(process.env.CORPUS_TARGET) || 1000;
+  const completedCount = await getCompletedCount();
+  console.log(`[audit-ai] corpus: ${completedCount} / ${CORPUS_TARGET} completed audits`);
+  if ((completedCount || 0) >= CORPUS_TARGET) {
+    console.log(`[audit-ai] corpus target ${CORPUS_TARGET} reached — pausing audit processing. Raise CORPUS_TARGET env var to resume.`);
+    process.exit(0);
+  }
+
 
 function shorten(s: string | null | undefined, n: number): string {
   return ((s || "") + "").replace(/\s+/g, " ").slice(0, n);

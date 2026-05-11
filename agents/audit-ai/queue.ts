@@ -97,3 +97,13 @@ export async function upsertPending(rows: Array<Partial<PendingAudit> & { notice
   if (error) throw new Error(`upsertPending: ${error.message}`);
   return count || 0;
 }
+
+// Corpus ceiling helper — returns total completed audits
+export async function getCompletedCount(): Promise<number> {
+  const { count } = await supabase
+    .from('audits')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'complete');
+  return count ?? 0;
+}
+
