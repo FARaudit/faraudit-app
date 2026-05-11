@@ -30,11 +30,17 @@ interface MultiYearAgency {
   yoyPct: number | null;             // latest year vs prior
 }
 
+// Strip joint-venture / partnership tails before single-word suffixes, so
+// "Bell Boeing Joint Project Office" + "Bell-Boeing Joint Project" + "Bell
+// Boeing JV" all collapse to "BELL BOEING". Order matters: phrase-level
+// patterns must run before the single-word suffix sweep.
+const JV_PHRASE_RX = /\b(JOINT\s+PROJECT(\s+OFFICE)?|JOINT\s+VENTURE|JV)\b/gi;
 const SUFFIX_RX = /\b(CORPORATION|CORP\.?|INCORPORATED|INC\.?|LLC|L\.L\.C\.?|CO\.?|COMPANY|LTD\.?|LIMITED|HOLDINGS|GROUP|THE)\b/gi;
-const PUNCT_RX = /[.,&]/g;
+const PUNCT_RX = /[.,&\-]/g;
 function normalizeRecipient(name: string): string {
   return name
     .toUpperCase()
+    .replace(JV_PHRASE_RX, "")
     .replace(SUFFIX_RX, "")
     .replace(PUNCT_RX, " ")
     .replace(/\s+/g, " ")
@@ -47,27 +53,26 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
-  const naics = url.searchParams.get("naics");
+  const naics = url.searchParams.get("naics");  // optional — omit for DoD-wide
   const yearsParam = url.searchParams.get("years");
 
-  if (!naics) {
-    return NextResponse.json({ error: "naics query param required" }, { status: 400 });
-  }
-
-  // Parse years — default 5-year rolling window ending at current FY
+  // Parse years — default 3-year rolling window ending at current FY. Dedup
+  // defensively so a malformed query string can't produce duplicate columns.
   const currentFy = new Date().getFullYear();
-  const years = yearsParam
+  const rawYears = yearsParam
     ? yearsParam.split(",").map((s) => parseInt(s.trim(), 10)).filter((y) => !Number.isNaN(y))
-    : [currentFy - 4, currentFy - 3, currentFy - 2, currentFy - 1, currentFy];
+    : [currentFy - 2, currentFy - 1, currentFy];
+  const years = Array.from(new Set(rawYears)).sort((a, b) => a - b);
 
   if (years.length === 0 || years.length > 8) {
     return NextResponse.json({ error: "years must be 1–8 comma-separated fiscal years" }, { status: 400 });
   }
 
   // ── Parallel fetch: top-recipients + agency-spend for each year ──
+  // naics is optional — omit (or empty) for DoD-wide spending across all NAICS.
   const [recipientResults, agencyResults] = await Promise.all([
-    Promise.all(years.map((y) => fetchDoDTotalAndRecipientsByNaics({ fiscalYear: y, naicsCode: naics, recipientLimit: 25 }))),
-    Promise.all(years.map((y) => fetchAgencySpendByNaics({ fiscalYear: y, naicsCodes: [naics], limit: 25 })))
+    Promise.all(years.map((y) => fetchDoDTotalAndRecipientsByNaics({ fiscalYear: y, naicsCode: naics || null, recipientLimit: 25 }))),
+    Promise.all(years.map((y) => fetchAgencySpendByNaics({ fiscalYear: y, naicsCodes: naics ? [naics] : undefined, limit: 25 })))
   ]);
 
   // ── Recipient consolidation ──

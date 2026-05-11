@@ -51,12 +51,12 @@ export default function NaicsCombobox({
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Display text reflects current value when input not focused
+  // Display text reflects current value when input not focused.
+  // Code-only display per FIX 2 — descriptions live in the dropdown tooltip only.
   const valueLabel = useMemo(() => {
     if (!value) return allLabel;
-    const found = normalized.find((o) => o.code === value);
-    return found ? (found.label ? `${found.code} — ${found.label}` : found.code) : value;
-  }, [value, normalized, allLabel]);
+    return value;
+  }, [value, allLabel]);
 
   const [displayText, setDisplayText] = useState(valueLabel);
 
@@ -106,7 +106,7 @@ export default function NaicsCombobox({
     onChange(opt.code);
     setOpen(false);
     setQuery("");
-    setDisplayText(opt.code ? (("label" in opt && opt.label) ? `${opt.code} — ${opt.label}` : opt.code) : allLabel);
+    setDisplayText(opt.code || allLabel);
     inputRef.current?.blur();
   }
 
@@ -185,10 +185,8 @@ export default function NaicsCombobox({
                 {opt.code === "" ? (
                   <span style={{ fontStyle: "italic", opacity: 0.7 }}>{opt.label || allLabel}</span>
                 ) : (
-                  <>
-                    <span style={{ fontWeight: 700 }}>{opt.code}</span>
-                    {opt.label && <span style={{ marginLeft: 8, opacity: 0.7 }}>{opt.label}</span>}
-                  </>
+                  // Code-only per FIX 2 — full label still available via title tooltip.
+                  <span title={opt.label || ""} style={{ fontWeight: 700 }}>{opt.code}</span>
                 )}
               </div>
             );

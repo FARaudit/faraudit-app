@@ -138,22 +138,28 @@ export interface RecipientShare {
 }
 export async function fetchDoDTotalAndRecipientsByNaics(opts: {
   fiscalYear: number;
-  naicsCode: string;
+  naicsCode?: string | null;  // optional — omit to query DoD-wide across all NAICS
   recipientLimit?: number;
 }): Promise<{ totalObligated: number; topRecipients: RecipientShare[] } | null> {
-  if (!opts.naicsCode) return null;
   const fyStart = `${opts.fiscalYear - 1}-10-01`;
-  const fyEnd = `${opts.fiscalYear}-09-30`;
-  const dodFilter = {
+  // Today-cap on end_date for in-progress fiscal years. USAspending returns
+  // empty for future dates, which produced the FY2026 column gap in May 2026
+  // testing of the rolling 5-year recipients table.
+  const fyEndCanonical = `${opts.fiscalYear}-09-30`;
+  const today = new Date().toISOString().slice(0, 10);
+  const fyEnd = fyEndCanonical > today ? today : fyEndCanonical;
+  const dodFilter: Record<string, unknown> = {
     award_type_codes: [
       "A", "B", "C", "D",
       "IDV_A", "IDV_B", "IDV_B_A", "IDV_B_B", "IDV_B_C",
       "IDV_C", "IDV_D", "IDV_E"
     ],
-    naics_codes: [opts.naicsCode],
     time_period: [{ start_date: fyStart, end_date: fyEnd }],
     agencies: [{ type: "awarding", tier: "toptier", name: "Department of Defense" }]
   };
+  if (opts.naicsCode) {
+    dodFilter.naics_codes = [opts.naicsCode];
+  }
 
   async function callCategory(category: "naics" | "recipient", limit: number): Promise<Array<{ name?: string; amount?: number; code?: string }>> {
     try {
@@ -214,9 +220,11 @@ export async function fetchDoDTotalAndRecipientsByNaics(opts: {
 
   // category=naics with naics_codes filter returns one aggregate row whose
   // amount is the total obligation across the filter. Use that single number
-  // rather than summing; summing across multiple rows would double-count
-  // sibling NAICS that we did not request.
-  const totalObligated = typeof naicsRows[0]?.amount === "number" ? naicsRows[0].amount : 0;
+  // when a NAICS is set; when querying DoD-wide (no NAICS), sum across all
+  // returned rows.
+  const totalObligated = opts.naicsCode
+    ? (typeof naicsRows[0]?.amount === "number" ? naicsRows[0].amount : 0)
+    : naicsRows.reduce((s, r) => s + (typeof r.amount === "number" ? r.amount : 0), 0);
   const topRecipients: RecipientShare[] = recipientRows
     .filter((r) => r.name && typeof r.amount === "number")
     .map((r) => ({ name: r.name as string, amount: r.amount as number }));
@@ -232,7 +240,10 @@ export async function fetchAgencySpendByNaics(opts: {
   // USAspending returns aggregated category data via the spending_by_category endpoint.
   // We use that to get top awarding agencies for the requested NAICS scope.
   const fyStart = `${opts.fiscalYear - 1}-10-01`; // FY starts Oct 1 prior calendar year
-  const fyEnd = `${opts.fiscalYear}-09-30`;
+  const fyEndCanonical = `${opts.fiscalYear}-09-30`;
+  // Today-cap for in-progress FY (parity with fetchDoDTotalAndRecipientsByNaics).
+  const today = new Date().toISOString().slice(0, 10);
+  const fyEnd = fyEndCanonical > today ? today : fyEndCanonical;
 
   const filters: Record<string, unknown> = {
     award_type_codes: ["A", "B", "C", "D"],

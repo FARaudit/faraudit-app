@@ -1689,8 +1689,10 @@ interface MultiYearRecipient { name: string; amounts: Record<number, number>; to
 interface MultiYearAgency { agency: string; amounts: Record<number, number>; total: number; yoyPct: number | null }
 
 function BudgetPanel(_props: { naicsOptions: string[] }) {
-  const [naics, setNaics] = useState<string>(DEFENSE_NAICS[0].code);
-  const [viewMode, setViewMode] = useState<"3" | "5">("5");
+  // FIX 4: NAICS filter removed from Defense Spending. The page shows DoD-wide
+  // spending across all NAICS. The combobox lives only on Opportunities.
+  // FIX 1: default view is 3 Year (was 5 Year).
+  const [viewMode, setViewMode] = useState<"3" | "5">("3");
   const [data, setData] = useState<{ years: number[]; recipients: MultiYearRecipient[]; agencies: MultiYearAgency[] } | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1705,7 +1707,8 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
     const years = Array.from({ length: window }, (_, i) => fy - (window - 1 - i));
     (async () => {
       try {
-        const url = `/api/budget-multi?naics=${encodeURIComponent(naics)}&years=${years.join(",")}`;
+        // No NAICS param — DoD-wide spending across all NAICS.
+        const url = `/api/budget-multi?years=${years.join(",")}`;
         const res = await fetch(url);
         const j = await res.json();
         if (cancelled) return;
@@ -1719,7 +1722,7 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [naics, fy, viewMode]);
+  }, [fy, viewMode]);
 
   function fmt(n: number): string {
     if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
@@ -1746,13 +1749,7 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
         <div className="is-header">
           <div className="is-title">Department of Defense · Rolling {viewMode}-Year Spend · {yearRange}</div>
           <div className="is-refresh">
-            <NaicsCombobox
-              value={naics}
-              onChange={setNaics}
-              options={DEFENSE_NAICS}
-              includeAll={false}
-            />
-            <span style={{ marginLeft: 6 }}>Live · USAspending.gov</span>
+            <span style={{ marginLeft: 6 }}>Live · USAspending.gov · DoD-wide (no NAICS filter)</span>
           </div>
         </div>
 
@@ -1782,7 +1779,7 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
         {loading && <div className="empty-block">Loading {viewMode}-year defense spending from USAspending.gov…</div>}
         {err && <div className="ko-status error">{err}</div>}
         {!loading && !err && data && data.recipients.length === 0 && (
-          <div className="empty-state">No DoD obligations found for NAICS {naics} in {yearRange}.</div>
+          <div className="empty-state">No DoD obligations found in {yearRange}.</div>
         )}
 
         {data && data.recipients.length > 0 && (
@@ -2855,6 +2852,7 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
           </div>
           {rows
             .filter((r) => groupFilter === "all" ? true : r.category_group === groupFilter)
+            .sort((a, b) => a.category.localeCompare(b.category))
             .map((r, i) => (
             <div key={i} className="sam-row" style={{ gridTemplateColumns: "1.4fr 80px 90px 90px 90px 1fr" }}>
               <span className="sr-title">{r.category}{r.curated && <span style={{ marginLeft: 8, fontFamily: "var(--mono)", fontSize: 8, color: "var(--green)" }}>· curated</span>}</span>
