@@ -120,10 +120,16 @@ export async function POST(req: NextRequest) {
   // ━━ Build solicitation source ━━
   let solicitation: Solicitation | null = null;
   if (noticeId) {
+    if (!process.env.SAM_API_KEY) {
+      return NextResponse.json(
+        { error: "SAM API key not configured. Contact support." },
+        { status: 503 }
+      );
+    }
     solicitation = await fetchSolicitationByNoticeId(noticeId);
     if (!solicitation && !pdf) {
       return NextResponse.json(
-        { error: "Solicitation not found in SAM.gov (or SAM_API_KEY not set)" },
+        { error: "Solicitation not found on SAM.gov. Try uploading the PDF directly, or verify the ID at sam.gov." },
         { status: 404 }
       );
     }

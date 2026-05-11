@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Navigation from "@/components/Navigation";
+import FeedbackWidget from "./feedback-widget";
 import { createBrowserClient } from "@/lib/supabase-browser";
 
 // Routes that NEVER show the sidebar regardless of auth state.
@@ -43,6 +44,7 @@ export default function AuthShell() {
   const onPublic = isPublicPath(pathname);
 
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [pinned, setPinned] = useState(true);
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export default function AuthShell() {
         const { data } = await sb.auth.getUser();
         if (cancelled) return;
         setAuthed(!!data.user);
+        setUserEmail(data.user?.email ?? null);
       } catch {
         if (!cancelled) setAuthed(false);
       }
@@ -77,5 +80,10 @@ export default function AuthShell() {
   if (onPublic) return null;
   if (authed !== true) return null; // null while loading + when unauthed
 
-  return <Navigation initialPinned={pinned} />;
+  return (
+    <>
+      <Navigation initialPinned={pinned} />
+      <FeedbackWidget userEmail={userEmail} />
+    </>
+  );
 }

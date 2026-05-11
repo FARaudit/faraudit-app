@@ -124,11 +124,14 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
       if (filter === "Small Business") return ["SB", "SDVOSB", "WOSB", "8(a)"].includes(r.saLabel);
       if (filter === "IDIQ") {
         const dt = (r.row.document_type || "").toUpperCase();
-        return dt.includes("IDIQ");
+        const nt = (r.row.notice_type || "").toUpperCase();
+        return dt.includes("IDIQ") || nt.includes("IDIQ") || nt.includes("COMBINED SYNOPSIS") || dt.includes("COMBINED SYNOPSIS");
       }
       if (filter === "Pre-Sol") {
-        const nt = (r.row.notice_type || "").toLowerCase();
-        return nt === "pre_sol" || nt === "sources_sought";
+        const nt = (r.row.notice_type || "").toLowerCase().replace(/[_-]/g, "");
+        const dt = (r.row.document_type || "").toLowerCase().replace(/[_-]/g, "");
+        return nt.includes("presol") || nt.includes("presolicitation") || nt.includes("sourcessought")
+          || dt.includes("presol") || dt.includes("presolicitation") || dt.includes("sourcessought");
       }
       return true;
     });

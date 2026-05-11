@@ -70,40 +70,51 @@ export function resolveAgency(s: {
   return cleaned.length > 0 ? cleaned.join(" · ") : null;
 }
 
+// Host: sam.gov/api/prod, NOT api.sam.gov — the latter returns 404. See
+// agents/sam-ingest/sam-client.ts for the same fix applied to the cron.
+const SAM_SEARCH = "https://sam.gov/api/prod/opportunities/v2/search";
+
+function mapOpportunity(o: Record<string, unknown>): Solicitation {
+  return {
+    noticeId: (o.noticeId as string | undefined) || "",
+    solicitationNumber: sanitizeSolicitationNumber(o.solicitationNumber as string | undefined),
+    title: (o.title as string | undefined) ?? "",
+    department: (o.department as string | undefined) ?? null,
+    subTier: (o.subTier as string | undefined) ?? null,
+    fullParentPathName: (o.fullParentPathName as string | undefined) ?? null,
+    naicsCode: (o.naicsCode as string | undefined) ?? null,
+    type: (o.type as string | undefined) ?? null,
+    typeOfSetAside: (o.typeOfSetAside as string | undefined) ?? null,
+    postedDate: (o.postedDate as string | undefined) ?? null,
+    responseDeadLine: (o.responseDeadLine as string | undefined) ?? null,
+    description: ((o.description as string | undefined) || "").slice(0, 4000),
+    resourceLinks: Array.isArray(o.resourceLinks) ? (o.resourceLinks as string[]) : []
+  };
+}
+
+// User-entered IDs come in two flavors: SAM UUID notice IDs (e.g.
+// "0716ae8da2cd4295b38531b72032ed03") and human solicitation numbers
+// (e.g. "FA301626Q0068"). The route used to query only `noticeid` and 404
+// any sol# input. This now tries `noticeid` first, then `solnum` on empty
+// result — covers both input styles without requiring the user to know
+// the distinction.
 export async function fetchSolicitationByNoticeId(
   noticeId: string
 ): Promise<Solicitation | null> {
   if (!SAM_API_KEY) return null;
 
-  // Host: sam.gov/api/prod, NOT api.sam.gov — the latter returns 404. See
-  // agents/sam-ingest/sam-client.ts for the same fix applied to the cron.
-  const url = `https://sam.gov/api/prod/opportunities/v2/search?api_key=${SAM_API_KEY}&noticeid=${encodeURIComponent(
-    noticeId
-  )}&limit=1`;
+  const tryQuery = async (paramName: "noticeid" | "solnum"): Promise<Solicitation | null> => {
+    const url = `${SAM_SEARCH}?api_key=${SAM_API_KEY}&${paramName}=${encodeURIComponent(noticeId)}&limit=1`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const o = data.opportunitiesData?.[0];
+      return o ? mapOpportunity(o) : null;
+    } catch {
+      return null;
+    }
+  };
 
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const o = data.opportunitiesData?.[0];
-    if (!o) return null;
-
-    return {
-      noticeId: o.noticeId,
-      solicitationNumber: sanitizeSolicitationNumber(o.solicitationNumber),
-      title: o.title ?? "",
-      department: o.department ?? null,
-      subTier: o.subTier ?? null,
-      fullParentPathName: o.fullParentPathName ?? null,
-      naicsCode: o.naicsCode ?? null,
-      type: o.type ?? null,
-      typeOfSetAside: o.typeOfSetAside ?? null,
-      postedDate: o.postedDate ?? null,
-      responseDeadLine: o.responseDeadLine ?? null,
-      description: (o.description || "").slice(0, 4000),
-      resourceLinks: Array.isArray(o.resourceLinks) ? (o.resourceLinks as string[]) : []
-    };
-  } catch {
-    return null;
-  }
+  return (await tryQuery("noticeid")) ?? (await tryQuery("solnum"));
 }
