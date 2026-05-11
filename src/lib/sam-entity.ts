@@ -91,16 +91,22 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
   if (!apiKey) return [];
   if (!opts.naics) return [];
 
+  // SAM Entity v3 param shape (May 11 2026): borrowed from the working
+  // opportunities-API call sites (src/app/api/sam/route.ts + agents/sam-ingest/
+  // sam-client.ts) which use `naicsCode` (not `primaryNaics`). Dropped
+  // `samBusinessType: "1"` — undocumented in v3, suspected v2-era param. Renamed
+  // `physicalAddressProvinceOrStateCode` → `physicalAddressStateOrProvinceCode`.
+  // Best-guess v3 fix shipped without log evidence; `if (!res.ok)` console.error
+  // (line below) will surface the actual SAM error on the first probe.
   const params = new URLSearchParams({
     api_key: apiKey,
-    primaryNaics: opts.naics,
+    naicsCode: opts.naics,
     registrationStatus: "A", // active only
     samRegistered: "Yes",
-    samBusinessType: "1", // SAM-registered (vs. exclusion list)
     pageSize: String(opts.limit || 25),
     pageNumber: "0"
   });
-  if (opts.state) params.set("physicalAddressProvinceOrStateCode", opts.state);
+  if (opts.state) params.set("physicalAddressStateOrProvinceCode", opts.state);
   // SAM accepts SBA-business-type descriptions in `sbaBusinessTypeCode`; pass through as a free-text filter.
   if (opts.setAside) params.set("sbaBusinessTypeCode", opts.setAside);
 
