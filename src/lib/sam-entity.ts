@@ -110,7 +110,8 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(15000)
     });
-  } catch {
+  } catch (err) {
+    console.error("[sam-entity] fetch failed:", err);
     return [];
   }
   if (!res.ok) return [];
@@ -118,7 +119,8 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
   let data: { entityData?: SamEntityRaw[] } = {};
   try {
     data = await res.json();
-  } catch {
+  } catch (err) {
+    console.error("[sam-entity] JSON parse failed:", err);
     return [];
   }
   const list = data.entityData || [];
