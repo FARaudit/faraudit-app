@@ -35,7 +35,7 @@ const TIERS: Tier[] = [
     priceSuffix: "/mo",
     eyebrow: "Limited to first 10 customers · waived during T1 sprint · rate locks in when invoicing begins",
     featured: true,
-    cta: { label: "Apply", href: "/access" }
+    cta: { label: "Apply", href: "/access.html" }
   },
   {
     slug: "standard",
@@ -260,7 +260,7 @@ export default function PricingPage() {
             10 spots. Locked rate. Direct line to the founder. Roadmap input.
           </p>
           <Link
-            href="/access"
+            href="/access.html"
             style={{
               alignSelf: "flex-start",
               marginTop: 4,
