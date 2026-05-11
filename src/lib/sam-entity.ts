@@ -1,8 +1,14 @@
 // SAM.gov Entity Management API v3 — searches the registered-vendor list.
 // Docs: https://open.gsa.gov/api/entity-api/
 // Requires SAM_API_KEY env var (already provisioned for sam-ingest).
-
-const BASE = "https://api.sam.gov/entity-information/v3/entities";
+//
+// HOST: sam.gov/api/prod (NOT api.sam.gov — same convention as the opportunities
+// API at src/app/api/sam/route.ts:55 and agents/sam-ingest/sam-client.ts).
+// Evidence: production logs (2026-05-11 15:54 UTC) showed `[sam-entity] SAM
+// responded 404` on three consecutive probes — host resolution failure, not
+// param validation. Switched to sam.gov/api/prod path mirroring the working
+// sam-ingest client.
+const BASE = "https://sam.gov/api/prod/entity-information/v3/entities";
 
 export interface SamEntity {
   uei: string | null;
