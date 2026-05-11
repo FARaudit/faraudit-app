@@ -550,7 +550,7 @@ function KOEmailButton({ auditId }: { auditId: string }) {
           }
         }}
       >
-        ✉ Send KO Email
+        ✉ Compose KO Email
       </button>
       {open && null /* the actual editor lives in Section 6 below */}
     </>
