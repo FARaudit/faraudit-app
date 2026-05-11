@@ -10,6 +10,7 @@ import type {
   AgencyRow
 } from "@/lib/bd-os/queries";
 import { auditDisplayName, auditHref, displaySolicitationId } from "@/lib/audit-display";
+import NaicsCombobox from "@/components/NaicsCombobox";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
@@ -118,7 +119,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
   const filtered = useMemo(() => {
     return enriched.filter((r) => {
-      if (naics !== "all" && r.row.naics_code !== naics) return false;
+      if (naics && naics !== "all" && r.row.naics_code !== naics) return false;
       if (filter === "P0 · P1") return r.risk === "rp0" || r.risk === "rp1";
       if (filter === "≤7 Days") return r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7;
       if (filter === "Small Business") return ["SB", "SDVOSB", "WOSB", "8(a)"].includes(r.saLabel);
@@ -508,10 +509,12 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                   <div className="is-header">
                     <div className="is-title">SAM.gov · Live Opportunity Feed</div>
                     <div className="is-refresh">
-                      <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
-                        <option value="all">All NAICS</option>
-                        {naicsOptions.map((n) => <option key={n} value={n}>{n}</option>)}
-                      </select>
+                      <NaicsCombobox
+                        value={naics === "all" ? "" : naics}
+                        onChange={(c) => setNaics(c || "all")}
+                        options={naicsOptions}
+                        includeAll
+                      />
                       <span>Last updated <span>{feedTs}</span></span>
                     </div>
                   </div>
@@ -1682,36 +1685,33 @@ const DEFENSE_NAICS: Array<{ code: string; label: string }> = [
   { code: "811219", label: "Other Electronic & Precision Equipment Repair" }
 ];
 
+interface MultiYearRecipient { name: string; amounts: Record<number, number>; total: number; trend: "up" | "down" | "flat" }
+interface MultiYearAgency { agency: string; amounts: Record<number, number>; total: number; yoyPct: number | null }
+
 function BudgetPanel(_props: { naicsOptions: string[] }) {
   const [naics, setNaics] = useState<string>(DEFENSE_NAICS[0].code);
-  const [rows, setRows] = useState<Array<{ agency: string; obligated_amount: number; prior_year_amount: number | null; delta_pct: number | null; fiscal_year: number }>>([]);
-  const [totalObligated, setTotalObligated] = useState<number | null>(null);
-  const [topRecipients, setTopRecipients] = useState<Array<{ name: string; amount: number }>>([]);
-  const [yoyDelta, setYoyDelta] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"3" | "5">("5");
+  const [data, setData] = useState<{ years: number[]; recipients: MultiYearRecipient[]; agencies: MultiYearAgency[] } | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [cached, setCached] = useState(false);
-  const [filterMode, setFilterMode] = useState<"all" | "growing" | "shrinking">("all");
   const fy = new Date().getFullYear();
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setErr(null);
+    const window = viewMode === "5" ? 5 : 3;
+    const years = Array.from({ length: window }, (_, i) => fy - (window - 1 - i));
     (async () => {
       try {
-        const url = `/api/budget?fy=${fy}&naics=${encodeURIComponent(naics)}`;
+        const url = `/api/budget-multi?naics=${encodeURIComponent(naics)}&years=${years.join(",")}`;
         const res = await fetch(url);
-        const data = await res.json();
+        const j = await res.json();
         if (cancelled) return;
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-        setRows(data.rows || []);
-        setTotalObligated(typeof data.total_obligated === "number" ? data.total_obligated : null);
-        setTopRecipients(Array.isArray(data.top_recipients) ? data.top_recipients : []);
-        setYoyDelta(typeof data.yoy_delta_pct === "number" ? data.yoy_delta_pct : null);
-        setFetchedAt(typeof data.fetched_at === "string" ? data.fetched_at : null);
-        setCached(!!data.cached);
+        if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+        setData({ years: j.years, recipients: j.recipients || [], agencies: j.agencies || [] });
+        setFetchedAt(typeof j.fetched_at === "string" ? j.fetched_at : null);
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
       } finally {
@@ -1719,99 +1719,51 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [naics, fy]);
-
-  const visible = useMemo(() => {
-    if (filterMode === "growing")    return rows.filter((r) => (r.delta_pct ?? 0) > 0);
-    if (filterMode === "shrinking")  return rows.filter((r) => (r.delta_pct ?? 0) < 0);
-    return rows;
-  }, [rows, filterMode]);
+  }, [naics, fy, viewMode]);
 
   function fmt(n: number): string {
     if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
     if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-    return `$${n}`;
+    if (n > 0) return `$${n.toFixed(0)}`;
+    return "—";
   }
+  function trendIcon(t: "up" | "down" | "flat"): { c: string; color: string } {
+    if (t === "up") return { c: "↑", color: "var(--green)" };
+    if (t === "down") return { c: "↓", color: "var(--red)" };
+    return { c: "→", color: "var(--t40)" };
+  }
+  const years = data?.years || [];
+  const yearCols = years.map(() => "100px").join(" ");
 
-  const recipientsTotal = topRecipients.reduce((s, r) => s + r.amount, 0);
+  const recipientGridCols = `30px 1fr ${yearCols} 60px`;
+  const agencyGridCols = `1fr ${yearCols} 80px`;
+  const yearRange = years.length > 0 ? `FY${years[0]}–FY${years[years.length - 1]}` : "";
 
   return (
     <div className="intel-tab-content">
       <div className="intel-section">
         <div className="is-header">
-          <div className="is-title">Defense Spending · Department of Defense FY{fy}</div>
+          <div className="is-title">Department of Defense · Rolling {viewMode}-Year Spend · {yearRange}</div>
           <div className="is-refresh">
-            <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
-              {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
-            </select>
-            <span style={{ marginLeft: 6 }}>{cached ? "Cached" : "Live"} · USAspending.gov</span>
+            <NaicsCombobox
+              value={naics}
+              onChange={setNaics}
+              options={DEFENSE_NAICS}
+              includeAll={false}
+            />
+            <span style={{ marginLeft: 6 }}>Live · USAspending.gov</span>
           </div>
         </div>
 
-        {/* DoD total + YoY arrow — primary number for the selected NAICS */}
-        {totalObligated != null && (
-          <div style={{
-            display: "flex", alignItems: "baseline", gap: 18, flexWrap: "wrap",
-            padding: "12px 16px", marginBottom: 18,
-            background: "rgba(24,95,165,.06)", border: "1px solid rgba(24,95,165,.18)", borderRadius: 4
-          }}>
-            <div>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--t60)", marginBottom: 4 }}>
-                DoD Obligated · NAICS {naics} · FY{fy}
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.01em" }}>{fmt(totalObligated)}</div>
-            </div>
-            {yoyDelta != null && (
-              <div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--t60)", marginBottom: 4 }}>
-                  vs FY{fy - 1}
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: yoyDelta > 0 ? "var(--green)" : yoyDelta < 0 ? "var(--red)" : "var(--t40)" }}>
-                  {yoyDelta > 0 ? "↑" : yoyDelta < 0 ? "↓" : "—"} {yoyDelta > 0 ? "+" : ""}{yoyDelta.toFixed(2)}%
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Top 10 prime recipients · DoD only */}
-        {topRecipients.length > 0 && (
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8 }}>
-              Top 10 Prime Recipients · FY{fy}
-            </div>
-            <div className="sam-table">
-              <div className="sam-th" style={{ gridTemplateColumns: "30px 1fr 130px 80px" }}>
-                <span>#</span><span>Recipient</span><span>FY{fy}</span><span>Share</span>
-              </div>
-              {topRecipients.map((r, i) => {
-                const share = recipientsTotal > 0 ? (r.amount / recipientsTotal) * 100 : 0;
-                return (
-                  <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "30px 1fr 130px 80px" }}>
-                    <span className="sr-num" style={{ color: "var(--t40)" }}>{i + 1}</span>
-                    <span className="sr-title" title={r.name}>{r.name}</span>
-                    <span className="sr-num">{fmt(r.amount)}</span>
-                    <span className="sr-num" style={{ color: "var(--t60)" }}>{share.toFixed(1)}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Agency-tier breakdown · YoY filters */}
-        <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8 }}>
-          Awarding Agencies · YoY Trend
-        </div>
+        {/* 3-year / 5-year toggle */}
         <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {(["all", "growing", "shrinking"] as const).map((m) => {
-            const active = m === filterMode;
-            const labels: Record<typeof m, string> = { all: "All", growing: "Growing ↑", shrinking: "Shrinking ↓" };
+          {(["3", "5"] as const).map((m) => {
+            const active = m === viewMode;
             return (
               <button
                 key={m}
-                onClick={() => setFilterMode(m)}
+                onClick={() => setViewMode(m)}
                 style={{
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
@@ -1821,48 +1773,74 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
                   color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
                 }}
               >
-                {labels[m]}
+                {m} Year
               </button>
             );
           })}
         </div>
 
-        {loading && <div className="empty-block">Loading defense spending from USAspending.gov…</div>}
+        {loading && <div className="empty-block">Loading {viewMode}-year defense spending from USAspending.gov…</div>}
         {err && <div className="ko-status error">{err}</div>}
-        {!loading && !err && visible.length === 0 && totalObligated == null && (
-          <div className="empty-state">No DoD obligations found for NAICS {naics} in FY{fy}. Try another code or check back tomorrow.</div>
+        {!loading && !err && data && data.recipients.length === 0 && (
+          <div className="empty-state">No DoD obligations found for NAICS {naics} in {yearRange}.</div>
         )}
 
-        {visible.length > 0 && (
-          <div className="sam-table">
-            <div className="sam-th" style={{ gridTemplateColumns: "1fr 130px 130px 110px" }}>
-              <span>Agency</span><span>FY{fy}</span><span>YoY Δ</span><span>Trend</span>
+        {data && data.recipients.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8 }}>
+              Top 10 Prime Recipients · {yearRange} · sub-entities consolidated
             </div>
-            {visible.map((r) => {
-              const deltaColor = r.delta_pct == null ? "var(--t40)" : r.delta_pct > 0 ? "var(--green)" : "var(--red)";
-              const arrow = r.delta_pct == null ? "—" : r.delta_pct > 0 ? "↑" : "↓";
-              const max = visible[0]?.obligated_amount || 1;
-              const pct = Math.min(100, (r.obligated_amount / max) * 100);
-              return (
-                <div key={r.agency} className="sam-row" style={{ gridTemplateColumns: "1fr 130px 130px 110px" }}>
-                  <span className="sr-title" title={r.agency}>{r.agency}</span>
-                  <span className="sr-num">{fmt(r.obligated_amount)}</span>
-                  <span className="sr-num" style={{ color: deltaColor }}>
-                    {arrow} {r.delta_pct != null ? `${r.delta_pct > 0 ? "+" : ""}${r.delta_pct.toFixed(1)}%` : "—"}
-                  </span>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <div style={{ width: "100%", height: 4, background: "rgba(201,168,76,.08)", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: deltaColor, opacity: 0.6 }} />
-                    </div>
+            <div className="sam-table">
+              <div className="sam-th" style={{ gridTemplateColumns: recipientGridCols }}>
+                <span>#</span><span>Recipient</span>
+                {years.map((y) => <span key={y}>FY{y}</span>)}
+                <span>Trend</span>
+              </div>
+              {data.recipients.map((r, i) => {
+                const t = trendIcon(r.trend);
+                return (
+                  <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: recipientGridCols }}>
+                    <span className="sr-num" style={{ color: "var(--t40)" }}>{i + 1}</span>
+                    <span className="sr-title" title={r.name}>{r.name}</span>
+                    {years.map((y) => <span key={y} className="sr-num">{fmt(r.amounts[y] || 0)}</span>)}
+                    <span className="sr-num" style={{ color: t.color, fontWeight: 700 }}>{t.c}</span>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
+        {data && data.agencies.length > 0 && (
+          <>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 8 }}>
+              Awarding Agencies · {yearRange}
+            </div>
+            <div className="sam-table">
+              <div className="sam-th" style={{ gridTemplateColumns: agencyGridCols }}>
+                <span>Agency</span>
+                {years.map((y) => <span key={y}>FY{y}</span>)}
+                <span>YoY Δ</span>
+              </div>
+              {data.agencies.map((a) => {
+                const deltaColor = a.yoyPct == null ? "var(--t40)" : a.yoyPct > 0 ? "var(--green)" : a.yoyPct < 0 ? "var(--red)" : "var(--t40)";
+                const arrow = a.yoyPct == null ? "—" : a.yoyPct > 0 ? "↑" : a.yoyPct < 0 ? "↓" : "→";
+                return (
+                  <div key={a.agency} className="sam-row" style={{ gridTemplateColumns: agencyGridCols }}>
+                    <span className="sr-title" title={a.agency}>{a.agency}</span>
+                    {years.map((y) => <span key={y} className="sr-num">{fmt(a.amounts[y] || 0)}</span>)}
+                    <span className="sr-num" style={{ color: deltaColor }}>
+                      {arrow} {a.yoyPct != null ? `${a.yoyPct > 0 ? "+" : ""}${a.yoyPct.toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
         <div style={{ marginTop: 18, paddingTop: 10, borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", letterSpacing: ".06em" }}>
-          Source: USAspending.gov v2 · DoD scope · 24h cache
+          Source: USAspending.gov v2 · DoD scope · recipient sub-entities consolidated via name normalization
           {fetchedAt && ` · refreshed ${new Date(fetchedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
         </div>
       </div>
@@ -2074,16 +2052,13 @@ function TeamingPartnersPanel(_props: { naicsOptions: string[] }) {
           noValidate
           style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14, padding: "12px 14px", background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 3 }}
         >
-          <select
-            className="naics-select"
+          <NaicsCombobox
             value={naics}
-            onChange={(e) => { setNaics(e.target.value); if (err) setErr(null); }}
-            aria-invalid={!!err && !naics}
-            style={!naics && err ? { borderColor: "var(--red)" } : undefined}
-          >
-            <option value="">Choose NAICS…</option>
-            {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
-          </select>
+            onChange={(c) => { setNaics(c); if (err) setErr(null); }}
+            options={DEFENSE_NAICS}
+            includeAll={false}
+            placeholder="Choose NAICS…"
+          />
           <input
             type="text"
             value={state}
@@ -2792,11 +2767,22 @@ function CMMCPanel() {
   );
 }
 
-interface LaborRow { category: string; naics_codes: string[]; rate_low: number; rate_median: number; rate_high: number; source: string; curated: boolean }
+interface LaborRow { category: string; category_group?: string; naics_codes: string[]; rate_low: number; rate_median: number; rate_high: number; source: string; curated: boolean }
+
+type LaborGroup = "all" | "engineering" | "program" | "manufacturing" | "logistics" | "security";
+const LABOR_GROUP_LABELS: Record<LaborGroup, string> = {
+  all: "All",
+  engineering: "Engineering",
+  program: "Program / Contracts",
+  manufacturing: "Manufacturing",
+  logistics: "Logistics",
+  security: "Security"
+};
 
 function LaborRatesPanel(_props: { naicsOptions: string[] }) {
   const [naics, setNaics] = useState<string>("");
   const [q, setQ] = useState<string>("");
+  const [groupFilter, setGroupFilter] = useState<LaborGroup>("all");
   const [rows, setRows] = useState<LaborRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -2822,10 +2808,12 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
         <div className="is-header">
           <div className="is-title">Labor Rate Intelligence · SCA + corpus benchmarks</div>
           <div className="is-refresh">
-            <select className="naics-select" value={naics} onChange={(e) => setNaics(e.target.value)}>
-              <option value="">All NAICS</option>
-              {DEFENSE_NAICS.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.label}</option>)}
-            </select>
+            <NaicsCombobox
+              value={naics}
+              onChange={setNaics}
+              options={DEFENSE_NAICS}
+              includeAll
+            />
             <input
               type="text"
               value={q}
@@ -2835,6 +2823,29 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
             />
           </div>
         </div>
+        {/* Category-group tab bar */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          {(Object.keys(LABOR_GROUP_LABELS) as LaborGroup[]).map((g) => {
+            const active = g === groupFilter;
+            return (
+              <button
+                key={g}
+                onClick={() => setGroupFilter(g)}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
+                  letterSpacing: ".08em", textTransform: "uppercase",
+                  padding: "5px 12px", borderRadius: 2,
+                  background: active ? "rgba(201,168,76,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
+                }}
+              >
+                {LABOR_GROUP_LABELS[g]}
+              </button>
+            );
+          })}
+        </div>
+
         {loading && <div className="empty-block">Loading rates…</div>}
         {!loading && rows.length === 0 && <div className="empty-state">No rates match this filter.</div>}
 
@@ -2842,7 +2853,9 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
           <div className="sam-th" style={{ gridTemplateColumns: "1.4fr 80px 90px 90px 90px 1fr" }}>
             <span>Labor category</span><span>NAICS</span><span>Low</span><span>Median</span><span>High</span><span>Source</span>
           </div>
-          {rows.map((r, i) => (
+          {rows
+            .filter((r) => groupFilter === "all" ? true : r.category_group === groupFilter)
+            .map((r, i) => (
             <div key={i} className="sam-row" style={{ gridTemplateColumns: "1.4fr 80px 90px 90px 90px 1fr" }}>
               <span className="sr-title">{r.category}{r.curated && <span style={{ marginLeft: 8, fontFamily: "var(--mono)", fontSize: 8, color: "var(--green)" }}>· curated</span>}</span>
               <span className="sr-num">{r.naics_codes[0] || "—"}</span>
