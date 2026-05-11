@@ -287,34 +287,35 @@ async function submitForm(){
   btn.disabled = true;
   btn.innerHTML = 'Submitting <span style="font-size:14px">...</span>';
 
-  // Submit to Formspree (replace with your endpoint)
-  // For production: use Resend API or Formspree
-  const payload = {
-    name: `${firstName} ${lastName}`,
-    email,
-    company,
-    role,
-    naics,
-    solicitations,
-    revenue,
-    timestamp: new Date().toISOString(),
-    source: 'FARaudit Access Page'
-  };
+  // POST to self-hosted /api/access — Resend forwards to jose@faraudit.com.
+  // No try/catch swallow: real network or server errors must surface to the
+  // prospect so they know to retry instead of silently disappearing into nothing.
+  const payload = { firstName, lastName, email, company, role, naics, solicitations, revenue };
 
-  // Attempt Formspree submission
-  // Replace 'YOUR_FORM_ID' with actual Formspree form ID at formspree.io
+  let res;
   try {
-    const res = await fetch('https://formspree.io/f/mvzloray', {
+    res = await fetch('/api/access', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: JSON.stringify(payload)
     });
-    // Show success regardless (fallback for demo)
-  } catch(e) {
-    // Show success state regardless for demo
+  } catch (netErr) {
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Access Request <span style="font-size:14px">→</span>';
+    alert('Network error reaching the server. Check your connection and try again.\n\nIf this keeps failing, email jose@faraudit.com directly.');
+    return;
   }
 
-  // Show success
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.json(); detail = j.error || ''; } catch (e) { /* response wasn't JSON */ }
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Access Request <span style="font-size:14px">→</span>';
+    alert(`Submission failed (HTTP ${res.status})${detail ? ': ' + detail : ''}.\n\nIf this keeps failing, email jose@faraudit.com directly.`);
+    return;
+  }
+
+  // Success
   document.getElementById('confirmEmail').textContent = email;
   document.getElementById('formPanel').classList.add('submitted');
   document.getElementById('successState').style.display = 'block';
