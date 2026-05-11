@@ -114,7 +114,10 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
     console.error("[sam-entity] fetch failed:", err);
     return [];
   }
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.error("[sam-entity] SAM responded", res.status, await res.text().catch(() => ""));
+    return [];
+  }
 
   let data: { entityData?: SamEntityRaw[] } = {};
   try {
