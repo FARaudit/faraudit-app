@@ -54,6 +54,13 @@ const TAB_KEYS: TabKey[] = [
 
 export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
   const router = useRouter();
+  // Mount-gate: SSR + first client paint both render null, then hydration completes
+  // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
+  // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
+  // DeadlineCalendar / BudgetPanel components). /home is auth-walled so the SSR-loss
+  // tradeoff is invisible to public visitors.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [tab, setTabState] = useState<TabKey>("home");
   const [filter, setFilter] = useState<FilterKey>("All");
   const [naics, setNaics] = useState<string>("all");
@@ -148,6 +155,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
   const initials = (user.email[0] || "?").toUpperCase() + (user.email.split("@")[0]?.[1] || "").toUpperCase();
   const handle = (user.email.split("@")[0] || "").slice(0, 18);
+
+  // Conditional return AFTER all hooks have executed — preserves hook order across
+  // mount/post-mount renders. Returning null pre-hydration matches the SSR output
+  // (no DOM diff), then the effect flips `mounted` and the real tree renders.
+  if (!mounted) return null;
 
   return (
     <div className="bd-home">
