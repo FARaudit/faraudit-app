@@ -42,7 +42,7 @@ export interface PendingAuditInsert {
 const BATCH = 100;
 
 // Doctrine cap (P0-1, 2026-05-08): pending_audits queue must not exceed
-// PENDING_QUEUE_CAP rows in status='pending'. Audit-AI processes 50/day,
+// PENDING_QUEUE_CAP rows in status='pending'. Audit-AI processes 10/batch (QUEUE_BATCH_SIZE=10 · updated May 10 2026),
 // so anything beyond this just sits until its response deadline passes
 // and becomes irrelevant — and it falsely inflates the "1,200 pending"
 // alarm count on dashboards. Cap is enforced at insert time. Existing
