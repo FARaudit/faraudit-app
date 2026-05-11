@@ -9,9 +9,8 @@
  *
  * Test stages:
  *   1) Module presence: lib/audit-engine, lib/sam, api/audit, api/ko-email,
- *      api/ko-email/send, schema migrations
- *   2) Surface area: classifyDocument, runAudit, parseDFARSTraps,
- *      KO email send columns
+ *      schema migrations
+ *   2) Surface area: classifyDocument, runAudit, parseDFARSTraps
  *   3) DFARS trap configuration: 252.223-7008, 252.204-7018, 252.204-7021
  *   4) Live classifier round-trip if ANTHROPIC_API_KEY is set
  *
@@ -48,10 +47,9 @@ async function main(): Promise<void> {
   check("audit engine present", await exists("src/lib/audit-engine.ts"));
   check("audit API route", await exists("src/app/api/audit/route.ts"));
   check("KO email draft route", await exists("src/app/api/ko-email/route.ts"));
-  check("KO email send route", await exists("src/app/api/ko-email/send/route.ts"));
   check("doc-type migration", await exists("schema/audits_doc_type.sql"));
   check("KO email migration", await exists("schema/audits_ko_email.sql"));
-  check("how-it-works page", await exists("app/how-it-works/page.tsx"));
+  check("how-it-works page", await exists("src/app/how-it-works/page.tsx"));
   check("lifecycle html", await exists("public/lifecycle/index.html"));
 
   // 2) Surface area
@@ -71,13 +69,6 @@ async function main(): Promise<void> {
     check("audit route enforces auth", /supabase\.auth\.getUser/.test(auditRoute));
     check("audit route rate-limited", /checkRateLimit/.test(auditRoute));
     check("audit route validates PDF magic bytes", /isPdfMagicValid/.test(auditRoute));
-  }
-  if (await exists("src/app/api/ko-email/send/route.ts")) {
-    const sendRoute = await read("src/app/api/ko-email/send/route.ts");
-    check("KO send uses Resend", /Resend/.test(sendRoute));
-    check("KO send writes ko_email_sent flag", /ko_email_sent\b/.test(sendRoute));
-    check("KO send records message id", /ko_email_message_id/.test(sendRoute));
-    check("KO send validates recipient email", /EMAIL_RX/.test(sendRoute));
   }
 
   // 3) Migration content

@@ -30,7 +30,7 @@ Run after each major deploy. Mark each step PASS / FAIL and paste the table into
 11. 5-step progress ladder advances: Upload → Classify → Overview → Compliance → Risks
 12. Within ~50 seconds, redirected to `/audit/<id>`
 13. Result page renders with: classification badge (SOW / PWS / SOO / RFP / RFQ / IFB / Sources Sought / Other), DFARS trap grid, P0/P1/P2 risk cards, FAR/DFARS clause table, CLIN section, Section L/M, KO email button
-14. KO email modal: enter `test@example.com` recipient → **Draft**, then **Send via Resend** (only if `RESEND_API_KEY` is set; otherwise verify the draft renders)
+14. KO email modal: click **Draft KO Email** → edit Subject + Body inline → enter recipient → click **✉ Open in Mail** → verify the OS mail client opens with pre-filled recipient/subject/body
 
 ## How It Works
 15. Navigate to `/how-it-works` — lifecycle visual loads (8 stages, gap map, demo script)
@@ -62,7 +62,7 @@ Run after each major deploy. Mark each step PASS / FAIL and paste the table into
 4.  Audit upload + classify             [   ]
 5.  Audit results render                [   ]
 6.  KO email draft                      [   ]
-7.  KO email send                       [   ]
+7.  KO email mailto handoff             [   ]
 8.  How It Works lifecycle              [   ]
 9.  Prospects index                     [   ]
 10. Prospect detail (6 tabs)            [   ]
