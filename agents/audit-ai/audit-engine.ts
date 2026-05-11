@@ -390,26 +390,36 @@ async function callClaude(
   // modelOverride takes priority (escalation router) · then test harness override · then default
   const model = modelOverride || _activeModel || CLAUDE_MODEL;
   const t0 = Date.now();
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content }]
-    }),
-    signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Claude API ${res.status}: ${errText.slice(0, 200)}`);
+  // 529/503 transient overload — 3-attempt retry with exponential backoff (2s, 4s).
+  // Stops Anthropic capacity dips from surfacing as Railway "Deployment crashed"
+  // alerts. Parity-locked across the vendor copy (see file header).
+  let res: Response | undefined;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content }]
+      }),
+      signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS)
+    });
+    if (res.ok) break;
+    const transient = res.status === 529 || res.status === 503;
+    if (!transient || attempt === 3) {
+      const errText = await res.text();
+      throw new Error(`Claude API ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    console.warn(`[audit-engine] Claude ${res.status} attempt ${attempt} — backing off ${attempt * 2}s`);
+    await new Promise(r => setTimeout(r, attempt * 2000));
   }
+  if (!res) throw new Error("Claude API: no response");
 
   const data = await res.json();
   if (_usageSink && data?.usage) {
