@@ -558,11 +558,11 @@ function KOEmailButton({ auditId }: { auditId: string }) {
 }
 
 function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initialNoticeId: string }) {
-  const [draft, setDraft] = useState<string>("");
+  const [subject, setSubject] = useState<string>("");
+  const [body, setBody] = useState<string>("");
   const [drafting, setDrafting] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [cc, setCc] = useState("");
-  const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<{ kind: "success" | "error"; msg: string } | null>(null);
 
   async function buildDraft() {
@@ -576,7 +576,8 @@ function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initia
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setDraft(data.draft || "");
+      setSubject(data.subject || "");
+      setBody(data.body || "");
     } catch (err) {
       setStatus({ kind: "error", msg: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -585,46 +586,47 @@ function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initia
   }
 
   async function copy() {
-    if (!draft) return;
-    try { await navigator.clipboard.writeText(draft); setStatus({ kind: "success", msg: "Copied to clipboard." }); } catch { /* */ }
+    if (!body) return;
+    const fullText = `Subject: ${subject}\n\n${body}`;
+    try { await navigator.clipboard.writeText(fullText); setStatus({ kind: "success", msg: "Copied to clipboard." }); } catch { /* */ }
   }
 
-  async function send() {
+  function openInMail() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
       setStatus({ kind: "error", msg: "Enter a valid recipient email." });
       return;
     }
-    setSending(true);
+    if (!subject || !body) return;
     setStatus(null);
-    try {
-      const res = await fetch("/api/ko-email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auditId, recipient: recipient.trim(), cc: cc.trim() || undefined, body: draft })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setStatus({ kind: "success", msg: `Sent to ${data.recipient}${data.message_id ? ` · ${data.message_id}` : ""}` });
-    } catch (err) {
-      setStatus({ kind: "error", msg: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setSending(false);
-    }
+    const ccParam = cc.trim() ? `cc=${encodeURIComponent(cc.trim())}&` : "";
+    const mailto =
+      `mailto:${encodeURIComponent(recipient.trim())}?` +
+      ccParam +
+      `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
   }
 
   return (
     <div id="ko-email-section" className="ko-email-area">
-      {!draft && (
+      {!body && (
         <button type="button" className="action-btn primary" disabled={drafting} onClick={buildDraft} style={{ alignSelf: "flex-start" }}>
           {drafting ? "Drafting…" : `✎ Draft KO Email · ${initialNoticeId}`}
         </button>
       )}
-      {draft && (
+      {body && (
         <>
+          <input
+            className="ko-email-input"
+            type="text"
+            placeholder="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            style={{ fontWeight: 600 }}
+          />
           <textarea
             className="ko-email-textarea"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
             spellCheck
           />
           <div className="ko-email-actions">
@@ -634,7 +636,6 @@ function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initia
               placeholder="ko@agency.mil"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
-              disabled={sending}
             />
             <input
               className="ko-email-input"
@@ -642,11 +643,10 @@ function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initia
               placeholder="cc (optional)"
               value={cc}
               onChange={(e) => setCc(e.target.value)}
-              disabled={sending}
             />
             <button type="button" className="action-btn" onClick={copy}>Copy</button>
-            <button type="button" className="action-btn primary" disabled={sending || !recipient} onClick={send}>
-              {sending ? "Sending…" : "Send via Resend"}
+            <button type="button" className="action-btn primary" disabled={!recipient || !subject || !body} onClick={openInMail}>
+              ✉ Open in Mail
             </button>
           </div>
         </>

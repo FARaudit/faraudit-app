@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
 
   const displayId = displaySolicitationId(audit);
 
-  const draft = `Subject: Clarification request — ${displayId}${audit.title ? " · " + audit.title : ""}
+  const subject = `Clarification request — ${displayId}${audit.title ? " · " + audit.title : ""}`;
 
-Dear Contracting Officer,
+  const emailBody = `Dear Contracting Officer,
 
 I am writing on behalf of [COMPANY NAME] regarding solicitation ${displayId}${audit.agency ? " issued by " + audit.agency : ""}. After a thorough review of the requirement we would appreciate clarification on the following items before proceeding with our proposal:
 
@@ -83,7 +83,7 @@ Respectfully,
 Audit reference: #${auditId} · Recommendation: ${audit.recommendation || "pending"}
 This is a draft; review and tailor before sending.`;
 
-  return NextResponse.json({ draft });
+  return NextResponse.json({ subject, body: emailBody });
 }
 
 export async function GET() {
