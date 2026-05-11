@@ -97,20 +97,24 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
   if (!apiKey) return [];
   if (!opts.naics) return [];
 
-  // SAM Entity v3 param shape (May 11 2026): borrowed from the working
-  // opportunities-API call sites (src/app/api/sam/route.ts + agents/sam-ingest/
-  // sam-client.ts) which use `naicsCode` (not `primaryNaics`). Dropped
-  // `samBusinessType: "1"` — undocumented in v3, suspected v2-era param. Renamed
-  // `physicalAddressProvinceOrStateCode` → `physicalAddressStateOrProvinceCode`.
-  // Best-guess v3 fix shipped without log evidence; `if (!res.ok)` console.error
-  // (line below) will surface the actual SAM error on the first probe.
+  // SAM Entity v3 param shape (May 11 2026, evidence-based via direct curl tests
+  // against sam.gov/api/prod):
+  //   - `pageSize`/`pageNumber` REJECTED with HTTP 400 "do not exist". REMOVED.
+  //     (API returns its default page size, ~10 records. UI caps at 25 anyway.)
+  //   - `primaryNaics` returned 1,424 records · `naicsCode` returned 6,299
+  //     (the latter matches secondary NAICS too). For teaming, primary is more
+  //     relevant — restored.
+  //   - `purposeOfRegistrationCode: "Z2"` ("All Awards") added — combined with
+  //     registrationStatus=A + samRegistered=Yes, narrows to 793 active
+  //     federal-eligible entities for NAICS 336411.
+  //   - opts.limit is now informational only; the API doesn't expose a limit
+  //     param. Caller-side slice/truncate if needed.
   const params = new URLSearchParams({
     api_key: apiKey,
-    naicsCode: opts.naics,
+    primaryNaics: opts.naics,
     registrationStatus: "A", // active only
     samRegistered: "Yes",
-    pageSize: String(opts.limit || 25),
-    pageNumber: "0"
+    purposeOfRegistrationCode: "Z2" // "All Awards" — federal-contract-eligible
   });
   if (opts.state) params.set("physicalAddressStateOrProvinceCode", opts.state);
   // SAM accepts SBA-business-type descriptions in `sbaBusinessTypeCode`; pass through as a free-text filter.
