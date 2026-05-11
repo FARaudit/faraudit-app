@@ -14,7 +14,7 @@ interface AuditRow {
   document_type: string | null;
   recommendation: string | null;
   compliance_score: number | null;
-  ko_email_sent: boolean | null;
+  ko_contacted: boolean | null;
   status: string;
   created_at: string;
 }
@@ -29,10 +29,10 @@ export default async function DashboardPage() {
   const [{ data: audits }, { count: emails }, { count: solicitationsCount }] = await Promise.all([
     sb
       .from("audits")
-      .select("id, notice_id, solicitation_number, title, document_type, recommendation, compliance_score, ko_email_sent, status, created_at")
+      .select("id, notice_id, solicitation_number, title, document_type, recommendation, compliance_score, ko_contacted, status, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
-    sb.from("audits").select("id", { count: "exact", head: true }).eq("ko_email_sent", true),
+    sb.from("audits").select("id", { count: "exact", head: true }).eq("ko_contacted", true),
     sb
       .from("intel_briefs")
       .select("id", { count: "exact", head: true })
@@ -70,7 +70,7 @@ No preamble. Bullets only. Each ≤25 words.`;
         <section className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border">
           <Stat label="Audits Run" value={String(auditCount)} sub="Recent 20 shown" />
           <Stat label="Traps Caught" value={String(trapsCount)} tone="red" sub="Declined recommendations" />
-          <Stat label="KO Emails Sent" value={String(emails ?? 0)} sub="via Resend" />
+          <Stat label="KO Outreach Initiated" value={String(emails ?? 0)} sub="User-confirmed" />
           <Stat label="Active Solicitations" value={String(solicitationsCount ?? 0)} sub="Watched (30d)" />
         </section>
 
@@ -123,7 +123,7 @@ No preamble. Bullets only. Each ≤25 words.`;
                         {!a.recommendation && <span className="text-text-3">—</span>}
                       </td>
                       <td className="px-4 py-2 text-xs">
-                        {a.ko_email_sent ? <span className="text-green">✓ sent</span> : <span className="text-text-3">—</span>}
+                        {a.ko_contacted ? <span className="text-green">✓ contacted</span> : <span className="text-text-3">—</span>}
                       </td>
                       <td className="px-4 py-2 text-xs text-text-3 uppercase">{a.status}</td>
                       <td className="px-4 py-2 text-right">

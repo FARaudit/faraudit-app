@@ -592,17 +592,28 @@ function KOEmailComposer({ auditId, initialNoticeId }: { auditId: string; initia
   }
 
   function openInMail() {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const r = recipient.trim();
+    if (!EMAIL_RX.test(r)) {
       setStatus({ kind: "error", msg: "Enter a valid recipient email." });
+      return;
+    }
+    const ccTrim = cc.trim();
+    if (ccTrim && !EMAIL_RX.test(ccTrim)) {
+      setStatus({ kind: "error", msg: "Enter a valid cc email or leave blank." });
       return;
     }
     if (!subject || !body) return;
     setStatus(null);
-    const ccParam = cc.trim() ? `cc=${encodeURIComponent(cc.trim())}&` : "";
+    const ccParam = ccTrim ? `cc=${encodeURIComponent(ccTrim)}&` : "";
     const mailto =
-      `mailto:${encodeURIComponent(recipient.trim())}?` +
+      `mailto:${encodeURIComponent(r)}?` +
       ccParam +
       `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    if (mailto.length > 1800) {
+      setStatus({ kind: "error", msg: "Email too long for some mail clients — use Copy and paste instead." });
+      return;
+    }
     window.location.href = mailto;
   }
 
