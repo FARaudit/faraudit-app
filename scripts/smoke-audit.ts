@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   check("KO email draft route", await exists("src/app/api/ko-email/route.ts"));
   check("doc-type migration", await exists("schema/audits_doc_type.sql"));
   check("KO email migration", await exists("schema/audits_ko_email.sql"));
-  check("how-it-works page", await exists("app/how-it-works/page.tsx"));
+  check("how-it-works page", await exists("src/app/how-it-works/page.tsx"));
   check("lifecycle html", await exists("public/lifecycle/index.html"));
 
   // 2) Surface area
