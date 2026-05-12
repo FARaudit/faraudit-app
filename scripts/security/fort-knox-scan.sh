@@ -56,6 +56,13 @@ echo "--- faraudit-app/public ---"
 unexpected=$(ls ~/faraudit-app/public/ | grep -vE "^landing\.html$|^access\.html$|^signin\.html$|^home\.html$|^lifecycle$|\.svg$|\.png$|\.ico$|\.txt$|\.xml$|\.webmanifest$|^\.DS_Store$")
 [ -n "$unexpected" ] && echo "⚠️  UNEXPECTED: $unexpected" || echo "✓ clean"
 
+# public/backups/ deploy-path guard (added 2026-05-12)
+# Backups must live in ~/faraudit-app/ceo/backups/ (gitignored), not public/ (Vercel-served)
+if [ -d ~/faraudit-app/public/backups ]; then
+  echo "❌ FAIL: public/backups/ exists — move to ~/faraudit-app/ceo/backups/"
+  FORT_KNOX_FAILED=1
+fi
+
 echo "--- bullrize/public ---"
 unexpected=$(ls ~/bullrize/public/ | grep -vE "\.svg$|\.png$|\.ico$|^sw\.js$|^lifecycle$|\.txt$|\.webmanifest$|^\.DS_Store$")
 [ -n "$unexpected" ] && echo "⚠️  UNEXPECTED: $unexpected" || echo "✓ clean"
