@@ -9,7 +9,7 @@
 //      SUPABASE_SERVICE_ROLE_KEY · DRY_RUN · QUEUE_BATCH_SIZE · CLAUDE_TIMEOUT_MS
 
 import dotenv from "dotenv";
-import { fetchPdfFromPath, fetchPdfFromSam, kSamNonPdfError } from "./pdf.js";
+import { fetchDocumentFromPath, fetchDocumentFromSam, kSamNonPdfError } from "./pdf.js";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
@@ -85,10 +85,10 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const kPdfTooLargeError = "PDF exceeds 25MB Anthropic API limit";
 const kNoPdfError = "pending_audit row has neither pdf_path nor pdf_url";
 
-async function loadPdf(row: PendingAudit) {
+async function loadDocument(row: PendingAudit) {
   let result;
-  if (row.pdf_path) result = await fetchPdfFromPath(row.pdf_path);
-  else if (row.pdf_url) result = await fetchPdfFromSam(row.pdf_url);
+  if (row.pdf_path) result = await fetchDocumentFromPath(row.pdf_path);
+  else if (row.pdf_url) result = await fetchDocumentFromSam(row.pdf_url);
   else throw new Error(kNoPdfError);
   if (result.bytes > MAX_PDF_BYTES) {
     throw new Error(`${kPdfTooLargeError} (${(result.bytes / 1024 / 1024).toFixed(1)}MB)`);
@@ -146,11 +146,17 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
       };
     }
 
-    const { base64, bytes, source } = await loadPdf(row);
-    console.log(`  pdf: ${bytes.toLocaleString()} bytes from ${source}`);
+    const doc = await loadDocument(row);
+    const formatLabel = doc.kind === "pdf" ? "pdf" : doc.format;
+    console.log(`  ${formatLabel}: ${doc.bytes.toLocaleString()} bytes from ${doc.source}`);
 
     const t0 = Date.now();
-    const result = await runAudit({ solicitation, pdfBase64: base64 });
+    const result = await runAudit({
+      solicitation,
+      pdfBase64: doc.kind === "pdf" ? doc.base64 : undefined,
+      extractedText: doc.kind === "text" ? doc.extractedText : undefined,
+      extractedFormat: doc.kind === "text" ? doc.format : undefined
+    });
     const ms = Date.now() - t0;
 
     const c = result.compliance.json;
