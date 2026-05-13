@@ -5,11 +5,11 @@
     "max_minutes_since_last_success": 1500,
     "_notes": "Daily 06:30 CDT = 11:30 UTC · processes pending_audits queue with Sonnet 4.6"
   },
-  "Email-AI": {
-    "rootDirectory": "agents/email-ai",
+  "email-ai-v3": {
+    "rootDirectory": "agents/email-ai-v3",
     "cronSchedule": "*/30 * * * *",
     "max_minutes_since_last_success": 60,
-    "_notes": "Every 30 min · Gmail organize"
+    "_notes": "Every 30 min · Gmail organize · canonical v3 service (replaces stale Email-AI per P0-6b 2026-05-13)"
   },
   "QA-AI": {
     "rootDirectory": "agents/qa-ai",
