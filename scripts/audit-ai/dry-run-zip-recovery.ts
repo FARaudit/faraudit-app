@@ -48,8 +48,10 @@ async function main() {
   console.log(`Processing ${rows.length} rows...\n`);
 
   // Dynamic imports AFTER dotenv.config — both modules capture env at load time.
+  // @ts-expect-error tsx runtime resolves .ts; tsc strict imports forbid the extension
   const pdfNs: any = await import("../../agents/audit-ai/pdf.ts");
   const fetchDocumentFromSam = pdfNs.fetchDocumentFromSam;
+  // @ts-expect-error see above
   const engineNs: any = await import("../../agents/audit-ai/audit-engine.ts");
   const runAudit = engineNs.runAudit;
   const outcomes: Outcome[] = [];
