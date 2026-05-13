@@ -44,3 +44,8 @@ next-env.d.ts
 # CEO tools — local only, never deploy to Vercel
 ceo/
 *.pdf
+
+# OAuth bootstrap — script is tracked, but block any accidental token/secret files
+scripts/oauth/*
+!scripts/oauth/
+!scripts/oauth/get-token.js
