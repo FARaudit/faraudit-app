@@ -49,3 +49,10 @@ ceo/
 scripts/oauth/*
 !scripts/oauth/
 !scripts/oauth/get-token.js
+
+# Sync log artifacts (launchd output — never source)
+scripts/sync-digest*.log
+
+# Local test artifacts
+outputs/
+state-snapshot.txt
