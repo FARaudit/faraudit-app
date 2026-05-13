@@ -100,7 +100,7 @@ async function main() {
         pdfSource: "sam_text_extracted"
       });
       const ms = Date.now() - t0;
-      const score = result?.compliance?.compliance_score ?? "?";
+      const score = result?.compliance_score ?? "?";
       console.log(`  ✅ audit_ok: score=${score} · ${ms}ms`);
       outcomes.push({ row: r.notice_id, status: "audit_ok", format: doc.format, textLen: doc.extractedText.length, ms });
     } catch (e: any) {
