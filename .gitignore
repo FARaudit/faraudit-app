@@ -44,3 +44,15 @@ next-env.d.ts
 # CEO tools — local only, never deploy to Vercel
 ceo/
 *.pdf
+
+# OAuth bootstrap — script is tracked, but block any accidental token/secret files
+scripts/oauth/*
+!scripts/oauth/
+!scripts/oauth/get-token.js
+
+# Sync log artifacts (launchd output — never source)
+scripts/sync-digest*.log
+
+# Local test artifacts
+outputs/
+state-snapshot.txt

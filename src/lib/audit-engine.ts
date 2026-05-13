@@ -118,7 +118,7 @@ export interface ComplianceJSON {
 // PdfSource indicates where the audit's PDF context came from. The report
 // renderer reads this to decide whether to surface a partial-audit badge
 // and gate the "requires the full RFP PDF" placeholder.
-export type PdfSource = "uploaded" | "sam_fetched" | "sam_unavailable";
+export type PdfSource = "uploaded" | "sam_fetched" | "sam_unavailable" | "sam_text_extracted";
 
 export interface RisksJSON {
   technical_risks?: string[];
@@ -265,6 +265,11 @@ export interface AuditResult {
 export interface AuditInput {
   solicitation: unknown;
   pdfBase64?: string | null;
+  // Text extracted from DOCX or XLSX when SAM serves an Office Open XML document
+  // instead of a PDF. When set, the prompt path is used (no document block);
+  // pdfBase64 should be absent. Mutually exclusive with pdfBase64.
+  extractedText?: string | null;
+  extractedFormat?: "docx" | "xlsx" | null;
   // Provenance of the PDF (or lack thereof) the audit ran with. The route
   // sets this; runAudit stamps it onto compliance.json.pdf_source.
   pdfSource?: PdfSource;
@@ -458,10 +463,13 @@ function isDocumentType(v: unknown): v is DocumentType {
 
 export async function classifyDocument(
   solText: string,
-  pdfBase64?: string | null
+  pdfBase64?: string | null,
+  extractedFormat?: "docx" | "xlsx" | null
 ): Promise<DocClassification> {
   const pdfHeader = pdfBase64
     ? "The full solicitation document is attached as a PDF. Skim it (titles, headers, Section labels) to determine its type.\n\n"
+    : extractedFormat
+    ? `Full solicitation content extracted from ${extractedFormat} is included below in the metadata block. Use it (titles, headers, Section labels) to determine the document type.\n\n`
     : "PDF was NOT provided. Classify based only on the SAM.gov metadata below.\n\n";
 
   const prompt = `${pdfHeader}SAM.gov metadata:
@@ -514,10 +522,19 @@ JSON only, no prose.`;
 }
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
-  const { solicitation, pdfBase64 } = input;
-  const pdfSource: PdfSource = input.pdfSource ?? (pdfBase64 ? "uploaded" : "sam_unavailable");
+  const { solicitation, pdfBase64, extractedText, extractedFormat } = input;
+  const pdfSource: PdfSource = input.pdfSource ?? (
+    pdfBase64 ? "uploaded"
+    : extractedText ? "sam_text_extracted"
+    : "sam_unavailable"
+  );
   const pdfUnavailableReason = input.pdfUnavailableReason ?? null;
-  const rawText = JSON.stringify(solicitation).slice(0, 4000);
+  // When extractedText is provided (DOCX/XLSX from SAM), append it to the SAM
+  // metadata so the model sees both via the prompt channel.
+  const metadataText = JSON.stringify(solicitation).slice(0, 4000);
+  const rawText = extractedText
+    ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${extractedText}`
+    : metadataText;
   const { sanitized: solText, redactionCount } = sanitizePdfText(rawText);
   if (redactionCount > 0) {
     console.warn(`[audit-engine] redacted ${redactionCount} injection-pattern hit(s)`);
@@ -527,7 +544,7 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
   // This runs BEFORE the 3 main calls so each downstream prompt can be tailored
   // to the document's procurement type (SOW emphasizes deliverables; PWS emphasizes
   // performance standards; SOO emphasizes objectives; etc.).
-  const classification = await classifyDocument(solText, pdfBase64).catch(
+  const classification = await classifyDocument(solText, pdfBase64, extractedFormat).catch(
     (err): DocClassification => {
       console.warn("[audit-engine] classifier failed:", err instanceof Error ? err.message : err);
       return { document_type: "Other", rationale: "Classifier call failed; defaulted to Other.", confidence: "low" };
@@ -541,6 +558,8 @@ DOCUMENT-TYPE-SPECIFIC FOCUS: ${DOC_TYPE_FOCUS[classification.document_type]}
 
   const pdfHeader = pdfBase64
     ? `${docTypePreamble}The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`
+    : extractedText
+    ? `${docTypePreamble}Full solicitation content extracted from ${extractedFormat ?? "office document"} is included below in the metadata block. Read it exhaustively, scanning for clauses, CLINs, and evaluation criteria.\n\n`
     : `${docTypePreamble}PDF was NOT provided. Use only the SAM.gov metadata below. If the metadata is thin, return an empty array for that field rather than fabricating.\n\n`;
 
   const overviewPrompt = `${pdfHeader}SAM.gov metadata:
