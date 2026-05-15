@@ -202,9 +202,13 @@ async function processThread(
   const companyLabelId = labelMap.get(companyLabelName);
   if (companyLabelId) await applyLabel(meta.threadId, companyLabelId);
 
-  // Auto-archive: REFERENCE / WAITING / ARCHIVE remove INBOX (matches L3 taxonomy intent).
-  // NOW + THIS_WEEK stay in INBOX (action-required buckets).
-  if (result.urgency === "REFERENCE" || result.urgency === "WAITING" || result.urgency === "ARCHIVE") {
+  // Email-AI v4 Stage 1 (2026-05-15): Inbox-as-NOW-queue.
+  // ONLY NOW keeps INBOX. THIS_WEEK / WAITING / REFERENCE / ARCHIVE all strip INBOX —
+  // bucket label retained, threads remain findable via label search.
+  // Defensive: only strip for KNOWN non-NOW buckets. Unknown urgency values keep INBOX
+  // to surface classifier failures rather than silently hiding them.
+  const STRIP_INBOX_BUCKETS = ["THIS_WEEK", "WAITING", "REFERENCE", "ARCHIVE"];
+  if (STRIP_INBOX_BUCKETS.includes(result.urgency)) {
     try {
       await removeLabel(meta.threadId, "INBOX");
       console.log(`[email-ai-v3] inbox-removed thread=${meta.threadId} urgency=${result.urgency}`);
