@@ -9,7 +9,7 @@
     "dry-run": "DRY_RUN=true tsx index.ts"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.74.0",
