@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS email_ai_drafts (
   draft_subject text,
   draft_body text NOT NULL,
   voice_samples_count int,
-  confidence numeric(3,2) CHECK (confidence >= 0 AND confidence <= 1),
+  confidence numeric(3,2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   model text,
   prompt_tokens int,
   completion_tokens int,
