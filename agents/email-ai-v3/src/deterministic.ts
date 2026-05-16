@@ -44,7 +44,17 @@ export function classifyDeterministic(meta: EmailMeta): ClassificationResult | n
   }
 
   // STEP B — Personal email (CEO's own Gmail/AT&T)
+  // Action-signal subjects escalate to LLM (return null) instead of short-circuiting to ARCHIVE.
+  // Real prospects, forwards, and meeting requests from CEO's own accounts must reach the classifier.
   if ((senders.personal_emails as string[]).includes(sender)) {
+    const ACTION_SIGNAL_REGEX = /\b(question|re:|fwd:|fw:|call|meeting|chat|sync|prospect|lead|prep|urgent|asap|today)\b/i;
+    if (ACTION_SIGNAL_REGEX.test(subject)) {
+      // Escalate — return null so the caller falls through to classifyLLM().
+      // Breadcrumb visibility deferred to a separate item if needed.
+      return null;
+    }
+
+    // Default: no action signal, route to ARCHIVE
     return {
       urgency: "ARCHIVE",
       domain: null,
