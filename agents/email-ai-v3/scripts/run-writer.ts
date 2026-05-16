@@ -14,6 +14,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { processAction, STAGE_5_SHIP_TS } from "../src/cross-system-writer";
+import { execSync } from "child_process";
+import { homedir } from "os";
+import { join } from "path";
 
 const limitArg = process.argv.find((a) => a.startsWith("--limit="));
 const verbArg = process.argv.find((a) => a.startsWith("--verb="));
@@ -73,6 +76,25 @@ async function main() {
   }
 
   console.log(`\n[run-writer] DONE: succeeded=${succeeded} skipped=${skipped} failed=${failed}`);
+
+  // Rule 40: if any digest mutations happened, sync canonical HTML inline block
+  if (succeeded > 0) {
+    const digestMutated = todo.some((a: any) =>
+      a.verb === "digest_p0_block" || a.verb === "digest_p0_unblock"
+    );
+    if (digestMutated) {
+      console.log("[run-writer] Rule 40: invoking update-digest.sh to sync canonical HTML");
+      try {
+        execSync("bash " + join(homedir(), "faraudit-app", "ceo", "update-digest.sh"), {
+          stdio: "inherit",
+          cwd: join(homedir(), "faraudit-app"),
+        });
+      } catch (e: any) {
+        console.error("[run-writer] WARN: update-digest.sh failed:", e?.message ?? e);
+        console.error("[run-writer] Manual sync required: bash ~/faraudit-app/ceo/update-digest.sh");
+      }
+    }
+  }
 }
 
 main().catch((e) => { console.error("fatal:", e); process.exit(1); });
