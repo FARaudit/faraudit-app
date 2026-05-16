@@ -16,6 +16,8 @@ import { classifyLLM } from "./anthropic";
 import { tickOutbound, tickReplies, tickWaiting } from "./outbound-tracker";
 import { getGmail } from "./gmail";
 import { extractEmail, extractDomain, errorMessage } from "./utils";
+import { extractAction } from "./action-extractor";
+import type { ActionDecision } from "./action-extractor";
 import senders from "./data/senders.json";
 import {
   URGENCY_TO_GMAIL_LABEL,
@@ -119,9 +121,9 @@ async function persistClassification(
   result: ClassificationResult,
   draftCreated: boolean,
   draftId: string | null,
-): Promise<void> {
+): Promise<string> {
   const supabase = getSupabase();
-  const { error } = await supabase.from("email_thread_classifications").insert({
+  const { data, error } = await supabase.from("email_thread_classifications").insert({
     thread_id: meta.threadId,
     sender_email: meta.senderEmail,
     subject: meta.subject,
@@ -133,8 +135,32 @@ async function persistClassification(
     tick_id: runId,
     overridden: false,
     override_reason: null,
-  });
+  }).select("id").single();
   if (error) throw new Error(`persistClassification: ${error.message}`);
+  return data.id as string;
+}
+
+async function persistAction(
+  classificationId: string,
+  threadId: string,
+  tickId: string,
+  decision: ActionDecision,
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.from("email_ai_actions").insert({
+    classification_id: classificationId,
+    thread_id: threadId,
+    tick_id: tickId,
+    verb: decision.verb,
+    reason: decision.reason,
+    cross_system: decision.cross_system,
+    confidence: Number(decision.confidence.toFixed(2)),
+    extractor_stage: decision.extractor_stage,
+    extractor_model: decision.extractor_model,
+  });
+  if (error) {
+    console.error(`persistAction soft-fail thread=${threadId}: ${error.message}`);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -341,7 +367,13 @@ async function main(): Promise<void> {
       if (outcome.result.stage === "deterministic") metrics.classifiedDeterministic += 1;
       else metrics.classifiedLLM += 1;
 
-      await persistClassification(runId, meta, outcome.result, outcome.draftCreated, outcome.draftId);
+      const classificationId = await persistClassification(runId, meta, outcome.result, outcome.draftCreated, outcome.draftId);
+      try {
+        const action = await extractAction(meta, outcome.result);
+        await persistAction(classificationId, meta.threadId, runId, action);
+      } catch (e) {
+        console.error(`[email-ai-v3] action extract failed thread=${meta.threadId}: ${errorMessage(e)}`);
+      }
     } catch (e) {
       metrics.errors += 1;
       metrics.errorLog.push({
