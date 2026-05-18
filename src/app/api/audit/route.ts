@@ -165,17 +165,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No solicitation source available" }, { status: 400 });
   }
 
-  // ━━ PDF base64 for Claude document content block ━━
-  // Three sources, in priority order:
+  // ━━ Content for Claude — pdf / image / text via fetchPdfFromSamUrl ━━
+  // Five outcomes, in priority order:
   //   1. User upload (pdfBuffer set above) → pdfSource="uploaded"
-  //   2. Notice ID + no upload + SAM resourceLinks present → fetch the PDF
-  //      → pdfSource="sam_fetched"
-  //   3. Notice ID + no upload + (no resourceLinks OR fetch fails OR magic
-  //      bytes invalid OR oversize) → pdfSource="sam_unavailable" with
-  //      reason captured for diagnostics. Audit still runs metadata-only.
+  //   2. Notice ID + no upload + SAM resourceLinks → fetchPdfFromSamUrl returns
+  //      one of three arms:
+  //        a. PDF arm  → pdfBase64 set, pdfSource="sam_fetched"
+  //        b. Image arm (JPEG/PNG) → imageBase64+imageMediaType set,
+  //           pdfSource="sam_image_extracted"               (FA-1)
+  //        c. Text arm (DOCX/XLSX/DOC/TXT) → extractedText+extractedFormat set,
+  //           pdfSource="sam_text_extracted"
+  //   3. Notice ID + no upload + (no resourceLinks OR fetch fails OR oversize)
+  //      → pdfSource="sam_unavailable" with reason captured for diagnostics.
+  //      Audit still runs metadata-only.
   let pdfBase64 = pdfBuffer ? pdfBuffer.toString("base64") : null;
+  let imageBase64: string | null = null;
+  let imageMediaType: "image/jpeg" | "image/png" | null = null;
   let extractedText: string | null = null;
-  let extractedFormat: "docx" | "xlsx" | null = null;
+  let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = pdfBase64 ? "uploaded" : "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
 
@@ -187,7 +194,11 @@ export async function POST(req: NextRequest) {
       } else if (fetched.kind === "pdf") {
         pdfBase64 = fetched.base64;
         pdfSource = "sam_fetched";
-      } else {
+      } else if (fetched.kind === "image") {
+        imageBase64 = fetched.base64;
+        imageMediaType = fetched.mediaType;
+        pdfSource = "sam_image_extracted";
+      } else {  // fetched.kind === "text"
         extractedText = fetched.extractedText;
         extractedFormat = fetched.format;
         pdfSource = "sam_text_extracted";
@@ -234,7 +245,7 @@ export async function POST(req: NextRequest) {
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   try {
-    const result = await runAudit({ solicitation, pdfBase64, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+    const result = await runAudit({ solicitation, pdfBase64, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
 
     const { error: updateError } = await supabase
       .from("audits")

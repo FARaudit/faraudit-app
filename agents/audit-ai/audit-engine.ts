@@ -1,4 +1,4 @@
-// PARITY-LOCKED VENDOR COPY of src/lib/audit-engine.ts.
+// DERIVED PARITY COPY of canonical src/lib/audit-engine.ts.
 //
 // Why this duplicate exists: Railway's Audit-AI service has Root Directory =
 // agents/audit-ai/. The deployed container has /app/index.ts but no /app/src/.
@@ -8,10 +8,11 @@
 // Railway's image doesn't ship src/. This is the documented root cause of
 // the 6-day Audit-AI cron crash loop.
 //
-// IMPORTANT: keep in sync with src/lib/audit-engine.ts. The two files MUST
-// stay byte-equivalent below this header. Any edit must be applied to both
-// files in the same commit. Same parity-pattern as agents/audit-ai/pdf.ts ↔
-// src/lib/sam-pdf.ts and agents/audit-ai/sam.ts ↔ src/lib/sam.ts.
+// IMPORTANT: src/lib/audit-engine.ts is the CANONICAL source. This file is the
+// DERIVED parity copy. The two files MUST stay byte-equivalent below this
+// header. Any edit must be applied to both files in the same commit. Same
+// parity-pattern as agents/audit-ai/pdf.ts ↔ src/lib/sam-pdf.ts and
+// agents/audit-ai/sam.ts ↔ src/lib/sam.ts.
 
 // Three-call audit engine — Overview, Compliance, Risks run in parallel.
 // Each call returns strict JSON parsed via a brace-balanced extractor that
@@ -128,7 +129,9 @@ export interface ComplianceJSON {
 // PdfSource indicates where the audit's PDF context came from. The report
 // renderer reads this to decide whether to surface a partial-audit badge
 // and gate the "requires the full RFP PDF" placeholder.
-export type PdfSource = "uploaded" | "sam_fetched" | "sam_unavailable" | "sam_text_extracted";
+// sam_image_extracted added 2026-05-17 (FA-1) for JPEG/PNG SAM attachments
+// routed through the Anthropic vision content block.
+export type PdfSource = "uploaded" | "sam_fetched" | "sam_image_extracted" | "sam_unavailable" | "sam_text_extracted";
 
 export interface RisksJSON {
   technical_risks?: string[];
@@ -211,7 +214,10 @@ export function assignRiskPriority(risksJson: RisksJSON): PrioritizedRisk[] {
 // This prevents the result page from showing a misleading "no risks surfaced"
 // when the underlying call returned empty (often because Claude couldn't read
 // the source). We surface a clear "manual review recommended" instead.
-function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasPdf: boolean): PrioritizedRisk {
+// hasRichSource = any of {pdf, image, extracted text} was attached. Renamed
+// from hasPdf 2026-05-17 (FA-1) — semantics now cover image + extracted-text
+// arms, not just PDF.
+function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: boolean): PrioritizedRisk {
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
   const dfarsTriggered = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).map((f) => f.title);
@@ -224,7 +230,7 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasPdf: boolean)
     };
   }
 
-  if (!hasPdf && farCount === 0 && dfarsCount === 0) {
+  if (!hasRichSource && farCount === 0 && dfarsCount === 0) {
     return {
       text: "Solicitation context was thin (no PDF attached and SAM.gov metadata limited). Manual review of the full document is required before bid/no-bid decision.",
       priority: "P1",
@@ -275,11 +281,18 @@ export interface AuditResult {
 export interface AuditInput {
   solicitation: unknown;
   pdfBase64?: string | null;
-  // Text extracted from DOCX or XLSX when SAM serves an Office Open XML document
-  // instead of a PDF. When set, the prompt path is used (no document block);
-  // pdfBase64 should be absent. Mutually exclusive with pdfBase64.
+  // Base64-encoded image content (JPEG or PNG) when SAM serves an image
+  // attachment instead of a PDF. When set, sent as an Anthropic vision content
+  // block on every call (classifier + overview + compliance + risks). Mutually
+  // exclusive with pdfBase64 and extractedText.
+  imageBase64?: string | null;
+  imageMediaType?: "image/jpeg" | "image/png" | null;
+  // Text extracted from DOCX, XLSX, legacy DOC, or plain TXT when SAM serves a
+  // non-PDF document. When set, the prompt path is used (no document/image
+  // block); pdfBase64 and imageBase64 should be absent. Mutually exclusive with
+  // both.
   extractedText?: string | null;
-  extractedFormat?: "docx" | "xlsx" | null;
+  extractedFormat?: "docx" | "xlsx" | "doc" | "txt" | null;
   // Provenance of the PDF (or lack thereof) the audit ran with. The route
   // sets this; runAudit stamps it onto compliance.json.pdf_source.
   pdfSource?: PdfSource;
@@ -372,18 +385,41 @@ function tryParse(s: string): Record<string, unknown> | null {
 
 type ContentBlock =
   | { type: "text"; text: string }
-  | { type: "document"; source: { type: "base64"; media_type: string; data: string } };
+  | { type: "document"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png"; data: string } };
 
+// SECURITY NOTE (FA-1 · image arm bypasses prompt-text sanitization):
+// SECURITY_DIRECTIVE + sanitizePdfText/INJECTION_PATTERNS run on the userPrompt
+// text only. Image content passes through to Claude vision unsanitized — an
+// adversarial SAM attachment could embed prompt-injection text in image pixels
+// that the regex won't see. Primary mitigation remains the SECURITY_DIRECTIVE
+// system-prompt (model-side instruction to ignore embedded directives). Ships
+// knowingly because (a) SAM is a federal source with low adversarial probability,
+// (b) all FA-1 image rows are scanned wage tables / past-perf pages, (c) the
+// SECURITY_DIRECTIVE has held under all observed text-side attacks. P2 hygiene:
+// add OCR-then-sanitize or a vision-injection classifier for defense-in-depth.
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
   maxTokens = 1000,
   pdfBase64?: string | null,
-  modelOverride?: string
+  modelOverride?: string,
+  imageBase64?: string | null,
+  imageMediaType?: "image/jpeg" | "image/png" | null
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
+  // Content block ordering: image → document → text. Image-first follows
+  // Anthropic vision best-practice for instruction following on multimodal
+  // prompts. In FA-1 image and pdfBase64 are mutually exclusive but the order
+  // is preserved for the hypothetical "both attached" case.
   const content: ContentBlock[] = [];
+  if (imageBase64 && imageMediaType) {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: imageMediaType, data: imageBase64 }
+    });
+  }
   if (pdfBase64) {
     content.push({
       type: "document",
@@ -452,13 +488,15 @@ async function callWithRetry(
   userPrompt: string,
   maxTokens: number,
   pdfBase64: string | null | undefined,
-  label: string
+  label: string,
+  imageBase64?: string | null,
+  imageMediaType?: "image/jpeg" | "image/png" | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -474,10 +512,14 @@ function isDocumentType(v: unknown): v is DocumentType {
 export async function classifyDocument(
   solText: string,
   pdfBase64?: string | null,
-  extractedFormat?: "docx" | "xlsx" | null
+  extractedFormat?: "docx" | "xlsx" | "doc" | "txt" | null,
+  imageBase64?: string | null,
+  imageMediaType?: "image/jpeg" | "image/png" | null
 ): Promise<DocClassification> {
   const pdfHeader = pdfBase64
     ? "The full solicitation document is attached as a PDF. Skim it (titles, headers, Section labels) to determine its type.\n\n"
+    : imageBase64
+    ? "The solicitation attachment is an image (scanned page, wage table, screenshot, or diagram). Read any visible text to determine the document type.\n\n"
     : extractedFormat
     ? `Full solicitation content extracted from ${extractedFormat} is included below in the metadata block. Use it (titles, headers, Section labels) to determine the document type.\n\n`
     : "PDF was NOT provided. Classify based only on the SAM.gov metadata below.\n\n";
@@ -514,7 +556,10 @@ JSON only, no prose.`;
     `${SECURITY_DIRECTIVE}\n\nYou are a federal contract document classifier. You output ONE valid JSON object — nothing before, nothing after.`,
     prompt,
     400,
-    pdfBase64
+    pdfBase64,
+    undefined,
+    imageBase64,
+    imageMediaType
   );
 
   const json = extractJSON(text) || {};
@@ -532,15 +577,17 @@ JSON only, no prose.`;
 }
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
-  const { solicitation, pdfBase64, extractedText, extractedFormat } = input;
+  const { solicitation, pdfBase64, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
   const pdfSource: PdfSource = input.pdfSource ?? (
     pdfBase64 ? "uploaded"
+    : imageBase64 ? "sam_image_extracted"
     : extractedText ? "sam_text_extracted"
     : "sam_unavailable"
   );
   const pdfUnavailableReason = input.pdfUnavailableReason ?? null;
-  // When extractedText is provided (DOCX/XLSX from SAM), append it to the SAM
-  // metadata so the model sees both via the prompt channel.
+  // When extractedText is provided (DOCX/XLSX/DOC/TXT from SAM), append it to
+  // the SAM metadata so the model sees both via the prompt channel. Image
+  // content rides on a separate Anthropic vision block, not the prompt body.
   const metadataText = JSON.stringify(solicitation).slice(0, 4000);
   const rawText = extractedText
     ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${extractedText}`
@@ -554,23 +601,40 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
   // This runs BEFORE the 3 main calls so each downstream prompt can be tailored
   // to the document's procurement type (SOW emphasizes deliverables; PWS emphasizes
   // performance standards; SOO emphasizes objectives; etc.).
-  const classification = await classifyDocument(solText, pdfBase64, extractedFormat).catch(
-    (err): DocClassification => {
-      console.warn("[audit-engine] classifier failed:", err instanceof Error ? err.message : err);
-      return { document_type: "Other", rationale: "Classifier call failed; defaulted to Other.", confidence: "low" };
-    }
-  );
+  const classification = await classifyDocument(
+    solText,
+    pdfBase64,
+    extractedFormat,
+    imageBase64,
+    imageMediaType
+  ).catch((err): DocClassification => {
+    console.warn("[audit-engine] classifier failed:", err instanceof Error ? err.message : err);
+    return { document_type: "Other", rationale: "Classifier call failed; defaulted to Other.", confidence: "low" };
+  });
 
   const docTypePreamble = `DOCUMENT TYPE: ${classification.document_type} — ${DOC_TYPE_HINTS[classification.document_type]}
 DOCUMENT-TYPE-SPECIFIC FOCUS: ${DOC_TYPE_FOCUS[classification.document_type]}
 
 `;
 
-  const pdfHeader = pdfBase64
-    ? `${docTypePreamble}The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`
-    : extractedText
-    ? `${docTypePreamble}Full solicitation content extracted from ${extractedFormat ?? "office document"} is included below in the metadata block. Read it exhaustively, scanning for clauses, CLINs, and evaluation criteria.\n\n`
-    : `${docTypePreamble}PDF was NOT provided. Use only the SAM.gov metadata below. If the metadata is thin, return an empty array for that field rather than fabricating.\n\n`;
+  // Source-specific prompt header. Image / .doc / .txt preambles added 2026-05-17 (FA-1).
+  // DOCX/XLSX wording preserved byte-for-byte from pre-FA-1 to avoid regressing the
+  // already-working extraction path. PDF and metadata-only branches unchanged.
+  let pdfHeader: string;
+  if (pdfBase64) {
+    pdfHeader = `${docTypePreamble}The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`;
+  } else if (imageBase64) {
+    pdfHeader = `${docTypePreamble}The following is an image attachment from a SAM.gov solicitation. The image may contain visible text (a scanned page, a wage table, a diagram, a screenshot). Read the visible text and treat it as part of the solicitation document. Then continue with the standard audit below.\n\n`;
+  } else if (extractedText && extractedFormat === "doc") {
+    pdfHeader = `${docTypePreamble}The following is text extracted from a legacy Microsoft Word (.doc) attachment to a SAM.gov solicitation. Extraction may have minor formatting artifacts. Treat the text as part of the solicitation document.\n\n`;
+  } else if (extractedText && extractedFormat === "txt") {
+    pdfHeader = `${docTypePreamble}The following is a plain-text attachment to a SAM.gov solicitation (e.g. a Davis-Bacon wage determination). Treat the text as part of the solicitation document.\n\n`;
+  } else if (extractedText) {
+    // docx / xlsx — preserved byte-for-byte from pre-FA-1 wording
+    pdfHeader = `${docTypePreamble}Full solicitation content extracted from ${extractedFormat ?? "office document"} is included below in the metadata block. Read it exhaustively, scanning for clauses, CLINs, and evaluation criteria.\n\n`;
+  } else {
+    pdfHeader = `${docTypePreamble}PDF was NOT provided. Use only the SAM.gov metadata below. If the metadata is thin, return an empty array for that field rather than fabricating.\n\n`;
+  }
 
   const overviewPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
@@ -641,21 +705,27 @@ JSON only.`;
       overviewPrompt,
       1500,
       pdfBase64,
-      "overview"
+      "overview",
+      imageBase64,
+      imageMediaType
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
       compliancePrompt,
       8000,
       pdfBase64,
-      "compliance"
+      "compliance",
+      imageBase64,
+      imageMediaType
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
       risksPrompt,
       6000,
       pdfBase64,
-      "risks"
+      "risks",
+      imageBase64,
+      imageMediaType
     )
   ]);
 
@@ -680,8 +750,10 @@ JSON only.`;
 
   // Fallback — never let prioritized_risks be empty. Synthesize one entry that
   // surfaces context (DFARS trap, thin source, manual review needed).
+  // hasRichSource = pdf | image | extracted text (any rich content arm).
   if (prioritized.length === 0) {
-    prioritized = [synthesizeFallbackRisk(complianceJson, !!pdfBase64)];
+    const hasRichSource = !!pdfBase64 || !!imageBase64 || !!extractedText;
+    prioritized = [synthesizeFallbackRisk(complianceJson, hasRichSource)];
   }
   risksJson.prioritized_risks = prioritized;
 
@@ -698,6 +770,8 @@ JSON only.`;
   // because it never read the SOW. Cap at 60 so recommendation falls into
   // CAUTION or worse — prevents false positives that could mislead a
   // customer into a bad bid. Honest data over flattering data.
+  // Cap fires only on sam_unavailable — image / text / pdf paths all provide
+  // genuine source content and are scored at full range.
   const compliance_score = pdfSource === "sam_unavailable" ? Math.min(rawScore, 60) : rawScore;
 
   let recommendation: AuditResult["recommendation"];

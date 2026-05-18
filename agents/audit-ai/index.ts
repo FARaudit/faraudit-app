@@ -1,9 +1,13 @@
 // Audit AI — Railway worker (cron 06:30 CT daily).
 //
-// Pulls 'pending' rows from pending_audits, downloads the PDF (local path
-// for fixture runs · SAM.gov for live), runs the upgraded 3-call audit
-// engine, and either logs the result (DRY_RUN) or writes to the corpus
-// (LIVE).
+// Pulls 'pending' rows from pending_audits, downloads the document (local path
+// for fixture runs · SAM.gov for live), runs the upgraded 3-call audit engine,
+// and either logs the result (DRY_RUN) or writes to the corpus (LIVE).
+//
+// Document arms supported (via agents/audit-ai/pdf.ts):
+//   PDF        → Claude document content block
+//   image      → Claude vision content block (JPEG/PNG · FA-1 2026-05-17)
+//   text       → injected into prompt (DOCX/XLSX/DOC/TXT)
 //
 // Env: ANTHROPIC_API_KEY · SAM_API_KEY · NEXT_PUBLIC_SUPABASE_URL ·
 //      SUPABASE_SERVICE_ROLE_KEY · DRY_RUN · QUEUE_BATCH_SIZE · CLAUDE_TIMEOUT_MS
@@ -80,7 +84,9 @@ function shorten(s: string | null | undefined, n: number): string {
 // (base64 inflates by ~33%, so a 25MB raw PDF becomes ~33MB on the wire).
 // Anything bigger gets a clean structured failure (kPdfTooLargeError) so the
 // row is marked failed with a clear error_message instead of triggering the
-// generic catch-all in processOne.
+// generic catch-all in processOne. Constant is named for the PDF case (the
+// historical reason it was added) but the byte cap applies equally to image
+// and text-extracted arms — same Anthropic wire limit.
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const kPdfTooLargeError = "PDF exceeds 25MB Anthropic API limit";
 const kNoPdfError = "pending_audit row has neither pdf_path nor pdf_url";
@@ -105,7 +111,9 @@ async function loadDocument(row: PendingAudit) {
 // kSamNonPdfError added 2026-05-08 (F-02): today's 06:30 CDT cron classified 12
 // SAM-non-PDF rows as engine-failed, exited 1, deployment showed CRASHED in
 // Railway despite ok=37/50. Prefix moved to pdf.ts so the sentinel string lives
-// next to the throw site that emits it.
+// next to the throw site that emits it. FA-1 (2026-05-17) broadened pdf.ts's
+// throw paths (OLE2-non-doc, unrecognized binary) but kept the kSamNonPdfError
+// prefix on every one of them — the substring match below still fires correctly.
 function isDataQualityFailure(message: string): boolean {
   return (
     message.includes(kNoPdfError) ||
@@ -147,15 +155,39 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
     }
 
     const doc = await loadDocument(row);
-    const formatLabel = doc.kind === "pdf" ? "pdf" : doc.format;
+
+    // Format label per arm: PDF magic, image media type, or extracted text format.
+    const formatLabel = doc.kind === "pdf" ? "pdf"
+      : doc.kind === "image" ? doc.mediaType
+      : doc.format;
     console.log(`  ${formatLabel}: ${doc.bytes.toLocaleString()} bytes from ${doc.source}`);
+
+    // PdfSource derivation mirrors src/app/api/audit/route.ts for parity across
+    // the worker (Railway) and user-facing (Vercel) entry points. Worker-side
+    // semantics:
+    //   doc.source="local"             → "uploaded"             (fixture mode)
+    //   doc.source="sam.gov" + pdf     → "sam_fetched"
+    //   doc.source="sam.gov" + image   → "sam_image_extracted"  (FA-1)
+    //   doc.source="sam.gov" + text    → "sam_text_extracted"
+    // Without this explicit derivation, runAudit's internal default labels every
+    // PDF as "uploaded" — wrong for the worker (which never receives user
+    // uploads). Pre-FA-1 the corpus consequently mis-labeled SAM-fetched PDFs;
+    // this commit corrects forward but does NOT backfill historical rows.
+    let pdfSource: string;
+    if (doc.source === "local") pdfSource = "uploaded";
+    else if (doc.kind === "pdf") pdfSource = "sam_fetched";
+    else if (doc.kind === "image") pdfSource = "sam_image_extracted";
+    else pdfSource = "sam_text_extracted";
 
     const t0 = Date.now();
     const result = await runAudit({
       solicitation,
-      pdfBase64: doc.kind === "pdf" ? doc.base64 : undefined,
-      extractedText: doc.kind === "text" ? doc.extractedText : undefined,
-      extractedFormat: doc.kind === "text" ? doc.format : undefined
+      pdfBase64:      doc.kind === "pdf"   ? doc.base64        : undefined,
+      imageBase64:    doc.kind === "image" ? doc.base64        : undefined,
+      imageMediaType: doc.kind === "image" ? doc.mediaType     : undefined,
+      extractedText:  doc.kind === "text"  ? doc.extractedText : undefined,
+      extractedFormat: doc.kind === "text" ? doc.format        : undefined,
+      pdfSource
     });
     const ms = Date.now() - t0;
 
