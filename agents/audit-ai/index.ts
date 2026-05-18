@@ -176,7 +176,7 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
     let pdfSource: string;
     if (doc.source === "local") pdfSource = "uploaded";
     else if (doc.kind === "pdf") pdfSource = "sam_fetched";
-    else if (doc.kind === "image") pdfSource = "sam_image_extracted";
+    else if (doc.kind === "image") pdfSource = doc.resized ? "sam_image_resized" : "sam_image_extracted";
     else pdfSource = "sam_text_extracted";
 
     const t0 = Date.now();

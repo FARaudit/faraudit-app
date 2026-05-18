@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
       } else if (fetched.kind === "image") {
         imageBase64 = fetched.base64;
         imageMediaType = fetched.mediaType;
-        pdfSource = "sam_image_extracted";
+        pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
       } else {  // fetched.kind === "text"
         extractedText = fetched.extractedText;
         extractedFormat = fetched.format;

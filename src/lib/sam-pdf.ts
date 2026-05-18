@@ -1,36 +1,45 @@
 // DERIVED PARITY TWIN of agents/audit-ai/pdf.ts (which is the CANONICAL source).
 //
 // PARITY NOTE: agents/audit-ai/pdf.ts is the CANONICAL source for the
-// kSamNonPdfError sentinel constant, the magic-byte + content-sniff format
-// detector, the Content-Disposition filename parser, and the OLE2 filename
-// guard. This file mirrors the same logic with these intentional asymmetries:
+// kSamNonPdfError + kImageResizeError sentinel constants, the magic-byte +
+// content-sniff format detector, the Content-Disposition filename parser,
+// the OLE2 filename guard, and the maybeResizeImage() sharp-resize helper.
+// This file mirrors the same logic with these intentional asymmetries:
 // (a) sam.gov-only source (no local-fixture arm), (b) no fetchDocumentFromPath
-// equivalent, (c) imports kSamNonPdfError from canonical pdf.ts and re-exports
-// it so consumers via @/lib/sam-pdf get it without knowing about the
-// cross-package import.
+// equivalent, (c) imports both sentinel constants from canonical pdf.ts and
+// re-exports them so consumers via @/lib/sam-pdf get them without knowing
+// about the cross-package import.
 // Do not edit one without updating the other. Same api-key auth,
-// redirect: "follow", 30s timeout, Content-Disposition filename plumbing.
+// redirect: "follow", 30s timeout, Content-Disposition filename plumbing,
+// and image resize policy.
 //
 // Why duplicated, not imported wholesale: agents/audit-ai/ ships to Railway
 // with Root Directory = agents/audit-ai/ — only that folder lands in the worker
 // container, no /src/. Symmetrically, the Vercel build does not ship agents/.
 // Cross-importing helpers between containers would break one or the other.
-// The kSamNonPdfError CONSTANT is the one exception: it imports from the
-// canonical pdf.ts (Vercel build can reach agents/, Railway cannot reach src/,
-// so the one-way direction works). All other helpers are mirrored. Consolidating
-// into a shared workspace package is P2 hygiene, separate from FA-1.
+// The kSamNonPdfError + kImageResizeError CONSTANTS are the one exception: they
+// import from the canonical pdf.ts (Vercel build can reach agents/, Railway
+// cannot reach src/, so the one-way direction works). All other helpers are
+// mirrored. Consolidating into a shared workspace package is P2 hygiene,
+// separate from FA-1.
 //
 // Handles seven SAM.gov payload formats with magic-byte + content-sniff detection:
 //   PDF   (%PDF / 25504446)        → base64 → Anthropic document block
 //   DOCX  (PK\x03\x04 with word/)  → mammoth.extractRawText → text injected into prompt
 //   XLSX  (PK\x03\x04 with xl/)    → exceljs sheet walk → text injected into prompt
-//   JPEG  (FFD8FF prefix)          → base64 → Anthropic image block (multimodal)
-//   PNG   (89504E470D0A1A0A)       → base64 → Anthropic image block (multimodal)
+//   JPEG  (FFD8FF prefix)          → maybeResizeImage → Anthropic image block (multimodal)
+//   PNG   (89504E470D0A1A0A)       → maybeResizeImage → Anthropic image block (multimodal)
 //   DOC   (OLE2 + filename .doc)   → word-extractor → text injected into prompt
 //   TXT   (utf-8 sniff · no NULs)  → utf-8 string → text injected into prompt
 // Anything else (.xls/.ppt/.pptx OLE2, encrypted ZIP, binary that is neither
 // image nor text) throws kSamNonPdfError so the route catch can mark
 // pdfSource="sam_unavailable" with a clear reason.
+//
+// Image-resize policy (FA-1.1 2026-05-17): raw bytes > IMAGE_RESIZE_THRESHOLD_BYTES
+// trigger a 2-attempt sharp pipeline (2000px@q85 then 1500px@q75, always JPEG output)
+// before the base64 conversion. PNG inputs are transcoded to JPEG on the resize
+// path. Below threshold the original buffer + source mediaType pass through.
+// If both attempts still exceed the threshold, throws kImageResizeError.
 //
 // SAM presigned URLs (the eventual S3 redirect target) carry an X-Amz-Expires
 // of ~9 seconds — fine for `redirect: "follow"` GETs in a single request, but
@@ -39,18 +48,19 @@
 import mammoth from "mammoth";
 import ExcelJS from "exceljs";
 import WordExtractor from "word-extractor";
-// Single-source-of-truth for the sentinel prefix · canonical export lives in
+import sharp from "sharp";
+// Single-source-of-truth for the sentinel prefixes · canonical exports live in
 // agents/audit-ai/pdf.ts. See "Why duplicated, not imported wholesale" above
-// for the asymmetry rationale (this constant is the one allowed cross-import).
-import { kSamNonPdfError } from "../../agents/audit-ai/pdf";
+// for the asymmetry rationale (these constants are the one allowed cross-import).
+import { kSamNonPdfError, kImageResizeError } from "../../agents/audit-ai/pdf";
 
-export { kSamNonPdfError };
+export { kSamNonPdfError, kImageResizeError };
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 
 export type DocumentFetchResult =
   | { kind: "pdf";   base64: string;        bytes: number; source: "sam.gov" }
-  | { kind: "image"; base64: string;        bytes: number; source: "sam.gov"; mediaType: "image/jpeg" | "image/png" }
+  | { kind: "image"; base64: string;        bytes: number; source: "sam.gov"; mediaType: "image/jpeg" | "image/png"; resized: boolean }
   | { kind: "text";  extractedText: string; bytes: number; source: "sam.gov"; format: "docx" | "xlsx" | "doc" | "txt" };
 
 const PDF_MAGIC  = Buffer.from("%PDF", "ascii");
@@ -58,6 +68,11 @@ const ZIP_MAGIC  = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
 const PNG_MAGIC  = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const OLE2_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+
+// Image resize threshold for sharp pipeline. Raw bytes ≤ this pass through
+// unchanged. Above this, maybeResizeImage transcodes to JPEG via sharp.
+// 3.5MB raw → ~4.66MB base64, safely under Anthropic's 5MB vision content cap.
+const IMAGE_RESIZE_THRESHOLD_BYTES = 3_500_000;
 
 function isPdf(buf: Buffer): boolean {
   return buf.length >= 4 && buf.subarray(0, 4).equals(PDF_MAGIC);
@@ -172,6 +187,44 @@ async function extractDocText(buf: Buffer): Promise<string> {
   return extracted.getBody();
 }
 
+// Resize an image buffer if it exceeds IMAGE_RESIZE_THRESHOLD_BYTES. Below
+// threshold: pass through the original buffer and mediaType unchanged. Above
+// threshold: 2-attempt sharp pipeline (2000px@q85 → 1500px@q75), always
+// transcoded to JPEG output. PNG-source inputs are converted to JPEG on the
+// resize path because (a) PNG's lossless compression usually fails to bring
+// scanned-page screenshots under the 5MB Anthropic cap, and (b) JPEG@85
+// preserves enough text-readability for Claude vision to extract clauses.
+// .rotate() applies any EXIF orientation tag so resize dimensions operate on
+// the visible image rather than the stored pixel matrix.
+// If both attempts still exceed the threshold, throws kImageResizeError.
+async function maybeResizeImage(
+  buf: Buffer,
+  sourceMediaType: "image/jpeg" | "image/png"
+): Promise<{ buffer: Buffer; mediaType: "image/jpeg" | "image/png"; resized: boolean }> {
+  if (buf.length <= IMAGE_RESIZE_THRESHOLD_BYTES) {
+    return { buffer: buf, mediaType: sourceMediaType, resized: false };
+  }
+
+  const attempts = [
+    { width: 2000, quality: 85 },
+    { width: 1500, quality: 75 }
+  ];
+
+  for (const { width, quality } of attempts) {
+    const out = await sharp(buf)
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+    if (out.length <= IMAGE_RESIZE_THRESHOLD_BYTES) {
+      return { buffer: out, mediaType: "image/jpeg", resized: true };
+    }
+  }
+
+  const last = attempts[attempts.length - 1];
+  throw new Error(`${kImageResizeError}: raw=${buf.length} bytes · sharp 2x attempt (${last.width}px/q${last.quality} JPEG mozjpeg) still > ${IMAGE_RESIZE_THRESHOLD_BYTES} bytes`);
+}
+
 async function classifyAndReturn(buf: Buffer, filename: string | null): Promise<DocumentFetchResult> {
   if (isPdf(buf)) {
     return { kind: "pdf", base64: buf.toString("base64"), bytes: buf.length, source: "sam.gov" };
@@ -187,10 +240,12 @@ async function classifyAndReturn(buf: Buffer, filename: string | null): Promise<
     throw new Error(`${kSamNonPdfError}: ZIP container with unknown content (first bytes: ${buf.subarray(0, 8).toString("hex")})`);
   }
   if (isJpeg(buf)) {
-    return { kind: "image", base64: buf.toString("base64"), bytes: buf.length, source: "sam.gov", mediaType: "image/jpeg" };
+    const out = await maybeResizeImage(buf, "image/jpeg");
+    return { kind: "image", base64: out.buffer.toString("base64"), bytes: out.buffer.length, source: "sam.gov", mediaType: out.mediaType, resized: out.resized };
   }
   if (isPng(buf)) {
-    return { kind: "image", base64: buf.toString("base64"), bytes: buf.length, source: "sam.gov", mediaType: "image/png" };
+    const out = await maybeResizeImage(buf, "image/png");
+    return { kind: "image", base64: out.buffer.toString("base64"), bytes: out.buffer.length, source: "sam.gov", mediaType: out.mediaType, resized: out.resized };
   }
   if (isOle2(buf)) {
     // OLE2 is the compound-file binary format used by legacy .doc/.xls/.ppt and others.

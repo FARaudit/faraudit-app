@@ -131,7 +131,9 @@ export interface ComplianceJSON {
 // and gate the "requires the full RFP PDF" placeholder.
 // sam_image_extracted added 2026-05-17 (FA-1) for JPEG/PNG SAM attachments
 // routed through the Anthropic vision content block.
-export type PdfSource = "uploaded" | "sam_fetched" | "sam_image_extracted" | "sam_unavailable" | "sam_text_extracted";
+// sam_image_resized added 2026-05-17 evening (FA-1.1) for JPEG/PNG attachments
+// that exceeded ~3.5MB raw and got pre-shrunk via sharp before the vision call.
+export type PdfSource = "uploaded" | "sam_fetched" | "sam_image_extracted" | "sam_image_resized" | "sam_unavailable" | "sam_text_extracted";
 
 export interface RisksJSON {
   technical_risks?: string[];
