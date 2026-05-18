@@ -462,14 +462,21 @@ async function callClaude(
   // Stops Anthropic capacity dips from surfacing as Railway "Deployment crashed"
   // alerts. Parity-locked across the vendor copy (see file header).
   let res: Response | undefined;
+  // FA-2 (2026-05-18): when the request references a Files API file_id in a
+  // document source block, the beta header is required on the Messages POST
+  // too — not just on the upload side. The SDK auto-adds it; raw fetch must
+  // do it manually. Below-threshold PDFs and image/text arms send no beta
+  // (they don't reference a file_id, so the API accepts the request as-is).
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-api-key": ANTHROPIC_KEY,
+    "anthropic-version": "2023-06-01"
+  };
+  if (pdfFileId) headers["anthropic-beta"] = "files-api-2025-04-14";
   for (let attempt = 1; attempt <= 3; attempt++) {
     res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01"
-      },
+      headers,
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
