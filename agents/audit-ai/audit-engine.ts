@@ -18,6 +18,12 @@
 // Each call returns strict JSON parsed via a brace-balanced extractor that
 // handles fenced blocks, raw JSON, and prose-wrapped JSON.
 
+// FA-2 cleanup helper · imported on a per-twin path (Railway = ./anthropic-files,
+// Vercel = @/lib/anthropic-files which re-exports from canonical). The IMPORT
+// path is the only line that differs between the two engine files — everything
+// from `type ContentBlock` onward is byte-equivalent. See parity header.
+import { deletePdfFromFilesApi } from "./anthropic-files";
+
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // Default model swap May 4 2026 · Opus 4.7 → Sonnet 4.6 · 82% cost reduction
 // validated via scripts/quality-gate/sonnet-vs-opus.mjs:
@@ -133,7 +139,9 @@ export interface ComplianceJSON {
 // routed through the Anthropic vision content block.
 // sam_image_resized added 2026-05-17 evening (FA-1.1) for JPEG/PNG attachments
 // that exceeded ~3.5MB raw and got pre-shrunk via sharp before the vision call.
-export type PdfSource = "uploaded" | "sam_fetched" | "sam_image_extracted" | "sam_image_resized" | "sam_unavailable" | "sam_text_extracted";
+// sam_pdf_via_files_api + uploaded_pdf_via_files_api added 2026-05-17 evening (FA-2)
+// for PDFs >20MB routed through the Anthropic Files API (avoids the 25MB inline cap).
+export type PdfSource = "uploaded" | "uploaded_pdf_via_files_api" | "sam_fetched" | "sam_pdf_via_files_api" | "sam_image_extracted" | "sam_image_resized" | "sam_unavailable" | "sam_text_extracted";
 
 export interface RisksJSON {
   technical_risks?: string[];
@@ -283,6 +291,12 @@ export interface AuditResult {
 export interface AuditInput {
   solicitation: unknown;
   pdfBase64?: string | null;
+  // Anthropic Files API file_id for PDFs >20MB. When set, used INSTEAD of
+  // pdfBase64 — document block source becomes {type:"file", file_id} not
+  // {type:"base64"}. runAudit deletes the file in its finally{} block after
+  // all 4 model calls complete (success OR failure). Mutually exclusive with
+  // pdfBase64. Added 2026-05-17 (FA-2).
+  pdfFileId?: string | null;
   // Base64-encoded image content (JPEG or PNG) when SAM serves an image
   // attachment instead of a PDF. When set, sent as an Anthropic vision content
   // block on every call (classifier + overview + compliance + risks). Mutually
@@ -387,7 +401,10 @@ function tryParse(s: string): Record<string, unknown> | null {
 
 type ContentBlock =
   | { type: "text"; text: string }
-  | { type: "document"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "document"; source:
+      | { type: "base64"; media_type: string; data: string }
+      | { type: "file"; file_id: string }
+    }
   | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png"; data: string } };
 
 // SECURITY NOTE (FA-1 · image arm bypasses prompt-text sanitization):
@@ -407,7 +424,8 @@ async function callClaude(
   pdfBase64?: string | null,
   modelOverride?: string,
   imageBase64?: string | null,
-  imageMediaType?: "image/jpeg" | "image/png" | null
+  imageMediaType?: "image/jpeg" | "image/png" | null,
+  pdfFileId?: string | null
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -415,6 +433,8 @@ async function callClaude(
   // Anthropic vision best-practice for instruction following on multimodal
   // prompts. In FA-1 image and pdfBase64 are mutually exclusive but the order
   // is preserved for the hypothetical "both attached" case.
+  // FA-2: pdfFileId takes precedence over pdfBase64 when both are set (they
+  // shouldn't be, per the mutually-exclusive contract, but file_id wins).
   const content: ContentBlock[] = [];
   if (imageBase64 && imageMediaType) {
     content.push({
@@ -422,7 +442,12 @@ async function callClaude(
       source: { type: "base64", media_type: imageMediaType, data: imageBase64 }
     });
   }
-  if (pdfBase64) {
+  if (pdfFileId) {
+    content.push({
+      type: "document",
+      source: { type: "file", file_id: pdfFileId }
+    });
+  } else if (pdfBase64) {
     content.push({
       type: "document",
       source: { type: "base64", media_type: "application/pdf", data: pdfBase64 }
@@ -492,13 +517,14 @@ async function callWithRetry(
   pdfBase64: string | null | undefined,
   label: string,
   imageBase64?: string | null,
-  imageMediaType?: "image/jpeg" | "image/png" | null
+  imageMediaType?: "image/jpeg" | "image/png" | null,
+  pdfFileId?: string | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -516,10 +542,13 @@ export async function classifyDocument(
   pdfBase64?: string | null,
   extractedFormat?: "docx" | "xlsx" | "doc" | "txt" | null,
   imageBase64?: string | null,
-  imageMediaType?: "image/jpeg" | "image/png" | null
+  imageMediaType?: "image/jpeg" | "image/png" | null,
+  pdfFileId?: string | null
 ): Promise<DocClassification> {
   const pdfHeader = pdfBase64
     ? "The full solicitation document is attached as a PDF. Skim it (titles, headers, Section labels) to determine its type.\n\n"
+    : pdfFileId
+    ? "The full solicitation document is attached as a PDF (large file · uploaded via the Anthropic Files API). Skim it (titles, headers, Section labels) to determine its type.\n\n"
     : imageBase64
     ? "The solicitation attachment is an image (scanned page, wage table, screenshot, or diagram). Read any visible text to determine the document type.\n\n"
     : extractedFormat
@@ -561,7 +590,8 @@ JSON only, no prose.`;
     pdfBase64,
     undefined,
     imageBase64,
-    imageMediaType
+    imageMediaType,
+    pdfFileId
   );
 
   const json = extractJSON(text) || {};
@@ -579,9 +609,11 @@ JSON only, no prose.`;
 }
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
-  const { solicitation, pdfBase64, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
+  const { solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
+  try {
   const pdfSource: PdfSource = input.pdfSource ?? (
-    pdfBase64 ? "uploaded"
+    pdfFileId ? "uploaded_pdf_via_files_api"
+    : pdfBase64 ? "uploaded"
     : imageBase64 ? "sam_image_extracted"
     : extractedText ? "sam_text_extracted"
     : "sam_unavailable"
@@ -608,7 +640,8 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
     pdfBase64,
     extractedFormat,
     imageBase64,
-    imageMediaType
+    imageMediaType,
+    pdfFileId
   ).catch((err): DocClassification => {
     console.warn("[audit-engine] classifier failed:", err instanceof Error ? err.message : err);
     return { document_type: "Other", rationale: "Classifier call failed; defaulted to Other.", confidence: "low" };
@@ -625,6 +658,8 @@ DOCUMENT-TYPE-SPECIFIC FOCUS: ${DOC_TYPE_FOCUS[classification.document_type]}
   let pdfHeader: string;
   if (pdfBase64) {
     pdfHeader = `${docTypePreamble}The full solicitation PDF is attached as a document — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`;
+  } else if (pdfFileId) {
+    pdfHeader = `${docTypePreamble}The full solicitation PDF is attached as a document (large file · uploaded via the Anthropic Files API) — read it directly and exhaustively, scanning every page for clauses, CLINs, and evaluation criteria.\n\n`;
   } else if (imageBase64) {
     pdfHeader = `${docTypePreamble}The following is an image attachment from a SAM.gov solicitation. The image may contain visible text (a scanned page, a wage table, a diagram, a screenshot). Read the visible text and treat it as part of the solicitation document. Then continue with the standard audit below.\n\n`;
   } else if (extractedText && extractedFormat === "doc") {
@@ -709,7 +744,8 @@ JSON only.`;
       pdfBase64,
       "overview",
       imageBase64,
-      imageMediaType
+      imageMediaType,
+      pdfFileId
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -718,7 +754,8 @@ JSON only.`;
       pdfBase64,
       "compliance",
       imageBase64,
-      imageMediaType
+      imageMediaType,
+      pdfFileId
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -727,7 +764,8 @@ JSON only.`;
       pdfBase64,
       "risks",
       imageBase64,
-      imageMediaType
+      imageMediaType,
+      pdfFileId
     )
   ]);
 
@@ -754,7 +792,7 @@ JSON only.`;
   // surfaces context (DFARS trap, thin source, manual review needed).
   // hasRichSource = pdf | image | extracted text (any rich content arm).
   if (prioritized.length === 0) {
-    const hasRichSource = !!pdfBase64 || !!imageBase64 || !!extractedText;
+    const hasRichSource = !!pdfBase64 || !!pdfFileId || !!imageBase64 || !!extractedText;
     prioritized = [synthesizeFallbackRisk(complianceJson, hasRichSource)];
   }
   risksJson.prioritized_risks = prioritized;
@@ -808,4 +846,9 @@ JSON only.`;
       risksResult.escalated ? "risks" : null
     ].filter((x): x is string => x !== null)
   };
+  } finally {
+    if (pdfFileId) {
+      await deletePdfFromFilesApi(pdfFileId);
+    }
+  }
 }

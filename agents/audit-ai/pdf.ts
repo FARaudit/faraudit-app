@@ -38,11 +38,12 @@ import mammoth from "mammoth";
 import ExcelJS from "exceljs";
 import WordExtractor from "word-extractor";
 import sharp from "sharp";
+import { uploadPdfToFilesApi } from "./anthropic-files";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 
 export type DocumentFetchResult =
-  | { kind: "pdf";   base64: string;        bytes: number; source: "local" | "sam.gov" }
+  | { kind: "pdf";   base64: string;        bytes: number; source: "local" | "sam.gov"; fileId?: string }
   | { kind: "image"; base64: string;        bytes: number; source: "local" | "sam.gov"; mediaType: "image/jpeg" | "image/png"; resized: boolean }
   | { kind: "text";  extractedText: string; bytes: number; source: "local" | "sam.gov"; format: "docx" | "xlsx" | "doc" | "txt" };
 
@@ -56,6 +57,13 @@ const OLE2_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
 // unchanged. Above this, maybeResizeImage transcodes to JPEG via sharp.
 // 3.5MB raw → ~4.66MB base64, safely under Anthropic's 5MB vision content cap.
 const IMAGE_RESIZE_THRESHOLD_BYTES = 3_500_000;
+
+// PDF size above which we route through the Anthropic Files API instead of
+// inlining base64. 20MB raw → ~26MB base64, which approaches Anthropic's
+// inline document-block limit. The Files API supports up to 500MB per file
+// and lets all 4 audit calls reuse the same file_id (single upload). The
+// returned fileId is carried on the pdf arm and consumed by audit-engine.ts.
+const PDF_FILES_API_THRESHOLD_BYTES = 20_000_000;
 
 function isPdf(buf: Buffer): boolean {
   return buf.length >= 4 && buf.subarray(0, 4).equals(PDF_MAGIC);
@@ -229,6 +237,12 @@ async function classifyAndReturn(
   filename: string | null
 ): Promise<DocumentFetchResult> {
   if (isPdf(buf)) {
+    if (buf.length > PDF_FILES_API_THRESHOLD_BYTES) {
+      // FA-2: upload to Anthropic Files API; document block will reference file_id.
+      // Buffer skips base64 conversion (the whole point of avoiding inline for large PDFs).
+      const { fileId } = await uploadPdfToFilesApi(buf, filename);
+      return { kind: "pdf", base64: "", bytes: buf.length, source, fileId };
+    }
     return { kind: "pdf", base64: buf.toString("base64"), bytes: buf.length, source };
   }
   if (isZipContainer(buf)) {

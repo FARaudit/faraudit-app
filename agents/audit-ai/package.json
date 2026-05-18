@@ -13,6 +13,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@supabase/supabase-js": "^2.104.1",
     "@types/word-extractor": "^1.0.6",
     "dotenv": "^17.4.2",

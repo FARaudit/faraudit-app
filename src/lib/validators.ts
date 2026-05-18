@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+// FA-2 (2026-05-17): raised 10MB → 500MB to match the Anthropic Files API
+// per-upload limit. PDFs above PDF_FILES_API_THRESHOLD_BYTES (20MB · defined
+// in src/app/api/audit/route.ts) are uploaded to the Files API instead of
+// being inlined as base64; this cap survives as a sanity ceiling that mirrors
+// agents/audit-ai/index.ts so the worker and the user-facing route agree on
+// the maximum acceptable PDF size.
+export const MAX_PDF_BYTES = 500 * 1024 * 1024; // 500 MB (Anthropic Files API cap)
 
 // Notice IDs from SAM.gov are alphanumeric with optional hyphens (and sometimes
 // dots in solicitation numbers — accept hyphens only per spec). Empty allowed

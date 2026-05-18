@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { runAudit, type PdfSource } from "@/lib/audit-engine";
+import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import {
   noticeIdSchema,
   pdfFileSchema,
@@ -10,6 +11,13 @@ import {
   MAX_PDF_BYTES
 } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
+
+// FA-2 (2026-05-17): mirror agents/audit-ai/pdf.ts + src/lib/sam-pdf.ts —
+// PDFs above this size are uploaded to the Anthropic Files API once instead
+// of being inlined as base64 on every model call. Keep the constant value in
+// sync with the canonical pdf.ts twin (it's not exported from there because
+// the constant is implementation-private to each loader).
+const PDF_FILES_API_THRESHOLD_BYTES = 20_000_000;
 
 // Force Node.js runtime explicitly · Edge caps maxDuration well below
 // the 300s the 3-call audit pipeline can need on a 20+ page IDIQ, and
@@ -107,6 +115,10 @@ export async function POST(req: NextRequest) {
   // ━━ Magic-byte verification ━━
   // Defends against rename attacks (e.g. evil.exe.pdf with image/jpeg MIME).
   let pdfBuffer: Buffer | null = null;
+  // safeName is hoisted above the Files API upload path so the filename is
+  // available both for that upload (passes a real name to Anthropic) and for
+  // the synthesized solicitation block below.
+  let safeName: string | null = null;
   if (pdf) {
     pdfBuffer = Buffer.from(await pdf.arrayBuffer());
     if (!isPdfMagicValid(pdfBuffer)) {
@@ -115,6 +127,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    safeName = sanitizeFilename(pdf.name);
   }
 
   // ━━ Build solicitation source ━━
@@ -135,8 +148,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!solicitation && pdf) {
-    const safeName = sanitizeFilename(pdf.name);
+  if (!solicitation && pdf && safeName) {
     // PDF filenames downloaded from SAM.gov often look like "Solicitation+-+FA301626Q0068.pdf"
     // (URL-encoded). Decode + normalize so the audit row stores a readable title.
     const rawTitle = safeName.replace(/\.pdf$/i, "").replace(/\+/g, " ").trim();
@@ -166,34 +178,54 @@ export async function POST(req: NextRequest) {
   }
 
   // ━━ Content for Claude — pdf / image / text via fetchPdfFromSamUrl ━━
-  // Five outcomes, in priority order:
-  //   1. User upload (pdfBuffer set above) → pdfSource="uploaded"
+  // Outcomes, in priority order:
+  //   1. User upload (pdfBuffer set above):
+  //        a. ≤20MB → inline base64, pdfSource="uploaded"
+  //        b. >20MB → uploaded to Anthropic Files API, pdfSource="uploaded_pdf_via_files_api"  (FA-2)
   //   2. Notice ID + no upload + SAM resourceLinks → fetchPdfFromSamUrl returns
   //      one of three arms:
-  //        a. PDF arm  → pdfBase64 set, pdfSource="sam_fetched"
-  //        b. Image arm (JPEG/PNG) → imageBase64+imageMediaType set,
-  //           pdfSource="sam_image_extracted"               (FA-1)
-  //        c. Text arm (DOCX/XLSX/DOC/TXT) → extractedText+extractedFormat set,
-  //           pdfSource="sam_text_extracted"
+  //        a. PDF arm (inline)              → pdfBase64 set, pdfSource="sam_fetched"
+  //        b. PDF arm (Files API, >20MB)    → pdfFileId set, pdfSource="sam_pdf_via_files_api"  (FA-2)
+  //        c. Image arm (JPEG/PNG)          → imageBase64+imageMediaType set,
+  //                                           pdfSource="sam_image_extracted"               (FA-1)
+  //        d. Text arm (DOCX/XLSX/DOC/TXT)  → extractedText+extractedFormat set,
+  //                                           pdfSource="sam_text_extracted"
   //   3. Notice ID + no upload + (no resourceLinks OR fetch fails OR oversize)
   //      → pdfSource="sam_unavailable" with reason captured for diagnostics.
   //      Audit still runs metadata-only.
-  let pdfBase64 = pdfBuffer ? pdfBuffer.toString("base64") : null;
+  let pdfBase64: string | null = null;
+  let pdfFileId: string | null = null;
   let imageBase64: string | null = null;
   let imageMediaType: "image/jpeg" | "image/png" | null = null;
   let extractedText: string | null = null;
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
-  let pdfSource: PdfSource = pdfBase64 ? "uploaded" : "sam_unavailable";
+  let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
 
-  if (!pdfBase64 && noticeId && solicitation.resourceLinks.length > 0) {
+  if (pdfBuffer) {
+    if (pdfBuffer.length > PDF_FILES_API_THRESHOLD_BYTES) {
+      const uploaded = await uploadPdfToFilesApi(pdfBuffer, safeName);
+      pdfFileId = uploaded.fileId;
+      pdfSource = "uploaded_pdf_via_files_api";
+    } else {
+      pdfBase64 = pdfBuffer.toString("base64");
+      pdfSource = "uploaded";
+    }
+  }
+
+  if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
     try {
       const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
       if (fetched.bytes > MAX_PDF_BYTES) {
         pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
       } else if (fetched.kind === "pdf") {
-        pdfBase64 = fetched.base64;
-        pdfSource = "sam_fetched";
+        if (fetched.fileId) {
+          pdfFileId = fetched.fileId;
+          pdfSource = "sam_pdf_via_files_api";
+        } else {
+          pdfBase64 = fetched.base64;
+          pdfSource = "sam_fetched";
+        }
       } else if (fetched.kind === "image") {
         imageBase64 = fetched.base64;
         imageMediaType = fetched.mediaType;
@@ -206,7 +238,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
     }
-  } else if (!pdfBase64 && noticeId) {
+  } else if (!pdfBase64 && !pdfFileId && noticeId) {
     pdfUnavailableReason =
       solicitation.resourceLinks.length === 0
         ? "no resourceLinks on SAM opportunity"
@@ -245,7 +277,7 @@ export async function POST(req: NextRequest) {
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   try {
-    const result = await runAudit({ solicitation, pdfBase64, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+    const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
 
     const { error: updateError } = await supabase
       .from("audits")

@@ -79,16 +79,15 @@ function shorten(s: string | null | undefined, n: number): string {
   return ((s || "") + "").replace(/\s+/g, " ").slice(0, n);
 }
 
-// Anthropic Messages API rejects requests >32MB; the 25MB ceiling here gives
-// headroom for the JSON envelope, system prompts, and base64 expansion overhead
-// (base64 inflates by ~33%, so a 25MB raw PDF becomes ~33MB on the wire).
-// Anything bigger gets a clean structured failure (kPdfTooLargeError) so the
-// row is marked failed with a clear error_message instead of triggering the
-// generic catch-all in processOne. Constant is named for the PDF case (the
-// historical reason it was added) but the byte cap applies equally to image
-// and text-extracted arms — same Anthropic wire limit.
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
-const kPdfTooLargeError = "PDF exceeds 25MB Anthropic API limit";
+// FA-2 (2026-05-17): ceiling raised 25MB → 500MB to match the Anthropic Files
+// API per-upload limit. PDFs in (20MB, 500MB] are uploaded by pdf.ts to the
+// Files API and the document content block references {type:"file", file_id}
+// — the inline base64 32MB wire limit no longer applies. The cap survives as
+// a sanity guard against absurd uploads (e.g. mis-detected non-PDF binary).
+// Image and text-extracted arms still flow inline; they remain well under the
+// inline cap so the 500MB constant doesn't loosen their effective ceiling.
+const MAX_PDF_BYTES = 500 * 1024 * 1024;
+const kPdfTooLargeError = "PDF exceeds 500MB Anthropic Files API limit";
 const kNoPdfError = "pending_audit row has neither pdf_path nor pdf_url";
 
 async function loadDocument(row: PendingAudit) {
@@ -165,16 +164,21 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
     // PdfSource derivation mirrors src/app/api/audit/route.ts for parity across
     // the worker (Railway) and user-facing (Vercel) entry points. Worker-side
     // semantics:
-    //   doc.source="local"             → "uploaded"             (fixture mode)
-    //   doc.source="sam.gov" + pdf     → "sam_fetched"
-    //   doc.source="sam.gov" + image   → "sam_image_extracted"  (FA-1)
-    //   doc.source="sam.gov" + text    → "sam_text_extracted"
+    //   doc.source="local" + pdf inline      → "uploaded"                    (fixture mode)
+    //   doc.source="local" + pdf via Files   → "uploaded_pdf_via_files_api"  (FA-2)
+    //   doc.source="sam.gov" + pdf inline    → "sam_fetched"
+    //   doc.source="sam.gov" + pdf via Files → "sam_pdf_via_files_api"       (FA-2)
+    //   doc.source="sam.gov" + image         → "sam_image_extracted"         (FA-1)
+    //   doc.source="sam.gov" + text          → "sam_text_extracted"
     // Without this explicit derivation, runAudit's internal default labels every
     // PDF as "uploaded" — wrong for the worker (which never receives user
     // uploads). Pre-FA-1 the corpus consequently mis-labeled SAM-fetched PDFs;
     // this commit corrects forward but does NOT backfill historical rows.
+    const isFilesApiPdf = doc.kind === "pdf" && !!doc.fileId;
     let pdfSource: string;
-    if (doc.source === "local") pdfSource = "uploaded";
+    if (doc.source === "local" && isFilesApiPdf) pdfSource = "uploaded_pdf_via_files_api";
+    else if (doc.source === "local") pdfSource = "uploaded";
+    else if (isFilesApiPdf) pdfSource = "sam_pdf_via_files_api";
     else if (doc.kind === "pdf") pdfSource = "sam_fetched";
     else if (doc.kind === "image") pdfSource = doc.resized ? "sam_image_resized" : "sam_image_extracted";
     else pdfSource = "sam_text_extracted";
@@ -182,7 +186,8 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
     const t0 = Date.now();
     const result = await runAudit({
       solicitation,
-      pdfBase64:      doc.kind === "pdf"   ? doc.base64        : undefined,
+      pdfBase64:      doc.kind === "pdf" && !doc.fileId ? doc.base64        : undefined,
+      pdfFileId:      doc.kind === "pdf" ? doc.fileId   : undefined,
       imageBase64:    doc.kind === "image" ? doc.base64        : undefined,
       imageMediaType: doc.kind === "image" ? doc.mediaType     : undefined,
       extractedText:  doc.kind === "text"  ? doc.extractedText : undefined,
