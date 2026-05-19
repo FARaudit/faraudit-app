@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type {
   HeaderCounter,
@@ -54,8 +54,15 @@ const TAB_KEYS: TabKey[] = [
   "protests", "regulatory", "cmmc", "wages", "teaming"
 ];
 
-export default function HomeClient({ user, counter, opportunities, recentAudits, kos, agencies }: Props) {
+export default function HomeClient({ user, counter, opportunities, recentAudits: initialRecentAudits, kos, agencies }: Props) {
   const router = useRouter();
+  // Locally-mutable audit list — pinning/unpinning from Past Audits flips
+  // in_pipeline on the matching row so the Pipeline Kanban re-derives without
+  // a page reload. Initial value seeded from server-fetched prop.
+  const [recentAudits, setRecentAudits] = useState<AuditRow[]>(initialRecentAudits);
+  const updateAudit = useCallback((id: string, patch: Partial<AuditRow>) => {
+    setRecentAudits((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }, []);
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
   // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
@@ -614,7 +621,10 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <div className="intel-tab-content">
                 <div className="intel-section">
                   <div className="is-header"><div className="is-title">Pipeline Kanban</div><div className="is-refresh">Drag a card to update its outcome · auto-saves to audits.outcome</div></div>
-                  <PipelineKanban audits={recentAudits} />
+                  <PipelineKanban
+                    key={recentAudits.filter((a) => a.in_pipeline === true).length}
+                    audits={recentAudits}
+                  />
                 </div>
                 <div className="intel-section">
                   <div className="is-header"><div className="is-title">Deadline Calendar</div><div className="is-refresh">Audited solicitations · real response deadlines from SAM</div></div>
@@ -635,7 +645,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
             {/* PAST AUDITS */}
             <div className={`tab-panel ${tab === "past-audits" ? "active" : ""}`}>
-              <PastAuditsPanel audits={recentAudits} filter={pastAuditsFilter} onFilterChange={setPastAuditsFilter} />
+              <PastAuditsPanel audits={recentAudits} filter={pastAuditsFilter} onFilterChange={setPastAuditsFilter} onAuditUpdate={updateAudit} />
             </div>
 
             {/* CONTRACTING OFFICERS */}
@@ -1077,11 +1087,13 @@ function SignOutButton() {
 function PastAuditsPanel({
   audits,
   filter,
-  onFilterChange
+  onFilterChange,
+  onAuditUpdate
 }: {
   audits: AuditRow[];
   filter: "all" | "p0" | "user";
   onFilterChange: (f: "all" | "p0" | "user") => void;
+  onAuditUpdate?: (id: string, patch: Partial<AuditRow>) => void;
 }) {
   const [query, setQuery] = useState("");
   const [pinned, setPinned] = useState<Set<string>>(() => new Set(audits.filter((a) => a.in_pipeline === true).map((a) => a.id)));
@@ -1107,6 +1119,8 @@ function PastAuditsPanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      // Propagate to parent so Pipeline Kanban + sidebar badge re-derive.
+      if (onAuditUpdate) onAuditUpdate(auditId, { in_pipeline: next });
     } catch (e) {
       // Rollback optimistic update.
       setPinned((s) => {
