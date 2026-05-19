@@ -450,22 +450,22 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                         <div className="fsh-count">{p0Rows.length} P0</div>
                       </div>
                     )}
-                    {p0Rows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
+                    {p0Rows.filter((r) => r.row.solicitation_number).map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
                       setAuditPrefill({
-                        // Prefer solicitation_number (SAM-visible "FA301626Q0068"
-                        // format) over notice_id (internal SAM API UUID). Falls
-                        // back only when the row predates migration 019. Same
-                        // priority order as displaySolicitationId helper.
-                        notice_id: r.row.solicitation_number || r.row.notice_id,
+                        // solicitation_number is guaranteed non-null by the
+                        // upstream .filter() — pre-solicitation notices without
+                        // a real sol# are filtered out of the feed entirely so
+                        // the demo never lands on a UUID prefill.
+                        notice_id: r.row.solicitation_number as string,
                         title: r.row.title ?? null,
                         agency: r.row.agency ?? null,
                         naics_code: r.row.naics_code ?? null
                       });
                       setTab("audit");
                     }} />)}
-                    {otherRows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
+                    {otherRows.filter((r) => r.row.solicitation_number).map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
                       setAuditPrefill({
-                        notice_id: r.row.solicitation_number || r.row.notice_id,
+                        notice_id: r.row.solicitation_number as string,
                         title: r.row.title ?? null,
                         agency: r.row.agency ?? null,
                         naics_code: r.row.naics_code ?? null
@@ -557,7 +557,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                           : "No rows match this NAICS filter."}
                       </div>
                     )}
-                    {[...filtered].sort((a, b) => {
+                    {filtered.filter((r) => r.row.solicitation_number).sort((a, b) => {
                       // Sort key: imminent (0..N) at top, expired (negative) pushed
                       // to 9998 so they fall just above null (9999) — mental model
                       // is "active opportunities up top, dead ones out of sight".
@@ -570,9 +570,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       return (
                         <div key={r.row.id} className="sam-row" onClick={() => {
                           setAuditPrefill({
-                            // SAM-visible solicitation_number (e.g. FA301626Q0068)
-                            // not the internal notice_id UUID.
-                            notice_id: r.row.solicitation_number || r.row.notice_id,
+                            // solicitation_number guaranteed non-null by the
+                            // upstream .filter() — pre-solicitation notices
+                            // without a real sol# are filtered out of the
+                            // table so the demo never prefills a UUID.
+                            notice_id: r.row.solicitation_number as string,
                             title: r.row.title ?? null,
                             agency: r.row.agency ?? null,
                             naics_code: r.row.naics_code ?? null
