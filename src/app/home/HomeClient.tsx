@@ -72,7 +72,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
   // P0 filter when it switches to past-audits. Counter (auditP0Count) and
   // PastAuditsPanel's "p0" filter both use compliance_score < 40 so the math
   // is identical · numbers stay consistent across the click.
-  const [pastAuditsFilter, setPastAuditsFilter] = useState<"all" | "p0" | "ai" | "user">("all");
+  const [pastAuditsFilter, setPastAuditsFilter] = useState<"all" | "p0" | "user">("all");
 
   const setTab = (next: TabKey) => {
     setTabState(next);
@@ -1075,14 +1075,13 @@ function PastAuditsPanel({
   onFilterChange
 }: {
   audits: AuditRow[];
-  filter: "all" | "p0" | "ai" | "user";
-  onFilterChange: (f: "all" | "p0" | "ai" | "user") => void;
+  filter: "all" | "p0" | "user";
+  onFilterChange: (f: "all" | "p0" | "user") => void;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     return audits.filter((a) => {
       if (filter === "p0") return a.compliance_score != null && a.compliance_score < 40;
-      if (filter === "ai") return a.audit_source === "audit_ai";
       if (filter === "user") return a.audit_source !== "audit_ai";
       return true;
     }).filter((a) => {
@@ -1107,8 +1106,7 @@ function PastAuditsPanel({
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
           {([
             { k: "all",  l: "All" },
-            { k: "p0",   l: "P0 (< 40)" },
-            { k: "ai",   l: "AI Audited" },
+            { k: "p0",   l: "High Risk" },
             { k: "user", l: "User Audited" }
           ] as const).map((f) => {
             const active = f.k === filter;
@@ -1145,7 +1143,7 @@ function PastAuditsPanel({
         </div>
 
         <div className="sam-table">
-          <div className="sam-th" style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px" }}>
+          <div className="sam-th" style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px" }}>
             <span>Date</span><span>Notice ID</span><span>Title</span><span>Agency</span><span>Source</span><span>Score</span><span>Verdict</span>
           </div>
           {filtered.length === 0 && <div className="empty-state">No audits match.</div>}
@@ -1159,7 +1157,7 @@ function PastAuditsPanel({
                 key={a.id}
                 href={auditHref(a)}
                 className="sam-row"
-                style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 140px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
+                style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
               >
                 <span className="sr-date">{new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 <span className="sr-num">{displaySolicitationId(a)}</span>
