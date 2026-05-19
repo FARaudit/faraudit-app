@@ -372,6 +372,14 @@ async function main(): Promise<void> {
         const action = await extractAction(meta, outcome.result);
         await persistAction(classificationId, meta.threadId, runId, action);
       } catch (e) {
+        metrics.errors += 1;
+        metrics.errorLog.push({
+          threadId: meta.threadId,
+          senderEmail: meta.senderEmail,
+          step: "action-persist",
+          message: errorMessage(e),
+          ts: new Date().toISOString(),
+        });
         console.error(`[email-ai-v3] action extract failed thread=${meta.threadId}: ${errorMessage(e)}`);
       }
     } catch (e) {
