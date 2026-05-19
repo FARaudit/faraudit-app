@@ -452,7 +452,11 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                     )}
                     {p0Rows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
                       setAuditPrefill({
-                        notice_id: r.row.notice_id,
+                        // Prefer solicitation_number (SAM-visible "FA301626Q0068"
+                        // format) over notice_id (internal SAM API UUID). Falls
+                        // back only when the row predates migration 019. Same
+                        // priority order as displaySolicitationId helper.
+                        notice_id: r.row.solicitation_number || r.row.notice_id,
                         title: r.row.title ?? null,
                         agency: r.row.agency ?? null,
                         naics_code: r.row.naics_code ?? null
@@ -461,7 +465,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                     }} />)}
                     {otherRows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
                       setAuditPrefill({
-                        notice_id: r.row.notice_id,
+                        notice_id: r.row.solicitation_number || r.row.notice_id,
                         title: r.row.title ?? null,
                         agency: r.row.agency ?? null,
                         naics_code: r.row.naics_code ?? null
@@ -566,7 +570,9 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                       return (
                         <div key={r.row.id} className="sam-row" onClick={() => {
                           setAuditPrefill({
-                            notice_id: r.row.notice_id,
+                            // SAM-visible solicitation_number (e.g. FA301626Q0068)
+                            // not the internal notice_id UUID.
+                            notice_id: r.row.solicitation_number || r.row.notice_id,
                             title: r.row.title ?? null,
                             agency: r.row.agency ?? null,
                             naics_code: r.row.naics_code ?? null
