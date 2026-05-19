@@ -76,6 +76,168 @@ function deriveRisks(risks: Record<string, unknown>): PrioritizedRisk[] {
     .sort((a, b) => order[a.priority] - order[b.priority]);
 }
 
+// Audit detail pages reuse the home shell (topbar + sidebar) so users keep
+// the same navigation context after drilling into an audit. Nav items are
+// plain anchors to /home#tab — HomeClient's hashchange listener picks up
+// the hash on load and activates the right tab.
+function AuditTopbar({ userEmail, solicitationId }: { userEmail: string; solicitationId: string }) {
+  const initials = userEmail ? userEmail.slice(0, 2).toUpperCase() : "U";
+  const handle = userEmail ? userEmail.split("@")[0] : "user";
+  return (
+    <div className="topbar">
+      <div className="tb-brand">
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
+          <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" strokeWidth="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
+          <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" strokeWidth=".9" opacity=".7"/>
+          <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" strokeWidth=".9" opacity=".5"/>
+        </svg>
+        <div className="tb-wordmark">FAR<span>audit</span></div>
+      </div>
+      <div className="tb-center">
+        <div className="tb-stats">Audit · {solicitationId}</div>
+      </div>
+      <div className="tb-right">
+        <a className="tb-user" href="/home" title={userEmail || "Back to intelligence home"}>
+          <div className="user-av">{initials}</div>
+          <div className="user-nm">{handle}</div>
+        </a>
+      </div>
+    </div>
+  );
+}
+
+const SIDEBAR_ANCHOR_STYLE: React.CSSProperties = { textDecoration: "none" };
+
+function AuditSidebar() {
+  return (
+    <div className="sidebar">
+      <div className="nav-label">Workspace</div>
+      <a href="/home#home" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+          <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+          <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+        </svg>
+        Today
+      </a>
+      <a href="/home#audit" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M4 2h8l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+          <line x1="6" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1" strokeOpacity=".5"/>
+          <line x1="6" y1="10" x2="10" y2="10" stroke="currentColor" strokeWidth="1" strokeOpacity=".5"/>
+        </svg>
+        Run Audit
+      </a>
+      <a href="/home#past-audits" className="nav-item active" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+          <line x1="8" y1="4" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <line x1="8" y1="8" x2="11" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Past Audits
+      </a>
+      <a href="/home#pipeline" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Pipeline
+      </a>
+      <a href="/home#capability" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
+          <line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <line x1="5" y1="10" x2="11" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <line x1="5" y1="13" x2="9" y2="13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Capability Statement
+      </a>
+
+      <div className="nav-label">Intelligence</div>
+      <a href="/home#opportunities" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Opportunities
+      </a>
+      <a href="/home#defense-spending" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+          <rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+          <rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+        </svg>
+        Defense Spending
+      </a>
+      <a href="/home#news" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+          <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Defense News
+      </a>
+      <a href="/home#contracting-officers" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M3 14c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Contracting Officers
+      </a>
+      <a href="/home#agencies" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Agencies
+      </a>
+      <a href="/home#protests" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+        </svg>
+        GAO Protests
+      </a>
+      <a href="/home#regulatory" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+          <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        FAR/DFARS Updates
+      </a>
+      <a href="/home#cmmc" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2L13 4V8C13 11 11 13 8 14C5 13 3 11 3 8V4L8 2Z" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M6 8l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        CMMC Readiness
+      </a>
+      <a href="/home#wages" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Wage Benchmarks
+      </a>
+      <a href="/home#teaming" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="5" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+          <circle cx="11" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M2 13c0-2 1.5-3 3-3s3 1 3 3M8 13c0-2 1.5-3 3-3s3 1 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Teaming Partners
+      </a>
+
+      <div className="nav-label">Account</div>
+      <a href="/settings" className="nav-item" style={SIDEBAR_ANCHOR_STYLE}>
+        <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        Profile &amp; Settings
+      </a>
+    </div>
+  );
+}
+
 export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
   const id = String(audit.id ?? "");
   const noticeId = (audit.notice_id as string) || "—";
@@ -129,9 +291,13 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
 
   return (
     <div className="bd-home audit-detail">
-      <div className="report-page">
-        <header className="report-header">
-          <a className="report-back" href="/home">← Intelligence Home</a>
+      <div className="app">
+        <AuditTopbar userEmail={_userEmail} solicitationId={displayId} />
+        <AuditSidebar />
+        <div className="main">
+          <div className="report-page">
+            <header className="report-header">
+              <a className="report-back" href="/home">← Intelligence Home</a>
           <div className="report-title">
             <div className="report-title-id">{displayId}</div>
             <div className="report-title-agency">
@@ -425,6 +591,8 @@ export default function AuditReport({ audit, userEmail: _userEmail }: Props) {
               </section>
             </>
           )}
+        </div>
+      </div>
         </div>
       </div>
     </div>
