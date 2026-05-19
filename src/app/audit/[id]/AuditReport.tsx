@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { auditDisplayName, displaySolicitationId } from "@/lib/audit-display";
+import FeedbackWidget from "@/app/_components/feedback-widget";
 
 interface PrioritizedRisk {
   text: string;
@@ -97,6 +98,7 @@ function AuditTopbar({ userEmail, solicitationId }: { userEmail: string; solicit
         <div className="tb-stats">Audit · {solicitationId}</div>
       </div>
       <div className="tb-right">
+        <FeedbackWidget userEmail={userEmail || null} />
         <a className="tb-user" href="/home" title={userEmail || "Back to intelligence home"}>
           <div className="user-av">{initials}</div>
           <div className="user-nm">{handle}</div>

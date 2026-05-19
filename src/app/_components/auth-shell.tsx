@@ -12,8 +12,9 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Navigation from "@/components/Navigation";
-import FeedbackWidget from "./feedback-widget";
 import { createBrowserClient } from "@/lib/supabase-browser";
+// FeedbackWidget no longer auth-shell-mounted (used to fixed-position
+// overlap content). Pages render it inline in their own topbars.
 
 // Routes that NEVER show the sidebar regardless of auth state.
 // Marketing, auth, and public-form pages.
@@ -83,7 +84,6 @@ export default function AuthShell() {
   return (
     <>
       <Navigation initialPinned={pinned} />
-      <FeedbackWidget userEmail={userEmail} />
     </>
   );
 }

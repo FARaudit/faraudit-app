@@ -1,8 +1,11 @@
 "use client";
 
-// Persistent feedback widget — fixed bottom-right button on every authed page.
-// Opens a modal with Type (radio) + Description (textarea), POSTs to /api/feedback,
-// which forwards to jose@faraudit.com via Resend. Errors surface — no silent success.
+// Persistent feedback widget — inline trigger button placed by the parent
+// (currently HomeClient topbar + AuditReport topbar). Opens a modal with
+// Type (radio) + Description (textarea), POSTs to /api/feedback, which
+// forwards to jose@faraudit.com via Resend. Errors surface — no silent success.
+// The button is intentionally NOT fixed-positioned so it never overlaps
+// content; callers control placement.
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -63,22 +66,18 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
         style={{
-          position: "fixed",
-          bottom: 18,
-          right: 18,
-          zIndex: 90,
-          background: "rgba(201,168,76,.92)",
-          color: "#03080F",
-          border: "none",
-          borderRadius: 999,
-          padding: "10px 16px",
+          background: "rgba(201,168,76,.14)",
+          color: "#C9A84C",
+          border: "1px solid rgba(201,168,76,.35)",
+          borderRadius: 4,
+          padding: "5px 10px",
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: 700,
           letterSpacing: ".08em",
           textTransform: "uppercase",
           cursor: "pointer",
-          boxShadow: "0 4px 16px rgba(0,0,0,.4)"
+          lineHeight: 1.2
         }}
       >
         💬 Feedback

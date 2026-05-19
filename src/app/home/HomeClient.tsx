@@ -11,6 +11,7 @@ import type {
 } from "@/lib/bd-os/queries";
 import { auditDisplayName, auditHref, displaySolicitationId } from "@/lib/audit-display";
 import NaicsCombobox from "@/components/NaicsCombobox";
+import FeedbackWidget from "@/app/_components/feedback-widget";
 
 type TabKey =
   | "home" | "audit" | "past-audits" | "pipeline" | "capability"
@@ -185,6 +186,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
           </div>
           <div className="tb-right">
             <div className="tb-live"><div className="live-dot" />Live · <span>{stats.total}</span> Active</div>
+            <FeedbackWidget userEmail={user.email ?? null} />
             <a className="tb-user" href="/home" title={user.email}>
               <div className="user-av">{initials || "U"}</div>
               <div className="user-nm">{handle || "user"}</div>
@@ -448,8 +450,24 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
                         <div className="fsh-count">{p0Rows.length} P0</div>
                       </div>
                     )}
-                    {p0Rows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => setTab("audit")} />)}
-                    {otherRows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => setTab("audit")} />)}
+                    {p0Rows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
+                      setAuditPrefill({
+                        notice_id: r.row.notice_id,
+                        title: r.row.title ?? null,
+                        agency: r.row.agency ?? null,
+                        naics_code: r.row.naics_code ?? null
+                      });
+                      setTab("audit");
+                    }} />)}
+                    {otherRows.map((r) => <FeedRowCmp key={r.row.id} r={r} onClick={() => {
+                      setAuditPrefill({
+                        notice_id: r.row.notice_id,
+                        title: r.row.title ?? null,
+                        agency: r.row.agency ?? null,
+                        naics_code: r.row.naics_code ?? null
+                      });
+                      setTab("audit");
+                    }} />)}
                   </div>
                 </div>
 
