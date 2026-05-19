@@ -54,7 +54,7 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
   const past = stmt.past_performance || [];
-  const contactBits = [stmt.contact_name, stmt.contact_email, stmt.contact_phone, stmt.contact_website].filter(Boolean) as string[];
+  const hasAnyContact = !!(stmt.contact_name || stmt.contact_email || stmt.contact_phone || stmt.contact_website || stmt.contact_address);
 
   return (
     <Document>
@@ -70,7 +70,13 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         </View>
 
         <Text style={styles.companyName}>{company}</Text>
-        {stmt.uei && <Text style={styles.uei}>UEI · {stmt.uei}{stmt.cage_code ? `   ·   CAGE · ${stmt.cage_code}` : ""}</Text>}
+        {(stmt.uei || stmt.cage_code) && (
+          <Text style={styles.uei}>
+            {stmt.uei ? `UEI · ${stmt.uei}` : ""}
+            {stmt.uei && stmt.cage_code ? "   ·   " : ""}
+            {stmt.cage_code ? `CAGE · ${stmt.cage_code}` : ""}
+          </Text>
+        )}
 
         <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
         <Text style={styles.body}>{stmt.core_competencies || "—"}</Text>
@@ -104,8 +110,11 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         ))}
 
         <Text style={styles.sectionEyebrow}>CONTACT</Text>
-        {contactBits.length === 0 && <Text style={styles.small}>No contact information set.</Text>}
-        {contactBits.map((c, i) => <Text key={i} style={styles.body}>{c}</Text>)}
+        {!hasAnyContact && <Text style={styles.small}>No contact information set.</Text>}
+        {stmt.contact_name && <Text style={styles.body}>{stmt.contact_name}</Text>}
+        {stmt.contact_email && <Text style={styles.small}>Email · {stmt.contact_email}</Text>}
+        {stmt.contact_phone && <Text style={styles.small}>Phone · {stmt.contact_phone}</Text>}
+        {stmt.contact_website && <Text style={styles.small}>Web · {stmt.contact_website}</Text>}
         {stmt.contact_address && <Text style={styles.small}>{stmt.contact_address}</Text>}
 
         <Text
