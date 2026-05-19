@@ -1,0 +1,20 @@
+{
+  "name": "prospector-ai",
+  "version": "1.0.0",
+  "description": "FARaudit Prospector AI — weekly BD pipeline refresh (USAspending → Notion BD)",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "DRY_RUN=true tsx index.ts"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-fetch": "^2.6.9",
+    "dotenv": "^17.4.2",
+    "node-fetch": "^2.6.9",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0"
+  }
+}

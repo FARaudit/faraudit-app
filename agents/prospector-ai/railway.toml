@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npx tsx index.ts"
+restartPolicyType = "never"
+
+[cron]
+schedule = "0 11 * * 1"
