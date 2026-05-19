@@ -517,7 +517,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
 
             {/* AUDIT */}
             <div className={`tab-panel ${tab === "audit" ? "active" : ""}`}>
-              <RunAuditPanel prefill={auditPrefill} active={tab === "audit"} />
+              <RunAuditPanel prefill={auditPrefill} active={tab === "audit"} onPrefillClear={() => setAuditPrefill(null)} />
             </div>
 
             {/* SAM */}
@@ -827,7 +827,7 @@ interface RunAuditPrefill {
 
 type RunAuditMode = "notice" | "pdf";
 
-function RunAuditPanel({ prefill, active }: { prefill?: RunAuditPrefill | null; active?: boolean }) {
+function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAuditPrefill | null; active?: boolean; onPrefillClear?: () => void }) {
   const router = useRouter();
   // Architectural mutual exclusion: user picks a mode FIRST, only that mode's
   // input renders. Submit handler sends only the active mode's field by
@@ -981,7 +981,17 @@ function RunAuditPanel({ prefill, active }: { prefill?: RunAuditPrefill | null; 
               ref={noticeInputRef}
               type="text"
               value={noticeId}
-              onChange={(e) => setNoticeId(e.target.value.trim())}
+              onChange={(e) => {
+                const next = e.target.value.trim();
+                setNoticeId(next);
+                // Drop the prefill banner the moment the user diverges from the
+                // pre-populated notice_id. Sticky clear: once cleared, retyping
+                // the original value does NOT bring the banner back — the only
+                // way back is a fresh row click that re-sets auditPrefill.
+                if (prefill?.notice_id && next !== prefill.notice_id && onPrefillClear) {
+                  onPrefillClear();
+                }
+              }}
               placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068"
               autoFocus
             />
