@@ -158,6 +158,17 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
     [recentAudits]
   );
 
+  // Pipeline badge count — proxy until audits.in_pipeline ships. Counts audits
+  // the user has explicitly progressed (outcome set OR bid_submitted=true);
+  // matches "user touched this card" semantics, not "all audits exist."
+  const pipelineCount = useMemo(
+    () => recentAudits.filter((a) => {
+      const r = (a as unknown) as { outcome?: string | null; bid_submitted?: boolean };
+      return (r.outcome != null && r.outcome !== "") || r.bid_submitted === true;
+    }).length,
+    [recentAudits]
+  );
+
   const initials = (user.email[0] || "?").toUpperCase() + (user.email.split("@")[0]?.[1] || "").toUpperCase();
   const handle = (user.email.split("@")[0] || "").slice(0, 18);
 
@@ -229,7 +240,7 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
               <polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Pipeline
-            {stats.p0 > 0 && <span className="nav-ct ct-red">{stats.p0}</span>}
+            {pipelineCount > 0 && <span className="nav-ct ct-red">{pipelineCount}</span>}
           </button>
           <button className={`nav-item ${tab === "capability" ? "active" : ""}`} onClick={() => setTab("capability")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -1641,6 +1652,18 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                 const r = riskFromScore(a.compliance_score);
                 const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
                 const isDragging = draggingId === a.id;
+                const countdown = (() => {
+                  if (!a.response_deadline) return null;
+                  const d = new Date(a.response_deadline);
+                  if (isNaN(d.getTime())) return null;
+                  const today = new Date(); today.setHours(0,0,0,0);
+                  const target = new Date(d); target.setHours(0,0,0,0);
+                  const days = Math.round((target.getTime() - today.getTime()) / 86400000);
+                  if (days < 0)  return { label: "Expired", color: "var(--t40)" };
+                  if (days === 0) return { label: "Today", color: "var(--red)" };
+                  return { label: `${days} day${days === 1 ? "" : "s"}`, color: "var(--amber)" };
+                })();
+                const ct = ((a as unknown) as { contract_type?: string | null }).contract_type;
                 return (
                   <div
                     key={a.id}
@@ -1677,9 +1700,21 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                     <div style={{ fontFamily: "var(--serif)", fontSize: 11, fontWeight: 500, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                       {auditDisplayName(a)}
                     </div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)" }}>
-                      {a.agency || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                      <span>{a.agency || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      {countdown && (
+                        <span style={{ fontWeight: 700, padding: "1px 5px", borderRadius: 2, color: countdown.color, border: `1px solid ${countdown.color}40`, background: `${countdown.color}10`, letterSpacing: ".04em" }}>
+                          {countdown.label}
+                        </span>
+                      )}
                     </div>
+                    {ct && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 7.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", padding: "1px 5px", borderRadius: 2, color: "var(--blue)", border: "1px solid rgba(96,165,250,.32)", background: "rgba(96,165,250,.08)" }}>
+                          {ct}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
