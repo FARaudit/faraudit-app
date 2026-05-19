@@ -1031,7 +1031,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
         <div className="audit-formats" style={{ marginTop: 22 }}>
           <span className="af">RFQ</span><span className="af">RFP</span><span className="af">IDIQ</span>
           <span className="af">IFB</span><span className="af">Sources Sought</span><span className="af">Pre-Sol Synopsis</span>
-          <span className="af">Task Order</span><span className="af">Mod.</span>
+          <span className="af">Task Order</span><span className="af">Modification</span>
         </div>
         {error && <div className="audit-error">{error}</div>}
         {result && (
