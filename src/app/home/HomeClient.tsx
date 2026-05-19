@@ -1088,22 +1088,32 @@ function PastAuditsPanel({
   const [pinBusy, setPinBusy] = useState<Set<string>>(() => new Set());
   const [pinErr, setPinErr] = useState<string | null>(null);
 
-  async function addToPipeline(auditId: string) {
-    if (pinned.has(auditId) || pinBusy.has(auditId)) return;
+  async function togglePinned(auditId: string) {
+    if (pinBusy.has(auditId)) return;
+    const wasPinned = pinned.has(auditId);
+    const next = !wasPinned;
     setPinBusy((s) => new Set(s).add(auditId));
     setPinErr(null);
-    setPinned((s) => new Set(s).add(auditId));
+    setPinned((s) => {
+      const n = new Set(s);
+      if (next) n.add(auditId); else n.delete(auditId);
+      return n;
+    });
     try {
       const res = await fetch(`/api/audit/${auditId}/lifecycle`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ in_pipeline: true })
+        body: JSON.stringify({ in_pipeline: next })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     } catch (e) {
       // Rollback optimistic update.
-      setPinned((s) => { const n = new Set(s); n.delete(auditId); return n; });
+      setPinned((s) => {
+        const n = new Set(s);
+        if (wasPinned) n.add(auditId); else n.delete(auditId);
+        return n;
+      });
       setPinErr(e instanceof Error ? e.message : String(e));
     } finally {
       setPinBusy((s) => { const n = new Set(s); n.delete(auditId); return n; });
@@ -1208,16 +1218,16 @@ function PastAuditsPanel({
                 </span>
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!isPinned) addToPipeline(a.id); }}
-                  disabled={isPinned || isBusy}
-                  title={isPinned ? "Already in Pipeline" : "Add to Pipeline"}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePinned(a.id); }}
+                  disabled={isBusy}
+                  title={isPinned ? "Click to unpin from Pipeline" : "Add to Pipeline"}
                   style={{
                     fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
                     padding: "3px 8px", borderRadius: 2,
                     background: isPinned ? "rgba(74,222,128,.10)" : "rgba(201,168,76,.08)",
                     border: `1px solid ${isPinned ? "rgba(74,222,128,.32)" : "rgba(201,168,76,.32)"}`,
                     color: isPinned ? "var(--green)" : "var(--gold)",
-                    cursor: isPinned ? "default" : isBusy ? "wait" : "pointer",
+                    cursor: isBusy ? "wait" : "pointer",
                     opacity: isBusy ? 0.6 : 1
                   }}
                 >
