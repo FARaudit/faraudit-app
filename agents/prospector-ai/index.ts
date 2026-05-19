@@ -42,14 +42,71 @@ const STATE_CAP = 3;
 const TOP_N = 10;
 const ENRICH_LIMIT = 14; // pull a few spares for failure-resilience
 
-// Manual blocklist — companies that pass technical filters but fail ICP fit.
-// Populated from FA-60 v1+v2 manual review. Compared after normalize().
+// Manual blocklist — companies that pass technical filters but fail ICP fit
+// or cannot be enriched via autonomous web search. Populated from FA-60 v1+v2
+// + Prospector AI tick 1 (2026-05-19) manual review. Compared after normalize().
+//
+// CRITERIA for adding:
+//   - "Too big" (subsidiary of a $1B+ prime · wrong ICP-size)
+//   - "Unfindable" (no exec DM surfaces after 2+ search passes)
+//   - "Name collision" (same name as a different known entity · can't disambiguate)
+//   - "Prime not sub" (full prime contractor · wrong customer segment)
 const ICP_BLOCKLIST = new Set(
   [
-    'asrc federal facilities logistics llc', // $4.95B tribal-owned subsidiary, prime not sub
-    'asrc federal facilities logistics inc'
+    // Too-big / prime-not-sub
+    'asrc federal facilities logistics llc', // $4.95B tribal-owned subsidiary
+    'asrc federal facilities logistics inc',
+    'lockheed martin',                       // prime not sub
+    // Unfindable / no surface DM (Prospector AI tick 1 drops)
+    'aviarms support corp',                  // no exec DM after 2 search passes
+    's i t corporation',                     // no findable web presence
+    'sit corporation',
+    'melton sales service',                  // generic name · no NJ match
+    'es3 prime logistics group',             // PM-only · no exec-level DM
+    // Name collision · cannot disambiguate
+    'phoenix trading inc',                   // collides with Phoenix Defense (different entity)
   ].map(normalize)
 );
+
+// Layer 3 — website fetch + CMMC posture classification.
+// Works headless in Railway. Returns 'HOT' / 'WARM' / 'COLD' / 'UNKNOWN'.
+// HOT  = defense work + no CMMC mention
+// WARM = CMMC Level 1 only / "working toward"
+// COLD = CMMC Level 2 certified by C3PAO
+async function classifyPosture(websiteUrl: string): Promise<'HOT' | 'WARM' | 'COLD' | 'UNKNOWN'> {
+  if (!websiteUrl) return 'UNKNOWN';
+  try {
+    const resp = await fetch(websiteUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FARauditBot/2.0)' },
+      // @ts-ignore
+      signal: AbortSignal.timeout(8000)
+    } as any);
+    if (!resp.ok) return 'UNKNOWN';
+    const html = (await resp.text()).toLowerCase();
+    if (/cmmc\s*(level\s*)?2|c3pao|cybersecurity\s*maturity.*level\s*2/.test(html)) return 'COLD';
+    if (/cmmc\s*(level\s*)?1|working\s+toward\s+cmmc|cmmc\s+ready/.test(html)) return 'WARM';
+    if (/defense|military|dod|navy|army|air force/.test(html)) return 'HOT';
+    return 'UNKNOWN';
+  } catch {
+    return 'UNKNOWN';
+  }
+}
+
+// NOTE on Layers 4/5/6 (LinkedIn Company Page · Decision-Maker · Signals):
+//
+// These layers REQUIRE either:
+//   (a) a paid search API (Brave Search · Google Custom Search · SerpAPI)
+//   (b) LinkedIn auth + scraping infrastructure (high-maintenance · ToS risk)
+//   (c) human-in-loop enrichment via the chat-side WebSearch tool
+//
+// DDG HTML scrape from headless Node is unreliable (high rate-limit / 403).
+// Current strategy: agent writes rows with status "needs_dm_enrichment" and
+// flags in Notes; CEO or chat-side run handles DM discovery before DM cadence.
+//
+// To wire layers 4/5/6 in-agent: add BRAVE_SEARCH_API_KEY env var + a wrapper
+// around Brave's /res/v1/web/search endpoint, then run per-company queries
+// for: site:linkedin.com/company "{name}" and site:linkedin.com/in "{name}" +
+// title keywords. Track at Notion BD as a property when implemented.
 
 function normalize(s: string): string {
   return s
@@ -314,7 +371,11 @@ async function main() {
   const enriched: Prospect[] = [];
   for (const v of candidates) {
     const email = await lookupSamEmail(v.uei);
-    const posture: 'HOT' | 'WARM' | 'COLD' = 'HOT'; // default; v2-style website fetch could extend
+    // Layer 3: posture classification via website fetch.
+    // Heuristic: try {normalized}.com — refine when site discovery wired (Layer 3a).
+    const guessedUrl = `https://www.${normalize(v.name).replace(/\s+/g, '')}.com`;
+    const rawPosture = await classifyPosture(guessedUrl);
+    const posture: 'HOT' | 'WARM' | 'COLD' = rawPosture === 'UNKNOWN' ? 'HOT' : rawPosture;
     const score = scoreVendor(v, email);
     enriched.push({
       company: v.name,
@@ -325,7 +386,7 @@ async function main() {
       compliance_posture: posture,
       icp_score: score,
       contact_email: email,
-      key_signal_note: `${v.awards} DoD awards · NAICS ${[...v.naics].join('|')}`
+      key_signal_note: `${v.awards} DoD awards · NAICS ${[...v.naics].join('|')} · posture_source=${rawPosture === 'UNKNOWN' ? 'default(HOT)' : 'website-classified'} · needs_dm_enrichment=true`
     });
   }
 
