@@ -2443,10 +2443,10 @@ function CapabilityPanel() {
     }, 1000);
   }
 
-  async function persist(current: CapStatement) {
+  async function persist(current: CapStatement, opts?: { force?: boolean }) {
     const payload = extractCapPayload(current);
     const sig = JSON.stringify(payload);
-    if (sig === lastSent.current) return;
+    if (!opts?.force && sig === lastSent.current) return;
     setSave("saving");
     setErr(null);
     try {
@@ -2468,6 +2468,49 @@ function CapabilityPanel() {
       setSave("error");
       setErr(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+  async function exportPdf() {
+    if (exporting) return;
+    setExportErr(null);
+    setExporting(true);
+    try {
+      const res = await fetch("/api/capability-statement/pdf", { credentials: "include" });
+      if (res.status === 404) {
+        setExportErr("Save your capability statement first.");
+        return;
+      }
+      if (!res.ok) {
+        setExportErr("Export failed, try again.");
+        return;
+      }
+      const blob = await res.blob();
+      // Parse filename from Content-Disposition if present, else fall back.
+      const disp = res.headers.get("Content-Disposition") || "";
+      const match = /filename="?([^"]+)"?/.exec(disp);
+      const filename = match?.[1] || `FARaudit-CapabilityStatement-${new Date().toISOString().slice(0,10)}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportErr("Export failed, try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function saveNow() {
+    if (!stmtRef.current || save === "saving") return;
+    // Cancel any debounced autosave so the button click is the source of truth.
+    if (timer.current) clearTimeout(timer.current);
+    await persist(stmtRef.current, { force: true });
   }
 
   if (loading) {
@@ -2499,10 +2542,25 @@ function CapabilityPanel() {
       <div className="intel-section">
         <div className="is-header">
           <div className="is-title">Capability Statement</div>
-          <div className="is-refresh">
-            <a className="action-btn primary" href="/api/capability-statement/pdf" download style={{ marginRight: 8 }}>
-              ↓ Export PDF
-            </a>
+          <div className="is-refresh" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={saveNow}
+              disabled={save === "saving"}
+              style={{ opacity: save === "saving" ? 0.6 : 1 }}
+            >
+              {save === "saving" ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="action-btn primary"
+              onClick={exportPdf}
+              disabled={exporting}
+              style={{ opacity: exporting ? 0.6 : 1 }}
+            >
+              {exporting ? "Exporting…" : "↓ Export PDF"}
+            </button>
             <span>
               {save === "error"
                 ? "⚠ Not saved"
@@ -2514,6 +2572,9 @@ function CapabilityPanel() {
             </span>
           </div>
         </div>
+        {exportErr && (
+          <div className="ko-status error" style={{ marginTop: 8 }}>{exportErr}</div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <CapField label="Company name" value={stmt.company_name || ""} onChange={(v) => update("company_name", v)} placeholder="Your company name" />
@@ -2541,7 +2602,7 @@ function CapabilityPanel() {
 
         <div style={{ marginTop: 18 }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 10 }}>
-            Past performance · auto-pulled from won audits
+            Past performance · auto-populated from won audits
           </div>
           {!Array.isArray(stmt.past_performance) || stmt.past_performance.length === 0 ? (
             <div className="empty-block">No won audits yet. Outcomes you mark "won" on /audit/[id] will appear here automatically.</div>
