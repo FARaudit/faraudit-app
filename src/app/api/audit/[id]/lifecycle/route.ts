@@ -11,9 +11,12 @@ interface Body {
   bid_submitted?: boolean;
   bid_submit_date?: string | null;
   team_assignee?: string | null;
+  in_pipeline?: boolean;
+  prime_sub?: "prime" | "sub" | null;
 }
 
 const ALLOWED_OUTCOMES = new Set(["won", "lost", "pending", "no-bid"]);
+const ALLOWED_PRIME_SUB = new Set(["prime", "sub"]);
 
 export async function PATCH(
   req: NextRequest,
@@ -46,6 +49,13 @@ export async function PATCH(
   if (body.bid_submitted !== undefined)   update.bid_submitted   = !!body.bid_submitted;
   if (body.bid_submit_date !== undefined) update.bid_submit_date = body.bid_submit_date;
   if (body.team_assignee !== undefined)   update.team_assignee   = body.team_assignee;
+  if (body.in_pipeline !== undefined)     update.in_pipeline     = !!body.in_pipeline;
+  if (body.prime_sub !== undefined) {
+    if (body.prime_sub !== null && !ALLOWED_PRIME_SUB.has(body.prime_sub)) {
+      return NextResponse.json({ error: `prime_sub must be one of ${[...ALLOWED_PRIME_SUB].join(", ")}` }, { status: 400 });
+    }
+    update.prime_sub = body.prime_sub;
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });

@@ -158,14 +158,8 @@ export default function HomeClient({ user, counter, opportunities, recentAudits,
     [recentAudits]
   );
 
-  // Pipeline badge count — proxy until audits.in_pipeline ships. Counts audits
-  // the user has explicitly progressed (outcome set OR bid_submitted=true);
-  // matches "user touched this card" semantics, not "all audits exist."
   const pipelineCount = useMemo(
-    () => recentAudits.filter((a) => {
-      const r = (a as unknown) as { outcome?: string | null; bid_submitted?: boolean };
-      return (r.outcome != null && r.outcome !== "") || r.bid_submitted === true;
-    }).length,
+    () => recentAudits.filter((a) => a.in_pipeline === true).length,
     [recentAudits]
   );
 
@@ -1090,6 +1084,32 @@ function PastAuditsPanel({
   onFilterChange: (f: "all" | "p0" | "user") => void;
 }) {
   const [query, setQuery] = useState("");
+  const [pinned, setPinned] = useState<Set<string>>(() => new Set(audits.filter((a) => a.in_pipeline === true).map((a) => a.id)));
+  const [pinBusy, setPinBusy] = useState<Set<string>>(() => new Set());
+  const [pinErr, setPinErr] = useState<string | null>(null);
+
+  async function addToPipeline(auditId: string) {
+    if (pinned.has(auditId) || pinBusy.has(auditId)) return;
+    setPinBusy((s) => new Set(s).add(auditId));
+    setPinErr(null);
+    setPinned((s) => new Set(s).add(auditId));
+    try {
+      const res = await fetch(`/api/audit/${auditId}/lifecycle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ in_pipeline: true })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (e) {
+      // Rollback optimistic update.
+      setPinned((s) => { const n = new Set(s); n.delete(auditId); return n; });
+      setPinErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPinBusy((s) => { const n = new Set(s); n.delete(auditId); return n; });
+    }
+  }
+
   const filtered = useMemo(() => {
     return audits.filter((a) => {
       if (filter === "p0") return a.compliance_score != null && a.compliance_score < 40;
@@ -1153,9 +1173,10 @@ function PastAuditsPanel({
           />
         </div>
 
+        {pinErr && <div className="ko-status error" style={{ marginBottom: 10 }}>{pinErr}</div>}
         <div className="sam-table">
-          <div className="sam-th" style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px" }}>
-            <span>Date</span><span>Notice ID</span><span>Title</span><span>Agency</span><span>Source</span><span>Score</span><span>Verdict</span>
+          <div className="sam-th" style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px 110px" }}>
+            <span>Date</span><span>Notice ID</span><span>Title</span><span>Agency</span><span>Source</span><span>Score</span><span>Verdict</span><span></span>
           </div>
           {filtered.length === 0 && <div className="empty-state">No audits match.</div>}
           {filtered.map((a) => {
@@ -1163,12 +1184,14 @@ function PastAuditsPanel({
             const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
             const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
             const recColor = a.recommendation === "PROCEED" ? "var(--green)" : a.recommendation === "DECLINE" ? "var(--red)" : "var(--amber)";
+            const isPinned = pinned.has(a.id);
+            const isBusy = pinBusy.has(a.id);
             return (
               <a
                 key={a.id}
                 href={auditHref(a)}
                 className="sam-row"
-                style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px", textDecoration: "none", color: "inherit" }}
+                style={{ gridTemplateColumns: "100px 130px minmax(0,1fr) 200px 70px 80px 110px 110px", textDecoration: "none", color: "inherit" }}
               >
                 <span className="sr-date">{new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 <span className="sr-num">{displaySolicitationId(a)}</span>
@@ -1183,6 +1206,23 @@ function PastAuditsPanel({
                 <span className="sr-badge" style={{ color: recColor, background: "transparent", border: `1px solid ${recColor}40` }}>
                   {a.recommendation ? a.recommendation.replace("_", " ") : "—"}
                 </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!isPinned) addToPipeline(a.id); }}
+                  disabled={isPinned || isBusy}
+                  title={isPinned ? "Already in Pipeline" : "Add to Pipeline"}
+                  style={{
+                    fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                    padding: "3px 8px", borderRadius: 2,
+                    background: isPinned ? "rgba(74,222,128,.10)" : "rgba(201,168,76,.08)",
+                    border: `1px solid ${isPinned ? "rgba(74,222,128,.32)" : "rgba(201,168,76,.32)"}`,
+                    color: isPinned ? "var(--green)" : "var(--gold)",
+                    cursor: isPinned ? "default" : isBusy ? "wait" : "pointer",
+                    opacity: isBusy ? 0.6 : 1
+                  }}
+                >
+                  {isPinned ? "✓ Pinned" : "+ Pipeline"}
+                </button>
               </a>
             );
           })}
@@ -1557,8 +1597,9 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
     // BUG 7: dedupe by notice_id, keeping the most-recent successful audit per
     //        notice_id. Failed audits are already removed so a re-audit only
     //        survives if it succeeded.
+    // FIX 2: only audits the user has explicitly added to pipeline appear.
     const successful = audits.filter(
-      (a) => a.status !== "failed" && a.compliance_score != null
+      (a) => a.status !== "failed" && a.compliance_score != null && a.in_pipeline === true
     );
     const sortedDesc = [...successful].sort((a, b) => {
       const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -1577,6 +1618,27 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Optimistic overlay for prime_sub edits — keyed by audit id, value is the
+  // current selection or undefined (server value still authoritative).
+  const [primeSubOverride, setPrimeSubOverride] = useState<Record<string, "prime" | "sub" | null>>({});
+
+  async function setPrimeSub(auditId: string, next: "prime" | "sub" | null) {
+    setPrimeSubOverride((m) => ({ ...m, [auditId]: next }));
+    setErr(null);
+    try {
+      const res = await fetch(`/api/audit/${auditId}/lifecycle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prime_sub: next })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (e) {
+      // Drop override on failure so card falls back to server value.
+      setPrimeSubOverride((m) => { const n = { ...m }; delete n[auditId]; return n; });
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   async function moveTo(auditId: string, stage: KanbanStage) {
     setBusyId(auditId);
@@ -1663,7 +1725,8 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                   if (days === 0) return { label: "Today", color: "var(--red)" };
                   return { label: `${days} day${days === 1 ? "" : "s"}`, color: "var(--amber)" };
                 })();
-                const ct = ((a as unknown) as { contract_type?: string | null }).contract_type;
+                const ct = a.contract_type;
+                const primeSub = primeSubOverride[a.id] !== undefined ? primeSubOverride[a.id] : a.prime_sub;
                 return (
                   <div
                     key={a.id}
@@ -1708,13 +1771,41 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                         </span>
                       )}
                     </div>
-                    {ct && (
-                      <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {ct && (
                         <span style={{ fontFamily: "var(--mono)", fontSize: 7.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", padding: "1px 5px", borderRadius: 2, color: "var(--blue)", border: "1px solid rgba(96,165,250,.32)", background: "rgba(96,165,250,.08)" }}>
                           {ct}
                         </span>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setPrimeSub(a.id, primeSub === "prime" ? null : "prime"); }}
+                        title="Toggle Prime"
+                        style={{
+                          fontFamily: "var(--mono)", fontSize: 7.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                          padding: "1px 5px", borderRadius: 2, cursor: "pointer",
+                          color: primeSub === "prime" ? "var(--blue)" : "var(--t25)",
+                          border: `1px solid ${primeSub === "prime" ? "rgba(96,165,250,.55)" : "var(--border)"}`,
+                          background: primeSub === "prime" ? "rgba(96,165,250,.14)" : "transparent"
+                        }}
+                      >
+                        Prime
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setPrimeSub(a.id, primeSub === "sub" ? null : "sub"); }}
+                        title="Toggle Sub"
+                        style={{
+                          fontFamily: "var(--mono)", fontSize: 7.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                          padding: "1px 5px", borderRadius: 2, cursor: "pointer",
+                          color: primeSub === "sub" ? "var(--amber)" : "var(--t25)",
+                          border: `1px solid ${primeSub === "sub" ? "rgba(245,158,11,.55)" : "var(--border)"}`,
+                          background: primeSub === "sub" ? "rgba(245,158,11,.14)" : "transparent"
+                        }}
+                      >
+                        Sub
+                      </button>
+                    </div>
                   </div>
                 );
               })}

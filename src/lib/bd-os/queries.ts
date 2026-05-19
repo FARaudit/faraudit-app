@@ -142,6 +142,11 @@ export interface AuditRow {
   created_at: string;
   completed_at: string | null;
   response_deadline: string | null;
+  contract_type: string | null;
+  outcome: string | null;
+  bid_submitted: boolean | null;
+  in_pipeline: boolean;
+  prime_sub: "prime" | "sub" | null;
 }
 
 export async function fetchRecentAudits(
@@ -150,7 +155,7 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline")
+    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(`fetchRecentAudits: ${error.message}`);
