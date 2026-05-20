@@ -934,7 +934,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center", justifyContent: "center", gap: 2 }}>
                             <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center" }}>{r.daysLabel}</span>
                             {r.row.award_ceiling != null && (
-                              <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 600, color: "var(--green)", textAlign: "center", opacity: 0.85 }}>{formatValue(r.row.award_ceiling)}</span>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 600, color: "var(--t40)", textAlign: "center" }}>{formatValue(r.row.award_ceiling)}</span>
                             )}
                           </div>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.riskLabel || "—"}</span>
