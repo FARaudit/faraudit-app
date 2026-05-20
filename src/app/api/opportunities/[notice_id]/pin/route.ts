@@ -76,7 +76,8 @@ export async function POST(
       user_id:             user.id,
       status:              "pending",
       in_pipeline:         true,
-      audit_source:        "opportunities_pin"
+      audit_source:        "opportunities_pin",
+      model_used:          "none"                // stub row — no model ran
     })
     .select("id")
     .single();
