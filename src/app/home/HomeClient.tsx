@@ -2398,8 +2398,11 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
   // from naicsList (dynamic — what's in the data + ingest list), but the
   // initial selection is fixed so the demo lands on a populated row.
   const [selectedNaics, setSelectedNaics] = useState<string>("336413");
-  const current = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2026) || null, [defenseSpending, selectedNaics]);
-  const prior   = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2025) || null, [defenseSpending, selectedNaics]);
+  const fy2026 = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2026) || null, [defenseSpending, selectedNaics]);
+  const fy2025 = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2025) || null, [defenseSpending, selectedNaics]);
+  const fy2024 = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2024) || null, [defenseSpending, selectedNaics]);
+  const current = fy2026;
+  const prior = fy2025;
   const refreshed = current?.refreshed_at || prior?.refreshed_at;
 
   const [showPrimes, setShowPrimes] = useState(false);
@@ -2455,10 +2458,10 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
         </div>
       </div>
 
-      {/* SECTION 1 — NAICS selector + KPIs */}
+      {/* SECTION 1 — NAICS selector + 3-year market trend (FA-96b) */}
       <div className="intel-section">
         <div className="is-header">
-          <div className="is-title">Your Market · NAICS {selectedNaics}</div>
+          <div className="is-title">Market Trend · NAICS {selectedNaics}</div>
           <div className="is-refresh">
             <select
               value={selectedNaics}
@@ -2471,18 +2474,31 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 6 }}>
-          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>FY2026 Obligations</div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 4 }}>{fmt(current?.total_obligations ?? null)}</div>
-          </div>
-          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>YoY Δ</div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: current?.yoy_delta_pct != null ? (current.yoy_delta_pct >= 0 ? "var(--green)" : "var(--red)") : "var(--t40)", marginTop: 4 }}>{fmtPct(current?.yoy_delta_pct ?? null)}</div>
-          </div>
-          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>SB Set-Aside %</div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--gold)", marginTop: 4 }}>{current?.sb_pct != null ? `${current.sb_pct.toFixed(1)}%` : "—"}</div>
-          </div>
+          {[
+            { row: fy2024, label: "FY2024", note: "closed", current: false },
+            { row: fy2025, label: "FY2025", note: "closed", current: false },
+            { row: fy2026, label: "FY2026", note: "in progress", current: true }
+          ].map((c) => {
+            const yoy = c.row?.yoy_delta_pct ?? null;
+            const arrow = yoy == null ? "" : yoy >= 0 ? "▲" : "▼";
+            const yoyColor = yoy == null ? "var(--t40)" : yoy >= 0 ? "var(--green)" : "var(--red)";
+            return (
+              <div key={c.label} style={{
+                background: c.current ? "rgba(96,165,250,.06)" : "var(--void3)",
+                border: c.current ? "1px solid rgba(96,165,250,.45)" : "1px solid var(--border)",
+                borderRadius: 4, padding: "14px 16px"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, color: c.current ? "var(--blue)" : "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>{c.label}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)" }}>{c.note}</div>
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 6 }}>{fmt(c.row?.total_obligations ?? null)}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, color: yoyColor, marginTop: 2 }}>
+                  {arrow} {fmtPct(yoy)} <span style={{ color: "var(--t40)", fontWeight: 500 }}>YoY · SB {c.row?.sb_pct != null ? `${c.row.sb_pct.toFixed(1)}%` : "—"}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -2492,33 +2508,62 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
         </div>
       )}
 
-      {/* SECTION 2 — Top competitors */}
+      {/* SECTION 2 — Split Top 10 (Large Primes vs SB Winners) · FA-96b */}
       <div className="intel-section">
-        <div className="is-header"><div className="is-title">Top Competitors · FY2026</div><div className="is-refresh">From USAspending · 10 max</div></div>
-        {current?.top_recipients && current.top_recipients.length > 0 ? (
-          <div className="sam-table">
-            <div className="sam-th" style={{ gridTemplateColumns: "50px 1fr 160px 100px" }}>
-              <span>Rank</span><span>Company</span><span>FY2026 Obligations</span><span>USAspending</span>
-            </div>
-            {current.top_recipients.slice(0, 10).map((r, i) => {
-              const priorMatch = prior?.top_recipients?.find((p) => p.name === r.name);
-              const trend = priorMatch ? r.amount - priorMatch.amount : 0;
-              return (
-                <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "50px 1fr 160px 100px" }}>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>{i + 1}</span>
-                  <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{r.name}</span>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(r.amount)}{priorMatch && <span style={{ marginLeft: 8, color: trend > 0 ? "var(--green)" : trend < 0 ? "var(--red)" : "var(--t40)", fontSize: 9 }}>{trend > 0 ? "▲" : trend < 0 ? "▼" : "—"}</span>}</span>
-                  <a href={`https://www.usaspending.gov/search/?hash=&recipients=${encodeURIComponent(r.name)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--blue)" }}>View →</a>
+        <div className="is-header"><div className="is-title">Top 10 Recipients · FY2026</div><div className="is-refresh">Large primes vs SB set-aside winners · USAspending</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {/* LEFT — Large Prime Winners */}
+          <div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>Large Prime Winners · FY2026</div>
+            {current?.top_recipients && current.top_recipients.length > 0 ? (
+              <div className="sam-table">
+                <div className="sam-th" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
+                  <span>#</span><span>Company</span><span>$</span><span></span>
                 </div>
-              );
-            })}
+                {current.top_recipients.slice(0, 10).map((r, i) => {
+                  const priorMatch = prior?.top_recipients?.find((p) => p.name === r.name);
+                  const trend = priorMatch ? r.amount - priorMatch.amount : 0;
+                  return (
+                    <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>{i + 1}</span>
+                      <span style={{ fontFamily: "var(--serif)", fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)" }}>{fmt(r.amount)} {priorMatch && <span style={{ marginLeft: 4, color: trend > 0 ? "var(--green)" : trend < 0 ? "var(--red)" : "var(--t40)", fontSize: 9 }}>{trend > 0 ? "▲" : trend < 0 ? "▼" : "—"}</span>}</span>
+                      <a href={`https://www.usaspending.gov/search/?hash=&recipients=${encodeURIComponent(r.name)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--blue)" }}>→</a>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (<div className="empty-state">No recipient data yet.</div>)}
           </div>
-        ) : (<div className="empty-state">No competitor data yet for this NAICS.</div>)}
+          {/* RIGHT — Small Business Winners */}
+          <div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--green)", marginBottom: 6 }}>Small Business Winners · FY2026 · ICP</div>
+            {current?.sb_recipients && current.sb_recipients.length > 0 ? (
+              <div className="sam-table">
+                <div className="sam-th" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
+                  <span>#</span><span>Company</span><span>$</span><span></span>
+                </div>
+                {current.sb_recipients.slice(0, 10).map((r, i) => {
+                  const priorMatch = prior?.sb_recipients?.find((p) => p.name === r.name);
+                  const trend = priorMatch ? r.amount - priorMatch.amount : 0;
+                  return (
+                    <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--green)", fontWeight: 700 }}>{i + 1}</span>
+                      <span style={{ fontFamily: "var(--serif)", fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text)" }}>{fmt(r.amount)} {priorMatch && <span style={{ marginLeft: 4, color: trend > 0 ? "var(--green)" : trend < 0 ? "var(--red)" : "var(--t40)", fontSize: 9 }}>{trend > 0 ? "▲" : trend < 0 ? "▼" : "—"}</span>}</span>
+                      <a href={`https://www.usaspending.gov/search/?hash=&recipients=${encodeURIComponent(r.name)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--blue)" }}>→</a>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (<div className="empty-state">No SB set-aside data for this NAICS.</div>)}
+          </div>
+        </div>
       </div>
 
       {/* SECTION 3 — Agency heat map */}
       <div className="intel-section">
-        <div className="is-header"><div className="is-title">Awarding Agencies · FY2026</div><div className="is-refresh">Top 10 by total obligations</div></div>
+        <div className="is-header"><div className="is-title">Agency Heat Map · FY2026</div><div className="is-refresh">Top 10 awarding agencies by total obligations</div></div>
         {current?.agency_breakdown && current.agency_breakdown.length > 0 ? (
           <div className="sam-table">
             <div className="sam-th" style={{ gridTemplateColumns: "1fr 160px 100px" }}>
@@ -2588,23 +2633,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
         })() : (<div className="empty-state">No state data yet for this NAICS.</div>)}
       </div>
 
-      {/* SECTION 6 — Contract vehicle breakdown (placeholder while we resolve USAspending endpoint) */}
-      <div className="intel-section">
-        <div className="is-header"><div className="is-title">Contract Vehicle Breakdown</div><div className="is-refresh">Pricing-type categorization (USAspending endpoint pending)</div></div>
-        {current?.contract_type_breakdown && current.contract_type_breakdown.length > 0 ? (
-          <div className="sam-table">
-            <div className="sam-th" style={{ gridTemplateColumns: "1fr 160px" }}><span>Type</span><span>Obligations</span></div>
-            {current.contract_type_breakdown.map((c, i) => (
-              <div key={`${c.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1fr 160px" }}>
-                <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{c.name}</span>
-                <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(c.amount)}</span>
-              </div>
-            ))}
-          </div>
-        ) : (<div className="empty-state">USAspending `contract_pricing_type_codes` category returns 404 — endpoint name verification pending.</div>)}
-      </div>
-
-      {/* SECTION 8 — DoD-wide primes (collapsible) */}
+      {/* SECTION 7 — DoD-wide primes (collapsible) · FA-96b: contract vehicle section removed (endpoint 404) */}
       <div className="intel-section">
         <button
           type="button"

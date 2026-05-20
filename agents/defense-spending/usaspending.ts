@@ -69,6 +69,18 @@ export async function fetchTopRecipients(f: Filters): Promise<Array<{ name: stri
   return (d?.results || []).map((r) => ({ name: r.name || r.code || "Unknown", amount: r.amount }));
 }
 
+// FA-96b — top 10 recipients on SB set-aside awards only. Same shape as
+// fetchTopRecipients but with the set_aside_type_codes filter applied so the
+// result excludes the Lockheed/Boeing-tier large primes. This is the ICP
+// intelligence — the actual small businesses who win in this NAICS.
+export async function fetchSBRecipients(f: Filters): Promise<Array<{ name: string; amount: number }>> {
+  const d = await post<{ results: CategoryResult[] }>("/search/spending_by_category/recipient/", {
+    filters: { ...baseFilters(f), set_aside_type_codes: SB_SET_ASIDE_CODES },
+    limit: 10
+  });
+  return (d?.results || []).map((r) => ({ name: r.name || r.code || "Unknown", amount: r.amount }));
+}
+
 export async function fetchAgencyBreakdown(f: Filters): Promise<Array<{ name: string; amount: number }>> {
   const d = await post<{ results: CategoryResult[] }>("/search/spending_by_category/awarding_agency/", {
     filters: baseFilters(f),

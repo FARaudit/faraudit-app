@@ -36,10 +36,12 @@ const NAICS_CODES = (process.env.NAICS_CODES || "336413")
 // FY definition: fiscal year N = Oct 1 (N-1) through Sep 30 N
 // FY2026 = 2025-10-01 → 2026-09-30 (current, in progress)
 // FY2025 = 2024-10-01 → 2025-09-30 (closed)
+// FY2024 = 2023-10-01 → 2024-09-30 (closed · FA-96b · 3-year trend reference)
 interface FYWindow { fy: number; start: string; end: string }
 const FY_WINDOWS: FYWindow[] = [
-  { fy: 2026, start: "2025-10-01", end: "2026-09-30" },
-  { fy: 2025, start: "2024-10-01", end: "2025-09-30" }
+  { fy: 2024, start: "2023-10-01", end: "2024-09-30" },
+  { fy: 2025, start: "2024-10-01", end: "2025-09-30" },
+  { fy: 2026, start: "2025-10-01", end: "2026-09-30" }
 ];
 
 interface IntelRow {
@@ -49,6 +51,7 @@ interface IntelRow {
   sb_obligations: number | null;
   sb_pct: number | null;
   top_recipients: unknown;
+  sb_recipients: unknown;          // FA-96b
   agency_breakdown: unknown;
   state_breakdown: unknown;
   contract_type_breakdown: unknown;
@@ -59,10 +62,11 @@ interface IntelRow {
 
 async function buildRow(naics: string, win: FYWindow, priorTotal: number | null): Promise<IntelRow> {
   const f = { naics, fyStart: win.start, fyEnd: win.end };
-  const [total, sb, recipients, agencies, states, contractTypes, rec90, rec180] = await Promise.all([
+  const [total, sb, recipients, sbRecipients, agencies, states, contractTypes, rec90, rec180] = await Promise.all([
     usa.fetchTotalObligations(f),
     usa.fetchSmallBusinessObligations(f),
     usa.fetchTopRecipients(f),
+    usa.fetchSBRecipients(f),       // FA-96b
     usa.fetchAgencyBreakdown(f),
     usa.fetchStateBreakdown(f),
     usa.fetchContractTypeBreakdown(f),
@@ -78,6 +82,7 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     sb_obligations: sb,
     sb_pct: sbPct,
     top_recipients: recipients,
+    sb_recipients: sbRecipients,
     agency_breakdown: agencies,
     state_breakdown: states,
     contract_type_breakdown: contractTypes,
@@ -100,18 +105,16 @@ async function main() {
 
   for (const naics of NAICS_CODES) {
     console.log(`[defense-spending] processing NAICS ${naics}...`);
-    // Fetch FY2025 first so we have priorTotal for the FY2026 YoY calc.
-    const priorWin = FY_WINDOWS.find((w) => w.fy === 2025)!;
-    const priorRow = await buildRow(naics, priorWin, null);
-    await upsert(priorRow);
-    const okFy25 = priorRow.total_obligations != null;
-    console.log(`  · FY2025: total=$${(priorRow.total_obligations || 0).toLocaleString()} · sb_pct=${priorRow.sb_pct?.toFixed(1)}%`);
-
-    const currentWin = FY_WINDOWS.find((w) => w.fy === 2026)!;
-    const currentRow = await buildRow(naics, currentWin, priorRow.total_obligations);
-    await upsert(currentRow);
-    const okFy26 = currentRow.total_obligations != null;
-    console.log(`  · FY2026: total=$${(currentRow.total_obligations || 0).toLocaleString()} · sb_pct=${currentRow.sb_pct?.toFixed(1)}% · yoy=${currentRow.yoy_delta_pct?.toFixed(1)}% · ok=${okFy25}/${okFy26}`);
+    // Process FY2024 → FY2025 → FY2026 sequentially so each year's YoY can
+    // reference the prior year's total. FY2024 has no prior reference → yoy=null.
+    let priorTotal: number | null = null;
+    for (const win of FY_WINDOWS) {
+      const row = await buildRow(naics, win, priorTotal);
+      await upsert(row);
+      const sbCount = Array.isArray(row.sb_recipients) ? row.sb_recipients.length : 0;
+      console.log(`  · FY${win.fy}: total=$${(row.total_obligations || 0).toLocaleString()} · sb_pct=${row.sb_pct?.toFixed(1)}% · yoy=${row.yoy_delta_pct?.toFixed(1)}% · sb_recipients=${sbCount}`);
+      priorTotal = row.total_obligations;
+    }
   }
 
   console.log(`[defense-spending] done ${new Date().toISOString()} · duration=${Date.now() - startedAt.getTime()}ms`);

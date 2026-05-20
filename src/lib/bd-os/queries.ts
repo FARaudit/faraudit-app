@@ -184,6 +184,9 @@ export interface DefenseSpendingRow {
   sb_obligations: number | null;
   sb_pct: number | null;
   top_recipients: DefenseRecipient[] | null;
+  // FA-96b: top 10 recipients on SB set-aside awards only (ICP intelligence).
+  // Column added via supabase/migrations/20260520*_add_sb_recipients.sql.
+  sb_recipients: DefenseRecipient[] | null;
   agency_breakdown: DefenseRecipient[] | null;
   state_breakdown: DefenseStateBucket[] | null;
   contract_type_breakdown: DefenseRecipient[] | null;
