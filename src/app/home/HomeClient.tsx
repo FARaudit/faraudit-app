@@ -875,12 +875,24 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       const togglePatch = async (field: "in_pipeline" | "watched") => {
                         const next = !r.row[field];
                         updateOpportunity(r.row.notice_id, { [field]: next });
+                        // FA-89h: in_pipeline now routes through dedicated pin/unpin
+                        // endpoints that also create a stub audit row so the row
+                        // appears in the Pipeline Kanban. Watched still uses the
+                        // generic PATCH endpoint — single-table flip only.
+                        const url =
+                          field === "in_pipeline" && next === true
+                            ? `/api/opportunities/${encodeURIComponent(r.row.notice_id)}/pin`
+                          : field === "in_pipeline" && next === false
+                            ? `/api/opportunities/${encodeURIComponent(r.row.notice_id)}/unpin`
+                          : `/api/opportunities/${encodeURIComponent(r.row.notice_id)}`;
+                        const method = field === "in_pipeline" ? "POST" : "PATCH";
+                        const body = field === "in_pipeline" ? "{}" : JSON.stringify({ [field]: next });
                         try {
-                          const res = await fetch(`/api/opportunities/${encodeURIComponent(r.row.notice_id)}`, {
-                            method: "PATCH",
+                          const res = await fetch(url, {
+                            method,
                             headers: { "Content-Type": "application/json" },
                             credentials: "include",
-                            body: JSON.stringify({ [field]: next })
+                            body
                           });
                           if (!res.ok) {
                             updateOpportunity(r.row.notice_id, { [field]: !next });
@@ -2008,8 +2020,12 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
     //        notice_id. Failed audits are already removed so a re-audit only
     //        survives if it succeeded.
     // FIX 2: only audits the user has explicitly added to pipeline appear.
+    // FA-89h: admit Opportunities-pin stub rows (audit_source='opportunities_pin')
+    // even though they have no compliance_score yet — they're tracking-only
+    // placeholders so the Pipeline Kanban shows pinned solicitations before any
+    // real audit has run.
     const successful = audits.filter(
-      (a) => a.status !== "failed" && a.compliance_score != null && a.in_pipeline === true
+      (a) => a.in_pipeline === true && a.status !== "failed" && (a.compliance_score != null || a.audit_source === "opportunities_pin")
     );
     const sortedDesc = [...successful].sort((a, b) => {
       const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
