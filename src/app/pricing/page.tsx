@@ -97,14 +97,14 @@ function TierCard({ tier }: { tier: Tier }) {
         position: "relative"
       }}
     >
-      {tier.featured && (
+      {tier.badgeLabel && (
         <div
           style={{
             position: "absolute",
             top: -11,
             left: 24,
-            background: GOLD,
-            color: BG,
+            background: tier.slug === "professional" ? "#378ADD" : GOLD,
+            color: tier.slug === "professional" ? "#ffffff" : BG,
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 9,
             padding: "3px 12px",
@@ -114,7 +114,7 @@ function TierCard({ tier }: { tier: Tier }) {
             fontWeight: 500
           }}
         >
-          Founding Rate
+          {tier.badgeLabel}
         </div>
       )}
 
