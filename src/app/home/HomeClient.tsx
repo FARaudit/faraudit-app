@@ -2605,31 +2605,46 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
       {/* SECTION 4 — Recompete radar */}
       <div className="intel-section">
         <div className="is-header"><div className="is-title">Recompete Radar</div><div className="is-refresh">Contracts expiring soon · sourced from USAspending</div></div>
-        {(["recompetes_expiring_90d","recompetes_expiring_180d"] as const).map((key) => {
-          const rows = key === "recompetes_expiring_90d" ? expiring90 : (current?.recompetes_expiring_180d || []);
-          const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring ≤180 days";
-          return (
-            <div key={key} style={{ marginBottom: 12 }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)", marginBottom: 6 }}>{label} · {rows.length}</div>
-              {rows.length > 0 ? (
-                <div className="sam-table">
-                  <div className="sam-th" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
-                    <span style={thHeader}>Award ID</span><span style={thHeader}>Incumbent</span><span style={thHeader}>Value</span><span style={thHeader}>Agency</span><span style={thHeader}>Expires</span>
-                  </div>
-                  {rows.slice(0, 10).map((r, i) => (
-                    <div key={`${r.award_id}-${i}`} className="sam-row" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.award_id.slice(0, 16)}</span>
-                      <span style={{ fontFamily: "var(--serif)", fontSize: 11, color: "var(--text)" }}>{r.recipient}</span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(r.amount)}</span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)" }}>{r.agency}</span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)" }}>{r.end_date.slice(0, 10)}</span>
+        {(() => {
+          // USAspending leaves Period of Performance Current End Date null for
+          // IDIQ vehicles (e.g. NAICS 336413's top primes). When the canonical
+          // 180d source has zero populated end_dates the EXPIRES column is
+          // useless — hide it rather than render a column of blanks.
+          const sourceRows = current?.recompetes_expiring_180d || [];
+          const hasEndDates = sourceRows.some((r) => r.end_date && r.end_date.trim() !== "");
+          const gridCols = hasEndDates ? "140px 1fr 110px 1fr 100px" : "140px 1fr 110px 1fr";
+          return (["recompetes_expiring_90d","recompetes_expiring_180d"] as const).map((key) => {
+            const rows = key === "recompetes_expiring_90d" ? expiring90 : sourceRows;
+            const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring ≤180 days";
+            const emptyMessage = key === "recompetes_expiring_90d"
+              ? "No contracts with published expiration dates within 90 days. USAspending does not publish end dates for active IDIQ vehicles in this NAICS."
+              : "None.";
+            return (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)", marginBottom: 6 }}>{label} · {rows.length}</div>
+                {rows.length > 0 ? (
+                  <div className="sam-table">
+                    <div className="sam-th" style={{ gridTemplateColumns: gridCols }}>
+                      <span style={thHeader}>Award ID</span><span style={thHeader}>Incumbent</span><span style={thHeader}>Value</span><span style={thHeader}>Agency</span>
+                      {hasEndDates && <span style={thHeader}>Expires</span>}
                     </div>
-                  ))}
-                </div>
-              ) : (<div className="empty-state" style={{ padding: "12px 0" }}>None.</div>)}
-            </div>
-          );
-        })}
+                    {rows.slice(0, 10).map((r, i) => (
+                      <div key={`${r.award_id}-${i}`} className="sam-row" style={{ gridTemplateColumns: gridCols }}>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.award_id.slice(0, 16)}</span>
+                        <span style={{ fontFamily: "var(--serif)", fontSize: 11, color: "var(--text)" }}>{r.recipient}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(r.amount)}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)" }}>{r.agency}</span>
+                        {hasEndDates && (
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)" }}>{r.end_date.slice(0, 10)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (<div className="empty-state" style={{ padding: "12px 0" }}>{emptyMessage}</div>)}
+              </div>
+            );
+          });
+        })()}
       </div>
 
       {/* SECTION 5 — Geographic concentration */}
