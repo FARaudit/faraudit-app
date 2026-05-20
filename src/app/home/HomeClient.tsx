@@ -2441,26 +2441,10 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
   const fmtPct = (v: number | null): string => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
   // .sam-th span CSS sets 7.5px / var(--t25) — too small + too transparent
-  // for these section headers. Override inline on the affected <span>s.
-  const thHeader: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)" };
-
-  // FA-96b · Client-side 90d filter. USAspending drops the
-  // period_of_performance_current_end_date filter server-side, so the agent
-  // stores top-10-by-amount in BOTH 90d and 180d columns (identical). Derive
-  // the 90d subset here by parsing end_date and keeping rows whose end date
-  // falls within today + 90d. Rows with missing/unparseable end_date are
-  // excluded — USAspending often returns null for IDIQ vehicles (e.g.
-  // NAICS 336413's top primes), so the 90d list may be empty pending
-  // better source data.
-  const expiring90 = useMemo(() => {
-    const rows = current?.recompetes_expiring_90d || [];
-    const cutoff = Date.now() + 90 * 86400_000;
-    return rows.filter((r) => {
-      if (!r.end_date) return false;
-      const t = Date.parse(r.end_date);
-      return Number.isFinite(t) && t <= cutoff;
-    });
-  }, [current]);
+  // for these section headers. Override inline on the affected <span>s; the
+  // class's other styles (mono font / weight / uppercase / letter-spacing)
+  // continue to apply.
+  const thHeader: React.CSSProperties = { fontSize: 9, color: "var(--t40)" };
 
   // No data path — show empty state with NAICS dropdown still visible
   const hasData = defenseSpending.length > 0;
@@ -2606,16 +2590,19 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
       <div className="intel-section">
         <div className="is-header"><div className="is-title">Recompete Radar</div><div className="is-refresh">Contracts expiring soon · sourced from USAspending</div></div>
         {(() => {
-          // USAspending leaves Period of Performance Current End Date null for
-          // IDIQ vehicles (e.g. NAICS 336413's top primes). When the canonical
-          // 180d source has zero populated end_dates the EXPIRES column is
-          // useless — hide it rather than render a column of blanks.
+          // 14310bc agent overhaul: paginated /spending_by_award/ with sort
+          // End Date asc + DISJOINT (0,90] / (90,180] windows, so the two
+          // recompetes_expiring_* arrays are sourced server-side and never
+          // overlap. UI defensives below are belt-and-suspenders for NAICS
+          // where USAspending publishes no end dates at all (e.g. IDIQ-
+          // dominated NAICS): hide EXPIRES col + swap the bare empty state
+          // for a sourced explanation.
           const sourceRows = current?.recompetes_expiring_180d || [];
           const hasEndDates = sourceRows.some((r) => r.end_date && r.end_date.trim() !== "");
           const gridCols = hasEndDates ? "140px 1fr 110px 1fr 100px" : "140px 1fr 110px 1fr";
           return (["recompetes_expiring_90d","recompetes_expiring_180d"] as const).map((key) => {
-            const rows = key === "recompetes_expiring_90d" ? expiring90 : sourceRows;
-            const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring ≤180 days";
+            const rows = current?.[key] || [];
+            const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring 91–180 days";
             const emptyMessage = key === "recompetes_expiring_90d"
               ? "No contracts with published expiration dates within 90 days. USAspending does not publish end dates for active IDIQ vehicles in this NAICS."
               : "None.";

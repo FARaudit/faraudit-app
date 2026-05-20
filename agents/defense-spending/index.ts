@@ -70,8 +70,8 @@ async function buildRow(naics: string, win: FYWindow, priorTotal: number | null)
     usa.fetchAgencyBreakdown(f),
     usa.fetchStateBreakdown(f),
     usa.fetchContractTypeBreakdown(f),
-    usa.fetchRecompetes(f, 90),
-    usa.fetchRecompetes(f, 180)
+    usa.fetchRecompetes(f, 0, 90),
+    usa.fetchRecompetes(f, 90, 180)
   ]);
   const sbPct = total && total > 0 && sb != null ? (sb / total) * 100 : null;
   const yoy = priorTotal != null && priorTotal > 0 && total != null ? ((total - priorTotal) / priorTotal) * 100 : null;

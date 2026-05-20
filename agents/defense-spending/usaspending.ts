@@ -121,31 +121,75 @@ export interface RecompeteRow {
   end_date: string;
 }
 
-// FA-96b fix · USAspending /spending_by_award/ requires HUMAN-READABLE field
-// names ("Awarding Sub Agency", not "awarding_agency_name") — unknown keys
-// are silently dropped. The endpoint also does NOT accept
-// period_of_performance_current_end_date as a filter (returns the warning
-// "filters from the request were not used"). For NAICS like 336413 those
-// fields are null at source (large IDIQ vehicles), so end_date may remain
-// empty post-fix — that's a USAspending data-availability limit, not a code
-// bug. Client filters on end_date downstream to derive the 90d subset.
-export async function fetchRecompetes(f: Filters, _daysAhead: number): Promise<RecompeteRow[]> {
-  const d = await post<{ results: Array<Record<string, unknown>> }>("/search/spending_by_award/", {
-    filters: {
-      naics_codes: [f.naics],
-      award_type_codes: ["A", "B", "C", "D"],
-      time_period: [{ start_date: f.fyStart, end_date: f.fyEnd }]
-    },
-    fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "Period of Performance Current End Date"],
-    limit: 10,
-    sort: "Award Amount",
-    order: "desc"
-  });
-  return (d?.results || []).map((r) => ({
-    award_id: String(r["Award ID"] ?? ""),
-    recipient: String(r["Recipient Name"] ?? ""),
-    amount: Number(r["Award Amount"] ?? 0),
-    agency: String(r["Awarding Sub Agency"] ?? ""),
-    end_date: String(r["Period of Performance Current End Date"] ?? "")
-  }));
+// FA-96b · Recompete radar via /spending_by_award/. Notes from probing the
+// live API (HTTP 400 traces):
+//   1. The endpoint's filters do NOT support filtering by end-of-performance
+//      date. Valid time_period.date_type values are only action_date /
+//      last_modified_date / date_signed / new_awards_only — no end_date.
+//      So "contracts ending in the next N days" cannot be expressed as a
+//      server-side filter; must filter client-side.
+//   2. The sort field for end-of-performance is "End Date" (not "Period of
+//      Performance Current End Date" — that label exists only as a response
+//      field). Sort fields must also appear in the `fields` array.
+//   3. Sorting End Date asc returns oldest end dates first, so the first
+//      page (100 rows) is almost entirely expired contracts. Must paginate
+//      past the expired-tail before reaching upcoming end dates.
+//
+// Window contract: caller passes [minDays, maxDays] and gets up to 10 rows
+// whose End Date falls in (today + minDays, today + maxDays]. The 90d and
+// 180d radar columns are wired as DISJOINT windows — (0,90] and (90,180] —
+// so the two lists never overlap regardless of NAICS density. (Overlapping
+// windows + a 10-row cap silently produced identical lists whenever ≥10
+// contracts ended within the first window — bad UX.)
+const RECOMPETE_PAGE_SIZE = 100;
+const RECOMPETE_MAX_PAGES = 6;
+
+export async function fetchRecompetes(f: Filters, minDays: number, maxDays: number): Promise<RecompeteRow[]> {
+  const today = new Date();
+  const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
+  // 90-day lookback on action_date keeps the candidate set to contracts that
+  // had any obligation/mod activity recently — a proxy for "still active."
+  const actionStart = new Date(today.getTime() - 90 * 86400_000);
+  const minMs = today.getTime() + minDays * 86400_000;
+  const maxMs = today.getTime() + maxDays * 86400_000;
+  const out: RecompeteRow[] = [];
+
+  for (let page = 1; page <= RECOMPETE_MAX_PAGES; page++) {
+    const d = await post<{ results: Array<Record<string, unknown>>; page_metadata?: { hasNext?: boolean } }>(
+      "/search/spending_by_award/",
+      {
+        filters: {
+          naics_codes: [f.naics],
+          award_type_codes: ["A", "B", "C", "D"],
+          time_period: [{ start_date: fmtDate(actionStart), end_date: fmtDate(today), date_type: "action_date" }]
+        },
+        fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "End Date"],
+        limit: RECOMPETE_PAGE_SIZE,
+        page,
+        sort: "End Date",
+        order: "asc"
+      }
+    );
+    const results = d?.results || [];
+    let pastCutoff = false;
+    for (const r of results) {
+      const endStr = String(r["End Date"] ?? "");
+      if (!endStr) continue;
+      const endMs = Date.parse(endStr);
+      if (!Number.isFinite(endMs)) continue;
+      if (endMs < minMs) continue;
+      if (endMs > maxMs) { pastCutoff = true; break; }
+      out.push({
+        award_id: String(r["Award ID"] ?? ""),
+        recipient: String(r["Recipient Name"] ?? ""),
+        amount: Number(r["Award Amount"] ?? 0),
+        agency: String(r["Awarding Sub Agency"] ?? ""),
+        end_date: endStr
+      });
+      if (out.length >= 10) return out;
+    }
+    if (pastCutoff) break;
+    if (!d?.page_metadata?.hasNext) break;
+  }
+  return out;
 }
