@@ -18,9 +18,9 @@ Founder is Jose Rodriguez — 10+ years at Lockheed Martin and Sikorsky.`;
 
 const PROMPTS: Record<string, string> = {
   linkedin_post:
-    "Write a LinkedIn post for FARaudit. Topic: one specific federal contracting insight that defense subcontractors miss. 150-200 words. End with a CTA asking readers to send a solicitation number for a free audit. Include 4-5 relevant hashtags at the end. No promotional language. Pure education.",
+    "Write a LinkedIn post for FARaudit. Topic: one specific federal contracting insight that defense subcontractors miss. 150-200 words. End with a CTA asking readers to send a solicitation number for a Request Access. Include 4-5 relevant hashtags at the end. No promotional language. Pure education.",
   prospect_followup:
-    "Draft a LinkedIn follow-up message for a defense manufacturing prospect who accepted a connection request but hasn't replied to the initial FARaudit introduction message. 3-4 sentences. Reference a specific federal contracting pain point. End with a soft ask for a free audit. Personalize with placeholder [First Name] and [Company].",
+    "Draft a LinkedIn follow-up message for a defense manufacturing prospect who accepted a connection request but hasn't replied to the initial FARaudit introduction message. 3-4 sentences. Reference a specific federal contracting pain point. End with a soft ask for a Request Access. Personalize with placeholder [First Name] and [Company].",
   newsletter_section:
     "Write a 200-word section for the FARaudit newsletter. Topic: one FAR or DFARS clause that defense subcontractors frequently misread and what the actual compliance requirement is. Include the clause number. End with what FARaudit does about it.",
   week_review:

@@ -80,7 +80,7 @@ export default async function UpstreamIntelPage() {
         <section className="border border-border bg-surface p-6 mt-8">
           <p className="text-[10px] uppercase tracking-[0.3em] text-accent mb-3">Strategy brief</p>
           <StreamingText
-            prompt="In 4 sentences, advise a defense subcontractor in the TX/OK corridor on which RFI / Sources Sought to prioritize this week. Tie ranking to NAICS 336413 / 332710 / 332721 alignment and SOW-influence likelihood. End with one specific action."
+            prompt="In 4 sentences, advise a defense subcontractor in the the continental United States on which RFI / Sources Sought to prioritize this week. Tie ranking to NAICS 336413 / 332710 / 332721 alignment and SOW-influence likelihood. End with one specific action."
             emptyState="ANTHROPIC_API_KEY not set."
           />
         </section>

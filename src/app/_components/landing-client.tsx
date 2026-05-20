@@ -92,7 +92,7 @@ export default function LandingClient() {
       {/* Hero */}
       <section style={{ padding: "80px 32px 100px", maxWidth: 1080, margin: "0 auto" }}>
         <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, letterSpacing: "0.22em", color: TEXT_3, textTransform: "uppercase", marginBottom: 16 }}>
-          Federal Contract Intelligence · TX/OK Corridor
+          Federal Contract Intelligence
         </p>
         <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "clamp(40px, 6vw, 68px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.025em", marginBottom: 24, color: TEXT_1 }}>
           Read the solicitation.<br />Catch every trap.<br /><span style={{ color: GOLD }}>Win the bid.</span>
@@ -109,7 +109,7 @@ export default function LandingClient() {
             className="h-cta"
             style={{ background: GOLD, color: BG, padding: "14px 26px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
           >
-            Run a free audit
+            Request Access →
           </Link>
           <Link
             href="/how-it-works"
@@ -239,7 +239,7 @@ export default function LandingClient() {
           className="h-cta"
           style={{ background: GOLD, color: BG, padding: "14px 30px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 14, textDecoration: "none", display: "inline-block" }}
         >
-          Run a free audit
+          Request Access →
         </Link>
       </section>
 

@@ -168,7 +168,7 @@ function renderHtml(opts: {
   <!-- 3. REVENUE BOTTLENECK -->
   <div style="background:#091322;margin-top:12px;padding:14px 18px;">
     <p style="margin:0 0 6px;color:#5B8AB8;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">3. Revenue Bottleneck</p>
-    <p style="margin:0;color:#EDF4FF;font-size:13px;">$0 because zero outbound conversations are open. What breaks it: 5 booked demos with subcontractors in TX/OK NAICS 332710. Friday cutoff for first close.</p>
+    <p style="margin:0;color:#EDF4FF;font-size:13px;">$0 because zero outbound conversations are open. What breaks it: 5 booked demos with subcontractors in NAICS 332710. Friday cutoff for first close.</p>
   </div>
 
   <!-- 4. TASKS -->

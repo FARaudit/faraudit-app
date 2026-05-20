@@ -54,7 +54,7 @@ async function run(req: NextRequest) {
     recent_audits: audits ?? []
   }).slice(0, 6000);
 
-  const prompt = `You are a federal contracting intelligence analyst writing the weekly FARaudit brief for a defense subcontractor in the TX/OK corridor focused on NAICS ${NAICS.join(", ")}.
+  const prompt = `You are a federal contracting intelligence analyst writing the weekly FARaudit brief for a defense subcontractor in the the continental United States focused on NAICS ${NAICS.join(", ")}.
 
 Context (last 7 days):
 ${ctx}

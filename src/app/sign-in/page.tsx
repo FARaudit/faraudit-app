@@ -237,7 +237,7 @@ function SignInInner() {
           </div>
 
           <p style={{ fontSize: 12, color: TEXT_3, marginTop: 18, textAlign: "center" }}>
-            Need an account? <Link href="/audit" style={{ color: GOLD }}>Run a free audit</Link>
+            Need an account? <Link href="/audit" style={{ color: GOLD }}>Request Access →</Link>
           </p>
         </div>
       </div>

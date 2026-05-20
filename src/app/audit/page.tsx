@@ -93,7 +93,7 @@ export default function AuditPage() {
 
           {submitting ? (
             <div className="mt-14 border border-accent/40 bg-accent/5 p-10">
-              <p className="font-display text-2xl text-text mb-2">Running five-stage analysis</p>
+              <p className="font-display text-2xl text-text mb-2">Analyzing solicitation</p>
               <p className="text-text-3 text-xs font-mono mb-8">~50 seconds</p>
               <ol className="space-y-3">
                 {[

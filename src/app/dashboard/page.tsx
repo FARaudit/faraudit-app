@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   const auditCount = auditList.length;
   const trapsCount = auditList.filter((a) => a.recommendation === "DECLINE").length;
 
-  const briefPrompt = `Today's federal contracting intelligence summary for a defense subcontractor in the TX/OK corridor. Cover in 4 bullets:
+  const briefPrompt = `Today's federal contracting intelligence summary for a defense subcontractor in the the continental United States. Cover in 4 bullets:
 1. New solicitations matched to NAICS 336413 / 332710 / 332721 in the last 24h
 2. Upcoming proposal deadlines in the next 7 days for tracked NAICS codes
 3. Congressional defense spending news that affects subcontract pipelines

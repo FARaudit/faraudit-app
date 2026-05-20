@@ -143,7 +143,7 @@ export default function LearnPage() {
             Upload your first solicitation. Free. No card.
           </p>
           <Link href="/audit" style={{ display: "inline-block", padding: "10px 20px", background: GOLD, color: BG, textDecoration: "none", fontFamily: "Syne, sans-serif", fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
-            Start free audit →
+            Request Access →
           </Link>
         </div>
       </div>

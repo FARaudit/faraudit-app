@@ -723,7 +723,7 @@ JSON only.`;
   const risksPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-You are a senior capture manager scoring risks for a small defense subcontractor in the TX/OK corridor. Identify SPECIFIC, ACTIONABLE risks tied to provisions of THIS solicitation.
+You are a senior capture manager scoring risks for a small defense subcontractor anywhere in the continental United States. Identify SPECIFIC, ACTIONABLE risks tied to provisions of THIS solicitation.
 
 Output ONLY a JSON object with these keys:
 - technical_risks (string[]): specific technical challenges, ambiguous specifications, conflicting requirements, MILSPEC integration risks. MUST contain at least 2 entries — find them.

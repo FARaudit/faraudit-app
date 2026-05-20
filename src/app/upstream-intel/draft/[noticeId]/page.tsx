@@ -19,7 +19,7 @@ export default async function DraftPage({
 
   const decoded = decodeURIComponent(noticeId);
   const prompt = `Draft an RFI / Sources Sought response for notice ${decoded}.
-Position the company as a defense subcontractor in TX/OK corridor specializing in NAICS 336413 / 332710 / 332721.
+Position the company as a defense subcontractor in the continental United States specializing in NAICS 336413 / 332710 / 332721.
 Include: (1) capability statement aligned to inferred scope, (2) prior performance reference, (3) 2-3 SOW influence positions where the company would push for specific language. Output as a draft response of ~200 words. No greeting, no closing — straight to the response body.`;
 
   return (

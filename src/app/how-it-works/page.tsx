@@ -340,7 +340,7 @@ export default function HowItWorksPage() {
             className="h-cta"
             style={{ background: GOLD, color: BG, padding: "14px 26px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
           >
-            Run a free audit
+            Request Access →
           </Link>
           <Link
             href="/pricing"
@@ -596,7 +596,7 @@ export default function HowItWorksPage() {
             className="h-cta"
             style={{ display: "inline-block", background: GOLD, color: BG, padding: "14px 28px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
           >
-            Run a free audit
+            Request Access →
           </Link>
         </div>
       </section>
