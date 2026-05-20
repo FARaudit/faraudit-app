@@ -774,7 +774,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   </div>
 
                   {/* Rows */}
-                  <div style={{ maxHeight: 560, overflowY: "auto" }}>
+                  <div>
                     {oppRows.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
@@ -844,10 +844,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
                           <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{r.row.title_plain ?? cleanTitle(r.row.title)}</span>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Veteran", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)" }}>{r.daysLabel}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center" }}>{r.riskLabel || "—"}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center" }}>{r.auditStatusLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Vet", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", justifySelf: "center" }}>{r.daysLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center" }}>{r.riskLabel || "—"}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center" }}>{r.auditStatusLabel}</span>
                           <div style={{ display: "flex", gap: 4 }}>
                             <button
                               type="button"
