@@ -90,6 +90,7 @@ export interface OpportunityRow {
   response_deadline: string | null;
   in_pipeline: boolean;
   watched: boolean;
+  title_plain: string | null;
   created_at: string;
   processed_at: string | null;
 }
@@ -109,7 +110,7 @@ export async function fetchOpportunities(
   // risk_level + response_deadline added in migration 020 (2026-05-07); same
   // graceful-degradation pattern — RICH includes them, BASIC stays without
   // them, falls through if either migration is unapplied.
-  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, created_at, processed_at";
+  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, title_plain, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   for (const cols of [RICH, BASIC]) {
     let q = client
@@ -124,7 +125,7 @@ export async function fetchOpportunities(
       if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
       throw new Error(`fetchOpportunities: ${error.message}`);
     }
-    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, ...(r as object) })) as OpportunityRow[];
+    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, ...(r as object) })) as OpportunityRow[];
   }
   return [];
 }

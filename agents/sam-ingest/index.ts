@@ -32,7 +32,7 @@ const { insertNew } = queue;
 // @ts-expect-error tsx
 const helpersNs: any = await import("./helpers.ts");
 const helpers = helpersNs.default ?? helpersNs;
-const { resolveAgency, classifyDocType, classifyRisk, sanitizeSolicitationNumber } = helpers;
+const { resolveAgency, classifyDocType, classifyRisk, sanitizeSolicitationNumber, generateTitlePlain } = helpers;
 
 const NAICS_CODES = (process.env.NAICS_CODES || "336413").split(",").map((s) => s.trim()).filter(Boolean);
 const SET_ASIDES = (process.env.SET_ASIDES || "SBA,8A,8AS,WOSB,EDWOSB,SDVOSBC,SDVOSBS,HZC,HZS")
@@ -119,6 +119,7 @@ async function main() {
       notice_id: o.noticeId,
       solicitation_number: sanitizeSolicitationNumber(o.solicitationNumber),
       title: o.title || null,
+      title_plain: null,  // FA-97 · filled by Haiku enrichment below (skipped in DRY_RUN)
       agency: resolveAgency(o),
       naics_code: o.naicsCode || null,
       set_aside: o.typeOfSetAsideDescription || o.typeOfSetAside || null,
@@ -131,6 +132,27 @@ async function main() {
     });
   }
   console.log(`[sam-ingest] filter · ${droppedNoPdf} opportunit${droppedNoPdf === 1 ? "y" : "ies"} dropped (no PDF · NSN line items / metadata-only) · ${audited.length} auditable`);
+
+  // FA-97: AI enrichment — generate title_plain for each row via Haiku in
+  // batches of 10 (~500ms per call · 10 parallel keeps ingest under ~30s even
+  // for 300 rows). Skipped in DRY_RUN to avoid API spend. Null result → keep
+  // title_plain=null and the UI falls back to cleanTitle(title).
+  if (audited.length > 0 && !DRY_RUN) {
+    const BATCH = 10;
+    console.log(`[sam-ingest] enriching ${audited.length} title${audited.length === 1 ? "" : "s"} via Haiku (batches of ${BATCH})...`);
+    const enrichStart = Date.now();
+    let okCount = 0;
+    for (let i = 0; i < audited.length; i += BATCH) {
+      const slice = audited.slice(i, i + BATCH);
+      const results = await Promise.all(slice.map((r: any) => generateTitlePlain(r.title)));
+      for (let j = 0; j < slice.length; j++) {
+        slice[j].title_plain = results[j];
+        if (results[j]) okCount++;
+      }
+    }
+    console.log(`[sam-ingest] enrichment · ${okCount}/${audited.length} filled · ${Date.now() - enrichStart}ms`);
+  }
+
   const rows = audited;
 
   if (DRY_RUN) {

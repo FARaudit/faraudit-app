@@ -2,7 +2,46 @@
 // (index.ts) and the one-shot backfill (backfill-fields.ts) import from here so
 // the precedence rules are defined exactly once.
 
+import Anthropic from "@anthropic-ai/sdk";
 import type { SamOpportunity } from "./sam-client.ts";
+
+// FA-97: AI-rewritten plain-English title. Strips PSC prefixes, FAR jargon,
+// NSN codes, and contract-speak. Preserves the actual subject. Used by the
+// Opportunities tab to show readable titles instead of raw SAM text like
+// "N083--TURBINE BLADE ASSEMBLY, ENGINE CARTRIDGE FOR T56-A-15 ENGINE".
+let _anthropicClient: Anthropic | null = null;
+function anthropicClient(): Anthropic {
+  if (!_anthropicClient) {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) throw new Error("ANTHROPIC_API_KEY missing");
+    _anthropicClient = new Anthropic({ apiKey: key });
+  }
+  return _anthropicClient;
+}
+
+export async function generateTitlePlain(rawTitle: string | null): Promise<string | null> {
+  if (!rawTitle || !rawTitle.trim()) return null;
+  try {
+    const res = await anthropicClient().messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 60,
+      messages: [
+        {
+          role: "user",
+          content: `Rewrite this US government solicitation title in plain English, ≤8 words. Strip jargon, NSN codes, PSC prefixes, contract-speak. Preserve the actual subject. Return ONLY the rewritten title, no explanation.\n\nTitle:\n${rawTitle}\n\nPlain English:`
+        }
+      ]
+    });
+    const block = res.content[0];
+    if (block.type !== "text") return null;
+    const out = block.text.trim().replace(/^["']|["']$/g, "");
+    return out || null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[generateTitlePlain] failed for "${rawTitle.slice(0, 40)}...": ${message}`);
+    return null;
+  }
+}
 
 // SAM.gov occasionally puts a PSC code + product name into the
 // solicitationNumber field on sources-sought / RFI / special notices that
