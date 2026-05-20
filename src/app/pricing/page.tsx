@@ -59,24 +59,27 @@ const TIERS: Tier[] = [
 // Comparison feature rows. All three tiers ship the same product surface;
 // the difference is price + onboarding (design partner reward, not feature
 // gating). Enterprise gets custom integrations + dedicated support on top.
-const FEATURES: Array<{ label: string; tiers: [string, string, string] }> = [
-  { label: "Run Audit OS · 3-call engine · full solicitation coverage", tiers: ["✓", "✓", "✓"] },
-  { label: "Defense Spending intelligence · USAspending.gov · all federal NAICS · top 10 primes · YoY", tiers: ["✓", "✓", "✓"] },
-  { label: "Defense News with per-card AI insights · claude-opus-4-7", tiers: ["✓", "✓", "✓"] },
-  { label: "Contracting Officers + Agencies intelligence", tiers: ["✓", "✓", "✓"] },
-  { label: "Capability Statement persistence + auto-population", tiers: ["✓", "✓", "✓"] },
-  { label: "Past Audits + Pipeline tracking", tiers: ["✓", "✓", "✓"] },
-  { label: "CMMC Readiness assessment (Levels 1/2/3)", tiers: ["✓", "✓", "✓"] },
-  { label: "Wage Benchmarks · SCA + DBA rates", tiers: ["✓", "✓", "✓"] },
-  { label: "GAO Protests intelligence", tiers: ["✓", "✓", "✓"] },
-  { label: "FAR/DFARS regulatory updates", tiers: ["✓", "✓", "✓"] },
-  { label: "Teaming Partners discovery", tiers: ["✓", "✓", "✓"] },
-  { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
-  { label: "Email support", tiers: ["✓", "✓", "✓"] },
-  { label: "Priority support", tiers: ["—", "✓", "✓"] },
-  { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
-  { label: "Multi-seat · priority SLA", tiers: ["—", "—", "✓"] }
-];
+const FEATURES: { label: string; tiers: string[] }[] = [
+    { label: "Run Audit OS · 3-call engine · full solicitation coverage", tiers: ["✓", "✓", "✓"] },
+    { label: "Audit history retention", tiers: ["90 days", "Unlimited", "Unlimited"] },
+    { label: "Defense Spending intelligence · USAspending.gov · all federal NAICS · top 10 primes · YoY", tiers: ["✓", "✓", "✓"] },
+    { label: "Defense News with per-card AI insights · claude-opus-4-7", tiers: ["✓", "✓", "✓"] },
+    { label: "Contracting Officers + Agencies intelligence", tiers: ["✓", "✓", "✓"] },
+    { label: "Capability Statement persistence + auto-population", tiers: ["✓", "✓", "✓"] },
+    { label: "Pipeline tracking", tiers: ["25 active", "Unlimited", "Unlimited"] },
+    { label: "CMMC Readiness assessment (Levels 1/2/3)", tiers: ["✓", "✓", "✓"] },
+    { label: "Wage Benchmarks · SCA + DBA", tiers: ["—", "✓", "✓"] },
+    { label: "GAO Protests intelligence", tiers: ["—", "✓", "✓"] },
+    { label: "FAR/DFARS regulatory updates", tiers: ["—", "✓", "✓"] },
+    { label: "Teaming Partners discovery", tiers: ["—", "✓", "✓"] },
+    { label: "Recompete alerts", tiers: ["—", "✓", "✓"] },
+    { label: "API access", tiers: ["—", "—", "✓"] },
+    { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
+    { label: "Email support", tiers: ["✓", "✓", "✓"] },
+    { label: "Priority support", tiers: ["—", "✓", "✓"] },
+    { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
+    { label: "Multi-seat · SLA", tiers: ["—", "—", "✓"] },
+  ];
 
 function TierCard({ tier }: { tier: Tier }) {
   return (
