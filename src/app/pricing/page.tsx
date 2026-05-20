@@ -18,7 +18,7 @@ const BORDER = "rgba(255,255,255,0.08)";
 const BORDER_GOLD = "rgba(196,164,74,0.32)";
 
 type Tier = {
-  slug: "design_partner" | "standard" | "enterprise";
+  slug: "design_partner" | "professional" | "enterprise";
   name: string;
   price: string;
   priceSuffix?: string;
@@ -38,8 +38,8 @@ const TIERS: Tier[] = [
     cta: { label: "Apply", href: "/access.html" }
   },
   {
-    slug: "standard",
-    name: "Standard",
+    slug: "professional",
+    name: "Professional",
     price: "$2,500",
     priceSuffix: "/mo",
     eyebrow: "Billed annually · full platform · open enrollment",
