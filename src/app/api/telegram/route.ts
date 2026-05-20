@@ -71,10 +71,11 @@ export async function POST(req: Request) {
   let reply = "";
   try {
     if (text === "/brief" || text === "/start") {
-      const days83b = Math.ceil((new Date("2026-05-27").getTime() - Date.now()) / 86400000);
+      const filed83b = new Date("2026-05-11T13:36:00-05:00");
+      const daysSince83b = Math.floor((Date.now() - filed83b.getTime()) / 86400000);
       const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
       reply = await askClaude(
-        `APEX Holdings CEO morning brief for ${today}. Include: 83(b) deadline ${days83b} days away (May 27 2026 HARD), revenue bottleneck per company (FARaudit/Bullrize/LexAnchor all at $0), top 3 tasks today, one-line single focus. Under 200 words. Professional. No markdown.`,
+        `APEX Holdings CEO morning brief for ${today}. Include: 83(b) FILED 2026-05-11 · ${daysSince83b} days since filing · awaiting IRS ack at Stable Dover DE, revenue bottleneck per company (FARaudit/Bullrize/LexAnchor all at $0), top 3 tasks today, one-line single focus. Under 200 words. Professional. No markdown.`,
         600
       );
     } else if (text === "/status") {
@@ -90,8 +91,9 @@ export async function POST(req: Request) {
       );
       reply = `APEX Route Status — ${new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago" })} CT\n\n${checks.join("\n")}`;
     } else if (text === "/83b") {
-      const days = Math.ceil((new Date("2026-05-27").getTime() - Date.now()) / 86400000);
-      reply = `83(b) Election Status\n\nFARaudit Inc -> ${days} days · May 27 2026 HARD DEADLINE\nBullrize Inc -> TBD (30d after EIN)\nLexAnchor Inc -> TBD (30d after EIN)\n\nEIN expected ~May 6-7 from Every.io\n\nUSPS Certified Mail + Return Receipt required`;
+      const filed = new Date("2026-05-11T13:36:00-05:00");
+      const daysSince = Math.floor((Date.now() - filed.getTime()) / 86400000);
+      reply = `83(b) Election Status\n\nDELIVERED 2026-05-11 · 1:36 PM CT\nIRS Austin TX 73301\nAll 3 entities · QSBS protected\n\nWatching: Stable Dover DE for IRS ack letter\n${daysSince} days since filing`;
     } else if (text.startsWith("/learn")) {
       const co = text.includes("fa")
         ? "FARaudit — federal contracting, FAR/DFARS, solicitation lifecycle"
@@ -112,7 +114,7 @@ export async function POST(req: Request) {
     } else if (text === "/mrr") {
       reply = `Holdings MRR\n\nFARaudit $0 -> M12 target $225K\nBullrize $0 -> M12 target $750K\nLexAnchor $0 -> M12 target $224K\n\nCombined $0 -> M12 target $1.2M\n\nNext action: Book Rachel Prevost demo`;
     } else if (text === "/tasks") {
-      reply = `CEO Tasks Today\n\n[P0] 83(b) — check jose@faraudit.com for EIN from Every.io\n[P1] Rachel Prevost — engage LinkedIn post\n[P1] Snoe Inc — send connection request 09:00 CT\n[P1] Newsletter #2 — publish 08:30 CT\n[P1] Webhook — register after build deploys\n[P1] /brief test — confirm bot working`;
+      reply = `CEO Tasks Today\n\n[P1] Rachel Prevost — engage LinkedIn post\n[P1] Snoe Inc — send connection request 09:00 CT\n[P1] Newsletter #2 — publish 08:30 CT\n[P1] Webhook — register after build deploys\n[P1] /brief test — confirm bot working`;
     } else if (text.startsWith("/done ")) {
       reply = `Done: "${text.replace("/done ", "")}" — logged. Say "create handoff" in Claude to update Done tab.`;
     } else if (text.startsWith("/build ")) {
@@ -128,7 +130,7 @@ export async function POST(req: Request) {
     } else if (text.startsWith("/audit ")) {
       reply = await triggerAuditReply(text.slice("/audit ".length).trim());
     } else {
-      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — deadline countdown\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
+      reply = `APEX CEO Bot\n\n/brief — morning digest\n/status — route health\n/tasks — today's tasks\n/prospects — pipeline\n/mrr — revenue vs target\n/83b — election status\n/learn fa|br|la — education\n/news — company news\n/done [item] — log it\n/build [note] — queue it\n\n— Vertex Intelligence —\n/signals — top 5 Bullrize signals\n/corpus — FARaudit corpus stats\n/pipeline — solicitations by stage\n/fleet — Railway agent status\n/audit [notice_id] — manual audit trigger`;
     }
   } catch (err) {
     console.error("[telegram-route] handler error:", err);

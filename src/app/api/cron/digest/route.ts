@@ -28,7 +28,8 @@ export async function GET(req: Request) {
   const isWeekend = day === 0 || day === 6;
   const isFriday = day === 5;
   const isSaturday = day === 6;
-  const days83b = Math.ceil((new Date("2026-05-27").getTime() - Date.now()) / 86400000);
+  const filed83b = new Date("2026-05-11T13:36:00-05:00");
+  const daysSince83b = Math.floor((Date.now() - filed83b.getTime()) / 86400000);
   const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const shortDate = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
     ? isSaturday
       ? `APEX Holdings Saturday CEO brief for ${dateStr}. Week in review: key wins, what moved in federal contracting/options market/legal tech this week, one competitive intelligence update, earnings week ahead if any. Mag 7 CEO level. Under 200 words. No markdown.`
       : `APEX Holdings Sunday CEO brief for ${dateStr}. Week ahead: what to prioritize Mon-Fri, SAM.gov opportunities expected, market events this week, one strategic CEO priority. Mag 7 CEO level. Under 200 words. No markdown.`
-    : `APEX Holdings CEO brief for ${dateStr}. 83(b) deadline: ${days83b} days (May 27 2026 HARD). Revenue bottleneck per company. Top 3 priorities. Single focus for today. Under 180 words. Professional. No markdown.`;
+    : `APEX Holdings CEO brief for ${dateStr}. 83(b) FILED 2026-05-11 · ${daysSince83b} days since filing · awaiting IRS ack at Stable Dover DE. Revenue bottleneck per company. Top 3 priorities. Single focus for today. Under 180 words. Professional. No markdown.`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
