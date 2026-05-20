@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "FARaudit Pricing — Defense BD Operating System",
   description:
-    "Defense intelligence at every stage. Design Partner $1,250/mo · Standard $2,500/mo · Enterprise on request. All tiers include the full Defense BD OS — Run Audit, Defense Spending, Defense News AI, Capability Statement, CMMC Readiness, more."
+    "The trap was already in the document. Design Partner $1,250/mo · Standard $2,500/mo · Enterprise on request. All tiers include the full Defense BD OS — Run Audit, Defense Spending, Defense News AI, Capability Statement, CMMC Readiness, more."
 };
 
 const BG = "#03080f";
@@ -33,7 +33,7 @@ const TIERS: Tier[] = [
     name: "Design Partner",
     price: "$1,250",
     priceSuffix: "/mo",
-    eyebrow: "Limited to first 10 customers · waived during T1 sprint · rate locks in when invoicing begins",
+    eyebrow: "5 slots remaining · 90-day program · rate locks at signup",
     featured: true,
     cta: { label: "Apply", href: "/access.html" }
   },
@@ -42,15 +42,15 @@ const TIERS: Tier[] = [
     name: "Standard",
     price: "$2,500",
     priceSuffix: "/mo",
-    eyebrow: "Post-launch standard · same Defense BD OS · monthly billing",
+    eyebrow: "Billed annually · full platform · open enrollment",
     featured: false,
-    cta: { label: "Coming Q3", disabled: true }
+    cta: { label: "Talk to us", href: "mailto:hello@faraudit.com?subject=FARaudit%20Standard%20inquiry" }
   },
   {
     slug: "enterprise",
     name: "Enterprise",
     price: "Talk to us",
-    eyebrow: "Custom corpus integrations · dedicated CSM · SLA",
+    eyebrow: "Multi-seat · priority SLA · custom NAICS coverage",
     featured: false,
     cta: { label: "Contact us", href: "mailto:hello@faraudit.com?subject=FARaudit%20Enterprise%20inquiry" }
   }
@@ -75,7 +75,7 @@ const FEATURES: Array<{ label: string; tiers: [string, string, string] }> = [
   { label: "Email support", tiers: ["✓", "✓", "✓"] },
   { label: "Priority support", tiers: ["—", "✓", "✓"] },
   { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
-  { label: "Custom corpus integrations", tiers: ["—", "—", "✓"] }
+  { label: "Multi-seat · priority SLA", tiers: ["—", "—", "✓"] }
 ];
 
 function TierCard({ tier }: { tier: Tier }) {
@@ -205,12 +205,12 @@ export default function PricingPage() {
           Pricing
         </p>
         <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: 44, fontWeight: 700, color: TEXT_1, letterSpacing: "-0.025em", lineHeight: 1.1, marginBottom: 14 }}>
-          Defense intelligence<br /><span style={{ color: GOLD }}>at every stage.</span>
+          The trap was already<br /><span style={{ color: GOLD }}>in the document.</span>
         </h1>
         <p style={{ fontSize: 16, color: TEXT_2, marginBottom: 52, maxWidth: 620, lineHeight: 1.7, fontWeight: 300 }}>
           The full Defense BD Operating System on every plan. Run Audit, Defense Spending,
           Defense News AI insights, Capability Statement, CMMC Readiness — same product
-          surface across all tiers. Design partner pricing rewards the first 10 customers.
+          surface across all tiers. Design partner pricing rewards the first 5 customers.
         </p>
 
         <div className="pricing-grid">
@@ -257,7 +257,7 @@ export default function PricingPage() {
             Become a design partner
           </p>
           <p style={{ fontSize: 14, color: TEXT_1, lineHeight: 1.6, margin: 0 }}>
-            10 spots. Locked rate. Direct line to the founder. Roadmap input.
+            5 spots. Locked rate. Direct line to the founder. Roadmap input.
           </p>
           <Link
             href="/access.html"

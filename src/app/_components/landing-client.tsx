@@ -210,11 +210,11 @@ export default function LandingClient() {
       <section className="reveal" style={{ padding: "60px 32px 100px", maxWidth: 1080, margin: "0 auto" }}>
         <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, letterSpacing: "0.22em", color: TEXT_3, textTransform: "uppercase", marginBottom: 14 }}>Pricing</p>
         <h2 style={{ fontFamily: "Syne, sans-serif", fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 18, color: TEXT_1 }}>
-          Unlimited audits. <span style={{ color: GOLD }}>One flat rate.</span>
+          Every solicitation. <span style={{ color: GOLD }}>Fully audited.</span>
         </h2>
         <p style={{ fontSize: 15, color: TEXT_2, maxWidth: 580, lineHeight: 1.65, fontWeight: 300, marginBottom: 28 }}>
-          Design Partner $1,250/mo (12-month, 7 spots) · Standard $1,500/mo · Growth $2,500/mo.
-          Design partner pricing · $1,250/mo · 5 slots remaining.
+          Design Partner · $1,250/mo · 5 slots remaining · 90-day program. Standard · $2,500/mo · billed annually. Enterprise · custom.
+          
         </p>
         <Link
           href="/pricing"
