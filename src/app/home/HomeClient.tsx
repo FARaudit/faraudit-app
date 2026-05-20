@@ -72,8 +72,13 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // FA-89 Opportunities tab filters
   const [oppSearch, setOppSearch] = useState("");
   const [oppSetAside, setOppSetAside] = useState<string>("All");
-  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired">("active");
+  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "watched">("active");
   const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "risk", dir: "asc" });
+  // FA-89e: ephemeral per-row "just pinned" confirmation — keyed by notice_id,
+  // value is Date.now() of the pin event. Used to render "Pinned ✓" + a "View
+  // in Pipeline →" link for ~2s after a successful pin, then revert to the
+  // normal "Pinned" label.
+  const [pinConfirmedAt, setPinConfirmedAt] = useState<Record<string, number>>({});
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
   // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
@@ -194,6 +199,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
     if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
     if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
+    if (oppDeadline === "watched") rows = rows.filter((r) => r.row.watched === true);
     const riskOrder: Record<string, number> = { rp0: 0, rp1: 1, rp2: 2, "": 3 };
     rows = [...rows].sort((a, b) => {
       if (oppSort.key === "risk") {
@@ -719,7 +725,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         ["<=3", "≤ 3 Days"],
                         ["<=7", "≤ 7 Days"],
                         ["<=30", "≤ 30 Days"],
-                        ["expired", "Expired"]
+                        ["expired", "Expired"],
+                        ["watched", "Watched"]
                       ] as const).map(([val, lbl]) => {
                         const active = oppDeadline === val;
                         return (
@@ -774,7 +781,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   </div>
 
                   {/* Rows */}
-                  <div>
+                  <div style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}>
                     {oppRows.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
@@ -823,13 +830,31 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           const res = await fetch(`/api/opportunities/${encodeURIComponent(r.row.notice_id)}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
+                            credentials: "include",
                             body: JSON.stringify({ [field]: next })
                           });
-                          if (!res.ok) updateOpportunity(r.row.notice_id, { [field]: !next });
+                          if (!res.ok) {
+                            updateOpportunity(r.row.notice_id, { [field]: !next });
+                            return;
+                          }
+                          // Flash "Pinned ✓ → View in Pipeline" for ~2s on pipeline pin success.
+                          if (field === "in_pipeline" && next === true) {
+                            const ts = Date.now();
+                            setPinConfirmedAt((prev) => ({ ...prev, [r.row.notice_id]: ts }));
+                            setTimeout(() => {
+                              setPinConfirmedAt((prev) => {
+                                if (prev[r.row.notice_id] !== ts) return prev;
+                                const nextMap = { ...prev };
+                                delete nextMap[r.row.notice_id];
+                                return nextMap;
+                              });
+                            }, 2000);
+                          }
                         } catch {
                           updateOpportunity(r.row.notice_id, { [field]: !next });
                         }
                       };
+                      const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
 
                       return (
                         <div
@@ -875,13 +900,25 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             >
                               {r.row.watched ? "Watching" : "Watch"}
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
-                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.in_pipeline ? "rgba(96,165,250,.14)" : "transparent", color: r.row.in_pipeline ? "var(--blue)" : "var(--t60)", border: `1px solid ${r.row.in_pipeline ? "rgba(96,165,250,.5)" : "var(--border2)"}` }}
-                            >
-                              {r.row.in_pipeline ? "Pinned" : "Pipeline"}
-                            </button>
+                            {isJustPinned ? (
+                              <a
+                                href="/home#pipeline"
+                                onClick={(e) => { e.stopPropagation(); }}
+                                style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "rgba(96,165,250,.22)", color: "var(--blue)", border: "1px solid rgba(96,165,250,.7)", textDecoration: "none", whiteSpace: "nowrap" }}
+                                title="Pinned to Pipeline — click to view"
+                              >
+                                Pinned ✓ → Pipeline
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
+                                style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.in_pipeline ? "rgba(96,165,250,.14)" : "transparent", color: r.row.in_pipeline ? "var(--blue)" : "var(--t60)", border: `1px solid ${r.row.in_pipeline ? "rgba(96,165,250,.5)" : "var(--border2)"}` }}
+                                title={r.row.in_pipeline ? "View in Pipeline tab — click to unpin" : "Add to Pipeline"}
+                              >
+                                {r.row.in_pipeline ? "Pinned" : "Pipeline"}
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
