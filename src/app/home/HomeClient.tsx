@@ -845,9 +845,9 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           <div onClick={onOpenAudit} title={r.row.title || ""} style={{ display: "flex", flexDirection: "column", gap: 1, overflow: "hidden", cursor: "pointer", minWidth: 0 }}>
                             {r.row.title_plain ? (
                               <>
-                                <div style={{ display: "flex", alignItems: "baseline", gap: 5, overflow: "hidden" }}>
-                                  <span style={{ fontFamily: "var(--mono)", fontSize: 6, fontWeight: 700, color: "var(--blue)", opacity: 0.7, letterSpacing: ".12em", padding: "1px 3px", border: "1px solid var(--blue)", borderRadius: 2, flexShrink: 0, lineHeight: 1 }}>AI</span>
-                                  <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.row.title_plain}</span>
+                                <div style={{ display: "flex", alignItems: "baseline", overflow: "hidden" }}>
+                                  <span style={{ fontSize: 8, background: "rgba(96,165,250,.15)", color: "var(--blue)", padding: "1px 4px", borderRadius: 2, marginRight: 4, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: ".08em", flexShrink: 0, lineHeight: 1 }}>AI</span>
+                                  <span style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.row.title_plain}</span>
                                 </div>
                                 <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontStyle: "italic", color: "var(--t40)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanTitle(r.row.title)}</span>
                               </>
@@ -857,9 +857,9 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           </div>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Vet", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", justifySelf: "center" }}>{r.daysLabel}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center" }}>{r.riskLabel || "—"}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center" }}>{r.auditStatusLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", justifySelf: "center", display: "flex", justifyContent: "center", alignItems: "center" }}>{r.daysLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.riskLabel || "—"}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
                           <div style={{ display: "flex", gap: 4 }}>
                             <button
                               type="button"
