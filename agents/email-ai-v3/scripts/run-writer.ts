@@ -10,6 +10,9 @@
  *   npx -y dotenv-cli -e ~/faraudit-app/.env.local -- npx tsx scripts/run-writer.ts
  *   npx -y dotenv-cli -e ~/faraudit-app/.env.local -- npx tsx scripts/run-writer.ts --limit=1
  *   npx -y dotenv-cli -e ~/faraudit-app/.env.local -- npx tsx scripts/run-writer.ts --verb=notion_update
+ *   npx -y dotenv-cli -e ~/faraudit-app/.env.local -- npx tsx scripts/run-writer.ts --limit=1 --dry-run
+ *
+ * --dry-run: log what would be written without touching Notion, digest, or email_ai_writes.
  */
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
@@ -22,6 +25,7 @@ const limitArg = process.argv.find((a) => a.startsWith("--limit="));
 const verbArg = process.argv.find((a) => a.startsWith("--verb="));
 const LIMIT = limitArg ? parseInt(limitArg.split("=")[1], 10) : null;
 const VERB_FILTER = verbArg ? verbArg.split("=")[1] : null;
+const DRY_RUN = process.argv.includes("--dry-run") || process.argv.includes("--dry");
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -31,7 +35,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: fa
 
 async function main() {
   const tickId = randomUUID();
-  console.log(`[run-writer] tick=${tickId} mode=APPLY limit=${LIMIT ?? "none"} verb=${VERB_FILTER ?? "all"}`);
+  console.log(`[run-writer] tick=${tickId} mode=${DRY_RUN ? "DRY-RUN" : "APPLY"} limit=${LIMIT ?? "none"} verb=${VERB_FILTER ?? "all"}`);
   console.log(`[run-writer] STAGE_5_SHIP_TS=${STAGE_5_SHIP_TS} (forward-only)`);
 
   let query = sb
@@ -64,7 +68,7 @@ async function main() {
         .select("subject, bucket, reasoning, confidence")
         .eq("id", action.classification_id)
         .single();
-      const result = await processAction(sb, action, classification ?? {}, tickId);
+      const result = await processAction(sb, action, classification ?? {}, tickId, DRY_RUN);
       console.log(`[run-writer] ${result.status} ${result.verb} thread=${result.thread_id} → ${result.target_system}:${result.target_ref}${result.error ? ` ERROR: ${result.error}` : ""}`);
       if (result.status === "success") succeeded++;
       else if (result.status === "skipped") skipped++;
@@ -78,7 +82,7 @@ async function main() {
   console.log(`\n[run-writer] DONE: succeeded=${succeeded} skipped=${skipped} failed=${failed}`);
 
   // Rule 40: if any digest mutations happened, sync canonical HTML inline block
-  if (succeeded > 0) {
+  if (succeeded > 0 && !DRY_RUN) {
     const digestMutated = todo.some((a: any) =>
       a.verb === "digest_p0_block" || a.verb === "digest_p0_unblock"
     );

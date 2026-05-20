@@ -56,10 +56,11 @@ function backupDigest(): string {
 // ─────────────────────────────────────────────────────────────
 async function handleNotionUpdate(
   action: any,
-  classification: any
+  classification: any,
+  dryRun: boolean
 ): Promise<{ target_ref: string; payload: any }> {
   const notionKey = process.env.NOTION_API_KEY;
-  if (!notionKey) throw new Error("NOTION_API_KEY missing from env");
+  if (!notionKey && !dryRun) throw new Error("NOTION_API_KEY missing from env");
 
   const subject = classification?.subject ?? "(no subject)";
   const title = subject.slice(0, 200);
@@ -78,6 +79,10 @@ async function handleNotionUpdate(
       "Action ID": { rich_text: [{ text: { content: action.id } }] },
     },
   };
+
+  if (dryRun) {
+    return { target_ref: `(dry-run: would-create-page title="${title.slice(0, 60)}")`, payload: body };
+  }
 
   const res = await fetch("https://api.notion.com/v1/pages", {
     method: "POST",
@@ -103,11 +108,18 @@ async function handleNotionUpdate(
 // ─────────────────────────────────────────────────────────────
 async function handleDigestP0Block(
   action: any,
-  classification: any
+  classification: any,
+  dryRun: boolean
 ): Promise<{ target_ref: string; payload: any }> {
-  backupDigest();
+  if (!dryRun) backupDigest();
   const digest = JSON.parse(readFileSync(DIGEST_PATH, "utf-8"));
   digest.p0 = digest.p0 ?? [];
+
+  // Dedup: skip if an open P0 already tracks this thread
+  const alreadyTracked = digest.p0.some((p: any) => p.thread_id === action.thread_id);
+  if (alreadyTracked) {
+    return { target_ref: `(skipped: thread ${action.thread_id} already in p0)`, payload: null };
+  }
 
   const existingIds = digest.p0.map((p: any) => p.id ?? "");
   const logIds = (digest.completionsLog ?? []).map((p: any) => p.id ?? "");
@@ -131,6 +143,10 @@ async function handleDigestP0Block(
     createdAt: new Date().toISOString().replace(/\.\d+/, ""),
   };
 
+  if (dryRun) {
+    return { target_ref: `(dry-run: would-add ${newId})`, payload: newP0 };
+  }
+
   digest.p0.push(newP0);
   digest.meta = digest.meta ?? {};
   digest.meta.last_updated = new Date().toISOString().replace(/\.\d+/, "");
@@ -146,9 +162,10 @@ async function handleDigestP0Block(
 // ─────────────────────────────────────────────────────────────
 async function handleDigestP0Unblock(
   action: any,
-  _classification: any
+  _classification: any,
+  dryRun: boolean
 ): Promise<{ target_ref: string; payload: any }> {
-  backupDigest();
+  if (!dryRun) backupDigest();
   const digest = JSON.parse(readFileSync(DIGEST_PATH, "utf-8"));
   digest.p0 = digest.p0 ?? [];
   digest.completionsLog = digest.completionsLog ?? [];
@@ -167,7 +184,6 @@ async function handleDigestP0Unblock(
   }
 
   const closedP0 = digest.p0[matchedIndex];
-  closedP0.status = "closed";
   const completion = {
     id: closedP0.id,
     title: closedP0.title,
@@ -176,6 +192,12 @@ async function handleDigestP0Unblock(
     evidence: `Auto-closed by Email-AI Stage 5 via thread ${action.thread_id}. Original detail: ${(closedP0.detail ?? "").slice(0, 300)}. Unblock signal: ${action.reason ?? "(none)"}.`,
     source: "email_ai_unblock",
   };
+
+  if (dryRun) {
+    return { target_ref: `(dry-run: would-close ${closedP0.id})`, payload: completion };
+  }
+
+  closedP0.status = "closed";
   digest.completionsLog.push(completion);
   digest.p0.splice(matchedIndex, 1);
 
@@ -196,7 +218,8 @@ export async function processAction(
   sb: SupabaseClient,
   action: any,
   classification: any,
-  tickId: string
+  tickId: string,
+  dryRun: boolean = false
 ): Promise<WriterResult> {
   const { data: existing } = await sb
     .from("email_ai_writes")
@@ -218,6 +241,39 @@ export async function processAction(
 
   const target_system: "notion" | "digest" = action.verb === "notion_update" ? "notion" : "digest";
 
+  if (dryRun) {
+    try {
+      let result: { target_ref: string; payload: any };
+      if (action.verb === "notion_update") {
+        result = await handleNotionUpdate(action, classification, true);
+      } else if (action.verb === "digest_p0_block") {
+        result = await handleDigestP0Block(action, classification, true);
+      } else if (action.verb === "digest_p0_unblock") {
+        result = await handleDigestP0Unblock(action, classification, true);
+      } else {
+        throw new Error(`unsupported verb: ${action.verb}`);
+      }
+      return {
+        action_id: action.id,
+        thread_id: action.thread_id,
+        verb: action.verb,
+        target_system,
+        target_ref: result.target_ref,
+        status: "success",
+      };
+    } catch (e: any) {
+      return {
+        action_id: action.id,
+        thread_id: action.thread_id,
+        verb: action.verb,
+        target_system,
+        target_ref: "(dry-run-failed)",
+        status: "failed",
+        error: e?.message ?? String(e),
+      };
+    }
+  }
+
   const { data: pending, error: pendErr } = await sb
     .from("email_ai_writes")
     .insert({
@@ -237,11 +293,11 @@ export async function processAction(
   try {
     let result: { target_ref: string; payload: any };
     if (action.verb === "notion_update") {
-      result = await handleNotionUpdate(action, classification);
+      result = await handleNotionUpdate(action, classification, false);
     } else if (action.verb === "digest_p0_block") {
-      result = await handleDigestP0Block(action, classification);
+      result = await handleDigestP0Block(action, classification, false);
     } else if (action.verb === "digest_p0_unblock") {
-      result = await handleDigestP0Unblock(action, classification);
+      result = await handleDigestP0Unblock(action, classification, false);
     } else {
       throw new Error(`unsupported verb: ${action.verb}`);
     }
