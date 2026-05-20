@@ -2548,7 +2548,18 @@ function CapabilityPanel() {
               className="action-btn"
               onClick={saveNow}
               disabled={save === "saving"}
-              style={{ opacity: save === "saving" ? 0.6 : 1 }}
+              style={{
+                border: "1px solid var(--border2)",
+                background: "transparent",
+                color: "var(--text)",
+                padding: "4px 12px",
+                borderRadius: 4,
+                cursor: save === "saving" ? "wait" : "pointer",
+                fontSize: 11,
+                fontFamily: "var(--mono)",
+                letterSpacing: ".06em",
+                opacity: save === "saving" ? 0.6 : 1
+              }}
             >
               {save === "saving" ? "Saving…" : "Save"}
             </button>
@@ -2557,7 +2568,19 @@ function CapabilityPanel() {
               className="action-btn primary"
               onClick={exportPdf}
               disabled={exporting}
-              style={{ opacity: exporting ? 0.6 : 1 }}
+              style={{
+                border: "1px solid var(--gold)",
+                background: "var(--gold)",
+                color: "var(--void)",
+                padding: "4px 12px",
+                borderRadius: 4,
+                cursor: exporting ? "wait" : "pointer",
+                fontSize: 11,
+                fontFamily: "var(--mono)",
+                fontWeight: 700,
+                letterSpacing: ".06em",
+                opacity: exporting ? 0.6 : 1
+              }}
             >
               {exporting ? "Exporting…" : "↓ Export PDF"}
             </button>
