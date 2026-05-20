@@ -84,7 +84,7 @@ export default function LandingClient() {
             className="h-cta"
             style={{ background: GOLD, color: BG, padding: "9px 18px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
           >
-            Free audit
+            Request Access
           </Link>
         </div>
       </nav>
@@ -215,7 +215,7 @@ export default function LandingClient() {
         </h2>
         <p style={{ fontSize: 15, color: TEXT_2, maxWidth: 580, lineHeight: 1.65, fontWeight: 300, marginBottom: 28 }}>
           Design Partner $1,250/mo (12-month, 7 spots) · Standard $1,500/mo · Growth $2,500/mo.
-          First audit is free — no credit card.
+          Design partner pricing · $1,250/mo · 5 slots remaining.
         </p>
         <Link
           href="/pricing"
@@ -229,10 +229,10 @@ export default function LandingClient() {
       {/* Final CTA */}
       <section className="reveal" style={{ padding: "60px 32px 120px", textAlign: "center" }}>
         <h2 style={{ fontFamily: "Syne, sans-serif", fontSize: 38, fontWeight: 700, letterSpacing: "-0.02em", color: TEXT_1, marginBottom: 12 }}>
-          Audit one solicitation. Free.
+          The operating system defense BD runs on.
         </h2>
         <p style={{ fontSize: 15, color: TEXT_2, marginBottom: 24, fontWeight: 300 }}>
-          Drop a SAM.gov PDF. Get the full report in under 60 seconds. Decide from there.
+          From pre-solicitation synopsis to recompete alert. Request access to start.
         </p>
         <Link
           href="/audit"

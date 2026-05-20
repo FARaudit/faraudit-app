@@ -31,7 +31,7 @@ const SYSTEM_PROMPT = `You are FARaudit Support — the embedded help agent for 
 PRODUCT CONTEXT:
 - FARaudit reads federal solicitations (RFQ/RFP/IFB) and surfaces FAR/DFARS compliance traps before bid submission.
 - Six DFARS detections: 252.223-7008 (hex chrome), 252.204-7012 / 7018 (covered defense info), 252.204-7021 (CMMC), 252.225-7048 (export), CLIN ambiguity, Section L/M page-limit conflicts.
-- Three plans: Design Partner $1,250/mo (12-mo, 7 spots), Standard $1,500/mo (most popular), Growth $2,500/mo. First audit free.
+- Three plans: Design Partner $1,250/mo (12-mo, 7 spots), Standard $1,500/mo (most popular), Growth $2,500/mo. Design partner $1,250/mo — no free tier.
 - Workflows: Upload at /audit → audit report → KO clarification email drafts → proposal strategy.
 - Education at /learn. Pricing at /pricing.
 

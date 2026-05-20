@@ -318,7 +318,7 @@ export default function HowItWorksPage() {
             className="h-cta"
             style={{ background: GOLD, color: BG, padding: "9px 18px", borderRadius: 6, fontFamily: "Syne, sans-serif", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
           >
-            Free audit
+            Request Access
           </Link>
         </div>
       </nav>
