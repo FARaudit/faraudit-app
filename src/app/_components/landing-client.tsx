@@ -201,8 +201,7 @@ export default function LandingClient() {
           <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, letterSpacing: "0.22em", color: GOLD, textTransform: "uppercase", marginBottom: 14 }}>Field validation</p>
           <p style={{ fontFamily: "Syne, sans-serif", fontSize: 22, lineHeight: 1.4, fontWeight: 600, color: TEXT_1, maxWidth: 800, letterSpacing: "-0.01em", fontVariantNumeric: "slashed-zero" }}>
             FA301626Q0068 — three <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "0.92em", color: GOLD, fontWeight: 700, fontVariantNumeric: "slashed-zero" }}>P0</span> traps surfaced before the estimator opened a spreadsheet.
-            CLIN quantity ambiguity, FOB conflict, hexavalent chromium prohibition. The same
-            audit costs <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "0.92em", fontWeight: 700, fontVariantNumeric: "slashed-zero" }}>$0</span> to run, beats Govwin/Deltek by 47 minutes per solicitation.
+            CLIN quantity ambiguity, FOB conflict, hexavalent chromium prohibition. Costs less than 47 minutes of an estimator's time. Beats Govwin/Deltek by that same 47 minutes per solicitation.
           </p>
         </div>
       </section>
