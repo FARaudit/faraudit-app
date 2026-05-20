@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { initSentry } from "./sentry";
+initSentry("email-ai-v3");
 
 import { runMigrationCheck } from "./migration-check";
 import { loadBlacklist, isBlacklisted } from "./blacklist";

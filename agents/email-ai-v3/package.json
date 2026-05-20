@@ -11,9 +11,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@sentry/node": "^10.53.1",
     "@supabase/supabase-js": "^2.45.0",
-    "googleapis": "^144.0.0",
     "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
   },
