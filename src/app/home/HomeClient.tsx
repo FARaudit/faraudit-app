@@ -1110,13 +1110,12 @@ function enrichRow(row: OpportunityRow): Enriched {
   else if (sa.includes("hubzone")) { saCls = "hz"; saLabel = "HUBZone"; }
   else if (sa.includes("small")) { saCls = "sb"; saLabel = "SB"; }
 
-  const statusMap: Record<string, { cls: Enriched["auditStatusCls"]; label: string }> = {
-    complete:   { cls: "complete",   label: "Audited ✓" },
-    processing: { cls: "processing", label: "In Progress" },
-    failed:     { cls: "failed",     label: "Failed" },
-    pending:    { cls: "pending",    label: "Not Audited" }
-  };
-  const auditEntry = statusMap[row.status ?? ""] ?? { cls: "none" as const, label: "—" };
+  // FA-89f: binary audit status — reads row.is_audited (cross-referenced
+  // from the audits table at fetch time), NOT pending_audits.status which is
+  // the ingest queue state.
+  const auditEntry = row.is_audited
+    ? { cls: "complete" as const, label: "Audited ✓" }
+    : { cls: "pending"  as const, label: "Not Audited" };
 
   return { row, daysNum, daysCls, daysLabel, risk, riskLabel, saCls, saLabel, auditStatusCls: auditEntry.cls, auditStatusLabel: auditEntry.label };
 }

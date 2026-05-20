@@ -91,6 +91,10 @@ export interface OpportunityRow {
   in_pipeline: boolean;
   watched: boolean;
   title_plain: string | null;
+  // FA-89f: cross-reference flag — true iff a row in audits with this
+  // notice_id exists with status='complete'. Computed at fetch time, NOT
+  // a real column on pending_audits. Drives the AUDIT badge in the UI.
+  is_audited: boolean;
   created_at: string;
   processed_at: string | null;
 }
@@ -112,6 +116,7 @@ export async function fetchOpportunities(
   // them, falls through if either migration is unapplied.
   const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, title_plain, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
+  let rawRows: unknown[] = [];
   for (const cols of [RICH, BASIC]) {
     let q = client
       .from("pending_audits")
@@ -125,9 +130,20 @@ export async function fetchOpportunities(
       if (cols === RICH) continue; // migration not applied yet → fall through to BASIC
       throw new Error(`fetchOpportunities: ${error.message}`);
     }
-    return ((data || []) as unknown[]).map((r) => ({ solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, ...(r as object) })) as OpportunityRow[];
+    rawRows = (data || []) as unknown[];
+    break;
   }
-  return [];
+  // FA-89f: cross-reference audits table for is_audited flag. A row is
+  // "audited" only when a corresponding audits.notice_id exists with
+  // status='complete' — independent of pending_audits.status which is the
+  // ingest-queue state, not whether a real audit was produced.
+  const { data: auditedRows } = await client.from("audits").select("notice_id").eq("status", "complete");
+  const auditedSet = new Set((auditedRows || []).map((r: { notice_id: string | null }) => r.notice_id).filter(Boolean) as string[]);
+  return rawRows.map((r) => {
+    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, ...(r as object) } as OpportunityRow;
+    base.is_audited = auditedSet.has(base.notice_id);
+    return base;
+  });
 }
 
 // ─── Tab 3: Audit (history) ───────────────────────────────────────────────
