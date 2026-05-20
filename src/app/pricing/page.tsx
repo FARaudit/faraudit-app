@@ -60,8 +60,8 @@ const TIERS: Tier[] = [
 // the difference is price + onboarding (design partner reward, not feature
 // gating). Enterprise gets custom integrations + dedicated support on top.
 const FEATURES: Array<{ label: string; tiers: [string, string, string] }> = [
-  { label: "Run Audit OS · 3-call engine · 10K+ corpus", tiers: ["✓", "✓", "✓"] },
-  { label: "Defense Spending intelligence · USAspending.gov · 19 NAICS · top 10 primes · YoY", tiers: ["✓", "✓", "✓"] },
+  { label: "Run Audit OS · 3-call engine · full solicitation coverage", tiers: ["✓", "✓", "✓"] },
+  { label: "Defense Spending intelligence · USAspending.gov · all federal NAICS · top 10 primes · YoY", tiers: ["✓", "✓", "✓"] },
   { label: "Defense News with per-card AI insights · claude-opus-4-7", tiers: ["✓", "✓", "✓"] },
   { label: "Contracting Officers + Agencies intelligence", tiers: ["✓", "✓", "✓"] },
   { label: "Capability Statement persistence + auto-population", tiers: ["✓", "✓", "✓"] },
@@ -71,7 +71,7 @@ const FEATURES: Array<{ label: string; tiers: [string, string, string] }> = [
   { label: "GAO Protests intelligence", tiers: ["✓", "✓", "✓"] },
   { label: "FAR/DFARS regulatory updates", tiers: ["✓", "✓", "✓"] },
   { label: "Teaming Partners discovery", tiers: ["✓", "✓", "✓"] },
-  { label: "All 19 defense NAICS codes", tiers: ["✓", "✓", "✓"] },
+  { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
   { label: "Email support", tiers: ["✓", "✓", "✓"] },
   { label: "Priority support", tiers: ["—", "✓", "✓"] },
   { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
@@ -108,7 +108,7 @@ function TierCard({ tier }: { tier: Tier }) {
             fontWeight: 500
           }}
         >
-          Most popular
+          Founding Rate
         </div>
       )}
 
