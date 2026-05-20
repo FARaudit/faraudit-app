@@ -2357,25 +2357,34 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
   // fall back to first naicsOptions, fall back to 336413.
   const naicsWithData = useMemo(() => Array.from(new Set(defenseSpending.map((r) => r.naics_code))).sort(), [defenseSpending]);
   const naicsList = naicsWithData.length > 0 ? naicsWithData : (naicsOptions.length > 0 ? naicsOptions : ["336413"]);
-  const [selectedNaics, setSelectedNaics] = useState<string>(naicsList[0]);
+  // FA-96: default to FARaudit's primary defense NAICS (Other Aircraft Parts
+  // & Auxiliary Equipment Manufacturing). The dropdown's options still come
+  // from naicsList (dynamic — what's in the data + ingest list), but the
+  // initial selection is fixed so the demo lands on a populated row.
+  const [selectedNaics, setSelectedNaics] = useState<string>("336413");
   const current = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2026) || null, [defenseSpending, selectedNaics]);
   const prior   = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2025) || null, [defenseSpending, selectedNaics]);
   const refreshed = current?.refreshed_at || prior?.refreshed_at;
 
   const [showPrimes, setShowPrimes] = useState(false);
-  // Section 7 — live Treasury MTS macro signal (client fetch, not cached)
+  // Section 7 — Treasury MTS macro signal via server-side proxy. fiscaldata.treasury.gov
+  // doesn't send CORS headers, so direct browser fetch fails. /api/treasury-signal
+  // proxies the call + returns a normalized { amount, date, error? } shape with
+  // amount in raw USD (Treasury reports in millions).
   const [treasury, setTreasury] = useState<{ ytd: number | null; loading: boolean; error: string | null }>({ ytd: null, loading: true, error: null });
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const url = "https://fiscaldata.treasury.gov/api/v1/accounting/mts/mts_table_5?fields=classification_desc,current_fytd_net_outly_amt&filter=classification_desc:eq:Department%20of%20Defense--Military%20Programs&sort=-record_date&page[size]=1";
-        const res = await fetch(url);
+        const res = await fetch("/api/treasury-signal");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const j = await res.json() as { data?: Array<{ current_fytd_net_outly_amt?: string }> };
-        const raw = j.data?.[0]?.current_fytd_net_outly_amt;
-        const ytd = raw ? Number(raw) : null;
-        if (!cancelled) setTreasury({ ytd: ytd && Number.isFinite(ytd) ? ytd * 1_000_000 : null, loading: false, error: null });
+        const j = await res.json() as { amount: number | null; date: string | null; error?: string };
+        if (cancelled) return;
+        if (j.error) {
+          setTreasury({ ytd: null, loading: false, error: j.error });
+        } else {
+          setTreasury({ ytd: j.amount, loading: false, error: null });
+        }
       } catch (e) {
         if (!cancelled) setTreasury({ ytd: null, loading: false, error: e instanceof Error ? e.message : "fetch failed" });
       }
