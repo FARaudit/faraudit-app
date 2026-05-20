@@ -19,6 +19,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
 
 import fetch from 'node-fetch';
+import { findEmailViaHunter } from './hunter-enrich';
 
 const NOTION_KEY = process.env.NOTION_API_KEY!;
 const SAM_KEY = process.env.SAM_API_KEY || '';
@@ -377,6 +378,18 @@ async function main() {
     const rawPosture = await classifyPosture(guessedUrl);
     const posture: 'HOT' | 'WARM' | 'COLD' = rawPosture === 'UNKNOWN' ? 'HOT' : rawPosture;
     const score = scoreVendor(v, email);
+
+    // FA-66: Hunter.io email fallback — fires when SAM POC email is empty
+    let hunterEmail: string | undefined;
+    if (!email && guessedUrl) {
+      const hunterResult = await findEmailViaHunter(guessedUrl);
+      if (hunterResult.found && hunterResult.email) {
+        hunterEmail = hunterResult.email;
+        console.log(`[hunter] ${v.name}: ${hunterEmail} (confidence ${hunterResult.confidence})`);
+      }
+    }
+    const emailSource = hunterEmail ? 'hunter' : email ? 'sam' : 'none';
+
     enriched.push({
       company: v.name,
       uei: v.uei,
@@ -385,8 +398,8 @@ async function main() {
       total_value_12mo: v.total,
       compliance_posture: posture,
       icp_score: score,
-      contact_email: email,
-      key_signal_note: `${v.awards} DoD awards · NAICS ${[...v.naics].join('|')} · posture_source=${rawPosture === 'UNKNOWN' ? 'default(HOT)' : 'website-classified'} · needs_dm_enrichment=true`
+      contact_email: email || hunterEmail || '',
+      key_signal_note: `${v.awards} DoD awards · NAICS ${[...v.naics].join('|')} · posture_source=${rawPosture === 'UNKNOWN' ? 'default(HOT)' : 'website-classified'} · needs_dm_enrichment=true · email_source=${emailSource}`
     });
   }
 
