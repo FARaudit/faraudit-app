@@ -7,7 +7,8 @@ import type {
   OpportunityRow,
   AuditRow,
   KORow,
-  AgencyRow
+  AgencyRow,
+  DefenseSpendingRow
 } from "@/lib/bd-os/queries";
 import { auditDisplayName, auditHref, displaySolicitationId } from "@/lib/audit-display";
 import NaicsCombobox from "@/components/NaicsCombobox";
@@ -44,6 +45,7 @@ interface Props {
   recentAudits: AuditRow[];
   kos: KORow[];
   agencies: AgencyRow[];
+  defenseSpending: DefenseSpendingRow[];
 }
 
 const FILTERS: FilterKey[] = ["All", "P0 · P1", "≤7 Days", "Small Business", "IDIQ", "Pre-Sol"];
@@ -54,7 +56,7 @@ const TAB_KEYS: TabKey[] = [
   "protests", "regulatory", "cmmc", "wages", "teaming"
 ];
 
-export default function HomeClient({ user, counter, opportunities: initialOpportunities, recentAudits: initialRecentAudits, kos, agencies }: Props) {
+export default function HomeClient({ user, counter, opportunities: initialOpportunities, recentAudits: initialRecentAudits, kos, agencies, defenseSpending }: Props) {
   const router = useRouter();
   // Locally-mutable audit list — pinning/unpinning from Past Audits flips
   // in_pipeline on the matching row so the Pipeline Kanban re-derives without
@@ -1008,7 +1010,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
 
             {/* BUDGET — live USAspending.gov */}
             <div className={`tab-panel ${tab === "defense-spending" ? "active" : ""}`}>
-              <BudgetPanel naicsOptions={naicsOptions} />
+              <DefenseSpendingPanel defenseSpending={defenseSpending} naicsOptions={naicsOptions} />
             </div>
 
             {/* NEWS — live RSS aggregation */}
@@ -2285,6 +2287,229 @@ const DEFENSE_NAICS: Array<{ code: string; label: string }> = [
 
 interface MultiYearRecipient { name: string; amounts: Record<number, number>; total: number; trend: "up" | "down" | "flat" }
 interface MultiYearAgency { agency: string; amounts: Record<number, number>; total: number; yoyPct: number | null }
+
+// ─── FA-96: Defense Spending Intel — 8 sections ───────────────────────────
+function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpending: DefenseSpendingRow[]; naicsOptions: string[] }) {
+  // NAICS dropdown — default to first NAICS that has data (likely 336413),
+  // fall back to first naicsOptions, fall back to 336413.
+  const naicsWithData = useMemo(() => Array.from(new Set(defenseSpending.map((r) => r.naics_code))).sort(), [defenseSpending]);
+  const naicsList = naicsWithData.length > 0 ? naicsWithData : (naicsOptions.length > 0 ? naicsOptions : ["336413"]);
+  const [selectedNaics, setSelectedNaics] = useState<string>(naicsList[0]);
+  const current = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2026) || null, [defenseSpending, selectedNaics]);
+  const prior   = useMemo(() => defenseSpending.find((r) => r.naics_code === selectedNaics && r.fiscal_year === 2025) || null, [defenseSpending, selectedNaics]);
+  const refreshed = current?.refreshed_at || prior?.refreshed_at;
+
+  const [showPrimes, setShowPrimes] = useState(false);
+  // Section 7 — live Treasury MTS macro signal (client fetch, not cached)
+  const [treasury, setTreasury] = useState<{ ytd: number | null; loading: boolean; error: string | null }>({ ytd: null, loading: true, error: null });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = "https://fiscaldata.treasury.gov/api/v1/accounting/mts/mts_table_5?fields=classification_desc,current_fytd_net_outly_amt&filter=classification_desc:eq:Department%20of%20Defense--Military%20Programs&sort=-record_date&page[size]=1";
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const j = await res.json() as { data?: Array<{ current_fytd_net_outly_amt?: string }> };
+        const raw = j.data?.[0]?.current_fytd_net_outly_amt;
+        const ytd = raw ? Number(raw) : null;
+        if (!cancelled) setTreasury({ ytd: ytd && Number.isFinite(ytd) ? ytd * 1_000_000 : null, loading: false, error: null });
+      } catch (e) {
+        if (!cancelled) setTreasury({ ytd: null, loading: false, error: e instanceof Error ? e.message : "fetch failed" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const fmt = (v: number | null): string => {
+    if (v == null) return "—";
+    if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
+    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `$${Math.round(v / 1_000)}K`;
+    return `$${v.toFixed(0)}`;
+  };
+  const fmtPct = (v: number | null): string => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
+  // No data path — show empty state with NAICS dropdown still visible
+  const hasData = defenseSpending.length > 0;
+
+  return (
+    <div className="intel-tab-content">
+      {/* SECTION 7 — Treasury MTS macro banner (top, full-width) */}
+      <div className="intel-section" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "rgba(96,165,250,.08)", border: "1px solid rgba(96,165,250,.25)", borderRadius: 4, fontFamily: "var(--mono)", fontSize: 11 }}>
+          <span style={{ color: "var(--blue)", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>🇺🇸 Macro Signal</span>
+          <span style={{ color: "var(--text)" }}>
+            {treasury.loading ? "Loading latest Treasury MTS…"
+              : treasury.error ? `Treasury MTS unavailable (${treasury.error})`
+              : treasury.ytd != null ? `DoD–Military Programs FYTD outlays: ${fmt(treasury.ytd)} (latest U.S. Treasury MTS)`
+              : "Treasury MTS returned no data"}
+          </span>
+        </div>
+      </div>
+
+      {/* SECTION 1 — NAICS selector + KPIs */}
+      <div className="intel-section">
+        <div className="is-header">
+          <div className="is-title">Your Market · NAICS {selectedNaics}</div>
+          <div className="is-refresh">
+            <select
+              value={selectedNaics}
+              onChange={(e) => setSelectedNaics(e.target.value)}
+              style={{ fontFamily: "var(--mono)", fontSize: 11, padding: "5px 8px", background: "rgba(3,8,16,.6)", border: "1px solid var(--border2)", borderRadius: 3, color: "var(--text)", outline: "none" }}
+            >
+              {naicsList.map((n) => (<option key={n} value={n}>{n}</option>))}
+            </select>
+            <span>{refreshed ? `Refreshed ${new Date(refreshed).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "Data refreshing nightly"}</span>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 6 }}>
+          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>FY2026 Obligations</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 4 }}>{fmt(current?.total_obligations ?? null)}</div>
+          </div>
+          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>YoY Δ</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: current?.yoy_delta_pct != null ? (current.yoy_delta_pct >= 0 ? "var(--green)" : "var(--red)") : "var(--t40)", marginTop: 4 }}>{fmtPct(current?.yoy_delta_pct ?? null)}</div>
+          </div>
+          <div style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "14px 16px" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em" }}>SB Set-Aside %</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--gold)", marginTop: 4 }}>{current?.sb_pct != null ? `${current.sb_pct.toFixed(1)}%` : "—"}</div>
+          </div>
+        </div>
+      </div>
+
+      {!hasData && (
+        <div className="intel-section">
+          <div className="empty-state">Defense spending data refreshing nightly. Run agents/defense-spending agent to populate. NAICS 336413 already seeded; other NAICS pending.</div>
+        </div>
+      )}
+
+      {/* SECTION 2 — Top competitors */}
+      <div className="intel-section">
+        <div className="is-header"><div className="is-title">Top Competitors · FY2026</div><div className="is-refresh">From USAspending · 10 max</div></div>
+        {current?.top_recipients && current.top_recipients.length > 0 ? (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "50px 1fr 160px 100px" }}>
+              <span>Rank</span><span>Company</span><span>FY2026 Obligations</span><span>USAspending</span>
+            </div>
+            {current.top_recipients.slice(0, 10).map((r, i) => {
+              const priorMatch = prior?.top_recipients?.find((p) => p.name === r.name);
+              const trend = priorMatch ? r.amount - priorMatch.amount : 0;
+              return (
+                <div key={`${r.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "50px 1fr 160px 100px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>{i + 1}</span>
+                  <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{r.name}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(r.amount)}{priorMatch && <span style={{ marginLeft: 8, color: trend > 0 ? "var(--green)" : trend < 0 ? "var(--red)" : "var(--t40)", fontSize: 9 }}>{trend > 0 ? "▲" : trend < 0 ? "▼" : "—"}</span>}</span>
+                  <a href={`https://www.usaspending.gov/search/?hash=&recipients=${encodeURIComponent(r.name)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--blue)" }}>View →</a>
+                </div>
+              );
+            })}
+          </div>
+        ) : (<div className="empty-state">No competitor data yet for this NAICS.</div>)}
+      </div>
+
+      {/* SECTION 3 — Agency heat map */}
+      <div className="intel-section">
+        <div className="is-header"><div className="is-title">Awarding Agencies · FY2026</div><div className="is-refresh">Top 10 by total obligations</div></div>
+        {current?.agency_breakdown && current.agency_breakdown.length > 0 ? (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "1fr 160px 100px" }}>
+              <span>Agency</span><span>FY2026 Obligations</span><span>USAspending</span>
+            </div>
+            {current.agency_breakdown.slice(0, 10).map((a, i) => (
+              <div key={`${a.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1fr 160px 100px" }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{a.name}</span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(a.amount)}</span>
+                <a href={`https://www.usaspending.gov/search/?hash=&awarding_agencies=${encodeURIComponent(a.name)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--blue)" }}>View →</a>
+              </div>
+            ))}
+          </div>
+        ) : (<div className="empty-state">No agency data yet for this NAICS.</div>)}
+      </div>
+
+      {/* SECTION 4 — Recompete radar */}
+      <div className="intel-section">
+        <div className="is-header"><div className="is-title">Recompete Radar</div><div className="is-refresh">Contracts expiring soon · sourced from USAspending</div></div>
+        {(["recompetes_expiring_90d","recompetes_expiring_180d"] as const).map((key) => {
+          const rows = current?.[key] || [];
+          const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring ≤180 days";
+          return (
+            <div key={key} style={{ marginBottom: 12 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)", marginBottom: 6 }}>{label} · {rows.length}</div>
+              {rows.length > 0 ? (
+                <div className="sam-table">
+                  <div className="sam-th" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
+                    <span>Award ID</span><span>Incumbent</span><span>Value</span><span>Agency</span><span>Expires</span>
+                  </div>
+                  {rows.slice(0, 10).map((r, i) => (
+                    <div key={`${r.award_id}-${i}`} className="sam-row" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.award_id.slice(0, 16)}</span>
+                      <span style={{ fontFamily: "var(--serif)", fontSize: 11, color: "var(--text)" }}>{r.recipient}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(r.amount)}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)" }}>{r.agency}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: key === "recompetes_expiring_90d" ? "var(--red)" : "var(--amber)" }}>{r.end_date.slice(0, 10)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (<div className="empty-state" style={{ padding: "12px 0" }}>None.</div>)}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* SECTION 5 — Geographic concentration */}
+      <div className="intel-section">
+        <div className="is-header"><div className="is-title">Geographic Concentration · FY2026</div><div className="is-refresh">Top 10 states by place of performance</div></div>
+        {current?.state_breakdown && current.state_breakdown.length > 0 ? (() => {
+          const total = current.state_breakdown.reduce((acc, s) => acc + s.amount, 0);
+          return (
+            <div className="sam-table">
+              <div className="sam-th" style={{ gridTemplateColumns: "80px 1fr 130px 100px" }}>
+                <span>State</span><span></span><span>Obligations</span><span>% of top 10</span>
+              </div>
+              {current.state_breakdown.slice(0, 10).map((s) => (
+                <div key={s.state} className="sam-row" style={{ gridTemplateColumns: "80px 1fr 130px 100px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 13, color: "var(--gold)", fontWeight: 700 }}>{s.state}</span>
+                  <span></span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(s.amount)}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--t60)" }}>{total > 0 ? `${(s.amount / total * 100).toFixed(1)}%` : "—"}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })() : (<div className="empty-state">No state data yet for this NAICS.</div>)}
+      </div>
+
+      {/* SECTION 6 — Contract vehicle breakdown (placeholder while we resolve USAspending endpoint) */}
+      <div className="intel-section">
+        <div className="is-header"><div className="is-title">Contract Vehicle Breakdown</div><div className="is-refresh">Pricing-type categorization (USAspending endpoint pending)</div></div>
+        {current?.contract_type_breakdown && current.contract_type_breakdown.length > 0 ? (
+          <div className="sam-table">
+            <div className="sam-th" style={{ gridTemplateColumns: "1fr 160px" }}><span>Type</span><span>Obligations</span></div>
+            {current.contract_type_breakdown.map((c, i) => (
+              <div key={`${c.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1fr 160px" }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)" }}>{c.name}</span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)" }}>{fmt(c.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (<div className="empty-state">USAspending `contract_pricing_type_codes` category returns 404 — endpoint name verification pending.</div>)}
+      </div>
+
+      {/* SECTION 8 — DoD-wide primes (collapsible) */}
+      <div className="intel-section">
+        <button
+          type="button"
+          onClick={() => setShowPrimes((v) => !v)}
+          style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--gold)", background: "transparent", border: "none", padding: "8px 0", cursor: "pointer" }}
+        >
+          {showPrimes ? "▼ Hide" : "▶ Show"} DoD-Wide Prime Contractors
+        </button>
+        {showPrimes && <BudgetPanel naicsOptions={naicsOptions} />}
+      </div>
+    </div>
+  );
+}
 
 function BudgetPanel(_props: { naicsOptions: string[] }) {
   // FIX 4: NAICS filter removed from Defense Spending. The page shows DoD-wide

@@ -171,6 +171,39 @@ export interface AuditRow {
   prime_sub: "prime" | "sub" | null;
 }
 
+// ─── Tab 4: Defense Spending Intel (FA-96) ────────────────────────────────
+export interface DefenseRecipient { name: string; amount: number }
+export interface DefenseRecompete { award_id: string; recipient: string; amount: number; agency: string; end_date: string }
+export interface DefenseStateBucket { state: string; amount: number }
+
+export interface DefenseSpendingRow {
+  id: string;
+  naics_code: string;
+  fiscal_year: number;
+  total_obligations: number | null;
+  sb_obligations: number | null;
+  sb_pct: number | null;
+  top_recipients: DefenseRecipient[] | null;
+  agency_breakdown: DefenseRecipient[] | null;
+  state_breakdown: DefenseStateBucket[] | null;
+  contract_type_breakdown: DefenseRecipient[] | null;
+  recompetes_expiring_90d: DefenseRecompete[] | null;
+  recompetes_expiring_180d: DefenseRecompete[] | null;
+  yoy_delta_pct: number | null;
+  refreshed_at: string;
+}
+
+export async function fetchDefenseSpending(client: SupabaseClient, naicsCode?: string): Promise<DefenseSpendingRow[]> {
+  let q = client.from("defense_spending_intel").select("*").order("fiscal_year", { ascending: false });
+  if (naicsCode) q = q.eq("naics_code", naicsCode);
+  const { data, error } = await q;
+  if (error) {
+    console.error(`fetchDefenseSpending: ${error.message}`);
+    return [];
+  }
+  return (data as DefenseSpendingRow[]) || [];
+}
+
 export async function fetchRecentAudits(
   client: SupabaseClient,
   limit = 25

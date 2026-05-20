@@ -1,0 +1,19 @@
+{
+  "name": "defense-spending",
+  "version": "0.1.0",
+  "description": "FARaudit Defense Spending Intel — nightly cron that queries USAspending API v2 and populates defense_spending_intel for each FARaudit NAICS code. No auth required at USAspending; service-role auth at Supabase.",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "once": "tsx index.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.21.0"
+  }
+}

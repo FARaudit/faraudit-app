@@ -5,7 +5,8 @@ import {
   fetchOpportunities,
   fetchRecentAudits,
   fetchKOs,
-  fetchAgencyStats
+  fetchAgencyStats,
+  fetchDefenseSpending
 } from "@/lib/bd-os/queries";
 import HomeClient from "./HomeClient";
 import "./home.css";
@@ -20,12 +21,13 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const [counter, opportunities, recentAudits, kos, agencies] = await Promise.all([
+  const [counter, opportunities, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
     fetchOpportunities(supabase, { limit: 200 }).catch(() => []),
     fetchRecentAudits(supabase, 200).catch(() => []),
     fetchKOs(supabase).catch(() => []),
-    fetchAgencyStats(supabase).catch(() => [])
+    fetchAgencyStats(supabase).catch(() => []),
+    fetchDefenseSpending(supabase).catch(() => [])
   ]);
 
   return (
@@ -36,6 +38,7 @@ export default async function HomePage() {
       recentAudits={recentAudits}
       kos={kos}
       agencies={agencies}
+      defenseSpending={defenseSpending}
     />
   );
 }
