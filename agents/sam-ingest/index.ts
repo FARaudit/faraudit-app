@@ -126,6 +126,7 @@ async function main() {
       document_type: classifyDocType(o.type),
       response_deadline: o.responseDeadLine || null,
       risk_level: classifyRisk(o, new Date()),
+      award_ceiling: (o as any).awardCeiling ?? (o as any).baseAndAllOptionsValue ?? null,
       pdf_url: pdfUrl,
       source: "sam_live" as const,
       notes: o.uiLink ? `posted ${o.postedDate} · ${o.uiLink}` : `posted ${o.postedDate}`

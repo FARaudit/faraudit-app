@@ -95,6 +95,9 @@ export interface OpportunityRow {
   // notice_id exists with status='complete'. Computed at fetch time, NOT
   // a real column on pending_audits. Drives the AUDIT badge in the UI.
   is_audited: boolean;
+  // FA-89g: SAM-derived award ceiling (USD). Either awardCeiling or
+  // baseAndAllOptionsValue on the SAM payload, whichever the agency populated.
+  award_ceiling: number | null;
   created_at: string;
   processed_at: string | null;
 }
@@ -114,7 +117,7 @@ export async function fetchOpportunities(
   // risk_level + response_deadline added in migration 020 (2026-05-07); same
   // graceful-degradation pattern — RICH includes them, BASIC stays without
   // them, falls through if either migration is unapplied.
-  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, title_plain, created_at, processed_at";
+  const RICH = "id, notice_id, solicitation_number, title, agency, naics_code, set_aside, document_type, incumbent_name, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, risk_level, response_deadline, in_pipeline, watched, title_plain, award_ceiling, created_at, processed_at";
   const BASIC = "id, notice_id, title, agency, naics_code, set_aside, source, status, recommendation, compliance_score, bid_no_bid, pdf_url, created_at, processed_at";
   let rawRows: unknown[] = [];
   for (const cols of [RICH, BASIC]) {
@@ -140,7 +143,7 @@ export async function fetchOpportunities(
   const { data: auditedRows } = await client.from("audits").select("notice_id").eq("status", "complete");
   const auditedSet = new Set((auditedRows || []).map((r: { notice_id: string | null }) => r.notice_id).filter(Boolean) as string[]);
   return rawRows.map((r) => {
-    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, ...(r as object) } as OpportunityRow;
+    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, ...(r as object) } as OpportunityRow;
     base.is_audited = auditedSet.has(base.notice_id);
     return base;
   });

@@ -73,6 +73,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   const [oppSearch, setOppSearch] = useState("");
   const [oppSetAside, setOppSetAside] = useState<string>("All");
   const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "watched">("active");
+  const [oppValue, setOppValue] = useState<string>("all");
   const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "risk", dir: "asc" });
   // FA-89e: ephemeral per-row "just pinned" confirmation — keyed by notice_id,
   // value is Date.now() of the pin event. Used to render "Pinned ✓" + a "View
@@ -166,6 +167,14 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // Today-tab "filter" chip enum above. Composes 4 dimensions (search,
   // set-aside, deadline, sort) and excludes rows without a real solicitation
   // number so the demo never lands on a UUID-prefilled audit.
+  // FA-89g: compact USD formatter for award_ceiling. $1.2M / $450K / $1,234.
+  const formatValue = (v: number | null): string => {
+    if (v == null) return "";
+    if (v >= 1000000) return "$" + (v / 1000000).toFixed(1) + "M";
+    if (v >= 1000)    return "$" + Math.round(v / 1000) + "K";
+    return "$" + v;
+  };
+
   // FA-89 display helpers — strip SAM PSC prefix (e.g. "N083--", "Y1BG--") and
   // title-case the result so the demo shows readable solicitation titles.
   const cleanTitle = (raw: string | null): string => {
@@ -200,6 +209,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
     if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
     if (oppDeadline === "watched") rows = rows.filter((r) => r.row.watched === true);
+    if (oppValue === "<100k")     rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling < 100000);
+    if (oppValue === "100k-500k") rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling >= 100000 && r.row.award_ceiling <= 500000);
+    if (oppValue === "500k-1m")   rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 500000 && r.row.award_ceiling <= 1000000);
+    if (oppValue === ">1m")       rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 1000000);
     const riskOrder: Record<string, number> = { rp0: 0, rp1: 1, rp2: 2, "": 3 };
     rows = [...rows].sort((a, b) => {
       if (oppSort.key === "risk") {
@@ -228,7 +241,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
       return 0;
     });
     return rows;
-  }, [enriched, naics, oppSearch, oppSetAside, oppDeadline, oppSort]);
+  }, [enriched, naics, oppSearch, oppSetAside, oppDeadline, oppValue, oppSort]);
 
   const p0Rows = filtered.filter((r) => r.risk === "rp0");
   const otherRows = filtered.filter((r) => r.risk !== "rp0");
@@ -752,6 +765,42 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       })}
                     </div>
 
+                    {/* Value filter */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
+                        Value
+                      </span>
+                      {([
+                        ["all", "All"],
+                        ["<100k", "Under $100K"],
+                        ["100k-500k", "$100K–$500K"],
+                        ["500k-1m", "$500K–$1M"],
+                        [">1m", "Over $1M"]
+                      ] as const).map(([val, lbl]) => {
+                        const active = oppValue === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setOppValue(val)}
+                            style={{
+                              padding: "4px 12px",
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: active ? "1px solid var(--green)" : "1px solid var(--border)",
+                              background: active ? "rgba(16,185,129,.14)" : "transparent",
+                              color: active ? "var(--green)" : "var(--t40)",
+                              transition: "all .15s"
+                            }}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+
                   </div>
 
                   {/* Sortable column header */}
@@ -882,7 +931,12 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           </div>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Vet", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", justifySelf: "center", display: "flex", justifyContent: "center", alignItems: "center" }}>{r.daysLabel}</span>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center", justifyContent: "center", gap: 2 }}>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center" }}>{r.daysLabel}</span>
+                            {r.row.award_ceiling != null && (
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 600, color: "var(--green)", textAlign: "center", opacity: 0.85 }}>{formatValue(r.row.award_ceiling)}</span>
+                            )}
+                          </div>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.riskLabel || "—"}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
                           <div style={{ display: "flex", gap: 4 }}>
