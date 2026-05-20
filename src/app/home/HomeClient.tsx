@@ -76,7 +76,10 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   const [oppSetAside, setOppSetAside] = useState<string>("All");
   const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "watched">("active");
   const [oppValue, setOppValue] = useState<string>("all");
-  const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "risk", dir: "asc" });
+  const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "signal", dir: "asc" });
+  // FA-89i: collapsible filter bar + per-row hover state for action overflow.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   // FA-89e: ephemeral per-row "just pinned" confirmation — keyed by notice_id,
   // value is Date.now() of the pin event. Used to render "Pinned ✓" + a "View
   // in Pipeline →" link for ~2s after a successful pin, then revert to the
@@ -99,6 +102,28 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // PastAuditsPanel's "p0" filter both use compliance_score < 40 so the math
   // is identical · numbers stay consistent across the click.
   const [pastAuditsFilter, setPastAuditsFilter] = useState<"all" | "p0" | "user">("all");
+
+  // FA-89i FIX 4: reset Opportunities filters whenever the tab becomes active —
+  // returning to a clean default view instead of stale filter state from a
+  // prior visit (which often hid the seeded demo rows behind a forgotten chip).
+  useEffect(() => {
+    if (tab === "opportunities") {
+      setOppDeadline("active");
+      setOppSearch("");
+      setOppSetAside("All");
+      setOppValue("all");
+      setFiltersOpen(false);
+    }
+  }, [tab]);
+
+  // FA-89i FIX 5: sync local recentAudits with refreshed prop. After a pin/
+  // unpin POST, togglePatch calls router.refresh() which re-runs page.tsx and
+  // delivers a fresh initialRecentAudits prop with the new stub row included.
+  // useState's lazy initializer would otherwise ignore the new prop, so we
+  // explicitly sync here so the Pipeline Kanban picks up the new audit.
+  useEffect(() => {
+    setRecentAudits(initialRecentAudits);
+  }, [initialRecentAudits]);
 
   const setTab = (next: TabKey) => {
     setTabState(next);
@@ -217,7 +242,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppValue === ">1m")       rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 1000000);
     const riskOrder: Record<string, number> = { rp0: 0, rp1: 1, rp2: 2, "": 3 };
     rows = [...rows].sort((a, b) => {
-      if (oppSort.key === "risk") {
+      if (oppSort.key === "risk" || oppSort.key === "signal") {
         const rDiff = (riskOrder[a.risk] ?? 3) - (riskOrder[b.risk] ?? 3);
         if (rDiff !== 0) return oppSort.dir === "asc" ? rDiff : -rDiff;
         return (a.daysNum ?? 9999) - (b.daysNum ?? 9999);
@@ -667,29 +692,47 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     ))}
                   </div>
 
-                  {/* Filter bar — 3 rows */}
+                  {/* FA-89i CHANGE 1: collapsible filter bar — search always visible,
+                       chip rows hidden by default behind a FILTERS toggle. */}
+                  {(() => {
+                    const anyActive = oppSetAside !== "All" || oppDeadline !== "active" || oppValue !== "all";
+                    return (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="Search by title, agency, or solicitation number..."
+                          value={oppSearch}
+                          onChange={(e) => setOppSearch(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: "8px 12px",
+                            fontSize: 12,
+                            borderRadius: 6,
+                            border: ".5px solid var(--border2)",
+                            background: "var(--void3)",
+                            color: "var(--text)",
+                            outline: "none"
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFiltersOpen((v) => !v)}
+                          style={{
+                            fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700,
+                            letterSpacing: ".08em", textTransform: "uppercase",
+                            color: anyActive ? "var(--amber)" : "var(--t40)",
+                            background: "transparent", border: "none", cursor: "pointer",
+                            padding: "4px 8px", display: "flex", alignItems: "center", gap: 4
+                          }}
+                        >
+                          Filters {filtersOpen ? "▲" : "▼"}{anyActive && <span style={{ color: "var(--amber)", fontSize: 14, lineHeight: 1 }}>•</span>}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
-                  {/* Row 1: Search */}
-                  <div style={{ marginBottom: 8 }}>
-                    <input
-                      type="text"
-                      placeholder="Search by title, agency, or solicitation number..."
-                      value={oppSearch}
-                      onChange={(e) => setOppSearch(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        fontSize: 12,
-                        borderRadius: 6,
-                        border: ".5px solid var(--border2)",
-                        background: "var(--void3)",
-                        color: "var(--text)",
-                        outline: "none"
-                      }}
-                    />
-                  </div>
-
-                  {/* Rows 2 & 3: Set-aside + Deadline filters */}
+                  {/* Chip rows — collapsed by default */}
+                  {filtersOpen && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
 
                     {/* Set-aside filter */}
@@ -804,16 +847,16 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     </div>
 
                   </div>
+                  )}
 
-                  {/* Sortable column header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 80px 70px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
+                  {/* Sortable column header — FA-89i: 7 cols (DEADLINE+RISK merged into SIGNAL) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 110px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
                     {[
                       { key: "sol",       label: "Sol #",     sortable: false },
                       { key: "title",     label: "Title / AI Summary", sortable: true },
                       { key: "agency",    label: "Agency",    sortable: true },
                       { key: "set-aside", label: "Set-Aside", sortable: false },
-                      { key: "deadline",  label: "Deadline",  sortable: true },
-                      { key: "risk",      label: "Risk",      sortable: true },
+                      { key: "signal",    label: "Signal",    sortable: true },
                       { key: "audit",     label: "Audit",     sortable: false },
                       { key: "actions",   label: "Actions",   sortable: false }
                     ].map((col) => (
@@ -912,6 +955,13 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             updateOpportunity(r.row.notice_id, { [field]: !next });
                             return;
                           }
+                          // FA-89i FIX 5: refresh page Server Component so the
+                          // Pipeline Kanban picks up the new/removed stub audit
+                          // row immediately. Pairs with the initialRecentAudits
+                          // sync useEffect at the top of HomeClient.
+                          if (field === "in_pipeline") {
+                            router.refresh();
+                          }
                           // Flash "Pinned ✓ → View in Pipeline" for ~2s on pipeline pin success.
                           if (field === "in_pipeline" && next === true) {
                             const ts = Date.now();
@@ -931,11 +981,14 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       };
                       const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
 
+                      const isHovered = hoveredRowId === r.row.notice_id;
                       return (
                         <div
                           key={r.row.id}
+                          onMouseEnter={() => setHoveredRowId(r.row.notice_id)}
+                          onMouseLeave={() => setHoveredRowId((curr) => curr === r.row.notice_id ? null : curr)}
                           style={{
-                            display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 80px 70px 100px 180px", gap: 8,
+                            display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 110px 100px 180px", gap: 8,
                             padding: "8px 10px", borderBottom: "1px solid var(--border)", alignItems: "center",
                             background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : r.row.watched ? "rgba(245,158,11,.04)" : "transparent",
                             transition: "background .15s"
@@ -957,49 +1010,59 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           </div>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Vet", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center", justifyContent: "center", gap: 2 }}>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center" }}>{r.daysLabel}</span>
-                            {r.row.award_ceiling != null && (
-                              <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 600, color: "var(--t40)", textAlign: "center" }}>{formatValue(r.row.award_ceiling)}</span>
-                            )}
+                          {/* FA-89i: merged SIGNAL cell — daysLabel above, risk pill below */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifySelf: "center", justifyContent: "center", gap: 3 }}>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)", textAlign: "center", lineHeight: 1 }}>{r.daysLabel}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, lineHeight: 1, letterSpacing: ".06em" }}>{r.riskLabel || "—"}</span>
                           </div>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.riskLabel || "—"}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
-                          <div style={{ display: "flex", gap: 4 }}>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); onOpenAudit(); }}
-                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "var(--gold)", color: "var(--void)", border: "1px solid var(--gold)" }}
-                            >
-                              Audit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
-                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.watched ? "rgba(245,158,11,.14)" : "transparent", color: r.row.watched ? "var(--amber)" : "var(--t60)", border: `1px solid ${r.row.watched ? "rgba(245,158,11,.5)" : "var(--border2)"}` }}
-                            >
-                              {r.row.watched ? "Watching" : "Watch"}
-                            </button>
-                            {isJustPinned ? (
-                              <a
-                                href="/home#pipeline"
-                                onClick={(e) => { e.stopPropagation(); }}
-                                style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "rgba(96,165,250,.22)", color: "var(--blue)", border: "1px solid rgba(96,165,250,.7)", textDecoration: "none", whiteSpace: "nowrap" }}
-                                title="Pinned to Pipeline — click to view"
-                              >
-                                Pinned ✓ → Pipeline
-                              </a>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
-                                style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.in_pipeline ? "rgba(96,165,250,.14)" : "transparent", color: r.row.in_pipeline ? "var(--blue)" : "var(--t60)", border: `1px solid ${r.row.in_pipeline ? "rgba(96,165,250,.5)" : "var(--border2)"}` }}
-                                title={r.row.in_pipeline ? "View in Pipeline tab — click to unpin" : "Add to Pipeline"}
-                              >
-                                {r.row.in_pipeline ? "Pinned" : "Pipeline"}
-                              </button>
-                            )}
-                          </div>
+                          {/* FA-89i CHANGE 3: Audit always-visible primary; Watch + Pipeline reveal on hover.
+                              Pinned ✓ flash + already-pinned/watched states stay visible so user can see active state at a glance. */}
+                          {(() => {
+                            const watched = r.row.watched === true;
+                            const pinned  = r.row.in_pipeline === true;
+                            // Hover-conditioned visibility on the secondary actions —
+                            // but keep them visible when active so the row reflects state.
+                            const showWatch = isHovered || watched;
+                            const showPipe  = isHovered || pinned || isJustPinned;
+                            return (
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onOpenAudit(); }}
+                                  style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "var(--gold)", color: "var(--void)", border: "1px solid var(--gold)" }}
+                                >
+                                  Audit →
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
+                                  style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: watched ? "rgba(245,158,11,.14)" : "transparent", color: watched ? "var(--amber)" : "var(--t60)", border: `1px solid ${watched ? "rgba(245,158,11,.5)" : "var(--border2)"}`, opacity: showWatch ? 1 : 0, pointerEvents: showWatch ? "auto" : "none", transition: "opacity .15s" }}
+                                >
+                                  {watched ? "Watching" : "Watch"}
+                                </button>
+                                {isJustPinned ? (
+                                  <a
+                                    href="/home#pipeline"
+                                    onClick={(e) => { e.stopPropagation(); }}
+                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "rgba(96,165,250,.22)", color: "var(--blue)", border: "1px solid rgba(96,165,250,.7)", textDecoration: "none", whiteSpace: "nowrap", opacity: 1, transition: "opacity .15s" }}
+                                    title="Pinned to Pipeline — click to view"
+                                  >
+                                    Pinned ✓ → Pipeline
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
+                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: pinned ? "rgba(96,165,250,.14)" : "transparent", color: pinned ? "var(--blue)" : "var(--t60)", border: `1px solid ${pinned ? "rgba(96,165,250,.5)" : "var(--border2)"}`, opacity: showPipe ? 1 : 0, pointerEvents: showPipe ? "auto" : "none", transition: "opacity .15s" }}
+                                    title={pinned ? "View in Pipeline tab — click to unpin" : "Add to Pipeline"}
+                                  >
+                                    {pinned ? "Pinned" : "Pipeline"}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
