@@ -72,7 +72,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // FA-89 Opportunities tab filters
   const [oppSearch, setOppSearch] = useState("");
   const [oppSetAside, setOppSetAside] = useState<string>("All");
-  const [oppDeadline, setOppDeadline] = useState<"all" | "<=3" | "<=7" | "<=30" | "expired">("all");
+  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired">("active");
   const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "risk", dir: "asc" });
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
@@ -188,6 +188,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppSetAside !== "All") {
       rows = rows.filter((r) => r.saLabel === oppSetAside);
     }
+    if (oppDeadline === "active")  rows = rows.filter((r) => r.daysNum == null || r.daysNum >= 0);
     if (oppDeadline === "<=3")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 3);
     if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
     if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
@@ -632,7 +633,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   {/* KPI strip — totals from the unfiltered enriched set */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
                     {[
-                      { label: "Active", value: enriched.filter((r) => !!r.row.solicitation_number).length, color: "var(--text)" },
+                      { label: "Active", value: enriched.filter((r) => !!r.row.solicitation_number && (r.daysNum == null || r.daysNum >= 0)).length, color: "var(--text)" },
                       { label: "P0 Risk", value: enriched.filter((r) => r.risk === "rp0").length, color: "var(--red)" },
                       { label: "Expiring ≤7d", value: enriched.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7).length, color: "var(--amber)" },
                       { label: "In Pipeline", value: opportunities.filter((o) => o.in_pipeline === true).length, color: "var(--blue)" }
@@ -712,6 +713,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         Deadline
                       </span>
                       {([
+                        ["active", "Active"],
                         ["all", "All Deadlines"],
                         ["<=3", "≤ 3 Days"],
                         ["<=7", "≤ 7 Days"],
@@ -841,7 +843,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
                           <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{cleanTitle(r.row.title)}</span>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{r.saLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Service-Disabled Veteran", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)" }}>{r.daysLabel}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center" }}>{r.riskLabel || "—"}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center" }}>{r.auditStatusLabel}</span>
@@ -1059,10 +1061,10 @@ function enrichRow(row: OpportunityRow): Enriched {
   else if (sa.includes("small")) { saCls = "sb"; saLabel = "SB"; }
 
   const statusMap: Record<string, { cls: Enriched["auditStatusCls"]; label: string }> = {
-    complete:   { cls: "complete",   label: "Audited ✓" },
+    complete:   { cls: "complete",   label: "Audited" },
     processing: { cls: "processing", label: "Auditing…" },
     failed:     { cls: "failed",     label: "Failed" },
-    pending:    { cls: "pending",    label: "Pending" }
+    pending:    { cls: "pending",    label: "Not Audited" }
   };
   const auditEntry = statusMap[row.status ?? ""] ?? { cls: "none" as const, label: "—" };
 
