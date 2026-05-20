@@ -54,7 +54,7 @@ const TAB_KEYS: TabKey[] = [
   "protests", "regulatory", "cmmc", "wages", "teaming"
 ];
 
-export default function HomeClient({ user, counter, opportunities, recentAudits: initialRecentAudits, kos, agencies }: Props) {
+export default function HomeClient({ user, counter, opportunities: initialOpportunities, recentAudits: initialRecentAudits, kos, agencies }: Props) {
   const router = useRouter();
   // Locally-mutable audit list — pinning/unpinning from Past Audits flips
   // in_pipeline on the matching row so the Pipeline Kanban re-derives without
@@ -63,6 +63,17 @@ export default function HomeClient({ user, counter, opportunities, recentAudits:
   const updateAudit = useCallback((id: string, patch: Partial<AuditRow>) => {
     setRecentAudits((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }, []);
+  // FA-89: opportunities lifted to state so Watch/Pipeline toggles in the
+  // Opportunities tab can optimistically reflect without a page reload.
+  const [opportunities, setOpportunities] = useState<OpportunityRow[]>(initialOpportunities);
+  const updateOpportunity = useCallback((noticeId: string, patch: Partial<OpportunityRow>) => {
+    setOpportunities((prev) => prev.map((o) => (o.notice_id === noticeId ? { ...o, ...patch } : o)));
+  }, []);
+  // FA-89 Opportunities tab filters
+  const [oppSearch, setOppSearch] = useState("");
+  const [oppSetAside, setOppSetAside] = useState<string>("All");
+  const [oppDeadline, setOppDeadline] = useState<"all" | "<=3" | "<=7" | "<=30" | "expired">("all");
+  const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "risk", dir: "asc" });
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
   // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
@@ -145,6 +156,61 @@ export default function HomeClient({ user, counter, opportunities, recentAudits:
       return true;
     });
   }, [enriched, filter, naics]);
+
+  // FA-89: Opportunities tab-specific filter + sort. Independent from the
+  // Today-tab "filter" chip enum above. Composes 4 dimensions (search,
+  // set-aside, deadline, sort) and excludes rows without a real solicitation
+  // number so the demo never lands on a UUID-prefilled audit.
+  const oppRows = useMemo(() => {
+    let rows = enriched.filter((r) => !!r.row.solicitation_number);
+    if (naics && naics !== "all") {
+      rows = rows.filter((r) => r.row.naics_code === naics);
+    }
+    if (oppSearch.trim()) {
+      const q = oppSearch.toLowerCase();
+      rows = rows.filter((r) =>
+        (r.row.title ?? "").toLowerCase().includes(q) ||
+        (r.row.agency ?? "").toLowerCase().includes(q) ||
+        (r.row.solicitation_number ?? "").toLowerCase().includes(q) ||
+        (r.row.notice_id ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (oppSetAside !== "All") {
+      rows = rows.filter((r) => r.saLabel === oppSetAside);
+    }
+    if (oppDeadline === "<=3")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 3);
+    if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
+    if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
+    if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
+    const riskOrder: Record<string, number> = { rp0: 0, rp1: 1, rp2: 2, "": 3 };
+    rows = [...rows].sort((a, b) => {
+      if (oppSort.key === "risk") {
+        const rDiff = (riskOrder[a.risk] ?? 3) - (riskOrder[b.risk] ?? 3);
+        if (rDiff !== 0) return oppSort.dir === "asc" ? rDiff : -rDiff;
+        return (a.daysNum ?? 9999) - (b.daysNum ?? 9999);
+      }
+      if (oppSort.key === "deadline") {
+        const d = (a.daysNum ?? 9999) - (b.daysNum ?? 9999);
+        return oppSort.dir === "asc" ? d : -d;
+      }
+      if (oppSort.key === "posted") {
+        const d = new Date(a.row.created_at ?? 0).getTime() - new Date(b.row.created_at ?? 0).getTime();
+        return oppSort.dir === "asc" ? d : -d;
+      }
+      if (oppSort.key === "agency") {
+        return oppSort.dir === "asc"
+          ? (a.row.agency ?? "").localeCompare(b.row.agency ?? "")
+          : (b.row.agency ?? "").localeCompare(a.row.agency ?? "");
+      }
+      if (oppSort.key === "title") {
+        return oppSort.dir === "asc"
+          ? (a.row.title ?? "").localeCompare(b.row.title ?? "")
+          : (b.row.title ?? "").localeCompare(a.row.title ?? "");
+      }
+      return 0;
+    });
+    return rows;
+  }, [enriched, naics, oppSearch, oppSetAside, oppDeadline, oppSort]);
 
   const p0Rows = filtered.filter((r) => r.risk === "rp0");
   const otherRows = filtered.filter((r) => r.risk !== "rp0");
@@ -549,55 +615,202 @@ export default function HomeClient({ user, counter, opportunities, recentAudits:
                         options={naicsOptions}
                         includeAll
                       />
-                      <span>Last updated <span>{feedTs}</span></span>
+                      <span>Last updated <span>{feedTs}</span> · {oppRows.length} matching</span>
                     </div>
                   </div>
-                  <div className="sam-stat-row">
-                    <div className="sam-stat"><div className="ss-n">{stats.total}</div><div className="ss-l">Active Opportunities</div></div>
-                    <div className="sam-stat"><div className="ss-n" style={{ color: "var(--red)" }}>{stats.p0}</div><div className="ss-l">P0 Flags Today</div></div>
-                    <div className="sam-stat"><div className="ss-n">{naicsOptions.length}</div><div className="ss-l">NAICS Codes Monitored</div></div>
-                    <div className="sam-stat"><div className="ss-n" style={{ color: "var(--green)" }}>0</div><div className="ss-l">Competitors w/ Audit</div></div>
+
+                  {/* KPI strip — totals from the unfiltered enriched set */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+                    {[
+                      { label: "Active", value: enriched.filter((r) => !!r.row.solicitation_number).length, color: "var(--text)" },
+                      { label: "P0 Risk", value: enriched.filter((r) => r.risk === "rp0").length, color: "var(--red)" },
+                      { label: "Expiring ≤7d", value: enriched.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7).length, color: "var(--amber)" },
+                      { label: "In Pipeline", value: opportunities.filter((o) => o.in_pipeline === true).length, color: "var(--blue)" }
+                    ].map((k) => (
+                      <div key={k.label} style={{ background: "var(--void3)", border: "1px solid var(--border)", borderRadius: 4, padding: "10px 14px" }}>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: 20, fontWeight: 700, color: k.color }}>{k.value}</div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t40)", textTransform: "uppercase", letterSpacing: ".08em", marginTop: 2 }}>{k.label}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="sam-table">
-                    <div className="sam-th">
-                      <span>Sol. Number</span><span>Title</span><span>Agency</span><span>Posted</span><span>Risk</span>
+
+                  {/* Filter bar */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                    <input
+                      type="text"
+                      placeholder="Search title, agency, sol #..."
+                      value={oppSearch}
+                      onChange={(e) => setOppSearch(e.target.value)}
+                      style={{ flex: "1 1 240px", minWidth: 200, padding: "6px 10px", fontFamily: "var(--mono)", fontSize: 11, borderRadius: 3, border: "1px solid var(--border2)", background: "rgba(3,8,16,.6)", color: "var(--text)", outline: "none" }}
+                    />
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {["All", "SB", "SDVOSB", "WOSB", "8(a)", "HUBZone"].map((sa) => {
+                        const active = oppSetAside === sa;
+                        return (
+                          <button
+                            key={sa}
+                            type="button"
+                            onClick={() => setOppSetAside(sa)}
+                            style={{
+                              fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                              padding: "4px 9px", borderRadius: 2, cursor: "pointer",
+                              background: active ? "rgba(96,165,250,.14)" : "transparent",
+                              border: `1px solid ${active ? "rgba(96,165,250,.5)" : "var(--border)"}`,
+                              color: active ? "var(--blue)" : "var(--t40)"
+                            }}
+                          >
+                            {sa}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {filtered.length === 0 && (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {([["all", "All"], ["<=3", "≤3d"], ["<=7", "≤7d"], ["<=30", "≤30d"], ["expired", "Expired"]] as const).map(([val, lbl]) => {
+                        const active = oppDeadline === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setOppDeadline(val)}
+                            style={{
+                              fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                              padding: "4px 9px", borderRadius: 2, cursor: "pointer",
+                              background: active ? "rgba(245,158,11,.14)" : "transparent",
+                              border: `1px solid ${active ? "rgba(245,158,11,.5)" : "var(--border)"}`,
+                              color: active ? "var(--amber)" : "var(--t40)"
+                            }}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sortable column header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 80px 70px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
+                    {[
+                      { key: "sol",       label: "Sol #",     sortable: false },
+                      { key: "title",     label: "Title",     sortable: true },
+                      { key: "agency",    label: "Agency",    sortable: true },
+                      { key: "set-aside", label: "Set-Aside", sortable: false },
+                      { key: "deadline",  label: "Deadline",  sortable: true },
+                      { key: "risk",      label: "Risk",      sortable: true },
+                      { key: "audit",     label: "Audit",     sortable: false },
+                      { key: "actions",   label: "Actions",   sortable: false }
+                    ].map((col) => (
+                      <div
+                        key={col.key}
+                        onClick={() => {
+                          if (!col.sortable) return;
+                          setOppSort((s) => s.key === col.key ? { key: col.key, dir: s.dir === "asc" ? "desc" : "asc" } : { key: col.key, dir: "asc" });
+                        }}
+                        style={{ cursor: col.sortable ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, userSelect: "none" }}
+                      >
+                        {col.label}
+                        {col.sortable && oppSort.key === col.key && <span style={{ fontSize: 8, color: "var(--gold)" }}>{oppSort.dir === "asc" ? "↑" : "↓"}</span>}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Rows */}
+                  <div style={{ maxHeight: 560, overflowY: "auto" }}>
+                    {oppRows.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
                           ? `Feed populates daily at 06:00 CDT · sam-ingest cron next run in ${hoursUntilNextSamIngest()} hour${hoursUntilNextSamIngest() === 1 ? "" : "s"}`
-                          : "No rows match this NAICS filter."}
+                          : "No opportunities match your filters."}
                       </div>
                     )}
-                    {filtered.filter((r) => r.row.solicitation_number).sort((a, b) => {
-                      // Sort key: imminent (0..N) at top, expired (negative) pushed
-                      // to 9998 so they fall just above null (9999) — mental model
-                      // is "active opportunities up top, dead ones out of sight".
-                      const ka = a.daysNum == null ? 9999 : a.daysNum < 0 ? 9998 : a.daysNum;
-                      const kb = b.daysNum == null ? 9999 : b.daysNum < 0 ? 9998 : b.daysNum;
-                      return ka - kb;
-                    }).map((r) => {
+                    {oppRows.map((r) => {
+                      const solNum = r.row.solicitation_number as string;
+                      const agency = (r.row.agency ?? "—").split("·")[0].trim();
+                      const saColors: Record<string, { bg: string; fg: string }> = {
+                        SB:       { bg: "rgba(74,222,128,.14)",  fg: "var(--green)" },
+                        SDVOSB:   { bg: "rgba(96,165,250,.14)",  fg: "var(--blue)" },
+                        WOSB:     { bg: "rgba(168,85,247,.14)",  fg: "#C084FC" },
+                        "8(a)":   { bg: "rgba(249,115,22,.14)",  fg: "#FB923C" },
+                        HUBZone:  { bg: "rgba(234,179,8,.14)",   fg: "#FACC15" },
+                        UNREST:   { bg: "rgba(148,163,184,.10)", fg: "var(--t60)" }
+                      };
+                      const saC = saColors[r.saLabel] ?? saColors.UNREST;
+                      const auditColors: Record<string, { bg: string; fg: string }> = {
+                        complete:   { bg: "rgba(74,222,128,.14)",  fg: "var(--green)" },
+                        processing: { bg: "rgba(245,158,11,.14)",  fg: "var(--amber)" },
+                        failed:     { bg: "rgba(220,38,38,.14)",   fg: "var(--red)" },
+                        pending:    { bg: "rgba(148,163,184,.10)", fg: "var(--t60)" },
+                        none:       { bg: "transparent",           fg: "var(--t40)" }
+                      };
+                      const auC = auditColors[r.auditStatusCls] ?? auditColors.none;
+                      const dlColors: Record<string, string> = { urg: "var(--red)", soon: "var(--amber)", ok: "var(--t60)", exp: "var(--t40)", none: "var(--t40)" };
                       const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : r.risk === "rp2" ? "var(--blue)" : "var(--gold)";
-                      const bg = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(201,168,76,.08)";
-                      return (
-                        <div key={r.row.id} className="sam-row" onClick={() => {
-                          setAuditPrefill({
-                            // solicitation_number guaranteed non-null by the
-                            // upstream .filter() — pre-solicitation notices
-                            // without a real sol# are filtered out of the
-                            // table so the demo never prefills a UUID.
-                            notice_id: r.row.solicitation_number as string,
-                            title: r.row.title ?? null,
-                            agency: r.row.agency ?? null,
-                            naics_code: r.row.naics_code ?? null
+                      const rb = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(201,168,76,.08)";
+
+                      const onOpenAudit = () => {
+                        setAuditPrefill({
+                          notice_id: solNum,
+                          title: r.row.title ?? null,
+                          agency: r.row.agency ?? null,
+                          naics_code: r.row.naics_code ?? null
+                        });
+                        setTab("audit");
+                      };
+
+                      const togglePatch = async (field: "in_pipeline" | "watched") => {
+                        const next = !r.row[field];
+                        updateOpportunity(r.row.notice_id, { [field]: next });
+                        try {
+                          const res = await fetch(`/api/opportunities/${encodeURIComponent(r.row.notice_id)}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ [field]: next })
                           });
-                          setTab("audit");
-                        }}>
-                          <span className="sr-num" title={r.row.title || displaySolicitationId(r.row)}>{displaySolicitationId(r.row)}</span>
-                          <span className="sr-title" title={r.row.title || ""}>{r.row.title || "—"}</span>
-                          <span className="sr-agency" title={r.row.agency || ""}>{r.row.agency || "—"}</span>
-                          <span className="sr-date">{new Date(r.row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                          <span className="sr-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{r.riskLabel}</span>
+                          if (!res.ok) updateOpportunity(r.row.notice_id, { [field]: !next });
+                        } catch {
+                          updateOpportunity(r.row.notice_id, { [field]: !next });
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={r.row.id}
+                          style={{
+                            display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 80px 70px 100px 180px", gap: 8,
+                            padding: "8px 10px", borderBottom: "1px solid var(--border)", alignItems: "center",
+                            background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : r.row.watched ? "rgba(245,158,11,.04)" : "transparent",
+                            transition: "background .15s"
+                          }}
+                        >
+                          <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
+                          <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{r.row.title || "—"}</span>
+                          <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{r.saLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)" }}>{r.daysLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center" }}>{r.riskLabel || "—"}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center" }}>{r.auditStatusLabel}</span>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onOpenAudit(); }}
+                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "var(--gold)", color: "var(--void)", border: "1px solid var(--gold)" }}
+                            >
+                              Audit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
+                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.watched ? "rgba(245,158,11,.14)" : "transparent", color: r.row.watched ? "var(--amber)" : "var(--t60)", border: `1px solid ${r.row.watched ? "rgba(245,158,11,.5)" : "var(--border2)"}` }}
+                            >
+                              {r.row.watched ? "Watching" : "Watch"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePatch("in_pipeline"); }}
+                              style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: r.row.in_pipeline ? "rgba(96,165,250,.14)" : "transparent", color: r.row.in_pipeline ? "var(--blue)" : "var(--t60)", border: `1px solid ${r.row.in_pipeline ? "rgba(96,165,250,.5)" : "var(--border2)"}` }}
+                            >
+                              {r.row.in_pipeline ? "Pinned" : "Pipeline"}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -701,8 +914,10 @@ interface Enriched {
   daysLabel: string;
   risk: "rp0" | "rp1" | "rp2" | "";
   riskLabel: string;
-  saCls: "sb" | "sd" | "wo" | "a8" | "un";
+  saCls: "sb" | "sd" | "wo" | "a8" | "hz" | "un";
   saLabel: string;
+  auditStatusCls: "pending" | "processing" | "complete" | "failed" | "none";
+  auditStatusLabel: string;
 }
 
 // Hours until the next sam-ingest cron run (06:00 CDT = 11:00 UTC).
@@ -783,9 +998,18 @@ function enrichRow(row: OpportunityRow): Enriched {
   if (sa.includes("8(a)") || sa.includes("8a")) { saCls = "a8"; saLabel = "8(a)"; }
   else if (sa.includes("woman")) { saCls = "wo"; saLabel = "WOSB"; }
   else if (sa.includes("sdvosb") || sa.includes("service-disabled")) { saCls = "sd"; saLabel = "SDVOSB"; }
+  else if (sa.includes("hubzone")) { saCls = "hz"; saLabel = "HUBZone"; }
   else if (sa.includes("small")) { saCls = "sb"; saLabel = "SB"; }
 
-  return { row, daysNum, daysCls, daysLabel, risk, riskLabel, saCls, saLabel };
+  const statusMap: Record<string, { cls: Enriched["auditStatusCls"]; label: string }> = {
+    complete:   { cls: "complete",   label: "Audited ✓" },
+    processing: { cls: "processing", label: "Auditing…" },
+    failed:     { cls: "failed",     label: "Failed" },
+    pending:    { cls: "pending",    label: "Pending" }
+  };
+  const auditEntry = statusMap[row.status ?? ""] ?? { cls: "none" as const, label: "—" };
+
+  return { row, daysNum, daysCls, daysLabel, risk, riskLabel, saCls, saLabel, auditStatusCls: auditEntry.cls, auditStatusLabel: auditEntry.label };
 }
 
 function FeedRowCmp({ r, onClick }: { r: Enriched; onClick: () => void }) {
