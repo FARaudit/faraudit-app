@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "FARaudit Pricing — Defense BD Operating System",
   description:
-    "The trap was already in the document. Design Partner $1,250/mo · Standard $2,500/mo · Enterprise on request. All tiers include the full Defense BD OS — Run Audit, Defense Spending, Defense News AI, Capability Statement, CMMC Readiness, more."
+    "The trap was already in the document. Standard $1,250/mo · Professional $2,500/mo · Enterprise on request. All tiers include the full Defense BD OS — Run Audit, Defense Spending, Defense News AI, Capability Statement, CMMC Readiness, more."
 };
 
 const BG = "#03080f";
@@ -30,7 +30,7 @@ type Tier = {
 const TIERS: Tier[] = [
   {
     slug: "design_partner",
-    name: "Design Partner",
+    name: "Standard",
     price: "$1,250",
     priceSuffix: "/mo",
     eyebrow: "5 slots remaining · 90-day program · rate locks at signup",
@@ -213,7 +213,7 @@ export default function PricingPage() {
         <p style={{ fontSize: 16, color: TEXT_2, marginBottom: 52, maxWidth: 620, lineHeight: 1.7, fontWeight: 300 }}>
           The full Defense BD Operating System on every plan. Run Audit, Defense Spending,
           Defense News AI insights, Capability Statement, CMMC Readiness — same product
-          surface across all tiers. Design partner pricing rewards the first 5 customers.
+          surface across all tiers. Standard pricing rewards the first 5 customers.
         </p>
 
         <div className="pricing-grid">
@@ -257,7 +257,7 @@ export default function PricingPage() {
           }}
         >
           <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: GOLD, letterSpacing: "0.16em", textTransform: "uppercase", margin: 0 }}>
-            Become a design partner
+            Start at Standard
           </p>
           <p style={{ fontSize: 14, color: TEXT_1, lineHeight: 1.6, margin: 0 }}>
             5 spots. Locked rate. Direct line to the founder. Roadmap input.
