@@ -121,19 +121,22 @@ export interface RecompeteRow {
   end_date: string;
 }
 
-export async function fetchRecompetes(f: Filters, daysAhead: number): Promise<RecompeteRow[]> {
-  const today = new Date();
-  const future = new Date(today.getTime() + daysAhead * 86400_000);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  // Recompete radar uses a different filter shape — period_of_performance_current_end_date
-  // is the upcoming-expiration window. award_type_codes constrain to prime contracts.
+// FA-96b fix · USAspending /spending_by_award/ requires HUMAN-READABLE field
+// names ("Awarding Sub Agency", not "awarding_agency_name") — unknown keys
+// are silently dropped. The endpoint also does NOT accept
+// period_of_performance_current_end_date as a filter (returns the warning
+// "filters from the request were not used"). For NAICS like 336413 those
+// fields are null at source (large IDIQ vehicles), so end_date may remain
+// empty post-fix — that's a USAspending data-availability limit, not a code
+// bug. Client filters on end_date downstream to derive the 90d subset.
+export async function fetchRecompetes(f: Filters, _daysAhead: number): Promise<RecompeteRow[]> {
   const d = await post<{ results: Array<Record<string, unknown>> }>("/search/spending_by_award/", {
     filters: {
       naics_codes: [f.naics],
       award_type_codes: ["A", "B", "C", "D"],
-      period_of_performance_current_end_date: [{ start_date: fmt(today), end_date: fmt(future) }]
+      time_period: [{ start_date: f.fyStart, end_date: f.fyEnd }]
     },
-    fields: ["Award ID", "Recipient Name", "Award Amount", "awarding_agency_name", "period_of_performance_current_end_date"],
+    fields: ["Award ID", "Recipient Name", "Award Amount", "Awarding Sub Agency", "Period of Performance Current End Date"],
     limit: 10,
     sort: "Award Amount",
     order: "desc"
@@ -142,7 +145,7 @@ export async function fetchRecompetes(f: Filters, daysAhead: number): Promise<Re
     award_id: String(r["Award ID"] ?? ""),
     recipient: String(r["Recipient Name"] ?? ""),
     amount: Number(r["Award Amount"] ?? 0),
-    agency: String(r["awarding_agency_name"] ?? ""),
-    end_date: String(r["period_of_performance_current_end_date"] ?? "")
+    agency: String(r["Awarding Sub Agency"] ?? ""),
+    end_date: String(r["Period of Performance Current End Date"] ?? "")
   }));
 }

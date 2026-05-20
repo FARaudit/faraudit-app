@@ -2440,6 +2440,28 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
   };
   const fmtPct = (v: number | null): string => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
+  // .sam-th span CSS sets 7.5px / var(--t25) — too small + too transparent
+  // for these section headers. Override inline on the affected <span>s.
+  const thHeader: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)" };
+
+  // FA-96b · Client-side 90d filter. USAspending drops the
+  // period_of_performance_current_end_date filter server-side, so the agent
+  // stores top-10-by-amount in BOTH 90d and 180d columns (identical). Derive
+  // the 90d subset here by parsing end_date and keeping rows whose end date
+  // falls within today + 90d. Rows with missing/unparseable end_date are
+  // excluded — USAspending often returns null for IDIQ vehicles (e.g.
+  // NAICS 336413's top primes), so the 90d list may be empty pending
+  // better source data.
+  const expiring90 = useMemo(() => {
+    const rows = current?.recompetes_expiring_90d || [];
+    const cutoff = Date.now() + 90 * 86400_000;
+    return rows.filter((r) => {
+      if (!r.end_date) return false;
+      const t = Date.parse(r.end_date);
+      return Number.isFinite(t) && t <= cutoff;
+    });
+  }, [current]);
+
   // No data path — show empty state with NAICS dropdown still visible
   const hasData = defenseSpending.length > 0;
 
@@ -2518,7 +2540,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
             {current?.top_recipients && current.top_recipients.length > 0 ? (
               <div className="sam-table">
                 <div className="sam-th" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
-                  <span>#</span><span>Company</span><span>$</span><span></span>
+                  <span style={thHeader}>#</span><span style={thHeader}>Company</span><span style={thHeader}>$</span><span></span>
                 </div>
                 {current.top_recipients.slice(0, 10).map((r, i) => {
                   const priorMatch = prior?.top_recipients?.find((p) => p.name === r.name);
@@ -2541,7 +2563,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
             {current?.sb_recipients && current.sb_recipients.length > 0 ? (
               <div className="sam-table">
                 <div className="sam-th" style={{ gridTemplateColumns: "30px 1fr 110px 50px" }}>
-                  <span>#</span><span>Company</span><span>$</span><span></span>
+                  <span style={thHeader}>#</span><span style={thHeader}>Company</span><span style={thHeader}>$</span><span></span>
                 </div>
                 {current.sb_recipients.slice(0, 10).map((r, i) => {
                   const priorMatch = prior?.sb_recipients?.find((p) => p.name === r.name);
@@ -2567,7 +2589,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
         {current?.agency_breakdown && current.agency_breakdown.length > 0 ? (
           <div className="sam-table">
             <div className="sam-th" style={{ gridTemplateColumns: "1fr 160px 100px" }}>
-              <span>Agency</span><span>FY2026 Obligations</span><span>USAspending</span>
+              <span style={thHeader}>Agency</span><span style={thHeader}>FY2026 Obligations</span><span style={thHeader}>USAspending</span>
             </div>
             {current.agency_breakdown.slice(0, 10).map((a, i) => (
               <div key={`${a.name}-${i}`} className="sam-row" style={{ gridTemplateColumns: "1fr 160px 100px" }}>
@@ -2584,7 +2606,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
       <div className="intel-section">
         <div className="is-header"><div className="is-title">Recompete Radar</div><div className="is-refresh">Contracts expiring soon · sourced from USAspending</div></div>
         {(["recompetes_expiring_90d","recompetes_expiring_180d"] as const).map((key) => {
-          const rows = current?.[key] || [];
+          const rows = key === "recompetes_expiring_90d" ? expiring90 : (current?.recompetes_expiring_180d || []);
           const label = key === "recompetes_expiring_90d" ? "Expiring ≤90 days" : "Expiring ≤180 days";
           return (
             <div key={key} style={{ marginBottom: 12 }}>
@@ -2592,7 +2614,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
               {rows.length > 0 ? (
                 <div className="sam-table">
                   <div className="sam-th" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
-                    <span>Award ID</span><span>Incumbent</span><span>Value</span><span>Agency</span><span>Expires</span>
+                    <span style={thHeader}>Award ID</span><span style={thHeader}>Incumbent</span><span style={thHeader}>Value</span><span style={thHeader}>Agency</span><span style={thHeader}>Expires</span>
                   </div>
                   {rows.slice(0, 10).map((r, i) => (
                     <div key={`${r.award_id}-${i}`} className="sam-row" style={{ gridTemplateColumns: "140px 1fr 110px 1fr 100px" }}>
@@ -2618,7 +2640,7 @@ function DefenseSpendingPanel({ defenseSpending, naicsOptions }: { defenseSpendi
           return (
             <div className="sam-table">
               <div className="sam-th" style={{ gridTemplateColumns: "80px 1fr 130px 100px" }}>
-                <span>State</span><span></span><span>Obligations</span><span>% of top 10</span>
+                <span style={thHeader}>State</span><span></span><span style={thHeader}>Obligations</span><span style={thHeader}>% of top 10</span>
               </div>
               {current.state_breakdown.slice(0, 10).map((s) => (
                 <div key={s.state} className="sam-row" style={{ gridTemplateColumns: "80px 1fr 130px 100px" }}>
