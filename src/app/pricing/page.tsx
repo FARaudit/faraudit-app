@@ -24,6 +24,7 @@ type Tier = {
   priceSuffix?: string;
   eyebrow: string;
   featured: boolean;
+  badgeLabel?: string;
   cta: { label: string; href?: string; disabled?: boolean };
 };
 
@@ -31,6 +32,7 @@ const TIERS: Tier[] = [
   {
     slug: "design_partner",
     name: "Standard",
+    badgeLabel: "Founding Rate",
     price: "$1,250",
     priceSuffix: "/mo",
     eyebrow: "5 slots remaining · 90-day program · rate locks at signup",
@@ -40,6 +42,7 @@ const TIERS: Tier[] = [
   {
     slug: "professional",
     name: "Professional",
+    badgeLabel: "Most Popular",
     price: "$2,500",
     priceSuffix: "/mo",
     eyebrow: "Billed annually · full platform · open enrollment",
