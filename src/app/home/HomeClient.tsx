@@ -714,7 +714,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       </span>
                       {([
                         ["active", "Active"],
-                        ["all", "All Deadlines"],
+                        ["all", "All (incl. expired)"],
                         ["<=3", "≤ 3 Days"],
                         ["<=7", "≤ 7 Days"],
                         ["<=30", "≤ 30 Days"],
@@ -843,7 +843,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
                           <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{cleanTitle(r.row.title)}</span>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Service-Disabled Veteran", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{({ SB: "Small Business", SDVOSB: "Serv-Disabled Veteran", WOSB: "Women-Owned", "8(a)": "8(a) Program", HUBZone: "HUBZone", UNREST: "Unrestricted" } as Record<string, string>)[r.saLabel] ?? r.saLabel}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)" }}>{r.daysLabel}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, textAlign: "center" }}>{r.riskLabel || "—"}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center" }}>{r.auditStatusLabel}</span>
@@ -1061,8 +1061,8 @@ function enrichRow(row: OpportunityRow): Enriched {
   else if (sa.includes("small")) { saCls = "sb"; saLabel = "SB"; }
 
   const statusMap: Record<string, { cls: Enriched["auditStatusCls"]; label: string }> = {
-    complete:   { cls: "complete",   label: "Audited" },
-    processing: { cls: "processing", label: "Auditing…" },
+    complete:   { cls: "complete",   label: "Audited ✓" },
+    processing: { cls: "processing", label: "In Progress" },
     failed:     { cls: "failed",     label: "Failed" },
     pending:    { cls: "pending",    label: "Not Audited" }
   };
