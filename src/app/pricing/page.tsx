@@ -247,42 +247,6 @@ export default function PricingPage() {
           </table>
         </div>
 
-        <div
-          style={{
-            marginTop: 40,
-            padding: "20px 22px",
-            background: "rgba(196,164,74,0.06)",
-            border: `1px solid ${BORDER_GOLD}`,
-            borderRadius: 8,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10
-          }}
-        >
-          <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: GOLD, letterSpacing: "0.16em", textTransform: "uppercase", margin: 0 }}>
-            Join as a founding member
-          </p>
-          <p style={{ fontSize: 14, color: TEXT_1, lineHeight: 1.6, margin: 0 }}>
-            5 founding spots open. $1,250/mo Standard rate. Direct line to the founder. Roadmap input.
-          </p>
-          <Link
-            href="/access.html"
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 4,
-              padding: "10px 18px",
-              background: GOLD,
-              color: BG,
-              borderRadius: 6,
-              fontFamily: "Syne, sans-serif",
-              fontSize: 12,
-              fontWeight: 600,
-              textDecoration: "none"
-            }}
-          >
-            Apply →
-          </Link>
-        </div>
       </div>
     </main>
   );
