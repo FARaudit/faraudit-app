@@ -7,22 +7,23 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const styles = StyleSheet.create({
-  page: { padding: 56, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
-  header: { borderBottom: "2pt solid #C9A84C", paddingBottom: 14, marginBottom: 22, flexDirection: "row", justifyContent: "space-between" },
+  page: { padding: 56, paddingBottom: 70, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
+  header: { borderBottom: "2pt solid #C9A84C", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
   brand: { fontSize: 18, fontWeight: 700, color: "#0f172a" },
   brandGold: { color: "#C9A84C" },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
-  companyName: { fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 12, marginBottom: 4 },
-  tagline: { fontSize: 10, color: "#475569", marginBottom: 18 },
-  uei: { fontSize: 9, color: "#C9A84C", marginBottom: 18 },
-  sectionEyebrow: { fontSize: 8, color: "#C9A84C", letterSpacing: 1.5, marginTop: 14, marginBottom: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 },
-  body: { fontSize: 10, color: "#0f172a", lineHeight: 1.5, marginBottom: 6 },
-  small: { fontSize: 9, color: "#475569", lineHeight: 1.5, marginBottom: 4 },
-  pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginBottom: 8 },
-  pill: { fontSize: 9, padding: "2pt 8pt", border: "1pt solid #C9A84C", color: "#C9A84C", marginRight: 4, marginBottom: 4, borderRadius: 2 },
+  companyName: { fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 8, marginBottom: 10 },
+  contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  contactCol: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
+  contactColRight: { flexDirection: "column", flexGrow: 1, flexBasis: 0 },
+  contactLine: { fontSize: 9, color: "#0f172a", lineHeight: 1.5, marginBottom: 2 },
+  contactLineRight: { fontSize: 9, color: "#0f172a", lineHeight: 1.5, marginBottom: 2, textAlign: "right" },
+  section: { marginBottom: 12 },
+  sectionEyebrow: { fontSize: 8, color: "#C9A84C", letterSpacing: 1.5, marginBottom: 4 },
+  body: { fontSize: 10, color: "#0f172a", lineHeight: 1.5 },
+  small: { fontSize: 9, color: "#475569", lineHeight: 1.5 },
   pastRow: { borderLeft: "2pt solid #C9A84C", paddingLeft: 8, marginBottom: 8 },
-  pageNum: { position: "absolute", bottom: 32, left: 56, right: 56, textAlign: "center", fontSize: 8, color: "#94a3b8" }
+  footer: { position: "absolute", bottom: 30, left: 40, right: 40, textAlign: "center", fontSize: 8, color: "#94a3b8" }
 });
 
 interface CapStmt {
@@ -54,7 +55,6 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
   const naics = stmt.naics_codes || [];
   const certs = stmt.certifications || [];
   const past = stmt.past_performance || [];
-  const hasAnyContact = !!(stmt.contact_name || stmt.contact_email || stmt.contact_phone || stmt.contact_website || stmt.contact_address);
 
   return (
     <Document>
@@ -70,57 +70,56 @@ function CapDoc({ stmt, generatedAt }: { stmt: CapStmt; generatedAt: string }): 
         </View>
 
         <Text style={styles.companyName}>{company}</Text>
-        {(stmt.uei || stmt.cage_code) && (
-          <Text style={styles.uei}>
-            {stmt.uei ? `UEI · ${stmt.uei}` : ""}
-            {stmt.uei && stmt.cage_code ? "   ·   " : ""}
-            {stmt.cage_code ? `CAGE · ${stmt.cage_code}` : ""}
-          </Text>
-        )}
 
-        <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
-        <Text style={styles.body}>{stmt.core_competencies || "—"}</Text>
-
-        <Text style={styles.sectionEyebrow}>NAICS</Text>
-        <View style={styles.pillRow}>
-          {naics.length === 0 && <Text style={styles.small}>None registered.</Text>}
-          {naics.map((n) => <Text key={n} style={styles.pill}>{n}</Text>)}
-        </View>
-
-        <Text style={styles.sectionEyebrow}>CERTIFICATIONS</Text>
-        <View style={styles.pillRow}>
-          {certs.length === 0 && <Text style={styles.small}>None recorded.</Text>}
-          {certs.map((c) => <Text key={c} style={styles.pill}>{c}</Text>)}
-        </View>
-
-        <Text style={styles.sectionEyebrow}>DIFFERENTIATORS</Text>
-        <Text style={styles.body}>{stmt.differentiators || "—"}</Text>
-
-        <Text style={styles.sectionEyebrow}>PAST PERFORMANCE</Text>
-        {past.length === 0 && <Text style={styles.small}>No prior contract awards on record.</Text>}
-        {past.slice(0, 12).map((p, i) => (
-          <View key={i} style={styles.pastRow} wrap={false}>
-            <Text style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.title || p.notice_id || "—"}</Text>
-            <Text style={styles.small}>
-              {p.agency || "—"}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
-              {p.contract_value ? ` · ${p.contract_value}` : ""}
-              {p.period ? ` · ${p.period}` : ""}
-            </Text>
+        <View style={styles.contactGrid}>
+          <View style={styles.contactCol}>
+            {stmt.uei && <Text style={styles.contactLine}>UEI · {stmt.uei}</Text>}
+            {stmt.cage_code && <Text style={styles.contactLine}>CAGE · {stmt.cage_code}</Text>}
+            {naics.length > 0 && <Text style={styles.contactLine}>NAICS · {naics.join(", ")}</Text>}
           </View>
-        ))}
+          <View style={styles.contactColRight}>
+            {stmt.contact_name && <Text style={styles.contactLineRight}>{stmt.contact_name}</Text>}
+            {stmt.contact_email && <Text style={styles.contactLineRight}>{stmt.contact_email}</Text>}
+            {stmt.contact_phone && <Text style={styles.contactLineRight}>{stmt.contact_phone}</Text>}
+            {stmt.contact_website && <Text style={styles.contactLineRight}>{stmt.contact_website}</Text>}
+            {stmt.contact_address && <Text style={styles.contactLineRight}>{stmt.contact_address}</Text>}
+          </View>
+        </View>
 
-        <Text style={styles.sectionEyebrow}>CONTACT</Text>
-        {!hasAnyContact && <Text style={styles.small}>No contact information set.</Text>}
-        {stmt.contact_name && <Text style={styles.body}>{stmt.contact_name}</Text>}
-        {stmt.contact_email && <Text style={styles.small}>Email · {stmt.contact_email}</Text>}
-        {stmt.contact_phone && <Text style={styles.small}>Phone · {stmt.contact_phone}</Text>}
-        {stmt.contact_website && <Text style={styles.small}>Web · {stmt.contact_website}</Text>}
-        {stmt.contact_address && <Text style={styles.small}>{stmt.contact_address}</Text>}
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>CORE COMPETENCIES</Text>
+          <Text style={styles.body}>{stmt.core_competencies || "—"}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>CERTIFICATIONS</Text>
+          <Text style={styles.body}>{certs.length > 0 ? certs.join(" · ") : "None recorded."}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>DIFFERENTIATORS</Text>
+          <Text style={styles.body}>{stmt.differentiators || "—"}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>PAST PERFORMANCE</Text>
+          {past.length === 0 && <Text style={styles.small}>Past performance populates automatically as you win contracts through FARaudit.</Text>}
+          {past.slice(0, 12).map((p, i) => (
+            <View key={i} style={styles.pastRow} wrap={false}>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.title || p.notice_id || "—"}</Text>
+              <Text style={styles.small}>
+                {p.agency || "—"}{p.naics_code ? ` · NAICS ${p.naics_code}` : ""}
+                {p.contract_value ? ` · ${p.contract_value}` : ""}
+                {p.period ? ` · ${p.period}` : ""}
+              </Text>
+            </View>
+          ))}
+        </View>
 
         <Text
-          style={styles.pageNum}
+          style={styles.footer}
           fixed
-          render={({ pageNumber, totalPages }) => `${company} · ${generatedAt} · Page ${pageNumber} of ${totalPages}`}
+          render={({ pageNumber }) => `FARaudit Federal Contract Intelligence  |  Page ${pageNumber}  |  Confidential`}
         />
       </Page>
     </Document>
