@@ -895,6 +895,18 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             body
                           });
                           if (!res.ok) {
+                            // FA-89h.1: surface partial-failure details from the
+                            // pin/unpin saga response so silent half-states are
+                            // visible during testing instead of disappearing
+                            // into a generic optimistic rollback.
+                            if (field === "in_pipeline") {
+                              try {
+                                const detail = await res.json();
+                                console.warn(`[togglePatch] ${next ? "pin" : "unpin"} failed for ${r.row.notice_id}: status=${res.status}`, detail);
+                              } catch {
+                                console.warn(`[togglePatch] ${next ? "pin" : "unpin"} failed for ${r.row.notice_id}: status=${res.status} (no JSON body)`);
+                              }
+                            }
                             updateOpportunity(r.row.notice_id, { [field]: !next });
                             return;
                           }
