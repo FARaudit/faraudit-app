@@ -161,7 +161,17 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // Today-tab "filter" chip enum above. Composes 4 dimensions (search,
   // set-aside, deadline, sort) and excludes rows without a real solicitation
   // number so the demo never lands on a UUID-prefilled audit.
-  const oppRows = useMemo(() => {
+  // FA-89 display helpers — strip SAM PSC prefix (e.g. "N083--", "Y1BG--") and
+  // title-case the result so the demo shows readable solicitation titles.
+  const cleanTitle = (raw: string | null): string => {
+    if (!raw) return "—";
+    const stripped = raw.replace(/^[A-Z0-9]{2,6}--\s*/i, "");
+    return stripped.replace(/\w\S*/g, (t) =>
+      t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()
+    );
+  };
+
+    const oppRows = useMemo(() => {
     let rows = enriched.filter((r) => !!r.row.solicitation_number);
     if (naics && naics !== "all") {
       rows = rows.filter((r) => r.row.naics_code === naics);
@@ -634,50 +644,60 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     ))}
                   </div>
 
-                  {/* Filter bar */}
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                  {/* Filter bar — 3 rows */}
+
+                  {/* Row 1: Search */}
+                  <div style={{ marginBottom: 8 }}>
                     <input
                       type="text"
-                      placeholder="Search title, agency, sol #..."
+                      placeholder="Search by title, agency, or solicitation number..."
                       value={oppSearch}
                       onChange={(e) => setOppSearch(e.target.value)}
-                      style={{ flex: "1 1 240px", minWidth: 200, padding: "6px 10px", fontFamily: "var(--mono)", fontSize: 11, borderRadius: 3, border: "1px solid var(--border2)", background: "rgba(3,8,16,.6)", color: "var(--text)", outline: "none" }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        fontSize: 12,
+                        borderRadius: 6,
+                        border: ".5px solid var(--border2)",
+                        background: "var(--void3)",
+                        color: "var(--text)",
+                        outline: "none"
+                      }}
                     />
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {["All", "SB", "SDVOSB", "WOSB", "8(a)", "HUBZone"].map((sa) => {
-                        const active = oppSetAside === sa;
-                        return (
-                          <button
-                            key={sa}
-                            type="button"
-                            onClick={() => setOppSetAside(sa)}
-                            style={{
-                              fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
-                              padding: "4px 9px", borderRadius: 2, cursor: "pointer",
-                              background: active ? "rgba(96,165,250,.14)" : "transparent",
-                              border: `1px solid ${active ? "rgba(96,165,250,.5)" : "var(--border)"}`,
-                              color: active ? "var(--blue)" : "var(--t40)"
-                            }}
-                          >
-                            {sa}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {([["all", "All"], ["<=3", "≤3d"], ["<=7", "≤7d"], ["<=30", "≤30d"], ["expired", "Expired"]] as const).map(([val, lbl]) => {
-                        const active = oppDeadline === val;
+                  </div>
+
+                  {/* Rows 2 & 3: Set-aside + Deadline filters */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+
+                    {/* Set-aside filter */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
+                        Set-Aside
+                      </span>
+                      {([
+                        ["All", "All"],
+                        ["SB", "Small Business"],
+                        ["SDVOSB", "Service-Disabled Veteran"],
+                        ["WOSB", "Women-Owned"],
+                        ["8(a)", "8(a) Program"],
+                        ["HUBZone", "HUBZone"]
+                      ] as const).map(([val, lbl]) => {
+                        const active = oppSetAside === val;
                         return (
                           <button
                             key={val}
                             type="button"
-                            onClick={() => setOppDeadline(val)}
+                            onClick={() => setOppSetAside(val)}
                             style={{
-                              fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
-                              padding: "4px 9px", borderRadius: 2, cursor: "pointer",
-                              background: active ? "rgba(245,158,11,.14)" : "transparent",
-                              border: `1px solid ${active ? "rgba(245,158,11,.5)" : "var(--border)"}`,
-                              color: active ? "var(--amber)" : "var(--t40)"
+                              padding: "4px 12px",
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: active ? "1px solid var(--blue)" : "1px solid var(--border)",
+                              background: active ? "rgba(96,165,250,.14)" : "transparent",
+                              color: active ? "var(--blue)" : "var(--t40)",
+                              transition: "all .15s"
                             }}
                           >
                             {lbl}
@@ -685,6 +705,43 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         );
                       })}
                     </div>
+
+                    {/* Deadline filter */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", whiteSpace: "nowrap", minWidth: 70 }}>
+                        Deadline
+                      </span>
+                      {([
+                        ["all", "All Deadlines"],
+                        ["<=3", "≤ 3 Days"],
+                        ["<=7", "≤ 7 Days"],
+                        ["<=30", "≤ 30 Days"],
+                        ["expired", "Expired"]
+                      ] as const).map(([val, lbl]) => {
+                        const active = oppDeadline === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setOppDeadline(val)}
+                            style={{
+                              padding: "4px 12px",
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: active ? "1px solid var(--amber)" : "1px solid var(--border)",
+                              background: active ? "rgba(245,158,11,.14)" : "transparent",
+                              color: active ? "var(--amber)" : "var(--t40)",
+                              transition: "all .15s"
+                            }}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+
                   </div>
 
                   {/* Sortable column header */}
@@ -782,7 +839,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           }}
                         >
                           <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
-                          <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{r.row.title || "—"}</span>
+                          <span onClick={onOpenAudit} title={r.row.title || ""} style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{cleanTitle(r.row.title)}</span>
                           <span title={r.row.agency || ""} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agency}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: saC.bg, color: saC.fg, textAlign: "center", letterSpacing: ".04em" }}>{r.saLabel}</span>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: dlColors[r.daysCls] ?? "var(--t40)" }}>{r.daysLabel}</span>
