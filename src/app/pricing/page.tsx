@@ -68,15 +68,15 @@ const FEATURES: { label: string; tiers: string[] }[] = [
     { label: "Capability Statement persistence + auto-population", tiers: ["✓", "✓", "✓"] },
     { label: "Pipeline tracking", tiers: ["25 active", "Unlimited", "Unlimited"] },
     { label: "CMMC Readiness assessment (Levels 1/2/3)", tiers: ["✓", "✓", "✓"] },
+    { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
+    { label: "Email support", tiers: ["✓", "✓", "✓"] },
     { label: "Wage Benchmarks · SCA + DBA", tiers: ["—", "✓", "✓"] },
     { label: "GAO Protests intelligence", tiers: ["—", "✓", "✓"] },
     { label: "FAR/DFARS regulatory updates", tiers: ["—", "✓", "✓"] },
     { label: "Teaming Partners discovery", tiers: ["—", "✓", "✓"] },
     { label: "Recompete alerts", tiers: ["—", "✓", "✓"] },
-    { label: "API access", tiers: ["—", "—", "✓"] },
-    { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
-    { label: "Email support", tiers: ["✓", "✓", "✓"] },
     { label: "Priority support", tiers: ["—", "✓", "✓"] },
+    { label: "API access", tiers: ["—", "—", "✓"] },
     { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
     { label: "Multi-seat · SLA", tiers: ["—", "—", "✓"] },
   ];
@@ -257,10 +257,10 @@ export default function PricingPage() {
           }}
         >
           <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: GOLD, letterSpacing: "0.16em", textTransform: "uppercase", margin: 0 }}>
-            Start at Standard
+            Join as a founding member
           </p>
           <p style={{ fontSize: 14, color: TEXT_1, lineHeight: 1.6, margin: 0 }}>
-            5 spots. Locked rate. Direct line to the founder. Roadmap input.
+            5 founding spots open. $1,250/mo Standard rate. Direct line to the founder. Roadmap input.
           </p>
           <Link
             href="/access.html"
