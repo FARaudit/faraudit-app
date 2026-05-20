@@ -202,6 +202,42 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     return "$" + v;
   };
 
+  // FA-89j: agency short-name display. pending_audits.agency arrives as
+  // "DEPT OF DEFENSE · DEPT OF THE AIR FORCE" from resolveAgency in sam-ingest
+  // helpers (two segments joined by " · "). Take first segment, strip prefix/
+  // suffix decorations, title-case, then look up a 2-3 letter short-name in
+  // the map. "Defense" mapping handles the post-strip DoD case where
+  // "DEPT OF DEFENSE" → "DEFENSE" → "Defense"; the literal "Dept Of Defense"
+  // entry per spec is also present for any pre-strip variant.
+  const agencyShort = (raw: string | null): string => {
+    if (!raw || !raw.trim()) return "—";
+    let s = raw.split("·")[0].trim();
+    s = s.replace(/,\s*DEPARTMENT\s+OF\s+THE\s*$/i, "").trim();
+    s = s.replace(/,\s*DEPARTMENT\s+OF\s*$/i, "").trim();
+    s = s.replace(/,\s*DEPT\s+OF\s*$/i, "").trim();
+    s = s.replace(/^DEPARTMENT\s+OF\s+/i, "").trim();
+    s = s.replace(/^DEPT\s+OF\s+/i, "").trim();
+    if (!s) return "—";
+    const titled = s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+    const shortMap: Record<string, string> = {
+      "Defense": "Dept of Defense",
+      "Dept Of Defense": "Dept of Defense",
+      "Veterans Affairs": "VA",
+      "Health And Human Services": "HHS",
+      "Homeland Security": "DHS",
+      "Transportation": "DOT",
+      "Agriculture": "USDA",
+      "Interior": "DOI",
+      "Justice": "DOJ",
+      "Energy": "DOE",
+      "Commerce": "DOC",
+      "Labor": "DOL",
+      "National Aeronautics And Space Administration": "NASA",
+      "General Services Administration": "GSA"
+    };
+    return shortMap[titled] ?? titled;
+  };
+
   // FA-89 display helpers — strip SAM PSC prefix (e.g. "N083--", "Y1BG--") and
   // title-case the result so the demo shows readable solicitation titles.
   const cleanTitle = (raw: string | null): string => {
@@ -850,7 +886,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   )}
 
                   {/* Sortable column header — FA-89i: 7 cols (DEADLINE+RISK merged into SIGNAL) */}
-                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 110px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px 90px 110px 100px 180px", gap: 8, padding: "8px 10px", fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t40)", borderBottom: "1px solid var(--border)" }}>
                     {[
                       { key: "sol",       label: "Sol #",     sortable: false },
                       { key: "title",     label: "Title / AI Summary", sortable: true },
@@ -875,7 +911,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   </div>
 
                   {/* Rows */}
-                  <div style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}>
+                  <div style={{ maxHeight: "calc(100vh - 360px)", overflowY: "auto", paddingBottom: 20 }}>
                     {oppRows.length === 0 && (
                       <div className="empty-state">
                         {opportunities.length === 0
@@ -885,7 +921,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     )}
                     {oppRows.map((r) => {
                       const solNum = r.row.solicitation_number as string;
-                      const agency = (r.row.agency ?? "—").split("·")[0].trim();
+                      const agency = agencyShort(r.row.agency);
                       const saColors: Record<string, { bg: string; fg: string }> = {
                         SB:       { bg: "rgba(74,222,128,.14)",  fg: "var(--green)" },
                         SDVOSB:   { bg: "rgba(96,165,250,.14)",  fg: "var(--blue)" },
@@ -988,7 +1024,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                           onMouseEnter={() => setHoveredRowId(r.row.notice_id)}
                           onMouseLeave={() => setHoveredRowId((curr) => curr === r.row.notice_id ? null : curr)}
                           style={{
-                            display: "grid", gridTemplateColumns: "130px 1fr 180px 90px 110px 100px 180px", gap: 8,
+                            display: "grid", gridTemplateColumns: "130px 1fr 150px 90px 110px 100px 180px", gap: 8,
                             padding: "8px 10px", borderBottom: "1px solid var(--border)", alignItems: "center",
                             background: r.row.in_pipeline ? "rgba(96,165,250,.06)" : r.row.watched ? "rgba(245,158,11,.04)" : "transparent",
                             transition: "background .15s"
