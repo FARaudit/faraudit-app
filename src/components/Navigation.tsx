@@ -212,6 +212,7 @@ export default function Navigation(_: { initialPinned: boolean }) {
     href: string;
     badge?: NavBadge;
   }> = [
+    { id: "command-center", label: "Command Center", icon: "today", href: "/command-center", badge: { text: "New", variant: "gold" } },
     { id: "today", label: "Today", icon: "today", href: "/home" },
     { id: "audit", label: "Run Audit", icon: "audit", href: "/home#audit", badge: { text: "New", variant: "gold" } },
     { id: "past-audits", label: "Past Audits", icon: "past-audits", href: "/home#past-audits" },
@@ -243,7 +244,7 @@ export default function Navigation(_: { initialPinned: boolean }) {
     label: def.label,
     icon: def.icon,
     onClick: () => router.push(def.href),
-    isActive: false, // workspace items can't be active here — Navigation hides on /home
+    isActive: def.id === "command-center" && pathname.startsWith("/command-center"),
     badge: def.badge ?? null
   });
 

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState } from 'react'
 import type { HomeStats, OpportunityRow, AuditRow } from '@/lib/bd-os/queries'
 import { ScoreChip }      from '@/components/ds/ScoreChip'
 import { TrapBadge }      from '@/components/ds/TrapBadge'
@@ -127,7 +127,7 @@ export function CommandCenterClient({ stats, opportunities, recentAudits, userEm
         return new Date(a.response_deadline).getTime() - new Date(b.response_deadline).getTime()
       })
     else if (sort === 'agency')
-      rows.sort((a, b) => a.agency.localeCompare(b.agency))
+      rows.sort((a, b) => (a.agency ?? "").localeCompare(b.agency ?? ""))
 
     return rows
   }, [opportunities, filter, sort])
