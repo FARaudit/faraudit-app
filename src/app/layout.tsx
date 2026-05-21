@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { THEME_INIT_SCRIPT } from '@/lib/theme-ds-init'
 import "./globals.css";
 import AuthShell from "./_components/auth-shell";
 import MobileAdvisory from "./_components/mobile-advisory";
@@ -17,7 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased"  suppressHydrationWarning>
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('faraudit-ds-theme');if(t&&t!=='system'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})();` }} />
+      </head>
       <body className="min-h-full flex flex-col bg-bg text-text">
         <ThemeProvider>
           <AuthShell />

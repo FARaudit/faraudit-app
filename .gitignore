@@ -56,3 +56,4 @@ scripts/sync-digest*.log
 # Local test artifacts
 outputs/
 state-snapshot.txt
+src/app/globals.css.bak-phase1
