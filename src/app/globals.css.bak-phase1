@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+:root {
+  --fa-bg:        #050D1A;
+  --fa-surface:   #091322;
+  --fa-surface-2: #0D1C30;
+  --fa-border:    #122240;
+  --fa-border-2:  #1a3560;
+  --fa-text-1:    #EDF4FF;
+  --fa-text-2:    #5B8AB8;
+  --fa-text-3:    #2D5280;
+  --fa-accent:    #185FA5;
+  --fa-accent-2:  #1D4ED8;
+  --fa-mid:       #378ADD;
+  --fa-light:     #B5D4F4;
+  --fa-pale:      #E6F1FB;
+  --fa-gain:      #10B981;
+  --fa-loss:      #EF4444;
+  --fa-warn:      #F59E0B;
+  --fa-gold:      #D4AF37;
+
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: "Inter", system-ui, sans-serif;
+
+  /* ━━ Theme tokens (Dark canonical · F-44 dropped Light May 3 2026) ━━ */
+  --theme-bg:      #0A1628;
+  --theme-surface: #0D1F35;
+  --theme-text:    #E2E8F2;
+  --theme-border:  #1E293B;
+  --theme-accent:  #378ADD;
+}
+
+[data-theme="dark"],
+[data-theme="auto"] {
+  --theme-bg:      #0A1628;
+  --theme-surface: #0D1F35;
+  --theme-text:    #E2E8F2;
+  --theme-border:  #1E293B;
+  --theme-accent:  #378ADD;
+}
+
+@theme {
+  /* Tailwind v4 token bridge so all utility classes resolve. Kept token names
+     in sync with FARaudit design palette + the existing utility surface. */
+  --color-bg: #050D1A;
+  --color-surface: #091322;
+  --color-surface-2: #0D1C30;
+  --color-border: #122240;
+  --color-border-2: #1a3560;
+  --color-text: #EDF4FF;
+  --color-text-2: #5B8AB8;
+  --color-text-3: #2D5280;
+  --color-accent: #185FA5;
+  --color-accent-2: #1D4ED8;
+  --color-mid: #378ADD;
+  --color-blue: #185FA5;
+  --color-light: #B5D4F4;
+  --color-pale: #E6F1FB;
+  --color-green: #10B981;
+  --color-green-dim: #064E3B;
+  --color-red: #EF4444;
+  --color-red-dim: #7F1D1D;
+  --color-amber: #F59E0B;
+  --color-warn: #F59E0B;
+  --color-gold: #D4AF37;
+  --color-gold-dim: #8B7034;
+
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-fraunces: "Inter", system-ui, sans-serif;
+  --font-jetbrains: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  background: var(--fa-bg);
+  color: var(--fa-text-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--fa-bg);
+  color: var(--fa-text-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (max-width: 640px) { body { font-size: 13px; } }
+
+::selection { background: var(--fa-accent); color: var(--fa-text-1); }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Animations — mirrored across the empire (BR/FA/LA) */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@keyframes flash-gain {
+  0%, 100% { color: var(--fa-text-1); }
+  50%      { color: var(--fa-gain); text-shadow: 0 0 8px var(--fa-gain); }
+}
+@keyframes flash-loss {
+  0%, 100% { color: var(--fa-text-1); }
+  50%      { color: var(--fa-loss); text-shadow: 0 0 8px var(--fa-loss); }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%      { opacity: 0.5; transform: scale(1.4); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; }
+  40%           { opacity: 1; }
+}
+
+.flash-gain { animation: flash-gain 0.8s ease; }
+.flash-loss { animation: flash-loss 0.8s ease; }
+.slide-in   { animation: slide-in-right 0.3s ease; }
+.pulse-dot  { animation: pulse-dot 1.5s infinite; }
+.count-up   { animation: count-up 0.6s ease both; }
+.blink      { animation: blink-cursor 1s steps(1) infinite; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--fa-surface) 25%, var(--fa-surface-2) 50%, var(--fa-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--fa-bg); }
+::-webkit-scrollbar-thumb { background: var(--fa-border-2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fa-text-3); }
+
+/* ─── Sidebar tint harmonization · matches /home .bd-home .sidebar palette ───
+ * Navigation.tsx aside ships with cool-blue Tailwind tokens (bg-surface,
+ * text-text-*, border-border) which clash with the warm cream-on-dark-navy
+ * palette of the /home app shell. This scopes warm overrides ONLY to the
+ * sidebar via [data-faraudit-sidebar] so the rest of the app (which was
+ * designed against the cool palette) is unaffected. Mirrors the values
+ * baked into src/app/home/home.css :root variables. */
+[data-faraudit-sidebar] {
+  background: #060F1C !important;             /* matches --void2 from home.css */
+  color: #F5F0E8;                              /* matches --text from home.css */
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  border-right-color: rgba(201, 168, 76, 0.1) !important;
+}
+[data-faraudit-sidebar] .border-border   { border-color: rgba(201, 168, 76, 0.1); }
+[data-faraudit-sidebar] .border-border-2 { border-color: rgba(201, 168, 76, 0.2); }
+[data-faraudit-sidebar] .text-text       { color: #F5F0E8; }
+[data-faraudit-sidebar] .text-text-2     { color: rgba(245, 240, 232, 0.6); }
+[data-faraudit-sidebar] .text-text-3     { color: rgba(245, 240, 232, 0.4); }
+[data-faraudit-sidebar] .text-accent     { color: #C9A84C; }
+[data-faraudit-sidebar] .border-accent   { border-color: #C9A84C; }
+[data-faraudit-sidebar] .bg-surface-2    { background-color: rgba(201, 168, 76, 0.06); }
+[data-faraudit-sidebar] .hover\:bg-surface-2:hover { background-color: rgba(201, 168, 76, 0.06); }
+[data-faraudit-sidebar] .hover\:text-text-2:hover  { color: rgba(245, 240, 232, 0.6); }
