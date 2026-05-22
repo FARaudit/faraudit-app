@@ -43,6 +43,16 @@ const DAILY_WINDOW_DAYS = Number(process.env.BACKFILL_DAYS) || Number(process.en
 const PAGE_LIMIT = Math.min(Number(process.env.PAGE_LIMIT) || 100, 1000);
 const DRY_RUN = process.env.DRY_RUN === "true";
 
+// FA-49: hard-fail if DRY_RUN not explicitly set (prevents accidental prod writes from local terminal)
+// Rule 47: Railway-side env vars win over local prefix — require explicit value every run.
+if (process.env.DRY_RUN === undefined || process.env.DRY_RUN === "") {
+  console.error("\n❌ HARD STOP: DRY_RUN must be explicitly set.");
+  console.error("   Local:   DRY_RUN=true tsx index.ts");
+  console.error("   Railway: set DRY_RUN=false in Railway env vars");
+  console.error("   npm:     use npm run dry-run or npm run start (reads package.json scripts)");
+  process.exit(1);
+}
+
 // TODO(v1): Add archived_at column to pending_audits and have cron mark
 // notices as archived when responseDeadLine has passed. Currently the feed
 // shows expired notices as live opportunities, which is a demo-killer for
