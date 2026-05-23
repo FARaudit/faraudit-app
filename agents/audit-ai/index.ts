@@ -1,4 +1,4 @@
-import { initSentry } from "../../lib/sentry";
+import { initSentry } from "./lib/sentry";
 initSentry("audit-ai");
 
 // Audit AI — Railway worker (cron 06:30 CT daily).
