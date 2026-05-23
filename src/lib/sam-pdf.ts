@@ -269,6 +269,7 @@ async function classifyAndReturn(buf: Buffer, filename: string | null): Promise<
     if (lowerName.endsWith(".doc")) {
       return { kind: "text", extractedText: await extractDocText(buf), bytes: buf.length, source: "sam.gov", format: "doc" };
     }
+      // FA-1.2 deferred: .xls OLE2 volume <1% of SAM attachments; SheetJS advisory risk > benefit at corpus scale. Revisit if .xls exceeds 5% of ingested rows.
     throw new Error(`${kSamNonPdfError}: OLE2 container with unsupported filename "${filename ?? "<unknown>"}" (first bytes: ${buf.subarray(0, 8).toString("hex")})`);
   }
   if (isLikelyText(buf)) {
