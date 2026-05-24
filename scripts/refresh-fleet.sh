@@ -118,9 +118,14 @@ for agent in d['agents']['fleet']:
         agent['last_tick']         = u['last_tick']
         agent['last_tick_display'] = u['last_tick_display']
 
+# Update meta.fleet_last_verified — refreshes the Railway-verified stamp
+# (consumed by data-digest-key="fleet-verified" in panel-infrastructure + sidebar)
+import datetime
+d.setdefault('meta', {})['fleet_last_verified'] = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%MZ")
+
 with open(path, 'w') as f:
     json.dump(d, f, indent=2)
-print(f"[refresh-fleet] wrote {len(updates)} agent updates")
+print(f"[refresh-fleet] wrote {len(updates)} agent updates · fleet_last_verified bumped")
 PYEOF
 
 bash "$SYNC"
