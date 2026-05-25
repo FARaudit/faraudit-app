@@ -182,12 +182,15 @@ export default function Navigation(_: { initialPinned: boolean }) {
   const router = useRouter();
   const pathname = usePathname() || "";
 
-  // Reserve --sidebar-w for the layout's main column. /home renders
-  // its own inline sidebar, and Navigation suppresses itself there
-  // (return null below), so --sidebar-w must be 0 on /home to avoid
-  // double-padding the main column.
+  // Reserve --sidebar-w for the layout's main column. /home and
+  // /command-center each render their own inline sidebar, and Navigation
+  // suppresses itself there (return null below), so --sidebar-w must be
+  // 0 on those routes to avoid double-padding the main column.
+  const suppressed =
+    pathname.startsWith("/home") || pathname.startsWith("/command-center");
+
   useEffect(() => {
-    if (pathname.startsWith("/home")) {
+    if (suppressed) {
       document.documentElement.style.setProperty("--sidebar-w", "0px");
     } else {
       document.documentElement.style.setProperty("--sidebar-w", "220px");
@@ -195,9 +198,9 @@ export default function Navigation(_: { initialPinned: boolean }) {
     return () => {
       document.documentElement.style.removeProperty("--sidebar-w");
     };
-  }, [pathname]);
+  }, [suppressed]);
 
-  if (pathname.startsWith("/home")) return null;
+  if (suppressed) return null;
 
   // P0-J — sign-out is now form-POST to /api/auth/sign-out (server-side
   // supabase.auth.signOut() + 303 redirect). Browser-side signOut() left the

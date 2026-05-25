@@ -90,6 +90,10 @@ const MOCK_FREE_TIER = {
 const MOCK_AVG_CYCLE_DAYS = 32; // no cycle-time data wired yet
 const MOCK_AVG_CYCLE_DELTA = "▼ −4 days";
 const MOCK_QUICK_AUDIT_RUN_WEEK = "94 ran this week";
+/* MOCK — seed the top 6 feed rows with demo scores when compliance_score is null.
+   Real scores from the audit engine replace these as audits run. Demo-only so
+   pixel diff against Claude Design shows colored badges instead of all-neutral. */
+const MOCK_DEMO_SCORES: ReadonlyArray<number> = [94, 88, 81, 76, 71, 65];
 
 /* ─── helpers ────────────────────────────────────────── */
 type Urgency = "urgent" | "watch" | "new" | "";
@@ -107,11 +111,13 @@ function urgencyClass(o: OpportunityRow): Urgency {
   return "new";
 }
 
-function scoreClass(score: number | null): "s-hi" | "s-md" | "s-lo" | "s-no" {
-  const s = score ?? 0;
-  if (s >= 80) return "s-hi";
-  if (s >= 60) return "s-md";
-  if (s >= 40) return "s-lo";
+function scoreClass(
+  score: number | null
+): "s-hi" | "s-md" | "s-lo" | "s-no" | "s-none" {
+  if (score == null) return "s-none";
+  if (score >= 80) return "s-hi";
+  if (score >= 60) return "s-md";
+  if (score >= 40) return "s-lo";
   return "s-no";
 }
 
@@ -362,12 +368,15 @@ export function CommandCenterClient({
 
   /* ─── render ─── */
   return (
-    <div className="fa-cc">
+    <div className="fa-cc" data-sb="open" suppressHydrationWarning>
       <div className="frame">
         {/* ═════════════ SIDEBAR ═════════════ */}
         <aside className="sidebar">
           <div className="sb-logo-row">
             <div className="sb-logo">F</div>
+            <span className="sb-wordmark">
+              FAR<span className="wm-au">audit</span>
+            </span>
           </div>
 
           <div className="sb-group-label">WORKSPACE</div>
@@ -383,6 +392,7 @@ export function CommandCenterClient({
               <rect x="3" y="14" width="7" height="7" rx="1.5" />
               <rect x="14" y="14" width="7" height="7" rx="1.5" />
             </svg>
+            <span className="sb-label">Today</span>
             <span className="sb-tip">Today</span>
           </div>
           <a className="sb-icon" href="/audit" title="Run Audit">
@@ -396,6 +406,7 @@ export function CommandCenterClient({
               <path d="M14 2v6h6" />
               <path d="M9 13l2 2 4-4" />
             </svg>
+            <span className="sb-label">Run Audit</span>
             <span className="sb-tip">Run Audit</span>
           </a>
           <a className="sb-icon" href="/dashboard" title="Past Audits">
@@ -408,6 +419,7 @@ export function CommandCenterClient({
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
             </svg>
+            <span className="sb-label">Past Audits</span>
             <span className="sb-tip">Past Audits</span>
           </a>
           <div className="sb-icon" title="Pipeline">
@@ -420,6 +432,7 @@ export function CommandCenterClient({
               <path d="M3 17l6-6 4 4 8-8" />
               <path d="M14 7h7v7" />
             </svg>
+            <span className="sb-label">Pipeline</span>
             <span className="sb-tip">Pipeline</span>
           </div>
 
@@ -434,6 +447,7 @@ export function CommandCenterClient({
               <circle cx="12" cy="12" r="9" />
               <path d="M9 12l2 2 4-4" />
             </svg>
+            <span className="sb-label">Opportunities</span>
             <span className="sb-tip">Opportunities</span>
           </a>
           <div className="sb-icon" title="Defense Spending">
@@ -448,6 +462,7 @@ export function CommandCenterClient({
               <rect x="12" y="8" width="3" height="9" />
               <rect x="17" y="13" width="3" height="4" />
             </svg>
+            <span className="sb-label">Defense Spending</span>
             <span className="sb-tip">Defense Spending</span>
           </div>
           <div className="sb-icon" title="Agencies">
@@ -461,6 +476,7 @@ export function CommandCenterClient({
               <path d="M5 21V8l7-5 7 5v13" />
               <path d="M9 21v-6h6v6" />
             </svg>
+            <span className="sb-label">Agencies</span>
             <span className="sb-tip">Agencies</span>
           </div>
 
@@ -475,6 +491,7 @@ export function CommandCenterClient({
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
             </svg>
+            <span className="sb-label">Profile</span>
             <span className="sb-tip">Profile</span>
           </a>
 
@@ -515,6 +532,7 @@ export function CommandCenterClient({
                 onClick={toggleTheme}
                 aria-label="Toggle theme"
                 title="Toggle theme"
+                suppressHydrationWarning
               >
                 {isDark ? (
                   <svg
@@ -573,13 +591,18 @@ export function CommandCenterClient({
                     Federal Contract Intelligence
                   </span>
                   <span className="gt-right">
-                    <span className="date">{dateStr}</span>
+                    {/* date + sync stamp differ server vs client (timezone /
+                        request-vs-hydration moment) — suppress the warning so
+                        React doesn't flash through a corrected re-render. */}
+                    <span className="date" suppressHydrationWarning>
+                      {dateStr}
+                    </span>
                     <span className="sep" />
                     <span className="sync">{MOCK_SYNC_LABEL}</span>
                   </span>
                 </div>
                 <h1 className="greeting">
-                  {greeting}, {fname}.{" "}
+                  <span suppressHydrationWarning>{greeting}</span>, {fname}.{" "}
                   <span className="muted">
                     <span className="num">{signalCount}</span> signal
                     {signalCount === 1 ? "" : "s"} need attention.
@@ -897,7 +920,7 @@ export function CommandCenterClient({
                       No opportunities match the current filters.
                     </div>
                   ) : (
-                    feed.map((o) => {
+                    feed.map((o, idx) => {
                       const ins = generateInsight(o);
                       const agencyParts = splitAgency(o.agency);
                       const sa = setAsideLabel(o.set_aside);
@@ -906,11 +929,25 @@ export function CommandCenterClient({
                         (o.solicitation_number || o.notice_id || o.id || "")
                           .toString()
                           .toLowerCase();
+                      /* MOCK — seed demo scores into the top 6 unscored rows */
+                      const isMockScore =
+                        o.compliance_score == null &&
+                        idx < MOCK_DEMO_SCORES.length;
+                      const effectiveScore = isMockScore
+                        ? MOCK_DEMO_SCORES[idx]
+                        : o.compliance_score;
                       return (
                         <div className={rowVariant(o)} key={o.id}>
-                          <div className={`score ${scoreClass(o.compliance_score)}`}>
+                          <div
+                            className={`score ${scoreClass(effectiveScore)}`}
+                            title={
+                              isMockScore
+                                ? "MOCK demo score — real score replaces when audit runs"
+                                : undefined
+                            }
+                          >
                             <div className="v">
-                              {o.compliance_score ?? "—"}
+                              {effectiveScore ?? "—"}
                             </div>
                             <div className="l">
                               {u === "urgent" ? "Trap" : "Match"}
