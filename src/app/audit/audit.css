@@ -1,0 +1,534 @@
+/* ═══════════════════════════════════════════════════════
+   FARaudit · Run Audit page
+   New brand standard from Claude Design (handoff bundle
+   website-ui-ux-redesign · faraudit-run-audit.html/.css).
+   Scoped to .fa-run-audit to avoid leaking into the rest
+   of the app (which still ships the old dark theme via
+   globals.css / tailwind tokens).
+   ═══════════════════════════════════════════════════════ */
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap");
+
+.fa-run-audit {
+  /* palette */
+  --navy-900: #050d1a;
+  --navy-800: #0a1628;
+  --navy-700: #142545;
+  --gold-300: #fcd34d;
+  --gold-400: #fbbf24;
+  --gold-500: #f59e0b;
+  --gold-600: #d97706;
+  --gold-700: #b45309;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --green-500: #10b981;
+  --green-600: #059669;
+  --green-700: #047857;
+  --red-200: #fecaca;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+
+  /* light theme (default) */
+  --page-bg: #dfe6ee;
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --card-soft: #fafcfe;
+  --ink: #0b1828;
+  --ink-2: #334155;
+  --mute: #64748b;
+  --mute-2: #94a3b8;
+  --line: #e2e8f0;
+  --line-2: #eef2f6;
+  --line-3: #f1f5f9;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px -12px rgba(15, 23, 42, 0.1);
+  --shadow-pop: 0 16px 48px -16px rgba(15, 23, 42, 0.24),
+    0 4px 12px -2px rgba(15, 23, 42, 0.1);
+
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* dark theme follows the global ThemeProvider attribute on <html> */
+:root[data-theme="dark"] .fa-run-audit,
+:root[data-theme="auto"] .fa-run-audit {
+  --page-bg: #02060c;
+  --bg: #050d1a;
+  --card: #0c1b30;
+  --card-soft: #0a1729;
+  --ink: #e8eef6;
+  --ink-2: #b6c2d3;
+  --mute: #7d8ba0;
+  --mute-2: #5b6778;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.05);
+  --line-3: rgba(255, 255, 255, 0.04);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* ─── main ─── */
+.fa-run-audit .ra-main {
+  padding: 24px 42px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  position: relative;
+  background: var(--bg);
+}
+
+.fa-run-audit .back-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--mute);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  transition: border-color 0.14s, color 0.14s;
+  letter-spacing: 0.005em;
+  margin-bottom: auto;
+}
+.fa-run-audit .back-link svg {
+  width: 13px;
+  height: 13px;
+}
+.fa-run-audit .back-link:hover {
+  color: var(--ink);
+  border-color: var(--mute-2);
+}
+
+/* ─── Run Audit stage (vertically centered) ─── */
+.fa-run-audit .run-audit-stage {
+  max-width: 760px;
+  width: 100%;
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+}
+
+.fa-run-audit .ra-shield {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--card), var(--card-soft));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  display: grid;
+  place-items: center;
+  color: var(--gold-500);
+  margin-bottom: 22px;
+  position: relative;
+}
+.fa-run-audit .ra-shield::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 17px;
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.35),
+    transparent 50%,
+    rgba(251, 191, 36, 0.15)
+  );
+  z-index: -1;
+  filter: blur(14px);
+  opacity: 0.7;
+}
+.fa-run-audit .ra-shield svg {
+  width: 32px;
+  height: 32px;
+}
+:root[data-theme="dark"] .fa-run-audit .ra-shield {
+  background: linear-gradient(135deg, #152033, #0e1727);
+}
+
+.fa-run-audit .ra-title {
+  margin: 0 0 14px;
+  font-family: "Fraunces", "Georgia", serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 46px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.fa-run-audit .ra-sub {
+  margin: 0 0 26px;
+  max-width: 580px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
+  color: var(--mute);
+}
+.fa-run-audit .ra-sub b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.fa-run-audit .ra-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 36px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.fa-run-audit .ra-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 8px;
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+  color: var(--mute);
+}
+.fa-run-audit .ra-step .dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 9.5px;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+.fa-run-audit .ra-step .lbl {
+  color: var(--ink-2);
+}
+.fa-run-audit .ra-step.active .dot {
+  background: var(--gold-500);
+  border-color: var(--gold-500);
+  color: #3f2304;
+}
+.fa-run-audit .ra-step.done .dot {
+  background: var(--green-500);
+  border-color: var(--green-500);
+  color: #fff;
+}
+.fa-run-audit .ra-arrow {
+  color: var(--mute-2);
+  font-weight: 400;
+  font-family: "IBM Plex Mono";
+}
+
+.fa-run-audit .ra-mode {
+  display: inline-flex;
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+.fa-run-audit .ra-mode-btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.14s;
+}
+.fa-run-audit .ra-mode-btn:hover {
+  color: var(--ink-2);
+}
+.fa-run-audit .ra-mode-btn svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}
+.fa-run-audit .ra-mode-btn.active {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06),
+    inset 0 0 0 1px var(--line);
+}
+:root[data-theme="dark"] .fa-run-audit .ra-mode-btn.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  box-shadow: none;
+}
+.fa-run-audit .ra-mode-btn.active svg {
+  opacity: 1;
+  color: var(--gold-500);
+}
+
+.fa-run-audit .ra-input-wrap {
+  width: 100%;
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+.fa-run-audit .ra-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+.fa-run-audit .ra-input-row:focus-within {
+  border-color: var(--gold-500);
+  box-shadow: var(--shadow), 0 0 0 4px rgba(245, 158, 11, 0.1);
+}
+.fa-run-audit .ra-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+  padding: 0 12px;
+}
+.fa-run-audit .ra-input::placeholder {
+  color: var(--mute-2);
+  font-weight: 400;
+}
+.fa-run-audit .ra-run-btn {
+  flex-shrink: 0;
+  border: 0;
+  cursor: pointer;
+  height: 46px;
+  padding: 0 18px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  color: #3f2304;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 8px 18px -6px rgba(245, 158, 11, 0.45);
+  transition: transform 0.15s;
+}
+.fa-run-audit .ra-run-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.fa-run-audit .ra-run-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.fa-run-audit .ra-run-btn .ra-run-sub {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+.fa-run-audit .ra-run-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fa-run-audit .ra-dropzone {
+  flex: 1;
+  cursor: pointer;
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  background: var(--card-soft);
+  padding: 30px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fa-run-audit .ra-dropzone:hover,
+.fa-run-audit .ra-dropzone.drag {
+  border-color: var(--gold-500);
+  background: rgba(245, 158, 11, 0.04);
+}
+.fa-run-audit .ra-dropzone svg {
+  width: 28px;
+  height: 28px;
+  color: var(--gold-500);
+}
+.fa-run-audit .ra-dz-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.fa-run-audit .ra-dz-browse {
+  color: var(--gold-600);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+:root[data-theme="dark"] .fa-run-audit .ra-dz-browse {
+  color: var(--gold-400);
+}
+.fa-run-audit .ra-dz-types {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--mute);
+}
+.fa-run-audit .ra-dz-remove {
+  margin-top: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--mute);
+  text-decoration: underline;
+}
+.fa-run-audit .ra-dz-remove:hover {
+  color: var(--ink-2);
+}
+
+.fa-run-audit .ra-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 28px;
+  max-width: 720px;
+}
+.fa-run-audit .ra-chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+:root[data-theme="dark"] .fa-run-audit .ra-chip {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #cfd6e1;
+}
+
+.fa-run-audit .ra-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--mute);
+  margin-bottom: 48px;
+  letter-spacing: 0.005em;
+}
+.fa-run-audit .ra-foot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.fa-run-audit .ra-foot-item svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.7;
+}
+.fa-run-audit .ra-foot-item b {
+  color: var(--ink-2);
+  font-weight: 700;
+}
+.fa-run-audit .ra-foot-sep {
+  color: var(--mute-2);
+}
+.fa-run-audit .ra-foot-link {
+  color: var(--gold-600);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.fa-run-audit .ra-foot-link:hover {
+  text-decoration: underline;
+}
+:root[data-theme="dark"] .fa-run-audit .ra-foot-link {
+  color: var(--gold-400);
+}
+
+.fa-run-audit .ra-error {
+  width: 100%;
+  max-width: 720px;
+  margin: -8px 0 24px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--red-500);
+  background: rgba(239, 68, 68, 0.06);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--red-600);
+  text-align: left;
+  border-radius: 4px;
+}
+:root[data-theme="dark"] .fa-run-audit .ra-error {
+  color: var(--red-200);
+}
+
+.fa-run-audit .ra-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+.fa-run-audit .ra-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: raDotPulse 1.4s infinite;
+}
+.fa-run-audit .ra-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.fa-run-audit .ra-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes raDotPulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}

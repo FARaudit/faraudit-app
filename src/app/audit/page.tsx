@@ -3,10 +3,24 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import "./audit.css";
+
+type Mode = "id" | "upload" | "url";
+
+const STAGES = ["Overview", "FAR / DFARS Compliance", "Risk Extraction"] as const;
+
+function extractNoticeIdFromUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const m = trimmed.match(/\/opp\/([A-Za-z0-9]+)/i);
+  return m?.[1] ?? null;
+}
 
 export default function AuditPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("id");
   const [noticeId, setNoticeId] = useState("");
+  const [samUrl, setSamUrl] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,17 +45,34 @@ export default function AuditPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!noticeId.trim() && !pdfFile) {
+    setError(null);
+
+    let resolvedNoticeId = noticeId.trim();
+
+    if (mode === "url") {
+      const extracted = extractNoticeIdFromUrl(samUrl);
+      if (!extracted) {
+        setError("Could not extract a Notice ID from that URL.");
+        return;
+      }
+      resolvedNoticeId = extracted;
+    }
+
+    if (mode === "upload" && !pdfFile) {
+      setError("Drop or browse a PDF to audit.");
+      return;
+    }
+
+    if (!resolvedNoticeId && !pdfFile) {
       setError("Provide a notice ID or upload a PDF.");
       return;
     }
 
     setSubmitting(true);
-    setError(null);
 
     try {
       const formData = new FormData();
-      formData.append("noticeId", noticeId.trim());
+      formData.append("noticeId", resolvedNoticeId);
       if (pdfFile) formData.append("pdf", pdfFile);
 
       const res = await fetch("/api/audit", {
@@ -64,167 +95,298 @@ export default function AuditPage() {
     }
   }
 
+  const canSubmit =
+    !submitting &&
+    ((mode === "id" && noticeId.trim().length > 0) ||
+      (mode === "url" && samUrl.trim().length > 0) ||
+      (mode === "upload" && pdfFile !== null));
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b border-border px-6 md:px-10 py-5 flex items-center justify-between">
-        <Link href="/" className="font-display text-2xl text-text">
-          FARaudit
+    <div className="fa-run-audit">
+      <main className="ra-main">
+        <Link href="/command-center" className="back-link">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            aria-hidden
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          Back to Command Center
         </Link>
-        <Link
-          href="/dashboard"
-          className="text-sm text-text-2 hover:text-text font-mono uppercase tracking-wider"
-        >
-          Dashboard
-        </Link>
-      </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-xl">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-gold mb-3">
-            Audit
-          </p>
-          <h1 className="font-display text-4xl md:text-5xl text-text font-light">
-            Audit a solicitation
-          </h1>
-          <p className="mt-4 text-text-2 leading-relaxed">
-            Upload a SAM.gov PDF or enter a notice ID. Four-stage analysis:{" "}
-            <span className="text-text">Classify · Overview · Compliance · Risks</span>.
+        <div className="run-audit-stage">
+          <div className="ra-shield" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </div>
+
+          <h1 className="ra-title">Run a New Audit</h1>
+
+          <p className="ra-sub">
+            Upload any federal solicitation PDF. FARaudit runs{" "}
+            <b>three sequential intelligence calls</b> and delivers a ranked
+            report with a KO clarification email drafted and ready to send.
           </p>
 
-          {submitting ? (
-            <div className="mt-14 border border-accent/40 bg-accent/5 p-10">
-              <p className="font-display text-2xl text-text mb-2">Analyzing solicitation</p>
-              <p className="text-text-3 text-xs font-mono mb-8">~50 seconds</p>
-              <ol className="space-y-3">
-                {[
-                  { label: "Upload", status: "done" },
-                  { label: "Classify", status: "active" },
-                  { label: "Overview", status: "queued" },
-                  { label: "Compliance", status: "queued" },
-                  { label: "Risks", status: "queued" }
-                ].map((step, i) => (
-                  <li key={i} className="flex items-center gap-3">
-                    <span
-                      className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-mono ${
-                        step.status === "done"
-                          ? "bg-green text-bg"
-                          : step.status === "active"
-                          ? "bg-accent text-white"
-                          : "bg-surface-2 text-text-3 border border-border"
-                      }`}
-                    >
-                      {step.status === "done" ? "✓" : i + 1}
-                    </span>
-                    <span
-                      className={`text-sm font-mono uppercase tracking-[0.18em] ${
-                        step.status === "done"
-                          ? "text-green"
-                          : step.status === "active"
-                          ? "text-text"
-                          : "text-text-3"
-                      }`}
-                    >
-                      {step.label}
-                    </span>
-                    {step.status === "active" && (
-                      <span className="ml-auto inline-flex gap-1.5">
-                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite" }} />
-                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite", animationDelay: "200ms" }} />
-                        <span className="w-1.5 h-1.5 bg-accent rounded-full" style={{ animation: "dotPulse 1.4s infinite", animationDelay: "400ms" }} />
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="mt-12 space-y-6">
-              <div>
-                <label
-                  htmlFor="noticeId"
-                  className="block text-xs uppercase tracking-[0.2em] text-text-3 mb-3 font-mono"
-                >
-                  Notice ID
-                </label>
+          <div className="ra-steps" aria-label="Audit pipeline stages">
+            {STAGES.map((label, i) => (
+              <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span className={`ra-step${submitting ? " active" : ""}`}>
+                  <span className="dot">{i + 1}</span>
+                  <span className="lbl">{label}</span>
+                </span>
+                {i < STAGES.length - 1 && <span className="ra-arrow">→</span>}
+              </span>
+            ))}
+          </div>
+
+          <div className="ra-mode" role="tablist" aria-label="Input mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "id"}
+              className={`ra-mode-btn${mode === "id" ? " active" : ""}`}
+              onClick={() => setMode("id")}
+              disabled={submitting}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v8M8 12h8" />
+              </svg>
+              SAM Notice ID
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "upload"}
+              className={`ra-mode-btn${mode === "upload" ? " active" : ""}`}
+              onClick={() => setMode("upload")}
+              disabled={submitting}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 4v12" />
+                <path d="M7 9l5-5 5 5" />
+                <path d="M5 20h14" />
+              </svg>
+              Upload PDF
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "url"}
+              className={`ra-mode-btn${mode === "url" ? " active" : ""}`}
+              onClick={() => setMode("url")}
+              disabled={submitting}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1" />
+                <path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1" />
+              </svg>
+              SAM.gov URL
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="ra-input-wrap">
+            {mode === "id" && (
+              <div className="ra-input-row">
                 <input
-                  id="noticeId"
                   type="text"
+                  className="ra-input"
+                  placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068"
                   value={noticeId}
                   onChange={(e) => setNoticeId(e.target.value)}
-                  placeholder="W912DY24R0042"
-                  className="w-full bg-bg border border-border text-text px-4 py-3.5 font-mono focus:outline-none focus:border-gold transition-colors"
+                  disabled={submitting}
+                  autoFocus
                 />
+                <button
+                  type="submit"
+                  className="ra-run-btn"
+                  disabled={!canSubmit}
+                >
+                  {submitting ? (
+                    <>
+                      Running
+                      <span className="ra-dots" aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Run Audit
+                      <span className="ra-run-sub">Notice ID</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </>
+                  )}
+                </button>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs uppercase tracking-[0.2em] text-text-3 mb-3 font-mono">
-                  Solicitation PDF (optional)
-                </label>
-                <div
+            {mode === "upload" && (
+              <div className="ra-input-row">
+                <label
+                  className={`ra-dropzone${dragActive ? " drag" : ""}`}
                   onDrop={handleDrop}
                   onDragOver={(e) => handleDrag(e, true)}
                   onDragEnter={(e) => handleDrag(e, true)}
                   onDragLeave={(e) => handleDrag(e, false)}
-                  className={`border-2 border-dashed transition-colors px-6 py-12 text-center ${
-                    dragActive
-                      ? "border-gold bg-gold/5"
-                      : "border-border bg-surface/40 hover:border-border-2"
-                  }`}
                 >
                   {pdfFile ? (
-                    <div>
-                      <p className="font-mono text-sm text-text">{pdfFile.name}</p>
-                      <p className="text-text-3 text-xs mt-2 font-mono">
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <path d="M14 2v6h6" />
+                      </svg>
+                      <span className="ra-dz-title">{pdfFile.name}</span>
+                      <span className="ra-dz-types">
                         {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
+                      </span>
                       <button
                         type="button"
-                        onClick={() => setPdfFile(null)}
-                        className="mt-4 text-xs text-text-3 underline hover:text-text-2 font-mono"
+                        className="ra-dz-remove"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPdfFile(null);
+                        }}
+                        disabled={submitting}
                       >
                         Remove
                       </button>
-                    </div>
+                    </>
                   ) : (
                     <>
-                      <p className="text-text-2 text-sm">Drop a PDF here or</p>
-                      <label className="inline-block mt-2 cursor-pointer">
-                        <input
-                          type="file"
-                          accept="application/pdf,.pdf"
-                          className="hidden"
-                          onChange={(e) =>
-                            setPdfFile(e.target.files?.[0] ?? null)
-                          }
-                        />
-                        <span className="text-gold underline hover:text-gold-dim">
-                          browse files
-                        </span>
-                      </label>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                        <path d="M12 4v12" />
+                        <path d="M7 9l5-5 5 5" />
+                        <path d="M5 20h14" />
+                      </svg>
+                      <span className="ra-dz-title">
+                        Drop a solicitation PDF or{" "}
+                        <span className="ra-dz-browse">browse</span>
+                      </span>
+                      <span className="ra-dz-types">PDF · max 25MB</span>
                     </>
                   )}
-                </div>
+                  <input
+                    type="file"
+                    hidden
+                    accept="application/pdf,.pdf"
+                    onChange={(e) =>
+                      setPdfFile(e.target.files?.[0] ?? null)
+                    }
+                    disabled={submitting}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="ra-run-btn"
+                  disabled={!canSubmit}
+                >
+                  {submitting ? (
+                    <>
+                      Running
+                      <span className="ra-dots" aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Run Audit
+                      <span className="ra-run-sub">PDF</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </>
+                  )}
+                </button>
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={!noticeId.trim() && !pdfFile}
-                className="w-full bg-gold text-bg py-4 font-medium tracking-wide hover:bg-gold-dim disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Run audit
-              </button>
+            {mode === "url" && (
+              <div className="ra-input-row">
+                <input
+                  type="text"
+                  className="ra-input"
+                  placeholder="Paste full SAM.gov opportunity URL"
+                  value={samUrl}
+                  onChange={(e) => setSamUrl(e.target.value)}
+                  disabled={submitting}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  className="ra-run-btn"
+                  disabled={!canSubmit}
+                >
+                  {submitting ? (
+                    <>
+                      Running
+                      <span className="ra-dots" aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Run Audit
+                      <span className="ra-run-sub">URL</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
-              {error && (
-                <div className="border-l-2 border-red bg-red/5 p-4 text-sm text-red">
-                  {error}
-                </div>
-              )}
-            </form>
-          )}
+            {error && <div className="ra-error" role="alert">{error}</div>}
+          </form>
 
-          <p className="mt-10 text-xs text-text-3 leading-relaxed">
-            Notice ID pulls the live SAM.gov record. PDF goes directly to Claude as a document. If you provide both, both are used.
-          </p>
+          <div className="ra-chips" aria-label="Supported document types">
+            {["RFQ", "RFP", "IDIQ", "IFB", "Sources Sought", "Pre-Sol Synopsis", "Task Order", "Modification"].map(
+              (c) => (
+                <span key={c} className="ra-chip">
+                  {c}
+                </span>
+              )
+            )}
+          </div>
+
+          <div className="ra-foot">
+            <span className="ra-foot-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              Avg <b>~50 sec</b>
+            </span>
+            <span className="ra-foot-sep">·</span>
+            <span className="ra-foot-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="4" y="10" width="16" height="10" rx="2" />
+                <path d="M8 10V7a4 4 0 018 0v3" />
+              </svg>
+              Your PDFs stay private
+            </span>
+          </div>
         </div>
       </main>
     </div>
