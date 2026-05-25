@@ -1,489 +1,1400 @@
-'use client'
-import React, { useState } from 'react'
-import type { HomeStats, OpportunityRow, AuditRow } from '@/lib/bd-os/queries'
-import { ScoreChip }      from '@/components/ds/ScoreChip'
-import { TrapBadge }      from '@/components/ds/TrapBadge'
-import { InsightCallout } from '@/components/ds/InsightCallout'
-import { WidgetCard }     from '@/components/ds/WidgetCard'
-import { KPIHeroCard }    from '@/components/ds/KPIHeroCard'
-import { ThemeToggle }    from '@/components/ds/ThemeToggle'
+"use client";
 
-/* ─── types ──────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Command Center — new brand standard
+   Source of truth: Claude Design handoff bundle
+     website-ui-ux-redesign/project/faraudit-command-center.html
+   Layout, classes, and CSS variables all live in command-center.css
+   (scoped under .fa-cc so it doesn't leak into the rest of the app).
+
+   Mock-data placeholders are clearly tagged `MOCK_*` and listed in
+   the implementation report — DO NOT promote any of those to live
+   without wiring real data first.
+   ═══════════════════════════════════════════════════════════════ */
+
+import React, { useMemo, useState } from "react";
+import type {
+  HomeStats,
+  OpportunityRow,
+  AuditRow,
+} from "@/lib/bd-os/queries";
+import { useTheme } from "@/lib/theme";
+import "./command-center.css";
+
+/* ─── types ──────────────────────────────────────────── */
 interface Props {
-  stats:        HomeStats
-  opportunities: OpportunityRow[]
-  recentAudits: AuditRow[]
-  userEmail:    string
+  stats: HomeStats;
+  opportunities: OpportunityRow[];
+  recentAudits: AuditRow[];
+  userEmail: string;
 }
 
-type FeedFilter = 'all' | 'urgent' | 'expiring' | 'pipeline' | 'small-biz'
-type FeedView   = 'cards' | 'compact'
-type SortKey    = 'score' | 'deadline' | 'agency'
+type FeedFilter =
+  | "all"
+  | "urgent"
+  | "hot"
+  | "new24h"
+  | "pipeline"
+  | "risk";
+type FeedView = "cards" | "compact";
+type SortKey = "score" | "deadline" | "agency";
 
-/* ─── helpers ────────────────────────────────────────────── */
-function urgencyClass(o: OpportunityRow): 'urgent' | 'watch' | 'new' | '' {
-  if ((o.compliance_score ?? 100) < 40)  return 'urgent'
-  if ((o.compliance_score ?? 100) < 70)  return 'watch'
+/* ─── MOCK PLACEHOLDERS ──────────────────────────────── */
+/* Every value here is decorative copy that the design ships with.
+   No real data source has been wired yet. Keep them obviously fake
+   strings so they're easy to spot in the running UI.            */
+const MOCK_KPI_DELTAS = {
+  liveSolDelta: "+14 vs. yesterday", // navy hero — sam-ingest 24h delta
+  trapsBriefs: "⚑ 2 unread briefs",
+  deadlinesSub: "12 close in < 48h. 4 require teaming.",
+  deadlines48h: "◐ 12 in < 48h",
+  auditsSubDelta: "+6 vs. last month · 11 critical findings shipped.",
+  auditsMoM: "▲ +33% MoM",
+};
+const MOCK_INGEST_TICKER = [
+  { t: "2m", txt: "FA8730 · AF · C5ISR · matched" },
+  { t: "9m", txt: "N00174 · Navy · IT svcs · matched" },
+  { t: "21m", txt: "70Z023 · DHS · cyber · new" },
+];
+const MOCK_SYNC_LABEL = "SAM.gov synced 2m ago"; // sam-ingest cron timestamp not yet exposed
+const MOCK_NOTIFICATION_COUNT = 7;
+const MOCK_SIDEBAR_BADGES = {
+  pastAudits: "15", // count placeholder until /api/audits/count
+  pipeline: "3",
+  agencies: "8",
+};
+const MOCK_PIPELINE_FUNNEL = {
+  segments: [
+    { label: "Capture", n: 5 },
+    { label: "Drafting", n: 6 },
+    { label: "Pricing", n: 4 },
+    { label: "Review", n: 3 },
+    { label: "Submit", n: 1 },
+  ],
+  weighted: "$55.9M weighted",
+  ofPipeline: "59% of pipeline",
+  topActive: "Top 5 active",
+  inFlight: "19 in flight",
+};
+const MOCK_PIPELINE_METRICS = [
+  { tone: "amber", lbl: "Closing this week", n: 4, dol: "$54.1M" },
+  { tone: "green", lbl: "Hot pursuits", n: 3, dol: "$34.2M" },
+  { tone: "red", lbl: "At risk", n: 2, dol: "$7.1M" },
+] as const;
+const MOCK_FREE_TIER = {
+  label: "Free Tier · 13 sprint",
+  pct: "62%",
+  bar: 0.62,
+  detail: "8 of 13 audits used · resets in 4d",
+};
+const MOCK_AVG_CYCLE_DAYS = 32; // no cycle-time data wired yet
+const MOCK_AVG_CYCLE_DELTA = "▼ −4 days";
+const MOCK_QUICK_AUDIT_RUN_WEEK = "94 ran this week";
+
+/* ─── helpers ────────────────────────────────────────── */
+type Urgency = "urgent" | "watch" | "new" | "";
+
+function urgencyClass(o: OpportunityRow): Urgency {
+  if ((o.compliance_score ?? 100) < 40) return "urgent";
+  if ((o.compliance_score ?? 100) < 70) return "watch";
   if (o.response_deadline) {
     const days = Math.ceil(
       (new Date(o.response_deadline).getTime() - Date.now()) / 86400000
-    )
-    if (days <= 7)  return 'urgent'
-    if (days <= 21) return 'watch'
+    );
+    if (days <= 7) return "urgent";
+    if (days <= 21) return "watch";
   }
-  return 'new'
+  return "new";
 }
 
-function borderColor(u: 'urgent' | 'watch' | 'new' | ''): string {
-  if (u === 'urgent') return 'var(--ds-red-500)'
-  if (u === 'watch')  return 'var(--ds-amber-400)'
-  return 'var(--ds-blue-500)'
+function scoreClass(score: number | null): "s-hi" | "s-md" | "s-lo" | "s-no" {
+  const s = score ?? 0;
+  if (s >= 80) return "s-hi";
+  if (s >= 60) return "s-md";
+  if (s >= 40) return "s-lo";
+  return "s-no";
 }
 
-function daysLabel(deadline?: string | null): string {
-  if (!deadline) return ''
-  const d = Math.ceil(
+function rowVariant(o: OpportunityRow): string {
+  const u = urgencyClass(o);
+  if (u === "urgent") return "row urgent";
+  if (u === "watch") return "row priority";
+  return "row";
+}
+
+function deadlineLabel(deadline?: string | null): string {
+  if (!deadline) return "—";
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const hours = Math.floor(ms / 3600000);
+  if (hours < 24) return `${hours}h left`;
+  const days = Math.ceil(ms / 86400000);
+  if (days === 1) return "1d left";
+  return `${days}d left`;
+}
+
+function deadlineClass(
+  deadline?: string | null
+): "crit" | "warn" | "ok" | "cold" {
+  if (!deadline) return "cold";
+  const days = Math.ceil(
     (new Date(deadline).getTime() - Date.now()) / 86400000
-  )
-  if (d < 0)  return 'Expired'
-  if (d === 0) return 'Due today'
-  if (d === 1) return '1 day left'
-  return `${d}d left`
+  );
+  if (days <= 3) return "crit";
+  if (days <= 7) return "warn";
+  if (days <= 14) return "ok";
+  return "cold";
 }
 
-function daysColor(deadline?: string | null): string {
-  if (!deadline) return 'var(--ds-text-secondary)'
-  const d = Math.ceil(
-    (new Date(deadline).getTime() - Date.now()) / 86400000
-  )
-  if (d <= 3)  return 'var(--ds-red-500)'
-  if (d <= 7)  return 'var(--ds-amber-500)'
-  return 'var(--ds-text-secondary)'
+function formatCurrency(v: number | null | undefined): string {
+  if (v == null) return "—";
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${Math.round(v / 1000)}K`;
+  return `$${v}`;
 }
 
-/* ─── insight generator (deterministic, no API call) ─────── */
-function generateInsight(o: OpportunityRow): string {
-  const parts: string[] = []
-  if (o.document_type === 'PWS')
-    parts.push('PWS detected — outcome-based proposal required')
-  else if (o.document_type === 'SOO')
-    parts.push('SOO detected — propose your own performance work statement')
-  else if (o.document_type === 'SOW')
-    parts.push('SOW — compliance-first task-based proposal')
-  if (o.set_aside === 'SBA' || o.set_aside?.includes('Small'))
-    parts.push('100% small business set-aside')
-  if (o.risk_level === 'high' || (o.compliance_score ?? 100) < 40)
-    parts.push('high compliance risk — audit before bidding')
-  if (!o.is_audited)
-    parts.push('not yet audited — run audit to reveal traps')
-  if (parts.length === 0)
-    parts.push(`${o.naics_code ?? 'NAICS'} · ${o.set_aside ?? 'unrestricted'} · review solicitation`)
-  return parts.join(' · ')
+function splitAgency(agency: string | null): {
+  name: string;
+  sub: string | null;
+} {
+  if (!agency) return { name: "—", sub: null };
+  const parts = agency.split(/\s*[·•|/]\s*/);
+  if (parts.length === 1) return { name: parts[0], sub: null };
+  return { name: parts[0], sub: parts.slice(1).join(" · ") };
 }
 
-/* ─── stage badge helper ──────────────────────────────────── */
-function stageBadge(a: AuditRow) {
-  if (a.outcome === 'won')
-    return { label: 'Won', bg: 'var(--ds-green-100)', color: 'var(--ds-green-600)' }
-  if (a.outcome === 'lost')
-    return { label: 'Lost', bg: 'var(--ds-red-100)', color: 'var(--ds-red-600)' }
-  if (a.bid_submitted)
-    return { label: 'Submitted', bg: 'var(--ds-amber-100)', color: 'var(--ds-amber-600)' }
-  if (a.status === 'completed')
-    return { label: 'Audited', bg: 'var(--ds-blue-100)', color: 'var(--ds-blue-600)' }
-  return { label: 'In progress', bg: 'var(--ds-surface-1)', color: 'var(--ds-text-secondary)' }
+function docBadgeClass(doc: string | null): string {
+  if (!doc) return "doc";
+  const d = doc.toLowerCase();
+  if (d.includes("rfq")) return "doc rfq";
+  if (d.includes("combined")) return "doc combined";
+  if (d.includes("source")) return "doc sources";
+  if (d.includes("pre")) return "doc presol";
+  return "doc";
 }
 
-/* ─── MAIN COMPONENT ─────────────────────────────────────── */
-export function CommandCenterClient({ stats, opportunities, recentAudits, userEmail }: Props) {
-  const [filter,   setFilter]   = useState<FeedFilter>('all')
-  const [view,     setView]     = useState<FeedView>('cards')
-  const [sort,     setSort]     = useState<SortKey>('score')
-  const [customize, setCustomize] = useState(false)
-  const [expanded, setExpanded]  = useState<string | null>(null)
+function docLabel(doc: string | null, notice: string | null): string {
+  if (doc && doc.trim().length > 0) return doc;
+  if (notice && notice.trim().length > 0) return notice;
+  return "RFP";
+}
+
+function setAsideLabel(s: string | null): {
+  label: string;
+  cls: string;
+} {
+  if (!s || s.toLowerCase() === "none" || s.toLowerCase().includes("full"))
+    return { label: "Full & Open", cls: "setaside full" };
+  return { label: s, cls: "setaside" };
+}
+
+function generateInsight(o: OpportunityRow): {
+  variant: "win" | "info" | "warn" | "alert";
+  lead: string;
+  rest: string;
+} {
+  const u = urgencyClass(o);
+  if (
+    (o.compliance_score ?? 100) < 40 ||
+    o.bid_no_bid === "no-bid" ||
+    o.risk_level === "high"
+  ) {
+    return {
+      variant: "alert",
+      lead: "Disqualifying clause detected.",
+      rest:
+        o.recommendation?.trim() ||
+        "Review the audit report before committing — high compliance risk.",
+    };
+  }
+  if (u === "watch") {
+    return {
+      variant: "warn",
+      lead: "Watch item.",
+      rest:
+        o.recommendation?.trim() ||
+        `Compliance score ${o.compliance_score ?? "?"} — manual review recommended before bid.`,
+    };
+  }
+  if ((o.compliance_score ?? 0) >= 80) {
+    return {
+      variant: "win",
+      lead: "Strong fit.",
+      rest:
+        o.recommendation?.trim() ||
+        `${o.set_aside ?? "Open"} · ${o.naics_code ?? "NAICS"} matches your past performance.`,
+    };
+  }
+  return {
+    variant: "info",
+    lead: "Shape the requirement.",
+    rest:
+      o.recommendation?.trim() ||
+      `${o.document_type ?? "Notice"} · ${o.naics_code ?? "NAICS"} · ${o.set_aside ?? "Open"} — review solicitation.`,
+  };
+}
+
+function firstName(email: string): string {
+  const local = (email.split("@")[0] || "").replace(/[._-]+/g, " ").trim();
+  if (!local) return "there";
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+function greetingTime(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/* ─── MAIN COMPONENT ─────────────────────────────────── */
+export function CommandCenterClient({
+  stats,
+  opportunities,
+  recentAudits,
+  userEmail,
+}: Props) {
+  const [filter, setFilter] = useState<FeedFilter>("all");
+  const [view, setView] = useState<FeedView>("cards");
+  const [sort, setSort] = useState<SortKey>("score");
+  const { theme, setTheme } = useTheme();
+
+  /* ── derived counters ── */
+  const urgentCount = useMemo(
+    () => opportunities.filter((o) => urgencyClass(o) === "urgent").length,
+    [opportunities]
+  );
+  const new24hCount = useMemo(
+    () =>
+      opportunities.filter(
+        (o) => Date.now() - new Date(o.created_at).getTime() <= 86_400_000
+      ).length,
+    [opportunities]
+  );
+  const pipelineCount = useMemo(
+    () => opportunities.filter((o) => o.in_pipeline).length,
+    [opportunities]
+  );
+  const hotCount = useMemo(
+    () =>
+      opportunities.filter(
+        (o) => (o.compliance_score ?? 0) >= 80 && urgencyClass(o) !== "urgent"
+      ).length,
+    [opportunities]
+  );
+  const riskCount = useMemo(
+    () =>
+      opportunities.filter(
+        (o) => (o.compliance_score ?? 100) < 40 || o.risk_level === "high"
+      ).length,
+    [opportunities]
+  );
 
   /* ── filtered + sorted feed ── */
-  const feed = React.useMemo(() => {
-    let rows = [...opportunities]
-    if (filter === 'urgent')
-      rows = rows.filter(o => urgencyClass(o) === 'urgent')
-    else if (filter === 'expiring')
-      rows = rows.filter(o => {
-        if (!o.response_deadline) return false
-        const d = Math.ceil((new Date(o.response_deadline).getTime() - Date.now()) / 86400000)
-        return d <= 7
-      })
-    else if (filter === 'pipeline')
-      rows = rows.filter(o => o.in_pipeline)
-    else if (filter === 'small-biz')
-      rows = rows.filter(o => o.set_aside && o.set_aside !== 'None')
+  const feed = useMemo(() => {
+    let rows = [...opportunities];
+    if (filter === "urgent")
+      rows = rows.filter((o) => urgencyClass(o) === "urgent");
+    else if (filter === "hot")
+      rows = rows.filter(
+        (o) => (o.compliance_score ?? 0) >= 80 && urgencyClass(o) !== "urgent"
+      );
+    else if (filter === "new24h")
+      rows = rows.filter(
+        (o) => Date.now() - new Date(o.created_at).getTime() <= 86_400_000
+      );
+    else if (filter === "pipeline")
+      rows = rows.filter((o) => o.in_pipeline);
+    else if (filter === "risk")
+      rows = rows.filter(
+        (o) => (o.compliance_score ?? 100) < 40 || o.risk_level === "high"
+      );
 
-    if (sort === 'score')
-      rows.sort((a, b) => (b.compliance_score ?? 0) - (a.compliance_score ?? 0))
-    else if (sort === 'deadline')
+    if (sort === "score")
+      rows.sort(
+        (a, b) => (b.compliance_score ?? 0) - (a.compliance_score ?? 0)
+      );
+    else if (sort === "deadline")
       rows.sort((a, b) => {
-        if (!a.response_deadline) return 1
-        if (!b.response_deadline) return -1
-        return new Date(a.response_deadline).getTime() - new Date(b.response_deadline).getTime()
-      })
-    else if (sort === 'agency')
-      rows.sort((a, b) => (a.agency ?? "").localeCompare(b.agency ?? ""))
+        if (!a.response_deadline) return 1;
+        if (!b.response_deadline) return -1;
+        return (
+          new Date(a.response_deadline).getTime() -
+          new Date(b.response_deadline).getTime()
+        );
+      });
+    else if (sort === "agency")
+      rows.sort((a, b) => (a.agency ?? "").localeCompare(b.agency ?? ""));
 
-    return rows
-  }, [opportunities, filter, sort])
+    return rows;
+  }, [opportunities, filter, sort]);
 
-  const urgentCount  = opportunities.filter(o => urgencyClass(o) === 'urgent').length
-  const pipelineRows = recentAudits.filter(a => a.in_pipeline).slice(0, 5)
-  const winCount     = recentAudits.filter(a => a.outcome === 'won').length
-  const lossCount    = recentAudits.filter(a => a.outcome === 'lost').length
-  const decidedCount = winCount + lossCount
-  const winRate      = decidedCount > 0 ? Math.round((winCount / decidedCount) * 100) : 0
+  /* ── account intelligence (live from recentAudits) ── */
+  const winCount = recentAudits.filter((a) => a.outcome === "won").length;
+  const lossCount = recentAudits.filter((a) => a.outcome === "lost").length;
+  const submittedCount = recentAudits.filter((a) => a.bid_submitted).length;
+  const lookedAt = recentAudits.length; // proxy: every audit = an opp we looked at
+  const winRatePct =
+    lookedAt > 0 ? ((winCount / lookedAt) * 100).toFixed(1) : "—";
+  const hitRatePct =
+    submittedCount > 0
+      ? ((winCount / submittedCount) * 100).toFixed(0)
+      : "—";
 
-  /* ── shared style tokens ── */
-  const T = {
-    pageBg:   'var(--ds-page-bg)',
-    cardBg:   'var(--ds-card-bg)',
-    surface1: 'var(--ds-surface-1)',
-    border:   'var(--ds-border-default)',
-    text:     'var(--ds-text-primary)',
-    muted:    'var(--ds-text-secondary)',
-    navy:     'var(--ds-navy-800)',
-    blue:     'var(--ds-blue-600)',
-    shadow:   'var(--ds-shadow-card)',
-    radius:   'var(--ds-radius-lg)',
-    topbar:   'var(--ds-topbar-bg)',
-    topbarTxt:'var(--ds-topbar-text)',
-    topbarBdr:'var(--ds-topbar-border)',
-    sbBg:     'var(--ds-sidebar-bg)',
-    sbText:   'var(--ds-sidebar-text)',
-    sbActive: 'var(--ds-sidebar-active-bg)',
-    sbActTxt: 'var(--ds-sidebar-text-active)',
-    sbBorder: 'var(--ds-sidebar-border)',
-  }
+  /* ── greeting bits ── */
+  const fname = firstName(userEmail);
+  const initials = fname.slice(0, 2).toUpperCase();
+  const greeting = greetingTime();
+  const dateStr = formatDate();
+  const signalCount = urgentCount + riskCount;
 
+  /* ── topbar theme toggle (cycles light ↔ dark) ── */
+  const isDark = theme === "dark";
+  const toggleTheme = () => setTheme(isDark ? "light" : "dark");
+
+  /* ─── render ─── */
   return (
-    <div style={{ display:'flex', height:'100vh', background:T.pageBg, fontFamily:'var(--font-sans,-apple-system,BlinkMacSystemFont,"Inter",sans-serif)', fontSize:13, color:T.text, overflow:'hidden' }}>
-
-      {/* ── SIDEBAR ── */}
-      <aside style={{ width:56, minWidth:56, background:T.sbBg, display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, flexShrink:0 }}>
-        {/* Logo */}
-        <div style={{ width:56, height:52, display:'flex', alignItems:'center', justifyContent:'center', borderBottom:`0.5px solid ${T.sbBorder}`, flexShrink:0 }}>
-          <div style={{ width:28, height:28, background:'var(--ds-blue-600)', borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:600 }}>F</div>
-        </div>
-
-        {/* Nav */}
-        <nav style={{ flex:1, padding:'12px 0', display:'flex', flexDirection:'column', gap:4, alignItems:'center', width:'100%' }}>
-          {[
-            { icon:'⬡', label:'Command Center', active:true  },
-            { icon:'◎', label:'Pursue',          active:false },
-            { icon:'◈', label:'Intelligence',    active:false },
-            { icon:'◉', label:'Account',         active:false },
-          ].map(item => (
-            <div key={item.label} title={item.label} style={{
-              width:40, height:40, borderRadius:10,
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:18, cursor:'pointer',
-              color: item.active ? T.sbActTxt : T.sbText,
-              background: item.active ? T.sbActive : 'transparent',
-              borderLeft: item.active ? '3px solid var(--ds-blue-500)' : '3px solid transparent',
-              transition:'all 0.15s',
-            }}>{item.icon}</div>
-          ))}
-        </nav>
-
-        {/* Bottom */}
-        <div style={{ padding:'12px 0', display:'flex', flexDirection:'column', gap:4, alignItems:'center', borderTop:`0.5px solid ${T.sbBorder}`, width:'100%' }}>
-          <div title="Search"   style={{ width:40, height:40, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:T.sbText, cursor:'pointer' }}>⌕</div>
-          <div title="Settings" style={{ width:40, height:40, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, color:T.sbText, cursor:'pointer' }}>⚙</div>
-          <div title={userEmail} style={{ width:32, height:32, borderRadius:'50%', background:'var(--ds-blue-600)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', marginTop:4 }}>
-            {userEmail.slice(0,2).toUpperCase()}
+    <div className="fa-cc">
+      <div className="frame">
+        {/* ═════════════ SIDEBAR ═════════════ */}
+        <aside className="sidebar">
+          <div className="sb-logo-row">
+            <div className="sb-logo">F</div>
           </div>
-        </div>
-      </aside>
 
-      {/* ── MAIN ── */}
-      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
-
-        {/* Topbar */}
-        <header style={{ height:52, background:T.topbar, borderBottom:`0.5px solid ${T.topbarBdr}`, display:'flex', alignItems:'center', padding:'0 20px', gap:12, flexShrink:0, zIndex:5 }}>
-          <span style={{ fontSize:14, fontWeight:500, color:T.topbarTxt }}>Command Center</span>
-          <div style={{ display:'flex', alignItems:'center', gap:5, background:'var(--ds-blue-100)', color:'var(--ds-blue-600)', fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:10 }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'#16a34a', display:'inline-block' }} />
-            SAM.gov live
-          </div>
-          <span style={{ fontSize:12, color:T.muted }}>{stats.audit_activity_month} audits · {stats.total_traps_caught} traps caught</span>
-
-          <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center' }}>
-            <ThemeToggle />
-            <a href="/home" style={{ fontSize:11, padding:'5px 10px', border:`0.5px solid ${T.topbarTxt === '#fff' || T.topbarTxt === 'var(--ds-text-inverse)' ? 'rgba(255,255,255,0.2)' : 'var(--ds-border-medium)'}`, borderRadius:'var(--ds-radius-md)', background:'transparent', cursor:'pointer', color:T.topbarTxt, textDecoration:'none', opacity:0.7 }}>
-              ← Classic view
-            </a>
-            <button
-              onClick={() => { window.location.href = '/audit' }}
-              style={{ fontSize:12, padding:'6px 14px', border:'none', borderRadius:'var(--ds-radius-md)', background:'var(--ds-blue-600)', cursor:'pointer', color:'#fff', fontWeight:500, display:'flex', alignItems:'center', gap:5 }}
+          <div className="sb-group-label">WORKSPACE</div>
+          <div className="sb-icon active" data-tip="Today">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
             >
-              + Run audit
-            </button>
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            <span className="sb-tip">Today</span>
           </div>
-        </header>
+          <a className="sb-icon" href="/audit" title="Run Audit">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M9 13l2 2 4-4" />
+            </svg>
+            <span className="sb-tip">Run Audit</span>
+          </a>
+          <a className="sb-icon" href="/dashboard" title="Past Audits">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span className="sb-tip">Past Audits</span>
+          </a>
+          <div className="sb-icon" title="Pipeline">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 17l6-6 4 4 8-8" />
+              <path d="M14 7h7v7" />
+            </svg>
+            <span className="sb-tip">Pipeline</span>
+          </div>
 
-        {/* Canvas */}
-        <main style={{ flex:1, overflowY:'auto', padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+          <div className="sb-group-label">INTELLIGENCE</div>
+          <a className="sb-icon" href="/upstream-intel" title="Opportunities">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <span className="sb-tip">Opportunities</span>
+          </a>
+          <div className="sb-icon" title="Defense Spending">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M4 19V5M4 19h16" />
+              <rect x="7" y="11" width="3" height="6" />
+              <rect x="12" y="8" width="3" height="9" />
+              <rect x="17" y="13" width="3" height="4" />
+            </svg>
+            <span className="sb-tip">Defense Spending</span>
+          </div>
+          <div className="sb-icon" title="Agencies">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 21h18" />
+              <path d="M5 21V8l7-5 7 5v13" />
+              <path d="M9 21v-6h6v6" />
+            </svg>
+            <span className="sb-tip">Agencies</span>
+          </div>
 
-          {/* Customize bar */}
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:11, color:T.muted }}>
-              <div
-                onClick={() => setCustomize(c => !c)}
-                style={{ width:32, height:18, borderRadius:9, background: customize ? 'var(--ds-blue-600)' : 'var(--ds-surface-1)', border:`0.5px solid ${customize ? 'var(--ds-blue-600)' : 'var(--ds-border-medium)'}`, cursor:'pointer', position:'relative', transition:'background 0.2s', flexShrink:0 }}
+          <div className="sb-group-label">ACCOUNT</div>
+          <a className="sb-icon" href="/settings" title="Profile & Settings">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
+            </svg>
+            <span className="sb-tip">Profile</span>
+          </a>
+
+          <div className="sb-bottom">
+            <div className="sb-avatar" title={userEmail}>
+              {initials}
+            </div>
+          </div>
+        </aside>
+
+        {/* ═════════════ MAIN ═════════════ */}
+        <main className="main">
+          {/* ─── topbar ─── */}
+          <div className="topbar">
+            <div className="crumbs">
+              <b>Today</b>
+              <span className="sep">/</span>
+              <span>Intelligence Brief</span>
+            </div>
+            <span className="live-pill">LIVE</span>
+            <div className="search" aria-label="Search (coming soon)">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                style={{ width: 14, height: 14, flexShrink: 0 }}
               >
-                <div style={{ position:'absolute', top:3, left: customize ? 17 : 3, width:12, height:12, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 2px rgba(0,0,0,0.2)' }} />
-              </div>
-              Customize layout
-            </label>
-            {customize && <span style={{ fontSize:11, color:'var(--ds-blue-600)' }}>Drag widgets to rearrange · Pull corner to resize</span>}
-            <span style={{ marginLeft:'auto', fontSize:11, color:T.muted }}>Design Partner · {Math.max(0, Math.ceil((new Date('2026-07-21').getTime() - Date.now()) / 86400000))}d remaining</span>
-          </div>
-
-          {/* ── HERO STRIP ── */}
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:10 }}>
-            <KPIHeroCard
-              variant="navy"
-              label="Intelligence feed"
-              value={opportunities.length}
-              sub={`Active federal solicitations across your NAICS codes · updated by sam-ingest`}
-              ctaLabel="Open feed"
-              onCta={() => {}}
-            />
-            <KPIHeroCard
-              variant="red"
-              label="Act today"
-              value={urgentCount}
-              sub="Traps or deadlines requiring immediate attention"
-              ctaLabel="Review now"
-              onCta={() => setFilter('urgent')}
-              topBorder
-            />
-            <KPIHeroCard
-              variant="amber"
-              label="Traps caught"
-              value={stats.total_traps_caught}
-              sub="Compliance risks flagged across all audits"
-              ctaLabel="View audits"
-              onCta={() => {}}
-            />
-            <KPIHeroCard
-              variant="teal"
-              label="Audits this month"
-              value={stats.audit_activity_month}
-              sub={`${stats.critical_p0} critical · compliance engine active`}
-              ctaLabel="View activity"
-              onCta={() => {}}
-            />
-          </div>
-
-          {/* ── MAIN GRID ── */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:12, flex:1, minHeight:0 }}>
-
-            {/* ── LEFT: Intelligence Feed ── */}
-            <WidgetCard
-              title="Intelligence feed"
-              badge={{ label: `${urgentCount} urgent`, variant: urgentCount > 0 ? 'red' : 'gray' }}
-              noPad
-              action={
-                <div style={{ display:'flex', gap:4 }}>
-                  {(['cards','compact'] as FeedView[]).map(v => (
-                    <button key={v} onClick={() => setView(v)} style={{ fontSize:10, padding:'2px 7px', borderRadius:5, border:`0.5px solid var(--ds-border-medium)`, background: view===v ? 'var(--ds-surface-1)' : 'transparent', cursor:'pointer', color:T.muted }}>
-                      {v === 'cards' ? '⊞' : '☰'}
-                    </button>
-                  ))}
-                </div>
-              }
-            >
-              {/* Filter bar */}
-              <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderBottom:`0.5px solid var(--ds-border-default)`, flexWrap:'wrap' }}>
-                {([
-                  ['all',       'All'],
-                  ['urgent',    'Urgent'],
-                  ['expiring',  '≤7 days'],
-                  ['pipeline',  'Pipeline'],
-                  ['small-biz', 'Small biz'],
-                ] as [FeedFilter, string][]).map(([key, label]) => (
-                  <button key={key} onClick={() => setFilter(key)} style={{
-                    fontSize:11, padding:'3px 10px', borderRadius:12,
-                    border:`0.5px solid ${filter===key ? 'var(--ds-navy-800)' : 'var(--ds-border-medium)'}`,
-                    background: filter===key ? 'var(--ds-navy-800)' : 'transparent',
-                    color: filter===key ? '#fff' : T.muted,
-                    cursor:'pointer', fontWeight: filter===key ? 500 : 400,
-                  }}>{label}</button>
-                ))}
-                <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
-                  {([['score','Score'],['deadline','Deadline'],['agency','Agency']] as [SortKey,string][]).map(([key,label]) => (
-                    <button key={key} onClick={() => setSort(key)} style={{ fontSize:10, padding:'2px 7px', borderRadius:5, border:`0.5px solid var(--ds-border-medium)`, background: sort===key ? 'var(--ds-blue-100)' : 'transparent', color: sort===key ? 'var(--ds-blue-600)' : T.muted, cursor:'pointer' }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Feed rows */}
-              <div className="ds-stagger-children" style={{ overflowY:'auto', maxHeight:'calc(100vh - 340px)', padding:'6px 10px' }}>
-                {feed.length === 0 && (
-                  <div style={{ padding:'24px 0', textAlign:'center', color:T.muted, fontSize:12 }}>No solicitations match this filter.</div>
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <span>Search opportunities, agencies, NAICS, COs…</span>
+              <span className="kbd">⌘K</span>
+            </div>
+            <div className="top-actions">
+              <button
+                className="icon-btn"
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                title="Toggle theme"
+              >
+                {isDark ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z" />
+                  </svg>
                 )}
-                {feed.map((o, idx) => {
-                  const urg  = urgencyClass(o)
-                  const isOpen = expanded === o.id
-                  return (
-                    <div key={o.id} style={{
-                      background: T.cardBg,
-                      border:`0.5px solid var(--ds-border-default)`,
-                      borderLeft:`3px solid ${borderColor(urg)}`,
-                      borderRadius:'var(--ds-radius-md)',
-                      marginBottom:6,
-                      cursor:'pointer',
-                      transition:'box-shadow 0.15s',
-                    }}
-                    onClick={() => setExpanded(isOpen ? null : o.id)}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = 'var(--ds-shadow-raised)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}
-                    >
-                      {/* Row header */}
-                      <div style={{ display:'flex', alignItems:'center', gap:10, padding: view==='compact' ? '7px 10px' : '10px 12px' }}>
-                        <ScoreChip score={o.compliance_score ?? 50} size={view==='compact' ? 'sm' : 'md'} animate={idx < 8} />
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize: view==='compact' ? 12 : 13, fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                            {o.solicitation_number ? `${o.solicitation_number} — ` : ''}{o.title}
-                          </div>
-                          {view !== 'compact' && (
-                            <div style={{ fontSize:11, color:T.muted, marginTop:1 }}>{o.agency} · {o.notice_type ?? o.document_type ?? 'RFQ'} · NAICS {o.naics_code}</div>
-                          )}
+              </button>
+              <button
+                className="icon-btn"
+                title="Notifications (mock)"
+                type="button"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z" />
+                  <path d="M10 21a2 2 0 004 0" />
+                </svg>
+                <span className="nbadge">{MOCK_NOTIFICATION_COUNT}</span>
+              </button>
+              <div className="user-chip">
+                <div className="av">{initials}</div>
+                <div>
+                  <div className="nm">{fname}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── body grid ─── */}
+          <div className="body">
+            {/* center column (display:contents — children slotted via grid-area) */}
+            <div className="center">
+              {/* greeting */}
+              <div className="greeting-wrap">
+                <div className="greeting-top">
+                  <span className="eyebrow">
+                    Federal Contract Intelligence
+                  </span>
+                  <span className="gt-right">
+                    <span className="date">{dateStr}</span>
+                    <span className="sep" />
+                    <span className="sync">{MOCK_SYNC_LABEL}</span>
+                  </span>
+                </div>
+                <h1 className="greeting">
+                  {greeting}, {fname}.{" "}
+                  <span className="muted">
+                    <span className="num">{signalCount}</span> signal
+                    {signalCount === 1 ? "" : "s"} need attention.
+                  </span>
+                </h1>
+              </div>
+
+              {/* KPI hero row */}
+              <div className="kpi-row">
+                {/* Navy — Live Solicitations (live from opportunities) */}
+                <div className="kpi navy">
+                  <div className="label">
+                    <span className="ico">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                      >
+                        <path d="M3 13l6-6 4 4 8-8" />
+                      </svg>
+                    </span>
+                    Live Solicitations
+                    <span className="corner-dot">LIVE</span>
+                  </div>
+                  <div className="wide">
+                    <div className="wide-l">
+                      <div>
+                        <div className="num">
+                          {opportunities.length}
+                          <span className="unit">on SAM.gov</span>
                         </div>
-                        <div style={{ display:'flex', gap:5, flexShrink:0, alignItems:'center' }}>
-                          {o.document_type && (
-                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background:'var(--ds-blue-100)', color:'var(--ds-blue-600)', fontWeight:600 }}>{o.document_type}</span>
-                          )}
-                          {o.response_deadline && (
-                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background:'var(--ds-surface-1)', color:daysColor(o.response_deadline), fontWeight:600 }}>
-                              {daysLabel(o.response_deadline)}
-                            </span>
-                          )}
-                          {urg === 'urgent' && <TrapBadge severity="P0" animate={idx < 5} />}
-                          {urg === 'watch'  && <TrapBadge severity="P1" />}
+                        <div className="sub">
+                          Matched against your NAICS &amp; PSCs in the last
+                          24h.{" "}
+                          <span
+                            style={{ color: "#5eead4", fontWeight: 700 }}
+                          >
+                            {MOCK_KPI_DELTAS.liveSolDelta}
+                          </span>
                         </div>
                       </div>
+                      <div className="actions">
+                        <a className="btn" href="/upstream-intel">
+                          Open feed
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            style={{ width: 11, height: 11 }}
+                          >
+                            <path d="M5 12h14M13 6l6 6-6 6" />
+                          </svg>
+                        </a>
+                        <button className="btn ghost">Filters</button>
+                      </div>
+                    </div>
+                    <div className="wide-r">
+                      <svg
+                        className="spark-lg"
+                        viewBox="0 0 220 64"
+                        preserveAspectRatio="none"
+                        aria-label="ingest sparkline (mock)"
+                      >
+                        <path
+                          className="fill"
+                          d="M0 52 L18 44 L36 48 L54 36 L72 40 L90 26 L108 30 L126 18 L144 24 L162 14 L180 18 L198 8 L220 16 L220 64 L0 64 Z"
+                        />
+                        <path d="M0 52 L18 44 L36 48 L54 36 L72 40 L90 26 L108 30 L126 18 L144 24 L162 14 L180 18 L198 8 L220 16" />
+                        <circle cx="198" cy="8" r="3" fill="#5eead4" />
+                        <circle
+                          cx="198"
+                          cy="8"
+                          r="6"
+                          fill="#5eead4"
+                          opacity="0.30"
+                        />
+                      </svg>
+                      <div className="ticker">
+                        <div className="head">Ingest stream (mock)</div>
+                        {MOCK_INGEST_TICKER.map((row) => (
+                          <div className="ln" key={row.t}>
+                            <span className="t">{row.t}</span>
+                            <span className="txt">{row.txt}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Expanded insight */}
-                      {isOpen && (
-                        <div style={{ padding:'0 12px 10px' }}>
-                          <InsightCallout text={generateInsight(o)} />
-                          <div style={{ display:'flex', gap:6, marginTop:8 }}>
-                            <button
-                              onClick={e => { e.stopPropagation(); window.location.href = '/audit' }}
-                              style={{ fontSize:11, padding:'5px 12px', borderRadius:'var(--ds-radius-sm)', border:'none', background:'var(--ds-navy-800)', color:'#fff', cursor:'pointer', fontWeight:500 }}
-                            >Run audit</button>
-                            <button
-                              onClick={e => e.stopPropagation()}
-                              style={{ fontSize:11, padding:'5px 12px', borderRadius:'var(--ds-radius-sm)', border:`0.5px solid var(--ds-border-medium)`, background:'transparent', cursor:'pointer', color:T.text }}
-                            >{o.in_pipeline ? '✓ In pipeline' : 'Add to pipeline'}</button>
+                {/* Red — Compliance Traps (live: stats.critical_p0) */}
+                <div className="kpi red">
+                  <div className="label">
+                    <span className="ico">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                      >
+                        <path d="M12 2L2 22h20L12 2z" />
+                        <path d="M12 9v6" />
+                      </svg>
+                    </span>
+                    Compliance Traps
+                    <span className="corner-dot">CRITICAL</span>
+                  </div>
+                  <div>
+                    <div className="num">
+                      {stats.critical_p0}
+                      <span className="unit">audits flagged</span>
+                    </div>
+                    <div className="sub">
+                      Disqualifying clauses caught before submission.
+                    </div>
+                  </div>
+                  <div className="foot">
+                    <span className="delta">{MOCK_KPI_DELTAS.trapsBriefs}</span>
+                    <svg
+                      className="spark"
+                      viewBox="0 0 120 28"
+                      preserveAspectRatio="none"
+                    >
+                      <path
+                        className="fill"
+                        d="M0 18 L15 20 L30 14 L45 16 L60 8 L75 10 L90 6 L105 12 L120 4 L120 28 L0 28 Z"
+                      />
+                      <path d="M0 18 L15 20 L30 14 L45 16 L60 8 L75 10 L90 6 L105 12 L120 4" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Amber — Traps caught (live: stats.total_traps_caught) */}
+                <div className="kpi amber">
+                  <div className="label">
+                    <span className="ico">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                    </span>
+                    Traps Caught
+                    <span className="corner-dot">CORPUS</span>
+                  </div>
+                  <div>
+                    <div className="num">
+                      {stats.total_traps_caught}
+                      <span className="unit">in corpus</span>
+                    </div>
+                    <div className="sub">{MOCK_KPI_DELTAS.deadlinesSub}</div>
+                  </div>
+                  <div className="foot">
+                    <span className="delta">
+                      {MOCK_KPI_DELTAS.deadlines48h}
+                    </span>
+                    <svg
+                      className="spark"
+                      viewBox="0 0 120 28"
+                      preserveAspectRatio="none"
+                    >
+                      <path
+                        className="fill"
+                        d="M0 10 L15 14 L30 8 L45 12 L60 6 L75 14 L90 10 L105 16 L120 12 L120 28 L0 28 Z"
+                      />
+                      <path d="M0 10 L15 14 L30 8 L45 12 L60 6 L75 14 L90 10 L105 16 L120 12" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Teal — Audits This Month (live: stats.audit_activity_month) */}
+                <div className="kpi teal">
+                  <div className="label">
+                    <span className="ico">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                      >
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                      </svg>
+                    </span>
+                    Audits This Month
+                    <span className="corner-dot">RUN RATE</span>
+                  </div>
+                  <div>
+                    <div className="num">
+                      {stats.audit_activity_month}
+                      <span className="unit">audits run</span>
+                    </div>
+                    <div className="sub">{MOCK_KPI_DELTAS.auditsSubDelta}</div>
+                  </div>
+                  <div className="foot">
+                    <span className="delta">{MOCK_KPI_DELTAS.auditsMoM}</span>
+                    <svg
+                      className="spark"
+                      viewBox="0 0 120 28"
+                      preserveAspectRatio="none"
+                    >
+                      <path
+                        className="fill"
+                        d="M0 22 L15 20 L30 18 L45 16 L60 14 L75 12 L90 10 L105 8 L120 5 L120 28 L0 28 Z"
+                      />
+                      <path d="M0 22 L15 20 L30 18 L45 16 L60 14 L75 12 L90 10 L105 8 L120 5" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── INTELLIGENCE FEED ─── */}
+              <div className="feed">
+                <div className="feed-head">
+                  <div className="fh-top">
+                    <h2>
+                      Intelligence Feed{" "}
+                      <span className="count">
+                        {feed.length} of {opportunities.length}
+                      </span>
+                    </h2>
+                    <div className="fh-controls">
+                      <button
+                        className="sort-pill"
+                        type="button"
+                        onClick={() =>
+                          setSort(
+                            sort === "score"
+                              ? "deadline"
+                              : sort === "deadline"
+                                ? "agency"
+                                : "score"
+                          )
+                        }
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 6h13M3 12h9M3 18h5M17 8V20m0 0 3-3m-3 3-3-3" />
+                        </svg>
+                        Sort:{" "}
+                        <span className="val">
+                          {sort === "score"
+                            ? "Score"
+                            : sort === "deadline"
+                              ? "Deadline"
+                              : "Agency"}
+                        </span>
+                      </button>
+                      <div className="view-seg seg">
+                        {(["cards", "compact"] as FeedView[]).map((v) => (
+                          <button
+                            key={v}
+                            data-on={view === v}
+                            onClick={() => setView(v)}
+                            type="button"
+                          >
+                            {v === "cards" ? "Cards" : "Compact"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="fh-sub">
+                    Ranked by composite signal · score · deadline · pipeline
+                    fit
+                  </div>
+                </div>
+
+                <div className="filter-bar">
+                  <div className="tier1">
+                    <span className="tier-label">View</span>
+                    {(
+                      [
+                        ["all", "All", opportunities.length, ""],
+                        ["urgent", "Urgent", urgentCount, ""],
+                        ["hot", "Hot Match", hotCount, "hot"],
+                        ["new24h", "New 24h", new24hCount, "new"],
+                        ["pipeline", "In Pipeline", pipelineCount, ""],
+                        ["risk", "At Risk", riskCount, "risk"],
+                      ] as [FeedFilter, string, number, string][]
+                    ).map(([key, label, count, extra]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setFilter(key)}
+                        className={`chip-tab ${filter === key ? "active" : ""} ${extra}`}
+                      >
+                        {label}
+                        <span className="ct-num">{count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`feed-list ${view === "compact" ? "compact" : ""}`}>
+                  {feed.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 40,
+                        textAlign: "center",
+                        color: "var(--mute)",
+                        fontSize: 13,
+                      }}
+                    >
+                      No opportunities match the current filters.
+                    </div>
+                  ) : (
+                    feed.map((o) => {
+                      const ins = generateInsight(o);
+                      const agencyParts = splitAgency(o.agency);
+                      const sa = setAsideLabel(o.set_aside);
+                      const u = urgencyClass(o);
+                      const slugId =
+                        (o.solicitation_number || o.notice_id || o.id || "")
+                          .toString()
+                          .toLowerCase();
+                      return (
+                        <div className={rowVariant(o)} key={o.id}>
+                          <div className={`score ${scoreClass(o.compliance_score)}`}>
+                            <div className="v">
+                              {o.compliance_score ?? "—"}
+                            </div>
+                            <div className="l">
+                              {u === "urgent" ? "Trap" : "Match"}
+                            </div>
+                          </div>
+
+                          <div className="row-body">
+                            <div className="row-top">
+                              <span className="row-title">
+                                {o.title_plain || o.title || "Untitled solicitation"}
+                              </span>
+                            </div>
+                            <div className="compact-sub">
+                              {(o.solicitation_number || o.notice_id) ?? "—"} ·{" "}
+                              {agencyParts.name}
+                              {agencyParts.sub
+                                ? ` · ${agencyParts.sub}`
+                                : ""}
+                            </div>
+                            <div className="row-meta">
+                              <span
+                                className={`badge ${docBadgeClass(o.document_type || o.notice_type)}`}
+                              >
+                                {docLabel(o.document_type, o.notice_type)}
+                              </span>
+                              {o.naics_code && (
+                                <span className="badge naics">
+                                  NAICS {o.naics_code}
+                                </span>
+                              )}
+                              <span className={`badge ${sa.cls}`}>
+                                {sa.label}
+                              </span>
+                              <span className="row-id">
+                                {o.solicitation_number || o.notice_id}
+                              </span>
+                            </div>
+                            <div className="row-agency one-line">
+                              <span className="agency-name">
+                                {agencyParts.name}
+                              </span>
+                              {agencyParts.sub && (
+                                <span className="agency-sub">
+                                  {agencyParts.sub}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="row-right">
+                            <span
+                              className={`deadline ${deadlineClass(o.response_deadline)}`}
+                            >
+                              {deadlineLabel(o.response_deadline)}
+                            </span>
+                            <span className="row-value">
+                              {formatCurrency(o.award_ceiling)}
+                            </span>
+                          </div>
+
+                          <div className={`insight ${ins.variant}`}>
+                            <div className="ai-row">
+                              <span className="ai-icon">
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+                                </svg>
+                              </span>
+                              <span className="ai-label">AI INSIGHT</span>
+                            </div>
+                            <div className="ai-desc">
+                              <b>{ins.lead}</b> {ins.rest}
+                            </div>
+                          </div>
+
+                          <div className="row-actions">
+                            <a
+                              className="a primary"
+                              href={`/audit/${encodeURIComponent(slugId)}`}
+                            >
+                              Open audit{" "}
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.4"
+                              >
+                                <path d="M5 12h14M13 6l6 6-6 6" />
+                              </svg>
+                            </a>
+                            {!o.in_pipeline && (
+                              <button className="a" type="button">
+                                Add to pipeline
+                              </button>
+                            )}
                             {o.pdf_url && (
-                              <a href={o.pdf_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                                style={{ fontSize:11, padding:'5px 12px', borderRadius:'var(--ds-radius-sm)', border:`0.5px solid var(--ds-border-medium)`, background:'transparent', cursor:'pointer', color:T.text, textDecoration:'none' }}
-                              >View PDF</a>
+                              <a className="a" href={o.pdf_url} target="_blank" rel="noreferrer">
+                                View solicitation
+                              </a>
                             )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </WidgetCard>
+            </div>
 
-            {/* ── RIGHT PANEL ── */}
-            <div style={{ display:'flex', flexDirection:'column', gap:10, overflowY:'auto' }}>
-
+            {/* ═════════ RIGHT RAIL ═════════ */}
+            <aside className="rail">
               {/* Active Pursuits */}
-              <WidgetCard
-                title="Active pursuits"
-                badge={{ label:`${pipelineRows.length} open`, variant:'blue' }}
-                action={
-                  <button onClick={() => window.location.href='/home#pipeline'}
-                    style={{ fontSize:11, padding:'2px 8px', borderRadius:'var(--ds-radius-sm)', border:`0.5px solid var(--ds-border-medium)`, background:'transparent', cursor:'pointer', color:T.muted }}>
-                    + Add
-                  </button>
-                }
-              >
-                {pipelineRows.length === 0 ? (
-                  <div style={{ fontSize:12, color:T.muted, fontStyle:'italic' }}>No active pursuits yet. Run an audit and add to pipeline.</div>
-                ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                    {pipelineRows.map(a => {
-                      const sb = stageBadge(a)
-                      const pct = a.status==='completed' ? (a.bid_submitted ? 80 : 60) : 30
-                      return (
-                        <div key={a.id} style={{ padding:'9px 10px', borderRadius:'var(--ds-radius-md)', background:'var(--ds-surface-1)', border:`0.5px solid var(--ds-border-default)` }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:5 }}>
-                            <span style={{ fontSize:12, fontWeight:500, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{a.title}</span>
-                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background:sb.bg, color:sb.color, fontWeight:600, flexShrink:0 }}>{sb.label}</span>
-                          </div>
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ flex:1, height:4, background:'var(--ds-border-default)', borderRadius:2, overflow:'hidden' }}>
-                              <div style={{ height:'100%', width:`${pct}%`, background:'var(--ds-blue-600)', borderRadius:2, transition:'width 0.4s var(--ds-ease-smooth)' }} />
-                            </div>
-                            <span style={{ fontSize:11, color:daysColor(a.response_deadline), whiteSpace:'nowrap' }}>
-                              {daysLabel(a.response_deadline) || (a.bid_submitted ? 'Awaiting award' : '—')}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
+              <section className="panel">
+                <div className="panel-head stacked">
+                  <div className="ph-top">
+                    <h3>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        style={{ width: 14, height: 14 }}
+                      >
+                        <path d="M3 12l4-4 5 5 4-4 5 5" />
+                      </svg>
+                      Active Pursuits
+                    </h3>
+                    <a className="view-all" href="/dashboard">
+                      View all
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                      >
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </a>
                   </div>
-                )}
-              </WidgetCard>
+                </div>
 
-              {/* Account Intelligence */}
-              <WidgetCard title="Account intelligence" badge={{ label:'vs corpus', variant:'gray' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-                  {[
-                    { num: stats.audit_activity_month, label:'Audits (30d)',    color:'var(--ds-navy-800)' },
-                    { num: stats.total_traps_caught,   label:'Traps caught',   color:'var(--ds-red-500)'  },
-                    { num: stats.critical_p0,          label:'Critical P0',    color:'var(--ds-amber-500)'},
-                    { num: `${winRate}%`,              label:'Win rate',       color:'var(--ds-blue-600)' },
-                  ].map(item => (
-                    <div key={item.label} style={{ background:'var(--ds-surface-1)', borderRadius:'var(--ds-radius-md)', padding:'9px 10px', border:`0.5px solid var(--ds-border-default)` }}>
-                      <div style={{ fontSize:22, fontWeight:500, lineHeight:1, color:item.color }}>{item.num}</div>
-                      <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>{item.label}</div>
+                <div className="pursuits-summary">
+                  <div className="ps-head">
+                    <span className="ps-left">Pipeline funnel (mock)</span>
+                    <span className="ps-mid">
+                      <span className="lead">
+                        {MOCK_PIPELINE_FUNNEL.topActive}
+                      </span>
+                      <span className="sub">
+                        {MOCK_PIPELINE_FUNNEL.inFlight}
+                      </span>
+                    </span>
+                    <span className="ps-right">
+                      <span className="lead">
+                        {MOCK_PIPELINE_FUNNEL.weighted}
+                      </span>
+                      <span className="sub">
+                        {MOCK_PIPELINE_FUNNEL.ofPipeline}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="funnel" role="img" aria-label="mock funnel">
+                    {MOCK_PIPELINE_FUNNEL.segments.map((seg, i) => (
+                      <div
+                        key={seg.label}
+                        className={`fseg s${i}`}
+                        style={{ flex: 1 }}
+                        title={`${seg.label}: ${seg.n}`}
+                      >
+                        {seg.n}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flabels">
+                    {MOCK_PIPELINE_FUNNEL.segments.map((seg) => (
+                      <span key={seg.label} style={{ flex: 1 }}>
+                        {seg.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pursuits-metrics">
+                  {MOCK_PIPELINE_METRICS.map((m) => (
+                    <div
+                      className={`m-cell ${m.tone}`}
+                      key={m.lbl}
+                      title="mock placeholder"
+                    >
+                      <div className="m-lbl">
+                        <span className="m-dot" />
+                        {m.lbl}
+                      </div>
+                      <div className="m-val">
+                        <span className="num">{m.n}</span>
+                        <span className="dol">{m.dol}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:T.muted, marginBottom:3 }}>
-                    <span>Win rate · {decidedCount} decided</span>
-                    <span style={{ color:'var(--ds-blue-600)', fontWeight:500 }}>{winRate}%</span>
+
+                {/* live pipeline rows from recentAudits.in_pipeline */}
+                {recentAudits
+                  .filter((a) => a.in_pipeline)
+                  .slice(0, 5)
+                  .map((a) => (
+                    <div className="pursuit" key={a.id}>
+                      <div className="p-row1">
+                        <span className="nm">
+                          {a.title || a.solicitation_number || a.notice_id}
+                        </span>
+                        <span className="ag">{a.agency || "—"}</span>
+                        <span
+                          className={`due ${deadlineClass(a.response_deadline)}`}
+                        >
+                          {deadlineLabel(a.response_deadline)}
+                        </span>
+                      </div>
+                      <div className="p-row2">
+                        <span className="stage draft">
+                          {(a.status || "in progress").toUpperCase()}
+                        </span>
+                        <span className="val">
+                          {a.recommendation || `Score ${a.compliance_score ?? "—"}`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                {recentAudits.filter((a) => a.in_pipeline).length === 0 && (
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      color: "var(--mute)",
+                      fontSize: 12,
+                    }}
+                  >
+                    No active pursuits.{" "}
+                    <a href="/audit" style={{ color: "var(--gold-600)" }}>
+                      Run an audit
+                    </a>{" "}
+                    to start one.
                   </div>
-                  <div style={{ height:4, background:'var(--ds-border-default)', borderRadius:2, overflow:'hidden' }}>
-                    <div style={{ height:'100%', width:`${winRate}%`, background:'var(--ds-blue-600)', borderRadius:2 }} />
+                )}
+              </section>
+
+              {/* Quick Audit */}
+              <section className="panel">
+                <div className="panel-head stacked">
+                  <div className="ph-top">
+                    <h3>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        style={{ width: 14, height: 14 }}
+                      >
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <path d="M14 2v6h6" />
+                        <path d="M9 15l2 2 4-4" />
+                      </svg>
+                      Quick Audit
+                    </h3>
+                    <span
+                      className="badge-compl"
+                      style={{
+                        fontFamily: "IBM Plex Mono",
+                        fontSize: 10.5,
+                        color: "var(--mute)",
+                        fontWeight: 600,
+                      }}
+                      title="mock"
+                    >
+                      {MOCK_QUICK_AUDIT_RUN_WEEK}
+                    </span>
                   </div>
                 </div>
-              </WidgetCard>
 
-              {/* Quick audit */}
-              <WidgetCard title="Quick audit">
-                <button
-                  onClick={() => window.location.href = '/audit'}
-                  style={{ display:'block', width:'100%', padding:'10px', borderRadius:'var(--ds-radius-md)', border:`1.5px dashed var(--ds-border-medium)`, background:'var(--ds-surface-1)', cursor:'pointer', fontSize:12, color:T.muted, textAlign:'center', transition:'all 0.15s' }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = 'var(--ds-blue-500)'; el.style.color = 'var(--ds-blue-600)' }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = 'var(--ds-border-medium)'; el.style.color = T.muted }}
-                >
-                  ⬆ Drop PDF or click to start audit
-                </button>
-              </WidgetCard>
+                <a className="qa-drop" href="/audit" style={{ textDecoration: "none" }}>
+                  <div className="ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                      <path d="M17 8l-5-5-5 5" />
+                      <path d="M12 3v12" />
+                    </svg>
+                  </div>
+                  <div className="t">
+                    Drop PDF or <span className="browse">browse</span>
+                  </div>
+                  <div className="types">
+                    PWS <span className="sep">·</span> SOW{" "}
+                    <span className="sep">·</span> SOO{" "}
+                    <span className="sep">·</span> RFP{" "}
+                    <span className="sep">·</span> RFQ{" "}
+                    <span className="sep">·</span> max 25MB
+                  </div>
+                </a>
 
-            </div>
+                <div className="qa-recent">
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: "var(--mute)",
+                      fontWeight: 700,
+                      letterSpacing: ".06em",
+                      textTransform: "uppercase",
+                      margin: "0 2px 2px",
+                    }}
+                  >
+                    Recent audits
+                  </div>
+                  {recentAudits.slice(0, 4).map((a) => {
+                    const sc = a.compliance_score ?? 0;
+                    const tone = sc >= 80 ? "hi" : sc >= 60 ? "md" : "lo";
+                    const slug = (
+                      a.solicitation_number ||
+                      a.notice_id ||
+                      a.id ||
+                      ""
+                    )
+                      .toString()
+                      .toLowerCase();
+                    return (
+                      <a
+                        className="qa-item"
+                        key={a.id}
+                        href={`/audit/${encodeURIComponent(slug)}`}
+                        style={{ textDecoration: "none", color: "inherit" }}
+                      >
+                        <div className="ic pdf">PDF</div>
+                        <div className="bd">
+                          <div className="ttl">
+                            {(a.solicitation_number || a.notice_id) ?? "—"} —{" "}
+                            {a.title || "Untitled"}
+                          </div>
+                          <div className="mt">
+                            {new Date(a.created_at).toLocaleDateString()} ·{" "}
+                            {a.recommendation ?? a.status}
+                          </div>
+                        </div>
+                        <span className={`sc ${tone}`}>{sc}</span>
+                      </a>
+                    );
+                  })}
+                  {recentAudits.length === 0 && (
+                    <div
+                      style={{
+                        padding: "12px 6px",
+                        fontSize: 11,
+                        color: "var(--mute)",
+                      }}
+                    >
+                      No audits yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="free-strip" title="mock — billing not wired">
+                  <div className="ft-top">
+                    <span>{MOCK_FREE_TIER.label}</span>
+                    <span>{MOCK_FREE_TIER.pct}</span>
+                  </div>
+                  <div className="ft-bar">
+                    <i style={{ width: `${MOCK_FREE_TIER.bar * 100}%` }} />
+                  </div>
+                  <div className="ft-d">{MOCK_FREE_TIER.detail}</div>
+                </div>
+              </section>
+
+              {/* Account Intelligence */}
+              <section className="panel">
+                <div className="panel-head">
+                  <h3>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      style={{ width: 14, height: 14 }}
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" />
+                    </svg>
+                    Account Intelligence
+                  </h3>
+                </div>
+
+                <div className="ai2">
+                  <div className="ai2-row cols-2">
+                    <div
+                      className="m hero"
+                      title="Win Rate = wins ÷ every opportunity you looked at (live from audits.outcome)"
+                    >
+                      <div className="lbl">Win Rate · 12mo</div>
+                      <div className="val">
+                        {winRatePct}
+                        <span className="small">%</span>
+                      </div>
+                      <div className="def">of all opps you look at</div>
+                    </div>
+                    <div
+                      className="m"
+                      title="Hit Rate = wins ÷ proposals submitted (live from audits.bid_submitted)"
+                    >
+                      <div className="lbl">Hit Rate · 12mo</div>
+                      <div className="val">
+                        {hitRatePct}
+                        <span className="small">%</span>
+                      </div>
+                      <div className="def">of bids you actually submit</div>
+                    </div>
+                    <div
+                      className="m critical"
+                      title="Open Priority-0 compliance findings (live)"
+                    >
+                      <div className="lbl">Critical P0</div>
+                      <div className="val">{stats.critical_p0}</div>
+                      <div className="def">blocking deals right now</div>
+                    </div>
+                    <div
+                      className="m"
+                      title="Avg Cycle Time — MOCK (no cycle-time data wired)"
+                    >
+                      <div className="lbl">Avg Cycle Time</div>
+                      <div className="val">
+                        {MOCK_AVG_CYCLE_DAYS}
+                        <span className="small">days</span>
+                      </div>
+                      <div className="delta up">{MOCK_AVG_CYCLE_DELTA}</div>
+                      <div className="def">to get a proposal out (mock)</div>
+                    </div>
+                  </div>
+
+                  {/* Locked Pipeline Coverage — design ships as locked / mock */}
+                  <div className="locked-chart">
+                    <div className="lc-head">
+                      <span className="lc-lbl">
+                        Pipeline Coverage · 8 weeks
+                      </span>
+                      <span className="lock-ico" title="Coming soon">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <rect
+                            x="4"
+                            y="10"
+                            width="16"
+                            height="10"
+                            rx="2"
+                          />
+                          <path d="M8 10V7a4 4 0 018 0v3" />
+                        </svg>
+                      </span>
+                    </div>
+                    <div className="lc-bars" aria-hidden="true">
+                      {[32, 46, 60, 52, 72, 80, 76, 100].map((h, i) => (
+                        <i key={i} style={{ height: `${h}%` }} />
+                      ))}
+                    </div>
+                    <div className="lc-msg">
+                      Populates once you have <b>3+ active pursuits</b>.
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </aside>
           </div>
         </main>
       </div>
     </div>
-  )
+  );
 }

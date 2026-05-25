@@ -18,7 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('faraudit-ds-theme');if(t&&t!=='system'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})();` }} />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('faraudit-theme');if(t==='system')t='auto';if(t!=='light'&&t!=='dark'&&t!=='auto')t='light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-bg text-text">
         <ThemeProvider>

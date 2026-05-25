@@ -1,7 +1,8 @@
 "use client";
 
-// Theme system — Dark + Auto only (Light dropped May 3 2026, F-44).
-// Stale 'light' / 'system' values from localStorage or server coerce to 'auto' on load.
+// Theme system — Light + Dark + Auto.
+// Light re-added 2026-05-24 to match the Claude Design brand standard (CC + Run Audit).
+// Stale 'system' values from localStorage or server coerce to 'auto' on load.
 // Persists to user_preferences.theme (server) when authed, localStorage (client) otherwise.
 
 import {
@@ -13,9 +14,9 @@ import {
   type ReactNode
 } from "react";
 
-export type Theme = "dark" | "auto";
+export type Theme = "light" | "dark" | "auto";
 const STORAGE_KEY = "faraudit-theme";
-const VALID: Theme[] = ["dark", "auto"];
+const VALID: Theme[] = ["light", "dark", "auto"];
 
 type ThemeContextValue = {
   theme: Theme;
@@ -30,12 +31,12 @@ function isTheme(v: unknown): v is Theme {
   return typeof v === "string" && (VALID as readonly string[]).includes(v);
 }
 
-// Stale values from before the F-44 cleanup map to Auto.
 function coerce(v: unknown): Theme {
+  if (v === "light") return "light";
   if (v === "dark") return "dark";
   if (v === "auto") return "auto";
-  if (v === "light" || v === "system") return "auto";
-  return "dark";
+  if (v === "system") return "auto";
+  return "light";
 }
 
 function applyToDom(theme: Theme) {
@@ -44,14 +45,14 @@ function applyToDom(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [ready, setReady] = useState(false);
 
   // ━ Initial load (client only) ━
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let initial: Theme = "dark";
+      let initial: Theme = "light";
       let staleLocal = false;
       try {
         const fromLocal = window.localStorage.getItem(STORAGE_KEY);
@@ -137,7 +138,7 @@ export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
     return {
-      theme: "dark",
+      theme: "light",
       setTheme: () => {},
       ready: false
     };
