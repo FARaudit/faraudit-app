@@ -582,7 +582,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
     <div class="hdr-naics-pills"><span class="hdr-naics-pill active">✓ 336413</span><span class="hdr-naics-pill active">✓ 332710</span><span class="hdr-naics-pill active">✓ 332721</span></div>
   </div>
 </header>
-<section class="filter-bar"><div class="fb-row"><div class="fb-group"><span class="fb-label">Command</span><button class="fb-pill active" onclick="setAgFilter('cmd','all',this)">All</button><button class="fb-pill" onclick="setAgFilter('cmd','AETC',this)">AETC</button><button class="fb-pill" onclick="setAgFilter('cmd','AFMC',this)">AFMC</button><button class="fb-pill" onclick="setAgFilter('cmd','AFLCMC',this)">AFLCMC</button><button class="fb-pill" onclick="setAgFilter('cmd','DLA',this)">DLA</button><button class="fb-pill" onclick="setAgFilter('cmd','USSOCOM',this)">USSOCOM</button></div></div><div class="fb-row"><div class="fb-group"><span class="fb-label">Set-Aside</span><button class="fb-pill active" onclick="setAgFilter('sa','all',this)">All</button><button class="fb-pill" onclick="setAgFilter('sa','SB',this)">&gt;80% SB</button><button class="fb-pill" onclick="setAgFilter('sa','MID',this)">60–80% SB</button><button class="fb-pill" onclick="setAgFilter('sa','LOW',this)">&lt;60% SB</button></div><div class="fb-group" style="margin-left:auto"><input id="ag-search" type="text" placeholder="Search agencies…" oninput="filterAgencies()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:200px"></div></div></section>
+<section class="filter-bar"><div class="fb-row"><div class="fb-group"><span class="fb-label">Command</span><button class="fb-pill active" onclick="setAgFilter('cmd','all',this)">All</button><button class="fb-pill" onclick="setAgFilter('cmd','AETC',this)">AETC</button><button class="fb-pill" onclick="setAgFilter('cmd','AFMC',this)">AFMC</button><button class="fb-pill" onclick="setAgFilter('cmd','AFLCMC',this)">AFLCMC</button><button class="fb-pill" onclick="setAgFilter('cmd','DLA',this)">DLA</button><button class="fb-pill" onclick="setAgFilter('cmd','USSOCOM',this)">USSOCOM</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">Set-Aside</span><button class="fb-pill active" onclick="setAgFilter('sa','all',this)">All</button><button class="fb-pill" onclick="setAgFilter('sa','SB',this)">&gt;80% SB</button><button class="fb-pill" onclick="setAgFilter('sa','MID',this)">60–80% SB</button><button class="fb-pill" onclick="setAgFilter('sa','LOW',this)">&lt;60% SB</button></div><div class="fb-group" style="margin-left:auto"><input id="ag-search" type="text" placeholder="Search agencies…" oninput="filterAgencies()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:200px"></div></div></section>
 <section class="stat-strip"><div class="stat-card tone-blue">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></span>
       <div class="stat-body">
@@ -617,7 +617,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .filter-bar .fb-row{display:flex;align-items:center;gap:6px;width:100%}
 .filter-bar .fb-group{gap:5px;flex-shrink:0}
 .filter-bar .fb-pill{padding:4px 10px;font-size:11px;white-space:nowrap}
-.fb-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);opacity:1;margin-right:4px;white-space:nowrap;flex-shrink:0}
+.fb-label{background:var(--card-soft);border:1px solid var(--line);color:var(--ink);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-right:6px;white-space:nowrap;flex-shrink:0}
 .widget-head{align-items:flex-start;min-height:auto}
 .wh-text h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;font-size:13px}
 .wh-sub{font-size:11px;color:var(--mute);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
@@ -718,7 +718,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
 [data-theme="dark"] .top-sols-val{color:var(--accent-light)}
 .sa-bar-row{margin-bottom:11px}
 .sa-bar-row:last-child{margin-bottom:0}
-.sa-bar-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;color:var(--ink-2)}
+.sa-bar-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px;width:100%;color:var(--ink-2)}
 .sa-bar-val{font-family:"IBM Plex Mono",monospace;font-weight:800}
 .sa-bar-track{height:5px;background:var(--line-2);border-radius:3px;overflow:hidden}
 .sa-bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
@@ -755,11 +755,11 @@ tr:hover .ii-notice{height:auto;opacity:1}
   </header>
   <div class="widget-body">
 <div style="padding:0 4px">
-<div class="sa-bar-row"><div class="sa-bar-top"><span>AETC</span><span class="sa-bar-val" style="color:var(--green-700)">90%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:90%;background:var(--green-600)"></div></div></div>
-<div class="sa-bar-row"><div class="sa-bar-top"><span>AFLCMC</span><span class="sa-bar-val" style="color:var(--green-700)">70%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:70%;background:var(--green-600)"></div></div></div>
-<div class="sa-bar-row"><div class="sa-bar-top"><span>AFMC</span><span class="sa-bar-val" style="color:var(--amber-700)">68%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:68%;background:var(--amber-600)"></div></div></div>
-<div class="sa-bar-row"><div class="sa-bar-top"><span>USSOCOM</span><span class="sa-bar-val" style="color:var(--amber-700)">55%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:55%;background:var(--amber-600)"></div></div></div>
-<div class="sa-bar-row"><div class="sa-bar-top"><span>DLA</span><span class="sa-bar-val" style="color:var(--red-700)">45%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:45%;background:var(--red-600)"></div></div></div>
+<div class="sa-bar-row"><div class="sa-bar-top"><span style="min-width:80px;display:inline-block">AETC</span><span class="sa-bar-val" style="font-family:monospace;font-weight:700;min-width:36px;text-align:right;display:inline-block;color:var(--green-700)">90%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:90%;background:var(--green-600)"></div></div></div>
+<div class="sa-bar-row"><div class="sa-bar-top"><span style="min-width:80px;display:inline-block">AFLCMC</span><span class="sa-bar-val" style="font-family:monospace;font-weight:700;min-width:36px;text-align:right;display:inline-block;color:var(--green-700)">70%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:70%;background:var(--green-600)"></div></div></div>
+<div class="sa-bar-row"><div class="sa-bar-top"><span style="min-width:80px;display:inline-block">AFMC</span><span class="sa-bar-val" style="font-family:monospace;font-weight:700;min-width:36px;text-align:right;display:inline-block;color:var(--amber-700)">68%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:68%;background:var(--amber-600)"></div></div></div>
+<div class="sa-bar-row"><div class="sa-bar-top"><span style="min-width:80px;display:inline-block">USSOCOM</span><span class="sa-bar-val" style="font-family:monospace;font-weight:700;min-width:36px;text-align:right;display:inline-block;color:var(--amber-700)">55%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:55%;background:var(--amber-600)"></div></div></div>
+<div class="sa-bar-row"><div class="sa-bar-top"><span style="min-width:80px;display:inline-block">DLA</span><span class="sa-bar-val" style="font-family:monospace;font-weight:700;min-width:36px;text-align:right;display:inline-block;color:var(--red-700)">45%</span></div><div class="sa-bar-track"><div class="sa-bar-fill" style="width:45%;background:var(--red-600)"></div></div></div>
 </div></div>
 </section><section class="widget">
   <header class="widget-head">
