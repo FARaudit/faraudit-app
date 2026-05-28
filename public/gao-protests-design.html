@@ -833,14 +833,11 @@ function renderProtests(){
           <div class="gp-top">
             <span class="gp-docket">${p.docket}</span>
             <span class="gp-sb ${statusClass(p.status)}">${p.status}</span>
+            <div class="gp-tags" style="margin-left:6px"><span class="gptag gpt-a">${p.agency}</span><span class="gptag gpt-g">${p.naics}</span></div>
           </div>
           <div class="gp-title">${p.title}</div>
           <div class="gp-sub">${p.protester} · Filed ${p.filed}</div>
           <div class="insight-chip ${p.status==='Active'?'insight-alert':p.status==='Sustained'?'insight-win':'insight-info'}"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${(PROTEST_INSIGHTS[p.docket]||"").replace(/^● AI INSIGHT:\s*/,"")}</span></div>
-          <div class="gp-tags">
-            <span class="gptag gpt-a">${p.agency}</span>
-            <span class="gptag gpt-g">${p.naics}</span>
-          </div>
         </div>
         <div class="gp-rt">
           <div class="gp-val">${p.val}</div>
