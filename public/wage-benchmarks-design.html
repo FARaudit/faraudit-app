@@ -582,7 +582,6 @@ tr:hover .ii-notice{height:auto;opacity:1}
     <div class="hdr-naics-pills"><span class="hdr-naics-pill active">✓ 336413</span><span class="hdr-naics-pill active">✓ 332710</span><span class="hdr-naics-pill active">✓ 332721</span></div>
   </div>
 </header>
-<div class="filter-bar"><div class="fb-group"><span class="fb-label">LOCATION</span><button class="fb-pill active" onclick="setF('loc','all',this)">All</button><button class="fb-pill" onclick="setF('loc','JBSA',this)">JBSA San Antonio</button><button class="fb-pill" onclick="setF('loc','WPAFB',this)">WPAFB Ohio</button><button class="fb-pill" onclick="setF('loc','Tinker',this)">Tinker AFB OK</button><button class="fb-pill" onclick="setF('loc','Robins',this)">Robins AFB GA</button><button class="fb-pill" onclick="setF('loc','Richmond',this)">Richmond VA</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">CATEGORY</span><button class="fb-pill active" onclick="setF('cat','all',this)">All</button><button class="fb-pill" onclick="setF('cat','Mechanic',this)">Mechanic</button><button class="fb-pill" onclick="setF('cat','Inspector',this)">Inspector</button><button class="fb-pill" onclick="setF('cat','Technician',this)">Technician</button><button class="fb-pill" onclick="setF('cat','Machinist',this)">Machinist</button><button class="fb-pill" onclick="setF('cat','Administrative',this)">Administrative</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search WD or category…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
 <style>
 [data-theme="light"]{
   --insight-amber-bg:#fef3c7;
@@ -632,36 +631,49 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .two-col{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:20px}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:14px;position:sticky;top:82px}
-.wage-row{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm);padding:12px 14px;display:flex;flex-direction:column;gap:6px;transition:border-color .15s}
-.wage-row:hover{border-color:var(--accent-light)}
-.wage-row.flag-red{border-left:3px solid #dc2626}
-.wage-row.flag-green{border-left:3px solid #16a34a}
-.wage-row.flag-neutral{border-left:3px solid var(--line-2)}
-.wage-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.wage-wd{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);font-weight:600}
-.wage-cat{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:-.1px;flex:1;min-width:140px}
-.wage-loc{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--purple-700);background:rgba(124,58,237,.10);padding:2px 7px;border-radius:4px;font-weight:700}
-[data-theme="dark"] .wage-loc{color:#c4b5fd;background:rgba(124,58,237,.22)}
-.wage-rates{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-family:"IBM Plex Mono",monospace}
-.rate-cell{background:var(--card-soft);border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;text-align:center}
-.rate-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin-bottom:3px;font-weight:700}
-.rate-val{font-size:13px;font-weight:800;color:var(--ink)}
-.rate-cell.var-pos .rate-val{color:var(--green-700)}
-.rate-cell.var-neg .rate-val{color:var(--red-700)}
-[data-theme="dark"] .rate-cell.var-pos .rate-val{color:#6ee7b7}
-[data-theme="dark"] .rate-cell.var-neg .rate-val{color:#fca5a5}
-.flag-row{padding:11px 14px;border-bottom:1px solid var(--line-3);font-size:12px}
-.flag-row:last-child{border-bottom:none}
-.flag-name{font-weight:700;color:var(--ink);margin-bottom:2px}
-.flag-info{font-size:11px;color:var(--mute);margin-bottom:5px}
-.flag-fix{font-size:11px;color:var(--red-700);background:rgba(220,38,38,.06);padding:5px 8px;border-radius:4px;border:1px solid rgba(220,38,38,.18)}
-[data-theme="dark"] .flag-fix{color:#fca5a5;background:rgba(220,38,38,.12)}
-.mp-bar-row{margin-bottom:11px}
-.mp-bar-row:last-child{margin-bottom:0}
-.mp-bar-top{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-2);margin-bottom:4px}
-.mp-bar-val{font-family:"IBM Plex Mono",monospace;font-weight:800}
-.mp-bar-track{height:6px;background:var(--line-2);border-radius:3px;overflow:hidden}
-.mp-bar-fill{height:100%;border-radius:3px}
+.wage-table-wrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.wage-table-scroll{overflow-x:auto}
+.wage-table{width:100%;border-collapse:collapse;font-size:12px}
+.wage-thead th{padding:9px 12px;background:var(--card-soft);font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);border-bottom:1px solid var(--line);white-space:nowrap;text-align:left;position:sticky;top:0;z-index:2}
+.wage-tbody tr{border-bottom:1px solid var(--line-3)}
+.wage-tbody tr:last-child{border-bottom:none}
+.wage-tbody tr:hover{background:var(--card-soft)}
+.wage-tbody td{padding:9px 12px;vertical-align:middle}
+.wd-num{font-family:"IBM Plex Mono",monospace;color:var(--accent-deep);font-size:10.5px;font-weight:700}
+[data-theme="dark"] .wd-num{color:var(--accent-light)}
+.lc-name{font-weight:600;color:var(--ink);font-size:12px}
+.lc-loc{font-size:10.5px;color:var(--mute);font-family:"IBM Plex Mono",monospace}
+.rate-val{font-family:"IBM Plex Mono",monospace;font-weight:700;color:var(--ink);font-size:11.5px}
+.var-pos{font-family:"IBM Plex Mono",monospace;font-weight:800;color:#16a34a;font-size:11.5px}
+.var-neg{font-family:"IBM Plex Mono",monospace;font-weight:800;color:#dc2626;font-size:11.5px}
+.var-neutral{font-family:"IBM Plex Mono",monospace;font-weight:800;color:#d97706;font-size:11.5px}
+[data-theme="dark"] .var-pos{color:#6ee7b7}
+[data-theme="dark"] .var-neg{color:#fca5a5}
+[data-theme="dark"] .var-neutral{color:#fcd34d}
+tr.flag-row{background:rgba(220,38,38,.04)}
+[data-theme="dark"] tr.flag-row{background:rgba(220,38,38,.08)}
+tr.flag-row:hover{background:rgba(220,38,38,.07)}
+.status-badge{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:10px;letter-spacing:.04em}
+.sb-Compliant{background:rgba(22,163,74,.12);color:#16a34a;border:1px solid rgba(22,163,74,.30)}
+.sb-Watch{background:rgba(217,119,6,.12);color:#d97706;border:1px solid rgba(217,119,6,.30)}
+.sb-FLAG{background:rgba(220,38,38,.12);color:#dc2626;border:1px solid rgba(220,38,38,.30)}
+[data-theme="dark"] .sb-Compliant{color:#6ee7b7;background:rgba(22,163,74,.18)}
+[data-theme="dark"] .sb-Watch{color:#fcd34d;background:rgba(245,158,11,.18)}
+[data-theme="dark"] .sb-FLAG{color:#fca5a5;background:rgba(220,38,38,.18)}
+tr.insight-row td{padding:0 12px 9px;background:rgba(220,38,38,.02)}
+[data-theme="dark"] tr.insight-row td{background:rgba(220,38,38,.05)}
+.flag-list-row{padding:11px 14px;border-bottom:1px solid var(--line-3);font-size:11.5px}
+.flag-list-row:last-child{border-bottom:none}
+.flag-list-cat{font-weight:700;color:var(--ink);margin-bottom:2px}
+.flag-list-info{font-size:10.5px;color:var(--mute);margin-bottom:5px;font-family:"IBM Plex Mono",monospace}
+.flag-list-fix{font-size:11px;color:#b91c1c;background:rgba(220,38,38,.06);padding:5px 8px;border-radius:4px;border:1px solid rgba(220,38,38,.18)}
+[data-theme="dark"] .flag-list-fix{color:#fca5a5;background:rgba(220,38,38,.12)}
+.mp-row{margin-bottom:11px}
+.mp-row:last-child{margin-bottom:0}
+.mp-top{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-2);margin-bottom:4px}
+.mp-val{font-family:"IBM Plex Mono",monospace;font-weight:800}
+.mp-track{height:6px;background:var(--line-2);border-radius:3px;overflow:hidden}
+.mp-fill{height:100%;border-radius:3px}
 .ren-row{padding:9px 14px;border-bottom:1px solid var(--line-3);display:flex;justify-content:space-between;align-items:center;font-size:12px}
 .ren-row:last-child{border-bottom:none}
 .ren-wd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);font-weight:700}
@@ -670,30 +682,42 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .ren-date{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--amber-700);font-weight:800}
 [data-theme="dark"] .ren-date{color:#fcd34d}
 </style>
-<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span><div class="stat-body"><p class="lbl">Labor Categories Tracked</p><p class="val">12</p><p class="sub">across 5 installation locations</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><div class="stat-body"><p class="lbl">SCA Determinations</p><p class="val">8</p><p class="sub">active WDs in your NAICS</p></div></div><div class="stat-card tone-green"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span><div class="stat-body"><p class="lbl">Avg Variance from Market</p><p class="val">-3.2%</p><p class="sub">slightly below prevailing — adjustable</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span><div class="stat-body"><p class="lbl">Compliance Flags</p><p class="val">2</p><p class="sub">rates below SCA minimum</p></div></div></section>
+<div class="filter-bar"><div class="fb-group"><span class="fb-label">LOCATION</span><button class="fb-pill active" onclick="setF('loc','all',this)">All</button><button class="fb-pill" onclick="setF('loc','JBSA',this)">JBSA SA</button><button class="fb-pill" onclick="setF('loc','WPAFB',this)">WPAFB</button><button class="fb-pill" onclick="setF('loc','Tinker',this)">Tinker</button><button class="fb-pill" onclick="setF('loc','Robins',this)">Robins</button><button class="fb-pill" onclick="setF('loc','Richmond',this)">Richmond</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">STATUS</span><button class="fb-pill active" onclick="setF('st','all',this)">All</button><button class="fb-pill" onclick="setF('st','Compliant',this)">Compliant</button><button class="fb-pill" onclick="setF('st','Watch',this)">Watch</button><button class="fb-pill" onclick="setF('st','FLAG',this)">FLAG</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search WD or category…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
+<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span><div class="stat-body"><p class="lbl">Labor Categories</p><p class="val">28</p><p class="sub">across 5 installation locations</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span><div class="stat-body"><p class="lbl">Compliance Flags</p><p class="val">8</p><p class="sub">rates >3% below market — adjust</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span><div class="stat-body"><p class="lbl">Avg Variance</p><p class="val">-1.8%</p><p class="sub">slightly below prevailing</p></div></div><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><div class="stat-body"><p class="lbl">WD Determinations</p><p class="val">5</p><p class="sub">active wage determinations</p></div></div></section>
 <div class="two-col">
-  <div id="list" style="grid-column:1/4;display:flex;flex-direction:column;gap:10px"></div>
+  <div style="grid-column:1/4"><div class="wage-table-wrap"><div class="wage-table-scroll"><table class="wage-table">
+<thead class="wage-thead"><tr>
+<th>WD Number</th><th>Labor Category</th><th>Location</th><th>SCA Min</th><th>Your Rate</th><th>Market Rate</th><th>Variance</th><th>Status</th>
+</tr></thead>
+<tbody class="wage-tbody" id="wage-tbody"></tbody>
+</table></div></div></div>
   <aside class="right-stack" style="grid-column:4/5"><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span>
-      <div class="wh-text"><h3>Compliance Flags</h3><p class="wh-sub">2 rates below SCA minimum</p></div>
+      <div class="wh-text"><h3>Compliance Flags</h3><p class="wh-sub">8 rates below market · adjust before bids</p></div>
     </div>
     <span class="wh-source">DOL WHD</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="flag-row"><div class="flag-name">Aircraft Inspector — JBSA</div><div class="flag-info">Your rate $31.00/hr vs market $32.10/hr — variance -3.4%</div><div class="flag-fix">Fix: raise to $32.10/hr (+$1.10/hr) before next AETC inspector bid</div></div>
-<div class="flag-row"><div class="flag-name">Aircraft Mechanic — WPAFB</div><div class="flag-info">Your rate $29.00/hr vs market $31.20/hr — variance -7.1%</div><div class="flag-fix">Fix: raise to $31.20/hr (+$2.20/hr) before bidding FA861521 C-17 work</div></div></div>
+  <div class="widget-body" style="padding:0"><div class="flag-list-row"><div class="flag-list-cat">Aircraft Inspector I — JBSA</div><div class="flag-list-info">$31.00 vs market $32.10 · -3.4%</div><div class="flag-list-fix">Adjust +$1.10/hr before next AETC inspector bid</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Aircraft Inspector II — JBSA</div><div class="flag-list-info">$34.00 vs market $35.20 · -3.4%</div><div class="flag-list-fix">Same fix as Inspector I — adjust +$1.20/hr</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">NDT Inspector — JBSA</div><div class="flag-list-info">$33.00 vs market $34.10 · -3.2%</div><div class="flag-list-fix">NDT is high-demand — adjust +$1.10/hr</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Aircraft Mechanic I — WPAFB</div><div class="flag-list-info">$29.00 vs market $31.20 · -7.1%</div><div class="flag-list-fix">Critical: +$2.20/hr before bidding FA861521</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Aircraft Mechanic II — WPAFB</div><div class="flag-list-info">$32.50 vs market $34.40 · -5.5%</div><div class="flag-list-fix">Adjust +$1.90/hr — primes will outbid for talent</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Avionics Technician — WPAFB</div><div class="flag-list-info">$33.50 vs market $34.80 · -3.7%</div><div class="flag-list-fix">Adjust +$1.30/hr — 772 ESS/PK requires avionics</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Aircraft Inspector — WPAFB</div><div class="flag-list-info">$32.00 vs market $33.90 · -5.6%</div><div class="flag-list-fix">Critical: +$1.90/hr — inspectors are leverage</div></div>
+<div class="flag-list-row"><div class="flag-list-cat">Aircraft Inspector — Richmond</div><div class="flag-list-info">$28.80 vs market $29.90 · -3.7%</div><div class="flag-list-fix">Adjust +$1.10/hr for DLA Aviation work</div></div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg></span>
-      <div class="wh-text"><h3>Market Position Summary</h3><p class="wh-sub">12 categories tracked</p></div>
+      <div class="wh-text"><h3>Market Position Summary</h3><p class="wh-sub">28 categories tracked</p></div>
     </div>
     <span class="wh-source">BLS OES</span>
   </header>
-  <div class="widget-body"><div class="mp-bar-row"><div class="mp-bar-top"><span>Above market</span><span class="mp-bar-val" style="color:var(--green-700)">5 categories</span></div><div class="mp-bar-track"><div class="mp-bar-fill" style="width:42%;background:var(--green-600)"></div></div></div>
-<div class="mp-bar-row"><div class="mp-bar-top"><span>On market (±1%)</span><span class="mp-bar-val" style="color:var(--mute)">4 categories</span></div><div class="mp-bar-track"><div class="mp-bar-fill" style="width:33%;background:var(--mute)"></div></div></div>
-<div class="mp-bar-row"><div class="mp-bar-top"><span>Below market</span><span class="mp-bar-val" style="color:var(--red-700)">3 categories</span></div><div class="mp-bar-track"><div class="mp-bar-fill" style="width:25%;background:var(--red-600)"></div></div></div></div>
+  <div class="widget-body"><div class="mp-row"><div class="mp-top"><span>Compliant</span><span class="mp-val" style="color:var(--green-700)">12 categories</span></div><div class="mp-track"><div class="mp-fill" style="width:43%;background:var(--green-600)"></div></div></div>
+<div class="mp-row"><div class="mp-top"><span>Watch</span><span class="mp-val" style="color:var(--amber-700)">10 categories</span></div><div class="mp-track"><div class="mp-fill" style="width:36%;background:var(--amber-600)"></div></div></div>
+<div class="mp-row"><div class="mp-top"><span>FLAG</span><span class="mp-val" style="color:var(--red-700)">8 categories</span></div><div class="mp-track"><div class="mp-fill" style="width:29%;background:var(--red-600)"></div></div></div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
@@ -702,41 +726,45 @@ tr:hover .ii-notice{height:auto;opacity:1}
     </div>
     <span class="wh-source">SAM.gov</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="ren-row"><div><div class="ren-wd">WD 2015-4267</div><div class="ren-loc">JBSA San Antonio · 4 categories</div></div><div class="ren-date">Jul 15</div></div>
-<div class="ren-row"><div><div class="ren-wd">WD 2015-4891</div><div class="ren-loc">Wright-Patterson AFB · 2 categories</div></div><div class="ren-date">Aug 02</div></div>
-<div class="ren-row"><div><div class="ren-wd">WD 2015-5102</div><div class="ren-loc">Tinker AFB · 2 categories</div></div><div class="ren-date">Aug 18</div></div></div>
+  <div class="widget-body" style="padding:0"><div class="ren-row"><div><div class="ren-wd">WD 2015-4267</div><div class="ren-loc">JBSA San Antonio · 16 categories</div></div><div class="ren-date">Jul 15</div></div>
+<div class="ren-row"><div><div class="ren-wd">WD 2015-4891</div><div class="ren-loc">Wright-Patterson AFB · 5 categories</div></div><div class="ren-date">Aug 02</div></div>
+<div class="ren-row"><div><div class="ren-wd">WD 2015-5102</div><div class="ren-loc">Tinker AFB · 3 categories</div></div><div class="ren-date">Aug 18</div></div></div>
 </section></aside>
 </div></main>
 
 </div>
 
 <script>
-const WAGES=[{"wd": "WD 2015-4267", "cat": "Aircraft Mechanic", "loc": "JBSA San Antonio TX", "sca": 28.14, "yours": 29.5, "market": 28.8, "variance": 2.4, "insight": "Your rate is above prevailing wage. Competitive for T-38 maintenance work at JBSA Randolph."}, {"wd": "WD 2015-4267", "cat": "Aircraft Inspector", "loc": "JBSA San Antonio TX", "sca": 31.22, "yours": 31.0, "market": 32.1, "variance": -3.4, "insight": "Your rate is below market. Risk of losing inspectors to prime contractors. Consider +$1.10/hr adjustment."}, {"wd": "WD 2015-4268", "cat": "Sheet Metal Worker", "loc": "JBSA San Antonio TX", "sca": 26.88, "yours": 27.2, "market": 27.0, "variance": 0.7, "insight": "On market. Competitive for NAICS 332710 fabrication contracts at JBSA Lackland."}, {"wd": "WD 2015-4891", "cat": "Aircraft Mechanic", "loc": "Wright-Patterson AFB OH", "sca": 30.45, "yours": 29.0, "market": 31.2, "variance": -7.1, "insight": "Significant below-market gap. AFMC contracts at WPAFB are highly competitive. Adjust before bidding FA861521."}, {"wd": "WD 2015-4891", "cat": "Electronics Technician", "loc": "Wright-Patterson AFB OH", "sca": 32.1, "yours": 33.5, "market": 32.8, "variance": 2.1, "insight": "Above market. Strong position for avionics work at 772 ESS/PK."}, {"wd": "WD 2015-5102", "cat": "Aircraft Mechanic", "loc": "Tinker AFB OK", "sca": 27.9, "yours": 28.1, "market": 28.4, "variance": -1.1, "insight": "Slightly below market. Acceptable for B-52 maintenance bids. Monitor for next WD update."}, {"wd": "WD 2015-5102", "cat": "Machinist", "loc": "Tinker AFB OK", "sca": 25.6, "yours": 26.0, "market": 25.9, "variance": 0.4, "insight": "On market. Competitive for OC-ALC precision machining contracts."}, {"wd": "WD 2015-5234", "cat": "Aircraft Mechanic", "loc": "Robins AFB GA", "sca": 27.45, "yours": 27.0, "market": 27.8, "variance": -2.9, "insight": "Below market for C-130J maintenance. AFLCMC contracts are price-competitive. Adjust rate."}, {"wd": "WD 2015-5234", "cat": "Sheet Metal Worker", "loc": "Robins AFB GA", "sca": 25.1, "yours": 25.5, "market": 25.3, "variance": 0.8, "insight": "On market. Competitive for WR-ALC structural repair contracts."}, {"wd": "WD 2015-4156", "cat": "Aircraft Mechanic", "loc": "Richmond VA", "sca": 26.8, "yours": 26.5, "market": 27.1, "variance": -2.2, "insight": "Slightly below market for DLA Aviation contracts. Low risk given DLA LPTA pricing model."}, {"wd": "WD 2015-4267", "cat": "Quality Control Inspector", "loc": "JBSA San Antonio TX", "sca": 29.75, "yours": 30.0, "market": 30.2, "variance": -0.7, "insight": "Near market. No adjustment needed. Strong position for AETC quality contracts."}, {"wd": "WD 2015-4267", "cat": "Administrative Assistant", "loc": "JBSA San Antonio TX", "sca": 18.45, "yours": 19.0, "market": 18.8, "variance": 1.1, "insight": "Above SCA minimum. Compliant for all JBSA contracts requiring admin support."}];
-let f={loc:"all",cat:"all"},q="";
+const WAGES=[{"wd": "WD 2015-4267", "cat": "Aircraft Mechanic I", "loc": "JBSA San Antonio TX", "sca": 28.14, "yours": 29.5, "market": 28.8, "var": 2.4, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Aircraft Mechanic II", "loc": "JBSA San Antonio TX", "sca": 31.8, "yours": 32.0, "market": 32.4, "var": -1.2, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "Aircraft Inspector I", "loc": "JBSA San Antonio TX", "sca": 31.22, "yours": 31.0, "market": 32.1, "var": -3.4, "status": "FLAG", "insight": "Your rate is 3.4% below market. Risk of losing inspectors to prime contractors. Adjust +$1.10/hr."}, {"wd": "WD 2015-4267", "cat": "Aircraft Inspector II", "loc": "JBSA San Antonio TX", "sca": 34.5, "yours": 34.0, "market": 35.2, "var": -3.4, "status": "FLAG", "insight": "3.4% below market for senior inspectors. Same fix recommended as Inspector I."}, {"wd": "WD 2015-4267", "cat": "Sheet Metal Worker", "loc": "JBSA San Antonio TX", "sca": 26.88, "yours": 27.2, "market": 27.0, "var": 0.7, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Structural Repair Tech", "loc": "JBSA San Antonio TX", "sca": 28.4, "yours": 29.0, "market": 28.9, "var": 0.3, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Hydraulics Mechanic", "loc": "JBSA San Antonio TX", "sca": 29.1, "yours": 29.5, "market": 29.8, "var": -1.0, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "Avionics Technician I", "loc": "JBSA San Antonio TX", "sca": 32.1, "yours": 33.0, "market": 33.4, "var": -1.2, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "Avionics Technician II", "loc": "JBSA San Antonio TX", "sca": 36.2, "yours": 36.5, "market": 36.8, "var": -0.8, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "NDT Inspector", "loc": "JBSA San Antonio TX", "sca": 33.4, "yours": 33.0, "market": 34.1, "var": -3.2, "status": "FLAG", "insight": "3.2% below market for NDT specialists. NDT is high-demand skill. Adjust +$1.10/hr to retain."}, {"wd": "WD 2015-4267", "cat": "CNC Machinist", "loc": "JBSA San Antonio TX", "sca": 27.6, "yours": 28.0, "market": 27.9, "var": 0.4, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Welder/Fabricator", "loc": "JBSA San Antonio TX", "sca": 26.2, "yours": 26.5, "market": 26.4, "var": 0.4, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Tool & Die Maker", "loc": "JBSA San Antonio TX", "sca": 30.8, "yours": 31.0, "market": 31.2, "var": -0.6, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "Quality Control Inspector", "loc": "JBSA San Antonio TX", "sca": 29.75, "yours": 30.0, "market": 30.2, "var": -0.7, "status": "Watch", "insight": null}, {"wd": "WD 2015-4267", "cat": "Administrative Assistant", "loc": "JBSA San Antonio TX", "sca": 18.45, "yours": 19.0, "market": 18.8, "var": 1.1, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4267", "cat": "Logistics/Supply Tech", "loc": "JBSA San Antonio TX", "sca": 22.1, "yours": 22.5, "market": 22.3, "var": 0.9, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4891", "cat": "Aircraft Mechanic I", "loc": "Wright-Patterson AFB OH", "sca": 30.45, "yours": 29.0, "market": 31.2, "var": -7.1, "status": "FLAG", "insight": "Critical -7.1% gap. WPAFB contracts are highly competitive. Adjust before bidding FA861521."}, {"wd": "WD 2015-4891", "cat": "Aircraft Mechanic II", "loc": "Wright-Patterson AFB OH", "sca": 33.8, "yours": 32.5, "market": 34.4, "var": -5.5, "status": "FLAG", "insight": "-5.5% on senior mechanics. C-17 prime contractors will outbid you for talent. Adjust +$1.90/hr."}, {"wd": "WD 2015-4891", "cat": "Avionics Technician", "loc": "Wright-Patterson AFB OH", "sca": 34.1, "yours": 33.5, "market": 34.8, "var": -3.7, "status": "FLAG", "insight": "-3.7% below market for avionics. 772 ESS/PK contracts require strong avionics talent. Adjust."}, {"wd": "WD 2015-4891", "cat": "Aircraft Inspector", "loc": "Wright-Patterson AFB OH", "sca": 33.2, "yours": 32.0, "market": 33.9, "var": -5.6, "status": "FLAG", "insight": "-5.6% below market. Inspectors are leverage points in C-17 maintenance. Critical to adjust."}, {"wd": "WD 2015-4891", "cat": "Electronics Technician", "loc": "Wright-Patterson AFB OH", "sca": 32.1, "yours": 33.5, "market": 32.8, "var": 2.1, "status": "Compliant", "insight": null}, {"wd": "WD 2015-5102", "cat": "Aircraft Mechanic", "loc": "Tinker AFB OK", "sca": 27.9, "yours": 28.1, "market": 28.4, "var": -1.1, "status": "Watch", "insight": null}, {"wd": "WD 2015-5102", "cat": "Machinist", "loc": "Tinker AFB OK", "sca": 25.6, "yours": 26.0, "market": 25.9, "var": 0.4, "status": "Compliant", "insight": null}, {"wd": "WD 2015-5102", "cat": "Sheet Metal Worker", "loc": "Tinker AFB OK", "sca": 24.8, "yours": 25.2, "market": 25.1, "var": 0.4, "status": "Compliant", "insight": null}, {"wd": "WD 2015-5234", "cat": "Aircraft Mechanic", "loc": "Robins AFB GA", "sca": 27.45, "yours": 27.0, "market": 27.8, "var": -2.9, "status": "Watch", "insight": null}, {"wd": "WD 2015-5234", "cat": "Sheet Metal Worker", "loc": "Robins AFB GA", "sca": 25.1, "yours": 25.5, "market": 25.3, "var": 0.8, "status": "Compliant", "insight": null}, {"wd": "WD 2015-4156", "cat": "Aircraft Mechanic", "loc": "Richmond VA", "sca": 26.8, "yours": 26.5, "market": 27.1, "var": -2.2, "status": "Watch", "insight": null}, {"wd": "WD 2015-4156", "cat": "Aircraft Inspector", "loc": "Richmond VA", "sca": 29.4, "yours": 28.8, "market": 29.9, "var": -3.7, "status": "FLAG", "insight": "-3.7% below market for Richmond. DLA Aviation requires strong inspectors. Adjust +$1.10/hr."}];
+let f={loc:"all",st:"all"},q="";
+function locMatch(w,filter){
+  if(filter==="all")return true;
+  const m={JBSA:"JBSA",WPAFB:"Wright-Patterson",Tinker:"Tinker",Robins:"Robins",Richmond:"Richmond"};
+  return w.loc.includes(m[filter]||filter);
+}
 function renderList(){
   let data=[...WAGES];
-  if(q){const qq=q.toLowerCase();data=data.filter(w=>w.wd.toLowerCase().includes(qq)||w.cat.toLowerCase().includes(qq)||w.loc.toLowerCase().includes(qq)||w.insight.toLowerCase().includes(qq));}
-  if(f.loc!=="all")data=data.filter(w=>w.loc.includes(f.loc==="JBSA"?"JBSA":f.loc==="WPAFB"?"Wright-Patterson":f.loc==="Tinker"?"Tinker":f.loc==="Robins"?"Robins":f.loc==="Richmond"?"Richmond":""));
-  if(f.cat!=="all")data=data.filter(w=>w.cat.includes(f.cat));
-  document.getElementById("list").innerHTML=data.map(w=>{
-    const flagCls=w.variance<=-3?"flag-red":w.variance>=1?"flag-green":"flag-neutral";
-    const varCls=w.variance>=0?"var-pos":"var-neg";
-    const chipTone=w.variance<=-3?"insight-alert":w.variance>=1?"insight-win":"insight-info";
-    const varSign=w.variance>=0?"+":"";
-    return `<div class="wage-row ${flagCls}">
-      <div class="wage-top">
-        <span class="wage-wd">${w.wd}</span>
-        <span class="wage-cat">${w.cat}</span>
-        <span class="wage-loc">${w.loc}</span>
-      </div>
-      <div class="wage-rates">
-        <div class="rate-cell"><div class="rate-lbl">SCA Min</div><div class="rate-val">$${w.sca.toFixed(2)}</div></div>
-        <div class="rate-cell"><div class="rate-lbl">Your Rate</div><div class="rate-val">$${w.yours.toFixed(2)}</div></div>
-        <div class="rate-cell"><div class="rate-lbl">Market</div><div class="rate-val">$${w.market.toFixed(2)}</div></div>
-        <div class="rate-cell ${varCls}"><div class="rate-lbl">Variance</div><div class="rate-val">${varSign}${w.variance.toFixed(1)}%</div></div>
-      </div>
-      <div class="insight-chip ${chipTone}" style="margin-top:5px"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></div>
-    </div>`;
+  if(q){const qq=q.toLowerCase();data=data.filter(w=>w.wd.toLowerCase().includes(qq)||w.cat.toLowerCase().includes(qq)||w.loc.toLowerCase().includes(qq));}
+  data=data.filter(w=>locMatch(w,f.loc));
+  if(f.st!=="all")data=data.filter(w=>w.status===f.st);
+  document.getElementById("wage-tbody").innerHTML=data.map(w=>{
+    const varCls=w.var<=-3?"var-neg":w.var>=1?"var-pos":w.var<0?"var-neutral":"var-pos";
+    const varSign=w.var>=0?"+":"";
+    const rowCls=w.status==="FLAG"?"flag-row":"";
+    let html=`<tr class="${rowCls}">
+      <td><span class="wd-num">${w.wd}</span></td>
+      <td><span class="lc-name">${w.cat}</span></td>
+      <td><span class="lc-loc">${w.loc}</span></td>
+      <td><span class="rate-val">$${w.sca.toFixed(2)}</span></td>
+      <td><span class="rate-val">$${w.yours.toFixed(2)}</span></td>
+      <td><span class="rate-val">$${w.market.toFixed(2)}</span></td>
+      <td><span class="${varCls}">${varSign}${w.var.toFixed(1)}%</span></td>
+      <td><span class="status-badge sb-${w.status}">${w.status}</span></td>
+    </tr>`;
+    if(w.status==="FLAG"&&w.insight){
+      html+=`<tr class="insight-row"><td colspan="8"><span class="insight-chip insight-alert" style="margin-top:0"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></span></td></tr>`;
+    }
+    return html;
   }).join("");
 }
 function setF(k,v,btn){f[k]=v;document.querySelectorAll(".filter-bar .fb-pill").forEach(p=>{if(p.onclick&&p.onclick.toString().includes("'"+k+"'"))p.classList.remove("active");});btn.classList.add("active");renderList();}

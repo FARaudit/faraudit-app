@@ -582,7 +582,6 @@ tr:hover .ii-notice{height:auto;opacity:1}
     <div class="hdr-naics-pills"><span class="hdr-naics-pill active">✓ 336413</span><span class="hdr-naics-pill active">✓ 332710</span><span class="hdr-naics-pill active">✓ 332721</span></div>
   </div>
 </header>
-<div class="filter-bar"><div class="fb-group"><span class="fb-label">TYPE</span><button class="fb-pill active" onclick="setF('type','all',this)">All</button><button class="fb-pill" onclick="setF('type','FAR',this)">FAR</button><button class="fb-pill" onclick="setF('type','DFARS',this)">DFARS</button><button class="fb-pill" onclick="setF('type','PGI',this)">DFARS PGI</button><button class="fb-pill" onclick="setF('type','Deviation',this)">Deviation</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">IMPACT</span><button class="fb-pill active" onclick="setF('imp','all',this)">All</button><button class="fb-pill" onclick="setF('imp','HIGH',this)">High</button><button class="fb-pill" onclick="setF('imp','MEDIUM',this)">Medium</button><button class="fb-pill" onclick="setF('imp','LOW',this)">Low</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><button class="fb-pill" id="sort-btn" onclick="cycleSort()">Sort: Date</button><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search clause or topic…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
 <style>
 [data-theme="light"]{
   --insight-amber-bg:#fef3c7;
@@ -632,64 +631,94 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .two-col{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:20px}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:14px;position:sticky;top:82px}
-.upd-card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
+.alert-strip{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;font-weight:600}
+.alert-red{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);color:#dc2626}
+[data-theme="dark"] .alert-red{background:rgba(252,165,165,.10);color:#fca5a5}
+.alert-icon{font-size:16px;flex-shrink:0}
+.alert-text{flex:1;min-width:0}
+.alert-cta{margin-left:auto;font-size:12px;font-weight:700;color:#dc2626;text-decoration:none;white-space:nowrap}
+[data-theme="dark"] .alert-cta{color:#fca5a5}
+.alert-cta:hover{text-decoration:underline}
+.upd-card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm);padding:13px 16px;display:flex;flex-direction:column;gap:7px;transition:border-color .15s}
 .upd-card:hover{border-color:var(--accent-light)}
-.upd-card.imp-high{border-left:3px solid #dc2626}
-.upd-card.imp-medium{border-left:3px solid #d97706}
-.upd-card.imp-low{border-left:3px solid #94a3b8}
+.upd-card.imp-HIGH{border-left:3px solid #dc2626;background:rgba(220,38,38,.03)}
+.upd-card.imp-MEDIUM{border-left:3px solid #d97706}
+.upd-card.imp-LOW{border-left:3px solid var(--accent)}
+[data-theme="dark"] .upd-card.imp-HIGH{background:rgba(220,38,38,.06)}
 .upd-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .upd-clause{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:800;color:var(--accent-deep)}
 [data-theme="dark"] .upd-clause{color:var(--accent-light)}
-.upd-impact{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:20px}
-.impact-high{background:rgba(220,38,38,.10);color:#b91c1c;border:1px solid rgba(220,38,38,.30)}
-.impact-medium{background:rgba(217,119,6,.10);color:#b45309;border:1px solid rgba(217,119,6,.30)}
-.impact-low{background:rgba(148,163,184,.14);color:var(--mute);border:1px solid var(--line)}
-[data-theme="dark"] .impact-high{color:#fca5a5;background:rgba(220,38,38,.18)}
-[data-theme="dark"] .impact-medium{color:#fcd34d;background:rgba(245,158,11,.18)}
+.upd-impact{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:20px}
+.impact-HIGH{background:rgba(220,38,38,.10);color:#b91c1c;border:1px solid rgba(220,38,38,.30)}
+.impact-MEDIUM{background:rgba(217,119,6,.10);color:#b45309;border:1px solid rgba(217,119,6,.30)}
+.impact-LOW{background:rgba(55,138,221,.10);color:var(--accent-deep);border:1px solid rgba(55,138,221,.30)}
+[data-theme="dark"] .impact-HIGH{color:#fca5a5;background:rgba(220,38,38,.18)}
+[data-theme="dark"] .impact-MEDIUM{color:#fcd34d;background:rgba(245,158,11,.18)}
+[data-theme="dark"] .impact-LOW{color:var(--accent-light);background:rgba(55,138,221,.20)}
 .upd-eff{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-left:auto}
-.upd-title{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:-.1px}
-.upd-summary{font-size:12px;color:var(--ink-2);line-height:1.5}
-.imp-list{padding:9px 14px;border-bottom:1px solid var(--line-3);font-size:12px}
-.imp-list:last-child{border-bottom:none}
-.imp-list-bar{height:6px;background:var(--line-2);border-radius:3px;overflow:hidden;margin-top:4px}
-.imp-list-fill{height:100%;border-radius:3px}
-.aff-row{padding:9px 14px;border-bottom:1px solid var(--line-3)}
+.upd-title{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.1px}
+.upd-summary{font-size:11.5px;color:var(--ink-2);line-height:1.45}
+.aff-row{padding:9px 14px;border-bottom:1px solid var(--line-3);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .aff-row:last-child{border-bottom:none}
-.aff-sol{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent-deep);font-weight:700;margin-bottom:1px}
+.aff-info{min-width:0}
+.aff-sol{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);font-weight:700;margin-bottom:1px}
 [data-theme="dark"] .aff-sol{color:var(--accent-light)}
-.aff-cls{font-size:11px;color:var(--ink-2)}
-.aff-cls b{color:var(--ink)}
-.up-row{padding:9px 14px;border-bottom:1px solid var(--line-3);display:flex;justify-content:space-between;align-items:center}
+.aff-cls{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink);font-weight:600}
+.aff-action{font-size:10px;color:var(--mute);margin-top:1px}
+.aff-badge{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap}
+.imp-list{padding:9px 14px}
+.imp-list-row{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:4px}
+.imp-list-val{font-family:"IBM Plex Mono",monospace;color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .imp-list-val{color:var(--accent-light)}
+.imp-list-bar{height:6px;background:var(--line-2);border-radius:3px;overflow:hidden;margin-bottom:11px}
+.imp-list-bar:last-child{margin-bottom:0}
+.imp-list-fill{height:100%;border-radius:3px;background:var(--accent)}
+.up-row{padding:11px 14px;border-bottom:1px solid var(--line-3);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
 .up-row:last-child{border-bottom:none}
-.up-name{font-size:12px;color:var(--ink);font-weight:600}
-.up-date{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--amber-700);font-weight:700}
-[data-theme="dark"] .up-date{color:#fcd34d}
+.up-name{font-size:12px;color:var(--ink);font-weight:700}
+.up-cls{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-top:1px}
+.up-countdown{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.up-red{background:rgba(220,38,38,.10);color:#b91c1c}
+.up-amber{background:rgba(217,119,6,.10);color:#b45309}
+[data-theme="dark"] .up-red{color:#fca5a5;background:rgba(220,38,38,.18)}
+[data-theme="dark"] .up-amber{color:#fcd34d;background:rgba(245,158,11,.18)}
 </style>
-<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><div class="stat-body"><p class="lbl">Updates This Month</p><p class="val">14</p><p class="sub">across FAR + DFARS + deviations</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span><div class="stat-body"><p class="lbl">High Impact</p><p class="val">3</p><p class="sub">contract action required</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Affected Contracts</p><p class="val">7</p><p class="sub">in your active portfolio</p></div></div><div class="stat-card tone-green"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="stat-body"><p class="lbl">New Deviations</p><p class="val">2</p><p class="sub">class deviations · review</p></div></div></section>
-<div class="two-col">
+<div class="alert-strip alert-red" id="high-impact">
+  <span class="alert-icon">⚠</span>
+  <span class="alert-text">3 HIGH impact regulatory changes affect your active solicitations. Review before Jun 3 deadline.</span>
+  <a class="alert-cta" href="#updates-list">Review now →</a>
+</div>
+<div class="filter-bar"><div class="fb-group"><span class="fb-label">TYPE</span><button class="fb-pill active" onclick="setF('type','all',this)">All</button><button class="fb-pill" onclick="setF('type','FAR',this)">FAR</button><button class="fb-pill" onclick="setF('type','DFARS',this)">DFARS</button><button class="fb-pill" onclick="setF('type','Deviation',this)">Deviation</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">IMPACT</span><button class="fb-pill active" onclick="setF('imp','all',this)">All</button><button class="fb-pill" onclick="setF('imp','HIGH',this)">High</button><button class="fb-pill" onclick="setF('imp','MEDIUM',this)">Medium</button><button class="fb-pill" onclick="setF('imp','LOW',this)">Low</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search clause or topic…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
+<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><div class="stat-body"><p class="lbl">Updates This Month</p><p class="val">14</p><p class="sub">across FAR + DFARS + deviations</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span><div class="stat-body"><p class="lbl">HIGH Impact</p><p class="val">3</p><p class="sub">contract action required now</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Affected Contracts</p><p class="val">7</p><p class="sub">in your active portfolio</p></div></div><div class="stat-card tone-green"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="stat-body"><p class="lbl">New Deviations</p><p class="val">2</p><p class="sub">class deviations · review</p></div></div></section>
+<div class="two-col" id="updates-list">
   <div id="list" style="grid-column:1/4;display:flex;flex-direction:column;gap:10px"></div>
   <aside class="right-stack" style="grid-column:4/5"><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
-      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg></span>
-      <div class="wh-text"><h3>Impact by Regulation Type</h3><p class="wh-sub">Distribution of updates · FY2026</p></div>
-    </div>
-    <span class="wh-source">FAR.gov</span>
-  </header>
-  <div class="widget-body" style="padding:0"><div class="imp-list"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2)"><span>DFARS</span><span style="font-family:monospace;color:var(--accent-deep);font-weight:700">8</span></div><div class="imp-list-bar"><div class="imp-list-fill" style="width:67%;background:var(--accent)"></div></div></div>
-<div class="imp-list"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2)"><span>FAR</span><span style="font-family:monospace;color:var(--accent-deep);font-weight:700">4</span></div><div class="imp-list-bar"><div class="imp-list-fill" style="width:33%;background:var(--accent)"></div></div></div>
-<div class="imp-list"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2)"><span>Deviation</span><span style="font-family:monospace;color:var(--accent-deep);font-weight:700">2</span></div><div class="imp-list-bar"><div class="imp-list-fill" style="width:17%;background:var(--accent)"></div></div></div></div>
-</section><section class="widget">
-  <header class="widget-head">
-    <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span>
-      <div class="wh-text"><h3>Your Affected Contracts</h3><p class="wh-sub">Active portfolio · clause overlap</p></div>
+      <div class="wh-text"><h3>Your Affected Contracts</h3><p class="wh-sub">3 active sols with new clauses</p></div>
     </div>
     <span class="wh-source">FPDS-NG</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="aff-row"><div class="aff-sol">FA301626Q0068</div><div class="aff-cls"><b>252.204-7021</b> CMMC Requirements · <span style="color:#b91c1c;font-weight:700">HIGH</span></div></div>
-<div class="aff-row"><div class="aff-sol">FA861521C0088</div><div class="aff-cls"><b>252.225-7060</b> Xinjiang Prohibition · <span style="color:#b91c1c;font-weight:700">HIGH</span></div></div>
-<div class="aff-row"><div class="aff-sol">FA810226D0007</div><div class="aff-cls"><b>52.219-14</b> Subcontracting · <span style="color:#b45309;font-weight:700">MEDIUM</span></div></div></div>
+  <div class="widget-body" style="padding:0"><div class="aff-row"><div class="aff-info"><div class="aff-sol">FA301626Q0068</div><div class="aff-cls">252.223-7008 · Hexavalent Chromium</div><div class="aff-action">Review supply chain for legacy primer compliance</div></div><span class="aff-badge impact-HIGH">HIGH</span></div>
+<div class="aff-row"><div class="aff-info"><div class="aff-sol">FA861521C0088</div><div class="aff-cls">252.204-7021 · CMMC Level 2</div><div class="aff-action">Certification required before contract performance</div></div><span class="aff-badge impact-HIGH">HIGH</span></div>
+<div class="aff-row"><div class="aff-info"><div class="aff-sol">FA810226D0007</div><div class="aff-cls">52.219-14 · Subcontracting Limits</div><div class="aff-action">Update subcontracting plan to new calculation method</div></div><span class="aff-badge impact-MEDIUM">MED</span></div></div>
+</section><section class="widget">
+  <header class="widget-head">
+    <div class="wh-left">
+      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg></span>
+      <div class="wh-text"><h3>Impact by Regulation Type</h3><p class="wh-sub">14 updates this month</p></div>
+    </div>
+    <span class="wh-source">FAR.gov</span>
+  </header>
+  <div class="widget-body" style="padding:0"><div class="imp-list">
+<div class="imp-list-row"><span>DFARS</span><span class="imp-list-val">8</span></div>
+<div class="imp-list-bar"><div class="imp-list-fill" style="width:67%"></div></div>
+<div class="imp-list-row"><span>FAR</span><span class="imp-list-val">4</span></div>
+<div class="imp-list-bar"><div class="imp-list-fill" style="width:33%"></div></div>
+<div class="imp-list-row"><span>Deviation</span><span class="imp-list-val">2</span></div>
+<div class="imp-list-bar"><div class="imp-list-fill" style="width:17%"></div></div>
+</div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
@@ -698,32 +727,30 @@ tr:hover .ii-notice{height:auto;opacity:1}
     </div>
     <span class="wh-source">DARS</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="up-row"><div><div class="up-name">CMMC Level 2 threshold</div><div style="font-size:10px;color:var(--mute);font-family:monospace">252.204-7021</div></div><div class="up-date">in 15 days</div></div>
-<div class="up-row"><div><div class="up-name">Xinjiang subcontractor cert</div><div style="font-size:10px;color:var(--mute);font-family:monospace">252.225-7060</div></div><div class="up-date">effective now</div></div>
-<div class="up-row"><div><div class="up-name">Buy American 60% threshold</div><div style="font-size:10px;color:var(--mute);font-family:monospace">52.225-1</div></div><div class="up-date">effective now</div></div></div>
+  <div class="widget-body" style="padding:0"><div class="up-row"><div><div class="up-name">CMMC Level 2 threshold</div><div class="up-cls">252.204-7021</div></div><span class="up-countdown up-red">in 15 days</span></div>
+<div class="up-row"><div><div class="up-name">Buy American 60% threshold</div><div class="up-cls">52.225-1</div></div><span class="up-countdown up-amber">effective now</span></div>
+<div class="up-row"><div><div class="up-name">Xinjiang subcontractor cert</div><div class="up-cls">252.225-7060</div></div><span class="up-countdown up-amber">effective now</span></div></div>
 </section></aside>
 </div></main>
 
 </div>
 
 <script>
-const UPDATES=[{"clause": "252.204-7021", "title": "CMMC Requirements", "date": "Mar 15 2026", "impact": "HIGH", "summary": "Level 2 certification threshold lowered to contracts >$100K with CUI", "tone": "alert", "insight": "7 of your tracked solicitations now require CMMC Level 2. Assess readiness before bidding."}, {"clause": "252.225-7060", "title": "Xinjiang Uyghur Prohibition", "date": "Feb 28 2026", "impact": "HIGH", "summary": "Supply chain certification now required at subcontractor level", "tone": "alert", "insight": "Affects all NAICS 336413 contracts with overseas material sourcing. Certify your supply chain."}, {"clause": "252.204-7018", "title": "Covered Telecom Prohibition", "date": "Feb 14 2026", "impact": "HIGH", "summary": "Expanded definition includes satellite communications equipment", "tone": "alert", "insight": "Review all comms equipment in your facilities. New annual rep required at contract renewal."}, {"clause": "52.219-14", "title": "Limitations on Subcontracting", "date": "Jan 30 2026", "impact": "MEDIUM", "summary": "Self-performance percentage calculation method clarified for supply contracts", "tone": "amber", "insight": "Calculation change affects cost-plus supply contracts. Review your subcontracting plans."}, {"clause": "252.223-7008", "title": "Hexavalent Chromium", "date": "Jan 15 2026", "impact": "MEDIUM", "summary": "New exemption process for legacy aircraft maintenance applications", "tone": "amber", "insight": "Exemption available for T-38 and C-130 legacy primers. File written request before delivery."}, {"clause": "52.225-1", "title": "Buy American Supplies", "date": "Jan 08 2026", "impact": "MEDIUM", "summary": "Domestic content threshold increased from 55% to 60% for commercial items", "tone": "amber", "insight": "Review all commercial item components. Threshold change effective for awards after Feb 1 2026."}, {"clause": "252.232-7006", "title": "WAWF Payment Instructions", "date": "Dec 20 2025", "impact": "LOW", "summary": "Combo document type now required for all fixed-price deliverables regardless of value", "tone": "info", "insight": "Update your WAWF submission process. Invoice 2in1 no longer accepted for physical deliverables."}, {"clause": "52.204-7", "title": "SAM Registration", "date": "Dec 10 2025", "impact": "LOW", "summary": "Annual renewal window extended from 365 to 395 days", "tone": "info", "insight": "Less risk of lapsed registration. Set a reminder 30 days before expiration regardless."}, {"clause": "252.247-7023", "title": "Transportation of Supplies by Sea", "date": "Nov 28 2025", "impact": "LOW", "summary": "Exemption threshold raised to contracts >$250K", "tone": "info", "insight": "Most NAICS 336413 contracts below threshold. Verify per-contract value before applying exemption."}, {"clause": "52.222-50", "title": "Combating Trafficking in Persons", "date": "Nov 15 2025", "impact": "MEDIUM", "summary": "New compliance plan requirement for contracts >$500K outside US", "tone": "amber", "insight": "Domestic-only contractors likely unaffected. Verify if any subcontractors have overseas operations."}, {"clause": "252.203-7002", "title": "Whistleblower Rights", "date": "Nov 01 2025", "impact": "LOW", "summary": "Posting requirement now includes contractor-operated websites", "tone": "info", "insight": "Update your company website and employee handbook to include the required notice."}, {"clause": "52.212-4", "title": "Commercial Products T&C", "date": "Oct 15 2025", "impact": "LOW", "summary": "Deviation 2026-O0038 consolidated 14 prior deviations into single clause update", "tone": "info", "insight": "Review all active contracts for clause version. Older versions remain in force until modification."}];
-let f={type:"all",imp:"all"},q="",sortMode=0;
-const sortModes=["Date","Impact","Clause"];
+const UPDATES=[{"clause": "252.204-7021", "title": "CMMC Requirements", "date": "Mar 15 2026", "impact": "HIGH", "summary": "Level 2 certification threshold lowered to contracts >$100K with CUI", "insight": "7 of your tracked solicitations now require CMMC Level 2. Assess readiness before bidding."}, {"clause": "252.225-7060", "title": "Xinjiang Uyghur Prohibition", "date": "Feb 28 2026", "impact": "HIGH", "summary": "Supply chain certification now required at subcontractor level", "insight": "Affects all NAICS 336413 contracts with overseas material sourcing. Certify your supply chain."}, {"clause": "252.204-7018", "title": "Covered Telecom Prohibition", "date": "Feb 14 2026", "impact": "HIGH", "summary": "Expanded definition includes satellite communications equipment", "insight": "Review all comms equipment in your facilities. New annual rep required at contract renewal."}, {"clause": "52.219-14", "title": "Limitations on Subcontracting", "date": "Jan 30 2026", "impact": "MEDIUM", "summary": "Self-performance percentage calculation method clarified for supply contracts", "insight": "Calculation change affects cost-plus supply contracts. Review your subcontracting plans."}, {"clause": "252.223-7008", "title": "Hexavalent Chromium", "date": "Jan 15 2026", "impact": "MEDIUM", "summary": "New exemption process for legacy aircraft maintenance applications", "insight": "Exemption available for T-38 and C-130 legacy primers. File written request before delivery."}, {"clause": "52.225-1", "title": "Buy American Supplies", "date": "Jan 08 2026", "impact": "MEDIUM", "summary": "Domestic content threshold increased from 55% to 60% for commercial items", "insight": "Review all commercial item components. Threshold change effective for awards after Feb 1 2026."}, {"clause": "252.232-7006", "title": "WAWF Payment Instructions", "date": "Dec 20 2025", "impact": "LOW", "summary": "Combo document type now required for all fixed-price deliverables regardless of value", "insight": "Update your WAWF submission process. Invoice 2in1 no longer accepted for physical deliverables."}, {"clause": "52.204-7", "title": "SAM Registration", "date": "Dec 10 2025", "impact": "LOW", "summary": "Annual renewal window extended from 365 to 395 days", "insight": "Less risk of lapsed registration. Set a reminder 30 days before expiration regardless."}, {"clause": "252.247-7023", "title": "Transportation of Supplies by Sea", "date": "Nov 28 2025", "impact": "LOW", "summary": "Exemption threshold raised to contracts >$250K", "insight": "Most NAICS 336413 contracts below threshold. Verify per-contract value before applying exemption."}, {"clause": "52.222-50", "title": "Combating Trafficking in Persons", "date": "Nov 15 2025", "impact": "MEDIUM", "summary": "New compliance plan requirement for contracts >$500K outside US", "insight": "Domestic-only contractors likely unaffected. Verify if any subcontractors have overseas operations."}, {"clause": "252.203-7002", "title": "Whistleblower Rights", "date": "Nov 01 2025", "impact": "LOW", "summary": "Posting requirement now includes contractor-operated websites", "insight": "Update your company website and employee handbook to include the required notice."}, {"clause": "52.212-4", "title": "Commercial Products T&C", "date": "Oct 15 2025", "impact": "LOW", "summary": "Deviation 2026-O0038 consolidated 14 prior deviations into single clause update", "insight": "Review all active contracts for clause version. Older versions remain in force until modification."}];
+let f={type:"all",imp:"all"},q="";
 function renderList(){
   let d=[...UPDATES];
   if(q){const qq=q.toLowerCase();d=d.filter(u=>u.clause.toLowerCase().includes(qq)||u.title.toLowerCase().includes(qq)||u.summary.toLowerCase().includes(qq));}
-  if(f.type!=="all")d=d.filter(u=>f.type==="Deviation"?u.summary.toLowerCase().includes("deviation"):u.clause.startsWith(f.type==="DFARS"?"252":f.type==="PGI"?"PGI":"52"));
+  if(f.type==="DFARS")d=d.filter(u=>u.clause.startsWith("252"));
+  if(f.type==="FAR")d=d.filter(u=>u.clause.startsWith("52"));
+  if(f.type==="Deviation")d=d.filter(u=>u.summary.toLowerCase().includes("deviation"));
   if(f.imp!=="all")d=d.filter(u=>u.impact===f.imp);
-  if(sortMode===1){const o={HIGH:3,MEDIUM:2,LOW:1};d.sort((a,b)=>o[b.impact]-o[a.impact]);}
-  if(sortMode===2)d.sort((a,b)=>a.clause.localeCompare(b.clause));
   document.getElementById("list").innerHTML=d.map(u=>{
-    const cls=u.impact==="HIGH"?"imp-high":u.impact==="MEDIUM"?"imp-medium":"imp-low";
-    const chip="insight-"+u.tone;
-    return `<div class="upd-card ${cls}">
+    const chip=u.impact==="HIGH"?"insight-alert":u.impact==="MEDIUM"?"insight-amber":"insight-info";
+    return `<div class="upd-card imp-${u.impact}">
       <div class="upd-top">
         <span class="upd-clause">${u.clause}</span>
-        <span class="upd-impact impact-${u.impact.toLowerCase()}">${u.impact}</span>
+        <span class="upd-impact impact-${u.impact}">${u.impact}</span>
         <span class="upd-eff">Effective ${u.date}</span>
       </div>
       <div class="upd-title">${u.title}</div>
@@ -734,7 +761,6 @@ function renderList(){
 }
 function setF(k,v,btn){f[k]=v;document.querySelectorAll(".filter-bar .fb-pill").forEach(p=>{if(p.onclick&&p.onclick.toString().includes("'"+k+"'"))p.classList.remove("active");});btn.classList.add("active");renderList();}
 function filterList(){q=document.getElementById("search").value;renderList();}
-function cycleSort(){sortMode=(sortMode+1)%sortModes.length;document.getElementById("sort-btn").textContent="Sort: "+sortModes[sortMode];renderList();}
 (function(){const sun=document.getElementById("themeSun"),moon=document.getElementById("themeMoon"),btn=document.getElementById("themeToggle");function sync(){const t=document.documentElement.getAttribute("data-theme");if(t==="light"){sun.style.display="none";moon.style.display="";}else{sun.style.display="";moon.style.display="none";}}sync();btn.addEventListener("click",()=>{const next=document.documentElement.getAttribute("data-theme")==="light"?"dark":"light";document.documentElement.setAttribute("data-theme",next);sync();});})();
 document.getElementById("sbToggle").addEventListener("click",()=>{const h=document.documentElement;h.dataset.sb=h.dataset.sb==="open"?"closed":"open";});
 renderList();

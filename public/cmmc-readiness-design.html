@@ -582,7 +582,6 @@ tr:hover .ii-notice{height:auto;opacity:1}
     <div class="hdr-naics-pills"><span class="hdr-naics-pill active">✓ 336413</span><span class="hdr-naics-pill active">✓ 332710</span><span class="hdr-naics-pill active">✓ 332721</span></div>
   </div>
 </header>
-<div class="filter-bar"><div class="fb-group"><span class="fb-label">DOMAIN</span><button class="fb-pill active" onclick="setF('dom','all',this)">All</button><button class="fb-pill" onclick="setF('dom','AC',this)">AC</button><button class="fb-pill" onclick="setF('dom','AU',this)">AU</button><button class="fb-pill" onclick="setF('dom','CM',this)">CM</button><button class="fb-pill" onclick="setF('dom','IA',this)">IA</button><button class="fb-pill" onclick="setF('dom','IR',this)">IR</button><button class="fb-pill" onclick="setF('dom','MA',this)">MA</button><button class="fb-pill" onclick="setF('dom','MP',this)">MP</button><button class="fb-pill" onclick="setF('dom','PS',this)">PS</button><button class="fb-pill" onclick="setF('dom','PE',this)">PE</button><button class="fb-pill" onclick="setF('dom','RA',this)">RA</button><button class="fb-pill" onclick="setF('dom','CA',this)">CA</button><button class="fb-pill" onclick="setF('dom','SC',this)">SC</button><button class="fb-pill" onclick="setF('dom','SI',this)">SI</button><button class="fb-pill" onclick="setF('dom','AT',this)">AT</button><button class="fb-pill" onclick="setF('dom','CM+',this)">CM+</button><button class="fb-pill" onclick="setF('dom','IA+',this)">IA+</button><button class="fb-pill" onclick="setF('dom','RE',this)">RE</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">STATUS</span><button class="fb-pill active" onclick="setF('st','all',this)">All</button><button class="fb-pill" onclick="setF('st','met',this)">Met</button><button class="fb-pill" onclick="setF('st','gap',this)">Gap</button><button class="fb-pill" onclick="setF('st','none',this)">Not Started</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search practice or domain…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
 <style>
 [data-theme="light"]{
   --insight-amber-bg:#fef3c7;
@@ -632,30 +631,46 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .two-col{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:20px}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:14px;position:sticky;top:82px}
-.dom-card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
+.bid-eligibility{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.be-hdr{padding:10px 16px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);background:var(--card-soft);border-bottom:1px solid var(--line)}
+.be-row{display:grid;grid-template-columns:120px 1fr 50px 70px 110px;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line-3);align-items:center;font-size:12.5px}
+.be-row:last-child{border-bottom:none}
+.be-sol{font-family:"IBM Plex Mono",monospace;color:var(--accent-deep);font-weight:700;font-size:11.5px}
+[data-theme="dark"] .be-sol{color:var(--accent-light)}
+.be-title{color:var(--ink);font-weight:600}
+.be-lvl{font-family:"IBM Plex Mono",monospace;font-weight:800;color:var(--ink);text-align:center;font-size:12px}
+.be-your{font-family:"IBM Plex Mono",monospace;color:var(--mute);font-size:11px;text-align:center}
+.be-can{background:rgba(22,163,74,.12);color:#16a34a;padding:4px 10px;border-radius:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-align:center;border:1px solid rgba(22,163,74,.30)}
+.be-cannot{background:rgba(220,38,38,.12);color:#dc2626;padding:4px 10px;border-radius:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-align:center;border:1px solid rgba(220,38,38,.30)}
+.be-border{background:rgba(217,119,6,.12);color:#d97706;padding:4px 10px;border-radius:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-align:center;border:1px solid rgba(217,119,6,.30)}
+[data-theme="dark"] .be-can{color:#6ee7b7;background:rgba(22,163,74,.18)}
+[data-theme="dark"] .be-cannot{color:#fca5a5;background:rgba(220,38,38,.18)}
+[data-theme="dark"] .be-border{color:#fcd34d;background:rgba(245,158,11,.18)}
+.cmmc-levels{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.cl-item{font-size:10.5px;padding:7px 12px;border-radius:6px;font-weight:600;flex:1;text-align:center;line-height:1.4}
+.cl-active{background:rgba(22,163,74,.10);color:#16a34a;border:1px solid rgba(22,163,74,.30)}
+.cl-current{background:rgba(217,119,6,.12);color:#d97706;border:2px solid #d97706;font-weight:700}
+.cl-future{background:var(--card-soft);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .cl-active{color:#6ee7b7;background:rgba(22,163,74,.18)}
+[data-theme="dark"] .cl-current{color:#fcd34d;background:rgba(245,158,11,.18);border-color:#fcd34d}
+.cl-arrow{color:var(--mute);font-size:16px;flex-shrink:0}
+.dom-card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm);padding:13px 16px;display:flex;flex-direction:column;gap:7px;transition:border-color .15s}
 .dom-card:hover{border-color:var(--accent-light)}
-.dom-card.gap-high{border-left:3px solid #dc2626}
-.dom-card.gap-medium{border-left:3px solid #d97706}
-.dom-card.gap-low{border-left:3px solid #16a34a}
-.dom-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.dom-name{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:-.1px;flex:1;min-width:0}
-.dom-code{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.dom-card.gap-HIGH{border-left:3px solid #dc2626}
+.dom-card.gap-MEDIUM{border-left:3px solid #d97706}
+.dom-card.gap-LOW{border-left:3px solid #16a34a}
+.dom-top{display:flex;align-items:center;gap:10px}
+.dom-badge{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 8px;border-radius:5px}
+.dom-name{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.1px;flex:1;min-width:0}
 .dom-pct{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:800;color:var(--accent-deep)}
 [data-theme="dark"] .dom-pct{color:var(--accent-light)}
-.dom-priority{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:20px}
+.dom-priority{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:20px}
 .prio-HIGH{background:rgba(220,38,38,.10);color:#b91c1c;border:1px solid rgba(220,38,38,.30)}
 .prio-MEDIUM{background:rgba(217,119,6,.10);color:#b45309;border:1px solid rgba(217,119,6,.30)}
 .prio-LOW{background:rgba(22,163,74,.10);color:var(--green-700);border:1px solid rgba(16,185,129,.30)}
 [data-theme="dark"] .prio-HIGH{color:#fca5a5;background:rgba(220,38,38,.18)}
 [data-theme="dark"] .prio-MEDIUM{color:#fcd34d;background:rgba(245,158,11,.18)}
 [data-theme="dark"] .prio-LOW{color:#6ee7b7;background:rgba(16,185,129,.18)}
-.dom-counts{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2)}
-.dom-counts .met{color:var(--green-700);font-weight:700}
-.dom-counts .gap{color:var(--amber-700);font-weight:700}
-.dom-counts .none{color:var(--red-700);font-weight:700}
-[data-theme="dark"] .dom-counts .met{color:#6ee7b7}
-[data-theme="dark"] .dom-counts .gap{color:#fcd34d}
-[data-theme="dark"] .dom-counts .none{color:#fca5a5}
 .dom-bar{height:6px;background:var(--line-2);border-radius:3px;overflow:hidden}
 .dom-bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
 .score-wrap{display:flex;flex-direction:column;align-items:center;padding:8px}
@@ -665,29 +680,51 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .score-ring .fg{fill:none;stroke:var(--amber-600);stroke-width:10;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:124}
 .score-num{position:absolute;inset:0;display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:32px;font-weight:800;color:var(--amber-700)}
 [data-theme="dark"] .score-num{color:#fcd34d}
-.score-legend{display:flex;flex-direction:column;gap:5px;width:100%;font-size:11.5px}
+.score-legend{display:flex;flex-direction:column;gap:6px;width:100%;font-size:11.5px}
 .sl-row{display:flex;justify-content:space-between}
 .sl-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
-.sol-row{padding:9px 14px;border-bottom:1px solid var(--line-3);display:flex;justify-content:space-between;align-items:center;font-size:12px}
-.sol-row:last-child{border-bottom:none}
-.sol-name{color:var(--ink);font-weight:600;font-family:"IBM Plex Mono",monospace;font-size:10.5px}
-.sol-lvl{font-family:"IBM Plex Mono",monospace;font-size:9px;color:#b91c1c;font-weight:800;background:rgba(220,38,38,.10);padding:2px 6px;border-radius:4px}
-.sol-dl{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--amber-700)}
-[data-theme="dark"] .sol-dl{color:#fcd34d}
-.tl-row{padding:9px 14px;border-bottom:1px solid var(--line-3);display:flex;justify-content:space-between;align-items:center;font-size:12px}
-.tl-row:last-child{border-bottom:none}
-.tl-stage{color:var(--ink);font-weight:600}
-.tl-days{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--accent-deep);font-weight:800}
-[data-theme="dark"] .tl-days{color:var(--accent-light)}
+.score-callout{margin-top:12px;padding:9px 12px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.20);border-radius:6px;font-size:11px;color:#b91c1c;text-align:center;font-weight:600}
+[data-theme="dark"] .score-callout{color:#fca5a5;background:rgba(220,38,38,.12)}
+.gap-row{padding:11px 14px;border-bottom:1px solid var(--line-3)}
+.gap-row:last-child{border-bottom:none}
+.gap-name{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);font-weight:700;margin-bottom:2px}
+[data-theme="dark"] .gap-name{color:var(--accent-light)}
+.gap-issue{font-size:11.5px;color:var(--ink);font-weight:600;margin-bottom:3px}
+.gap-fix{font-size:11px;color:var(--red-700);background:rgba(220,38,38,.06);padding:5px 8px;border-radius:4px;border:1px solid rgba(220,38,38,.18)}
+[data-theme="dark"] .gap-fix{color:#fca5a5;background:rgba(220,38,38,.12)}
+.tl-flow{display:flex;align-items:center;padding:12px 14px;gap:6px}
+.tl-step{flex:1;text-align:center;padding:9px 6px;background:var(--card-soft);border:1px solid var(--line);border-radius:8px}
+.tl-step-name{font-size:10px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.tl-step-days{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .tl-step-days{color:var(--accent-light)}
+.tl-arrow{color:var(--mute);font-size:14px;flex-shrink:0}
+.tl-total{padding:9px 14px;border-top:1px solid var(--line-3);font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);text-align:center}
+.tl-total b{color:var(--amber-700);font-weight:800}
+[data-theme="dark"] .tl-total b{color:#fcd34d}
 </style>
-<section class="stat-strip"><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div class="stat-body"><p class="lbl">Readiness Score</p><p class="val">67%</p><p class="sub">Level 2 — 36 practices remain</p></div></div><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Practices Met</p><p class="val">74 of 110</p><p class="sub">across 17 NIST 800-171 domains</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span><div class="stat-body"><p class="lbl">Open Sols Requiring CMMC</p><p class="val">4</p><p class="sub">active in your NAICS today</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="stat-body"><p class="lbl">Days to Assessment</p><p class="val">127</p><p class="sub">estimated C3PAO ready date</p></div></div></section>
+<div class="bid-eligibility">
+  <div class="be-hdr">BID ELIGIBILITY STATUS — CMMC REQUIREMENTS</div>
+  <div class="be-row"><span class="be-sol">FA301626Q0068</span><span class="be-title">T-38 Intake Plugs · AETC</span><span class="be-lvl">L1</span><span class="be-your">67% L2</span><span class="be-can">CAN BID</span></div>
+  <div class="be-row"><span class="be-sol">FA861521C0088</span><span class="be-title">C-17 Maintenance IDIQ · AFMC</span><span class="be-lvl">L2</span><span class="be-your">67%</span><span class="be-border">BORDERLINE</span></div>
+  <div class="be-row"><span class="be-sol">FA851526D0034</span><span class="be-title">C-130J Structural Parts · AFLCMC</span><span class="be-lvl">L2</span><span class="be-your">67%</span><span class="be-border">BORDERLINE</span></div>
+  <div class="be-row"><span class="be-sol">SPE4AX25D0014</span><span class="be-title">Aviation Fasteners IDIQ · DLA</span><span class="be-lvl">L1</span><span class="be-your">67%</span><span class="be-can">CAN BID</span></div>
+</div>
+<div class="cmmc-levels">
+  <div class="cl-item cl-active">L1 · 17 practices · FCI only · Self-assessed · YOU MEET THIS</div>
+  <div class="cl-arrow">→</div>
+  <div class="cl-item cl-current">L2 · 110 practices · CUI required · C3PAO assessed · 67% READY</div>
+  <div class="cl-arrow">→</div>
+  <div class="cl-item cl-future">L3 · 134 practices · Critical CUI · DIBCAC assessed · N/A</div>
+</div>
+<div class="filter-bar"><div class="fb-group"><span class="fb-label">PRIORITY</span><button class="fb-pill active" onclick="setF('p','all',this)">All</button><button class="fb-pill" onclick="setF('p','HIGH',this)">High</button><button class="fb-pill" onclick="setF('p','MEDIUM',this)">Medium</button><button class="fb-pill" onclick="setF('p','LOW',this)">Low</button><button class="fb-pill" onclick="setF('p','MET',this)">Met (100%)</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search practice or domain…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
+<section class="stat-strip"><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div class="stat-body"><p class="lbl">Readiness Score</p><p class="val">67%</p><p class="sub">Level 2 — 36 practices remain</p></div></div><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Practices Met</p><p class="val">74 of 110</p><p class="sub">across 17 NIST 800-171 domains</p></div></div><div class="stat-card tone-red"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span><div class="stat-body"><p class="lbl">Bids Eligible TODAY</p><p class="val">2 of 4</p><p class="sub">36-practice gap blocks 2 sols</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="stat-body"><p class="lbl">Days to L2 Cert</p><p class="val">127</p><p class="sub">estimated C3PAO ready date</p></div></div></section>
 <div class="two-col">
   <div id="list" style="grid-column:1/4;display:flex;flex-direction:column;gap:10px"></div>
   <aside class="right-stack" style="grid-column:4/5"><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
-      <div class="wh-text"><h3>Overall Readiness Score</h3><p class="wh-sub">CMMC Level 2 · 110 practices</p></div>
+      <div class="wh-text"><h3>Overall Score</h3><p class="wh-sub">CMMC Level 2 readiness</p></div>
     </div>
     <span class="wh-source">NIST 800-171</span>
   </header>
@@ -697,62 +734,63 @@ tr:hover .ii-notice{height:auto;opacity:1}
 <div class="sl-row"><span><span class="sl-dot" style="background:var(--green-600)"></span>Met</span><b style="font-family:monospace;color:var(--green-700)">74</b></div>
 <div class="sl-row"><span><span class="sl-dot" style="background:var(--amber-600)"></span>Gap</span><b style="font-family:monospace;color:var(--amber-700)">17</b></div>
 <div class="sl-row"><span><span class="sl-dot" style="background:var(--red-600)"></span>Not Started</span><b style="font-family:monospace;color:var(--red-700)">19</b></div>
-</div></div></div>
+</div>
+<div class="score-callout">36 practices blocking 2 bids</div>
+</div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
-      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>
-      <div class="wh-text"><h3>Open Sols Requiring CMMC</h3><p class="wh-sub">4 active in your NAICS</p></div>
+      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span>
+      <div class="wh-text"><h3>Priority Gap Actions</h3><p class="wh-sub">Top 5 highest-priority gaps · specific fixes</p></div>
     </div>
-    <span class="wh-source">SAM.gov</span>
+    <span class="wh-source">CMMC Assessment Guide</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="sol-row"><div><div class="sol-name">FA301626Q0068</div><div style="font-size:10px;color:var(--mute)">T-38 Intake Plugs · CUI required</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span class="sol-lvl">LVL 2</span><span class="sol-dl">Jun 3</span></div></div>
-<div class="sol-row"><div><div class="sol-name">FA861521C0088</div><div style="font-size:10px;color:var(--mute)">C-17 Maintenance IDIQ · CUI required</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span class="sol-lvl">LVL 2</span><span class="sol-dl">Jun 15</span></div></div>
-<div class="sol-row"><div><div class="sol-name">FA851526D0034</div><div style="font-size:10px;color:var(--mute)">C-130J Structural Parts · CUI required</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span class="sol-lvl">LVL 2</span><span class="sol-dl">Jul 8</span></div></div>
-<div class="sol-row"><div><div class="sol-name">SPE4AX25D0014</div><div style="font-size:10px;color:var(--mute)">Aviation Fasteners · CUI required</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span class="sol-lvl">LVL 2</span><span class="sol-dl">Jul 22</span></div></div></div>
+  <div class="widget-body" style="padding:0"><div class="gap-row"><div class="gap-name">CM · Configuration Mgmt</div><div class="gap-issue">Baseline config not documented</div><div class="gap-fix">Fix: Create system baseline doc this week</div></div>
+<div class="gap-row"><div class="gap-name">RA · Risk Assessment</div><div class="gap-issue">Last assessment 18 months ago</div><div class="gap-fix">Fix: Schedule RA immediately — takes 1 day</div></div>
+<div class="gap-row"><div class="gap-name">CA · Security Assessment</div><div class="gap-issue">System Security Plan incomplete</div><div class="gap-fix">Fix: Complete SSP — C3PAOs require it first</div></div>
+<div class="gap-row"><div class="gap-name">SC · System Comms</div><div class="gap-issue">CUI not encrypted in transit</div><div class="gap-fix">Fix: Enable TLS 1.2+ on all CUI systems</div></div>
+<div class="gap-row"><div class="gap-name">IA+ · Identification Extended</div><div class="gap-issue">No replay-resistant auth</div><div class="gap-fix">Fix: Enable MFA with TOTP on all privileged accounts</div></div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <div class="wh-text"><h3>C3PAO Assessment Timeline</h3><p class="wh-sub">Est. 127 days to certification</p></div>
+      <div class="wh-text"><h3>C3PAO Timeline</h3><p class="wh-sub">Est. path to L2 certification</p></div>
     </div>
     <span class="wh-source">C3PAO Marketplace</span>
   </header>
-  <div class="widget-body" style="padding:0"><div class="tl-row"><div><div class="tl-stage">Preparation</div><div style="font-size:10px;color:var(--mute)">Gap remediation · 36 practices</div></div><div class="tl-days">45 days</div></div>
-<div class="tl-row"><div><div class="tl-stage">Documentation</div><div style="font-size:10px;color:var(--mute)">SSP + POA&M finalization</div></div><div class="tl-days">30 days</div></div>
-<div class="tl-row"><div><div class="tl-stage">Assessment</div><div style="font-size:10px;color:var(--mute)">C3PAO on-site evaluation</div></div><div class="tl-days">14 days</div></div>
-<div class="tl-row"><div><div class="tl-stage">Review</div><div style="font-size:10px;color:var(--mute)">DoD review + certification</div></div><div class="tl-days">38 days</div></div></div>
+  <div class="widget-body" style="padding:0"><div class="tl-flow">
+<div class="tl-step"><div class="tl-step-name">Preparation</div><div class="tl-step-days">45d</div></div>
+<span class="tl-arrow">→</span>
+<div class="tl-step"><div class="tl-step-name">Documentation</div><div class="tl-step-days">30d</div></div>
+<span class="tl-arrow">→</span>
+<div class="tl-step"><div class="tl-step-name">Assessment</div><div class="tl-step-days">14d</div></div>
+<span class="tl-arrow">→</span>
+<div class="tl-step"><div class="tl-step-name">Review</div><div class="tl-step-days">38d</div></div>
+</div>
+<div class="tl-total">Total estimated: <b>127 days</b></div></div>
 </section></aside>
 </div></main>
 
 </div>
 
 <script>
-const DOMAINS=[{"name": "Access Control", "code": "AC", "total": 22, "met": 18, "gap": 3, "none": 1, "pct": 82, "priority": "MEDIUM", "insight": "3 gaps in remote access controls. Priority fix before C3PAO assessment."}, {"name": "Audit and Accountability", "code": "AU", "total": 9, "met": 7, "gap": 2, "none": 0, "pct": 78, "priority": "MEDIUM", "insight": "Log retention gaps. NIST 800-171 requires 90-day minimum. Current: 30 days."}, {"name": "Configuration Management", "code": "CM", "total": 9, "met": 5, "gap": 2, "none": 2, "pct": 56, "priority": "HIGH", "insight": "Baseline configuration not documented. High-priority gap \u2014 C3PAOs flag this in 89% of assessments."}, {"name": "Identification and Authentication", "code": "IA", "total": 11, "met": 10, "gap": 1, "none": 0, "pct": 91, "priority": "LOW", "insight": "MFA implemented on most systems. One legacy system still using single-factor. Schedule upgrade."}, {"name": "Incident Response", "code": "IR", "total": 3, "met": 2, "gap": 0, "none": 1, "pct": 67, "priority": "MEDIUM", "insight": "Incident response plan not tested in 12 months. DoD requires annual tabletop exercise."}, {"name": "Maintenance", "code": "MA", "total": 6, "met": 6, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. All maintenance activities logged and controlled. No action required."}, {"name": "Media Protection", "code": "MP", "total": 9, "met": 7, "gap": 1, "none": 1, "pct": 78, "priority": "MEDIUM", "insight": "Removable media policy not enforced at shop floor terminals. High-risk gap for manufacturing environments."}, {"name": "Personnel Security", "code": "PS", "total": 2, "met": 2, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Background check procedures documented and current."}, {"name": "Physical Protection", "code": "PE", "total": 6, "met": 5, "gap": 1, "none": 0, "pct": 83, "priority": "LOW", "insight": "One visitor log gap at secondary entrance. Low risk but document before assessment."}, {"name": "Risk Assessment", "code": "RA", "total": 3, "met": 1, "gap": 1, "none": 1, "pct": 33, "priority": "HIGH", "insight": "Risk assessment not conducted in 18 months. Required annually. Schedule immediately."}, {"name": "Security Assessment", "code": "CA", "total": 4, "met": 2, "gap": 1, "none": 1, "pct": 50, "priority": "HIGH", "insight": "System Security Plan (SSP) incomplete. SSP is the foundation document \u2014 C3PAOs require it before scheduling."}, {"name": "System and Comms Protection", "code": "SC", "total": 16, "met": 11, "gap": 3, "none": 2, "pct": 69, "priority": "MEDIUM", "insight": "CUI encryption in transit gaps. All CUI must be encrypted end-to-end per DFARS 252.204-7012."}, {"name": "System and Info Integrity", "code": "SI", "total": 7, "met": 5, "gap": 2, "none": 0, "pct": 71, "priority": "MEDIUM", "insight": "Malicious code scan frequency below requirement. Increase to daily on CUI-handling systems."}, {"name": "Awareness and Training", "code": "AT", "total": 3, "met": 3, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Annual security awareness training documented for all personnel."}, {"name": "Configuration Management Extended", "code": "CM+", "total": 2, "met": 1, "gap": 0, "none": 1, "pct": 50, "priority": "HIGH", "insight": "Software usage restrictions not enforced. Create approved software list immediately."}, {"name": "Identification Extended", "code": "IA+", "total": 1, "met": 0, "gap": 0, "none": 1, "pct": 0, "priority": "HIGH", "insight": "Replay-resistant authentication not implemented. Required for all privileged accounts."}, {"name": "Recovery", "code": "RE", "total": 2, "met": 2, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Backup and recovery procedures tested and documented."}];
-let f={dom:"all",st:"all"},q="";
-function statusFilter(d,st){
-  if(st==="met")return d.gap===0&&d.none===0;
-  if(st==="gap")return d.gap>0;
-  if(st==="none")return d.none>0;
-  return true;
-}
+const DOMAINS=[{"code": "AC", "name": "Access Control", "total": 22, "met": 18, "gap": 3, "none": 1, "pct": 82, "priority": "MEDIUM", "insight": "3 gaps in remote access controls. Priority fix before C3PAO assessment."}, {"code": "AU", "name": "Audit and Accountability", "total": 9, "met": 7, "gap": 2, "none": 0, "pct": 78, "priority": "MEDIUM", "insight": "Log retention gaps. NIST 800-171 requires 90-day minimum. Current: 30 days."}, {"code": "CM", "name": "Configuration Management", "total": 9, "met": 5, "gap": 2, "none": 2, "pct": 56, "priority": "HIGH", "insight": "Baseline configuration not documented. High-priority gap \u2014 C3PAOs flag this in 89% of assessments."}, {"code": "IA", "name": "Identification & Authentication", "total": 11, "met": 10, "gap": 1, "none": 0, "pct": 91, "priority": "LOW", "insight": "MFA implemented on most systems. One legacy system still using single-factor. Schedule upgrade."}, {"code": "IR", "name": "Incident Response", "total": 3, "met": 2, "gap": 0, "none": 1, "pct": 67, "priority": "MEDIUM", "insight": "Incident response plan not tested in 12 months. DoD requires annual tabletop exercise."}, {"code": "MA", "name": "Maintenance", "total": 6, "met": 6, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. All maintenance activities logged and controlled. No action required."}, {"code": "MP", "name": "Media Protection", "total": 9, "met": 7, "gap": 1, "none": 1, "pct": 78, "priority": "MEDIUM", "insight": "Removable media policy not enforced at shop floor terminals. High-risk gap for manufacturing environments."}, {"code": "PS", "name": "Personnel Security", "total": 2, "met": 2, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Background check procedures documented and current."}, {"code": "PE", "name": "Physical Protection", "total": 6, "met": 5, "gap": 1, "none": 0, "pct": 83, "priority": "LOW", "insight": "One visitor log gap at secondary entrance. Low risk but document before assessment."}, {"code": "RA", "name": "Risk Assessment", "total": 3, "met": 1, "gap": 1, "none": 1, "pct": 33, "priority": "HIGH", "insight": "Risk assessment not conducted in 18 months. Required annually. Schedule immediately."}, {"code": "CA", "name": "Security Assessment", "total": 4, "met": 2, "gap": 1, "none": 1, "pct": 50, "priority": "HIGH", "insight": "System Security Plan (SSP) incomplete. SSP is the foundation document \u2014 C3PAOs require it before scheduling."}, {"code": "SC", "name": "System & Comms Protection", "total": 16, "met": 11, "gap": 3, "none": 2, "pct": 69, "priority": "MEDIUM", "insight": "CUI encryption in transit gaps. All CUI must be encrypted end-to-end per DFARS 252.204-7012."}, {"code": "SI", "name": "System & Info Integrity", "total": 7, "met": 5, "gap": 2, "none": 0, "pct": 71, "priority": "MEDIUM", "insight": "Malicious code scan frequency below requirement. Increase to daily on CUI-handling systems."}, {"code": "AT", "name": "Awareness & Training", "total": 3, "met": 3, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Annual security awareness training documented for all personnel."}, {"code": "CM+", "name": "Configuration Mgmt Extended", "total": 2, "met": 1, "gap": 0, "none": 1, "pct": 50, "priority": "HIGH", "insight": "Software usage restrictions not enforced. Create approved software list immediately."}, {"code": "IA+", "name": "Identification Extended", "total": 1, "met": 0, "gap": 0, "none": 1, "pct": 0, "priority": "HIGH", "insight": "Replay-resistant authentication not implemented. Required for all privileged accounts."}, {"code": "RE", "name": "Recovery", "total": 2, "met": 2, "gap": 0, "none": 0, "pct": 100, "priority": "LOW", "insight": "Full compliance. Backup and recovery procedures tested and documented."}];
+let f={p:"all"},q="";
 function renderList(){
   let data=[...DOMAINS];
   if(q){const qq=q.toLowerCase();data=data.filter(d=>d.name.toLowerCase().includes(qq)||d.code.toLowerCase().includes(qq)||d.insight.toLowerCase().includes(qq));}
-  if(f.dom!=="all")data=data.filter(d=>d.code===f.dom);
-  if(f.st!=="all")data=data.filter(d=>statusFilter(d,f.st));
+  if(f.p==="MET")data=data.filter(d=>d.pct===100);
+  else if(f.p!=="all")data=data.filter(d=>d.priority===f.p);
   document.getElementById("list").innerHTML=data.map(d=>{
-    const cls="gap-"+d.priority.toLowerCase();
     const chipTone=d.priority==="HIGH"?"insight-alert":d.priority==="MEDIUM"?"insight-amber":"insight-win";
     const barColor=d.pct>=80?"var(--green-600)":d.pct>=50?"var(--amber-600)":"var(--red-600)";
-    return `<div class="dom-card ${cls}">
+    return `<div class="dom-card gap-${d.priority}">
       <div class="dom-top">
-        <span class="dom-code">[${d.code}]</span>
+        <span class="dom-badge">${d.code}</span>
         <span class="dom-name">${d.name}</span>
         <span class="dom-pct">${d.pct}%</span>
         <span class="dom-priority prio-${d.priority}">${d.priority}</span>
       </div>
-      <div class="dom-counts"><span class="met">${d.met} met</span> · <span class="gap">${d.gap} gap</span> · <span class="none">${d.none} not started</span> · ${d.total} total</div>
       <div class="dom-bar"><div class="dom-bar-fill" style="width:${d.pct}%;background:${barColor}"></div></div>
       <div class="insight-chip ${chipTone}" style="margin-top:5px"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${d.insight}</span></div>
     </div>`;

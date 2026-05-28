@@ -582,7 +582,6 @@ tr:hover .ii-notice{height:auto;opacity:1}
     <div class="hdr-naics-pills"><span class="hdr-naics-pill active">✓ 336413</span><span class="hdr-naics-pill active">✓ 332710</span><span class="hdr-naics-pill active">✓ 332721</span></div>
   </div>
 </header>
-<div class="filter-bar"><div class="fb-group"><span class="fb-label">NAICS</span><button class="fb-pill active" onclick="setF('naics','all',this)">All</button><button class="fb-pill" onclick="setF('naics','336413',this)">336413</button><button class="fb-pill" onclick="setF('naics','332710',this)">332710</button><button class="fb-pill" onclick="setF('naics','332721',this)">332721</button><button class="fb-pill" onclick="setF('naics','332722',this)">332722</button><button class="fb-pill" onclick="setF('naics','336411',this)">336411</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">CERTIFICATION</span><button class="fb-pill active" onclick="setF('cert','all',this)">All</button><button class="fb-pill" onclick="setF('cert','SB',this)">SB</button><button class="fb-pill" onclick="setF('cert','WOSB',this)">WOSB</button><button class="fb-pill" onclick="setF('cert','SDVOSB',this)">SDVOSB</button><button class="fb-pill" onclick="setF('cert','8(a)',this)">8(a)</button><button class="fb-pill" onclick="setF('cert','HUBZone',this)">HUBZone</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">AGENCY</span><button class="fb-pill active" onclick="setF('agency','all',this)">All</button><button class="fb-pill" onclick="setF('agency','AETC',this)">AETC</button><button class="fb-pill" onclick="setF('agency','AFMC',this)">AFMC</button><button class="fb-pill" onclick="setF('agency','AFLCMC',this)">AFLCMC</button><button class="fb-pill" onclick="setF('agency','DLA',this)">DLA</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search partner or location…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
 <style>
 [data-theme="light"]{
   --insight-amber-bg:#fef3c7;
@@ -632,73 +631,102 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .two-col{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:20px}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:14px;position:sticky;top:82px}
-.partner-card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);transition:border-color .15s;overflow:hidden}
+.teaming-recs{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.tr-hdr{padding:10px 16px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);background:var(--card-soft);border-bottom:1px solid var(--line)}
+.tr-row{display:grid;grid-template-columns:130px 1fr 200px 1fr auto;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line-3);align-items:center;font-size:12px}
+.tr-row:last-child{border-bottom:none}
+.tr-sol{font-family:"IBM Plex Mono",monospace;color:var(--accent-deep);font-weight:700;font-size:11.5px}
+[data-theme="dark"] .tr-sol{color:var(--accent-light)}
+.tr-title{font-weight:600;color:var(--ink)}
+.tr-partner{color:var(--ink);font-weight:600;font-size:11.5px}
+.tr-reason{color:var(--mute);font-size:11px;font-style:italic}
+.tr-btn{padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-family:"Manrope",sans-serif;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .14s}
+.tr-btn:hover{opacity:.85}
+.partner-card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm);transition:border-color .15s;overflow:hidden}
 .partner-card:hover{border-color:var(--accent-light)}
 .partner-card.expanded{border-color:var(--accent)}
-.p-face{padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+.p-face{padding:13px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;user-select:none}
 .p-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .p-name{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:-.1px;flex:1;min-width:0}
-.p-loc{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--purple-700);background:rgba(124,58,237,.10);padding:2px 7px;border-radius:4px;font-weight:700}
+.p-loc{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--purple-700);background:rgba(124,58,237,.10);padding:2px 7px;border-radius:4px;font-weight:700}
 [data-theme="dark"] .p-loc{color:#c4b5fd;background:rgba(124,58,237,.22)}
 .p-chev{margin-left:8px;font-size:13px;color:var(--mute);transition:transform .2s}
 .partner-card.expanded .p-chev{transform:rotate(180deg)}
-.p-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.p-tag{font-family:"IBM Plex Mono",monospace;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.04em}
+.p-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.p-tag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.04em}
 .p-naics{background:rgba(55,138,221,.10);color:var(--accent-deep)}
 [data-theme="dark"] .p-naics{background:rgba(55,138,221,.20);color:var(--accent-light)}
 .p-cert{background:rgba(16,185,129,.10);color:var(--green-700)}
 [data-theme="dark"] .p-cert{background:rgba(16,185,129,.20);color:#6ee7b7}
 .p-agy{background:rgba(217,119,6,.10);color:var(--amber-700)}
 [data-theme="dark"] .p-agy{background:rgba(245,158,11,.20);color:#fcd34d}
-.p-value{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute)}
+.p-value{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-left:auto}
 .p-value b{color:var(--accent-deep);font-weight:800}
 [data-theme="dark"] .p-value b{color:var(--accent-light)}
-.p-det{display:none;border-top:1px solid var(--line);background:var(--card-soft);padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.partner-card.expanded .p-det{display:grid}
+.p-det{display:none;border-top:1px solid var(--line);background:var(--card-soft)}
+.partner-card.expanded .p-det{display:block}
+.p-det-grid{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .p-det-lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);margin-bottom:7px}
 .p-det-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line-3);font-size:12px}
 .p-det-row:last-child{border-bottom:none}
 .p-det-k{color:var(--ink-2)}
 .p-det-v{font-weight:700;color:var(--ink)}
-.p-acts{border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;background:var(--card)}
-.p-btn{padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:"Manrope",sans-serif;transition:all .14s}
-.p-btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--line)}
+.p-acts{border-top:1px solid var(--line);padding:11px 16px;display:flex;gap:8px;background:var(--card)}
+.p-btn{padding:7px 14px;border-radius:7px;font-family:"Manrope",sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;transition:opacity .14s}
 .p-btn:hover{opacity:.85}
+.p-btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--line)}
 .p-btn.ghost:hover{border-color:var(--accent);color:var(--accent-deep)}
-.opp-row{padding:11px 14px;border-bottom:1px solid var(--line-3);font-size:12px}
-.opp-row:last-child{border-bottom:none}
-.opp-sol{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent-deep);font-weight:700}
-[data-theme="dark"] .opp-sol{color:var(--accent-light)}
-.opp-title{color:var(--ink);font-weight:600;margin:2px 0}
-.opp-why{color:var(--mute);font-size:11px;font-style:italic}
 .cov-row{padding:9px 14px;border-bottom:1px solid var(--line-3);font-size:12px;display:flex;justify-content:space-between;align-items:center}
 .cov-row:last-child{border-bottom:none}
 .cov-name{color:var(--ink);font-weight:600}
 .cov-have{font-family:"IBM Plex Mono",monospace;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700}
 .cov-have.have{background:rgba(16,185,129,.10);color:var(--green-700)}
 .cov-have.via{background:rgba(55,138,221,.10);color:var(--accent-deep)}
+.cov-have.miss{background:var(--card-soft);color:var(--mute);border:1px solid var(--line)}
 [data-theme="dark"] .cov-have.have{background:rgba(16,185,129,.20);color:#6ee7b7}
 [data-theme="dark"] .cov-have.via{background:rgba(55,138,221,.20);color:var(--accent-light)}
+.opp-row{padding:11px 14px;border-bottom:1px solid var(--line-3);font-size:12px}
+.opp-row:last-child{border-bottom:none}
+.opp-sol{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent-deep);font-weight:700}
+[data-theme="dark"] .opp-sol{color:var(--accent-light)}
+.opp-title{color:var(--ink);font-weight:600;margin:2px 0}
+.opp-why{color:var(--mute);font-size:11px;font-style:italic;margin-bottom:3px}
+.opp-dl{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--amber-700);font-weight:700}
+[data-theme="dark"] .opp-dl{color:#fcd34d}
 .shared-row{padding:9px 14px;border-bottom:1px solid var(--line-3);font-size:12px}
 .shared-row:last-child{border-bottom:none}
-.shared-partner{font-weight:700;color:var(--ink)}
+.shared-partner{font-weight:700;color:var(--ink);margin-bottom:2px}
 .shared-agencies{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
 </style>
-<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span><div class="stat-body"><p class="lbl">Partners Identified</p><p class="val">24</p><p class="sub">matched on NAICS + agency overlap</p></div></div><div class="stat-card tone-green"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Active Teaming Opps</p><p class="val">3</p><p class="sub">open solicitations where teaming is recommended</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div class="stat-body"><p class="lbl">Certification Match</p><p class="val">8</p><p class="sub">WOSB · SDVOSB · 8(a) coverage via partners</p></div></div><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg></span><div class="stat-body"><p class="lbl">Shared Agency History</p><p class="val">6</p><p class="sub">partners with overlapping past performance</p></div></div></section>
+<div class="teaming-recs">
+  <div class="tr-hdr">TEAMING RECOMMENDATIONS FOR YOUR ACTIVE SOLICITATIONS</div>
+  <div class="tr-row">
+    <span class="tr-sol">FA851526D0034</span>
+    <span class="tr-title">C-130J Structural Parts</span>
+    <span class="tr-partner">Team with: Desert Aerospace <span style="color:var(--mute);font-weight:500">(SDVOSB)</span></span>
+    <span class="tr-reason">SDVOSB set-aside opens this solicitation</span>
+    <button class="tr-btn" onclick="alert('Teaming agreement draft — feature coming soon')">Draft Agreement</button>
+  </div>
+  <div class="tr-row">
+    <span class="tr-sol">FA301626Q0068</span>
+    <span class="tr-title">T-38 Intake Plugs</span>
+    <span class="tr-partner">Team with: Falcon Aero Supply</span>
+    <span class="tr-reason">Geographic + AETC past perf overlap</span>
+    <button class="tr-btn" onclick="alert('Teaming agreement draft — feature coming soon')">Draft Agreement</button>
+  </div>
+  <div class="tr-row">
+    <span class="tr-sol">SPE4AX25D0014</span>
+    <span class="tr-title">Aviation Fasteners</span>
+    <span class="tr-partner">Team with: Ironclad Supply <span style="color:var(--mute);font-weight:500">(HUBZone)</span></span>
+    <span class="tr-reason">HUBZone price evaluation preference</span>
+    <button class="tr-btn" onclick="alert('Teaming agreement draft — feature coming soon')">Draft Agreement</button>
+  </div>
+</div>
+<div class="filter-bar"><div class="fb-group"><span class="fb-label">NAICS</span><button class="fb-pill active" onclick="setF('naics','all',this)">All</button><button class="fb-pill" onclick="setF('naics','336413',this)">336413</button><button class="fb-pill" onclick="setF('naics','332710',this)">332710</button><button class="fb-pill" onclick="setF('naics','332721',this)">332721</button><button class="fb-pill" onclick="setF('naics','336411',this)">336411</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div class="fb-group"><span class="fb-label">CERT</span><button class="fb-pill active" onclick="setF('cert','all',this)">All</button><button class="fb-pill" onclick="setF('cert','SB',this)">SB</button><button class="fb-pill" onclick="setF('cert','WOSB',this)">WOSB</button><button class="fb-pill" onclick="setF('cert','SDVOSB',this)">SDVOSB</button><button class="fb-pill" onclick="setF('cert','8(a)',this)">8(a)</button><button class="fb-pill" onclick="setF('cert','HUBZone',this)">HUBZone</button></div><span style="color:var(--mute);font-size:14px;margin:0 10px;flex-shrink:0">|</span><div style="margin-left:auto"><input id="search" type="text" placeholder="Search partner or location…" oninput="filterList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-family:inherit;outline:none;width:220px"></div></div>
+<section class="stat-strip"><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span><div class="stat-body"><p class="lbl">Partners Identified</p><p class="val">24</p><p class="sub">matched on NAICS + agency overlap</p></div></div><div class="stat-card tone-green"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span><div class="stat-body"><p class="lbl">Active Teaming Opps</p><p class="val">3</p><p class="sub">open sols where teaming recommended</p></div></div><div class="stat-card tone-amber"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div class="stat-body"><p class="lbl">Cert Coverage</p><p class="val">5 types</p><p class="sub">accessible via teaming partners</p></div></div><div class="stat-card tone-blue"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg></span><div class="stat-body"><p class="lbl">Shared Agency History</p><p class="val">6</p><p class="sub">partners with overlapping past perf</p></div></div></section>
 <div class="two-col">
   <div id="list" style="grid-column:1/4;display:flex;flex-direction:column;gap:10px"></div>
   <aside class="right-stack" style="grid-column:4/5"><section class="widget">
-  <header class="widget-head">
-    <div class="wh-left">
-      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>
-      <div class="wh-text"><h3>Active Teaming Opportunities</h3><p class="wh-sub">3 open sols where teaming wins</p></div>
-    </div>
-    <span class="wh-source">SAM.gov</span>
-  </header>
-  <div class="widget-body" style="padding:0"><div class="opp-row"><div class="opp-sol">FA301626Q0068</div><div class="opp-title">T-38 Intake Plugs & Exhaust Covers</div><div class="opp-why">Recommended partner: Falcon Aero Supply — AETC past performance + local TX delivery</div></div>
-<div class="opp-row"><div class="opp-sol">FA851526D0034</div><div class="opp-title">C-130J Structural Repair Parts</div><div class="opp-why">Recommended partner: Desert Aerospace (SDVOSB) — set-aside opens with SDVOSB teaming</div></div>
-<div class="opp-row"><div class="opp-sol">SPE4AX25Q0041</div><div class="opp-title">Precision Bearings (NAICS 332722)</div><div class="opp-why">Recommended partner: Ironclad Supply (HUBZone) — price evaluation preference</div></div></div>
-</section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
@@ -709,8 +737,19 @@ tr:hover .ii-notice{height:auto;opacity:1}
   <div class="widget-body" style="padding:0"><div class="cov-row"><span class="cov-name">SB (Small Business)</span><span class="cov-have have">You have it</span></div>
 <div class="cov-row"><span class="cov-name">WOSB</span><span class="cov-have via">via SkyBridge Defense</span></div>
 <div class="cov-row"><span class="cov-name">SDVOSB</span><span class="cov-have via">via Desert Aerospace</span></div>
-<div class="cov-row"><span class="cov-name">8(a)</span><span class="cov-have via">— need partner</span></div>
+<div class="cov-row"><span class="cov-name">8(a)</span><span class="cov-have miss">— need partner</span></div>
 <div class="cov-row"><span class="cov-name">HUBZone</span><span class="cov-have via">via Ironclad Supply</span></div></div>
+</section><section class="widget">
+  <header class="widget-head">
+    <div class="wh-left">
+      <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <div class="wh-text"><h3>Active Teaming Opps</h3><p class="wh-sub">3 open sols where teaming wins</p></div>
+    </div>
+    <span class="wh-source">SAM.gov</span>
+  </header>
+  <div class="widget-body" style="padding:0"><div class="opp-row"><div class="opp-sol">FA301626Q0068</div><div class="opp-title">T-38 Intake Plugs · AETC</div><div class="opp-why">Recommended partner: Falcon Aero Supply</div><div class="opp-dl">Deadline: Jun 3</div></div>
+<div class="opp-row"><div class="opp-sol">FA851526D0034</div><div class="opp-title">C-130J Structural Parts · AFLCMC</div><div class="opp-why">Recommended partner: Desert Aerospace (SDVOSB)</div><div class="opp-dl">Deadline: Jul 8</div></div>
+<div class="opp-row"><div class="opp-sol">SPE4AX25D0014</div><div class="opp-title">Aviation Fasteners · DLA</div><div class="opp-why">Recommended partner: Ironclad Supply (HUBZone)</div><div class="opp-dl">Deadline: Jul 22</div></div></div>
 </section><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
@@ -732,13 +771,12 @@ tr:hover .ii-notice{height:auto;opacity:1}
 
 <script>
 const PARTNERS=[{"id": "p-001", "name": "Falcon Aero Supply Inc.", "loc": "San Antonio TX", "naics": ["336413", "332710"], "certs": ["SB"], "agencies": ["AETC", "DLA"], "value": "2.1", "insight": "Strong AETC overlap. Complementary DLA Aviation experience. Teaming strengthens your geographic coverage."}, {"id": "p-002", "name": "Desert Aerospace LLC", "loc": "Tucson AZ", "naics": ["336413", "336411"], "certs": ["SB", "SDVOSB"], "agencies": ["AFMC", "AFLCMC"], "value": "4.8", "insight": "SDVOSB certification adds set-aside eligibility. AFLCMC past performance fills your C-130J gap."}, {"id": "p-003", "name": "Precision Aviation Parts LLC", "loc": "Oklahoma City OK", "naics": ["332710", "332721", "332722"], "certs": ["SB"], "agencies": ["AFMC", "DLA"], "value": "3.2", "insight": "Tinker AFB proximity matches OC-ALC opportunities. Precision machining fills your NAICS 332721 gap."}, {"id": "p-004", "name": "SkyBridge Defense Systems", "loc": "Dallas TX", "naics": ["336413", "336411"], "certs": ["SB", "WOSB"], "agencies": ["AETC"], "value": "1.4", "insight": "WOSB certification opens WOSB set-aside solicitations. Local TX presence supports JBSA delivery requirements."}, {"id": "p-005", "name": "Vector Defense LLC", "loc": "San Antonio TX", "naics": ["336413"], "certs": ["SB"], "agencies": ["AFMC"], "value": "2.8", "insight": "Direct NAICS 336413 overlap. Shared San Antonio base strengthens T-38 maintenance bid teams."}, {"id": "p-006", "name": "Coastal Defense Supply Co.", "loc": "Savannah GA", "naics": ["336413", "332710"], "certs": ["SB"], "agencies": ["AFLCMC"], "value": "1.9", "insight": "Robins AFB proximity fills WR-ALC geographic gap. C-130J supply chain experience is additive."}, {"id": "p-007", "name": "Atlas Aerospace Supply", "loc": "Fort Worth TX", "naics": ["332710", "332721"], "certs": ["SB"], "agencies": ["AETC", "AFMC"], "value": "5.1", "insight": "Largest past performance in the pool. Strong AFMC relationships complement your AETC focus."}, {"id": "p-008", "name": "Ironclad Supply Corp.", "loc": "Richmond VA", "naics": ["332722", "332710"], "certs": ["SB", "HUBZone"], "agencies": ["DLA"], "value": "0.9", "insight": "HUBZone certification adds price evaluation preference. DLA Aviation proximity is strategic for fastener supply chains."}];
-let f={naics:"all",cert:"all",agency:"all"},q="",exp=null;
+let f={naics:"all",cert:"all"},q="",exp=null;
 function renderList(){
   let data=[...PARTNERS];
   if(q){const qq=q.toLowerCase();data=data.filter(p=>p.name.toLowerCase().includes(qq)||p.loc.toLowerCase().includes(qq)||p.insight.toLowerCase().includes(qq));}
   if(f.naics!=="all")data=data.filter(p=>p.naics.includes(f.naics));
   if(f.cert!=="all")data=data.filter(p=>p.certs.includes(f.cert));
-  if(f.agency!=="all")data=data.filter(p=>p.agencies.includes(f.agency));
   document.getElementById("list").innerHTML=data.map(p=>{
     const isExp=exp===p.id;
     const naicsTags=p.naics.map(n=>`<span class="p-tag p-naics">${n}</span>`).join("");
@@ -755,20 +793,22 @@ function renderList(){
         <div class="insight-chip insight-info" style="margin-top:5px"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${p.insight}</span></div>
       </div>
       <div class="p-det">
-        <div>
-          <div class="p-det-lbl">Profile</div>
-          <div class="p-det-row"><span class="p-det-k">NAICS Codes</span><span class="p-det-v">${p.naics.join(" · ")}</span></div>
-          <div class="p-det-row"><span class="p-det-k">Certifications</span><span class="p-det-v">${p.certs.join(" · ")}</span></div>
-          <div class="p-det-row"><span class="p-det-k">Past Performance</span><span class="p-det-v">$${p.value}M</span></div>
+        <div class="p-det-grid">
+          <div>
+            <div class="p-det-lbl">Profile</div>
+            <div class="p-det-row"><span class="p-det-k">NAICS Codes</span><span class="p-det-v">${p.naics.join(" · ")}</span></div>
+            <div class="p-det-row"><span class="p-det-k">Certifications</span><span class="p-det-v">${p.certs.join(" · ")}</span></div>
+            <div class="p-det-row"><span class="p-det-k">Past Performance</span><span class="p-det-v">$${p.value}M</span></div>
+          </div>
+          <div>
+            <div class="p-det-lbl">Agency Footprint</div>
+            ${p.agencies.map(a=>`<div class="p-det-row"><span class="p-det-k">${a}</span><span class="p-det-v">Active history</span></div>`).join("")}
+          </div>
         </div>
-        <div>
-          <div class="p-det-lbl">Agency Footprint</div>
-          ${p.agencies.map(a=>`<div class="p-det-row"><span class="p-det-k">${a}</span><span class="p-det-v">Active history</span></div>`).join("")}
+        <div class="p-acts">
+          <button class="p-btn" onclick="event.stopPropagation();alert('Outreach draft — feature coming soon')">Reach Out</button>
+          <button class="p-btn ghost" onclick="event.stopPropagation();window.open('https://sam.gov/search/?keywords='+encodeURIComponent('${p.name}'),'_blank')">SAM.gov Profile</button>
         </div>
-      </div>
-      <div class="p-acts">
-        <button class="p-btn" onclick="event.stopPropagation();alert('Outreach draft — feature coming soon')">Reach Out</button>
-        <button class="p-btn ghost" onclick="event.stopPropagation();window.open('https://sam.gov/search/?keywords='+encodeURIComponent('${p.name}'),'_blank')">SAM.gov Profile</button>
       </div>
     </div>`;
   }).join("");
