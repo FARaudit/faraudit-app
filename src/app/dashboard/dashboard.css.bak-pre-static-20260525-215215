@@ -1,0 +1,324 @@
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Past Audits dashboard — brand visual language
+   Token chain mirrors public/command-center-design.html so the page
+   matches the rest of the redesigned surfaces. Scoped under
+   .fa-dashboard so styles don't leak into other routes.
+   No logic changes — Supabase data + routing untouched.
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+.fa-dashboard {
+  /* brand accent */
+  --accent:        #378ADD;
+  --accent-deep:   #185FA5;
+  --accent-light:  #B5D4F4;
+
+  /* light theme (default) */
+  --page-bg:   #f0f4f8;
+  --card:      #ffffff;
+  --card-soft: #fafcfe;
+  --ink:       #0A1628;
+  --ink-2:     #334155;
+  --mute:      #64748b;
+  --mute-2:    #94a3b8;
+  --line:      #e5e7eb;
+  --line-2:    #eef2f6;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px -4px rgba(15,23,42,0.10);
+
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+:root[data-theme="dark"] .fa-dashboard {
+  --page-bg:   #02060c;
+  --card:      #0c1b30;
+  --card-soft: #0a1729;
+  --ink:       #e8eef6;
+  --ink-2:     #b6c2d3;
+  --mute:      #7d8ba0;
+  --mute-2:    #5b6778;
+  --line:      rgba(255,255,255,0.08);
+  --line-2:    rgba(255,255,255,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 12px -4px rgba(0,0,0,0.6);
+}
+
+/* ─── header ─── */
+.fa-dashboard .dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 40px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+.fa-dashboard .dash-eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 6px;
+}
+.fa-dashboard .dash-title {
+  font-family: "Manrope", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.fa-dashboard .dash-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.15s;
+}
+.fa-dashboard .dash-cta:hover {
+  background: var(--accent-deep);
+  transform: translateY(-1px);
+}
+
+/* ─── main ─── */
+.fa-dashboard .dash-main {
+  padding: 32px 40px 60px;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* ─── stat grid ─── */
+.fa-dashboard .dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 880px) {
+  .fa-dashboard .dash-stats { grid-template-columns: repeat(2, 1fr); }
+}
+.fa-dashboard .dash-stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 18px 20px;
+}
+.fa-dashboard .dash-stat-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin: 0 0 10px;
+}
+.fa-dashboard .dash-stat-value {
+  font-family: "Manrope", sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.1;
+}
+.fa-dashboard .dash-stat[data-tone="red"]   .dash-stat-value { color: #dc2626; }
+.fa-dashboard .dash-stat[data-tone="green"] .dash-stat-value { color: #047857; }
+:root[data-theme="dark"] .fa-dashboard .dash-stat[data-tone="red"]   .dash-stat-value { color: #fca5a5; }
+:root[data-theme="dark"] .fa-dashboard .dash-stat[data-tone="green"] .dash-stat-value { color: #6ee7b7; }
+.fa-dashboard .dash-stat-sub {
+  font-size: 11px;
+  color: var(--mute);
+  margin: 6px 0 0;
+}
+
+/* ─── section labels ─── */
+.fa-dashboard .dash-section-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+.fa-dashboard .dash-section-label.muted { color: var(--mute); }
+
+/* ─── morning brief card ─── */
+.fa-dashboard .dash-brief {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 20px 24px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ─── table ─── */
+.fa-dashboard .dash-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+.fa-dashboard table.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.fa-dashboard table.dash-table thead th {
+  text-align: left;
+  padding: 12px 16px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  background: var(--card-soft);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.fa-dashboard table.dash-table thead th.right { text-align: right; }
+.fa-dashboard table.dash-table tbody tr { border-top: 1px solid var(--line-2); }
+.fa-dashboard table.dash-table tbody tr:first-child { border-top: 0; }
+.fa-dashboard table.dash-table tbody tr:hover { background: var(--card-soft); }
+.fa-dashboard table.dash-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+.fa-dashboard .dash-cell-mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.fa-dashboard .dash-cell-title {
+  color: var(--ink-2);
+  max-width: 32ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.fa-dashboard .dash-cell-right { text-align: right; }
+
+/* ─── document-type pill (accent border) ─── */
+.fa-dashboard .dash-doctype {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-light);
+  color: var(--accent-deep);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(55,138,221,0.06);
+}
+:root[data-theme="dark"] .fa-dashboard .dash-doctype {
+  background: rgba(55,138,221,0.10);
+  color: var(--accent-light);
+  border-color: rgba(181,212,244,0.30);
+}
+
+/* ─── score badges (match command-center palette exactly) ─── */
+.fa-dashboard .dash-score {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.fa-dashboard .dash-score.s-hi   { background: linear-gradient(135deg, #047857, #10b981); }
+.fa-dashboard .dash-score.s-md   { background: linear-gradient(135deg, #185FA5, #378ADD); }
+.fa-dashboard .dash-score.s-lo   { background: linear-gradient(135deg, #b45309, #f59e0b); }
+.fa-dashboard .dash-score.s-no   { background: linear-gradient(135deg, #991b1b, #dc2626); }
+.fa-dashboard .dash-score.s-none {
+  background: linear-gradient(135deg, #94a3b8, #cbd5e1);
+  color: #475569;
+}
+
+/* ─── recommendation text ─── */
+.fa-dashboard .dash-rec-proceed { color: #047857; font-weight: 600; }
+.fa-dashboard .dash-rec-caution { color: #b45309; font-weight: 600; }
+.fa-dashboard .dash-rec-decline { color: #b91c1c; font-weight: 600; }
+.fa-dashboard .dash-rec-none    { color: var(--mute); }
+:root[data-theme="dark"] .fa-dashboard .dash-rec-proceed { color: #6ee7b7; }
+:root[data-theme="dark"] .fa-dashboard .dash-rec-caution { color: #fcd34d; }
+:root[data-theme="dark"] .fa-dashboard .dash-rec-decline { color: #fca5a5; }
+
+/* ─── status pills ─── */
+.fa-dashboard .dash-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.fa-dashboard .dash-status.status-pending  { background: #f3f4f6; color: #6b7280; }
+.fa-dashboard .dash-status.status-complete { background: #dcfce7; color: #166534; }
+.fa-dashboard .dash-status.status-failed   { background: #fee2e2; color: #991b1b; }
+:root[data-theme="dark"] .fa-dashboard .dash-status.status-pending  { background: rgba(255,255,255,0.06); color: #cbd5e1; }
+:root[data-theme="dark"] .fa-dashboard .dash-status.status-complete { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+:root[data-theme="dark"] .fa-dashboard .dash-status.status-failed   { background: rgba(220,38,38,0.18); color: #fca5a5; }
+
+/* ─── KO contacted ─── */
+.fa-dashboard .dash-ko-yes { color: #047857; font-weight: 600; font-size: 12px; }
+.fa-dashboard .dash-ko-no  { color: var(--mute); }
+:root[data-theme="dark"] .fa-dashboard .dash-ko-yes { color: #6ee7b7; }
+
+/* ─── view link ─── */
+.fa-dashboard .dash-view {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 12.5px;
+}
+.fa-dashboard .dash-view:hover { color: var(--accent-deep); text-decoration: underline; }
+
+/* ─── empty state ─── */
+.fa-dashboard .dash-empty {
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--mute);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ─── shared muted hyphen ─── */
+.fa-dashboard .dash-muted { color: var(--mute); }

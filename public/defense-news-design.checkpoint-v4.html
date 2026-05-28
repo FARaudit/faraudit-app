@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Defense News</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ═══ FARaudit · Defense News — industry intelligence ═══ */
+:root {
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe;
+  --blue-400:#60a5fa; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0;
+  --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --teal-500:#14b8a6; --teal-600:#0d9488; --teal-700:#0f766e;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca;
+  --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b; --red-900:#7f1d1d;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a;
+  --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e; --amber-900:#78350f;
+}
+[data-theme="light"] {
+  --page-bg:#f0f4f8; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --sb-bg:var(--navy-800); --sb-border:#0b1a30; --sb-text:#cbd5e1;
+  --sb-text-mute:#6f8099; --sb-hover:#0f1f3a; --sb-active:#13294b; --sb-divider:#1f2e48;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 16px 48px -16px rgba(15,23,42,.24), 0 4px 12px -2px rgba(15,23,42,.10);
+}
+[data-theme="dark"] {
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04);
+  --search-bg:rgba(255,255,255,0.04);
+  --sb-bg:#02070f; --sb-border:rgba(255,255,255,0.06); --sb-text:#b6c2d3;
+  --sb-text-mute:#5b6778; --sb-hover:rgba(255,255,255,0.04); --sb-active:rgba(59,130,246,0.14);
+  --sb-divider:rgba(255,255,255,0.06);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 24px 60px -20px rgba(0,0,0,.85);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh;align-items:stretch;transition:background-color .25s ease}
+
+/* ═══ SIDEBAR (canonical) ═══ */
+.sidebar{background:var(--sb-bg);color:var(--sb-text);border-right:1px solid var(--sb-border);position:relative;min-height:100%;align-self:stretch;overflow:visible}
+.sidebar-sticky{position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:visible;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;width:100%;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.10) transparent}
+.sidebar-sticky::-webkit-scrollbar{width:6px}
+.sidebar-sticky::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+.sidebar-sticky::-webkit-scrollbar-track{background:transparent}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));display:grid;place-items:center;color:#ffffff;font-weight:800;font-size:14px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);margin-bottom:10px;position:relative}
+.sb-divider{width:24px;height:1px;background:var(--sb-divider);margin:6px 0}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--sb-text-mute);position:relative;cursor:pointer;transition:all .15s}
+.sb-icon:hover{background:var(--sb-hover);color:#e2e8f0}
+.sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--accent);border-radius:2px}
+.sb-icon svg{width:18px;height:18px}
+.sb-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red-500);box-shadow:0 0 0 2px var(--sb-bg)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid var(--sb-divider)}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s, transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+.frame{grid-template-columns:var(--sb-width, 56px) 1fr;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+[data-sb="open"] .frame{--sb-width:232px}
+.sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);min-height:100%}
+[data-sb="open"] .sidebar-sticky{align-items:stretch;padding:14px 10px 14px}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;align-self:stretch;margin:0 0 8px 2px}
+[data-sb="open"] .sb-logo{margin:0}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+[data-sb="open"] .sb-divider{display:none}
+[data-sb="open"] .sb-icon{width:100%;height:36px;justify-content:flex-start;gap:11px;padding:0 10px;border-radius:9px}
+[data-sb="open"] .sb-icon.active::before{left:-12px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;line-height:1;flex:1;min-width:0}
+[data-sb="open"] .sb-icon .sb-tip{display:none !important}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#ffffff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,0.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono";font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.32);padding:14px 12px 6px}
+[data-sb="open"] .sb-icon .sb-dot{display:none}
+[data-sb="open"] .sb-bottom{align-items:stretch;width:100%}
+[data-sb="open"] .sb-avatar{align-self:flex-start;margin:6px 0 0 2px}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--sb-bg);border:1px solid var(--sb-border);color:var(--sb-text);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s, color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.sb-toggle:hover{background:var(--sb-hover);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo{background:transparent;box-shadow:none;color:var(--accent)}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,0.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:var(--accent)}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,0.18);color:#fca5a5;border:1px solid rgba(220,38,38,0.30)}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,0.08)}
+[data-sb="open"] .sb-icon{flex-wrap:nowrap;overflow:hidden}
+[data-sb="open"] .sb-icon .sb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;line-height:1.1}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge{flex-shrink:0;white-space:nowrap}
+[data-sb="open"] .sb-icon{display:flex !important;align-items:center !important;justify-content:flex-start !important;width:100% !important;height:36px;gap:11px !important;padding:0 10px !important;border-radius:9px;flex-direction:row !important}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex !important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon .sb-badge{flex-shrink:0;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-tip{display:none !important}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));color:#ffffff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55)}
+[data-sb="open"] .sb-logo-row{display:flex !important;align-items:center;gap:10px;justify-content:flex-start;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-bottom{flex-direction:column;align-items:flex-start;gap:6px}
+
+/* ═══ MAIN + TOPBAR ═══ */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:280px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+
+/* ═══ BODY ═══ */
+.body{padding:0;display:flex;flex-direction:column;gap:0}
+
+/* ─── Section 1: Page header ─── */
+.dn-header{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 28px 0;gap:24px}
+.dn-header-left{flex:1;min-width:0}
+.dn-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700;margin-bottom:4px}
+.dn-title{font-family:"Manrope",sans-serif;font-size:26px;font-weight:700;color:var(--ink);margin:0 0 4px;letter-spacing:-.015em;line-height:1.15}
+.dn-subtitle{font-size:13px;color:var(--mute);margin:0}
+.dn-header-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-top:6px;flex-shrink:0}
+.dn-live-badge{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:#16a34a;letter-spacing:.04em}
+[data-theme="dark"] .dn-live-badge{color:#6ee7b7}
+.dn-last-updated{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
+
+/* ─── Section 2: Bento grid hero ─── */
+.dn-bento{display:grid;grid-template-columns:3fr 2fr;grid-template-rows:auto auto;gap:12px;padding:0 28px 20px}
+.dn-bento-main{grid-row:1/3}
+.dn-bento-card{background:var(--card);border:0.5px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .1s;text-decoration:none;display:flex;flex-direction:column}
+.dn-bento-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-1px)}
+.dn-bento-visual{flex-shrink:0;line-height:0}
+.dn-bento-body{padding:16px 18px;flex:1;display:flex;flex-direction:column;gap:8px}
+.dn-bento-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dn-bento-source{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.dn-bento-age{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.dn-bento-headline{font-family:"Manrope",sans-serif;font-weight:700;color:var(--ink);line-height:1.35;letter-spacing:-.01em}
+.dn-bento-main .dn-bento-headline{font-size:18px}
+.dn-bento-side .dn-bento-headline{font-size:14px}
+.dn-bento-insight{font-size:11px;color:#185FA5;line-height:1.5;padding-left:10px;border-left:2px solid #378ADD}
+[data-theme="dark"] .dn-bento-insight{color:var(--accent-light);border-left-color:var(--accent-light)}
+
+/* ─── Section 3: Two-column layout (feed + sidebar) ─── */
+.dn-layout{display:grid;grid-template-columns:1fr 280px;gap:24px;padding:0 28px 28px}
+.dn-feed-col{min-width:0}
+.dn-feed-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:0.5px solid var(--line)}
+.dn-section-label{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);font-weight:700}
+.dn-feed-filters{display:flex;gap:6px;flex-wrap:wrap}
+.dn-filt{font-family:"Manrope",sans-serif;font-size:11px;padding:3px 10px;border-radius:12px;border:0.5px solid var(--line);background:var(--card);color:var(--mute);cursor:pointer;font-weight:500;transition:all .12s}
+.dn-filt.active{background:var(--ink);color:var(--card);border-color:var(--ink)}
+[data-theme="dark"] .dn-filt.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dn-filt:hover:not(.active){background:var(--card-soft);border-color:var(--mute-2)}
+
+/* Image-left feed rows */
+.dn-feed{display:flex;flex-direction:column;gap:0}
+.dn-story{display:grid;grid-template-columns:160px 1fr;gap:14px;padding:14px 0;border-bottom:0.5px solid var(--line-2);cursor:pointer;text-decoration:none;transition:background .12s, padding .12s, margin .12s;border-radius:8px}
+.dn-story:hover{background:var(--card-soft);padding:14px 10px;margin:0 -10px;border-bottom-color:transparent}
+.dn-story:last-child{border-bottom:none}
+.dn-story-visual{border-radius:8px;overflow:hidden;flex-shrink:0;line-height:0}
+.dn-story-content{display:flex;flex-direction:column;gap:5px;min-width:0}
+.dn-story-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dn-story-source{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.dn-story-age{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.dn-story-headline{font-family:"Manrope",sans-serif;font-size:13px;font-weight:700;color:var(--ink);line-height:1.4;letter-spacing:-.005em}
+.dn-story-excerpt{font-size:11px;color:var(--ink-2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dn-story-insight{font-size:11px;color:#185FA5;line-height:1.4}
+[data-theme="dark"] .dn-story-insight{color:var(--accent-light)}
+.dn-story-insight::before{content:"● ";font-size:8px;font-weight:800;color:#378ADD}
+[data-theme="dark"] .dn-story-insight::before{color:var(--accent-light)}
+
+/* Right sidebar column + widgets */
+.dn-sidebar-col{display:flex;flex-direction:column;gap:14px}
+.dn-sw{background:var(--card);border:0.5px solid var(--line);border-radius:10px;padding:16px}
+.dn-sw-title{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);font-weight:700;margin-bottom:12px}
+
+/* ─── Category badges ─── */
+.dn-cat-badge{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.dn-cat-contracts{background:#0A1628;color:#B5D4F4}
+.dn-cat-regulatory{background:#fef3c7;color:#92400e}
+.dn-cat-cmmc{background:#fee2e2;color:#991b1b}
+.dn-cat-industry{background:#ccfbf1;color:#134e4a}
+.dn-cat-budget{background:#E6F1FB;color:#185FA5}
+[data-theme="dark"] .dn-cat-contracts{background:rgba(181,212,244,0.15);color:#B5D4F4}
+[data-theme="dark"] .dn-cat-regulatory{background:rgba(180,83,9,0.18);color:#fcd34d}
+[data-theme="dark"] .dn-cat-cmmc{background:rgba(220,38,38,0.18);color:#fca5a5}
+[data-theme="dark"] .dn-cat-industry{background:rgba(13,148,136,0.18);color:#5eead4}
+[data-theme="dark"] .dn-cat-budget{background:rgba(55,138,221,0.18);color:var(--accent-light)}
+
+/* ─── Section 5: Contract awards ticker ─── */
+.dn-ticker-wrap{background:#0A1628;padding:10px 28px;display:flex;align-items:center;gap:16px;overflow:hidden;margin-bottom:24px}
+.dn-ticker-label{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#378ADD;font-weight:700;white-space:nowrap;flex-shrink:0}
+.dn-ticker-track{flex:1;overflow:hidden}
+.dn-ticker-inner{display:flex;gap:0;white-space:nowrap;animation:dn-scroll 30s linear infinite;width:max-content}
+.dn-ticker-item{display:inline-flex;align-items:center;gap:8px;padding:0 24px;border-right:1px solid rgba(255,255,255,0.1)}
+.dn-ticker-agency{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#B5D4F4}
+.dn-ticker-val{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:#378ADD}
+.dn-ticker-company{font-size:11px;color:rgba(255,255,255,0.7)}
+.dn-ticker-naics{font-family:"IBM Plex Mono",monospace;font-size:10px;color:rgba(255,255,255,0.4)}
+@keyframes dn-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ─── Section 6: Regulatory feed ─── */
+.dn-reg-section{padding:0 28px 32px}
+.dn-reg-header{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.dn-reg-subtitle{font-size:11px;color:var(--mute)}
+.dn-reg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dn-reg-item{background:var(--card);border:0.5px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;transition:box-shadow .15s;border-left:3px solid transparent}
+.dn-reg-item:hover{box-shadow:var(--shadow-sm)}
+.dn-reg-item-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.dn-reg-date{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+.dn-reg-headline{font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:6px}
+.dn-reg-insight{font-size:11px;color:#185FA5;line-height:1.5}
+[data-theme="dark"] .dn-reg-insight{color:var(--accent-light)}
+.dn-reg-insight::before{content:"● ";font-size:8px}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════ SIDEBAR ═════════ -->
+  <aside class="sidebar">
+    <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+    <div class="sidebar-sticky">
+    <div class="sb-logo-row">
+      <div class="sb-logo">F</div>
+      <span class="sb-wordmark">FAR<span class="wm-au">audit</span></span>
+    </div>
+
+    <div class="sb-group-label">WORKSPACE</div>
+    <a class="sb-icon" href="/home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+    <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+    <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+    <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+    <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+
+    <div class="sb-group-label">INTELLIGENCE</div>
+    <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+    <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+    <a class="sb-icon active" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+    <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+    <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Agencies</span></a>
+    <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+    <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+    <a class="sb-icon" href="/cmmc-readiness"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+    <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+    <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+
+    <div class="sb-group-label">ACCOUNT</div>
+    <a class="sb-icon" href="/profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+    <a class="sb-icon sb-signout" href="/sign-out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></a>
+    <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+    </div>
+  </aside>
+
+  <!-- ═════════ MAIN ═════════ -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Defense News</b><span class="sep">/</span><span>Industry intelligence</span></div>
+      <span class="live-pill">LIVE</span>
+      <div class="tb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Quick search…</span><span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge">7</span></button>
+        <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <!-- ═══ Section 1: Page header ═══ -->
+      <div class="dn-header">
+        <div class="dn-header-left">
+          <div class="dn-eyebrow">INDUSTRY INTELLIGENCE</div>
+          <h1 class="dn-title">Defense News</h1>
+          <p class="dn-subtitle">Real-time defense intelligence · scored for NAICS 336413 · 332710 · 332721</p>
+        </div>
+        <div class="dn-header-right">
+          <div class="dn-live-badge">● LIVE</div>
+          <div class="dn-last-updated">Updated 6 min ago</div>
+        </div>
+      </div>
+
+      <!-- ═══ Section 2: Bento grid hero ═══ -->
+      <div class="dn-bento" id="dn-bento"></div>
+
+      <!-- ═══ Section 3: Two-column layout — feed + sidebar ═══ -->
+      <div class="dn-layout">
+        <div class="dn-feed-col">
+          <div class="dn-feed-header">
+            <span class="dn-section-label">MORE INTELLIGENCE</span>
+            <div class="dn-feed-filters" id="dn-feed-filters">
+              <button class="dn-filt active" type="button" onclick="filterFeed('all',this)">All</button>
+              <button class="dn-filt" type="button" onclick="filterFeed('contracts',this)">Contracts</button>
+              <button class="dn-filt" type="button" onclick="filterFeed('cmmc',this)">CMMC</button>
+              <button class="dn-filt" type="button" onclick="filterFeed('regulatory',this)">Regulatory</button>
+              <button class="dn-filt" type="button" onclick="filterFeed('industry',this)">Industry</button>
+            </div>
+          </div>
+          <div class="dn-feed" id="dn-feed"></div>
+        </div>
+        <aside class="dn-sidebar-col" id="dn-sidebar-col"></aside>
+      </div>
+
+      <!-- ═══ Section 5: Contract awards ticker ═══ -->
+      <div class="dn-ticker-wrap">
+        <div class="dn-ticker-label">RECENT AWARDS · YOUR NAICS</div>
+        <div class="dn-ticker-track">
+          <div class="dn-ticker-inner" id="dn-ticker"></div>
+        </div>
+      </div>
+
+      <!-- ═══ Section 6: Regulatory & compliance feed ═══ -->
+      <div class="dn-reg-section">
+        <div class="dn-reg-header">
+          <span class="dn-section-label">REGULATORY &amp; COMPLIANCE</span>
+          <span class="dn-reg-subtitle">FAR/DFARS updates · CMMC · NDAA provisions affecting your bids</span>
+        </div>
+        <div class="dn-reg-grid" id="dn-reg-grid"></div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ═══ Defense News v4 — bento hero + image-left feed + sidebar widgets + ticker + reg feed ═══ */
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ─── BENTO HERO (3 cards: 1 large left, 2 stacked right) ─── */
+var BENTO_STORIES = [
+  {
+    cat:'CMMC', catColor:'#991b1b', catBg:'#fee2e2',
+    source:'DFARS 252.204-7021', age:'Active now',
+    headline:'CMMC Phase 2: 167 days until mandatory C3PAO certification — fewer than 1,100 of 76,000 contractors certified',
+    insight:'C3PAO waitlists are 4–6 months. Start assessment now or lose eligibility on November 10, 2026.',
+    visual:'<svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:220px;display:block">'
+      +'<rect width="600" height="220" fill="#0A1628"/>'
+      +'<text x="30" y="50" font-family="IBM Plex Mono,monospace" font-size="11" fill="#B5D4F4" letter-spacing="2" font-weight="700">CMMC PHASE 2 · NOVEMBER 10 2026</text>'
+      +'<text x="30" y="130" font-family="IBM Plex Mono,monospace" font-size="88" fill="#ffffff" font-weight="800" letter-spacing="-2">167</text>'
+      +'<text x="30" y="162" font-family="IBM Plex Mono,monospace" font-size="14" fill="#9ca3af" letter-spacing="1">DAYS REMAINING</text>'
+      +'<rect x="30" y="185" width="540" height="6" rx="3" fill="#1e3a5f"/>'
+      +'<rect x="30" y="185" width="293" height="6" rx="3" fill="#991b1b"/>'
+      +'<text x="30" y="210" font-family="IBM Plex Mono,monospace" font-size="10" fill="#6b7280">Phase 1 began Nov 10 2025</text>'
+      +'<text x="570" y="210" font-family="IBM Plex Mono,monospace" font-size="10" fill="#991b1b" text-anchor="end">Phase 2 enforcement ▶</text>'
+      +'</svg>'
+  },
+  {
+    cat:'CONTRACTS', catColor:'#185FA5', catBg:'#E6F1FB',
+    source:'American Machinist', age:'Apr 1 2026',
+    headline:'Pentagon finalizes $3.8B F135 engine contract — Lot 18 supply chain now open',
+    insight:'F135 Lot 18 spares create NAICS 336413 precision parts opportunities. Monitor SAM.gov for sub-tier notices.',
+    visual:'<svg viewBox="0 0 280 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:140px;display:block">'
+      +'<rect width="280" height="140" fill="#0D1F35"/>'
+      +'<text x="20" y="35" font-family="IBM Plex Mono,monospace" font-size="9" fill="#378ADD" letter-spacing="2" font-weight="700">PRATT &amp; WHITNEY · F135 LOT 18</text>'
+      +'<text x="20" y="90" font-family="IBM Plex Mono,monospace" font-size="52" fill="#ffffff" font-weight="800">$3.8B</text>'
+      +'<text x="20" y="115" font-family="IBM Plex Mono,monospace" font-size="11" fill="#9ca3af">148 engines · 2026–2027 delivery</text>'
+      +'<circle cx="250" cy="35" r="18" fill="none" stroke="#378ADD" stroke-width="1.5" opacity=".4"/>'
+      +'<circle cx="250" cy="35" r="12" fill="none" stroke="#378ADD" stroke-width="1" opacity=".3"/>'
+      +'<circle cx="250" cy="35" r="5" fill="#378ADD" opacity=".6"/>'
+      +'</svg>'
+  },
+  {
+    cat:'COMPLIANCE', catColor:'#92400e', catBg:'#fef3c7',
+    source:'DoJ Civil Cyber-Fraud', age:'Jan 2026',
+    headline:'DoJ recovered $52M in cybersecurity FCA settlements FY2025 — first subcontractor enforcement included',
+    insight:'False SPRS scores are False Claims Act exposure. Correct your score before Phase 2 enforcement.',
+    visual:'<svg viewBox="0 0 280 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:140px;display:block">'
+      +'<rect width="280" height="140" fill="#7f1d1d"/>'
+      +'<text x="20" y="35" font-family="IBM Plex Mono,monospace" font-size="9" fill="#fca5a5" letter-spacing="2" font-weight="700">DOJ CIVIL CYBER-FRAUD INITIATIVE</text>'
+      +'<text x="20" y="88" font-family="IBM Plex Mono,monospace" font-size="52" fill="#ffffff" font-weight="800">$52M</text>'
+      +'<text x="20" y="112" font-family="IBM Plex Mono,monospace" font-size="11" fill="#fca5a5">9 settlements · FY2025</text>'
+      +'<text x="20" y="130" font-family="IBM Plex Mono,monospace" font-size="10" fill="#ef4444">First subcontractor enforcement ▲</text>'
+      +'</svg>'
+  }
+];
+
+function renderBento(){
+  var el = document.getElementById('dn-bento');
+  if (!el) return;
+  el.innerHTML = BENTO_STORIES.map(function(s, i){
+    var sideCls = i === 0 ? 'dn-bento-main' : 'dn-bento-side';
+    return '<a class="dn-bento-card ' + sideCls + '" href="#" target="_blank">'
+      + '<div class="dn-bento-visual">' + s.visual + '</div>'
+      + '<div class="dn-bento-body">'
+      +   '<div class="dn-bento-meta">'
+      +     '<span class="dn-cat-badge" style="background:' + s.catBg + ';color:' + s.catColor + '">' + esc(s.cat) + '</span>'
+      +     '<span class="dn-bento-source">' + esc(s.source) + '</span>'
+      +     '<span class="dn-bento-age">' + esc(s.age) + '</span>'
+      +   '</div>'
+      +   '<div class="dn-bento-headline">' + esc(s.headline) + '</div>'
+      +   '<div class="dn-bento-insight">' + esc(s.insight) + '</div>'
+      + '</div>'
+      + '</a>';
+  }).join('');
+}
+
+/* ─── IMAGE-LEFT FEED ─── */
+var FEED_STORIES = [
+  {
+    cat:'regulatory', catLabel:'NDAA', catColor:'#92400e', catBg:'#fef3c7',
+    source:'PilieroMazza', age:'Dec 18 2025',
+    headline:'FY2026 NDAA signed: $900.6B authorized — CAS threshold raised, small business competition expanded',
+    excerpt:'President Trump signed the FY2026 NDAA Dec 18. CAS compliance threshold raised under §1806, small business competition provisions expanded under §1823.',
+    insight:'CAS threshold raise reduces compliance burden for small NAICS 336413/332710 contracts.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#1e3a5f"/>'
+      +'<text x="10" y="20" font-family="IBM Plex Mono,monospace" font-size="7" fill="#378ADD" letter-spacing="1.5" font-weight="700">FY2026 NDAA</text>'
+      +'<text x="10" y="58" font-family="IBM Plex Mono,monospace" font-size="26" fill="#ffffff" font-weight="800">$900B</text>'
+      +'<text x="10" y="76" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">Authorized Dec 18 2025</text>'
+      +'<rect x="118" y="10" width="32" height="32" rx="4" fill="none" stroke="#378ADD" stroke-width="1" opacity=".4"/>'
+      +'<text x="134" y="31" font-family="IBM Plex Mono,monospace" font-size="14" fill="#378ADD" text-anchor="middle" font-weight="700">§</text>'
+      +'</svg>'
+  },
+  {
+    cat:'contracts', catLabel:'CONTRACTS', catColor:'#185FA5', catBg:'#E6F1FB',
+    source:'American Machinist', age:'Nov 16 2025',
+    headline:'Pentagon awards $1.09B to Pratt & Whitney for F100 engine parts — F-15/F-16 fleet sustainment',
+    excerpt:'RTX subsidiary wins $1.09B for consumable and depot-level parts supporting 7,000+ F100 engines in USAF and allied service.',
+    insight:'F100 consumables contract spawns NAICS 336413 parts opportunities. Cross-reference with your CAGE codes.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#0A1628"/>'
+      +'<text x="10" y="20" font-family="IBM Plex Mono,monospace" font-size="7" fill="#B5D4F4" letter-spacing="1.5" font-weight="700">F100 ENGINE · USAF</text>'
+      +'<text x="10" y="58" font-family="IBM Plex Mono,monospace" font-size="22" fill="#ffffff" font-weight="800">$1.09B</text>'
+      +'<text x="10" y="76" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">7,000+ engines in service</text>'
+      +'<line x1="120" y1="15" x2="148" y2="15" stroke="#378ADD" stroke-width="1" opacity=".5"/>'
+      +'<line x1="120" y1="22" x2="148" y2="22" stroke="#378ADD" stroke-width="1" opacity=".3"/>'
+      +'<line x1="120" y1="29" x2="140" y2="29" stroke="#378ADD" stroke-width="1" opacity=".2"/>'
+      +'</svg>'
+  },
+  {
+    cat:'regulatory', catLabel:'NDAA §866', catColor:'#92400e', catBg:'#fef3c7',
+    source:'Greenberg Traurig', age:'Feb 10 2026',
+    headline:'NDAA §866: DoD must harmonize DFARS cybersecurity requirements — reduce duplicative contract clauses by June 1 2026',
+    excerpt:'Section 866 mandates DoD harmonize cybersecurity requirements across the DIB and reduce contract-specific requirements. Implementation reports due June 2026.',
+    insight:'Fewer duplicative DFARS cybersecurity clauses coming. Watch for FAR/DFARS updates Q2 2026.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#431407"/>'
+      +'<text x="10" y="20" font-family="IBM Plex Mono,monospace" font-size="7" fill="#fed7aa" letter-spacing="1.5" font-weight="700">NDAA §866 · DFARS</text>'
+      +'<text x="10" y="48" font-family="IBM Plex Mono,monospace" font-size="14" fill="#ffffff" font-weight="800">HARMONI-</text>'
+      +'<text x="10" y="65" font-family="IBM Plex Mono,monospace" font-size="14" fill="#ffffff" font-weight="800">ZATION</text>'
+      +'<text x="10" y="82" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">Deadline Jun 1 2026</text>'
+      +'</svg>'
+  },
+  {
+    cat:'industry', catLabel:'INDUSTRY', catColor:'#134e4a', catBg:'#ccfbf1',
+    source:'DoD OSBP', age:'FY2024 Report',
+    headline:'DoD earns "A" on SBA scorecard — $4.9B increase in small business contract awards in FY2024',
+    excerpt:'The Department of Defense awarded $4.9B more to small businesses year-over-year in FY2024, earning an "A" rating from SBA.',
+    insight:'Rising SB obligation share benefits NAICS 336413/332710/332721. Position for FY2027 recompetes now.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#052e16"/>'
+      +'<text x="10" y="20" font-family="IBM Plex Mono,monospace" font-size="7" fill="#86efac" letter-spacing="1.5" font-weight="700">DOD SBA SCORECARD FY2024</text>'
+      +'<rect x="10" y="30" width="14" height="40" rx="2" fill="#166534" opacity=".5"/>'
+      +'<rect x="28" y="25" width="14" height="45" rx="2" fill="#166534" opacity=".6"/>'
+      +'<rect x="46" y="20" width="14" height="50" rx="2" fill="#166534" opacity=".7"/>'
+      +'<rect x="64" y="15" width="14" height="55" rx="2" fill="#166534" opacity=".85"/>'
+      +'<rect x="82" y="10" width="14" height="60" rx="2" fill="#16a34a"/>'
+      +'<text x="130" y="42" font-family="IBM Plex Mono,monospace" font-size="32" fill="#4ade80" font-weight="800" text-anchor="middle">A</text>'
+      +'<text x="10" y="84" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">+$4.9B YoY SB awards</text>'
+      +'</svg>'
+  },
+  {
+    cat:'regulatory', catLabel:'SUPPLY CHAIN', catColor:'#92400e', catBg:'#fef3c7',
+    source:'King & Spalding', age:'Dec 29 2025',
+    headline:'FY2026 NDAA §837-§838: China/Russia supply chain risk assessment now mandatory for DoD contractors',
+    excerpt:'NDAA §837–§838 require DoD to assess foreign entity of concern dependencies. Contractors must scrutinize lower-tier suppliers for China/Russia exposure.',
+    insight:'Xinjiang prohibition (DFARS 252.225-7060) now backed by NDAA mandate. Certify tier-2 suppliers now.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#1c1917"/>'
+      +'<text x="10" y="18" font-family="IBM Plex Mono,monospace" font-size="7" fill="#fed7aa" letter-spacing="1.5" font-weight="700">SUPPLY CHAIN · FEOC</text>'
+      +'<circle cx="80" cy="52" r="26" fill="none" stroke="#92400e" stroke-width="1" opacity=".5"/>'
+      +'<circle cx="80" cy="52" r="18" fill="none" stroke="#b45309" stroke-width="1" opacity=".4"/>'
+      +'<circle cx="80" cy="52" r="4" fill="#ef4444"/>'
+      +'<line x1="56" y1="38" x2="52" y2="34" stroke="#ef4444" stroke-width="1.5"/>'
+      +'<circle cx="50" cy="32" r="3" fill="#ef4444" opacity=".8"/>'
+      +'<line x1="104" y1="38" x2="108" y2="34" stroke="#ef4444" stroke-width="1.5"/>'
+      +'<circle cx="110" cy="32" r="3" fill="#ef4444" opacity=".8"/>'
+      +'<text x="10" y="84" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">China · Russia ban</text>'
+      +'</svg>'
+  },
+  {
+    cat:'contracts', catLabel:'BUDGET', catColor:'#185FA5', catBg:'#E6F1FB',
+    source:'Nextgov/FCW', age:'Jan 5 2026',
+    headline:'NDAA §1823: Commercial solutions openings expanded — NAICS 336413/332710 manufacturers can now bid CSO pathway',
+    excerpt:'2026 NDAA revises 10 U.S.C. §3458 to allow DoD to use commercial solutions openings for standard commercial products — no "innovative" classification required.',
+    insight:'CSO bids now available for standard commercial manufacturers. Review solicitations for CSO language in Section B.',
+    visual:'<svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg" style="width:160px;height:90px;display:block">'
+      +'<rect width="160" height="90" fill="#0c1a2e"/>'
+      +'<text x="10" y="18" font-family="IBM Plex Mono,monospace" font-size="7" fill="#93c5fd" letter-spacing="1.5" font-weight="700">NDAA §1823 · CSO</text>'
+      +'<rect x="10" y="28" width="55" height="24" rx="4" fill="#1e3a5f" stroke="#378ADD" stroke-width="1"/>'
+      +'<text x="37" y="44" font-family="IBM Plex Mono,monospace" font-size="9" fill="#93c5fd" text-anchor="middle" font-weight="700">STANDARD</text>'
+      +'<line x1="68" y1="40" x2="88" y2="40" stroke="#378ADD" stroke-width="1.5"/>'
+      +'<text x="78" y="36" font-family="IBM Plex Mono,monospace" font-size="7" fill="#378ADD" text-anchor="middle">CSO</text>'
+      +'<rect x="92" y="28" width="58" height="24" rx="4" fill="#166534" stroke="#4ade80" stroke-width="1"/>'
+      +'<text x="121" y="44" font-family="IBM Plex Mono,monospace" font-size="9" fill="#4ade80" text-anchor="middle" font-weight="700">ELIGIBLE</text>'
+      +'<text x="10" y="76" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9ca3af">Lower proposal burden</text>'
+      +'</svg>'
+  }
+];
+
+function buildStoryRow(s){
+  return '<a class="dn-story" href="#" target="_blank">'
+    + '<div class="dn-story-visual">' + s.visual + '</div>'
+    + '<div class="dn-story-content">'
+    +   '<div class="dn-story-meta">'
+    +     '<span class="dn-cat-badge" style="background:' + s.catBg + ';color:' + s.catColor + '">' + esc(s.catLabel) + '</span>'
+    +     '<span class="dn-story-source">' + esc(s.source) + '</span>'
+    +     '<span class="dn-story-age">' + esc(s.age) + '</span>'
+    +   '</div>'
+    +   '<div class="dn-story-headline">' + esc(s.headline) + '</div>'
+    +   '<div class="dn-story-excerpt">' + esc(s.excerpt) + '</div>'
+    +   '<div class="dn-story-insight">' + esc(s.insight) + '</div>'
+    + '</div>'
+    + '</a>';
+}
+
+function renderFeed(filter){
+  var stories = (!filter || filter === 'all') ? FEED_STORIES : FEED_STORIES.filter(function(s){ return s.cat === filter; });
+  var html = stories.map(buildStoryRow).join('');
+  if (!html) html = '<div style="padding:24px;color:var(--mute);font-size:13px;text-align:center">No stories in this category.</div>';
+  var el = document.getElementById('dn-feed');
+  if (el) el.innerHTML = html;
+}
+
+function filterFeed(cat, btn){
+  document.querySelectorAll('.dn-feed-filters .dn-filt').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderFeed(cat);
+}
+
+/* ─── SIDEBAR (3 widgets: ring countdown, awards, sources) ─── */
+function renderSidebar(){
+  var AWARDS = [
+    {agency:'P&W / USAF', val:'$3.8B',  label:'F135 Lot 18'},
+    {agency:'P&W / USAF', val:'$1.09B', label:'F100 Parts'},
+    {agency:'AFLCMC',     val:'$44.7M', label:'Boeing IDS'},
+    {agency:'NAVAIR',     val:'$15.8M', label:'Astronics'},
+    {agency:'TACOM',      val:'$6.2M',  label:'Heico Corp'},
+    {agency:'DLA',        val:'$6.3M',  label:'Parker Hannifin'}
+  ];
+  var SOURCES = [
+    {name:'Defense News',        color:'#185FA5'},
+    {name:'Breaking Defense',    color:'#0A1628'},
+    {name:'JANES',               color:'#134e4a'},
+    {name:'Federal Register',    color:'#92400e'},
+    {name:'SAM.gov',             color:'#378ADD'},
+    {name:'DFARS Updates',       color:'#991b1b'},
+    {name:'GovExec',             color:'#6b7280'},
+    {name:'American Machinist',  color:'#0d9488'}
+  ];
+  var sb = document.getElementById('dn-sidebar-col');
+  if (!sb) return;
+
+  // CMMC ring math (Nov 10 2025 → Nov 10 2026)
+  var target = new Date('2026-11-10T00:00:00Z');
+  var start  = new Date('2025-11-10T00:00:00Z');
+  var now = new Date();
+  var msPerDay = 86400000;
+  var days = Math.max(0, Math.ceil((target - now) / msPerDay));
+  var totalMs = target - start;
+  var elapsedFrac = totalMs > 0 ? Math.max(0, Math.min(1, (now - start) / totalMs)) : 0;
+  var circumference = 201; // 2*pi*r where r=32 ≈ 201
+  var dashOffset = Math.max(0, circumference - (elapsedFrac * circumference));
+
+  var awardsHtml = AWARDS.map(function(a){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--line-2)">'
+      + '<div style="min-width:0">'
+      +   '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;font-weight:600;color:var(--mute);letter-spacing:.04em;text-transform:uppercase">' + esc(a.agency) + '</div>'
+      +   '<div style="font-size:11px;font-weight:600;color:var(--ink)">' + esc(a.label) + '</div>'
+      + '</div>'
+      + '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:800;color:#185FA5">' + esc(a.val) + '</div>'
+      + '</div>';
+  }).join('');
+
+  var sourcesHtml = SOURCES.map(function(s){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;color:var(--ink-2)">'
+      + '<div style="width:6px;height:6px;border-radius:50%;background:' + s.color + ';flex-shrink:0"></div>'
+      + esc(s.name)
+      + '</div>';
+  }).join('');
+
+  sb.innerHTML =
+      '<div class="dn-sw" style="border-left:3px solid #991b1b">'
+    +   '<div class="dn-sw-title">CMMC PHASE 2 COUNTDOWN</div>'
+    +   '<div style="display:flex;align-items:center;gap:14px">'
+    +     '<svg viewBox="0 0 80 80" style="width:72px;height:72px;flex-shrink:0">'
+    +       '<circle cx="40" cy="40" r="32" fill="none" stroke="#fee2e2" stroke-width="6"/>'
+    +       '<circle cx="40" cy="40" r="32" fill="none" stroke="#991b1b" stroke-width="6" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + dashOffset + '" stroke-linecap="round" transform="rotate(-90 40 40)"/>'
+    +       '<text x="40" y="42" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="16" font-weight="800" fill="#991b1b">' + days + '</text>'
+    +       '<text x="40" y="55" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#9ca3af">days left</text>'
+    +     '</svg>'
+    +     '<div>'
+    +       '<div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px">Nov 10, 2026</div>'
+    +       '<div style="font-size:10px;color:var(--mute);margin-bottom:6px">C3PAO mandatory for CUI</div>'
+    +       '<div style="font-size:10px;color:#991b1b;font-weight:600">&lt;1,100 of 76K ready</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="dn-sw">'
+    +   '<div class="dn-sw-title">RECENT CONTRACT AWARDS</div>'
+    +   awardsHtml
+    + '</div>'
+    + '<div class="dn-sw">'
+    +   '<div class="dn-sw-title">SOURCES MONITORED</div>'
+    +   sourcesHtml
+    + '</div>';
+}
+
+var TICKER_ITEMS = [
+  {agency:'P&W / USAF', val:'$3.8B',  company:'F135 Lot 18 Engines', naics:'336413'},
+  {agency:'P&W / USAF', val:'$1.09B', company:'F100 Engine Parts',   naics:'336413'},
+  {agency:'AFLCMC',     val:'$44.7M', company:'Boeing IDS',          naics:'336413'},
+  {agency:'NAVAIR',     val:'$15.8M', company:'Astronics Test',      naics:'336413'},
+  {agency:'TACOM',      val:'$6.2M',  company:'Heico Corp',          naics:'332710'},
+  {agency:'DLA',        val:'$6.3M',  company:'Parker Hannifin',     naics:'332721'},
+  {agency:'NAVAIR',     val:'$8.9M',  company:'TransDigm Group',     naics:'332710'},
+  {agency:'AFLCMC',     val:'$22.4M', company:'Precision Castparts', naics:'332721'}
+];
+
+function renderTicker(){
+  var items = TICKER_ITEMS.concat(TICKER_ITEMS); // duplicate for seamless loop
+  var html = items.map(function(t){
+    return '<div class="dn-ticker-item">'
+      + '<span class="dn-ticker-agency">' + esc(t.agency) + '</span>'
+      + '<span class="dn-ticker-val">' + esc(t.val) + '</span>'
+      + '<span class="dn-ticker-company">' + esc(t.company) + '</span>'
+      + '<span class="dn-ticker-naics">' + esc(t.naics) + '</span>'
+      + '</div>';
+  }).join('');
+  var el = document.getElementById('dn-ticker');
+  if (el) el.innerHTML = html;
+}
+
+var REG_ITEMS = [
+  { cat:'cmmc',       catLabel:'CMMC',         date:'Nov 10 2025', borderColor:'#991b1b', headline:'DFARS 252.204-7021 now live — CMMC Phase 1 self-assessments required in active solicitations', insight:'Check every current solicitation for 252.204-7021 clause. If present, your SPRS score must be current or you are non-responsive.' },
+  { cat:'regulatory', catLabel:'NDAA §866',    date:'Jun 1 2026',  borderColor:'#b45309', headline:'DoD cybersecurity harmonization deadline June 1 — expect DFARS clause consolidation across military departments', insight:'Watch for interim DFARS rule reducing duplicative cybersecurity clauses. Less compliance overhead on contracts issued after Jun 1.' },
+  { cat:'regulatory', catLabel:'FY2026 NDAA',  date:'Dec 18 2025', borderColor:'#b45309', headline:'CAS threshold raised — Cost Accounting Standards compliance burden reduced for small defense contractors', insight:'CAS exemption threshold increase under §1806 reduces compliance burden. Update your proposal pricing certification language for post-NDAA contracts.' },
+  { cat:'cmmc',       catLabel:'FCA / DOJ',    date:'Jan 2026',    borderColor:'#991b1b', headline:'DoJ Civil Cyber-Fraud Initiative: $52M recovered FY2025, first subcontractor enforcement action — misrepresentation, not breaches', insight:'False SPRS scores = False Claims Act liability. If you have a POA&M, document it and do not attest to full compliance.' },
+  { cat:'budget',     catLabel:'NDAA §1823',   date:'Dec 18 2025', borderColor:'#378ADD', headline:'Commercial solutions openings expanded to all commercial products — new CSO pathway available for NAICS 336413/332710 manufacturers', insight:'CSO bids no longer require "innovative" classification. Review FY2026 solicitations for CSO language — lower proposal burden than full RFP.' },
+  { cat:'regulatory', catLabel:'SUPPLY CHAIN', date:'Feb 10 2026', borderColor:'#b45309', headline:'NDAA §837–§838: DoD must assess FEOC supply chain dependencies — Xinjiang prohibition enforcement tightened', insight:'DFARS 252.225-7060 Xinjiang prohibition now backed by NDAA mandate. Certify your tier-2 suppliers before Q3 proposals or risk disqualification.' }
+];
+
+function renderRegFeed(){
+  var el = document.getElementById('dn-reg-grid');
+  if (!el) return;
+  el.innerHTML = REG_ITEMS.map(function(r){
+    return '<div class="dn-reg-item" style="border-left-color:' + r.borderColor + '">'
+      + '<div class="dn-reg-item-meta">'
+      +   '<span class="dn-cat-badge dn-cat-' + r.cat + '">' + esc(r.catLabel) + '</span>'
+      +   '<span class="dn-reg-date">' + esc(r.date) + '</span>'
+      + '</div>'
+      + '<div class="dn-reg-headline">' + esc(r.headline) + '</div>'
+      + '<div class="dn-reg-insight">' + esc(r.insight) + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function dnInit(){
+  renderBento();
+  renderFeed('all');
+  renderSidebar();
+  renderTicker();
+  renderRegFeed();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', dnInit);
+} else {
+  dnInit();
+}
+
+/* Theme + sidebar toggle — canonical */
+(function(){
+  var root = document.documentElement;
+  var sun = document.getElementById('themeSun');
+  var moon = document.getElementById('themeMoon');
+  var themeBtn = document.getElementById('themeToggle');
+  var sbBtn = document.getElementById('sbToggle');
+  function syncThemeIcons(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light') { sun.style.display = 'none'; moon.style.display = ''; }
+    else               { sun.style.display = '';    moon.style.display = 'none'; }
+  }
+  syncThemeIcons();
+  if (themeBtn) themeBtn.addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    syncThemeIcons();
+  });
+  if (sbBtn) sbBtn.addEventListener('click', function(){
+    var open = root.getAttribute('data-sb') === 'open';
+    root.setAttribute('data-sb', open ? 'closed' : 'open');
+  });
+})();
+</script>
+</body>
+</html>

@@ -45,6 +45,19 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders
+      },
+      // CEO 2026-05-25 — transitional Clear-Site-Data on /home to flush the
+      // browser-cached 308 permanent redirects (the prior next.config used
+      // permanent redirects from /audit, /dashboard, /upstream-intel,
+      // /prospects → /home; removed but cached at browser level). Browser
+      // arrives at /home via the cached redirect, gets the header, clears
+      // its HTTP cache including the stale 308. Remove this entry once
+      // production user agents have rolled over (e.g. one week from now).
+      {
+        source: "/home",
+        headers: [
+          { key: "Clear-Site-Data", value: '"cache"' }
+        ]
       }
     ];
   },
@@ -52,12 +65,15 @@ const nextConfig: NextConfig = {
     return [
       { source: "/login", destination: "/sign-in", permanent: true },
       { source: "/login/:path*", destination: "/sign-in", permanent: true },
-      { source: "/dashboard", destination: "/home", permanent: true },
-      { source: "/audit", destination: "/home", permanent: true },
-      { source: "/upstream-intel", destination: "/home", permanent: true },
-      { source: "/prospects", destination: "/home", permanent: true },
+      // /alerts has no route under src/app — keep redirecting to /home so the
+      // path doesn't 404. Re-add to a route folder + delete this when ready.
       { source: "/alerts", destination: "/home", permanent: true }
-      // /settings is a real route now (Profile & Settings · theme toggle).
+      // CEO 2026-05-25 — Removed permanent redirects for /audit, /dashboard,
+      // /upstream-intel, /prospects. These all have real route handlers /
+      // page.tsx under src/app, and the redirects were masking them (sidebar
+      // links from the static command-center-design.html were funneling to
+      // /home instead of their real destinations). /settings was already a
+      // real route.
     ];
   }
 };

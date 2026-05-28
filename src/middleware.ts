@@ -15,7 +15,7 @@ const PUBLIC = [
   "/access.html",
   "/signin.html"
 ];
-const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots", "/lifecycle/"];
+const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots", "/vendor/", "/lifecycle/"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

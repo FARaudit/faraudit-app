@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Capability Statement</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Capability Statement — brand visual language
+   Token chain + sidebar + topbar mirror command-center-design.html.
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --accent:        #378ADD;
+  --accent-blue:   #378ADD;
+  --accent-deep:   #185FA5;
+  --accent-light:  #B5D4F4;
+
+  --navy-900: #050d1a; --navy-800: #0A1628; --navy-700: #142545; --navy-600: #1e3a8a;
+
+  --blue-50:  #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe;
+  --blue-400: #60a5fa; --blue-500: #3b82f6; --blue-600: #2563eb; --blue-700: #1d4ed8;
+
+  --green-50:  #ecfdf5; --green-100: #d1fae5; --green-200: #a7f3d0;
+  --green-500: #10b981; --green-600: #059669; --green-700: #047857; --green-800: #065f46;
+
+  --red-50:  #fef2f2; --red-100: #fee2e2; --red-200: #fecaca;
+  --red-500: #ef4444; --red-600: #dc2626; --red-700: #b91c1c; --red-800: #991b1b; --red-900: #7f1d1d;
+
+  --amber-50:  #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a;
+  --amber-600: #d97706; --amber-700: #b45309; --amber-800: #92400e; --amber-900: #78350f;
+}
+
+[data-theme="light"] {
+  --page-bg:   #f0f4f8;
+  --bg:        #f0f4f8;
+  --card:      #ffffff;
+  --card-soft: #fafcfe;
+  --ink:       #0A1628;
+  --ink-2:     #334155;
+  --mute:      #64748b;
+  --mute-2:    #94a3b8;
+  --line:      #e5e7eb;
+  --line-2:    #eef2f6;
+  --line-3:    #f1f5f9;
+  --search-bg: #f1f5f9;
+
+  --sb-bg:       var(--navy-800);
+  --sb-border:   #0b1a30;
+  --sb-text:     #cbd5e1;
+  --sb-text-mute:#6f8099;
+  --sb-hover:    #0f1f3a;
+  --sb-active:   #13294b;
+  --sb-divider:  #1f2e48;
+
+  --shadow:    0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 16px 48px -16px rgba(15,23,42,.24), 0 4px 12px -2px rgba(15,23,42,.10);
+}
+
+[data-theme="dark"] {
+  --page-bg:   #02060c;
+  --bg:        #050d1a;
+  --card:      #0c1b30;
+  --card-soft: #0a1729;
+  --ink:       #e8eef6;
+  --ink-2:     #b6c2d3;
+  --mute:      #7d8ba0;
+  --mute-2:    #5b6778;
+  --line:      rgba(255,255,255,0.08);
+  --line-2:    rgba(255,255,255,0.05);
+  --line-3:    rgba(255,255,255,0.04);
+  --search-bg: rgba(255,255,255,0.04);
+
+  --sb-bg:       #02070f;
+  --sb-border:   rgba(255,255,255,0.06);
+  --sb-text:     #b6c2d3;
+  --sb-text-mute:#5b6778;
+  --sb-hover:    rgba(255,255,255,0.04);
+  --sb-active:   rgba(59,130,246,0.14);
+  --sb-divider:  rgba(255,255,255,0.06);
+
+  --shadow:    0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 24px 60px -20px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh;transition:background-color .25s ease}
+
+/* ═══════════════ SIDEBAR (canonical — synced from command-center) ═══════════════ */
+.sidebar{
+  background:var(--sb-bg);color:var(--sb-text);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:14px 0 18px;position:sticky;top:0;height:100vh;
+  border-right:1px solid var(--sb-border);
+}
+.sb-logo{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));
+  display:grid;place-items:center;color:#ffffff;font-weight:800;font-size:14px;
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);
+  margin-bottom:10px;position:relative;
+}
+.sb-divider{width:24px;height:1px;background:var(--sb-divider);margin:6px 0}
+.sb-icon{
+  width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--sb-text-mute);
+  position:relative;cursor:pointer;transition:all .15s;
+}
+.sb-icon:hover{background:var(--sb-hover);color:#e2e8f0}
+.sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--accent);border-radius:2px}
+.sb-icon svg{width:18px;height:18px}
+.sb-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red-500);box-shadow:0 0 0 2px var(--sb-bg)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid var(--sb-divider)}
+.sb-tip{
+  position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s, transform .14s;
+  box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em;
+}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+
+.frame{grid-template-columns:var(--sb-width, 56px) 1fr;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+[data-sb="open"] .frame{--sb-width:232px}
+.sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);overflow:visible;position:relative}
+[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;align-self:stretch;margin:0 0 8px 2px}
+[data-sb="open"] .sb-logo{margin:0}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+[data-sb="open"] .sb-divider{display:none}
+[data-sb="open"] .sb-icon{width:100%;height:36px;justify-content:flex-start;gap:11px;padding:0 10px;border-radius:9px}
+[data-sb="open"] .sb-icon.active::before{left:-12px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;line-height:1;flex:1;min-width:0}
+[data-sb="open"] .sb-icon .sb-tip{display:none !important}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#ffffff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,0.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono";font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.32);padding:14px 12px 6px}
+[data-sb="open"] .sb-icon .sb-dot{display:none}
+[data-sb="open"] .sb-bottom{align-items:stretch;width:100%}
+[data-sb="open"] .sb-avatar{align-self:flex-start;margin:6px 0 0 2px}
+
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--sb-bg);border:1px solid var(--sb-border);color:var(--sb-text);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s, color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.sb-toggle:hover{background:var(--sb-hover);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+
+.sb-logo{background:transparent;box-shadow:none;color:var(--accent)}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,0.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:var(--accent)}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,0.18);color:#fca5a5;border:1px solid rgba(220,38,38,0.30)}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,0.08)}
+
+[data-sb="open"] .sb-icon{flex-wrap:nowrap;overflow:hidden}
+[data-sb="open"] .sb-icon .sb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;line-height:1.1}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge{flex-shrink:0;white-space:nowrap}
+
+[data-sb="open"] .sb-icon{
+  display:flex !important;align-items:center !important;justify-content:flex-start !important;
+  width:100% !important;height:36px;gap:11px !important;padding:0 10px !important;border-radius:9px;
+  flex-direction:row !important;
+}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{
+  display:inline-flex !important;align-items:center;
+  font-size:12.5px;font-weight:500;letter-spacing:.005em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  line-height:1.1;flex:1 1 auto;min-width:0;
+}
+[data-sb="open"] .sb-icon .sb-badge{flex-shrink:0;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-tip{display:none !important}
+
+.sb-logo{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));
+  color:#ffffff;display:grid;place-items:center;
+  font-weight:800;font-size:14px;flex-shrink:0;
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);
+}
+[data-sb="open"] .sb-logo-row{
+  display:flex !important;align-items:center;gap:10px;
+  justify-content:flex-start;
+  margin:0 0 8px 4px;align-self:flex-start;
+}
+[data-sb="open"] .sb-bottom{flex-direction:column;align-items:flex-start;gap:6px}
+
+/* ═══════════════ MAIN ═══════════════ */
+.main{display:flex;flex-direction:column;min-width:0}
+
+/* ─── topbar (canonical — synced from command-center) ───────────── */
+.topbar{
+  height:60px;background:var(--card);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:18px;padding:0 24px;
+  transition:background-color .25s, border-color .25s;
+}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{
+  display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;
+  background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  border:1px solid var(--green-200);
+}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.search{
+  margin-left:auto;display:flex;align-items:center;gap:10px;
+  height:34px;width:360px;padding:0 12px;border-radius:9px;
+  background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px;
+}
+.search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{
+  width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);
+  cursor:pointer;position:relative;transition:background .14s, border-color .14s;
+}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{
+  height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);
+  display:flex;align-items:center;gap:8px;
+}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+.user-chip .org{font-size:10.5px;color:var(--mute);line-height:1.1}
+
+/* ═══════════════ PAGE BODY ═══════════════ */
+.body{padding:24px 28px 60px;display:flex;flex-direction:column;gap:24px}
+
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.page-header .heading{display:flex;flex-direction:column;gap:6px}
+.page-header .eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0;
+}
+.page-header h1{
+  font-family:"Manrope",sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;
+  color:var(--ink);margin:0;line-height:1.1;
+}
+.page-header .sub{font-size:13px;color:var(--mute);margin:0;max-width:62ch}
+
+.cta-primary{
+  display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 18px;border-radius:9px;
+  background:var(--accent);color:#ffffff;border:0;
+  font-family:"Manrope",sans-serif;font-size:13px;font-weight:600;letter-spacing:.02em;
+  text-decoration:none;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 8px 20px -8px rgba(55,138,221,.55);
+  transition:background .14s, transform .14s;
+}
+.cta-primary:hover{background:var(--accent-deep);transform:translateY(-1px)}
+.cta-primary svg{width:14px;height:14px}
+
+/* ── stat strip (3 cards) ── */
+.stat-strip{display:grid;grid-template-columns:repeat(4, 1fr);gap:14px}
+.stat-card{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow-sm);padding:18px 20px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.stat-card .lbl{
+  font-family:"Manrope",sans-serif;font-size:10.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--mute);margin:0;
+}
+.stat-card .val{
+  font-family:"Manrope",sans-serif;font-size:34px;font-weight:700;letter-spacing:-.02em;
+  color:var(--ink);margin:0;line-height:1;
+}
+.stat-card .val.naics-list{font-size:18px;font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
+.stat-card .sub{font-size:11px;color:var(--mute);margin:0}
+
+/* ── two-column main content ── */
+.cs-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px}
+
+/* document card (left column) */
+.doc-card{
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow-sm);overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.doc-head{
+  padding:18px 22px 14px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.doc-head h2{
+  font-family:"Manrope",sans-serif;font-size:14.5px;font-weight:800;letter-spacing:-.01em;
+  color:var(--ink);margin:0;
+}
+.doc-head .doc-meta{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);
+  letter-spacing:.04em;
+}
+.doc-body{padding:8px 0 12px}
+.doc-section{padding:18px 22px;border-bottom:1px solid var(--line-2)}
+.doc-section:last-child{border-bottom:0}
+.doc-section .sec-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+}
+.doc-section .sec-title{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--mute);
+}
+.edit-btn{
+  width:26px;height:26px;border-radius:7px;border:1px solid var(--line);
+  background:var(--card);display:grid;place-items:center;color:var(--mute);
+  cursor:pointer;transition:border-color .14s, color .14s, background .14s;
+}
+.edit-btn:hover{border-color:var(--accent-light);color:var(--accent);background:rgba(55,138,221,0.04)}
+.edit-btn svg{width:13px;height:13px}
+
+.company-head{display:grid;grid-template-columns:1fr 1fr;gap:14px 24px}
+.company-head .field{display:flex;flex-direction:column;gap:3px}
+.company-head .field .k{
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--mute);
+}
+.company-head .field .v{font-size:13px;color:var(--ink);font-weight:600;letter-spacing:-.005em}
+.company-head .field .v.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2);font-weight:500}
+.company-head .field.span-2{grid-column:1 / -1}
+.mock-badge{
+  display:inline-flex;align-items:center;margin-left:10px;
+  padding:2px 7px;border-radius:5px;vertical-align:middle;
+  background:rgba(245,158,11,0.14);color:#b45309;border:1px solid rgba(245,158,11,0.32);
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.10em;
+  text-transform:uppercase;line-height:1;
+}
+[data-theme="dark"] .mock-badge{background:rgba(245,158,11,0.18);color:#fcd34d;border-color:rgba(252,211,77,0.30)}
+
+.bullet-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.bullet-list li{
+  font-size:13px;color:var(--ink-2);line-height:1.5;padding-left:18px;position:relative;
+}
+.bullet-list li::before{
+  content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,0.18);
+}
+
+.perf-list{display:flex;flex-direction:column;gap:12px}
+.perf-item{
+  border:1px solid var(--line-2);border-radius:9px;padding:12px 14px;
+  background:var(--card-soft);
+  display:grid;grid-template-columns:1fr auto;gap:6px 16px;
+}
+.perf-item .perf-title{font-size:13px;color:var(--ink);font-weight:700;letter-spacing:-.005em}
+.perf-item .perf-agency{font-size:11.5px;color:var(--mute);font-weight:500}
+.perf-item .perf-value{
+  font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--accent-deep);font-weight:700;
+  text-align:right;align-self:start;
+}
+[data-theme="dark"] .perf-item .perf-value{color:var(--accent-light)}
+.perf-item .perf-summary{
+  grid-column:1 / -1;font-size:12px;color:var(--ink-2);line-height:1.5;margin-top:2px;
+}
+
+.diff-list{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:10px 16px}
+.diff-list li{
+  font-size:12.5px;color:var(--ink-2);line-height:1.45;padding-left:22px;position:relative;
+}
+.diff-list li::before{
+  content:"✓";position:absolute;left:0;top:0;
+  font-family:"Manrope";font-size:12px;font-weight:800;color:var(--accent);
+}
+
+/* right column cards */
+.side-col{display:flex;flex-direction:column;gap:16px}
+.side-card{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:14px;
+}
+.side-card h3{
+  font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.005em;
+  color:var(--ink);margin:0;display:flex;align-items:center;gap:8px;
+}
+.side-card h3 svg{width:15px;height:15px;color:var(--accent)}
+
+.export-list{display:flex;flex-direction:column;gap:8px}
+.export-btn{
+  display:flex;align-items:center;gap:10px;width:100%;
+  height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--line);background:var(--card-soft);
+  font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:600;color:var(--ink-2);
+  cursor:pointer;text-align:left;transition:border-color .14s, color .14s, background .14s;
+}
+.export-btn:hover{border-color:var(--accent-light);color:var(--accent-deep);background:rgba(55,138,221,0.04)}
+[data-theme="dark"] .export-btn:hover{color:var(--accent-light)}
+.export-btn svg{width:15px;height:15px;color:var(--mute);flex-shrink:0}
+.export-btn:hover svg{color:var(--accent)}
+.export-btn .ext{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;
+  letter-spacing:.06em;color:var(--mute);
+}
+
+/* health card */
+.health-score{display:flex;align-items:baseline;gap:6px}
+.health-score .pct{
+  font-family:"Manrope",sans-serif;font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--accent-deep);
+}
+[data-theme="dark"] .health-score .pct{color:var(--accent-light)}
+.health-score .lbl{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.04em;text-transform:uppercase}
+.health-bar{
+  height:6px;border-radius:3px;background:var(--line-2);overflow:hidden;position:relative;
+}
+.health-bar .fill{
+  height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));border-radius:3px;
+}
+.health-missing{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.health-missing li{
+  font-size:11.5px;color:var(--ink-2);line-height:1.4;padding-left:18px;position:relative;
+}
+.health-missing li::before{
+  content:"";position:absolute;left:0;top:5px;width:10px;height:10px;border:1.5px solid var(--mute-2);
+  border-radius:3px;background:transparent;
+}
+.health-missing li.done{color:var(--green-700);font-weight:600}
+[data-theme="dark"] .health-missing li.done{color:#6ee7b7}
+.health-missing li.done::before{
+  content:"✓";display:grid;place-items:center;
+  width:14px;height:14px;border:0;border-radius:4px;
+  background:var(--green-600);color:#ffffff;
+  font-family:"Manrope",sans-serif;font-size:10px;font-weight:800;line-height:1;
+  top:2px;
+}
+.improve-btn{
+  width:100%;height:36px;border-radius:8px;
+  background:var(--accent);color:#fff;border:0;cursor:pointer;
+  font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 6px 16px -6px rgba(55,138,221,.55);
+  transition:background .14s, transform .14s;
+}
+.improve-btn:hover{background:var(--accent-deep);transform:translateY(-1px)}
+.improve-btn svg{width:13px;height:13px}
+
+/* tailored versions */
+.ver-list{display:flex;flex-direction:column;gap:10px}
+.ver-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card-soft);
+  cursor:pointer;transition:border-color .14s, background .14s;
+}
+.ver-row:hover{border-color:var(--accent-light);background:rgba(55,138,221,0.04)}
+.ver-row .ver-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ver-row .ver-title{font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:-.005em}
+.ver-row .ver-meta{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.04em;
+}
+.ver-row .ver-arrow{color:var(--mute);flex-shrink:0}
+.ver-row .ver-arrow svg{width:14px;height:14px;display:block}
+.ver-row:hover .ver-arrow{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR ═════════════ -->
+  <aside class="sidebar">
+    <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+
+    <div class="sb-logo-row">
+      <div class="sb-logo">F</div>
+      <span class="sb-wordmark">FAR<span class="wm-au">audit</span></span>
+    </div>
+
+    <div class="sb-group-label">WORKSPACE</div>
+    <div class="sb-icon" data-tip="Today" onclick="location.href='/command-center'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span class="sb-label">Today</span><span class="sb-tip">Today</span>
+    </div>
+    <div class="sb-icon" onclick="location.href='/audit'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg>
+      <span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span>
+    </div>
+    <div class="sb-icon" onclick="location.href='/dashboard'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span>
+    </div>
+    <div class="sb-icon" onclick="location.href='/pipeline'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+      <span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span>
+    </div>
+    <div class="sb-icon active" onclick="location.href='/capability-statement'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span>
+    </div>
+
+    <div class="sb-group-label">INTELLIGENCE</div>
+    <div class="sb-icon" onclick="location.href='/upstream-intel'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+      <span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg>
+      <span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg>
+      <span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg>
+      <span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>
+      <span class="sb-label">Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Agencies</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg>
+      <span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg>
+      <span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg>
+      <span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span>
+    </div>
+
+    <div class="sb-group-label">ACCOUNT</div>
+    <div class="sb-icon" onclick="location.href='/settings'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+      <span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span>
+    </div>
+    <!-- Sign out: form POST per CLAUDE.md P0-J (server-side supabase.auth.signOut + 303 redirect) -->
+    <form action="/api/auth/sign-out" method="post" style="display:contents">
+      <button type="submit" class="sb-icon sb-signout" style="background:transparent;border:0;font:inherit;color:inherit;cursor:pointer;padding:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span>
+      </button>
+    </form>
+
+    <div class="sb-bottom">
+      <div class="sb-avatar">JR</div>
+    </div>
+  </aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">
+        <b>Capability Statement</b><span class="sep">/</span><span>v1 · generated today</span>
+      </div>
+      <span class="live-pill">LIVE</span>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Search sections, NAICS, contracts…</span>
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
+          <span class="nbadge">7</span>
+        </button>
+        <div class="user-chip">
+          <div class="av">JR</div>
+          <div>
+            <div class="nm">Jose Rodriguez</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <!-- page header -->
+      <header class="page-header">
+        <div class="heading">
+          <p class="eyebrow">Capability Statement</p>
+          <h1>Your Capability Statement</h1>
+          <p class="sub">AI-generated from your audit history and past performance. Refreshes after every new audit; tailored for the agencies you most often pursue.</p>
+        </div>
+        <button class="cta-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+          Generate New Statement
+        </button>
+      </header>
+
+      <!-- stat strip -->
+      <section class="stat-strip">
+        <div class="stat-card">
+          <p class="lbl">Contracts Audited</p>
+          <p class="val">15</p>
+          <p class="sub">Inputs feeding capability narrative</p>
+        </div>
+        <div class="stat-card">
+          <p class="lbl">NAICS Codes</p>
+          <p class="val">3</p>
+          <p class="sub mono">336413 · 332710 · 332721</p>
+        </div>
+        <div class="stat-card">
+          <p class="lbl">Last Generated</p>
+          <p class="val">Today</p>
+          <p class="sub">11:42 AM CT · v1.0</p>
+        </div>
+        <div class="stat-card">
+          <p class="lbl">Statement Version</p>
+          <p class="val">v1.0</p>
+          <p class="sub">auto-synced · updated today</p>
+        </div>
+      </section>
+
+      <!-- two-column main content -->
+      <section class="cs-grid">
+
+        <!-- ── LEFT: document ── -->
+        <article class="doc-card">
+          <div class="doc-head">
+            <h2>Generated Capability Statement</h2>
+            <span class="doc-meta">v1.0 · auto-synced</span>
+          </div>
+
+          <div class="doc-body">
+
+            <!-- Company header -->
+            <div class="doc-section">
+              <div class="sec-head">
+                <span class="sec-title">Company Header</span>
+                <button class="edit-btn" type="button" aria-label="Edit Company Header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+              </div>
+              <div class="company-head">
+                <div class="field span-2">
+                  <span class="k">Legal Name</span>
+                  <span class="v">FARaudit Defense Solutions, Inc.<span class="mock-badge" title="Mock data — real company name will pull from user profile when live data is wired">Mock Data</span></span>
+                </div>
+                <div class="field">
+                  <span class="k">CAGE Code</span>
+                  <span class="v mono">8X4K2</span>
+                </div>
+                <div class="field">
+                  <span class="k">UEI</span>
+                  <span class="v mono">JR4XF9P28KL2</span>
+                </div>
+                <div class="field">
+                  <span class="k">Primary NAICS</span>
+                  <span class="v mono">336413 · Aircraft Parts</span>
+                </div>
+                <div class="field">
+                  <span class="k">Secondary NAICS</span>
+                  <span class="v mono">332710 · 332721</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Core competencies -->
+            <div class="doc-section">
+              <div class="sec-head">
+                <span class="sec-title">Core Competencies</span>
+                <button class="edit-btn" type="button" aria-label="Edit Core Competencies">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+              </div>
+              <ul class="bullet-list">
+                <li><b>Radar &amp; sensor sustainment</b> — overhaul, repair, and upgrade of shipboard and ground-based radar arrays, supporting AN/SPY-class and GPS-III ground stations.</li>
+                <li><b>Mission systems software</b> — CI/CD pipeline engineering for embedded test harnesses, with verified delivery against F-35 mission-critical airworthiness criteria.</li>
+                <li><b>Cyber resilience &amp; CMMC</b> — Level 2 ready posture; assessment-grade documentation packages for critical-infrastructure clients under USACE Huntsville scope.</li>
+                <li><b>Precision machining &amp; turned-product manufacturing</b> — NAICS 332710 / 332721 production runs supporting DLA, Army TACOM, and Air Force OEM tier-2 contracts.</li>
+              </ul>
+            </div>
+
+            <!-- Past performance -->
+            <div class="doc-section">
+              <div class="sec-head">
+                <span class="sec-title">Past Performance</span>
+                <button class="edit-btn" type="button" aria-label="Edit Past Performance">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+              </div>
+              <div class="perf-list">
+                <div class="perf-item">
+                  <span class="perf-title">SPY-6 Radar Sustainment — Phase IV CDRL Refresh</span>
+                  <span class="perf-value">$18.4M</span>
+                  <span class="perf-agency">U.S. Navy · NAVSEA · N00024-26-R-2207</span>
+                  <p class="perf-summary">Authored Phase IV CDRL refresh package covering reliability data submissions and 6-month operational sustainment milestones. Delivered ahead of schedule with zero CO-issued deficiency reports.</p>
+                </div>
+                <div class="perf-item">
+                  <span class="perf-title">GPS-III Ground Station Software Modernization</span>
+                  <span class="perf-value">$24.6M</span>
+                  <span class="perf-agency">U.S. Space Force · SSC · FA2517-26-R-0033</span>
+                  <p class="perf-summary">Migration of legacy command/control codebase to containerized microservices, with cryptographic key-handling re-architecture. Zero classified-data spillage across 14 months.</p>
+                </div>
+                <div class="perf-item">
+                  <span class="perf-title">F-35 Mission Systems — CI Pipeline Refactor</span>
+                  <span class="perf-value">$7.9M</span>
+                  <span class="perf-agency">Dept. of the Air Force · AFLCMC · FA8730-26-Q-0114</span>
+                  <p class="perf-summary">Re-engineered test harness for mission-systems software builds, reducing nightly verification time by 62% and unblocking 3 stalled airworthiness packages.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Differentiators -->
+            <div class="doc-section">
+              <div class="sec-head">
+                <span class="sec-title">Differentiators</span>
+                <button class="edit-btn" type="button" aria-label="Edit Differentiators">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+              </div>
+              <ul class="diff-list">
+                <li>Cleared workforce — 78% TS/SCI, 22% Secret</li>
+                <li>ISO 9001:2015 + AS9100D certified production</li>
+                <li>CMMC Level 2 conformance attested 2026-04</li>
+                <li>Sub-12-month average phase-IV delivery cycle</li>
+                <li>Two HUBZone partner integrators on retainer</li>
+                <li>Direct-buy authority on 14 DLA NSNs</li>
+              </ul>
+            </div>
+
+          </div>
+        </article>
+
+        <!-- ── RIGHT: side cards ── -->
+        <aside class="side-col">
+
+          <!-- Export Options -->
+          <section class="side-card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              Export Options
+            </h3>
+            <div class="export-list">
+              <button class="export-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+                Download as PDF
+                <span class="ext">.PDF</span>
+              </button>
+              <button class="export-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 4 4-7"/></svg>
+                Download as Word
+                <span class="ext">.DOCX</span>
+              </button>
+              <button class="export-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy to Clipboard
+                <span class="ext">TEXT</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Statement Health -->
+          <section class="side-card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+              Statement Health
+            </h3>
+            <div class="health-score">
+              <span class="pct">82%</span>
+              <span class="lbl">completeness</span>
+            </div>
+            <div class="health-bar"><div class="fill" style="width:82%"></div></div>
+            <ul class="health-missing">
+              <li class="done">Company legal name &amp; UEI</li>
+              <li class="done">Primary &amp; secondary NAICS</li>
+              <li class="done">Core competencies (4 of 4)</li>
+              <li class="done">Past performance (3 of 3 required)</li>
+              <li>Add small-business socioeconomic certifications</li>
+              <li>Add 1 additional differentiator for tier-2 contracts</li>
+              <li>Upload company logo (300×300 minimum)</li>
+            </ul>
+            <button class="improve-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2L9 9 2 12l7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>
+              Improve with AI
+            </button>
+          </section>
+
+          <!-- Tailored Versions -->
+          <section class="side-card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
+              Tailored Versions
+            </h3>
+            <div class="ver-list">
+              <div class="ver-row">
+                <div class="ver-left">
+                  <span class="ver-title">U.S. Army Edition</span>
+                  <span class="ver-meta">USACE · TACOM · AMC focus</span>
+                </div>
+                <span class="ver-arrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+              </div>
+              <div class="ver-row">
+                <div class="ver-left">
+                  <span class="ver-title">U.S. Navy Edition</span>
+                  <span class="ver-meta">NAVSEA · NAVAIR · sustainment focus</span>
+                </div>
+                <span class="ver-arrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+              </div>
+              <div class="ver-row">
+                <div class="ver-left">
+                  <span class="ver-title">U.S. Air Force Edition</span>
+                  <span class="ver-meta">AFLCMC · SSC · mission-systems focus</span>
+                </div>
+                <span class="ver-arrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+              </div>
+            </div>
+          </section>
+
+        </aside>
+
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<!-- v1 2026-05-25-2310 -->
+
+<script>
+/* Theme toggle + sidebar collapse — canonical handlers, parity with command-center */
+(function(){
+  var root = document.documentElement;
+  var sun = document.getElementById('themeSun');
+  var moon = document.getElementById('themeMoon');
+  var themeBtn = document.getElementById('themeToggle');
+  var sbBtn = document.getElementById('sbToggle');
+
+  function syncThemeIcons(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light') { sun.style.display = 'none'; moon.style.display = ''; }
+    else               { sun.style.display = '';    moon.style.display = 'none'; }
+  }
+  syncThemeIcons();
+
+  if (themeBtn) themeBtn.addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    syncThemeIcons();
+  });
+
+  if (sbBtn) sbBtn.addEventListener('click', function(){
+    var open = root.getAttribute('data-sb') === 'open';
+    root.setAttribute('data-sb', open ? 'closed' : 'open');
+  });
+})();
+</script>
+</body>
+</html>

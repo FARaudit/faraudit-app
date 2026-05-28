@@ -1,0 +1,1741 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Defense Spending</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ═══ FARaudit · Defense Spending v3 — full intelligence dashboard ═══ */
+:root{
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --accent-pale:#E6F1FB;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-400:#60a5fa; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --teal-500:#14b8a6; --teal-600:#0d9488; --teal-700:#0f766e;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
+  --purple-100:#ede9fe; --purple-600:#7c3aed; --purple-700:#6d28d9;
+  --pink-100:#fce7f3; --pink-600:#db2777; --pink-700:#be185d;
+}
+[data-theme="light"]{
+  --page-bg:#f0f4f8; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --sb-bg:var(--navy-800); --sb-border:#0b1a30; --sb-text:#cbd5e1;
+  --sb-text-mute:#6f8099; --sb-hover:#0f1f3a; --sb-active:#13294b; --sb-divider:#1f2e48;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 16px 48px -16px rgba(15,23,42,.24), 0 4px 12px -2px rgba(15,23,42,.10);
+  --geo-1:#E6F1FB; --geo-2:#B5D4F4; --geo-3:#378ADD; --geo-4:#185FA5; --geo-5:#0A1628;
+  --geo-blank:#eef2f6;
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04);
+  --search-bg:rgba(255,255,255,0.04);
+  --sb-bg:#02070f; --sb-border:rgba(255,255,255,0.06); --sb-text:#b6c2d3;
+  --sb-text-mute:#5b6778; --sb-hover:rgba(255,255,255,0.04); --sb-active:rgba(59,130,246,0.14);
+  --sb-divider:rgba(255,255,255,0.06);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 24px 60px -20px rgba(0,0,0,.85);
+  --geo-1:rgba(55,138,221,0.10); --geo-2:rgba(55,138,221,0.28); --geo-3:rgba(55,138,221,0.55); --geo-4:rgba(55,138,221,0.85); --geo-5:#02060c;
+  --geo-blank:rgba(255,255,255,0.04);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh;align-items:stretch;transition:background-color .25s ease}
+
+/* ═══ SIDEBAR (canonical) ═══ */
+.sidebar{background:var(--sb-bg);color:var(--sb-text);border-right:1px solid var(--sb-border);position:relative;min-height:100%;align-self:stretch;overflow:visible}
+.sidebar-sticky{position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:visible;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;width:100%;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.10) transparent}
+.sidebar-sticky::-webkit-scrollbar{width:6px}
+.sidebar-sticky::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+.sidebar-sticky::-webkit-scrollbar-track{background:transparent}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));display:grid;place-items:center;color:#ffffff;font-weight:800;font-size:14px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);margin-bottom:10px;position:relative}
+.sb-divider{width:24px;height:1px;background:var(--sb-divider);margin:6px 0}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--sb-text-mute);position:relative;cursor:pointer;transition:all .15s}
+.sb-icon:hover{background:var(--sb-hover);color:#e2e8f0}
+.sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--accent);border-radius:2px}
+.sb-icon svg{width:18px;height:18px}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid var(--sb-divider)}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s, transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+.frame{grid-template-columns:var(--sb-width, 56px) 1fr;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+[data-sb="open"] .frame{--sb-width:232px}
+.sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);min-height:100%}
+[data-sb="open"] .sidebar-sticky{align-items:stretch;padding:14px 10px 14px}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;align-self:stretch;margin:0 0 8px 2px}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+[data-sb="open"] .sb-icon{width:100%;height:36px;justify-content:flex-start;gap:11px;padding:0 10px;border-radius:9px}
+[data-sb="open"] .sb-icon.active::before{left:-12px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;line-height:1;flex:1;min-width:0}
+[data-sb="open"] .sb-icon .sb-tip{display:none !important}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#ffffff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,0.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono";font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.32);padding:14px 12px 6px}
+[data-sb="open"] .sb-bottom{align-items:stretch;width:100%}
+[data-sb="open"] .sb-avatar{align-self:flex-start;margin:6px 0 0 2px}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--sb-bg);border:1px solid var(--sb-border);color:var(--sb-text);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s, color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.sb-toggle:hover{background:var(--sb-hover);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo{background:transparent;box-shadow:none;color:var(--accent)}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,0.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:var(--accent)}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,0.18);color:#fca5a5;border:1px solid rgba(220,38,38,0.30)}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,0.08)}
+[data-sb="open"] .sb-icon{display:flex !important;align-items:center !important;justify-content:flex-start !important;width:100% !important;height:36px;gap:11px !important;padding:0 10px !important;border-radius:9px;flex-direction:row !important;flex-wrap:nowrap;overflow:hidden}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex !important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon .sb-badge{flex-shrink:0;white-space:nowrap}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));color:#ffffff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55)}
+[data-sb="open"] .sb-logo-row{display:flex !important;align-items:center;gap:10px;justify-content:flex-start;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-bottom{flex-direction:column;align-items:flex-start;gap:6px}
+
+/* ═══ TOPBAR ═══ */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.tb-search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:280px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+
+/* ═══ BODY ═══ */
+.body{padding:24px 28px 32px;display:flex;flex-direction:column;gap:18px}
+.page-header{display:flex;flex-direction:column;gap:6px;max-width:62ch}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0}
+.page-header h1{font-family:"Manrope",sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.1}
+.page-sub{font-size:13px;color:var(--mute);margin:0}
+.hdr-sub-combined{display:flex;align-items:baseline;gap:0;flex-wrap:nowrap;margin:0 0 12px;white-space:nowrap}
+.hdr-sub-primary{font-size:13px;color:var(--ink-2);font-weight:400}
+.hdr-sub-divider{font-size:13px;color:var(--mute);padding:0 6px}
+.hdr-sub-source{font-size:11px;color:var(--mute);font-weight:400}
+
+/* ═══ FILTER BAR ═══ */
+.filter-bar{
+  background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-sm);
+  padding:10px 18px;display:flex;flex-direction:column;gap:8px;
+  position:sticky;top:0;z-index:20;margin-bottom:0;
+}
+.fb-row{display:flex;align-items:center;gap:16px;flex-wrap:nowrap}
+.fb-row-2{justify-content:flex-end;gap:10px}
+.fb-divider{width:0.5px;height:20px;background:var(--line);flex-shrink:0}
+/* ── Agency overflow dropdown ── */
+.fb-more-wrap{position:relative}
+.fb-more-btn{background:var(--card-soft);border:0.5px solid var(--line);color:var(--mute);font-family:"IBM Plex Mono",monospace}
+.fb-more-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--card);border:0.5px solid var(--line);border-radius:8px;padding:6px;z-index:200;flex-direction:column;gap:4px;min-width:100px;box-shadow:var(--shadow-pop)}
+.fb-more-wrap:hover .fb-more-dropdown,.fb-more-wrap:focus-within .fb-more-dropdown{display:flex}
+/* ── Inline FY timeline ── */
+.fb-timeline{display:flex;align-items:center;gap:12px;justify-content:flex-end;width:100%}
+.fb-tl-label{font-family:"IBM Plex Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);font-weight:700;white-space:nowrap}
+.fb-tl-track{display:flex;align-items:center;gap:6px}
+.fb-tl-item{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--mute)}
+.fb-tl-item.current{color:#378ADD;font-weight:700}
+[data-theme="dark"] .fb-tl-item.current{color:var(--accent-light)}
+.fb-tl-item.projected{color:var(--mute);font-style:italic}
+.fb-tl-item.closed{color:var(--mute);text-decoration:none}
+.fb-tl-sep{font-size:10px;color:var(--line)}
+.fb-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fb-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-right:6px}
+.fb-pill{
+  display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:7px;
+  background:var(--card-soft);border:1px solid var(--line);color:var(--ink-2);
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  cursor:pointer;transition:border-color .14s, color .14s, background .14s;
+}
+.fb-pill:hover{border-color:var(--accent-light);color:var(--accent-deep);background:rgba(55,138,221,0.04)}
+[data-theme="dark"] .fb-pill:hover{color:var(--accent-light)}
+.fb-pill.active{background:rgba(55,138,221,0.12);border-color:var(--accent-light);color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .fb-pill.active{color:var(--accent-light);background:rgba(55,138,221,0.20);border-color:rgba(181,212,244,0.30)}
+.fb-pill.check{border-style:dashed}
+.fb-pill.check.active::before{content:"✓ ";margin-right:2px;font-size:10px;line-height:1;color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .fb-pill.check.active::before{color:var(--accent-light)}
+/* ── FY timeline pills (display only, no click) ── */
+
+/* ═══ STAT STRIP ═══ */
+.stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat-card{height:80px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);padding:0 18px;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center;position:relative;overflow:hidden}
+.stat-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.stat-card.tone-amber::before{background:var(--amber-600)}
+.stat-card.tone-red::before{background:var(--red-600)}
+.stat-card.tone-blue::before{background:var(--accent)}
+.stat-card.tone-green::before{background:var(--green-600)}
+.stat-card .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+.stat-card.tone-amber .ic{background:rgba(245,158,11,0.12);color:var(--amber-700)}
+.stat-card.tone-red   .ic{background:rgba(220,38,38,0.12);color:var(--red-700)}
+.stat-card.tone-blue  .ic{background:rgba(55,138,221,0.12);color:var(--accent-deep)}
+.stat-card.tone-green .ic{background:rgba(16,185,129,0.12);color:var(--green-700)}
+[data-theme="dark"] .stat-card.tone-amber .ic{color:#fcd34d}
+[data-theme="dark"] .stat-card.tone-red   .ic{color:#fca5a5}
+[data-theme="dark"] .stat-card.tone-blue  .ic{color:var(--accent-light)}
+[data-theme="dark"] .stat-card.tone-green .ic{color:#6ee7b7}
+.stat-card .ic svg{width:20px;height:20px}
+.stat-card .stat-body{min-width:0;display:flex;flex-direction:column;gap:1px}
+.stat-card .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0;line-height:1.1}
+.stat-card .val{font-family:"Manrope",sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:1px 0 0;line-height:1.05}
+.stat-card.tone-amber .val{color:var(--amber-700)}
+.stat-card.tone-red   .val{color:var(--red-700)}
+.stat-card.tone-blue  .val{color:var(--accent-deep)}
+.stat-card.tone-green .val{color:var(--green-700)}
+[data-theme="dark"] .stat-card.tone-amber .val{color:#fcd34d}
+[data-theme="dark"] .stat-card.tone-red   .val{color:#fca5a5}
+[data-theme="dark"] .stat-card.tone-blue  .val{color:var(--accent-light)}
+[data-theme="dark"] .stat-card.tone-green .val{color:#6ee7b7}
+.stat-card .sub{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin:1px 0 0;letter-spacing:.02em;line-height:1.1}
+/* ═══ Info tooltips (stat cards + widget headers) ═══ */
+.stat-info-btn{position:absolute;top:8px;right:8px;background:none;border:0;cursor:pointer;color:var(--mute-2);padding:0;line-height:1;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center}
+.stat-info-btn:hover{color:var(--ink-2)}
+.stat-info-btn svg{width:13px;height:13px}
+.stat-tooltip{position:absolute;top:24px;right:0;width:220px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--ink-2);line-height:1.6;z-index:100;display:none;text-align:left;box-shadow:var(--shadow-pop);font-family:"Manrope",sans-serif;letter-spacing:0;text-transform:none;font-weight:500;white-space:normal}
+.stat-info-btn:hover .stat-tooltip{display:block}
+.widget-info-btn{display:inline-flex;align-items:center;margin-left:6px;background:none;border:0;cursor:pointer;color:var(--mute-2);padding:0;vertical-align:middle;position:relative;width:14px;height:14px;justify-content:center}
+.widget-info-btn:hover{color:var(--ink-2)}
+.widget-info-btn svg{width:13px;height:13px}
+.widget-info-btn .stat-tooltip{top:20px;right:auto;left:0;width:260px}
+.widget-info-btn:hover .stat-tooltip{display:block}
+
+/* ═══ Rows ═══ */
+.row{display:grid;gap:18px;align-items:stretch}
+.row.cols-2{grid-template-columns:1fr 1fr}
+.row.cols-1{grid-template-columns:1fr}
+.row.r-380 > .widget{min-height:380px;max-height:380px}
+.row.r-420 > .widget{min-height:420px;max-height:420px}
+.row.r-520 > .widget{min-height:520px;max-height:520px}
+.row.r-720 > .widget{min-height:720px}
+.row.r-320 > .widget{min-height:320px;max-height:320px}
+
+/* ═══ Widget base ═══ */
+.widget{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;min-width:0}
+.widget-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-shrink:0;min-height:48px}
+.wh-left{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}
+.wh-icon{width:30px;height:30px;border-radius:8px;background:rgba(55,138,221,0.10);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+[data-theme="dark"] .wh-icon{background:rgba(55,138,221,0.18);color:var(--accent-light)}
+.wh-icon svg{width:16px;height:16px}
+.wh-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wh-text h3{font-family:"Manrope",sans-serif;font-size:14px;font-weight:800;letter-spacing:-.005em;color:var(--ink);margin:0;line-height:1.2}
+.wh-text .wh-sub{font-size:11.5px;color:var(--mute);margin:0;line-height:1.35}
+.wh-source{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);padding:3px 7px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.wh-right{display:flex;align-items:center;gap:6px}
+.fy-toggle{display:inline-flex;border:1px solid var(--line);border-radius:7px;background:var(--card-soft);overflow:hidden;flex-shrink:0}
+.fy-toggle button{background:transparent;border:0;cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--mute);padding:5px 9px;border-right:1px solid var(--line)}
+.fy-toggle button:last-child{border-right:0}
+.fy-toggle button.active{background:var(--card);color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .fy-toggle button.active{color:var(--accent-light)}
+.widget-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
+
+/* ═══ Recompete Radar ═══ */
+.recompete-list{display:flex;flex-direction:column;gap:8px}
+.rc-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 13px;background:var(--card-soft);border:1px solid var(--line-2);border-left:3px solid var(--amber-600);border-radius:9px}
+.rc-info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.rc-name{font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:-.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-incumbent{font-size:11px;color:var(--ink-2);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-incumbent b{font-weight:800;color:var(--ink)}
+.rc-meta{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-meta .rc-q{color:var(--amber-700);font-weight:700}
+[data-theme="dark"] .rc-meta .rc-q{color:#fcd34d}
+.rc-alert{background:transparent;border:1px solid var(--accent-light);color:var(--accent-deep);font-family:"Manrope",sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:6px 11px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .14s, color .14s, border-color .14s}
+.rc-alert:hover{background:rgba(55,138,221,0.06);border-color:var(--accent)}
+[data-theme="dark"] .rc-alert{color:var(--accent-light);border-color:rgba(181,212,244,0.30)}
+
+/* ═══ Incumbent Intelligence (table — fixed header contrast) ═══ */
+.ii-table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}
+.ii-table thead th{padding:10px 8px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);border-bottom:2px solid var(--accent);text-align:left;white-space:nowrap;background:rgba(55,138,221,0.06);position:sticky;top:0;z-index:1}
+[data-theme="dark"] .ii-table thead th{color:var(--accent-light);background:rgba(55,138,221,0.12);border-bottom-color:rgba(181,212,244,0.40)}
+.ii-table td{padding:7px 8px;border-bottom:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.ii-table tr:last-child td{border-bottom:0}
+.ii-table tr:hover td{background:rgba(55,138,221,0.04)}
+[data-theme="dark"] .ii-table tr:hover td{background:rgba(55,138,221,0.08)}
+.ii-awardee-cell{display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden}
+.ii-name{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ii-notice{font-size:10px;color:var(--mute);font-family:"IBM Plex Mono",monospace;opacity:0;transition:opacity .15s ease;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ii-awardee-cell:hover .ii-notice,tr:hover .ii-notice{opacity:1}
+.ii-table .c-awd{font-weight:700;color:var(--ink);font-size:11.5px}
+.ii-table .c-agy{color:var(--mute);font-size:11px}
+.ii-table .c-val{font-family:"IBM Plex Mono",monospace;font-weight:800;color:var(--accent-deep);font-size:11px;text-align:right}
+[data-theme="dark"] .ii-table .c-val{color:var(--accent-light)}
+.ii-table .c-nai{font-family:"IBM Plex Mono",monospace;color:var(--ink-2);font-size:10.5px}
+.sb-bdg{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.04em;padding:2px 6px;border-radius:4px;line-height:1.3;text-align:center}
+.sb-bdg.sb{background:#dcfce7;color:#166534}
+.sb-bdg.lp{background:#0D1F35;color:#B5D4F4}
+[data-theme="dark"] .sb-bdg.sb{background:rgba(22,101,52,0.30);color:#86efac}
+[data-theme="dark"] .sb-bdg.lp{background:rgba(13,31,53,0.85);color:#B5D4F4}
+.find-contact{font-family:"Manrope",sans-serif;font-size:11px;font-weight:700;color:var(--accent-deep);background:transparent;border:0;padding:4px 10px;cursor:pointer;white-space:nowrap;width:100%;text-align:center}
+[data-theme="dark"] .find-contact{color:var(--accent-light)}
+.find-contact:hover{text-decoration:underline}
+
+/* ═══ Agency Breakdown ═══ */
+.ag-list{display:flex;flex-direction:column;gap:11px;padding-top:4px}
+.ag-row{display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;transition:opacity .25s}
+.ag-name{font-size:11.5px;color:var(--ink-2);font-weight:700;letter-spacing:-.005em;display:flex;align-items:center;gap:5px}
+.ag-trend{display:inline-flex;align-items:center;justify-content:center;width:11px;height:11px;font-size:9px;font-weight:800;font-family:"IBM Plex Mono";flex-shrink:0;line-height:1}
+.ag-trend.up{color:var(--green-700)}
+.ag-trend.down{color:var(--red-700)}
+.ag-trend.flat{color:var(--mute-2)}
+[data-theme="dark"] .ag-trend.up{color:#6ee7b7}
+[data-theme="dark"] .ag-trend.down{color:#fca5a5}
+.ag-bar{height:20px;border-radius:6px;background:var(--line-2);overflow:hidden;position:relative}
+.ag-fill{height:100%;background:linear-gradient(90deg,var(--navy-700),var(--navy-800));border-radius:6px;display:flex;align-items:stretch;position:relative;transition:width .35s ease}
+.ag-sb{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));border-radius:6px 0 0 6px;display:grid;place-items:center;position:relative;transition:width .35s ease}
+.ag-sb-lbl{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;color:#fff;letter-spacing:.04em;padding:0 4px;white-space:nowrap}
+.ag-val{font-family:"IBM Plex Mono",monospace;font-weight:800;font-size:12px;color:var(--accent-deep);text-align:right}
+[data-theme="dark"] .ag-val{color:var(--accent-light)}
+.ag-legend{display:flex;gap:14px;margin-top:auto;padding-top:8px;border-top:1px solid var(--line-2);font-size:10.5px;color:var(--mute);font-family:"IBM Plex Mono",monospace;letter-spacing:.02em}
+.ag-legend .lg{display:inline-flex;align-items:center;gap:6px}
+.ag-legend .lg::before{content:"";width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.ag-legend .lg.sb::before{background:linear-gradient(135deg,var(--accent),var(--accent-deep))}
+.ag-legend .lg.lp::before{background:linear-gradient(135deg,var(--navy-700),var(--navy-800))}
+
+/* ═══ Chart wrapper ═══ */
+.chart-canvas-wrap{flex:1;min-height:0;position:relative}
+.chart-canvas-wrap canvas{position:absolute !important;inset:0;width:100% !important;height:100% !important}
+
+/* ═══ Teaming Intelligence (large primes) ═══ */
+.team-list{display:flex;flex-direction:column;gap:6px}
+.team-row{display:grid;grid-template-columns:24px 180px 100px 52px 64px 80px;gap:9px;align-items:center;padding:8px 10px;background:var(--card-soft);border:1px solid var(--line-2);border-radius:8px;transition:opacity .14s}
+.team-header-row{display:grid;grid-template-columns:24px 180px 100px 52px 64px 80px;gap:9px;padding:0 0 8px 0;border-bottom:0.5px solid var(--line);margin-bottom:4px;align-items:center}
+.team-header-row span{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:700}
+.tr-rank{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--mute);text-align:center}
+.tr-name{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:-.005em;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:800;color:var(--accent-deep);text-align:right}
+[data-theme="dark"] .tr-val{color:var(--accent-light)}
+.tr-agencies{display:flex;gap:4px;align-items:center;overflow:hidden;min-width:0}
+.agy-pill{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.04em;padding:2px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.agy-pill.overflow{background:rgba(100,116,139,0.12);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .agy-pill.overflow{background:rgba(255,255,255,0.06);color:#94a3b8;border-color:rgba(255,255,255,0.10)}
+.agy-pill.navair{background:rgba(55,138,221,0.12);color:var(--accent-deep);border:1px solid rgba(55,138,221,0.30)}
+.agy-pill.aflcmc{background:rgba(10,22,40,0.10);color:var(--navy-800);border:1px solid rgba(10,22,40,0.20)}
+.agy-pill.tacom{background:rgba(100,116,139,0.10);color:var(--mute);border:1px solid var(--line)}
+.agy-pill.dla{background:rgba(245,158,11,0.12);color:var(--amber-700);border:1px solid rgba(245,158,11,0.30)}
+[data-theme="dark"] .agy-pill.navair{color:var(--accent-light);background:rgba(55,138,221,0.20);border-color:rgba(181,212,244,0.30)}
+[data-theme="dark"] .agy-pill.aflcmc{color:#cbd5e1;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.10)}
+[data-theme="dark"] .agy-pill.dla{color:#fcd34d;background:rgba(245,158,11,0.18);border-color:rgba(252,211,77,0.30)}
+.tr-sbplan{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.06em;padding:3px 6px;border-radius:4px;text-align:center}
+.tr-sbplan.yes{background:rgba(16,185,129,0.12);color:var(--green-700);border:1px solid rgba(16,185,129,0.30)}
+.tr-sbplan.no{background:rgba(100,116,139,0.10);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .tr-sbplan.yes{color:#6ee7b7;background:rgba(16,185,129,0.18);border-color:rgba(110,231,183,0.30)}
+
+/* ═══ SB Competitive Intelligence ═══ */
+.sb-list{display:flex;flex-direction:column;gap:6px}
+.sb-row{display:grid;grid-template-columns:24px 180px 80px 72px 64px 80px;gap:8px;align-items:center;padding:8px 10px;background:var(--card-soft);border:1px solid var(--line-2);border-radius:8px;transition:opacity .14s}
+.sb-row .tr-name{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-header-row{display:grid;grid-template-columns:24px 180px 80px 72px 64px 80px;gap:8px;padding:0 0 8px 0;border-bottom:0.5px solid var(--line);margin-bottom:4px;align-items:center}
+.sb-header-row span{font-family:"IBM Plex Mono",monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:700}
+.sb-row .tr-rank{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:800;color:var(--mute);text-align:center}
+.sb-row .tr-name{font-size:12px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-row .tr-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:800;color:var(--accent-deep);text-align:right}
+[data-theme="dark"] .sb-row .tr-val{color:var(--accent-light)}
+.sa-pill{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;text-align:center;white-space:nowrap}
+.sa-pill.sb{background:rgba(55,138,221,0.12);color:var(--accent-deep);border:1px solid rgba(55,138,221,0.30)}
+.sa-pill.sdvosb{background:rgba(16,185,129,0.12);color:var(--green-700);border:1px solid rgba(16,185,129,0.30)}
+.sa-pill.eight-a{background:rgba(124,58,237,0.10);color:var(--purple-700);border:1px solid rgba(124,58,237,0.30)}
+.sa-pill.wosb{background:rgba(219,39,119,0.10);color:var(--pink-700);border:1px solid rgba(219,39,119,0.30)}
+[data-theme="dark"] .sa-pill.sb{color:var(--accent-light);background:rgba(55,138,221,0.20);border-color:rgba(181,212,244,0.30)}
+[data-theme="dark"] .sa-pill.sdvosb{color:#6ee7b7;background:rgba(16,185,129,0.18);border-color:rgba(110,231,183,0.30)}
+[data-theme="dark"] .sa-pill.eight-a{color:#c4b5fd;background:rgba(124,58,237,0.20);border-color:rgba(196,181,253,0.30)}
+[data-theme="dark"] .sa-pill.wosb{color:#f9a8d4;background:rgba(219,39,119,0.20);border-color:rgba(249,168,212,0.30)}
+.sb-row .pa{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-2);font-weight:600;letter-spacing:.02em;text-align:right}
+.wr-pill{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.06em;padding:3px 6px;border-radius:4px;text-align:center}
+.wr-pill.high{background:rgba(16,185,129,0.12);color:var(--green-700);border:1px solid rgba(16,185,129,0.30)}
+.wr-pill.med{background:rgba(245,158,11,0.12);color:var(--amber-700);border:1px solid rgba(245,158,11,0.30)}
+.wr-pill.low{background:rgba(220,38,38,0.10);color:var(--red-700);border:1px solid rgba(220,38,38,0.30)}
+[data-theme="dark"] .wr-pill.high{color:#6ee7b7;background:rgba(16,185,129,0.18);border-color:rgba(110,231,183,0.30)}
+[data-theme="dark"] .wr-pill.med{color:#fcd34d;background:rgba(245,158,11,0.18);border-color:rgba(252,211,77,0.30)}
+[data-theme="dark"] .wr-pill.low{color:#fca5a5;background:rgba(220,38,38,0.18);border-color:rgba(220,38,38,0.40)}
+
+/* ═══ Geographic Concentration (full-width SVG map) ═══ */
+.geo-fullwrap{display:grid;grid-template-columns:60fr 40fr;gap:18px;min-height:580px;height:auto;align-items:stretch}
+.geo-mapbox{position:relative;display:flex;flex-direction:column;gap:8px;min-height:560px;overflow:visible}
+.geo-svg{width:100%;height:520px;display:block;flex-shrink:0}
+.geo-svg path{cursor:pointer;transition:opacity .14s}
+.geo-svg path:hover{opacity:.75}
+.geo-svg .b0{fill:var(--geo-blank);stroke:var(--card);stroke-width:.6}
+.geo-svg .b1{fill:var(--geo-1);stroke:var(--card);stroke-width:.6}
+.geo-svg .b2{fill:var(--geo-2);stroke:var(--card);stroke-width:.6}
+.geo-svg .b3{fill:var(--geo-3);stroke:var(--card);stroke-width:.6}
+.geo-svg .b4{fill:var(--geo-4);stroke:var(--card);stroke-width:.6}
+.geo-svg .b5{fill:var(--geo-5);stroke:var(--card);stroke-width:.6}
+.geo-legend-row{display:flex;gap:10px;align-items:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);letter-spacing:.04em;justify-content:center}
+.geo-legend-row .leg{display:inline-flex;align-items:center;gap:5px}
+.geo-legend-row .leg::before{content:"";width:11px;height:11px;border-radius:3px}
+.leg.gb1::before{background:var(--geo-1)}
+.leg.gb2::before{background:var(--geo-2)}
+.leg.gb3::before{background:var(--geo-3)}
+.leg.gb4::before{background:var(--geo-4)}
+.leg.gb5::before{background:var(--geo-5)}
+#geoTooltip{
+  position:absolute;display:none;pointer-events:none;z-index:50;
+  background:#050d1a;color:#fff;padding:8px 10px;border-radius:6px;
+  font-size:11px;font-weight:600;white-space:nowrap;letter-spacing:.01em;
+  box-shadow:0 4px 14px rgba(0,0,0,0.3);
+}
+#geoTooltip .tt-name{font-family:"Manrope";font-weight:800;font-size:12px;color:#fff;margin-bottom:3px}
+#geoTooltip .tt-row{font-family:"IBM Plex Mono";font-size:10.5px;color:#cbd5e1;letter-spacing:.02em}
+#geoTooltip .tt-row b{color:#fff;font-weight:700}
+#geoTooltip .tt-up{color:#6ee7b7}
+#geoTooltip .tt-down{color:#fca5a5}
+.geo-rank-wrap{display:flex;flex-direction:column;gap:8px;justify-content:space-between}
+/* ── Unified geo data table (single source of truth) ── */
+.geo-data-table{display:flex;flex-direction:column;padding:4px 0}
+.gdt-row{display:grid;grid-template-columns:32px 58px 88px 1fr;gap:10px;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--line-2)}
+.gdt-row:last-of-type{border-bottom:none}
+.gdt-state{font-size:13px;font-weight:700;color:var(--ink);font-family:"IBM Plex Mono",monospace}
+.gdt-val{font-size:12px;font-weight:700;color:#378ADD;font-family:"IBM Plex Mono",monospace}
+[data-theme="dark"] .gdt-val{color:var(--accent-light)}
+.gdt-signal{font-size:11px;font-weight:700;font-family:"IBM Plex Mono",monospace;display:flex;align-items:center}
+.gdt-signal.up{color:#16a34a}
+.gdt-signal.down{color:#dc2626}
+[data-theme="dark"] .gdt-signal.up{color:#6ee7b7}
+[data-theme="dark"] .gdt-signal.down{color:#fca5a5}
+.gdt-signal.gap{background:#fee2e2;color:#991b1b;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap;justify-self:start}
+[data-theme="dark"] .gdt-signal.gap{background:rgba(220,38,38,0.18);color:#fca5a5}
+.gdt-hint{font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gdt-section-label{font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:var(--mute);font-weight:700;padding:14px 0 6px;border-bottom:0.5px solid var(--line);margin-bottom:2px;font-family:"IBM Plex Mono",monospace}
+.gdt-section-label:first-child{padding-top:0}
+.gdt-insight{margin-top:16px;background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:8px;padding:12px 14px}
+[data-theme="dark"] .gdt-insight{background:rgba(55,138,221,0.10);border-color:rgba(181,212,244,0.30)}
+.gdt-insight-label{font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:#185FA5;font-weight:700;display:block;margin-bottom:4px;font-family:"IBM Plex Mono",monospace}
+[data-theme="dark"] .gdt-insight-label{color:var(--accent-light)}
+.gdt-insight-text{font-size:12px;color:#1e40af;line-height:1.6}
+.gdt-insight-text b{color:#185FA5;font-weight:700}
+[data-theme="dark"] .gdt-insight-text{color:#cbd5e1}
+[data-theme="dark"] .gdt-insight-text b{color:var(--accent-light)}
+/* ── Geo widget header separator ── */
+.geo-widget .widget-head{padding-bottom:12px;border-bottom:0.5px solid var(--line-2);margin-bottom:0}
+.geo-widget .widget-body{padding-top:16px}
+
+/* ═══ Competition Density ═══ */
+.cd-list{display:flex;flex-direction:column;gap:9px;flex:1}
+.cd-tile{display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;padding:14px 16px;background:var(--card-soft);border:1px solid var(--line-2);border-radius:10px;border-left-width:3px;flex:1;transition:transform .14s, box-shadow .14s}
+.cd-tile.high{border-left-color:var(--green-600)}
+.cd-tile.crowded{border-left-color:var(--red-600)}
+.cd-tile.highlighted{box-shadow:0 0 0 2px var(--accent-light);transform:translateX(2px)}
+.cd-naics{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:800;color:var(--ink);letter-spacing:.02em}
+.cd-stats{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cd-firms{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);letter-spacing:.02em}
+.cd-ratio{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:800;color:var(--ink-2);letter-spacing:.02em}
+.cd-tag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;padding:4px 9px;border-radius:5px;white-space:nowrap}
+.cd-tag.high{background:rgba(16,185,129,0.12);color:var(--green-700);border:1px solid rgba(16,185,129,0.30)}
+.cd-tag.crowded{background:rgba(220,38,38,0.12);color:var(--red-700);border:1px solid rgba(220,38,38,0.30)}
+[data-theme="dark"] .cd-tag.high{color:#6ee7b7;background:rgba(16,185,129,0.18);border-color:rgba(110,231,183,0.30)}
+[data-theme="dark"] .cd-tag.crowded{color:#fca5a5;background:rgba(220,38,38,0.18);border-color:rgba(220,38,38,0.40)}
+.cd-legend{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em;padding-top:8px;border-top:1px solid var(--line-2);line-height:1.5}
+
+/* ═══ Pricing Intelligence ═══ */
+.pricing-list{display:flex;flex-direction:column;gap:12px;flex:1}
+.pricing-table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:auto}
+.pricing-table thead th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--mute);padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+.pricing-table tbody td{padding:10px 10px;border-bottom:1px solid var(--line-3);font-family:"IBM Plex Mono",monospace;color:var(--ink-2);vertical-align:middle}
+.pricing-table tbody tr:last-child td{border-bottom:0}
+.pricing-table tbody tr:nth-child(even) td{background:var(--card-soft)}
+.pricing-table .pr-c-naics{font-weight:800;color:var(--ink);font-size:12px;letter-spacing:.02em}
+.pricing-table .pr-c-avg{color:var(--accent);font-weight:600;font-size:12px}
+[data-theme="dark"] .pricing-table .pr-c-avg{color:var(--accent-light)}
+.pricing-table .pr-c-amber{color:#d97706;font-weight:600;white-space:nowrap}
+[data-theme="dark"] .pricing-table .pr-c-amber{color:#fcd34d}
+.pricing-table .pr-c-mute{color:var(--mute);white-space:nowrap}
+.pricing-callout-box{background:#E6F1FB;border:1px solid #B5D4F4;border-radius:6px;padding:10px 14px;font-size:11.5px;color:#1e3a5f;line-height:1.5;margin-top:auto}
+[data-theme="dark"] .pricing-callout-box{background:rgba(55,138,221,0.12);border-color:rgba(181,212,244,0.30);color:#cbd5e1}
+
+/* ═══ Budget chart legend ═══ */
+.bud-legend{display:flex;gap:14px;justify-content:center;padding-top:8px;border-top:1px solid var(--line-2);margin-top:6px}
+.bud-legend .bl{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);letter-spacing:.02em;font-weight:600}
+.bud-legend .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* ═══ NDAA Highlights widget ═══ */
+.ndaa-body{display:flex;flex-direction:column;gap:10px;overflow:auto}
+.ndaa-card{background:var(--card-soft);border:1px solid var(--line-2);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.ndaa-card.ndaa-amber{border-left:3px solid #d97706}
+.ndaa-card.ndaa-green{border-left:3px solid #16a34a}
+.ndaa-card.ndaa-blue{border-left:3px solid #378ADD}
+.ndaa-badge{display:inline-block;align-self:flex-start;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.ndaa-badge.amber{background:rgba(245,158,11,0.14);color:#b45309}
+.ndaa-badge.green{background:rgba(22,163,74,0.14);color:#15803d}
+.ndaa-badge.blue{background:rgba(55,138,221,0.14);color:var(--accent-deep)}
+[data-theme="dark"] .ndaa-badge.amber{background:rgba(245,158,11,0.22);color:#fcd34d}
+[data-theme="dark"] .ndaa-badge.green{background:rgba(22,163,74,0.22);color:#86efac}
+[data-theme="dark"] .ndaa-badge.blue{background:rgba(55,138,221,0.22);color:var(--accent-light)}
+.ndaa-title{font-family:"Manrope",sans-serif;font-size:13px;font-weight:600;color:var(--ink);margin:6px 0 4px;line-height:1.3;letter-spacing:-.005em}
+.ndaa-body-text{font-size:12px;color:var(--mute);line-height:1.6;margin:0}
+
+/* ═══ Footer status pills ═══ */
+.footer-strip{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.status-pill{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);padding:14px 18px;display:flex;align-items:center;gap:14px}
+.sp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 4px rgba(0,0,0,0.04)}
+.sp-dot.green{background:var(--green-500);box-shadow:0 0 0 4px rgba(16,185,129,0.18);animation:pulse 1.6s ease-out infinite}
+.sp-dot.amber{background:var(--amber-600);box-shadow:0 0 0 4px rgba(245,158,11,0.18)}
+.sp-content{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sp-label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0}
+.sp-status{font-size:13px;font-weight:700;color:var(--ink);margin:0;line-height:1.3}
+.sp-status b{color:var(--accent-deep)}
+[data-theme="dark"] .sp-status b{color:var(--accent-light)}
+.sp-status .countdown{font-family:"IBM Plex Mono",monospace;font-weight:800;color:var(--amber-700);font-size:13px}
+[data-theme="dark"] .sp-status .countdown{color:#fcd34d}
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════ SIDEBAR ═════════ -->
+  <aside class="sidebar">
+    <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+    <div class="sidebar-sticky">
+    <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+    <div class="sb-group-label">WORKSPACE</div>
+    <a class="sb-icon" href="/home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+    <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+    <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+    <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+    <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+    <div class="sb-group-label">INTELLIGENCE</div>
+    <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+    <a class="sb-icon active" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+    <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+    <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+    <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Agencies</span></a>
+    <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+    <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+    <a class="sb-icon" href="/cmmc-readiness"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+    <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+    <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+    <div class="sb-group-label">ACCOUNT</div>
+    <a class="sb-icon" href="/profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+    <a class="sb-icon sb-signout" href="/sign-out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></a>
+    <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+    </div>
+  </aside>
+
+  <!-- ═════════ MAIN ═════════ -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Defense Spending</b><span class="sep">/</span><span>FY2023–FY2026 budget intelligence</span></div>
+      <span class="live-pill">LIVE</span>
+      <div class="tb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Quick search…</span><span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge">7</span></button>
+        <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <header class="page-header">
+        <p class="eyebrow">Budget Intelligence</p>
+        <h1>Defense Spending</h1>
+        <p class="hdr-sub-combined"><span class="hdr-sub-primary">FY2022–FY2026 actuals · FY2027 projected · filtered to your NAICS codes</span><span class="hdr-sub-divider">·</span><span class="hdr-sub-source">Sourced from FPDS-NG + USAspending.gov · updated daily</span></p>
+      </header>
+
+      <!-- ═══ FILTER BAR ═══ -->
+      <section class="filter-bar">
+        <div class="fb-row fb-row-1">
+          <div class="fb-group">
+            <span class="fb-label">Your NAICS</span>
+            <button class="fb-pill check active" data-grp="naics" data-val="336413" type="button">336413</button>
+            <button class="fb-pill check active" data-grp="naics" data-val="332710" type="button">332710</button>
+            <button class="fb-pill check active" data-grp="naics" data-val="332721" type="button">332721</button>
+          </div>
+          <div class="fb-divider"></div>
+          <div class="fb-group">
+            <span class="fb-label">Agency</span>
+            <button class="fb-pill active" data-grp="agency" data-val="all" type="button">All</button>
+            <button class="fb-pill" data-grp="agency" data-val="navy" type="button">Navy</button>
+            <button class="fb-pill" data-grp="agency" data-val="airforce" type="button">Air Force</button>
+            <button class="fb-pill" data-grp="agency" data-val="army" type="button">Army</button>
+            <button class="fb-pill" data-grp="agency" data-val="dla" type="button">DLA</button>
+            <div class="fb-more-wrap">
+              <button class="fb-pill fb-more-btn" type="button">More ▾</button>
+              <div class="fb-more-dropdown">
+                <button class="fb-pill" data-grp="agency" data-val="navair" type="button">NAVAIR</button>
+                <button class="fb-pill" data-grp="agency" data-val="aflcmc" type="button">AFLCMC</button>
+                <button class="fb-pill" data-grp="agency" data-val="tacom" type="button">TACOM</button>
+              </div>
+            </div>
+          </div>
+          <div class="fb-divider"></div>
+          <div class="fb-group">
+            <span class="fb-label">Set-Aside</span>
+            <button class="fb-pill active" data-grp="setaside" data-val="all" type="button">All</button>
+            <button class="fb-pill" data-grp="setaside" data-val="sb" type="button">SB</button>
+            <button class="fb-pill" data-grp="setaside" data-val="sdvosb" type="button">SDVOSB</button>
+            <button class="fb-pill" data-grp="setaside" data-val="8a" type="button">8(a)</button>
+            <button class="fb-pill" data-grp="setaside" data-val="hubzone" type="button">HUBZone</button>
+          </div>
+        </div>
+        <div class="fb-row fb-row-2">
+          <div class="fb-timeline">
+            <span class="fb-tl-label">Budget cycle</span>
+            <div class="fb-tl-track">
+              <span class="fb-tl-item closed">FY2022</span>
+              <span class="fb-tl-sep">→</span>
+              <span class="fb-tl-item closed">FY2023</span>
+              <span class="fb-tl-sep">→</span>
+              <span class="fb-tl-item closed">FY2024</span>
+              <span class="fb-tl-sep">→</span>
+              <span class="fb-tl-item closed">FY2025</span>
+              <span class="fb-tl-sep">→</span>
+              <span class="fb-tl-item current">FY2026 ●</span>
+              <span class="fb-tl-sep">→</span>
+              <span class="fb-tl-item projected">FY2027 ◌</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ STAT STRIP ═══ -->
+      <section class="stat-strip" id="statStrip">
+        <div class="stat-card tone-amber">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span>
+          <div class="stat-body"><p class="lbl">Recompetes Due</p><p class="val" id="statRecompetes">23</p><p class="sub">FY2027 expiry · 18-mo window</p></div>
+          <button class="stat-info-btn" type="button" aria-label="About this metric"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Contracts expiring in FY2027 that must be re-awarded. Incumbent win rate is 70–90%. Start positioning 12–18 months before expiry.</span></button>
+        </div>
+        <div class="stat-card tone-red">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <div class="stat-body"><p class="lbl">Expiring 90 Days</p><p class="val" id="statExpiring">$340M</p><p class="sub">Obligations due near term</p></div>
+          <button class="stat-info-btn" type="button" aria-label="About this metric"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Total contract value expiring within 90 days across your NAICS codes. These are immediate pursuit opportunities.</span></button>
+        </div>
+        <div class="stat-card tone-blue">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+          <div class="stat-body"><p class="lbl">Set-Aside Eligible</p><p class="val" id="statSetAside">47 active</p><p class="sub">SB / SDVOSB / 8(a) / HUBZone</p></div>
+          <button class="stat-info-btn" type="button" aria-label="About this metric"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Active solicitations restricted to your set-aside certifications (SB · SDVOSB · 8(a) · HUBZone). You are eligible to bid on all of these.</span></button>
+        </div>
+        <div class="stat-card tone-green">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 2v4M16 2v4"/></svg></span>
+          <div class="stat-body"><p class="lbl">Synopsis → Award</p><p class="val" id="statAvgDays">68 days</p><p class="sub">Avg cycle · your NAICS</p></div>
+          <button class="stat-info-btn" type="button" aria-label="About this metric"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Average calendar days from Pre-Solicitation Synopsis to contract award in your NAICS. Plan your BD calendar around this window.</span></button>
+        </div>
+      </section>
+
+      <!-- ═══ ROW 1 · 380px · Recompete + Incumbent ═══ -->
+      <section class="row cols-2 r-380">
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span>
+              <div class="wh-text"><h3>Recompete Radar<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Contracts recompeting in FY2027 filtered to your NAICS and agency. Incumbent win rate 70–90%. The earlier you start positioning, the higher your probability of award.</span></button></h3><p class="wh-sub">Contracts recompeting in FY2027 · start positioning now</p></div>
+            </div>
+            <span class="wh-source">FPDS-NG</span>
+          </header>
+          <div class="widget-body"><div class="recompete-list" id="recompeteList"></div></div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></span>
+              <div class="wh-text"><h3>Incumbent Intelligence<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Recent contract awards in your NAICS codes. These awardees are your primary teaming targets — contact their BD team to position as a subcontractor on the next award.</span></button></h3><p class="wh-sub">Recent awards in your NAICS — these are your teaming targets</p></div>
+            </div>
+            <span class="wh-source">USASpending.gov</span>
+          </header>
+          <div class="widget-body" style="overflow:auto">
+            <table class="ii-table">
+              <colgroup><col><col style="width:80px"><col style="width:72px"><col style="width:72px"><col style="width:52px"><col style="width:96px"></colgroup>
+              <thead><tr><th>Awardee</th><th>Agency</th><th>Value</th><th>NAICS</th><th>Type</th><th></th></tr></thead>
+              <tbody id="incumbentBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- ═══ ROW 2 · 380px · Agency Breakdown + Market Trend ═══ -->
+      <section class="row cols-2 r-380">
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/></svg></span>
+              <div class="wh-text"><h3>Agency Breakdown<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Defense spending by agency in your NAICS codes. Use this to prioritize which agency relationships to build. Growing agencies (▲) signal increasing opportunity.</span></button></h3><p class="wh-sub" id="agencySubtitle">Where your NAICS money lives — and where it's moving</p></div>
+            </div>
+            <div class="wh-right">
+              <div class="fy-toggle" id="agencyFYToggle">
+                <button data-fy="FY2024" type="button">FY2024</button>
+                <button data-fy="FY2025" type="button">FY2025</button>
+                <button class="active" data-fy="FY2026" type="button">FY2026</button>
+              </div>
+              <span class="wh-source">FPDS</span>
+            </div>
+          </header>
+          <div class="widget-body">
+            <div class="ag-list" id="agencyList"></div>
+            <div class="ag-legend"><span class="lg sb">Small Business</span><span class="lg lp">Large Prime</span></div>
+          </div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 8,12 13,15 21,7"/></svg></span>
+              <div class="wh-text"><h3>Market Trend · Your NAICS<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Award volume trend FY2022–FY2027 per NAICS code. Dotted lines are projected based on budget trajectory and historical growth rates. Use to validate which NAICS codes to invest in.</span></button></h3><p class="wh-sub" id="marketSubtitle">FY2022–FY2027 · dotted = projected</p></div>
+            </div>
+            <span class="wh-source">FPDS-NG</span>
+          </header>
+          <div class="widget-body"><div class="chart-canvas-wrap"><canvas id="chartMarketTrend"></canvas></div></div>
+        </section>
+
+      </section>
+
+      <!-- ═══ ROW 3 · 420px · Teaming + SB Competitive ═══ -->
+      <section class="row cols-2 r-420">
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg></span>
+              <div class="wh-text"><h3>Large Prime Winners · FY2026<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">The 10 largest prime contractors awarded in your NAICS codes this fiscal year. These are your teaming targets — they are required to subcontract a portion of their work to small businesses.</span></button></h3><p class="wh-sub">Your teaming targets · contact their BD team to position as a subcontractor</p></div>
+            </div>
+            <span class="wh-source">FPDS · GovTribe</span>
+          </header>
+          <div class="widget-body"><div class="team-list" id="teamList"></div></div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+              <div class="wh-text"><h3>SB Competitive Intelligence · FY2026<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">The 10 most successful small businesses in your NAICS codes. These are your direct competitors. Study their set-aside certifications and agency relationships.</span></button></h3><p class="wh-sub">Your direct competitors · study their set-aside edge before you bid</p></div>
+            </div>
+            <span class="wh-source">SAM · DSBS</span>
+          </header>
+          <div class="widget-body"><div class="sb-list" id="sbList"></div></div>
+        </section>
+
+      </section>
+
+      <!-- ═══ ROW 4 · auto · Geographic Concentration FULL WIDTH ═══ -->
+      <section class="row cols-1 r-720">
+
+        <section class="widget geo-widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <div class="wh-text"><h3>Geographic Concentration · Your NAICS<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Where DoD contract dollars physically flow across states. Dark = high spend. Red states = high spend with no recorded activity from your firm — BD expansion opportunities.</span></button></h3><p class="wh-sub" id="geoSubtitle">Where your NAICS money flows — gaps are the intelligence</p></div>
+            </div>
+            <span class="wh-source">FPDS · POP-derived</span>
+          </header>
+          <div class="widget-body">
+            <div class="geo-fullwrap">
+              <div class="geo-mapbox">
+                <svg class="geo-svg" id="geoSvg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet"></svg>
+                <div id="geoTooltip"></div>
+                <div class="geo-legend-row">
+                  <span class="leg gb1">&lt;$30M</span>
+                  <span class="leg gb2">$30–80M</span>
+                  <span class="leg gb3">$80–150M</span>
+                  <span class="leg gb4">$150–250M</span>
+                  <span class="leg gb5">$250M+</span>
+                </div>
+              </div>
+              <div class="geo-rank-wrap">
+                <div class="geo-data-table">
+                  <div class="gdt-section-label">Top 5 States · FY2026</div>
+                  <div class="gdt-row"><span class="gdt-state">TX</span><span class="gdt-val">$340M</span><span class="gdt-signal up">▲ +8%</span><span class="gdt-hint">34% SB · JBSA Lackland · DLA Aviation</span></div>
+                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">28% SB · NAVAIR Pax River · Quantico</span></div>
+                  <div class="gdt-row"><span class="gdt-state">CA</span><span class="gdt-val">$245M</span><span class="gdt-signal down">▼ −3%</span><span class="gdt-hint">31% SB · Edwards AFB · MCAS Miramar</span></div>
+                  <div class="gdt-row"><span class="gdt-state">MD</span><span class="gdt-val">$195M</span><span class="gdt-signal up">▲ +5%</span><span class="gdt-hint">38% SB · Aberdeen PG · Andrews AFB</span></div>
+                  <div class="gdt-row"><span class="gdt-state">FL</span><span class="gdt-val">$165M</span><span class="gdt-signal up">▲ +2%</span><span class="gdt-hint">29% SB · MacDill AFB · NAS Jacksonville</span></div>
+
+                  <div class="gdt-section-label gdt-gap">BD Gap Analysis · High-spend · No recorded activity</div>
+                  <div class="gdt-row"><span class="gdt-state">WA</span><span class="gdt-val">$134M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">NAVAIR Whidbey · Boeing Supply Chain</span></div>
+                  <div class="gdt-row"><span class="gdt-state">OH</span><span class="gdt-val">$67M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">WPAFB · DLA Aviation Columbus</span></div>
+                  <div class="gdt-row"><span class="gdt-state">GA</span><span class="gdt-val">$54M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Robins AFB · Warner Robins ALC</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Luke AFB · Davis-Monthan · MCAS Yuma</span></div>
+
+                  <div class="gdt-section-label gdt-growth">Fastest Growing · YoY Momentum</div>
+                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">NAVAIR Pax River accelerating</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal up">▲ +9%</span><span class="gdt-hint">Luke AFB F-35 program expansion</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AL</span><span class="gdt-val">$112M</span><span class="gdt-signal up">▲ +7%</span><span class="gdt-hint">Redstone Arsenal · AMCOM growth</span></div>
+
+                  <div class="gdt-insight">
+                    <span class="gdt-insight-label">BD Insight</span>
+                    <span class="gdt-insight-text"><b>Virginia fastest growing +12% YoY</b> — BD footprint opportunity. NAVAIR Pax River + Quantico drive concentration; SDVOSB set-asides outperform national average.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- ═══ ROW 5 · 380px · Competition Density + Pricing Intelligence ═══ -->
+      <section class="row cols-2 r-380">
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="2.5"/><circle cx="6" cy="14" r="2"/><circle cx="13" cy="14" r="2"/><circle cx="20" cy="14" r="2"/><path d="M2 22h20"/></svg></span>
+              <div class="wh-text"><h3>Competition Density<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Number of registered firms competing per NAICS code divided by total award dollars. HIGH VALUE means fewer competitors per dollar — better odds and higher margins.</span></button></h3><p class="wh-sub">Crowded-market signal by NAICS — bid where the money concentrates</p></div>
+            </div>
+            <span class="wh-source">SAM.gov · FPDS-NG</span>
+          </header>
+          <div class="widget-body">
+            <div class="cd-list" id="competitionList"></div>
+            <p class="cd-legend">▲ &gt;$1M / firm = green · $500K–$1M = amber · &lt;$500K = red (crowded)</p>
+          </div>
+        </section>
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
+              <div class="wh-text"><h3>Pricing Intelligence · FY2026<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">What contracting agencies actually pay per contract in your NAICS. Use this to price competitively — pricing above median signals quality without disqualifying on LPTA evaluations.</span></button></h3><p class="wh-sub">What agencies actually pay — price with data not guesses</p></div>
+            </div>
+            <span class="wh-source">FPDS · NSN-level</span>
+          </header>
+          <div class="widget-body">
+            <div class="pricing-list" id="pricingList"></div>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- ═══ ROW 6 · 320px · Budget charts (STATIC, no filter) ═══ -->
+      <section class="row cols-2 r-320">
+
+        <section class="widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 8,12 13,15 21,7"/></svg></span>
+              <div class="wh-text"><h3>DoD Budget Trajectory<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Total DoD enacted budget FY2022–FY2026. Amber bar = Continuing Resolution year (no new program starts). Red bar = government shutdown followed by enacted appropriations.</span></button></h3><p class="wh-sub">5-year topline — CR years constrain new contract starts</p></div>
+            </div>
+            <span class="wh-source">OMB · DoD Comptroller</span>
+          </header>
+          <div class="widget-body">
+            <div class="chart-canvas-wrap"><canvas id="chartBudgetLine"></canvas></div>
+            <div class="bud-legend">
+              <span class="bl"><span class="sw" style="background:#378ADD"></span>Enacted</span>
+              <span class="bl"><span class="sw" style="background:#d97706"></span>CR year</span>
+              <span class="bl"><span class="sw" style="background:#ef4444"></span>Shutdown + enacted</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="widget ndaa-widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg></span>
+              <div class="wh-text"><h3>NDAA Highlights · FY2026<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Key provisions from the FY2026 National Defense Authorization Act that directly affect subcontractors in your NAICS codes. These are regulatory changes you must act on.</span></button></h3><p class="wh-sub">Key provisions affecting your contracts — act before enforcement</p></div>
+            </div>
+            <span class="wh-source">NDAA §</span>
+          </header>
+          <div class="widget-body ndaa-body">
+            <div class="ndaa-card ndaa-amber">
+              <span class="ndaa-badge amber">ACTION REQUIRED</span>
+              <p class="ndaa-title">CMMC Phase 2 · November 10, 2026</p>
+              <p class="ndaa-body-text">Mandatory C3PAO certification for CUI contracts. Self-assessment no longer sufficient for Level 2. 158 days to enforcement date.</p>
+            </div>
+            <div class="ndaa-card ndaa-green">
+              <span class="ndaa-badge green">FAVORABLE</span>
+              <p class="ndaa-title">TINA Threshold raised to $5M · NDAA §815</p>
+              <p class="ndaa-body-text">Truth in Negotiations Act threshold increased from $2.5M to $5M. Contracts under $5M now exempt from certified cost or pricing data requirements.</p>
+            </div>
+            <div class="ndaa-card ndaa-blue">
+              <span class="ndaa-badge blue">MONITOR</span>
+              <p class="ndaa-title">DFARS 252.204-7018 · Covered Telecom</p>
+              <p class="ndaa-body-text">Prohibition on covered defense telecom equipment remains active across all contracts. Representation required at time of offer. Applies to all NAICS codes.</p>
+            </div>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- ═══ FOOTER STRIP ═══ -->
+      <section class="footer-strip">
+        <div class="status-pill">
+          <span class="sp-dot green"></span>
+          <div class="sp-content"><p class="sp-label">CR / Budget Status</p><p class="sp-status">FY2026 Fully Enacted · <b>$839.2B</b> · No CR restrictions active</p></div>
+        </div>
+        <div class="status-pill">
+          <span class="sp-dot amber"></span>
+          <div class="sp-content"><p class="sp-label">CMMC Phase 2 Countdown</p><p class="sp-status">CMMC Phase 2 enforcement: <b>November 2026</b> · <span class="countdown" id="cmmcCountdown">— days remaining</span></p></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   FARaudit · Defense Spending v3 — state, render fns, Chart.js, filters
+   ═══════════════════════════════════════════════════════════════════════ */
+
+window.__filters = { naics: ['336413','332710','332721'], agency: ['all'], fy: 'FY2026', setaside: 'all' };
+window.__charts = {};
+
+/* ─── Mock data (keyed by FY where applicable) ──────────────────────── */
+window.__data = {
+
+  statByFY: {
+    FY2024: { recompetes: 27, expiring: '$285M', setAside: '52 active', avgDays: 72 },
+    FY2025: { recompetes: 25, expiring: '$310M', setAside: '49 active', avgDays: 70 },
+    FY2026: { recompetes: 23, expiring: '$340M', setAside: '47 active', avgDays: 68 }
+  },
+
+  agencyBars: {
+    FY2024: [
+      {key:'navy',     name:'U.S. Navy',  val:820, sb:31, trend:'up'},
+      {key:'airforce', name:'Air Force',  val:630, sb:36, trend:'up'},
+      {key:'army',     name:'U.S. Army',  val:310, sb:39, trend:'flat'},
+      {key:'dla',      name:'DLA',        val:108, sb:50, trend:'up'},
+      {key:'navair',   name:'NAVAIR',     val:88,  sb:42, trend:'up'},
+      {key:'aflcmc',   name:'AFLCMC',     val:72,  sb:40, trend:'flat'},
+      {key:'tacom',    name:'TACOM',      val:58,  sb:46, trend:'up'},
+      {key:'other',    name:'Other',      val:62,  sb:42, trend:'down'}
+    ],
+    FY2025: [
+      {key:'navy',     name:'U.S. Navy',  val:855, sb:32, trend:'up'},
+      {key:'airforce', name:'Air Force',  val:655, sb:37, trend:'up'},
+      {key:'army',     name:'U.S. Army',  val:328, sb:40, trend:'up'},
+      {key:'dla',      name:'DLA',        val:117, sb:51, trend:'up'},
+      {key:'navair',   name:'NAVAIR',     val:92,  sb:43, trend:'up'},
+      {key:'aflcmc',   name:'AFLCMC',     val:76,  sb:40, trend:'up'},
+      {key:'tacom',    name:'TACOM',      val:62,  sb:47, trend:'flat'},
+      {key:'other',    name:'Other',      val:71,  sb:43, trend:'down'}
+    ],
+    FY2026: [
+      {key:'navy',     name:'U.S. Navy',  val:890, sb:32, trend:'up'},
+      {key:'airforce', name:'Air Force',  val:680, sb:38, trend:'up'},
+      {key:'army',     name:'U.S. Army',  val:340, sb:41, trend:'flat'},
+      {key:'dla',      name:'DLA',        val:125, sb:52, trend:'up'},
+      {key:'navair',   name:'NAVAIR',     val:97,  sb:44, trend:'up'},
+      {key:'aflcmc',   name:'AFLCMC',     val:79,  sb:40, trend:'up'},
+      {key:'tacom',    name:'TACOM',      val:65,  sb:48, trend:'up'},
+      {key:'other',    name:'Other',      val:85,  sb:45, trend:'down'}
+    ]
+  },
+
+  recompetes: [
+    {name:'F-35 GSE Support IDIQ',   incumbent:'DRS Technologies',  val:'$500M', agency:'aflcmc', agencyLabel:'AFLCMC', q:'Q2 FY2027'},
+    {name:'NAVAIR Depot Maintenance',incumbent:'Vertex Aerospace',  val:'$180M', agency:'navair', agencyLabel:'NAVAIR', q:'Q3 FY2027'},
+    {name:'DLA Aviation Parts',      incumbent:'Aviall Services',   val:'$90M',  agency:'dla',    agencyLabel:'DLA',    q:'Q1 FY2027'},
+    {name:'Army TACOM Components',   incumbent:'AM General',        val:'$67M',  agency:'tacom',  agencyLabel:'TACOM',  q:'Q4 FY2027'},
+    {name:'NSWC Test Equipment',     incumbent:'SAIC',              val:'$45M',  agency:'navy',   agencyLabel:'NSWC',   q:'Q2 FY2027'}
+  ],
+
+  incumbents: [
+    {date:'2026-05-26',id:'N00024-26-D-1234',awd:'Raytheon Intel & Space',agy:'NAVSEA',agencyKey:'navy',  val:'$54.2M',naics:'336413',sa:'lp'},
+    {date:'2026-05-25',id:'FA8730-26-C-0099',awd:'Ducommun Inc',           agy:'AFLCMC',agencyKey:'aflcmc',val:'$32.1M',naics:'336413',sa:'sb'},
+    {date:'2026-05-24',id:'W56HZV-26-D-0078',awd:'General Dynamics Land',  agy:'TACOM', agencyKey:'tacom', val:'$87.5M',naics:'332710',sa:'lp'},
+    {date:'2026-05-24',id:'SPE7L1-26-Q-0091',awd:'Magellan Aerospace',     agy:'DLA',   agencyKey:'dla',   val:'$12.4M',naics:'336413',sa:'sb'},
+    {date:'2026-05-23',id:'N00019-26-C-0145',awd:'TransDigm Group',        agy:'NAVAIR',agencyKey:'navair',val:'$8.9M', naics:'332710',sa:'sb'},
+    {date:'2026-05-23',id:'FA8101-26-C-0204',awd:'Boeing IDS',             agy:'AFLCMC',agencyKey:'aflcmc',val:'$44.7M',naics:'336413',sa:'lp'},
+    {date:'2026-05-22',id:'W56HZV-26-Q-0099',awd:'Heico Corp',             agy:'TACOM', agencyKey:'tacom', val:'$6.2M', naics:'332710',sa:'sb'},
+    {date:'2026-05-22',id:'N00019-26-D-0067',awd:'Astronics Test',         agy:'NAVAIR',agencyKey:'navair',val:'$15.8M',naics:'336413',sa:'sb'},
+    {date:'2026-05-21',id:'SPE2D1-26-Q-0210',awd:'Parker Hannifin',        agy:'DLA',   agencyKey:'dla',   val:'$6.3M', naics:'332721',sa:'lp'},
+    {date:'2026-05-21',id:'FA8730-26-D-0042',awd:'Precision Castparts',    agy:'AFLCMC',agencyKey:'aflcmc',val:'$22.4M',naics:'332721',sa:'lp'}
+  ],
+
+  marketTrend: {
+    '336413': [980, 1100, 1280, 1380, 1520, 1650],
+    '332710': [280, 310, 290, 305, 338, 360],
+    '332721': [180, 195, 210, 200, 220, 245]
+  },
+
+  primes: [
+    {rank:1, name:'TransDigm Group',         val:'$143M', agencies:['navair','aflcmc'],         sbPlan:true},
+    {rank:2, name:'Ducommun',                val:'$98M',  agencies:['aflcmc','navair'],         sbPlan:true},
+    {rank:3, name:'Heico',                   val:'$67M',  agencies:['dla','tacom'],             sbPlan:true},
+    {rank:4, name:'Raytheon',                val:'$54M',  agencies:['navair'],                  sbPlan:true},
+    {rank:5, name:'General Dynamics',        val:'$52M',  agencies:['tacom','navair'],          sbPlan:true},
+    {rank:6, name:'Boeing IDS',              val:'$45M',  agencies:['aflcmc','navair'],         sbPlan:true},
+    {rank:7, name:'Magellan Aerospace',      val:'$32M',  agencies:['dla'],                     sbPlan:true},
+    {rank:8, name:'Astronics',               val:'$22M',  agencies:['navair'],                  sbPlan:true},
+    {rank:9, name:'Parker Hannifin',         val:'$18M',  agencies:['dla','aflcmc'],            sbPlan:true},
+    {rank:10,name:'Precision Castparts',     val:'$15M',  agencies:['aflcmc'],                  sbPlan:true}
+  ],
+
+  sbs: [
+    {rank:1, name:'Aviall Services',      val:'$44M', sa:'sb',     primaryAgency:'DLA',    agencyKey:'dla',    wr:'high'},
+    {rank:2, name:'AM General',           val:'$38M', sa:'sb',     primaryAgency:'TACOM',  agencyKey:'tacom',  wr:'high'},
+    {rank:3, name:'SAIC',                 val:'$32M', sa:'sdvosb', primaryAgency:'NAVAIR', agencyKey:'navair', wr:'high'},
+    {rank:4, name:'DRS Technologies',     val:'$28M', sa:'sb',     primaryAgency:'AFLCMC', agencyKey:'aflcmc', wr:'high'},
+    {rank:5, name:'Vertex Aerospace',     val:'$22M', sa:'sb',     primaryAgency:'NAVAIR', agencyKey:'navair', wr:'med'},
+    {rank:6, name:'Chromalloy',           val:'$18M', sa:'sb',     primaryAgency:'DLA',    agencyKey:'dla',    wr:'med'},
+    {rank:7, name:'Triumph Group',        val:'$15M', sa:'sb',     primaryAgency:'NAVAIR', agencyKey:'navair', wr:'med'},
+    {rank:8, name:'Kaman Aerospace',      val:'$12M', sa:'8a',     primaryAgency:'AFLCMC', agencyKey:'aflcmc', wr:'low'},
+    {rank:9, name:'StandardAero',         val:'$10M', sa:'sb',     primaryAgency:'AFLCMC', agencyKey:'aflcmc', wr:'low'},
+    {rank:10,name:'API Technologies',     val:'$8M',  sa:'wosb',   primaryAgency:'DLA',    agencyKey:'dla',    wr:'low'}
+  ],
+
+  pricing: {
+    '336413': { avg:47, min:8,  max:340, median:28, awardsCount:340,  uniqAwardees:142, topAgency:{name:'NAVAIR', avg:62} },
+    '332710': { avg:18, min:2,  max:180, median:11, awardsCount:1240, uniqAwardees:540, topAgency:{name:'DLA',    avg:24} },
+    '332721': { avg:52, min:12, max:420, median:34, awardsCount:88,   uniqAwardees:54,  topAgency:{name:'AFLCMC', avg:71} }
+  },
+
+  /* US states with rough polygon approximations, FY2026 spend, YoY, SB share.
+     Bucket per user spec:
+       b5 (darkest): TX, VA, CA
+       b4: FL, MD, CT, AL
+       b3: PA, WA, OH, GA, AZ
+       b2: remaining active states
+       b1: minimal activity
+     Polygons designed for 1000x600 viewBox. Geographic-approximate, not topologically accurate. */
+  states: [
+    /* PNW + Pacific */
+    {c:'WA',n:'Washington',     val:128,yoy:11, sb:36, b:3, pts:'150,90 250,75 260,130 175,140'},
+    {c:'OR',n:'Oregon',         val:48, yoy:5,  sb:44, b:2, pts:'175,140 260,130 265,200 160,205'},
+    {c:'CA',n:'California',     val:245,yoy:-3, sb:31, b:5, pts:'160,205 215,210 230,295 215,345 175,365 145,330 140,260'},
+    {c:'NV',n:'Nevada',         val:32, yoy:5,  sb:51, b:2, pts:'215,210 280,210 295,290 230,295'},
+    {c:'ID',n:'Idaho',          val:14, yoy:5,  sb:52, b:1, pts:'250,75 320,75 335,205 280,210'},
+    /* Mountain */
+    {c:'MT',n:'Montana',        val:9,  yoy:-2, sb:55, b:1, pts:'320,75 470,75 470,140 320,140'},
+    {c:'WY',n:'Wyoming',        val:6,  yoy:-3, sb:62, b:1, pts:'335,140 460,140 460,220 335,220'},
+    {c:'UT',n:'Utah',           val:31, yoy:7,  sb:43, b:2, pts:'295,210 360,210 365,290 305,290'},
+    {c:'CO',n:'Colorado',       val:88, yoy:11, sb:37, b:3, pts:'365,210 470,210 470,300 365,300'},
+    {c:'AZ',n:'Arizona',        val:88, yoy:8,  sb:40, b:3, pts:'230,295 360,295 360,400 245,400'},
+    {c:'NM',n:'New Mexico',     val:74, yoy:5,  sb:43, b:2, pts:'360,300 465,300 465,400 360,400'},
+    /* Plains */
+    {c:'ND',n:'North Dakota',   val:11, yoy:3,  sb:48, b:1, pts:'470,75 580,75 580,135 470,135'},
+    {c:'SD',n:'South Dakota',   val:5,  yoy:0,  sb:60, b:1, pts:'470,135 580,135 580,195 470,195'},
+    {c:'NE',n:'Nebraska',       val:9,  yoy:0,  sb:53, b:1, pts:'470,195 595,195 595,250 470,250'},
+    {c:'KS',n:'Kansas',         val:21, yoy:2,  sb:50, b:1, pts:'470,250 605,250 605,305 470,305'},
+    {c:'OK',n:'Oklahoma',       val:115,yoy:9,  sb:46, b:3, pts:'465,305 615,305 620,360 470,360'},
+    /* Texas (iconic shape) */
+    {c:'TX',n:'Texas',          val:340,yoy:14, sb:43, b:5, pts:'465,360 620,360 625,395 605,455 555,495 510,490 460,510 440,485 405,485 395,440 405,400'},
+    /* Upper midwest */
+    {c:'MN',n:'Minnesota',      val:38, yoy:4,  sb:39, b:2, pts:'580,75 670,75 670,130 580,135'},
+    {c:'WI',n:'Wisconsin',      val:42, yoy:6,  sb:41, b:2, pts:'595,135 680,135 690,195 600,200'},
+    {c:'IA',n:'Iowa',           val:14, yoy:2,  sb:47, b:1, pts:'580,195 670,195 670,245 590,245'},
+    {c:'MO',n:'Missouri',       val:42, yoy:3,  sb:42, b:2, pts:'595,245 680,245 690,320 605,320'},
+    {c:'AR',n:'Arkansas',       val:12, yoy:1,  sb:54, b:1, pts:'615,320 690,320 690,395 620,400'},
+    {c:'LA',n:'Louisiana',      val:24, yoy:3,  sb:47, b:1, pts:'620,400 685,400 690,475 625,495 600,480'},
+    /* Great Lakes */
+    {c:'MI',n:'Michigan',       val:67, yoy:9,  sb:38, b:2, pts:'690,115 760,115 770,195 705,200'},
+    {c:'IL',n:'Illinois',       val:48, yoy:7,  sb:35, b:2, pts:'670,195 705,200 715,290 670,290'},
+    {c:'IN',n:'Indiana',        val:39, yoy:8,  sb:42, b:2, pts:'705,200 750,200 755,290 715,290'},
+    {c:'OH',n:'Ohio',           val:87, yoy:10, sb:39, b:3, pts:'755,170 825,170 830,255 760,260'},
+    {c:'KY',n:'Kentucky',       val:18, yoy:1,  sb:46, b:1, pts:'700,290 830,290 835,340 705,335'},
+    {c:'TN',n:'Tennessee',      val:34, yoy:4,  sb:41, b:2, pts:'700,335 845,335 845,380 705,380'},
+    /* South */
+    {c:'MS',n:'Mississippi',    val:18, yoy:0,  sb:52, b:1, pts:'690,380 745,380 745,470 690,475'},
+    {c:'AL',n:'Alabama',        val:82, yoy:9,  sb:44, b:4, pts:'745,380 815,380 815,475 750,475'},
+    {c:'GA',n:'Georgia',        val:69, yoy:7,  sb:41, b:3, pts:'815,380 880,380 880,475 820,475'},
+    {c:'FL',n:'Florida',        val:165,yoy:2,  sb:29, b:4, pts:'820,475 905,475 935,510 950,545 905,545 855,520 825,500'},
+    /* SE Atlantic */
+    {c:'SC',n:'South Carolina', val:35, yoy:6,  sb:42, b:2, pts:'825,355 895,355 900,415 855,415'},
+    {c:'NC',n:'North Carolina', val:88, yoy:12, sb:38, b:3, pts:'815,305 940,305 945,355 820,355'},
+    {c:'VA',n:'Virginia',       val:290,yoy:12, sb:28, b:5, pts:'815,255 940,255 945,305 820,305'},
+    {c:'WV',n:'West Virginia',  val:11, yoy:-1, sb:50, b:1, pts:'770,255 830,255 825,305 775,305'},
+    /* Mid-Atlantic */
+    {c:'MD',n:'Maryland',       val:195,yoy:5,  sb:38, b:4, pts:'870,235 945,235 950,265 880,272'},
+    {c:'DE',n:'Delaware',       val:9,  yoy:2,  sb:45, b:1, pts:'950,235 970,235 970,275 955,275'},
+    {c:'NJ',n:'New Jersey',     val:98, yoy:9,  sb:31, b:3, pts:'940,200 970,200 970,235 945,235'},
+    {c:'PA',n:'Pennsylvania',   val:87, yoy:8,  sb:36, b:3, pts:'825,175 945,175 945,230 830,225'},
+    {c:'NY',n:'New York',       val:54, yoy:1,  sb:33, b:2, pts:'855,120 960,120 965,175 860,175'},
+    /* New England */
+    {c:'CT',n:'Connecticut',    val:152,yoy:4,  sb:32, b:4, pts:'945,185 975,185 975,205 950,210'},
+    {c:'RI',n:'Rhode Island',   val:17, yoy:1,  sb:48, b:1, pts:'975,193 988,193 988,212 975,212'},
+    {c:'MA',n:'Massachusetts',  val:88, yoy:12, sb:41, b:3, pts:'945,165 988,165 988,188 945,188'},
+    {c:'VT',n:'Vermont',        val:9,  yoy:0,  sb:48, b:1, pts:'930,130 952,130 952,165 932,165'},
+    {c:'NH',n:'New Hampshire',  val:22, yoy:8,  sb:45, b:1, pts:'952,130 974,130 978,178 955,178'},
+    {c:'ME',n:'Maine',          val:18, yoy:5,  sb:54, b:1, pts:'970,75 992,75 992,150 975,150'},
+    /* Insets */
+    {c:'AK',n:'Alaska',         val:8,  yoy:2,  sb:42, b:1, pts:'30,505 130,495 170,510 175,545 110,560 30,555'},
+    {c:'HI',n:'Hawaii',         val:12, yoy:3,  sb:48, b:1, pts:'205,530 230,525 258,540 260,560 215,560'}
+  ]
+};
+
+/* ─── small helpers ─────────────────────────────────────────────────── */
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function elem(id){ return document.getElementById(id); }
+function clearActiveInGroup(grp){
+  document.querySelectorAll('.fb-pill[data-grp="'+grp+'"]').forEach(function(b){ b.classList.remove('active'); });
+}
+function setActive(grp, val){
+  document.querySelectorAll('.fb-pill[data-grp="'+grp+'"]').forEach(function(b){
+    if (b.getAttribute('data-val') === val) b.classList.add('active');
+  });
+}
+
+/* ─── Stat strip ────────────────────────────────────────────────────── */
+function renderStatStrip(){
+  var d = window.__data.statByFY[window.__filters.fy] || window.__data.statByFY.FY2026;
+  elem('statRecompetes').textContent = d.recompetes;
+  elem('statExpiring').textContent   = d.expiring;
+  elem('statSetAside').textContent   = d.setAside;
+  elem('statAvgDays').textContent    = d.avgDays + ' days';
+}
+
+/* ─── Recompete Radar (filtered by agency) ──────────────────────────── */
+function renderRecompete(){
+  var f = window.__filters;
+  var list = window.__data.recompetes;
+  if (!f.agency.includes('all') && f.agency.length > 0) {
+    list = list.filter(function(r){ return f.agency.includes(r.agency); });
+  }
+  var html = list.map(function(r){
+    return '<div class="rc-card"><div class="rc-info">'
+      + '<div class="rc-name">' + esc(r.name) + '</div>'
+      + '<div class="rc-incumbent">Incumbent · <b>' + esc(r.incumbent) + '</b></div>'
+      + '<div class="rc-meta">' + esc(r.val) + ' · ' + esc(r.agencyLabel) + ' · Due <span class="rc-q">' + esc(r.q) + '</span></div>'
+      + '</div><button class="rc-alert" type="button">Set Alert</button></div>';
+  }).join('');
+  elem('recompeteList').innerHTML = html || '<div class="rc-card"><div class="rc-info"><div class="rc-name" style="color:var(--mute)">No recompetes match current agency filter</div></div></div>';
+}
+
+/* ─── Incumbent Intelligence (filtered by NAICS + agency + set-aside) ─ */
+function renderIncumbents(){
+  var f = window.__filters;
+  var list = window.__data.incumbents.filter(function(it){
+    if (f.naics.length > 0 && !f.naics.includes(it.naics)) return false;
+    if (!f.agency.includes('all') && f.agency.length > 0) {
+      if (!f.agency.includes(it.agencyKey)) return false;
+    }
+    if (f.setaside !== 'all') {
+      if (f.setaside === 'sb' && it.sa !== 'sb') return false;
+      if (f.setaside !== 'sb' && it.sa !== 'sb') {} // simplified: other set-asides not in mock
+    }
+    return true;
+  });
+  var html = list.map(function(it){
+    return '<tr>'
+      + '<td class="c-awd"><div class="ii-awardee-cell"><span class="ii-name">' + esc(it.awd) + '</span><span class="ii-notice">' + esc(it.id) + '</span></div></td>'
+      + '<td class="c-agy">' + esc(it.agy) + '</td>'
+      + '<td class="c-val">' + esc(it.val) + '</td>'
+      + '<td class="c-nai">' + esc(it.naics) + '</td>'
+      + '<td><span class="sb-bdg ' + it.sa + '">' + it.sa.toUpperCase() + '</span></td>'
+      + '<td><button class="find-contact">Find →</button></td>'
+      + '</tr>';
+  }).join('');
+  elem('incumbentBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:var(--mute);padding:20px">No awards match current filters</td></tr>';
+}
+
+/* ─── Agency Breakdown (FY toggle in widget) ────────────────────────── */
+function renderAgencyBreakdown(fy){
+  fy = fy || window.__filters.fy;
+  var bars = window.__data.agencyBars[fy] || window.__data.agencyBars.FY2026;
+  var max = Math.max.apply(null, bars.map(function(b){ return b.val; }));
+  var html = bars.map(function(b){
+    var pct = Math.round((b.val / max) * 100);
+    var arrow = b.trend === 'up' ? '▲' : b.trend === 'down' ? '▼' : '—';
+    var label = b.sb >= 32 ? (b.sb + '% SB') : (b.sb + '%');
+    return '<div class="ag-row">'
+      + '<span class="ag-name">' + esc(b.name) + ' <span class="ag-trend ' + b.trend + '">' + arrow + '</span></span>'
+      + '<div class="ag-bar"><div class="ag-fill" style="width:' + pct + '%"><div class="ag-sb" style="width:' + b.sb + '%"><span class="ag-sb-lbl">' + label + '</span></div></div></div>'
+      + '<span class="ag-val">$' + b.val + 'M</span>'
+      + '</div>';
+  }).join('');
+  elem('agencyList').innerHTML = html;
+  document.querySelectorAll('#agencyFYToggle button').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-fy') === fy);
+  });
+}
+
+/* ─── Teaming Intelligence (large primes, filtered by agency) ───────── */
+function renderTeaming(){
+  var f = window.__filters;
+  var list = window.__data.primes;
+  if (!f.agency.includes('all') && f.agency.length > 0) {
+    list = list.filter(function(p){ return p.agencies.some(function(a){ return f.agency.includes(a); }); });
+  }
+  var agencyLabel = { navair:'NAVAIR', aflcmc:'AFLCMC', tacom:'TACOM', dla:'DLA' };
+  var html = list.map(function(p){
+    var visibleAgencies = p.agencies.slice(0, 2);
+    var overflow = p.agencies.length - visibleAgencies.length;
+    var agencyPills = visibleAgencies.map(function(a){
+      return '<span class="agy-pill ' + a + '">' + agencyLabel[a] + '</span>';
+    }).join('');
+    if (overflow > 0) {
+      agencyPills += '<span class="agy-pill overflow">+' + overflow + '</span>';
+    }
+    return '<div class="team-row">'
+      + '<span class="tr-rank">' + p.rank + '</span>'
+      + '<span class="tr-name">' + esc(p.name) + '</span>'
+      + '<span class="tr-agencies">' + agencyPills + '</span>'
+      + '<span class="tr-sbplan ' + (p.sbPlan?'yes':'no') + '">' + (p.sbPlan?'YES':'NO') + '</span>'
+      + '<span class="tr-val">' + esc(p.val) + '</span>'
+      + '<button class="find-contact">Find →</button>'
+      + '</div>';
+  }).join('');
+  var header = '<div class="team-header-row">'
+    + '<span class="th-rank">#</span>'
+    + '<span class="th-name">Company</span>'
+    + '<span class="th-agencies">Agencies</span>'
+    + '<span class="th-sbplan">SB Plan</span>'
+    + '<span class="th-val">FY2026 $</span>'
+    + '<span class="th-action"></span>'
+    + '</div>';
+  elem('teamList').innerHTML = html
+    ? header + html
+    : header + '<div class="team-row" style="grid-template-columns:1fr"><span style="color:var(--mute);text-align:center">No primes match current agency filter</span></div>';
+}
+
+/* ─── SB Competitive Intelligence (filtered by agency + set-aside) ──── */
+function renderSBCompetitive(){
+  var f = window.__filters;
+  var list = window.__data.sbs;
+  if (!f.agency.includes('all') && f.agency.length > 0) {
+    list = list.filter(function(s){ return f.agency.includes(s.agencyKey); });
+  }
+  if (f.setaside !== 'all') {
+    list = list.filter(function(s){ return s.sa === f.setaside; });
+  }
+  var saLabel = { sb:'SB', sdvosb:'SDVOSB', '8a':'8(a)', wosb:'WOSB' };
+  var html = list.map(function(s){
+    return '<div class="sb-row">'
+      + '<span class="tr-rank">' + s.rank + '</span>'
+      + '<span class="tr-name">' + esc(s.name) + '</span>'
+      + '<span class="sa-pill ' + (s.sa==='8a'?'eight-a':s.sa) + '">' + saLabel[s.sa] + '</span>'
+      + '<span class="pa">' + esc(s.primaryAgency) + '</span>'
+      + '<span class="tr-val">' + esc(s.val) + '</span>'
+      + '<span class="wr-pill ' + s.wr + '">' + s.wr.toUpperCase() + '</span>'
+      + '</div>';
+  }).join('');
+  var header = '<div class="sb-header-row">'
+    + '<span>#</span>'
+    + '<span>Company</span>'
+    + '<span>Set-Aside</span>'
+    + '<span>Agency</span>'
+    + '<span>FY2026 $</span>'
+    + '<span>Win Rate</span>'
+    + '</div>';
+  elem('sbList').innerHTML = html
+    ? header + html
+    : header + '<div class="sb-row" style="grid-template-columns:1fr"><span style="color:var(--mute);text-align:center">No SB winners match current filters</span></div>';
+}
+
+/* ─── Competition Density (highlight selected NAICS) ────────────────── */
+function renderCompetition(){
+  var f = window.__filters;
+  var rows = [
+    {naics:'336413', firms:667,   total:'$2.1B',  ratio:'$3.1M / firm', tag:'high',    label:'High Value'},
+    {naics:'332710', firms:1240,  total:'$338M',  ratio:'$273K / firm', tag:'crowded', label:'Crowded'},
+    {naics:'332721', firms:92,    total:'$220M',  ratio:'$2.4M / firm', tag:'high',    label:'High Value'}
+  ];
+  var html = rows.map(function(r){
+    var hl = f.naics.length === 1 && f.naics[0] === r.naics ? ' highlighted' : '';
+    return '<div class="cd-tile ' + r.tag + hl + '">'
+      + '<div class="cd-naics">' + r.naics + '</div>'
+      + '<div class="cd-stats"><span class="cd-firms">' + r.firms + ' firms · ' + r.total + ' total</span><span class="cd-ratio">' + r.ratio + '</span></div>'
+      + '<span class="cd-tag ' + r.tag + '">' + r.label + '</span>'
+      + '</div>';
+  }).join('');
+  elem('competitionList').innerHTML = html;
+}
+
+/* ─── Pricing Intelligence (clean table per NAICS) ──────────────────── */
+function renderPricing(){
+  var f = window.__filters;
+  var data = window.__data.pricing;
+  var rows = '';
+  ['336413','332710','332721'].forEach(function(naics){
+    if (f.naics.length > 0 && !f.naics.includes(naics)) return;
+    var p = data[naics];
+    rows += '<tr>'
+      + '<td class="pr-c-naics">' + naics + '</td>'
+      + '<td class="pr-c-avg">$' + p.avg + 'K</td>'
+      + '<td class="pr-c-mute">$' + p.min + 'K</td>'
+      + '<td class="pr-c-mute">$' + p.max + 'K</td>'
+      + '<td class="pr-c-amber">' + esc(p.topAgency.name) + ' · $' + p.topAgency.avg + 'K avg</td>'
+      + '<td class="pr-c-mute">' + p.awardsCount.toLocaleString() + ' awards</td>'
+      + '</tr>';
+  });
+  var head = '<thead><tr>'
+    + '<th>NAICS</th><th>Avg Contract</th><th>Min</th><th>Max</th><th>Agency Paying Most</th><th>Awards</th>'
+    + '</tr></thead>';
+  var tbl = rows
+    ? '<table class="pricing-table">' + head + '<tbody>' + rows + '</tbody></table>'
+      + '<div class="pricing-callout-box">Price above median to avoid LPTA margin erosion — the government awards lowest technically acceptable price</div>'
+    : '<div style="color:var(--mute);text-align:center;padding:24px">No NAICS selected</div>';
+  elem('pricingList').innerHTML = tbl;
+}
+
+/* ─── Geographic Concentration · D3 Albers USA + TopoJSON ───────────── */
+/* Per-state tooltip + bucket data. Buckets:
+     b5 #0A1628 (>$300M): TX VA CA
+     b4 #185FA5 ($150-300M): FL MD CT AL
+     b3 #378ADD ($75-150M): PA WA OH GA AZ CO
+     b2 #B5D4F4 ($25-75M): NC MA NJ MI MN WI MO TN OK NM NV NH UT NY SC IL IN
+     b1 #E6F1FB (<$25M): everything else                                       */
+window.__mapData = {
+  TX:{val:'$340M',yoy:'+8%',sb:'34%',b:5}, VA:{val:'$290M',yoy:'+12%',sb:'28%',b:5}, CA:{val:'$245M',yoy:'-3%',sb:'31%',b:5},
+  FL:{val:'$165M',yoy:'+2%',sb:'29%',b:4}, MD:{val:'$195M',yoy:'+5%',sb:'38%',b:4}, CT:{val:'$152M',yoy:'+4%',sb:'32%',b:4}, AL:{val:'$182M',yoy:'+9%',sb:'44%',b:4},
+  PA:{val:'$87M',yoy:'+8%',sb:'36%',b:3}, WA:{val:'$134M',yoy:'+4%',sb:'27%',b:3}, OH:{val:'$87M',yoy:'+10%',sb:'39%',b:3}, GA:{val:'$104M',yoy:'+7%',sb:'41%',b:3}, AZ:{val:'$88M',yoy:'+9%',sb:'44%',b:3}, CO:{val:'$88M',yoy:'+11%',sb:'37%',b:3},
+  NC:{val:'$54M',yoy:'+6%',sb:'29%',b:2}, MA:{val:'$68M',yoy:'+12%',sb:'41%',b:2}, NJ:{val:'$58M',yoy:'+9%',sb:'31%',b:2}, MI:{val:'$67M',yoy:'+9%',sb:'38%',b:2}, MN:{val:'$38M',yoy:'+4%',sb:'39%',b:2}, WI:{val:'$42M',yoy:'+6%',sb:'41%',b:2}, MO:{val:'$42M',yoy:'+3%',sb:'42%',b:2}, TN:{val:'$34M',yoy:'+4%',sb:'41%',b:2}, OK:{val:'$45M',yoy:'+5%',sb:'46%',b:2}, NM:{val:'$54M',yoy:'+5%',sb:'43%',b:2}, NV:{val:'$32M',yoy:'+5%',sb:'51%',b:2}, NH:{val:'$32M',yoy:'+8%',sb:'45%',b:2}, UT:{val:'$31M',yoy:'+7%',sb:'43%',b:2}, NY:{val:'$54M',yoy:'+1%',sb:'33%',b:2}, SC:{val:'$35M',yoy:'+6%',sb:'42%',b:2}, IL:{val:'$48M',yoy:'+7%',sb:'35%',b:2}, IN:{val:'$39M',yoy:'+8%',sb:'42%',b:2}
+};
+// Bucket colors keyed to brand palette
+window.__mapColors = { 1:'#E6F1FB', 2:'#B5D4F4', 3:'#378ADD', 4:'#185FA5', 5:'#0A1628' };
+// FIPS → 2-letter code (US Atlas uses FIPS numeric IDs)
+window.__fipsToAbbr = {
+  '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE','11':'DC','12':'FL',
+  '13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA','20':'KS','21':'KY','22':'LA','23':'ME',
+  '24':'MD','25':'MA','26':'MI','27':'MN','28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH',
+  '34':'NJ','35':'NM','36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+  '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA','54':'WV','55':'WI','56':'WY','72':'PR'
+};
+
+function renderGeoMap(){
+  var svg = elem('geoSvg');
+  if (!svg || !window.d3 || !window.topojson || !window.__usAtlas) return;
+  var box = svg.parentElement;
+  var w = Math.max(320, box.clientWidth || 580);
+  var h = 520;
+  svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var d3 = window.d3, topojson = window.topojson;
+  var us = window.__usAtlas;
+  var statesGeo = topojson.feature(us, us.objects.states);
+  var projection = d3.geoAlbersUsa().fitSize([w, h], statesGeo);
+  var path = d3.geoPath().projection(projection);
+  var svgSel = d3.select(svg);
+  var g = svgSel.append('g');
+  g.selectAll('path')
+    .data(statesGeo.features)
+    .enter().append('path')
+    .attr('d', path)
+    .attr('data-fips', function(d){ return d.id; })
+    .attr('data-abbr', function(d){ return window.__fipsToAbbr[d.id] || ''; })
+    .attr('fill', function(d){
+      var abbr = window.__fipsToAbbr[d.id];
+      var info = window.__mapData[abbr];
+      var bucket = info ? info.b : 1;
+      return window.__mapColors[bucket];
+    })
+    .attr('stroke', '#0A1628')
+    .attr('stroke-width', 0.5)
+    .style('cursor', 'pointer')
+    .style('transition', 'opacity .14s')
+    .on('mouseenter', function(ev, d){
+      d3.select(this).style('opacity', 0.78);
+      var abbr = window.__fipsToAbbr[d.id] || '';
+      var name = d.properties && d.properties.name ? d.properties.name : abbr;
+      var info = window.__mapData[abbr] || { val:'<$25M', yoy:'—', sb:'—' };
+      var yoyClass = '';
+      if (info.yoy.indexOf('+') === 0) yoyClass = 'tt-up';
+      else if (info.yoy.indexOf('-') === 0 || info.yoy.indexOf('−') === 0) yoyClass = 'tt-down';
+      var tip = elem('geoTooltip');
+      tip.innerHTML = '<div class="tt-name">' + esc(name) + '</div>'
+        + '<div class="tt-row">$<b>' + esc(info.val.replace(/^\$/, '')) + '</b> · <span class="' + yoyClass + '">' + esc(info.yoy) + '</span></div>'
+        + '<div class="tt-row">SB share · <b>' + esc(info.sb) + '</b></div>';
+      tip.style.display = 'block';
+    })
+    .on('mousemove', function(ev){
+      var wrap = elem('geoSvg').parentElement.getBoundingClientRect();
+      var tip = elem('geoTooltip');
+      tip.style.left = (ev.clientX - wrap.left + 14) + 'px';
+      tip.style.top  = (ev.clientY - wrap.top - 60) + 'px';
+    })
+    .on('mouseleave', function(){
+      d3.select(this).style('opacity', 1);
+      var tip = elem('geoTooltip'); if (tip) tip.style.display = 'none';
+    });
+
+  // ─── State abbreviation labels (centroid via d3.geoPath) ──────────────
+  var stateAbbr = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY','District of Columbia':'DC'};
+  var skipLabels = {'Rhode Island':1,'Delaware':1,'Connecticut':1,'Hawaii':1,'District of Columbia':1};
+  var smallStates = {ME:1,VT:1,NH:1,MA:1,NJ:1,MD:1,DE:1};
+  // States with dark fill (buckets 4-5): white label. Else dark label.
+  var darkFillStates = {TX:1,VA:1,CA:1,FL:1,MD:1,CT:1,AL:1};
+
+  g.selectAll('text.state-label')
+    .data(statesGeo.features)
+    .enter().append('text')
+    .attr('class', 'state-label')
+    .attr('transform', function(d){
+      var c = path.centroid(d);
+      if (!c || isNaN(c[0]) || isNaN(c[1])) return null;
+      return 'translate(' + c[0] + ',' + c[1] + ')';
+    })
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .style('pointer-events', 'none')
+    .style('font-family', '"IBM Plex Mono",monospace')
+    .style('font-weight', '700')
+    .style('font-size', function(d){
+      var name = d.properties && d.properties.name;
+      var abbr = stateAbbr[name];
+      return smallStates[abbr] ? '7px' : '8px';
+    })
+    .style('fill', function(d){
+      var name = d.properties && d.properties.name;
+      var abbr = stateAbbr[name];
+      return darkFillStates[abbr] ? '#ffffff' : '#1e3a5f';
+    })
+    .text(function(d){
+      var name = d.properties && d.properties.name;
+      if (!name || skipLabels[name]) return '';
+      return stateAbbr[name] || '';
+    });
+
+  // ─── Fix 8 — hide NO INSIGHT placeholder when top-5 data exists ────────
+  var insightEl = document.getElementById('geoInsightPlaceholder') || document.querySelector('.geo-insight.no-insight');
+  if (insightEl) {
+    var top5 = document.querySelectorAll('.geo-rank-row');
+    if (top5 && top5.length > 0) insightEl.style.display = 'none';
+  }
+}
+
+/* ─── Master filter apply ───────────────────────────────────────────── */
+function updateDynamicSubtitles(){
+  var naics = window.__filters.naics || [];
+  var suffix = naics.length ? ' · ' + naics.join(' · ') : '';
+  var subs = [
+    ['agencySubtitle', "Where your NAICS money lives — and where it's moving"],
+    ['marketSubtitle', 'FY2022–FY2027 · dotted = projected'],
+    ['geoSubtitle',    'Where your NAICS money flows — gaps are the intelligence']
+  ];
+  subs.forEach(function(p){ var el = elem(p[0]); if (el) el.textContent = p[1] + suffix; });
+}
+
+function applyFilters(){
+  renderStatStrip();
+  renderRecompete();
+  renderIncumbents();
+  renderAgencyBreakdown(window.__filters.fy);
+  renderTeaming();
+  renderSBCompetitive();
+  renderCompetition();
+  renderPricing();
+  renderGeoMap();
+  updateDynamicSubtitles();
+  if (window.__charts.marketTrend) updateMarketTrendVisibility();
+}
+
+/* ─── Chart.js — Market Trend, Budget Line, Budget Area ──────────────── */
+function buildCharts(){
+  if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded yet'); return; }
+  destroyCharts();
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var ink = isDark ? '#e8eef6' : '#0A1628';
+  var mute = isDark ? '#7d8ba0' : '#64748b';
+  var lineSoft = isDark ? 'rgba(255,255,255,0.04)' : '#eef2f6';
+  Chart.defaults.font.family = '"Manrope", ui-sans-serif, system-ui, sans-serif';
+  Chart.defaults.color = mute;
+  Chart.defaults.font.size = 11;
+  Chart.defaults.animation = false;
+
+  /* Market Trend · 3 NAICS lines × 6 FYs, last segment dotted (projection) */
+  (function(){
+    var c = elem('chartMarketTrend');
+    if (!c) return;
+    var d = window.__data.marketTrend;
+    function lineForNaics(code, color){
+      // Split into solid + dotted segments. Approach: one dataset with full data + borderDash callback per-segment.
+      return {
+        label: code,
+        data: d[code],
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointBackgroundColor: color,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        tension: 0.25,
+        fill: false,
+        segment: {
+          borderDash: function(ctx){
+            // Index 4→5 is FY2026→FY2027 (projected)
+            return ctx.p1DataIndex === 5 ? [6,4] : undefined;
+          }
+        },
+        spanGaps: true,
+        // Custom: 2-letter NAICS key for visibility toggle
+        __naicsKey: code
+      };
+    }
+    window.__charts.marketTrend = new Chart(c, {
+      type: 'line',
+      data: {
+        labels: ['FY2022','FY2023','FY2024','FY2025','FY2026','FY2027'],
+        datasets: [
+          lineForNaics('336413', '#378ADD'),
+          lineForNaics('332710', '#B5D4F4'),
+          lineForNaics('332721', 'rgba(55,138,221,0.40)')
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position:'bottom', labels:{ boxWidth:14, boxHeight:3, padding:10, font:{ size:10.5, weight:'600' } } },
+          tooltip: { callbacks: { label: function(ctx){ return ctx.dataset.label + ': $' + ctx.parsed.y + 'M' } } }
+        },
+        scales: {
+          x: { grid:{ display:false }, ticks:{ font:{ size:10.5, weight:'700' }, color:mute } },
+          y: {
+            grid:{ color:lineSoft },
+            ticks:{ callback:function(v){ return '$' + v + 'M' }, color:mute, font:{ size:10 } },
+            title:{ display:true, text:'Award Volume ($M)', color: mute, font:{ size:11, weight:'600' } }
+          }
+        }
+      }
+    });
+    updateMarketTrendVisibility();
+  })();
+
+  /* DoD Budget Trajectory · bar with per-year color + value labels */
+  (function(){
+    var c = elem('chartBudgetLine');
+    if (!c) return;
+    var values = [782, 858, 886, 892, 839];
+    var labels = ['FY2022','FY2023','FY2024','FY2025','FY2026'];
+    var colors = ['#378ADD','#378ADD','#378ADD','#d97706','#ef4444'];
+    var valueLabels = {};
+    values.forEach(function(v, i){
+      valueLabels['val' + i] = {
+        type:'label',
+        xValue: i,
+        yValue: v + 18,
+        content: '$' + v + 'B',
+        color: ink,
+        font:{ size:10, weight:'700' },
+        backgroundColor:'transparent',
+        padding:0
+      };
+    });
+    window.__charts.budgetLine = new Chart(c, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets:[{
+          label:'DoD Topline',
+          data: values,
+          backgroundColor: colors,
+          borderColor: colors,
+          borderWidth: 0,
+          borderRadius: 4,
+          categoryPercentage: 0.7,
+          barPercentage: 0.85
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{ label:function(ctx){ return '$' + ctx.parsed.y + 'B' } } },
+          annotation: { annotations: valueLabels }
+        },
+        scales: {
+          x:{ grid:{ display:false }, ticks:{ font:{ size:11, weight:'700' }, color:mute } },
+          y:{
+            grid:{ color:lineSoft },
+            ticks:{ callback:function(v){ return '$' + v + 'B' }, color:mute, font:{ size:10 } },
+            title:{ display:true, text:'Budget Authority ($B)', color:mute, font:{ size:11, weight:'600' } },
+            min: 750, max: 930
+          }
+        }
+      }
+    });
+  })();
+
+  /* Budget Composition removed — replaced by NDAA Highlights static widget */
+}
+
+function destroyCharts(){
+  Object.keys(window.__charts).forEach(function(k){
+    if (window.__charts[k]) { try { window.__charts[k].destroy(); } catch(e){} window.__charts[k] = null; }
+  });
+}
+
+window.__rebuildCharts = buildCharts;
+
+function updateMarketTrendVisibility(){
+  var ch = window.__charts.marketTrend;
+  if (!ch) return;
+  ch.data.datasets.forEach(function(ds, idx){
+    var key = ds.__naicsKey;
+    var visible = window.__filters.naics.length === 0 ? true : window.__filters.naics.includes(key);
+    ch.setDatasetVisibility(idx, visible);
+  });
+  ch.update();
+}
+
+/* ═══ Wire filter pills ═══ */
+document.querySelectorAll('.fb-pill').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var grp = btn.getAttribute('data-grp');
+    var val = btn.getAttribute('data-val');
+    var f = window.__filters;
+    if (grp === 'naics') {
+      // multi-select toggle
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) {
+        if (!f.naics.includes(val)) f.naics.push(val);
+      } else {
+        f.naics = f.naics.filter(function(x){ return x !== val; });
+      }
+    } else if (grp === 'agency') {
+      // "All" is single-select; specific agencies stack as multi-select
+      if (val === 'all') {
+        clearActiveInGroup('agency');
+        btn.classList.add('active');
+        f.agency = ['all'];
+      } else {
+        // Remove "All" if a specific agency is being selected
+        var allBtn = document.querySelector('.fb-pill[data-grp="agency"][data-val="all"]');
+        if (allBtn) allBtn.classList.remove('active');
+        if (f.agency.includes('all')) f.agency = [];
+        btn.classList.toggle('active');
+        if (btn.classList.contains('active')) {
+          if (!f.agency.includes(val)) f.agency.push(val);
+        } else {
+          f.agency = f.agency.filter(function(x){ return x !== val; });
+        }
+        if (f.agency.length === 0) {
+          if (allBtn) allBtn.classList.add('active');
+          f.agency = ['all'];
+        }
+      }
+    } else if (grp === 'setaside') {
+      clearActiveInGroup('setaside');
+      btn.classList.add('active');
+      f.setaside = val;
+    }
+    applyFilters();
+  });
+});
+
+/* ═══ Wire Agency Breakdown FY toggle (independent of filter bar) ═══ */
+document.querySelectorAll('#agencyFYToggle button').forEach(function(b){
+  b.addEventListener('click', function(){
+    renderAgencyBreakdown(b.getAttribute('data-fy'));
+  });
+});
+
+/* ═══ Dynamic script loaders ═══ */
+function loadChartJS(callback){
+  if (window.Chart && window.__chartAnnotationLoaded) { callback(); return; }
+  function injectAnnotation(){
+    var s2 = document.createElement('script');
+    s2.src = '/vendor/chartjs-plugin-annotation.min.js';
+    s2.onload = function(){ window.__chartAnnotationLoaded = true; callback(); };
+    s2.onerror = function(){ console.warn('annotation plugin failed'); callback(); };
+    document.head.appendChild(s2);
+  }
+  if (window.Chart) { injectAnnotation(); return; }
+  var s1 = document.createElement('script');
+  s1.src = '/vendor/chart.umd.min.js';
+  s1.onload = injectAnnotation;
+  s1.onerror = function(){ console.warn('Chart.js failed to load'); };
+  document.head.appendChild(s1);
+}
+
+function loadD3AndAtlas(callback){
+  function ensureD3(next){
+    if (window.d3) { next(); return; }
+    var s = document.createElement('script');
+    s.src = '/vendor/d3.min.js';
+    s.onload = next;
+    s.onerror = function(){ console.warn('d3 failed'); };
+    document.head.appendChild(s);
+  }
+  function ensureTopojson(next){
+    if (window.topojson) { next(); return; }
+    var s = document.createElement('script');
+    s.src = '/vendor/topojson-client.min.js';
+    s.onload = next;
+    s.onerror = function(){ console.warn('topojson failed'); };
+    document.head.appendChild(s);
+  }
+  function ensureAtlas(next){
+    if (window.__usAtlas) { next(); return; }
+    fetch('/vendor/states-10m.json')
+      .then(function(r){ return r.json(); })
+      .then(function(json){ window.__usAtlas = json; next(); })
+      .catch(function(){ console.warn('us-atlas fetch failed'); });
+  }
+  ensureD3(function(){ ensureTopojson(function(){ ensureAtlas(callback); }); });
+}
+
+/* ═══ Theme + sidebar toggle ═══ */
+(function(){
+  var root = document.documentElement;
+  var sun = document.getElementById('themeSun');
+  var moon = document.getElementById('themeMoon');
+  var themeBtn = document.getElementById('themeToggle');
+  var sbBtn = document.getElementById('sbToggle');
+  function syncThemeIcons(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light') { sun.style.display = 'none'; moon.style.display = ''; }
+    else               { sun.style.display = '';    moon.style.display = 'none'; }
+  }
+  syncThemeIcons();
+  if (themeBtn) themeBtn.addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    syncThemeIcons();
+    // Rebuild charts (theme colors flip) — reload+reinit via loadChartJS
+    loadChartJS(function(){
+      destroyCharts();
+      buildCharts();
+    });
+    renderGeoMap();
+  });
+  if (sbBtn) sbBtn.addEventListener('click', function(){
+    var open = root.getAttribute('data-sb') === 'open';
+    root.setAttribute('data-sb', open ? 'closed' : 'open');
+  });
+})();
+
+/* ═══ CMMC countdown ═══ */
+(function(){
+  var enforce = new Date('2026-11-01T00:00:00Z');
+  var now = new Date();
+  var days = Math.max(0, Math.ceil((enforce - now) / (1000 * 60 * 60 * 24)));
+  var el = document.getElementById('cmmcCountdown');
+  if (el) el.textContent = days + ' days remaining';
+})();
+
+/* ═══ Initial paint ═══ */
+applyFilters();
+document.addEventListener('DOMContentLoaded', function(){
+  loadChartJS(function(){ buildCharts(); });
+  loadD3AndAtlas(function(){ renderGeoMap(); });
+});
+// If DOMContentLoaded already fired (e.g. defer/late-injection), kick now.
+if (document.readyState === 'interactive' || document.readyState === 'complete') {
+  loadChartJS(function(){ buildCharts(); });
+  loadD3AndAtlas(function(){ renderGeoMap(); });
+}
+// Re-render map on resize for crisp Albers fit
+window.addEventListener('resize', function(){
+  if (window.__resizeTO) clearTimeout(window.__resizeTO);
+  window.__resizeTO = setTimeout(function(){ renderGeoMap(); }, 200);
+});
+</script>
+</body>
+</html>

@@ -94,16 +94,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           /* ignore */
         }
       }
-      if (serverStale) {
-        fetch("/api/preferences", {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ theme: initial })
-        }).catch(() => {
-          /* offline */
-        });
-      }
+      // serverStale PATCH removed alongside the setTheme PATCH — same
+      // /api/preferences 400 surface. Coerced value is already in
+      // localStorage above; server reconciliation is deferred.
     })();
     return () => {
       cancelled = true;
@@ -119,14 +112,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    fetch("/api/preferences", {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: next })
-    }).catch(() => {
-      /* offline · localStorage already saved */
-    });
+    // Server-side persistence removed 2026-05-25 — /api/preferences was
+    // returning 400 on theme PATCH and surfacing as a console error on every
+    // toggle. localStorage + the inline init script in layout.tsx give us
+    // no-flash persistence per browser; cross-device theme sync is out of
+    // scope for now. Re-add a server write here when /api/preferences is
+    // re-shaped to accept the theme key without erroring.
   }, []);
 
   return (

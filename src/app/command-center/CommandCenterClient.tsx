@@ -12,7 +12,7 @@
    without wiring real data first.
    ═══════════════════════════════════════════════════════════════ */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type {
   HomeStats,
   OpportunityRow,
@@ -366,27 +366,50 @@ export function CommandCenterClient({
   const isDark = theme === "dark";
   const toggleTheme = () => setTheme(isDark ? "light" : "dark");
 
+  /* ── feed-height sync — re-implementation of the design's --rail-height
+        trick without the inline <script>. Observes the rail's rendered
+        height and pins the feed's container to match, so the feed becomes
+        a fixed-size scrollable column with its bottom edge aligned to
+        Account Intelligence's bottom edge. */
+  const railRef = useRef<HTMLElement | null>(null);
+  const [railPx, setRailPx] = useState<number | null>(null);
+  useEffect(() => {
+    const node = railRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (typeof h === "number" && h > 100) setRailPx(Math.round(h));
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+
   /* ─── render ─── */
   return (
     <div className="fa-cc" data-sb="open" suppressHydrationWarning>
       <div className="frame">
         {/* ═════════════ SIDEBAR ═════════════ */}
+        {/* ═════════════ SIDEBAR ═════════════
+            Structure + icons + badge variants extracted verbatim from
+            Claude Design HTML (faraudit-command-center.html lines 1574-1661).
+            17 nav items across WORKSPACE / INTELLIGENCE / ACCOUNT sections.
+            Items without a real route render as non-clickable placeholders
+            (cursor:default) — wire to real routes as those pages ship.    */}
         <aside className="sidebar">
           <div className="sb-logo-row">
             <div className="sb-logo">F</div>
             <span className="sb-wordmark">
-              FAR<span className="wm-au">audit</span>
+              <span>FAR</span>
+              <span className="wm-au">audit</span>
             </span>
           </div>
 
+          {/* Scrollable nav region — logo above and avatar below stay anchored,
+              this middle section scrolls when 17 items overflow the viewport. */}
+          <nav className="sb-nav">
           <div className="sb-group-label">WORKSPACE</div>
           <div className="sb-icon active" data-tip="Today">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="7" height="7" rx="1.5" />
               <rect x="14" y="3" width="7" height="7" rx="1.5" />
               <rect x="3" y="14" width="7" height="7" rx="1.5" />
@@ -396,67 +419,56 @@ export function CommandCenterClient({
             <span className="sb-tip">Today</span>
           </div>
           <a className="sb-icon" href="/audit" title="Run Audit">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
               <path d="M14 2v6h6" />
               <path d="M9 13l2 2 4-4" />
             </svg>
             <span className="sb-label">Run Audit</span>
+            <span className="sb-badge new">New</span>
             <span className="sb-tip">Run Audit</span>
           </a>
           <a className="sb-icon" href="/dashboard" title="Past Audits">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
             </svg>
             <span className="sb-label">Past Audits</span>
+            {/* MOCK count — wire to /api/audits/count when available */}
+            <span className="sb-badge count" title="mock">{MOCK_SIDEBAR_BADGES.pastAudits}</span>
             <span className="sb-tip">Past Audits</span>
           </a>
-          <div className="sb-icon" title="Pipeline">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+          <div className="sb-icon" title="Pipeline (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 17l6-6 4 4 8-8" />
               <path d="M14 7h7v7" />
             </svg>
             <span className="sb-label">Pipeline</span>
+            {/* MOCK danger count */}
+            <span className="sb-badge danger" title="mock">{MOCK_SIDEBAR_BADGES.pipeline}</span>
             <span className="sb-tip">Pipeline</span>
+          </div>
+          <div className="sb-icon" title="Capability Statement (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M8 8h8M8 12h8M8 16h5" />
+            </svg>
+            <span className="sb-label">Capability Statement</span>
+            <span className="sb-tip">Capability Statement</span>
           </div>
 
           <div className="sb-group-label">INTELLIGENCE</div>
           <a className="sb-icon" href="/upstream-intel" title="Opportunities">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="9" />
               <path d="M9 12l2 2 4-4" />
             </svg>
             <span className="sb-label">Opportunities</span>
+            <span className="sb-badge live">Live</span>
             <span className="sb-tip">Opportunities</span>
           </a>
-          <div className="sb-icon" title="Defense Spending">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+          <div className="sb-icon" title="Defense Spending (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 19V5M4 19h16" />
               <rect x="7" y="11" width="3" height="6" />
               <rect x="12" y="8" width="3" height="9" />
@@ -465,35 +477,120 @@ export function CommandCenterClient({
             <span className="sb-label">Defense Spending</span>
             <span className="sb-tip">Defense Spending</span>
           </div>
-          <div className="sb-icon" title="Agencies">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+          <div className="sb-icon" title="Defense News (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 3L4 8v8l8 5 8-5V8l-8-5z" />
+            </svg>
+            <span className="sb-label">Defense News</span>
+            <span className="sb-tip">Defense News</span>
+          </div>
+          <div className="sb-icon" title="Contracting Officers (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="9" cy="9" r="3" />
+              <path d="M3 20c1-3 3-5 6-5s5 2 6 5" />
+              <circle cx="17" cy="8" r="2.5" />
+              <path d="M21 17c-.5-2-2-3.5-4-3.5" />
+            </svg>
+            <span className="sb-label">Contracting Officers</span>
+            <span className="sb-tip">Contracting Officers</span>
+          </div>
+          <div className="sb-icon" title="Agencies (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 21h18" />
               <path d="M5 21V8l7-5 7 5v13" />
               <path d="M9 21v-6h6v6" />
             </svg>
             <span className="sb-label">Agencies</span>
+            {/* MOCK count */}
+            <span className="sb-badge count" title="mock">{MOCK_SIDEBAR_BADGES.agencies}</span>
             <span className="sb-tip">Agencies</span>
+          </div>
+          <div className="sb-icon" title="GAO Protests (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20" />
+            </svg>
+            <span className="sb-label">GAO Protests</span>
+            <span className="sb-tip">GAO Protests</span>
+          </div>
+          <div className="sb-icon" title="FAR/DFARS Updates (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M8 8h8M8 12h8M8 16h5" />
+            </svg>
+            <span className="sb-label">FAR/DFARS Updates</span>
+            <span className="sb-tip">FAR/DFARS Updates</span>
+          </div>
+          <div className="sb-icon" title="CMMC Readiness (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <span className="sb-label">CMMC Readiness</span>
+            <span className="sb-tip">CMMC Readiness</span>
+          </div>
+          <div className="sb-icon" title="Wage Benchmarks (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 20h18" />
+              <rect x="5" y="11" width="3" height="9" />
+              <rect x="10.5" y="6" width="3" height="14" />
+              <rect x="16" y="14" width="3" height="6" />
+            </svg>
+            <span className="sb-label">Wage Benchmarks</span>
+            <span className="sb-tip">Wage Benchmarks</span>
+          </div>
+          <div className="sb-icon" title="Teaming Partners (coming soon)" style={{ cursor: "default" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="7" cy="9" r="3" />
+              <circle cx="17" cy="9" r="3" />
+              <path d="M2 20c0-3 2.5-5 5-5s5 2 5 5" />
+              <path d="M12 20c0-3 2.5-5 5-5s5 2 5 5" />
+            </svg>
+            <span className="sb-label">Teaming Partners</span>
+            <span className="sb-tip">Teaming Partners</span>
           </div>
 
           <div className="sb-group-label">ACCOUNT</div>
           <a className="sb-icon" href="/settings" title="Profile & Settings">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
             </svg>
-            <span className="sb-label">Profile</span>
-            <span className="sb-tip">Profile</span>
+            <span className="sb-label">Profile &amp; Settings</span>
+            <span className="sb-tip">Profile &amp; Settings</span>
           </a>
+          {/* Sign-out is a form POST → server-side supabase.auth.signOut() + 303
+              redirect (per CLAUDE.md P0-J fix; browser-side signOut left the
+              SSR cookie in place). */}
+          <form
+            action="/api/auth/sign-out"
+            method="post"
+            style={{ width: "100%", margin: 0 }}
+          >
+            <button
+              type="submit"
+              className="sb-icon sb-signout"
+              title="Sign out"
+              style={{
+                width: "100%",
+                background: "transparent",
+                border: 0,
+                font: "inherit",
+                color: "inherit",
+                cursor: "pointer",
+                padding: 0
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              <span className="sb-label">Sign out</span>
+              <span className="sb-tip">Sign out</span>
+            </button>
+          </form>
+          </nav>
 
           <div className="sb-bottom">
             <div className="sb-avatar" title={userEmail}>
@@ -821,7 +918,10 @@ export function CommandCenterClient({
               </div>
 
               {/* ─── INTELLIGENCE FEED ─── */}
-              <div className="feed">
+              <div
+                className="feed"
+                style={railPx != null ? { height: railPx } : undefined}
+              >
                 <div className="feed-head">
                   <div className="fh-top">
                     <h2>
@@ -1064,7 +1164,7 @@ export function CommandCenterClient({
             </div>
 
             {/* ═════════ RIGHT RAIL ═════════ */}
-            <aside className="rail">
+            <aside className="rail" ref={railRef}>
               {/* Active Pursuits */}
               <section className="panel">
                 <div className="panel-head stacked">
@@ -1348,48 +1448,47 @@ export function CommandCenterClient({
                 </div>
 
                 <div className="ai2">
-                  <div className="ai2-row cols-2">
+                  {/* Inline pill row — replaces the previous 2x2 grid.
+                      Single row of 4 compact pills (Win Rate / Hit Rate /
+                      Critical P0 / Avg Cycle Time). Live data where wired,
+                      MOCK pills clearly tagged. */}
+                  <div className="acct-pills">
                     <div
-                      className="m hero"
+                      className="acct-pill"
                       title="Win Rate = wins ÷ every opportunity you looked at (live from audits.outcome)"
                     >
-                      <div className="lbl">Win Rate · 12mo</div>
-                      <div className="val">
+                      <span className="lbl">Win Rate</span>
+                      <span className="val">
                         {winRatePct}
                         <span className="small">%</span>
-                      </div>
-                      <div className="def">of all opps you look at</div>
+                      </span>
                     </div>
                     <div
-                      className="m"
+                      className="acct-pill"
                       title="Hit Rate = wins ÷ proposals submitted (live from audits.bid_submitted)"
                     >
-                      <div className="lbl">Hit Rate · 12mo</div>
-                      <div className="val">
+                      <span className="lbl">Hit Rate</span>
+                      <span className="val">
                         {hitRatePct}
                         <span className="small">%</span>
-                      </div>
-                      <div className="def">of bids you actually submit</div>
+                      </span>
                     </div>
                     <div
-                      className="m critical"
+                      className="acct-pill critical"
                       title="Open Priority-0 compliance findings (live)"
                     >
-                      <div className="lbl">Critical P0</div>
-                      <div className="val">{stats.critical_p0}</div>
-                      <div className="def">blocking deals right now</div>
+                      <span className="lbl">Critical P0</span>
+                      <span className="val">{stats.critical_p0}</span>
                     </div>
                     <div
-                      className="m"
+                      className="acct-pill mock"
                       title="Avg Cycle Time — MOCK (no cycle-time data wired)"
                     >
-                      <div className="lbl">Avg Cycle Time</div>
-                      <div className="val">
+                      <span className="lbl">Avg Cycle</span>
+                      <span className="val">
                         {MOCK_AVG_CYCLE_DAYS}
-                        <span className="small">days</span>
-                      </div>
-                      <div className="delta up">{MOCK_AVG_CYCLE_DELTA}</div>
-                      <div className="def">to get a proposal out (mock)</div>
+                        <span className="small">d</span>
+                      </span>
                     </div>
                   </div>
 

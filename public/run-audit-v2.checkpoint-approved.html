@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Run a New Audit</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════
+   FARaudit — Run Audit tab
+   Theme tokens mirror faraudit-command-center.html
+   ═══════════════════════════════════════════════════════ */
+:root {
+  /* ━━━ Brand accent (2026-05-25): blue from linkedin-thumbnail.html ━━━ */
+  --accent:        #378ADD;
+  --accent-blue:   #378ADD;
+  --accent-deep:   #185FA5;
+  --accent-light:  #B5D4F4;
+
+  --navy-900: #050d1a; --navy-800: #0A1628; --navy-700: #142545;
+  --gold-300: #B5D4F4; --gold-400: #378ADD; --gold-500: #378ADD;
+  --gold-600: #185FA5; --gold-700: #185FA5; --gold-900: #185FA5;
+  --blue-100: #dbeafe; --blue-200: #bfdbfe; --blue-500: #3b82f6;
+  --blue-600: #2563eb; --blue-700: #1d4ed8;
+  --green-500: #10b981; --green-600: #059669; --green-700: #047857;
+  --red-200: #fecaca; --red-500: #ef4444; --red-600: #dc2626; --red-700: #b91c1c;
+}
+[data-theme="light"] {
+  --page-bg:#dfe6ee; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0b1828; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e2e8f0; --line-2:#eef2f6; --line-3:#f1f5f9;
+  --sb-bg:var(--navy-800); --sb-text:#cbd5e1; --sb-text-mute:#6f8099;
+  --sb-hover:#0f1f3a; --sb-active:#13294b; --sb-border:#0b1a30;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-pop:0 16px 48px -16px rgba(15,23,42,.24), 0 4px 12px -2px rgba(15,23,42,.10);
+}
+[data-theme="dark"] {
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04);
+  --sb-bg:#02070f; --sb-text:#b6c2d3; --sb-text-mute:#5b6778;
+  --sb-hover:rgba(255,255,255,0.04); --sb-active:rgba(59,130,246,0.14); --sb-border:rgba(255,255,255,0.06);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-pop:0 24px 60px -20px rgba(0,0,0,.85);
+}
+
+/* base */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);color:var(--ink);
+  font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  transition:background-color .25s ease,color .25s ease}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+
+/* frame */
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;
+  background:var(--bg);display:grid;grid-template-columns:56px 1fr;min-height:100vh}
+
+/* ─── sidebar (minimal — full nav lives in dashboard) ─── */
+.sidebar{background:var(--sb-bg);display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:14px 0 14px;position:sticky;top:0;height:100vh;border-right:1px solid var(--sb-border)}
+.sb-logo{width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,var(--gold-400),var(--gold-500) 55%,var(--gold-700));
+  display:grid;place-items:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.45);
+  margin-bottom:14px}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;
+  color:var(--sb-text-mute);cursor:pointer;transition:background .15s,color .15s;position:relative}
+.sb-icon svg{width:18px;height:18px}
+.sb-icon:hover{background:var(--sb-hover);color:#e2e8f0}
+.sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--gold-400)}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--gold-400);border-radius:2px}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px}
+.sb-theme{width:34px;height:34px;border-radius:9px;border:0;background:transparent;
+  color:var(--sb-text-mute);cursor:pointer;display:grid;place-items:center}
+.sb-theme svg{width:16px;height:16px}
+.sb-theme:hover{background:var(--sb-hover);color:#e2e8f0}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:11.5px;border:1.5px solid var(--sb-border)}
+
+/* ─── main ─── */
+.main{padding:24px 42px 60px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:calc(100vh - 60px);position:relative}
+
+.back-link{position:absolute;top:24px;left:24px;display:inline-flex;align-items:center;gap:7px;
+  font-size:11.5px;font-weight:600;color:var(--mute);text-decoration:none;
+  padding:6px 10px;border-radius:7px;border:1px solid var(--line);background:var(--card);
+  transition:border-color .14s,color .14s;letter-spacing:.005em;z-index:1}
+.back-link svg{width:13px;height:13px}
+.back-link:hover{color:var(--ink);border-color:var(--mute-2)}
+
+/* ─── Run Audit stage — CEO 2026-05-25: removed `margin: auto 0` vertical
+   centering (was creating ~270px of dead space above the shield icon on
+   tall viewports). Stage now anchors to the top of the content area.   */
+.run-audit-stage{max-width:760px;width:100%;margin:0 0 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:0}
+
+/* shield icon */
+.ra-shield{
+  width:72px;height:72px;border-radius:16px;
+  background:linear-gradient(135deg,var(--card),var(--card-soft));
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-pop);
+  display:grid;place-items:center;color:var(--gold-500);
+  margin-bottom:22px;position:relative;
+}
+.ra-shield::after{
+  content:"";position:absolute;inset:-1px;border-radius:17px;
+  background:linear-gradient(135deg,rgba(55,138,221,0.35),transparent 50%,rgba(55,138,221,0.15));
+  z-index:-1;filter:blur(14px);opacity:.7;
+}
+.ra-shield svg{width:32px;height:32px}
+[data-theme="dark"] .ra-shield{background:linear-gradient(135deg,#152033,#0e1727)}
+
+/* heading */
+.ra-title{
+  margin:0 0 20px;
+  font-family:"Fraunces","Georgia",serif;
+  font-style:italic;font-weight:600;font-size:46px;letter-spacing:-.02em;line-height:1.1;
+  color:var(--ink);
+}
+
+/* subtitle */
+.ra-sub{
+  margin:0 0 32px;
+  max-width:580px;
+  font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:400;line-height:1.65;letter-spacing:.005em;
+  color:var(--mute);
+}
+.ra-sub b{color:var(--ink-2);font-weight:600}
+
+/* 3-step flow indicator */
+.ra-steps{
+  display:flex;align-items:center;gap:6px;margin-bottom:28px;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
+.ra-step{display:inline-flex;align-items:center;gap:7px;
+  padding:6px 10px 6px 6px;border-radius:8px;
+  background:var(--card-soft);border:1px solid var(--line);color:var(--mute);
+}
+.ra-step .dot{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;
+  background:var(--card);border:1px solid var(--line);font-size:9.5px;color:var(--ink-2);font-weight:700}
+.ra-step .lbl{color:var(--ink-2)}
+.ra-arrow{color:var(--mute-2);font-weight:400;font-family:"IBM Plex Mono"}
+
+/* mode toggle */
+.ra-mode{
+  display:inline-flex;background:var(--card-soft);border:1px solid var(--line);border-radius:10px;padding:3px;
+  margin-bottom:20px;
+}
+.ra-mode-btn{
+  height:36px;padding:0 14px;border:0;border-radius:7px;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--mute);letter-spacing:.02em;
+  display:inline-flex;align-items:center;gap:7px;transition:all .14s;
+}
+.ra-mode-btn:hover{color:var(--ink-2)}
+.ra-mode-btn svg{width:13px;height:13px;opacity:.8}
+.ra-mode-btn.active{
+  background:var(--card);color:var(--ink);
+  box-shadow:0 1px 2px rgba(15,23,42,.06), inset 0 0 0 1px var(--line);
+}
+[data-theme="dark"] .ra-mode-btn.active{background:rgba(255,255,255,0.06);color:#fff;box-shadow:none}
+.ra-mode-btn.active svg{opacity:1;color:var(--gold-500)}
+
+/* input panel */
+.ra-input-wrap{width:100%;max-width:720px;margin-bottom:16px}
+.ra-input-row{
+  display:flex;gap:10px;align-items:stretch;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px;
+  box-shadow:var(--shadow);
+}
+/* CEO 2026-05-25 — restore [hidden] semantics that the design's .ra-input-row
+   display:flex was overriding; without this all 3 mode panels render at once
+   instead of just the active one.                                         */
+.ra-input-row[hidden]{display:none !important;}
+.ra-input-row:focus-within{border-color:var(--gold-500);box-shadow:var(--shadow),0 0 0 4px rgba(55,138,221,0.10)}
+.ra-input{
+  flex:1;min-width:0;border:0;background:transparent;outline:none;
+  font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--ink);
+  padding:0 12px;
+}
+.ra-input::placeholder{color:var(--mute-2);font-weight:400}
+.ra-run-btn{
+  flex-shrink:0;border:0;cursor:pointer;
+  height:46px;padding:0 18px;border-radius:9px;
+  background:linear-gradient(180deg,var(--gold-400),var(--gold-500));
+  color:#ffffff;font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.04em;
+  display:inline-flex;align-items:center;gap:8px;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 8px 18px -6px rgba(55,138,221,.45);
+  transition:transform .15s;
+}
+.ra-run-btn:hover{transform:translateY(-1px)}
+.ra-run-btn .ra-run-sub{font-weight:600;font-size:11px;letter-spacing:.06em;opacity:.7;text-transform:uppercase}
+.ra-run-btn svg{width:13px;height:13px}
+
+/* dropzone */
+.ra-dropzone{
+  flex:1;cursor:pointer;
+  border:1.5px dashed var(--line);border-radius:10px;
+  background:var(--card-soft);
+  padding:30px 18px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  transition:border-color .15s,background .15s;
+}
+.ra-dropzone:hover{border-color:var(--gold-500);background:rgba(55,138,221,0.04)}
+.ra-dropzone svg{width:28px;height:28px;color:var(--gold-500)}
+.ra-dz-title{font-size:13px;font-weight:600;color:var(--ink)}
+.ra-dz-browse{color:var(--gold-600);text-decoration:underline;text-underline-offset:3px}
+[data-theme="dark"] .ra-dz-browse{color:var(--gold-400)}
+.ra-dz-types{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
+
+/* doc-type chips */
+.ra-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:12px;max-width:720px}
+.ra-chip{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  padding:5px 10px;border-radius:6px;
+  background:var(--card-soft);border:1px solid var(--line);color:var(--ink-2);
+}
+[data-theme="dark"] .ra-chip{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.08);color:#cfd6e1}
+
+/* footer micro-row */
+.ra-foot{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;color:var(--mute);
+  margin-bottom:36px;letter-spacing:.005em;
+}
+.ra-foot-item{display:inline-flex;align-items:center;gap:5px}
+.ra-foot-item svg{width:11px;height:11px;opacity:.7}
+.ra-foot-item b{color:var(--ink-2);font-weight:700}
+.ra-foot-sep{color:var(--mute-2)}
+.ra-foot-link{color:#185FA5;text-decoration:underline;font-weight:700;letter-spacing:0.02em}
+.ra-foot-link:hover{text-decoration:underline;color:#378ADD}
+[data-theme="dark"] .ra-foot-link{color:#B5D4F4}
+
+/* recently audited strip */
+.ra-recent{width:100%;max-width:760px;margin-top:48px;padding-top:28px;border-top:1px solid var(--line)}
+.ra-recent-label{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--mute);margin-bottom:14px;text-align:left;
+}
+/* CEO 2026-05-25 — recently audited cards sized up: bigger padding, larger
+   score badge, wider min-width so they read as substantial summary cards
+   rather than the design's compact strip.                                */
+.ra-recent-grid{display:grid;grid-template-columns:repeat(4, minmax(170px, 1fr));gap:12px}
+.ra-recent-card{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  border-radius:12px;background:var(--card);border:1px solid var(--line);
+  text-decoration:none;color:inherit;transition:transform .14s,border-color .14s,box-shadow .14s;
+  min-height:64px;
+}
+.ra-recent-card:hover{transform:translateY(-1px);border-color:var(--mute-2);box-shadow:var(--shadow)}
+.ra-recent-score{
+  width:40px;height:40px;border-radius:9px;flex-shrink:0;
+  display:grid;place-items:center;color:#fff;
+  font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;
+}
+.ra-recent-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
+.ra-recent-score.s-md{background:linear-gradient(135deg,var(--blue-700),var(--blue-500))}
+.ra-recent-score.s-no{background:linear-gradient(135deg,var(--red-700),var(--red-500))}
+.ra-recent-body{min-width:0;text-align:left}
+.ra-recent-title{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
+.ra-recent-sub{font-size:11px;color:var(--mute);font-weight:500;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR (shared with dashboard) ═════════════ -->
+  <aside class="sidebar">
+    <div class="sb-logo-row">
+      <div class="sb-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:#ffffff"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+    </div>
+    <div class="sb-icon" title="Today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </div>
+    <div class="sb-icon active" title="Run Audit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg>
+    </div>
+    <div class="sb-icon" title="Past Audits">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    </div>
+    <div class="sb-icon" title="Pipeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+    </div>
+
+    <div class="sb-bottom">
+      <button class="sb-theme" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+        <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+      </button>
+      <div class="sb-avatar">JR</div>
+    </div>
+  </aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
+    <a href="/command-center" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back to Command Center
+    </a>
+
+    <div class="run-audit-stage">
+
+      <!-- shield icon -->
+      <div class="ra-shield">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      </div>
+
+      <!-- heading -->
+      <h1 class="ra-title">Run a New Audit</h1>
+
+      <!-- subtitle -->
+      <p class="ra-sub">
+        Upload any federal solicitation PDF. FARaudit runs <b>three sequential intelligence calls</b>
+        and delivers a ranked report with a KO clarification email drafted and ready to send.
+      </p>
+
+      <!-- 3-step flow indicator -->
+      <div class="ra-steps">
+        <div class="ra-step"><span class="dot">1</span><span class="lbl">Overview</span></div>
+        <span class="ra-arrow">→</span>
+        <div class="ra-step"><span class="dot">2</span><span class="lbl">FAR / DFARS Compliance</span></div>
+        <span class="ra-arrow">→</span>
+        <div class="ra-step"><span class="dot">3</span><span class="lbl">Risk Extraction</span></div>
+      </div>
+
+      <!-- input mode toggle -->
+      <div class="ra-mode" role="tablist">
+        <button class="ra-mode-btn active" data-mode="id" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+          SAM Notice ID
+        </button>
+        <button class="ra-mode-btn" data-mode="upload" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+          Upload PDF
+        </button>
+        <button class="ra-mode-btn" data-mode="url" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
+          SAM.gov URL
+        </button>
+      </div>
+
+      <!-- input panel (changes by mode) -->
+      <div class="ra-input-wrap">
+        <!-- Mode: SAM ID -->
+        <div class="ra-input-row" data-mode-panel="id">
+          <input type="text" class="ra-input" placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068" />
+          <button class="ra-run-btn">
+            Run Audit
+            <span class="ra-run-sub">Notice ID</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Mode: Upload PDF -->
+        <div class="ra-input-row" data-mode-panel="upload" hidden>
+          <label class="ra-dropzone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+            <span class="ra-dz-title">Drop a solicitation PDF or <span class="ra-dz-browse">browse</span></span>
+            <span class="ra-dz-types">PDF · DOCX · max 25MB</span>
+            <input type="file" hidden accept=".pdf,.docx" />
+          </label>
+        </div>
+
+        <!-- Mode: URL -->
+        <div class="ra-input-row" data-mode-panel="url" hidden>
+          <input type="text" class="ra-input" placeholder="Paste full SAM.gov opportunity URL" />
+          <button class="ra-run-btn">
+            Run Audit
+            <span class="ra-run-sub">URL</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- supported document types -->
+      <div class="ra-chips">
+        <span class="ra-chip">RFQ</span>
+        <span class="ra-chip">RFP</span>
+        <span class="ra-chip">IDIQ</span>
+        <span class="ra-chip">IFB</span>
+        <span class="ra-chip">Sources Sought</span>
+        <span class="ra-chip">Pre-Sol Synopsis</span>
+        <span class="ra-chip">Task Order</span>
+        <span class="ra-chip">Modification</span>
+      </div>
+
+      <!-- footer micro-row -->
+      <div class="ra-foot">
+        <span class="ra-foot-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          Avg <b>38 sec</b>
+        </span>
+        <span class="ra-foot-sep">·</span>
+        <span class="ra-foot-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+          Your PDFs stay private · <b>SOC 2 Type II</b>
+        </span>
+        <span class="ra-foot-sep">·</span>
+        <a class="ra-foot-link" href="#">View a sample audit →</a>
+      </div>
+
+      <!-- recently audited (compact strip) -->
+      <div class="ra-recent">
+        <div class="ra-recent-label">Recently audited</div>
+        <div class="ra-recent-grid">
+          <a class="ra-recent-card" href="#">
+            <span class="ra-recent-score s-hi">94</span>
+            <div class="ra-recent-body">
+              <div class="ra-recent-title">N00024-26-R-2207</div>
+              <div class="ra-recent-sub">SPY-6 Phase IV · 2m ago</div>
+            </div>
+          </a>
+          <a class="ra-recent-card" href="#">
+            <span class="ra-recent-score s-hi">88</span>
+            <div class="ra-recent-body">
+              <div class="ra-recent-title">FA8730-26-Q-0114</div>
+              <div class="ra-recent-sub">F-35 Test Harness · 38m ago</div>
+            </div>
+          </a>
+          <a class="ra-recent-card" href="#">
+            <span class="ra-recent-score s-md">68</span>
+            <div class="ra-recent-body">
+              <div class="ra-recent-title">W56KGY-26-R-0014</div>
+              <div class="ra-recent-sub">CECOM TNSS · 2h ago</div>
+            </div>
+          </a>
+          <a class="ra-recent-card" href="#">
+            <span class="ra-recent-score s-no">42</span>
+            <div class="ra-recent-body">
+              <div class="ra-recent-title">N00178-26-R-3071</div>
+              <div class="ra-recent-sub">Indian Head · yesterday</div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+/* ───────── Run Audit tab — interactions ───────── */
+
+/* theme toggle */
+const themeBtn = document.getElementById("themeToggle");
+const themeSun = document.getElementById("themeSun");
+const themeMoon = document.getElementById("themeMoon");
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  if (themeSun && themeMoon) {
+    themeSun.style.display = t === "light" ? "none" : "";
+    themeMoon.style.display = t === "light" ? "" : "none";
+  }
+  try { localStorage.setItem("faraudit-theme", t); } catch (e) {}
+}
+const saved = (() => { try { return localStorage.getItem("faraudit-theme"); } catch (e) { return null; } })();
+applyTheme(saved || "light");
+themeBtn?.addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme") || "light";
+  applyTheme(cur === "light" ? "dark" : "light");
+});
+
+/* mode toggle (SAM ID / Upload PDF / URL) */
+const modeBtns = document.querySelectorAll(".ra-mode-btn");
+const modePanels = document.querySelectorAll("[data-mode-panel]");
+modeBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.mode;
+    modeBtns.forEach(b => {
+      const on = b.dataset.mode === mode;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    modePanels.forEach(p => {
+      p.hidden = p.dataset.modePanel !== mode;
+    });
+  });
+});
+
+
+/* ───── submit handler · CEO 2026-05-25 ─────
+   Wires the design's static .ra-run-btn (and PDF dropzone auto-submit)
+   to POST FormData to the existing /api/audit endpoint, then redirects
+   the browser to /audit/<slug>. No state machine — reads the active
+   mode panel at click time.                                          */
+(function () {
+  function extractNoticeIdFromUrl(url) {
+    var m = (url || "").trim().match(/\/opp\/([A-Za-z0-9]+)/i);
+    return m ? m[1] : null;
+  }
+  function setBusy(btn, busy) {
+    if (!btn) return;
+    if (busy) {
+      btn.dataset._label = btn.innerHTML;
+      btn.innerHTML = "Running…";
+      btn.disabled = true;
+    } else if (btn.dataset._label) {
+      btn.innerHTML = btn.dataset._label;
+      btn.disabled = false;
+    }
+  }
+  function submitAudit(noticeId, pdfFile, sourceBtn) {
+    var fd = new FormData();
+    fd.append("noticeId", noticeId || "");
+    if (pdfFile) fd.append("pdf", pdfFile);
+    setBusy(sourceBtn, true);
+    fetch("/api/audit", { method: "POST", body: fd, credentials: "include" })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (out) {
+        if (!out.ok) {
+          alert((out.data && out.data.error) || ("Audit failed: HTTP " + out.status));
+          setBusy(sourceBtn, false);
+          return;
+        }
+        var slug = ((out.data.solicitationNumber || out.data.auditId || "") + "").trim().toLowerCase();
+        if (!slug) { alert("Audit started but no audit ID returned."); setBusy(sourceBtn, false); return; }
+        window.location.href = "/audit/" + encodeURIComponent(slug);
+      })
+      .catch(function (err) {
+        alert("Network error: " + (err && err.message ? err.message : String(err)));
+        setBusy(sourceBtn, false);
+      });
+  }
+  document.querySelectorAll(".ra-run-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      var panel = btn.closest("[data-mode-panel]");
+      var mode  = panel ? panel.dataset.modePanel : "id";
+      var input = panel ? panel.querySelector(".ra-input") : null;
+      var value = input ? input.value.trim() : "";
+      if (mode === "id") {
+        if (!value) { alert("Enter a SAM.gov Notice ID."); return; }
+        submitAudit(value, null, btn);
+      } else if (mode === "url") {
+        var n = extractNoticeIdFromUrl(value);
+        if (!n) { alert("Could not extract Notice ID from that URL."); return; }
+        submitAudit(n, null, btn);
+      }
+    });
+  });
+  /* PDF dropzone — auto-submit on file select */
+  var fileInput = document.querySelector(".ra-dropzone input[type=file]");
+  if (fileInput) {
+    fileInput.addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) submitAudit("", f, null);
+    });
+  }
+})();
+
+</script>
+</body>
+</html>
+<!-- v9 2026-05-25-2135 -->
