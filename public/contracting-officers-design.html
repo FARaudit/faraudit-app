@@ -573,9 +573,8 @@ tr:hover .ii-notice{height:auto;opacity:1}
       <header class="page-header">
   <div class="page-header-text">
     <p class="eyebrow">Contract Intelligence</p>
-    <h1>Contracting Officers</h1>
+    <h1>Contracting Officers <span class="hdr-info-icon" tabindex="0">ⓘ<span class="hdr-tooltip">Who has live requirements and what's my relationship with them?</span></span></h1>
     <p class="hdr-sub-combined"><span class="hdr-sub-primary">Relationship intelligence · responsiveness scoring · active requirements · outreach tracker</span></p>
-    <p class="hdr-tagline" style="font-size:13px;font-style:italic;color:var(--mute);font-weight:400;margin-top:6px">"Who has live requirements and what's my relationship with them?"</p>
     <p class="hdr-budget-context">12 COs tracked · SAM.gov + FPDS-NG + Hunter API · email verification active · updated daily</p>
   </div>
   <div class="hdr-naics">
@@ -615,9 +614,49 @@ tr:hover .ii-notice{height:auto;opacity:1}
     </div></section>
 <style>
 /* CO-specific card styles */
-.hdr-tagline{font-size:12px;font-style:italic;color:var(--mute);margin-top:4px}
-.filter-bar{flex-wrap:nowrap;overflow-x:auto;gap:6px}
-.filter-bar .fb-pill{padding:4px 8px;font-size:11px}
+.filter-bar{flex-wrap:nowrap;overflow-x:auto;gap:0;align-items:center}
+.filter-bar .fb-group{gap:5px;flex-shrink:0}
+.filter-bar .fb-divider{width:1px;height:20px;min-width:1px;background:var(--line);margin:0 10px;flex-shrink:0}
+.filter-bar .fb-pill{padding:4px 10px;font-size:11px;white-space:nowrap}
+[data-theme="light"]{
+  --insight-amber-bg:#fef3c7;
+  --insight-amber-line:rgba(180,117,23,0.28);
+  --insight-amber-ink:var(--ink);
+  --insight-alert-bg:#fee2e2;
+  --insight-alert-line:rgba(220,38,38,0.28);
+  --insight-alert-ink:var(--ink);
+  --insight-info-bg:#dbeafe;
+  --insight-info-line:rgba(24,95,165,0.28);
+  --insight-info-ink:var(--ink);
+  --insight-win-bg:#d1fae5;
+  --insight-win-line:rgba(16,185,129,0.32);
+  --insight-win-ink:var(--ink);
+}
+[data-theme="dark"]{
+  --insight-amber-bg:rgba(253,230,138,0.18);
+  --insight-amber-line:rgba(253,230,138,0.32);
+  --insight-amber-ink:#f5deb9;
+  --insight-alert-bg:rgba(252,165,165,0.18);
+  --insight-alert-line:rgba(252,165,165,0.32);
+  --insight-alert-ink:#ffd7d4;
+  --insight-info-bg:rgba(147,197,253,0.18);
+  --insight-info-line:rgba(147,197,253,0.32);
+  --insight-info-ink:#cfe2ff;
+  --insight-win-bg:rgba(110,231,183,0.18);
+  --insight-win-line:rgba(110,231,183,0.32);
+  --insight-win-ink:#c8f1dc;
+}
+.insight-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;font-size:11px;margin-top:5px;border:1px solid}
+.insight-chip.insight-info{background:var(--insight-info-bg,rgba(37,99,235,.08));border-color:var(--insight-info-line,rgba(37,99,235,.2));color:var(--insight-info-ink,#2563eb)}
+.insight-chip.insight-amber{background:var(--insight-amber-bg,rgba(217,119,6,.08));border-color:var(--insight-amber-line,rgba(217,119,6,.2));color:var(--insight-amber-ink,#d97706)}
+.insight-chip.insight-alert{background:var(--insight-alert-bg,rgba(220,38,38,.08));border-color:var(--insight-alert-line,rgba(220,38,38,.2));color:var(--insight-alert-ink,#dc2626)}
+.insight-chip.insight-win{background:var(--insight-win-bg,rgba(22,163,74,.08));border-color:var(--insight-win-line,rgba(22,163,74,.2));color:var(--insight-win-ink,#16a34a)}
+.insight-icon{font-size:11px;flex-shrink:0}
+.insight-label{font-weight:800;font-size:10px;letter-spacing:.06em;flex-shrink:0}
+.insight-body{font-style:italic;line-height:1.4}
+.hdr-info-icon{position:relative;font-size:14px;color:var(--mute);cursor:pointer;font-style:normal;font-weight:400;vertical-align:middle;margin-left:6px}
+.hdr-info-icon:hover .hdr-tooltip,.hdr-info-icon:focus .hdr-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
+.hdr-tooltip{position:absolute;left:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;font-style:italic;color:var(--ink-2);white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(-4px);transition:all .15s;z-index:100;font-weight:400;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 .two-col{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start;margin-top:0}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:18px;position:sticky;top:82px}
