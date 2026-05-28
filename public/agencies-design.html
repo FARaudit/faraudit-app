@@ -646,7 +646,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
   --insight-win-line:rgba(110,231,183,0.32);
   --insight-win-ink:#c8f1dc;
 }
-.insight-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;font-size:11px;margin-top:5px;border:1px solid}
+.insight-chip{display:inline-flex;max-width:fit-content;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;font-size:11px;margin-top:5px;border:1px solid}
 .insight-chip.insight-info{background:var(--insight-info-bg,rgba(37,99,235,.08));border-color:var(--insight-info-line,rgba(37,99,235,.2));color:var(--insight-info-ink,#2563eb)}
 .insight-chip.insight-amber{background:var(--insight-amber-bg,rgba(217,119,6,.08));border-color:var(--insight-amber-line,rgba(217,119,6,.2));color:var(--insight-amber-ink,#d97706)}
 .insight-chip.insight-alert{background:var(--insight-alert-bg,rgba(220,38,38,.08));border-color:var(--insight-alert-line,rgba(220,38,38,.2));color:var(--insight-alert-ink,#dc2626)}
@@ -821,7 +821,7 @@ function renderAgencies(){
             <span class="agtag agt-b">${a.base.split(",")[0]}</span>
             ${a.sols>0?`<span class="agtag agt-s" onclick="event.stopPropagation();location.href='/opportunities'">● ${a.sols} active sols →</span>`:""}
           </div>
-          <div class="insight-chip insight-info"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${(AGENCY_INSIGHTS[a.id]||"").replace(/^● AI INSIGHT:\s*/,"")}</span></div>
+          <div class="insight-chip insight-info" style="margin-top:5px"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${(AGENCY_INSIGHTS[a.id]||"").replace(/^● AI INSIGHT:\s*/,"")}</span></div>
         </div>
         <div class="ag-rt">
           <div class="ag-fy">${a.fy26}</div>
