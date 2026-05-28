@@ -617,7 +617,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .filter-bar .fb-group{gap:5px;flex-shrink:0}
 .filter-bar .fb-divider{width:1px;height:20px;min-width:1px;background:var(--line);margin:0 10px;flex-shrink:0}
 .filter-bar .fb-pill{padding:4px 10px;font-size:11px;white-space:nowrap}
-.fb-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);opacity:1;margin-right:4px;white-space:nowrap;flex-shrink:0}
+.fb-label{background:#2563eb;border:1px solid #2563eb;color:#ffffff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-right:6px;white-space:nowrap;flex-shrink:0}
 [data-theme="light"]{
   --insight-amber-bg:#fef3c7;
   --insight-amber-line:rgba(180,117,23,0.28);
@@ -657,7 +657,7 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .hdr-info-icon{position:relative;font-size:14px;color:var(--mute);cursor:pointer;font-style:normal;font-weight:400;vertical-align:middle;margin-left:6px}
 .hdr-info-icon:hover .hdr-tooltip,.hdr-info-icon:focus .hdr-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
 .hdr-tooltip{position:absolute;left:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;font-style:italic;color:var(--ink-2);white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(-4px);transition:all .15s;z-index:100;font-weight:400;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-.two-col{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+.two-col{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:20px}
 @media(max-width:1180px){.two-col{grid-template-columns:1fr}}
 .right-stack{display:flex;flex-direction:column;gap:18px;position:sticky;top:82px}
 .gp-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden;transition:border-color .15s}
@@ -736,8 +736,8 @@ tr:hover .ii-notice{height:auto;opacity:1}
 .risk-desc{font-size:11px;color:var(--mute)}
 </style>
 <div class="two-col">
-  <div id="gp-list" style="display:flex;flex-direction:column;gap:10px"></div>
-  <aside class="right-stack"><section class="widget">
+  <div id="gp-list" style="grid-column:1/4;display:flex;flex-direction:column;gap:10px"></div>
+  <aside class="right-stack" style="grid-column:4/5"><section class="widget">
   <header class="widget-head">
     <div class="wh-left">
       <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V11l7-6 7 6v10M9 21v-6h6v6"/></svg></span>
