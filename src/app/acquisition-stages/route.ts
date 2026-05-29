@@ -1,18 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import path from 'path'
-import fs from 'fs'
+/* GET /dashboard — serves the static Past Audits HTML
+   (public/acquisition-stages-design.html) behind the existing Supabase auth gate.
 
-export const dynamic = 'force-dynamic'
+   Mirror of /command-center/route.ts and /audit/route.ts — the design
+   is a complete standalone document with its own <html data-theme=…>
+   so it has to be served as a raw HTTP response, which only a Route
+   Handler can do. The auth-gate semantics that lived in the previous
+   page.tsx are preserved verbatim below.
+   (See page.tsx.bak-pre-static-* for the React Supabase-driven version.)
 
-export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    return NextResponse.redirect(new URL('/sign-in', req.url))
-  }
-  const filePath = path.join(process.cwd(), 'public', 'acquisition-stages-design.html')
-  const html = fs.readFileSync(filePath, 'utf-8')
-  return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } })
+   The static page is currently mock-data only. Live data injection will
+   come AFTER pixel-perfect approval, same staged approach as the CC.   */
+
+import { redirect } from "next/navigation";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { createServerClient } from "@/lib/supabase-server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const supabase = await createServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in?next=/dashboard");
+
+  const filePath = path.join(
+    process.cwd(),
+    "public",
+    "acquisition-stages-design.html"
+  );
+  const html = await readFile(filePath, "utf8");
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      // Transitional cache flush — see next.config.ts.
+      "clear-site-data": '"cache"'
+    }
+  });
 }
