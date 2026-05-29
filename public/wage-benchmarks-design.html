@@ -781,10 +781,11 @@ function renderList(){
   data=data.filter(w=>locMatch(w,f.loc));
   if(f.cat!=="all")data=data.filter(w=>w.cat.includes(f.cat));
   if(f.status!=="all")data=data.filter(w=>w.status===f.status);
-  if(lcSort===0)data.sort((a,b)=>a.cat.localeCompare(b.cat));
-  else if(lcSort===1)data.sort((a,b)=>b.cat.localeCompare(a.cat));
-  else if(lcSort===2)data.sort((a,b)=>a.var-b.var);
-  else if(lcSort===3)data.sort((a,b)=>b.var-a.var);
+  let inst=data.filter(w=>w.section==="installation");
+  let prof=data.filter(w=>w.section==="professional");
+  const sortFn=lcSort===0?(a,b)=>a.cat.localeCompare(b.cat):lcSort===1?(a,b)=>b.cat.localeCompare(a.cat):lcSort===2?(a,b)=>a.var-b.var:(a,b)=>b.var-a.var;
+  inst.sort(sortFn);prof.sort(sortFn);
+  data=inst.concat(prof);
   let lastSection=null;document.getElementById("wage-tbody").innerHTML=data.map(w=>{const sep=(lastSection!==null&&w.section!==lastSection)?'<tr class="section-separator"><td colspan="8" style="padding:8px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);background:var(--card-soft);border-top:2px solid var(--line);border-bottom:1px solid var(--line);font-family:\'IBM Plex Mono\',monospace">PROFESSIONAL &amp; TECHNICAL ROLES · BLS OES + CORPUS DATA</td></tr>':'';lastSection=w.section;
     const varCls=w.var<=-3?"var-neg":w.var>=1?"var-pos":w.var<0?"var-neutral":"var-pos";
     const varSign=w.var>=0?"+":"";
@@ -800,7 +801,7 @@ function renderList(){
       <td><span class="status-badge sb-${w.status}">${w.status}</span></td>
     </tr>`;
     if(w.status==="FLAG"&&w.insight){
-      html+=`<tr class="insight-row"><td colspan="8"><span class="insight-chip insight-alert" style="margin-top:0"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></span></td></tr>`;
+      html+=`<tr class="insight-row"><td colspan="8"><span class="insight-chip insight-amber" style="margin-top:0"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></span></td></tr>`;
     }
     return html;
   }).join("");
