@@ -1,4 +1,4 @@
-/* GET /dashboard — serves the static Past Audits HTML
+/* GET /acquisition-stages — serves the static Acquisition Stages HTML
    (public/acquisition-stages-design.html) behind the existing Supabase auth gate.
 
    Mirror of /command-center/route.ts and /audit/route.ts — the design
@@ -23,7 +23,7 @@ export async function GET() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/dashboard");
+  if (!user) redirect("/sign-in?next=/acquisition-stages");
 
   const filePath = path.join(
     process.cwd(),
