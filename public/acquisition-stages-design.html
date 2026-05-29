@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARaudit — Acquisition Stages</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0A1628;--navy2:#0D1F35;--blue:#185FA5;--mid:#378ADD;
+  --light:#B5D4F4;--pale:#E6F1FB;
+  --page-bg:#f0f4f8;--card:#ffffff;
+  --text:#1f2937;--muted:#6b7280;--subtle:#9ca3af;
+  --border:#e5e7eb;--border2:#d1d5db;
+  --green-bg:#dcfce7;--green-txt:#166534;
+  --amber-bg:#fef3c7;--amber-txt:#92400e;
+  --red-bg:#fee2e2;--red-txt:#991b1b;
+  --radius:8px;--radius-lg:12px;
+}
+body{font-family:'Manrope',system-ui,-apple-system,sans-serif;background:var(--page-bg);color:var(--text);display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{width:220px;min-height:100vh;background:var(--navy);display:flex;flex-direction:column;padding:0;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:.5px solid rgba(255,255,255,.08)}
+.sb-logo-mark{width:32px;height:32px;background:var(--mid);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
+.sb-logo-text{font-size:16px;font-weight:700;color:#e2e8f2;letter-spacing:-.01em}.sb-logo-text span{color:var(--mid)}
+.sb-section{padding:16px 12px 4px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+.sb-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin:1px 8px;cursor:pointer;text-decoration:none;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:all .15s;position:relative}
+.sb-item:hover{background:rgba(255,255,255,.06);color:#e2e8f2}
+.sb-item.active{background:rgba(55,138,221,.15);color:var(--mid)}
+.sb-badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(55,138,221,.2);color:var(--mid)}
+.sb-badge.red{background:rgba(239,68,68,.2);color:#f87171}
+.sb-badge.green{background:rgba(34,197,94,.2);color:#4ade80}
+.sb-divider{height:.5px;background:rgba(255,255,255,.06);margin:8px 16px}
+.sb-item svg{width:16px;height:16px;opacity:.7;flex-shrink:0}
+.sb-item.active svg{opacity:1}
+
+/* ── Main ── */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:56px;background:var(--card);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;position:sticky;top:0;z-index:50}
+.topbar-breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.topbar-breadcrumb span{color:var(--text);font-weight:600}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.topbar-search{display:flex;align-items:center;gap:8px;background:var(--page-bg);border:.5px solid var(--border2);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--muted);width:260px}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+
+/* ── Content ── */
+.content{padding:28px 32px;flex:1}
+.page-header{margin-bottom:24px}
+.page-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.page-title{font-size:26px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted)}
+
+/* ── Stage Rail ── */
+.stage-rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:20px}
+.stage-pip{border:.5px solid var(--border2);border-radius:var(--radius);padding:12px 8px;cursor:pointer;background:var(--card);transition:all .15s;text-align:center;position:relative}
+.stage-pip:hover{border-color:var(--mid);background:var(--pale)}
+.stage-pip.active{border-color:var(--mid);background:var(--navy);color:#e2e8f2}
+.stage-pip.faraudit{border-left:3px solid var(--mid)}
+.stage-pip.inactive{opacity:.5}
+.pip-num{font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--subtle);margin-bottom:4px}
+.stage-pip.active .pip-num{color:var(--light)}
+.pip-name{font-size:10px;font-weight:600;line-height:1.3;color:var(--text)}
+.stage-pip.active .pip-name{color:#e2e8f2}
+.pip-indicator{width:6px;height:6px;border-radius:50%;background:var(--mid);margin:6px auto 0}
+.stage-pip:not(.faraudit) .pip-indicator{background:var(--border2)}
+
+/* ── Coverage bar ── */
+.coverage-bar{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius);padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px}
+.coverage-stat{font-size:22px;font-weight:700;color:var(--navy)}
+.coverage-label{font-size:12px;color:var(--muted)}
+.coverage-pill{background:var(--green-bg);color:var(--green-txt);font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;margin-left:auto}
+
+/* ── Stage Detail ── */
+.stage-detail{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.detail-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px}
+.detail-card.fa-card{border-color:var(--light);background:var(--pale)}
+.detail-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px}
+.fa-label{background:var(--navy);color:var(--light);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:10px}
+.detail-headline{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.detail-body{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+.item-list{display:flex;flex-direction:column;gap:5px}
+.item-row{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text);line-height:1.5}
+.item-dot{width:4px;height:4px;border-radius:50%;background:var(--mid);flex-shrink:0;margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600}
+.chip-output{background:var(--card);border:.5px solid var(--light);color:var(--blue)}
+.chip-green{background:var(--green-bg);color:var(--green-txt)}
+
+/* ── Clauses + Risks ── */
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bottom-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
+.bottom-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px}
+.clause-row{display:flex;gap:10px;padding:6px 0;border-bottom:.5px solid var(--border);align-items:flex-start;font-size:11px}
+.clause-row:last-child{border-bottom:none}
+.clause-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue);font-weight:600;min-width:110px;flex-shrink:0}
+.clause-title{color:var(--text);line-height:1.4;flex:1}
+.clause-badge{font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;flex-shrink:0}
+.badge-trap{background:var(--red-bg);color:var(--red-txt)}
+.badge-req{background:var(--amber-bg);color:var(--amber-txt)}
+.badge-ref{background:#f3f4f6;color:var(--muted)}
+.risk-row{padding:8px 10px;border-radius:6px;margin-bottom:6px;font-size:11px}
+.risk-row:last-child{margin-bottom:0}
+.risk-row.p0{background:#fff1f2;border:.5px solid #fecdd3}
+.risk-row.p1{background:var(--amber-bg);border:.5px solid #fde68a}
+.risk-title{font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+.risk-desc{color:var(--muted);line-height:1.5;font-size:10px}
+.sev{font-size:9px;padding:1px 6px;border-radius:6px;font-weight:700}
+.sev-p0{background:var(--red-bg);color:var(--red-txt)}
+.sev-p1{background:var(--amber-bg);color:var(--amber-txt)}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-mark">F</div>
+    <div class="sb-logo-text"><span>FAR</span>audit</div>
+  </div>
+  <div class="sb-section">Workspace</div>
+  <a href="/command-center" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Today</a>
+  <a href="/audit" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Run Audit<span class="sb-badge green">New</span></a>
+  <a href="/acquisition-stages" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Acquisition Stages</a>
+  <a href="/acquisition-stages" class="sb-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Acquisition Stages</a>
+  <a href="/dashboard" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>Past Audits<span class="sb-badge">15</span></a>
+  <a href="/pipeline" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Pipeline<span class="sb-badge red">3</span></a>
+  <a href="/capability-statement" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>Capability Statement</a>
+  <div class="sb-divider"></div>
+  <div class="sb-section">Intelligence</div>
+  <a href="/opportunities" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Opportunities<span class="sb-badge green">Live</span></a>
+  <a href="/defense-spending" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Defense Spending</a>
+  <a href="/defense-news" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2"/><path d="M4 11h8"/><path d="M4 16h4"/><rect x="2" y="7" width="6" height="4"/></svg>Defense News</a>
+  <a href="/agencies" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Defense Agencies<span class="sb-badge">8</span></a>
+  <a href="/contracting-officers" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contracting Officers</a>
+  <a href="/gao-protests" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>GAO Protests</a>
+  <a href="/far-dfars-updates" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/></svg>FAR/DFARS Updates</a>
+  <a href="/cmmc" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>CMMC Readiness</a>
+  <a href="/wage-benchmarks" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Wage Benchmarks</a>
+  <a href="/teaming-partners" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>Teaming Partners</a>
+  <div class="sb-divider"></div>
+  <div class="sb-section">Account</div>
+  <a href="/settings" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Profile & Settings</a>
+  <a href="/sign-in" class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</a>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-breadcrumb">Acquisition Stages <span>/ Lifecycle Intelligence</span></div>
+    <div class="topbar-right">
+      <div class="topbar-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search stages, clauses, risks...</div>
+      <div class="user-avatar">JR</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="page-header">
+      <div class="page-label">Workspace</div>
+      <div class="page-title">Acquisition Stages</div>
+      <div class="page-sub">The complete federal acquisition lifecycle — where FARaudit gives you the edge at every stage</div>
+    </div>
+
+    <!-- Coverage bar -->
+    <div class="coverage-bar">
+      <div>
+        <div class="coverage-stat">7 of 8</div>
+        <div class="coverage-label">stages covered by FARaudit</div>
+      </div>
+      <div style="width:1px;height:36px;background:var(--border);margin:0 8px"></div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy)">60–90 day head start</div>
+        <div class="coverage-label">FARaudit starts at Stage 01, before competitors see the solicitation</div>
+      </div>
+      <div class="coverage-pill">● Active coverage</div>
+    </div>
+
+    <!-- Stage Rail -->
+    <div class="stage-rail" id="rail">
+      <div class="stage-pip faraudit" onclick="select(0)" id="pip-0"><div class="pip-num">01</div><div class="pip-name">Pre-Sol Synopsis</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="select(1)" id="pip-1"><div class="pip-num">02</div><div class="pip-name">Sources Sought / RFI</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit active" onclick="select(2)" id="pip-2"><div class="pip-num">03</div><div class="pip-name">Solicitation Drops</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="select(3)" id="pip-3"><div class="pip-num">04</div><div class="pip-name">Proposal Dev</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="select(4)" id="pip-4"><div class="pip-num">05</div><div class="pip-name">Submission</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="select(5)" id="pip-5"><div class="pip-num">06</div><div class="pip-name">Evaluation</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="select(6)" id="pip-6"><div class="pip-num">07</div><div class="pip-name">Award</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip inactive" onclick="select(7)" id="pip-7"><div class="pip-num">08</div><div class="pip-name">Post-Award</div><div class="pip-indicator" style="background:var(--border2)"></div></div>
+    </div>
+
+    <!-- Stage Detail (dynamic) -->
+    <div id="stage-detail"></div>
+  </div>
+</div>
+
+<script>
+const STAGES = [
+  {
+    num:'01', name:'Pre-Solicitation Synopsis', sub:'FAR 5.203 · Public notice on SAM.gov · 60–90 days before solicitation',
+    headline:'60–90 days before the solicitation drops',
+    what:['CO posts formal public notice to SAM.gov','Industry begins positioning for competition','Contract type announced (FFP, T&M, Cost-Plus)','NAICS code and size standard confirmed','Estimated solicitation release date provided'],
+    fa:'Synopsis Scanner detects notices at 06:15 CT daily across 9 defense NAICS codes. Analyzes contract type, set-aside eligibility, urgency score 0–100. Generates a strategic CO contact email — a precise, intelligent single-question inquiry that positions your company as an industry subject matter expert before competitors know the requirement exists.',
+    outputs:['Synopsis analysis','CO contact email','Preparation calendar','Urgency score 0–100','NAICS eligibility check'],
+    outcomes:['60–90 day head start','CO relationship established','Teaming strategy formed'],
+    clauses:[{num:'FAR 5.203',title:'Publicizing Contract Actions',badge:'ref'},{num:'FAR Part 10',title:'Market Research — agency uses RFI/Synopsis to gauge capability',badge:'ref'}],
+    risks:[{sev:'p1',title:'Missed synopsis — competition starts without you',desc:'Competitors establish the CO relationship first. Late engagement is visible and signals low interest.'}]
+  },
+  {
+    num:'02', name:'Sources Sought / RFI', sub:'Agency shapes the requirement · Maximum contractor influence window',
+    headline:'Where contractor language enters the government SOW',
+    what:['Agency gauges market capability and interest','Technical capabilities and approach requested','SOW and PWS language still actively being written','Evaluation factor weights not yet determined'],
+    fa:'RFI Scanner monitors 9 defense NAICS codes daily, ranked by influence score. RFI Response Drafter produces a solution-first strategic response: unconsidered risks the agency missed, agency terminology mirrored precisely, performance standards proposed from industry best practice. SOW Influence Tracker later closes the loop with a match score.',
+    outputs:['Ranked RFI feed (9 NAICS)','Strategic response draft','Unconsidered risk analysis','Agency terminology alignment'],
+    outcomes:['Language written into final SOW','SME positioning with agency','Evaluation criteria shaped'],
+    clauses:[{num:'FAR 10.002',title:'Procedures for Market Research',badge:'ref'},{num:'FAR 52.215-3',title:'Request for Information or Solicitation for Planning Purposes',badge:'ref'}],
+    risks:[{sev:'p0',title:'RFI response leads with company history',desc:'Agencies at this stage evaluate technical understanding, not past performance. History-first signals misread requirement.'},{sev:'p1',title:'Failing to identify unconsidered risks',desc:'The most influential RFI responses flag a technical constraint the agency missed. This gets your language into the final SOW.'}]
+  },
+  {
+    num:'03', name:'Solicitation Released', sub:'RFQ / RFP / IFB posted to SAM.gov · Competition clock starts',
+    headline:'Three-call architecture — no token truncation on large IDIQs',
+    what:['CO releases full solicitation to SAM.gov','Section B — CLINs, quantities, pricing structure','Section C — SOW, PWS, or SOO','Section L — instructions to offerors','Section M — evaluation factors and weights'],
+    fa:'Full three-call audit engine. Pre-step: SOW/PWS/SOO Classifier reads Section C — this changes the entire bid strategy before a single clause is checked. Call 1 (Overview): CLIN ambiguities, FOB conflicts, pricing traps. Call 2 (Compliance): every FAR/DFARS clause vs current regulations. Call 3 (Risks): DFARS trap detection across 6 high-disqualification clauses.',
+    outputs:['SOW/PWS/SOO classification + bid strategy','CLIN ambiguity flags with citations','Full FAR/DFARS compliance report','DFARS trap list with severity ratings','KO clarification email draft'],
+    outcomes:['Zero pricing surprises at award','Compliance confirmed before submission','Clarification questions filed within window'],
+    clauses:[{num:'252.223-7008',title:'Prohibition of Hexavalent Chromium',badge:'trap'},{num:'252.204-7018',title:'Prohibition on Covered Defense Telecom Equipment',badge:'trap'},{num:'252.204-7021',title:'CMMC Requirements',badge:'trap'},{num:'52.219-14',title:'Limitations on Subcontracting — 50% self-performance rule',badge:'req'},{num:'52.225-1',title:'Buy American — domestic end product certification',badge:'req'}],
+    risks:[{sev:'p0',title:'CLIN quantity ambiguity — "Set of 2 · 80 Each"',desc:'2x margin exposure if CO and contractor read CLIN quantity differently. Must be resolved in question window.'},{sev:'p0',title:'FOB designation conflict between CLINs',desc:'Wrong DoDAAC on delivery = freight out of pocket. FARaudit flags cross-CLIN FOB inconsistencies in Call 1.'}]
+  },
+  {
+    num:'04', name:'Proposal Development', sub:'Technical and price volumes built against Section L/M',
+    headline:'Audit report drives pricing — before the spreadsheet opens',
+    what:['Estimator prices each CLIN line item','BOE developed per CLIN with labor categories and loaded rates','Compliance matrix completed against Section L','Past performance references compiled'],
+    fa:'Audit report drives every pricing decision. CLIN ambiguities resolved before the spreadsheet opens. Document type classification determines strategy: SOW gets a compliance matrix, PWS gets outcome innovation narrative with measurable metrics, SOO gets a full contractor-authored PWS. Section M evaluation factors extracted and weighted for proposal section prioritization.',
+    outputs:['CLIN-level pricing guidance','Section L compliance checklist','Section M factor weights and response outline','Risk-adjusted BOE inputs','Document type bid strategy brief'],
+    outcomes:['Defensible competition-ready pricing','Proposal directly addresses evaluation criteria','No compliance deficiencies at submission'],
+    clauses:[{num:'52.215-14',title:'Integrity of Unit Prices',badge:'req'},{num:'52.219-9',title:'Small Business Subcontracting Plan',badge:'req'}],
+    risks:[{sev:'p1',title:'Proposing to wrong document type — SOO treated as SOW',desc:'A compliance-first task list response to a SOO signals low technical sophistication and scores poorly.'}]
+  },
+  {
+    num:'05', name:'Submission', sub:'Quote / proposal delivered to CO by deadline',
+    headline:'Pre-submission compliance checklist — zero gaps',
+    what:['Submit by stated deadline — no exceptions','SAM.gov registration current and active','SF 1449 or applicable form completed','All representations and certifications signed'],
+    fa:'Pre-submission checklist derived directly from the audit report. Every clause with an offeror action confirmed complete. Deadline with explicit time zone extracted (CDT vs EDT confusion is a P0 risk). Both CO email addresses confirmed. Product information requirements from Special Notes extracted and verified.',
+    outputs:['Pre-submission compliance checklist','Both CO email addresses confirmed','Deadline and time zone verified','Reps and certs completion status'],
+    outcomes:['On-time delivery confirmed','Compliant package — no administrative rejection','SAM registration verified active'],
+    clauses:[{num:'52.214-34',title:'Submission of Offers in the English Language',badge:'req'},{num:'52.214-35',title:'Submission of Offers in U.S. Currency',badge:'req'},{num:'252.204-7017',title:'Covered Defense Telecom Representation',badge:'req'}],
+    risks:[{sev:'p0',title:'Submitting after local deadline (CDT vs EDT)',desc:'One hour late = rejection without exception under FAR 52.212-1. FARaudit flags deadline with explicit multi-timezone conversion.'}]
+  },
+  {
+    num:'06', name:'Government Evaluation', sub:'LPTA or Best Value · Technical acceptability first',
+    headline:'SOW Influence Tracker — closes the loop, proves ROI',
+    what:['CO evaluates technical volumes for acceptability','Price reasonableness determined vs. IGE','Responsibility determination — SAM, FAPIIS checked','Technical rating: Acceptable / Unacceptable only'],
+    fa:'SOW Influence Tracker activates here. Cross-references your RFI response from Stage 02 against the final SOW, Section C, and evaluation factors. Computes a match score 0–100. Identifies specific phrases, risk flags, and performance standards that carried through from your RFI into the final solicitation. This is the ROI demonstration that justifies the subscription.',
+    outputs:['SOW influence match score (0–100)','Specific phrases that carried through','Risk flags that became requirements','Competitive positioning report'],
+    outcomes:['ROI demonstrated to customer','Advantage documented before award','Renewal conversation anchored to results'],
+    clauses:[{num:'FAR 15.305',title:'Proposal Evaluation — technical factors and procedures',badge:'ref'},{num:'52.219-6',title:'Notice of Total Small Business Set-Aside',badge:'req'}],
+    risks:[{sev:'p0',title:'Technical unacceptability — missed Section M factor',desc:'LPTA evaluation is binary. Any proposal missing a mandatory Section M factor is rejected regardless of price.'}]
+  },
+  {
+    num:'07', name:'Award & Performance', sub:'Purchase Order issued · WAWF invoicing active',
+    headline:'Post-award compliance + recompete intelligence',
+    what:['CO issues purchase order or contract','Performance period begins per Section F','WAWF invoicing registration confirmed active','Delivery schedule tracked against Section F'],
+    fa:'Post-award compliance monitoring. WAWF payment routing codes verified. Delivery schedule tracked. Contract modifications analyzed for scope and pricing impact. Performance on this contract builds the past performance record used in Stage 02–03 of the next competition. FARaudit flags the recompete timeline 180 days before estimated contract expiration.',
+    outputs:['WAWF routing code verification','Delivery schedule tracker','Modification impact analysis','Past performance record baseline','Recompete alert (180 days out)'],
+    outcomes:['On-time invoicing — no payment delays','Delivery compliance maintained','Next competition preparation started early'],
+    clauses:[{num:'252.232-7006',title:'WAWF Payment Instructions — Combo document type',badge:'req'},{num:'5352.242-9000',title:'Contractor Access to Air Force Installations',badge:'req'}],
+    risks:[{sev:'p1',title:'Wrong WAWF document type — payment delay',desc:'Physical deliverables require Combo document type. Using Invoice 2in1 triggers rejection and restarts the 30-day payment clock.'},{sev:'p1',title:'Missing base access form — delivery blocked at gate',desc:'5352.242-9000 requires written request on company letterhead with employee names before delivery.'}]
+  },
+  {
+    num:'08', name:'Post-Award', sub:'Contract administration · Modifications · Recompete prep',
+    headline:'FARaudit coverage at this stage is roadmap',
+    what:['Contract administration and modification tracking','Past performance record building','Incumbent advantage analysis for recompete','Final deliverable acceptance and closeout'],
+    fa:'Post-award intelligence is on the FARaudit roadmap. Recompete alerting (180 days out) is live at Stage 07. Full contract administration monitoring and modification tracking are planned for Phase 2 of the corpus build.',
+    outputs:['Recompete alert (live at Stage 07)','Post-award monitoring (roadmap)'],
+    outcomes:['Recompete preparation starts before competitors know the contract ends'],
+    clauses:[],
+    risks:[]
+  }
+];
+
+let active = 2;
+
+function select(i) {
+  active = i;
+  document.querySelectorAll('.stage-pip').forEach((p,idx) => {
+    p.classList.toggle('active', idx===i);
+  });
+  render();
+}
+
+function badgeClass(b){return b==='trap'?'badge-trap':b==='req'?'badge-req':'badge-ref';}
+function badgeLabel(b){return b==='trap'?'TRAP':b==='req'?'Required':'Reference';}
+
+function render() {
+  const s = STAGES[active];
+  const el = document.getElementById('stage-detail');
+  el.innerHTML = `
+    <div class="stage-detail">
+      <div class="detail-card">
+        <div class="detail-label">Stage ${s.num} — What's happening</div>
+        <div class="detail-headline">${s.name}</div>
+        <div class="detail-body">${s.sub}</div>
+        <div class="item-list">${s.what.map(w=>`<div class="item-row"><div class="item-dot"></div>${w}</div>`).join('')}</div>
+      </div>
+      <div class="detail-card fa-card">
+        <div class="fa-label">FARaudit</div>
+        <div class="detail-headline">${s.headline}</div>
+        <div class="detail-body">${s.fa}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px">Outputs</div>
+        <div class="chips">${s.outputs.map(o=>`<span class="chip chip-output">${o}</span>`).join('')}</div>
+        ${s.outcomes.length?`<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin:10px 0 8px">Outcomes</div><div class="chips">${s.outcomes.map(o=>`<span class="chip chip-green">${o}</span>`).join('')}</div>`:''}
+      </div>
+    </div>
+    <div class="bottom-grid">
+      <div class="bottom-card">
+        <div class="bottom-title">Key clauses at this stage (${s.clauses.length})</div>
+        ${s.clauses.length?s.clauses.map(c=>`<div class="clause-row"><div class="clause-num">${c.num}</div><div class="clause-title">${c.title}</div><div class="clause-badge ${badgeClass(c.badge)}">${badgeLabel(c.badge)}</div></div>`).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic">No active clauses at this stage.</div>'}
+      </div>
+      <div class="bottom-card">
+        <div class="bottom-title">Risks flagged at this stage (${s.risks.length})</div>
+        ${s.risks.length?s.risks.map(r=>`<div class="risk-row ${r.sev}"><div class="risk-title">${r.title}<span class="sev sev-${r.sev}">${r.sev.toUpperCase()}</span></div><div class="risk-desc">${r.desc}</div></div>`).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic">No flagged risks at this stage.</div>'}
+      </div>
+    </div>`;
+}
+
+render();
+</script>
+</body>
+</html>
