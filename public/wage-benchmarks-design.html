@@ -764,7 +764,7 @@ function renderList(){
       <td><span class="status-badge sb-${w.status}">${w.status}</span></td>
     </tr>`;
     if(w.status==="FLAG"&&w.insight){
-      html+=`<tr class="insight-row"><td colspan="8"><span class="insight-chip insight-amber" style="margin-top:0"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></span></td></tr>`;
+      html+=`<tr class="insight-row"><td colspan="8"><span class="insight-chip insight-info" style="margin-top:0"><span class="insight-icon">⚡</span><span class="insight-label">AI INSIGHT</span><span class="insight-body">${w.insight}</span></span></td></tr>`;
     }
     return html;
   }).join("");
