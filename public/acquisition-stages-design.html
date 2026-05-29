@@ -178,14 +178,14 @@ body{font-family:'Manrope',system-ui,-apple-system,sans-serif;background:var(--p
 
     <!-- Stage Rail -->
     <div class="stage-rail" id="rail">
-      <div class="stage-pip faraudit" onclick="select(0)" id="pip-0"><div class="pip-num">01</div><div class="pip-name">Pre-Sol Synopsis</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="select(1)" id="pip-1"><div class="pip-num">02</div><div class="pip-name">Sources Sought / RFI</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit active" onclick="select(2)" id="pip-2"><div class="pip-num">03</div><div class="pip-name">Solicitation Drops</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="select(3)" id="pip-3"><div class="pip-num">04</div><div class="pip-name">Proposal Dev</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="select(4)" id="pip-4"><div class="pip-num">05</div><div class="pip-name">Submission</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="select(5)" id="pip-5"><div class="pip-num">06</div><div class="pip-name">Evaluation</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="select(6)" id="pip-6"><div class="pip-num">07</div><div class="pip-name">Award</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip inactive" onclick="select(7)" id="pip-7"><div class="pip-num">08</div><div class="pip-name">Post-Award</div><div class="pip-indicator" style="background:var(--border2)"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(0)" id="pip-0"><div class="pip-num">01</div><div class="pip-name">Pre-Sol Synopsis</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(1)" id="pip-1"><div class="pip-num">02</div><div class="pip-name">Sources Sought / RFI</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit active" onclick="selectStage(2)" id="pip-2"><div class="pip-num">03</div><div class="pip-name">Solicitation Drops</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(3)" id="pip-3"><div class="pip-num">04</div><div class="pip-name">Proposal Dev</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(4)" id="pip-4"><div class="pip-num">05</div><div class="pip-name">Submission</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(5)" id="pip-5"><div class="pip-num">06</div><div class="pip-name">Evaluation</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip faraudit" onclick="selectStage(6)" id="pip-6"><div class="pip-num">07</div><div class="pip-name">Award</div><div class="pip-indicator"></div></div>
+      <div class="stage-pip inactive" onclick="selectStage(7)" id="pip-7"><div class="pip-num">08</div><div class="pip-name">Post-Award</div><div class="pip-indicator" style="background:var(--border2)"></div></div>
     </div>
 
     <!-- Stage Detail (dynamic) -->
@@ -279,7 +279,7 @@ const STAGES = [
 
 let active = 2;
 
-function select(i) {
+function selectStage(i) {
   active = i;
   document.querySelectorAll('.stage-pip').forEach((p,idx) => {
     p.classList.toggle('active', idx===i);
@@ -322,7 +322,7 @@ function render() {
     </div>`;
 }
 
-render();
+selectStage(2);
 </script>
 </body>
 </html>
