@@ -218,10 +218,10 @@
     margin:0 auto;
     background:var(--bg);
     display:grid;
-    grid-template-columns:56px 1fr;
+    grid-template-columns:var(--sb-width) 1fr;
     min-height:100vh;
     align-items:stretch;
-    transition:background-color .25s ease;
+    transition:background-color .25s ease,grid-template-columns .22s cubic-bezier(0.16,1,0.3,1);
   }
 
   /* ═══════════════════════════════════════════════════════
