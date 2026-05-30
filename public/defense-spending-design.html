@@ -691,6 +691,61 @@ tr:hover .ii-notice{height:auto;opacity:1}
         </div>
       </section>
 
+  <section class="row cols-1 r-720">
+
+        <section class="widget geo-widget">
+          <header class="widget-head">
+            <div class="wh-left">
+              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <div class="wh-text"><h3>Geographic Concentration · Your NAICS<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Where DoD contract dollars physically flow across states. Dark = high spend. Red states = high spend with no recorded activity from your firm — BD expansion opportunities.</span></button></h3><p class="wh-sub" id="geoSubtitle">Where your NAICS money flows — gaps are the intelligence</p></div>
+            </div>
+            <span class="wh-source">FPDS · POP-derived</span>
+          </header>
+          <div class="widget-body">
+            <div class="geo-fullwrap">
+              <div class="geo-mapbox">
+                <svg class="geo-svg" id="geoSvg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet"></svg>
+                <div id="geoTooltip"></div>
+                <div class="geo-legend-row">
+                  <span class="leg gb1">&lt;$30M</span>
+                  <span class="leg gb2">$30–80M</span>
+                  <span class="leg gb3">$80–150M</span>
+                  <span class="leg gb4">$150–250M</span>
+                  <span class="leg gb5">$250M+</span>
+                </div>
+              </div>
+              <div class="geo-rank-wrap">
+                <div class="geo-data-table">
+                  <div class="gdt-section-label">Top 5 States · FY2026</div>
+                  <div class="gdt-row"><span class="gdt-state">TX</span><span class="gdt-val">$340M</span><span class="gdt-signal up">▲ +8%</span><span class="gdt-hint">34% SB · JBSA Lackland · DLA Aviation</span></div>
+                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">28% SB · NAVAIR Pax River · Quantico</span></div>
+                  <div class="gdt-row"><span class="gdt-state">CA</span><span class="gdt-val">$245M</span><span class="gdt-signal down">▼ −3%</span><span class="gdt-hint">31% SB · Edwards AFB · MCAS Miramar</span></div>
+                  <div class="gdt-row"><span class="gdt-state">MD</span><span class="gdt-val">$195M</span><span class="gdt-signal up">▲ +5%</span><span class="gdt-hint">38% SB · Aberdeen PG · Andrews AFB</span></div>
+                  <div class="gdt-row"><span class="gdt-state">FL</span><span class="gdt-val">$165M</span><span class="gdt-signal up">▲ +2%</span><span class="gdt-hint">29% SB · MacDill AFB · NAS Jacksonville</span></div>
+
+                  <div class="gdt-section-label gdt-gap">BD Gap Analysis · High-spend · No recorded activity</div>
+                  <div class="gdt-row"><span class="gdt-state">WA</span><span class="gdt-val">$134M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">NAVAIR Whidbey · Boeing Supply Chain</span></div>
+                  <div class="gdt-row"><span class="gdt-state">OH</span><span class="gdt-val">$67M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">WPAFB · DLA Aviation Columbus</span></div>
+                  <div class="gdt-row"><span class="gdt-state">GA</span><span class="gdt-val">$54M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Robins AFB · Warner Robins ALC</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Luke AFB · Davis-Monthan · MCAS Yuma</span></div>
+
+                  <div class="gdt-section-label gdt-growth">Fastest Growing · YoY Momentum</div>
+                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">NAVAIR Pax River accelerating</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal up">▲ +9%</span><span class="gdt-hint">Luke AFB F-35 program expansion</span></div>
+                  <div class="gdt-row"><span class="gdt-state">AL</span><span class="gdt-val">$112M</span><span class="gdt-signal up">▲ +7%</span><span class="gdt-hint">Redstone Arsenal · AMCOM growth</span></div>
+
+                  <div class="gdt-insight">
+                    <span class="gdt-insight-label">BD Insight</span>
+                    <span class="gdt-insight-text"><b>Virginia fastest growing +12% YoY</b> — BD footprint opportunity. NAVAIR Pax River + Quantico drive concentration; SDVOSB set-asides outperform national average.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </section>
+
       <!-- ═══ ROW 1 · 380px · Recompete + Incumbent ═══ -->
       <section class="row cols-2 r-380">
 
@@ -789,61 +844,6 @@ tr:hover .ii-notice{height:auto;opacity:1}
       </section>
 
       <!-- ═══ ROW 4 · auto · Geographic Concentration FULL WIDTH ═══ -->
-      <section class="row cols-1 r-720">
-
-        <section class="widget geo-widget">
-          <header class="widget-head">
-            <div class="wh-left">
-              <span class="wh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-              <div class="wh-text"><h3>Geographic Concentration · Your NAICS<button class="widget-info-btn" type="button" aria-label="About this widget"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1"/><text x="6.5" y="9.5" text-anchor="middle" font-size="8" fill="currentColor" font-weight="600">?</text></svg><span class="stat-tooltip">Where DoD contract dollars physically flow across states. Dark = high spend. Red states = high spend with no recorded activity from your firm — BD expansion opportunities.</span></button></h3><p class="wh-sub" id="geoSubtitle">Where your NAICS money flows — gaps are the intelligence</p></div>
-            </div>
-            <span class="wh-source">FPDS · POP-derived</span>
-          </header>
-          <div class="widget-body">
-            <div class="geo-fullwrap">
-              <div class="geo-mapbox">
-                <svg class="geo-svg" id="geoSvg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet"></svg>
-                <div id="geoTooltip"></div>
-                <div class="geo-legend-row">
-                  <span class="leg gb1">&lt;$30M</span>
-                  <span class="leg gb2">$30–80M</span>
-                  <span class="leg gb3">$80–150M</span>
-                  <span class="leg gb4">$150–250M</span>
-                  <span class="leg gb5">$250M+</span>
-                </div>
-              </div>
-              <div class="geo-rank-wrap">
-                <div class="geo-data-table">
-                  <div class="gdt-section-label">Top 5 States · FY2026</div>
-                  <div class="gdt-row"><span class="gdt-state">TX</span><span class="gdt-val">$340M</span><span class="gdt-signal up">▲ +8%</span><span class="gdt-hint">34% SB · JBSA Lackland · DLA Aviation</span></div>
-                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">28% SB · NAVAIR Pax River · Quantico</span></div>
-                  <div class="gdt-row"><span class="gdt-state">CA</span><span class="gdt-val">$245M</span><span class="gdt-signal down">▼ −3%</span><span class="gdt-hint">31% SB · Edwards AFB · MCAS Miramar</span></div>
-                  <div class="gdt-row"><span class="gdt-state">MD</span><span class="gdt-val">$195M</span><span class="gdt-signal up">▲ +5%</span><span class="gdt-hint">38% SB · Aberdeen PG · Andrews AFB</span></div>
-                  <div class="gdt-row"><span class="gdt-state">FL</span><span class="gdt-val">$165M</span><span class="gdt-signal up">▲ +2%</span><span class="gdt-hint">29% SB · MacDill AFB · NAS Jacksonville</span></div>
-
-                  <div class="gdt-section-label gdt-gap">BD Gap Analysis · High-spend · No recorded activity</div>
-                  <div class="gdt-row"><span class="gdt-state">WA</span><span class="gdt-val">$134M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">NAVAIR Whidbey · Boeing Supply Chain</span></div>
-                  <div class="gdt-row"><span class="gdt-state">OH</span><span class="gdt-val">$67M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">WPAFB · DLA Aviation Columbus</span></div>
-                  <div class="gdt-row"><span class="gdt-state">GA</span><span class="gdt-val">$54M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Robins AFB · Warner Robins ALC</span></div>
-                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal gap">No presence</span><span class="gdt-hint">Luke AFB · Davis-Monthan · MCAS Yuma</span></div>
-
-                  <div class="gdt-section-label gdt-growth">Fastest Growing · YoY Momentum</div>
-                  <div class="gdt-row"><span class="gdt-state">VA</span><span class="gdt-val">$290M</span><span class="gdt-signal up">▲ +12%</span><span class="gdt-hint">NAVAIR Pax River accelerating</span></div>
-                  <div class="gdt-row"><span class="gdt-state">AZ</span><span class="gdt-val">$48M</span><span class="gdt-signal up">▲ +9%</span><span class="gdt-hint">Luke AFB F-35 program expansion</span></div>
-                  <div class="gdt-row"><span class="gdt-state">AL</span><span class="gdt-val">$112M</span><span class="gdt-signal up">▲ +7%</span><span class="gdt-hint">Redstone Arsenal · AMCOM growth</span></div>
-
-                  <div class="gdt-insight">
-                    <span class="gdt-insight-label">BD Insight</span>
-                    <span class="gdt-insight-text"><b>Virginia fastest growing +12% YoY</b> — BD footprint opportunity. NAVAIR Pax River + Quantico drive concentration; SDVOSB set-asides outperform national average.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </section>
-
       <!-- ═══ ROW 5 · 380px · Competition Density + Pricing Intelligence ═══ -->
       <section class="row cols-2 r-380">
 
