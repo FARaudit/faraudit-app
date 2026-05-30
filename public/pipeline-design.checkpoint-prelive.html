@@ -58,7 +58,7 @@ html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-
 button{font-family:inherit}
 
 /* ── frame ── */
-.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh;align-items:stretch}
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
 
 /* ═══════════════ SIDEBAR (canonical — synced from command-center) ═══════════════ */
 .sidebar{
