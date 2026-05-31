@@ -14,7 +14,7 @@ function SignInForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const urlError     = searchParams.get("error");
-  const next         = searchParams.get("next") ?? "/command-center";
+  const next         = searchParams.get("next") ?? "/home";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
