@@ -57,3 +57,8 @@ scripts/sync-digest*.log
 outputs/
 state-snapshot.txt
 src/app/globals.css.bak-phase1
+*.bak-*
+src/app/sign-in/*.bak*
+src/app/pricing/*.bak*
+public/*.bak*
+src/app/globals.css.bak*

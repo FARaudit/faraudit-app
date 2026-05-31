@@ -2,252 +2,227 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "FARaudit Pricing — Defense BD Operating System",
-  description:
-    "The trap was already in the document. Standard $1,250/mo · Professional $2,500/mo · Enterprise on request. All tiers include the full Defense BD OS — Run Audit, Defense Spending, Defense News AI, Capability Statement, CMMC Readiness, more."
+  title: "Pricing — FARaudit · Federal Contract Intelligence",
+  description: "Design Partner $1,250/mo · Standard $2,500/mo · Enterprise for large teams. Federal Contract Intelligence for defense subcontractors.",
 };
 
-const BG = "#03080f";
-const SURFACE = "#06101a";
-const SURFACE_2 = "#0a1525";
-const TEXT_1 = "#e2eaf4";
-const TEXT_2 = "#5a7fa0";
-const TEXT_3 = "#3d5b75";
-const GOLD = "#c4a44a";
-const BORDER = "rgba(255,255,255,0.08)";
-const BORDER_GOLD = "rgba(196,164,74,0.32)";
-
-type Tier = {
-  slug: "design_partner" | "professional" | "enterprise";
-  name: string;
-  price: string;
-  priceSuffix?: string;
-  eyebrow: string;
-  featured: boolean;
-  badgeLabel?: string;
-  cta: { label: string; href?: string; disabled?: boolean };
-};
-
-const TIERS: Tier[] = [
+const TIERS = [
   {
     slug: "design_partner",
-    name: "Standard",
-    badgeLabel: "Founding Rate",
-    price: "$1,250",
-    priceSuffix: "/mo",
-    eyebrow: "5 slots remaining · 90-day program · rate locks at signup",
-    featured: true,
-    cta: { label: "Apply", href: "/access.html" }
+    name: "Design Partner",
+    badge: "FOUNDING RATE",
+    price: 1250,
+    annual: 15000,
+    audits: "25 audits/month",
+    seats: "1 seat",
+    cta: "Apply Now",
+    ctaHref: "/access.html",
+    primary: true,
+    urgency: "5 slots remaining · rate locked 12 months",
+    description: "For solo BD directors getting started with Federal Contract Intelligence.",
   },
   {
-    slug: "professional",
-    name: "Professional",
-    badgeLabel: "Most Popular",
-    price: "$2,500",
-    priceSuffix: "/mo",
-    eyebrow: "Billed annually · full platform · open enrollment",
-    featured: false,
-    cta: { label: "Talk to us", href: "mailto:hello@faraudit.com?subject=FARaudit%20Standard%20inquiry" }
+    slug: "standard",
+    name: "Standard",
+    badge: "FULL PLATFORM",
+    price: 2500,
+    annual: 30000,
+    audits: "100 audits/month",
+    seats: "3 seats",
+    cta: "Contact Us",
+    ctaHref: "mailto:jose@faraudit.com?subject=FARaudit%20Standard%20Inquiry",
+    primary: false,
+    urgency: null,
+    description: "For BD teams that need the full intelligence layer and unlimited capacity.",
   },
   {
     slug: "enterprise",
     name: "Enterprise",
-    price: "Talk to us",
-    eyebrow: "Multi-seat · priority SLA · custom NAICS coverage",
-    featured: false,
-    cta: { label: "Contact us", href: "mailto:hello@faraudit.com?subject=FARaudit%20Enterprise%20inquiry" }
-  }
+    badge: "5+ SEATS",
+    price: null,
+    annual: null,
+    audits: "Unlimited audits",
+    seats: "Unlimited seats",
+    cta: "Contact Us",
+    ctaHref: "mailto:jose@faraudit.com?subject=FARaudit%20Enterprise%20Inquiry",
+    primary: false,
+    urgency: null,
+    description: "For large contractors with custom requirements, API access, and dedicated support.",
+  },
 ];
 
-// Comparison feature rows. All three tiers ship the same product surface;
-// the difference is price + onboarding (design partner reward, not feature
-// gating). Enterprise gets custom integrations + dedicated support on top.
-const FEATURES: { label: string; tiers: string[] }[] = [
-    { label: "Run Audit OS · 3-call engine · full solicitation coverage", tiers: ["✓", "✓", "✓"] },
-    { label: "Audit history retention", tiers: ["90 days", "Unlimited", "Unlimited"] },
-    { label: "Defense Spending intelligence · USAspending.gov · all federal NAICS · top 10 primes · YoY", tiers: ["✓", "✓", "✓"] },
-    { label: "Defense News with per-card AI insights · claude-opus-4-7", tiers: ["✓", "✓", "✓"] },
-    { label: "Contracting Officers + Agencies intelligence", tiers: ["✓", "✓", "✓"] },
-    { label: "Capability Statement persistence + auto-population", tiers: ["✓", "✓", "✓"] },
-    { label: "Pipeline tracking", tiers: ["25 active", "Unlimited", "Unlimited"] },
-    { label: "CMMC Readiness assessment (Levels 1/2/3)", tiers: ["✓", "✓", "✓"] },
-    { label: "All federal NAICS codes", tiers: ["✓", "✓", "✓"] },
-    { label: "Email support", tiers: ["✓", "✓", "✓"] },
-    { label: "Wage Benchmarks · SCA + DBA", tiers: ["—", "✓", "✓"] },
-    { label: "GAO Protests intelligence", tiers: ["—", "✓", "✓"] },
-    { label: "FAR/DFARS regulatory updates", tiers: ["—", "✓", "✓"] },
-    { label: "Teaming Partners discovery", tiers: ["—", "✓", "✓"] },
-    { label: "Recompete alerts", tiers: ["—", "✓", "✓"] },
-    { label: "Priority support", tiers: ["—", "✓", "✓"] },
-    { label: "API access", tiers: ["—", "—", "✓"] },
-    { label: "Dedicated CSM", tiers: ["—", "—", "✓"] },
-    { label: "Multi-seat · SLA", tiers: ["—", "—", "✓"] },
-  ];
+type CellValue = boolean | string;
 
-function TierCard({ tier }: { tier: Tier }) {
-  return (
-    <div
-      style={{
-        background: tier.featured ? "linear-gradient(165deg, #091522, #06101a)" : SURFACE,
-        border: tier.featured ? `1px solid ${BORDER_GOLD}` : `1px solid ${BORDER}`,
-        borderRadius: 12,
-        padding: "28px 24px",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative"
-      }}
-    >
-      {tier.badgeLabel && (
-        <div
-          style={{
-            position: "absolute",
-            top: -11,
-            left: 24,
-            background: tier.slug === "professional" ? "#378ADD" : GOLD,
-            color: tier.slug === "professional" ? "#ffffff" : BG,
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: 9,
-            padding: "3px 12px",
-            borderRadius: 20,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            fontWeight: 500
-          }}
-        >
-          {tier.badgeLabel}
-        </div>
-      )}
+const FEATURES: { category: string; rows: { name: string; design_partner: CellValue; standard: CellValue; enterprise: CellValue }[] }[] = [
+  { category: "CORE PLATFORM", rows: [
+    { name: "Run Audit OS · 3-call engine", design_partner: true, standard: true, enterprise: true },
+    { name: "Audit history retention", design_partner: "90 days", standard: "Unlimited", enterprise: "Unlimited" },
+    { name: "Opportunities · upstream intelligence", design_partner: true, standard: true, enterprise: true },
+    { name: "Defense News · per-card insights", design_partner: true, standard: true, enterprise: true },
+    { name: "Defense Spending intelligence", design_partner: true, standard: true, enterprise: true },
+    { name: "Contracting Officers + Agencies", design_partner: true, standard: true, enterprise: true },
+    { name: "Capability Statement auto-population", design_partner: true, standard: true, enterprise: true },
+    { name: "Pipeline tracking", design_partner: "25 active", standard: "Unlimited", enterprise: "Unlimited" },
+    { name: "Acquisition Stages lifecycle", design_partner: true, standard: true, enterprise: true },
+    { name: "Win Rate capture · Won/Lost tracking", design_partner: true, standard: true, enterprise: true },
+    { name: "All federal NAICS codes", design_partner: true, standard: true, enterprise: true },
+    { name: "Email support", design_partner: true, standard: true, enterprise: true },
+  ]},
+  { category: "INTELLIGENCE LAYER", rows: [
+    { name: "Wage Benchmarks · SCA + DBA", design_partner: false, standard: true, enterprise: true },
+    { name: "GAO Protests intelligence", design_partner: false, standard: true, enterprise: true },
+    { name: "FAR/DFARS regulatory updates", design_partner: false, standard: true, enterprise: true },
+    { name: "Teaming Partners discovery", design_partner: false, standard: true, enterprise: true },
+    { name: "Recompete alerts", design_partner: false, standard: true, enterprise: true },
+    { name: "Win Rate Analytics · full dashboard", design_partner: false, standard: true, enterprise: true },
+    { name: "Priority support", design_partner: false, standard: true, enterprise: true },
+  ]},
+  { category: "ENTERPRISE INFRASTRUCTURE", rows: [
+    { name: "API access", design_partner: false, standard: false, enterprise: true },
+    { name: "Dedicated CSM", design_partner: false, standard: false, enterprise: true },
+    { name: "Custom NAICS coverage", design_partner: false, standard: false, enterprise: true },
+    { name: "SLA + uptime guarantee", design_partner: false, standard: false, enterprise: true },
+    { name: "Unlimited seats", design_partner: false, standard: false, enterprise: true },
+  ]},
+];
 
-      <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 9, color: TEXT_2, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
-        {tier.name}
-      </p>
-      <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 36, fontWeight: 500, color: TEXT_1, lineHeight: 1, marginBottom: 8 }}>
-        {tier.price}
-        {tier.priceSuffix && <sub style={{ fontSize: 13, color: TEXT_2, marginLeft: 2 }}>{tier.priceSuffix}</sub>}
-      </p>
-      <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: TEXT_2, lineHeight: 1.6, marginBottom: 22, flex: 1 }}>
-        {tier.eyebrow}
-      </p>
-
-      {tier.cta.disabled ? (
-        <span
-          aria-disabled="true"
-          style={{
-            display: "block",
-            textAlign: "center",
-            padding: 12,
-            borderRadius: 6,
-            fontFamily: "Syne, sans-serif",
-            fontSize: 12,
-            fontWeight: 600,
-            background: "transparent",
-            color: TEXT_3,
-            border: `1px solid ${BORDER}`,
-            width: "100%",
-            cursor: "not-allowed"
-          }}
-        >
-          {tier.cta.label}
-        </span>
-      ) : (
-        <Link
-          href={tier.cta.href || "#"}
-          style={{
-            display: "block",
-            textAlign: "center",
-            padding: 12,
-            borderRadius: 6,
-            fontFamily: "Syne, sans-serif",
-            fontSize: 12,
-            fontWeight: 600,
-            background: tier.featured ? GOLD : "transparent",
-            color: tier.featured ? BG : TEXT_1,
-            border: tier.featured ? "none" : `1px solid ${BORDER}`,
-            width: "100%",
-            textDecoration: "none"
-          }}
-        >
-          {tier.cta.label}
-        </Link>
-      )}
-    </div>
-  );
+function Cell({ value }: { value: CellValue }) {
+  if (value === true) return <span style={{ color: "#378ADD", fontWeight: 700 }}>✓</span>;
+  if (value === false) return <span style={{ color: "#4b5563" }}>—</span>;
+  return <span style={{ color: "#94a3b8", fontSize: 12 }}>{value}</span>;
 }
 
 export default function PricingPage() {
   return (
-    <main style={{ background: BG, minHeight: "100vh", padding: "60px 20px 80px", fontFamily: "Inter, system-ui, sans-serif" }}>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+    <div style={{ minHeight: "100vh", background: "#0A1628", color: "#e2e8f2", fontFamily: "Manrope, system-ui, sans-serif" }}>
 
-      {/* Responsive treatment via scoped <style> · 3-col desktop, 2-col iPad, 1-col phone.
-          Comparison table scrolls horizontally inside its container at narrow widths. */}
-      <style>{`
-        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 56px; }
-        .pricing-compare { overflow-x: auto; border: 1px solid ${BORDER}; border-radius: 8px; background: ${SURFACE}; }
-        .pricing-compare table { width: 100%; min-width: 560px; border-collapse: collapse; }
-        .pricing-compare th, .pricing-compare td { padding: 13px 16px; text-align: left; font-size: 12px; border-bottom: 1px solid ${BORDER}; }
-        .pricing-compare th { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: ${TEXT_2}; background: ${SURFACE_2}; }
-        .pricing-compare td.label { color: ${TEXT_1}; }
-        .pricing-compare td.tick { text-align: center; color: ${GOLD}; font-family: 'JetBrains Mono', monospace; width: 90px; }
-        .pricing-compare td.tick.dash { color: ${TEXT_3}; }
-        .pricing-compare tr:last-child td { border-bottom: none; }
-
-        @media (min-width: 768px) and (max-width: 1023px) {
-          .pricing-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 767px) {
-          .pricing-grid { grid-template-columns: 1fr; gap: 14px; }
-          .pricing-compare th, .pricing-compare td { padding: 10px 12px; }
-        }
-      `}</style>
-
-      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-        <Link href="/" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: TEXT_3, textDecoration: "none" }}>
-          ← FARaudit
+      {/* NAV */}
+      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 40px", height: 60, borderBottom: "1px solid #1e2d45", position: "sticky", top: 0, background: "#0A1628", zIndex: 50 }}>
+        <Link href="/" style={{ color: "#e2e8f2", textDecoration: "none", fontWeight: 800, fontSize: 18, letterSpacing: "-0.02em" }}>
+          FAR<span style={{ color: "#378ADD" }}>audit</span>
         </Link>
+        <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
+          <Link href="/how-it-works" style={{ color: "#94a3b8", textDecoration: "none", fontSize: 14 }}>How it works</Link>
+          <Link href="/sign-in" style={{ color: "#94a3b8", textDecoration: "none", fontSize: 14 }}>Sign in</Link>
+          <Link href="/access.html" style={{ background: "#378ADD", color: "#fff", textDecoration: "none", fontSize: 13, fontWeight: 700, padding: "8px 18px", borderRadius: 6 }}>Request Access</Link>
+        </div>
+      </nav>
 
-        <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: TEXT_2, letterSpacing: "0.22em", textTransform: "uppercase", margin: "24px 0 12px" }}>
-          Pricing
-        </p>
-        <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: 44, fontWeight: 700, color: TEXT_1, letterSpacing: "-0.025em", lineHeight: 1.1, marginBottom: 14 }}>
-          The trap was already<br /><span style={{ color: GOLD }}>in the document.</span>
+      {/* HERO */}
+      <div style={{ textAlign: "center", padding: "80px 40px 60px", maxWidth: 640, margin: "0 auto" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", color: "#378ADD", marginBottom: 16, textTransform: "uppercase" as const }}>Pricing</div>
+        <h1 style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.15, marginBottom: 16, letterSpacing: "-0.03em", color: "#e2e8f2" }}>
+          Federal Contract Intelligence.<br />
+          <span style={{ color: "#378ADD" }}>Priced for every stage.</span>
         </h1>
-        <p style={{ fontSize: 16, color: TEXT_2, marginBottom: 52, maxWidth: 620, lineHeight: 1.7, fontWeight: 300 }}>
-          The full Defense BD Operating System on every plan. Run Audit, Defense Spending,
-          Defense News AI insights, Capability Statement, CMMC Readiness — same product
-          surface across all tiers. Standard pricing rewards the first 5 customers.
+        <p style={{ fontSize: 16, color: "#94a3b8", lineHeight: 1.7, margin: 0 }}>
+          Start as a solo BD director. Scale to a full team. Every tier runs on the same platform.
         </p>
-
-        <div className="pricing-grid">
-          {TIERS.map((t) => <TierCard key={t.slug} tier={t} />)}
-        </div>
-
-        <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: TEXT_2, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 14 }}>
-          Compare features
-        </p>
-        <div className="pricing-compare">
-          <table>
-            <thead>
-              <tr>
-                <th>Feature</th>
-                {TIERS.map((t) => <th key={t.slug} style={{ textAlign: "center", color: t.featured ? GOLD : TEXT_2 }}>{t.name}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {FEATURES.map((row) => (
-                <tr key={row.label}>
-                  <td className="label">{row.label}</td>
-                  {row.tiers.map((cell, i) => (
-                    <td key={i} className={`tick${cell === "—" ? " dash" : ""}`}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
       </div>
-    </main>
+
+      {/* TIER CARDS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, maxWidth: 1000, margin: "0 auto 80px", padding: "0 40px" }}>
+        {TIERS.map((tier) => (
+          <div key={tier.slug} style={{
+            background: tier.primary ? "#0d1f35" : "#080e1a",
+            border: tier.primary ? "1.5px solid #378ADD" : "1px solid #1e2d45",
+            borderRadius: 12, padding: "32px 28px",
+            display: "flex", flexDirection: "column" as const,
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: tier.primary ? "#378ADD" : "#4a6080", marginBottom: 16, textTransform: "uppercase" as const }}>{tier.badge}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.02em", color: "#e2e8f2" }}>{tier.name}</div>
+            <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, marginBottom: 24 }}>{tier.description}</div>
+
+            <div style={{ marginBottom: 24 }}>
+              {tier.price ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span style={{ fontSize: 38, fontWeight: 800, letterSpacing: "-0.03em", color: "#e2e8f2" }}>${tier.price.toLocaleString()}</span>
+                    <span style={{ fontSize: 14, color: "#64748b" }}>/mo</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>${tier.annual?.toLocaleString()}/year · billed annually</div>
+                </>
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", color: "#94a3b8" }}>Custom pricing</div>
+              )}
+            </div>
+
+            <div style={{ background: "#0A1628", borderRadius: 8, padding: "12px 14px", marginBottom: 24, display: "flex", flexDirection: "column" as const, gap: 6 }}>
+              <div style={{ fontSize: 12, color: "#94a3b8", display: "flex", justifyContent: "space-between" }}>
+                <span>Audits</span><span style={{ color: "#e2e8f2", fontWeight: 600 }}>{tier.audits}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8", display: "flex", justifyContent: "space-between" }}>
+                <span>Seats</span><span style={{ color: "#e2e8f2", fontWeight: 600 }}>{tier.seats}</span>
+              </div>
+            </div>
+
+            {tier.urgency && (
+              <div style={{ fontSize: 11, color: "#378ADD", fontWeight: 600, marginBottom: 16, letterSpacing: "0.02em" }}>● {tier.urgency}</div>
+            )}
+
+            <Link href={tier.ctaHref} style={{
+              display: "block", textAlign: "center" as const, textDecoration: "none",
+              padding: "12px 20px", borderRadius: 8, fontWeight: 700, fontSize: 14, marginTop: "auto",
+              ...(tier.primary
+                ? { background: "#378ADD", color: "#fff" }
+                : { background: "transparent", color: "#378ADD", border: "1.5px solid #378ADD" }),
+            }}>{tier.cta}</Link>
+          </div>
+        ))}
+      </div>
+
+      {/* FEATURE TABLE */}
+      <div style={{ maxWidth: 1000, margin: "0 auto 80px", padding: "0 40px" }}>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 40, textAlign: "center" as const, letterSpacing: "-0.02em", color: "#e2e8f2" }}>Everything included</h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 120px", padding: "12px 16px", borderBottom: "1px solid #1e2d45", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>Feature</div>
+          {TIERS.map(t => (
+            <div key={t.slug} style={{ fontSize: 11, color: t.primary ? "#378ADD" : "#64748b", fontWeight: 700, textAlign: "center" as const, textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{t.name}</div>
+          ))}
+        </div>
+
+        {FEATURES.map((section) => (
+          <div key={section.category} style={{ marginBottom: 32 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: "#378ADD", padding: "10px 16px", textTransform: "uppercase" as const }}>{section.category}</div>
+            {section.rows.map((row, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 120px", padding: "11px 16px", background: i % 2 === 0 ? "#080e1a" : "transparent", borderRadius: 6, alignItems: "center" }}>
+                <div style={{ fontSize: 13, color: "#94a3b8" }}>{row.name}</div>
+                <div style={{ textAlign: "center" as const }}><Cell value={row.design_partner} /></div>
+                <div style={{ textAlign: "center" as const }}><Cell value={row.standard} /></div>
+                <div style={{ textAlign: "center" as const }}><Cell value={row.enterprise} /></div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* FAQ */}
+      <div style={{ maxWidth: 640, margin: "0 auto 80px", padding: "0 40px" }}>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 32, textAlign: "center" as const, letterSpacing: "-0.02em", color: "#e2e8f2" }}>Common questions</h2>
+        {[
+          { q: "What counts as an audit?", a: "One audit = one solicitation run through the full 3-call engine. PDFs uploaded through Run Audit count against your monthly limit. Design Partner accounts reset on the 1st of each month." },
+          { q: "Can I upgrade mid-month?", a: "Yes. Upgrades take effect immediately and are prorated. Downgrades take effect at the next billing cycle." },
+          { q: "Is the founding rate really locked?", a: "Yes. Design Partner customers who sign up during the founding cohort lock their $1,250/mo rate for 12 months from signup. The standard rate is $2,500/mo." },
+          { q: "What happens when I hit 25 audits?", a: "You'll see a counter in your dashboard. When you hit the limit, Run Audit pauses until your cycle resets. You can upgrade to Standard for 100 audits/month at any time." },
+          { q: "Who is Enterprise for?", a: "Any contractor with 5+ seats, API integration needs, or custom NAICS requirements. Contact us and we'll scope it together." },
+        ].map((item, i) => (
+          <div key={i} style={{ borderBottom: "1px solid #1e2d45", padding: "20px 0" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: "#e2e8f2" }}>{item.q}</div>
+            <div style={{ fontSize: 14, color: "#64748b", lineHeight: 1.7 }}>{item.a}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* BOTTOM CTA */}
+      <div style={{ textAlign: "center" as const, padding: "60px 40px 80px", borderTop: "1px solid #1e2d45" }}>
+        <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 12, letterSpacing: "-0.02em", color: "#e2e8f2" }}>Ready to start?</div>
+        <div style={{ fontSize: 15, color: "#64748b", marginBottom: 28 }}>5 Design Partner slots remaining. Founding rate locks at signup.</div>
+        <Link href="/access.html" style={{ display: "inline-block", background: "#378ADD", color: "#fff", textDecoration: "none", padding: "14px 32px", borderRadius: 8, fontWeight: 700, fontSize: 15 }}>
+          Apply for Design Partner →
+        </Link>
+      </div>
+
+    </div>
   );
 }

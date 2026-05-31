@@ -3,6 +3,11 @@
 @import "@fontsource/inter/500.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/manrope/400.css";
+@import "@fontsource/manrope/500.css";
+@import "@fontsource/manrope/600.css";
+@import "@fontsource/manrope/700.css";
+@import "@fontsource/manrope/800.css";
 
 :root {
   --fa-bg:        #050D1A;
@@ -24,7 +29,7 @@
   --fa-gold:      #D4AF37;
 
   --mono: "JetBrains Mono", ui-monospace, monospace;
-  --sans: "Inter", system-ui, sans-serif;
+  --sans: "Manrope", "Inter", system-ui, sans-serif;
 
   /* ━━ Theme tokens (Dark canonical · F-44 dropped Light May 3 2026) ━━ */
   --theme-bg:      #0A1628;
@@ -69,10 +74,10 @@
   --color-gold: #D4AF37;
   --color-gold-dim: #8B7034;
 
-  --font-display: "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  --font-display: "Manrope", "Inter", system-ui, sans-serif;
+  --font-body: "Manrope", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-fraunces: "Inter", system-ui, sans-serif;
+  --font-fraunces: "Manrope", "Inter", system-ui, sans-serif;
   --font-jetbrains: "JetBrains Mono", ui-monospace, monospace;
 }
 
