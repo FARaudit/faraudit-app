@@ -43,7 +43,7 @@ button{font-family:inherit;cursor:pointer}
 
 /* ───── left brand panel ───── */
 .brand-panel{
-  position:relative;overflow:hidden;padding:40px 56px;display:flex;flex-direction:column;
+  position:relative;overflow:hidden;padding:40px 56px;display:flex;flex-direction:column;align-items:center;text-align:center;
   background:
     radial-gradient(ellipse at 20% 0%, rgba(55,138,221,0.18), rgba(55,138,221,0) 55%),
     linear-gradient(160deg,#0A1628 0%,#0a1424 55%,#02060c 100%);
@@ -54,7 +54,7 @@ button{font-family:inherit;cursor:pointer}
   background:radial-gradient(circle,rgba(55,138,221,.12),rgba(55,138,221,0) 70%);pointer-events:none;
 }
 .bp-top{position:relative;z-index:1}
-.bp-mid{position:relative;z-index:1;margin:auto 0;max-width:460px}
+.bp-mid{position:relative;z-index:1;margin:auto 0;max-width:460px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .eyebrow{
   font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
   color:var(--mute);display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;
@@ -67,7 +67,7 @@ button{font-family:inherit;cursor:pointer}
 .bp-card{
   background:linear-gradient(135deg,#0A1628 0%,#16294a 55%,#1e3a8a 100%);
   border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px 14px;color:#fff;
-  box-shadow:var(--shadow-lg);max-width:380px;position:relative;overflow:hidden;
+  box-shadow:var(--shadow-lg);max-width:380px;position:relative;overflow:hidden;text-align:left;
 }
 .bp-card-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .bp-card .label{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.8)}
