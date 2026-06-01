@@ -13,7 +13,13 @@ const PUBLIC = [
   "/access",
   "/landing.html",
   "/access.html",
-  "/signin.html"
+  "/signin.html",
+  "/sign-in.html",
+  "/pricing.html",
+  "/how-it-works.html",
+  "/root-landing.html",
+  "/site.css",
+  "/auth.css"
 ];
 const PUBLIC_PREFIX = ["/api/", "/_next/", "/_vercel", "/favicon", "/robots", "/vendor/", "/lifecycle/"];
 

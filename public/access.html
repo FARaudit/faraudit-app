@@ -1,612 +1,131 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Request Access — FARaudit · Federal Contract Intelligence</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --navy:    #0A1628;
-  --navy2:   #0d1f35;
-  --blue:    #378ADD;
-  --light:   #B5D4F4;
-  --pale:    #E6F1FB;
-  --white:   #ffffff;
-  --text:    #e2e8f2;
-  --muted:   #94a3b8;
-  --subtle:  #64748b;
-  --border:  rgba(255,255,255,0.08);
-  --border2: rgba(255,255,255,0.12);
-  --surface: rgba(255,255,255,0.04);
-  --red:     #ef4444;
-  --green:   #22c55e;
-}
-
-body {
-  font-family: 'Manrope', system-ui, sans-serif;
-  background: var(--navy);
-  color: var(--text);
-  min-height: 100vh;
-}
-
-/* NAV */
-nav {
-  background: var(--navy);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-.nav-inner {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 0 24px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.wordmark {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text);
-  text-decoration: none;
-}
-.wordmark span { color: var(--blue); }
-.nav-links {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-}
-.nav-links a {
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: none;
-}
-.nav-links a:hover { color: var(--text); }
-
-/* PAGE */
-.page {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 48px 24px 80px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 64px;
-  align-items: start;
-}
-
-/* LEFT PANEL */
-.left-panel {}
-
-.badge-slots {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(239,68,68,0.1);
-  border: 1px solid rgba(239,68,68,0.25);
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fca5a5;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 28px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.badge-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--red);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
-}
-
-h1 {
-  font-size: 36px;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  color: var(--text);
-  margin-bottom: 16px;
-}
-h1 span { color: var(--blue); }
-
-.tagline {
-  font-size: 15px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin-bottom: 36px;
-}
-
-/* Benefits */
-.benefits-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--subtle);
-  margin-bottom: 14px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.benefit-item {
-  display: flex;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  align-items: flex-start;
-}
-.benefit-item:last-child { border-bottom: none; }
-.benefit-check {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(34,197,94,0.15);
-  border: 1px solid rgba(34,197,94,0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-  font-size: 10px;
-  color: var(--green);
-}
-.benefit-text {
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.55;
-}
-.benefit-text strong {
-  font-weight: 700;
-  color: var(--text);
-}
-
-/* Price block */
-.price-block {
-  margin-top: 32px;
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 10px;
-  padding: 20px 22px;
-}
-.price-eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--blue);
-  margin-bottom: 8px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.price-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-.price-amount {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--text);
-}
-.price-unit {
-  font-size: 14px;
-  color: var(--muted);
-}
-.price-annual {
-  font-size: 12px;
-  color: var(--subtle);
-  margin-bottom: 12px;
-}
-.price-note {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.6;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-.price-note strong { color: var(--text); font-weight: 600; }
-
-/* RIGHT PANEL — FORM */
-.right-panel {
-  background: var(--white);
-  border-radius: 12px;
-  padding: 36px 32px;
-  box-shadow: 0 4px 32px rgba(0,0,0,0.3);
-}
-
-.form-eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #94a3b8;
-  margin-bottom: 8px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.form-title {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #0A1628;
-  margin-bottom: 6px;
-}
-.form-subtitle {
-  font-size: 13px;
-  color: #64748b;
-  line-height: 1.6;
-  margin-bottom: 28px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.form-group {
-  margin-bottom: 14px;
-}
-.form-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 6px;
-  font-family: 'JetBrains Mono', monospace;
-}
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  padding: 11px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: 'Manrope', system-ui, sans-serif;
-  color: #0A1628;
-  outline: none;
-  transition: border-color 0.15s;
-  appearance: none;
-}
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  border-color: #378ADD;
-  box-shadow: 0 0 0 3px rgba(55,138,221,0.1);
-}
-.form-textarea {
-  resize: vertical;
-  min-height: 80px;
-  line-height: 1.5;
-}
-.form-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 36px;
-}
-
-.submit-btn {
-  width: 100%;
-  padding: 13px;
-  background: #378ADD;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 700;
-  font-family: 'Manrope', system-ui, sans-serif;
-  cursor: pointer;
-  letter-spacing: 0.01em;
-  transition: background 0.15s;
-  margin-top: 6px;
-}
-.submit-btn:hover { background: #2d74c4; }
-.submit-btn:disabled { background: #93c5fd; cursor: not-allowed; }
-
-.form-footer {
-  margin-top: 14px;
-  font-size: 11px;
-  color: #94a3b8;
-  text-align: center;
-  line-height: 1.6;
-}
-.form-footer a { color: #378ADD; text-decoration: none; }
-
-/* SUCCESS STATE */
-.success-state {
-  display: none;
-  text-align: center;
-  padding: 40px 20px;
-}
-.success-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: rgba(34,197,94,0.12);
-  border: 1px solid rgba(34,197,94,0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px;
-  font-size: 24px;
-}
-.success-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #0A1628;
-  margin-bottom: 8px;
-  letter-spacing: -0.02em;
-}
-.success-sub {
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.7;
-  margin-bottom: 6px;
-}
-.success-email {
-  font-size: 13px;
-  color: #378ADD;
-  font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-/* ERROR BANNER */
-.error-banner {
-  display: none;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: #dc2626;
-  margin-bottom: 16px;
-}
-
-@media (max-width: 768px) {
-  .page { grid-template-columns: 1fr; gap: 40px; }
-  h1 { font-size: 28px; }
-  .right-panel { padding: 28px 22px; }
-  .form-row { grid-template-columns: 1fr; }
-}
-</style>
+<meta charset="utf-8" />
+<title>Request access — FARaudit</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="auth.css" />
 </head>
 <body>
+<div class="auth-shell">
 
-<!-- NAV -->
-<nav>
-  <div class="nav-inner">
-    <a href="/" class="wordmark">FAR<span>audit</span></a>
-    <div class="nav-links">
-      <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/sign-in">Sign in</a>
+  <!-- left brand panel -->
+  <aside class="brand-panel">
+    <div class="bp-top">
+      <a class="brand" href="FARaudit Landing.html">
+        <span class="tile">F</span>
+        <span class="wordmark">FAR<span>audit</span></span>
+      </a>
     </div>
-  </div>
-</nav>
-
-<!-- PAGE -->
-<div class="page">
-
-  <!-- LEFT: CONTEXT -->
-  <div class="left-panel">
-
-    <!-- Slots badge -->
-    <!-- TODO: FA-101 — wire to Supabase design_partner_slots_remaining counter -->
-    <div class="badge-slots">
-      <div class="badge-dot"></div>
-      <span id="slotsLeft">5 of 5 slots remaining</span>
-    </div>
-
-    <h1>Federal Contract Intelligence.<br><span>Built for BD directors.</span></h1>
-
-    <p class="tagline">
-      FARaudit covers seven of eight acquisition stages — starting 60–90 days before the solicitation drops. Design partners get the full platform, direct founder access, and founding-rate pricing locked for 12 months.
-    </p>
-
-    <div class="benefits-label">What design partners get</div>
-
-    <div class="benefit-item">
-      <div class="benefit-check">✓</div>
-      <div class="benefit-text"><strong>Full platform access</strong> — every feature, every stage, no restrictions</div>
-    </div>
-    <div class="benefit-item">
-      <div class="benefit-check">✓</div>
-      <div class="benefit-text"><strong>Direct founder access</strong> — weekly calls, Slack channel, feature requests actioned</div>
-    </div>
-    <div class="benefit-item">
-      <div class="benefit-check">✓</div>
-      <div class="benefit-text"><strong>Roadmap input</strong> — your BD workflow shapes what gets built next</div>
-    </div>
-    <div class="benefit-item">
-      <div class="benefit-check">✓</div>
-      <div class="benefit-text"><strong>Founding rate locked 12 months</strong> — $1,250/mo regardless of future price increases</div>
-    </div>
-    <div class="benefit-item">
-      <div class="benefit-check">✓</div>
-      <div class="benefit-text"><strong>Phase 2 priority</strong> — first access to Bullrize investor intelligence and LexAnchor compliance modules</div>
-    </div>
-
-    <div class="price-block">
-      <div class="price-eyebrow">Design Partner Pricing</div>
-      <div class="price-row">
-        <div class="price-amount">$1,250</div>
-        <div class="price-unit">/month</div>
-      </div>
-      <div class="price-annual">$15,000/year · billed annually</div>
-      <div class="price-note">
-        Standard pricing is <strong>$2,500/month</strong> after the founding cohort closes.
-        Founding rate is locked for 12 months from signup date.
+    <div class="bp-mid">
+      <div class="eyebrow"><span class="dot"></span>Design Partner Program</div>
+      <h2>Start at Stage 01,<br/><span class="accent">60–90 days early.</span></h2>
+      <div class="bp-card">
+        <div class="bp-card-top">
+          <div class="label"><span class="ico">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>
+          </span>Founding Cohort</div>
+          <div class="corner-dot">Open</div>
+        </div>
+        <div class="bp-claim">Design partners shape the roadmap.</div>
+        <div class="bp-sub">Founding rate of $1,250/mo, locked for 12 months — and a direct line to the team building it.</div>
+        <svg class="spark" viewBox="0 0 300 46" preserveAspectRatio="none">
+          <path class="fill" d="M0,40 L30,36 L60,33 L90,28 L120,30 L150,22 L180,24 L210,15 L240,17 L270,9 L300,7 L300,46 L0,46 Z"/>
+          <path d="M0,40 L30,36 L60,33 L90,28 L120,30 L150,22 L180,24 L210,15 L240,17 L270,9 L300,7"/>
+        </svg>
       </div>
     </div>
+    <div class="bp-foot mono">SOC 2 Type II · FedRAMP-aligned · SAM.gov synced 2m ago</div>
+  </aside>
 
-  </div>
+  <!-- right form -->
+  <main class="form-panel">
+    <div class="form-card">
+      <div class="brand brand-sm">
+        <span class="tile">F</span>
+        <span class="wordmark">FAR<span>audit</span></span>
+      </div>
 
-  <!-- RIGHT: FORM -->
-  <div class="right-panel">
+      <div id="form-view">
+        <h1>Request access</h1>
+        <p class="sub">Tell us about your pipeline. We review applications within one business day.</p>
 
-    <div id="formView">
-      <div class="form-eyebrow">Apply now</div>
-      <div class="form-title">Request Design Partner access</div>
-      <div class="form-subtitle">5 slots total. We review every application and respond within 24 hours.</div>
+        <div class="slots"><span>Design partners shape the roadmap</span></div>
 
-      <div class="error-banner" id="errorBanner"></div>
-
-      <form id="accessForm">
-        <div class="form-row">
-          <div>
-            <label class="form-label" for="firstName">First name</label>
-            <input class="form-input" type="text" id="firstName" name="firstName" placeholder="Jose" required>
+        <form id="access-form" onsubmit="return submitForm(event)">
+          <div class="field-row">
+            <label class="field">
+              <span class="lbl">Full name</span>
+              <input type="text" name="name" autocomplete="name" placeholder="Jordan Reyes" required />
+            </label>
+            <label class="field">
+              <span class="lbl">Work email</span>
+              <input type="email" name="email" autocomplete="email" placeholder="you@company.com" required />
+            </label>
           </div>
-          <div>
-            <label class="form-label" for="lastName">Last name</label>
-            <input class="form-input" type="text" id="lastName" name="lastName" placeholder="Rodriguez" required>
+
+          <div class="field-row">
+            <label class="field">
+              <span class="lbl">Company</span>
+              <input type="text" name="company" autocomplete="organization" placeholder="Acme Defense LLC" required />
+            </label>
+            <label class="field">
+              <span class="lbl">Your role</span>
+              <select name="role" required>
+                <option value="" disabled selected>Select…</option>
+                <option>BD / Capture Director</option>
+                <option>Proposal Manager</option>
+                <option>Founder / Owner</option>
+                <option>Contracts / Compliance</option>
+                <option>Other</option>
+              </select>
+            </label>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label" for="email">Work email</label>
-          <input class="form-input" type="email" id="email" name="email" placeholder="you@yourcompany.com" required>
-        </div>
+          <label class="field">
+            <span class="lbl">Primary NAICS codes <span style="color:var(--mute-2);font-weight:500">— optional</span></span>
+            <input type="text" name="naics" placeholder="e.g. 541330, 336413, 541512" />
+          </label>
 
-        <div class="form-group">
-          <label class="form-label" for="company">Company name</label>
-          <input class="form-input" type="text" id="company" name="company" placeholder="Acme Defense LLC" required>
-        </div>
+          <label class="field">
+            <span class="lbl">Where does your pipeline lose deals today?</span>
+            <textarea name="context" placeholder="Late on solicitations, missed CLIN traps, compliance surprises…"></textarea>
+          </label>
 
-        <div class="form-group">
-          <label class="form-label" for="role">Your role</label>
-          <input class="form-input" type="text" id="role" name="role" placeholder="BD Director / CEO / Contracts Manager" required>
-        </div>
+          <button type="submit" class="btn btn-primary btn-block">Apply for Design Partner access&nbsp;→</button>
+        </form>
 
-        <div class="form-group">
-          <label class="form-label" for="naics">Primary NAICS code</label>
-          <select class="form-select" id="naics" name="naics" required>
-            <option value="" disabled selected>Select your primary NAICS</option>
-            <option value="336411">336411 — Aircraft Manufacturing</option>
-            <option value="336412">336412 — Aircraft Engine & Parts</option>
-            <option value="336413">336413 — Aircraft Parts & Auxiliary Equipment</option>
-            <option value="336414">336414 — Guided Missile & Space Vehicle Mfg</option>
-            <option value="336415">336415 — Guided Missile Propulsion Units</option>
-            <option value="336419">336419 — Other Guided Missile & Space Vehicle</option>
-            <option value="336992">336992 — Military Armored Vehicle & Tank Parts</option>
-            <option value="other">Other defense NAICS</option>
-          </select>
-        </div>
+        <p class="alt">Already have an account? <a href="sign-in.html">Sign in&nbsp;→</a></p>
+      </div>
 
-        <div class="form-group">
-          <label class="form-label" for="solicitations">Active solicitations you're pursuing</label>
-          <textarea class="form-textarea" id="solicitations" name="solicitations" placeholder="List any active RFQs, RFPs, or IDIQs you're currently working — or describe your typical pipeline." required></textarea>
+      <!-- success state -->
+      <div id="success-view" class="success">
+        <div class="check">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
+        <h1>Application received</h1>
+        <p>Thanks — we'll review your pipeline and follow up within one business day. Watch for an email from <b style="color:var(--ink)">access@faraudit.com</b>.</p>
+        <a class="btn btn-ghost btn-block" href="FARaudit Landing.html">Back to home</a>
+      </div>
 
-        <div class="form-group">
-          <label class="form-label" for="revenue">Annual federal revenue</label>
-          <select class="form-select" id="revenue" name="revenue" required>
-            <option value="" disabled selected>Select revenue range</option>
-            <option value="<500k">Under $500K</option>
-            <option value="500k-2m">$500K – $2M</option>
-            <option value="2m-10m">$2M – $10M</option>
-            <option value="10m-50m">$10M – $50M</option>
-            <option value="50m+">$50M+</option>
-          </select>
-        </div>
-
-        <button class="submit-btn" type="submit" id="submitBtn">Apply for Design Partner access →</button>
-
-        <div class="form-footer">
-          FARaudit Inc. · <a href="mailto:jose@faraudit.com">jose@faraudit.com</a> · (203) 589-1929<br>
-          We review every application personally and respond within 24 hours.
-        </div>
-      </form>
     </div>
+    <div class="legal mono">© 2026 FARaudit Inc. · Dover, DE</div>
+  </main>
 
-    <!-- SUCCESS STATE -->
-    <div class="success-state" id="successView">
-      <div class="success-icon">✓</div>
-      <div class="success-title">Application received</div>
-      <div class="success-sub">We'll review your application and respond within 24 hours at</div>
-      <div class="success-email" id="successEmail"></div>
-      <div class="success-sub" style="margin-top:16px">In the meantime, explore the platform at <a href="/how-it-works" style="color:#378ADD">how it works →</a></div>
-    </div>
-
-  </div>
 </div>
 
 <script>
-const form = document.getElementById('accessForm');
-const submitBtn = document.getElementById('submitBtn');
-const errorBanner = document.getElementById('errorBanner');
-const formView = document.getElementById('formView');
-const successView = document.getElementById('successView');
-const successEmail = document.getElementById('successEmail');
-
-function showError(msg) {
-  errorBanner.textContent = msg;
-  errorBanner.style.display = 'block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function hideError() {
-  errorBanner.style.display = 'none';
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  hideError();
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting...';
-
-  const data = {
-    firstName: form.firstName.value.trim(),
-    lastName:  form.lastName.value.trim(),
-    email:     form.email.value.trim(),
-    company:   form.company.value.trim(),
-    role:      form.role.value.trim(),
-    naics:     form.naics.value,
-    solicitations: form.solicitations.value.trim(),
-    revenue:   form.revenue.value,
-  };
-
-  try {
-    const res = await fetch('/api/access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (res.ok) {
-      successEmail.textContent = data.email;
-      formView.style.display = 'none';
-      successView.style.display = 'block';
-    } else {
-      const body = await res.json().catch(() => ({}));
-      showError(body.message || 'Submission failed. Please try again or email jose@faraudit.com directly.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Apply for Design Partner access →';
-    }
-  } catch (err) {
-    showError('Network error. Please check your connection and try again, or email jose@faraudit.com directly.');
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Apply for Design Partner access →';
+  function submitForm(e){
+    e.preventDefault();
+    document.getElementById('form-view').style.display = 'none';
+    var sv = document.getElementById('success-view');
+    sv.classList.add('show');
+    window.scrollTo(0,0);
+    return false;
   }
-});
 </script>
-
 </body>
 </html>
