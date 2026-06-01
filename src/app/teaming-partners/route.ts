@@ -14,6 +14,6 @@ export async function GET() {
   const html = await readFile(filePath, "utf8");
 
   return new Response(html, {
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, max-age=30, stale-while-revalidate=10" }
   });
 }

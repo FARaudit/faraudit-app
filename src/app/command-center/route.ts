@@ -35,9 +35,7 @@ export async function GET() {
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      // CEO 2026-05-25 transitional cache flush — see next.config.ts.
-      "clear-site-data": '"cache"'
-    }
+      "cache-control": "private, max-age=30, stale-while-revalidate=10"
+}
   });
 }
