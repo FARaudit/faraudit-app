@@ -43,7 +43,7 @@
   }
 
   // ── Build feed row ─────────────────────────────────────────────────────────
-    function buildRow(opp) {
+      function buildRow(opp) {
     var score = opp.compliance_score || 0;
     var dl = opp.response_deadline ? Math.ceil((new Date(opp.response_deadline) - Date.now()) / 864e5) : 99;
     var expired = dl < 0;
@@ -51,9 +51,15 @@
     var docSub = docBadgeClass(opp.document_type || opp.notice_type || "");
     var iClass = insightClass(opp.risk_level, score);
     var iText = insightText(opp);
+    var iSplit = iText.split(' — ');
+    var iBold = iSplit[0];
+    var iRest = iSplit.slice(1).join(' — ');
     var tlText = expired ? "expired" : timeLeft(opp.response_deadline);
     var tlClass = expired ? "crit" : dlClass(dl);
-    var agency = (opp.agency || opp.department || "").split(" · ").filter(function(p,i,a){ return a.indexOf(p)===i; }).join(" · ");
+    var agencyRaw = opp.agency || opp.department || "";
+    var agencyParts = agencyRaw.split(' · ').filter(function(p,i,a){ return a.indexOf(p)===i; });
+    var agencyName = agencyParts[0] || agencyRaw;
+    var agencySub = agencyParts.slice(1).join(' · ');
     var value = opp.award_ceiling ? fmtValue(opp.award_ceiling) : "";
     var title = opp.title_plain || opp.title || opp.solicitation_title || "Untitled";
     var solNum = opp.solicitation_number || opp.notice_id || "—";
@@ -62,13 +68,16 @@
       + '<div class="score ' + scoreClass(score) + '"><div class="v">' + (score || "--") + '</div><div class="l">' + scoreLabel(score) + '</div></div>'
       + '<div class="row-body">'
       + '<div class="row-top"><span class="row-id">' + solNum + '</span><span class="row-title">' + title + '</span></div>'
-      + '<div class="row-sub">' + agency + '</div>'
+      + '<div class="compact-sub">' + solNum + ' · ' + agencyName + '</div>'
       + '<div class="row-meta">'
       + '<span class="badge doc ' + docSub + '">' + (opp.document_type || opp.notice_type || "Notice") + '</span>'
       + (opp.naics_code ? '<span class="badge naics">NAICS ' + opp.naics_code + '</span>' : '')
       + (opp.set_aside_description || opp.set_aside_code ? '<span class="badge setaside">' + (opp.set_aside_description || opp.set_aside_code) + '</span>' : '')
       + '</div>'
-      + '<div class="insight ' + iClass + '"><span class="insight-dot"></span>' + iText + '</div>'
+      + '<div class="row-agency one-line"><span class="agency-name">' + agencyName + '</span>'
+      + (agencySub ? '<span class="agency-sub">' + agencySub + '</span>' : '')
+      + '</div>'
+      + '<div class="insight ' + iClass + '"><b>' + iBold + '</b>' + (iRest ? ' — ' + iRest : '') + '</div>'
       + '</div>'
       + '<div class="row-right">'
       + '<span class="deadline ' + tlClass + '">' + tlText + '</span>'
