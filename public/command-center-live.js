@@ -211,22 +211,15 @@
       });
     }
 
-    var pursuitsPanel = Array.from(document.querySelectorAll(".panel")).find(function (p) { return p.innerText?.includes("Active Pursuits"); });
-    if (pursuitsPanel) {
-      fetch("/api/pipeline")
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (!d || !d.pipeline || !d.pipeline.length) return;
-          var rows = pursuitsPanel.querySelectorAll("[class*=pursuit-row], .pursuit");
-          if (rows.length) {
-            var container = rows[0].parentElement;
-            container.innerHTML = d.pipeline.map(buildPursuit).join("");
-          }
-          var viewAll = pursuitsPanel.querySelector("a, button");
-          if (viewAll) viewAll.href = "/pipeline";
-        })
-        .catch(function () {});
-    }
+    var pursuitsPanel = Array.from(document.querySelectorAll('.panel')).find(function (p) { return p.innerText?.includes('Active Pursuits'); });
+  if (pursuitsPanel) {
+    var viewAll = Array.from(pursuitsPanel.querySelectorAll('a, button')).find(function(el){ return el.innerText?.includes('View all') || el.innerText?.includes('view all'); });
+    if (viewAll) { viewAll.href = '/pipeline'; viewAll.style.cursor = 'pointer'; }
+    Array.from(pursuitsPanel.querySelectorAll('[class*=pursuit], [class*=p-row]')).forEach(function(row){
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', function(){ window.location.href = '/pipeline'; });
+    });
+  }
 
     var quickPanel = Array.from(document.querySelectorAll(".panel")).find(function (p) { return p.innerText?.includes("Quick Audit"); });
     if (quickPanel) {
