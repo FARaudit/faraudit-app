@@ -53,21 +53,21 @@ button{font-family:inherit;cursor:pointer}
   content:"";position:absolute;inset:auto -120px -160px auto;width:420px;height:420px;border-radius:50%;
   background:radial-gradient(circle,rgba(55,138,221,.12),rgba(55,138,221,0) 70%);pointer-events:none;
 }
-.bp-top{position:relative;z-index:1}
+.bp-top{position:relative;z-index:1;align-self:flex-start}
 .bp-mid{position:relative;z-index:1;margin:auto 0;max-width:460px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .eyebrow{
   font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--mute);display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;
+  color:var(--mute);display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;white-space:nowrap;
 }
-.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
-.bp-mid h2{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1.14;margin-bottom:32px;text-wrap:balance}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);flex-shrink:0}
+.bp-mid h2{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1.14;margin-bottom:28px;text-wrap:balance}
 .bp-mid h2 .accent{color:var(--accent)}
 
 /* mini navy KPI card */
 .bp-card{
   background:linear-gradient(135deg,#0A1628 0%,#16294a 55%,#1e3a8a 100%);
-  border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px 14px;color:#fff;
-  box-shadow:var(--shadow-lg);max-width:380px;position:relative;overflow:hidden;text-align:left;
+  border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px 26px 20px;color:#fff;
+  box-shadow:var(--shadow-lg);width:100%;max-width:460px;position:relative;overflow:hidden;text-align:left;
 }
 .bp-card-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .bp-card .label{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.8)}
@@ -75,19 +75,19 @@ button{font-family:inherit;cursor:pointer}
 .bp-card .corner-dot{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;background:rgba(255,255,255,.08);padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.14)}
 .bp-card .corner-dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;animation:livePulse 1.6s ease-in-out infinite}
 @keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(147,197,253,.6)}50%{box-shadow:0 0 0 5px rgba(147,197,253,0)}}
-.bp-num{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:44px;letter-spacing:-.02em;line-height:1;display:flex;align-items:baseline;gap:9px}
+.bp-num{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:52px;letter-spacing:-.02em;line-height:1;display:flex;align-items:baseline;gap:10px}
 .bp-num .unit{font-size:13px;font-weight:500;color:rgba(255,255,255,.7);font-family:"Manrope"}
 .bp-claim{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.22;color:#fff;text-wrap:balance}
 .bp-sub{font-size:12px;color:rgba(255,255,255,.78);margin-top:8px}
-.bp-card .spark{height:40px;width:100%;margin-top:8px}
+.bp-card .spark{height:52px;width:100%;margin-top:12px}
 .bp-card .spark path{fill:none;stroke:#5eead4;stroke-width:1.6}
 .bp-card .spark path.fill{fill:rgba(94,234,212,0.16);stroke:none}
-.bp-foot{position:relative;z-index:1;font-size:10.5px;color:var(--mute-2);letter-spacing:.04em}
+.bp-foot{position:relative;z-index:1;font-size:10.5px;color:var(--mute-2);letter-spacing:.04em;align-self:flex-start}
 
 /* ───── right form panel ───── */
 .form-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;background:var(--page-bg)}
 .form-card{width:100%;max-width:392px}
-.brand-sm{margin-bottom:30px}
+.brand-sm{margin-bottom:30px;display:none}
 .brand-sm .tile{width:28px;height:28px;font-size:12px}
 .brand-sm .wordmark{font-size:17px}
 .form-card h1{font-size:28px;font-weight:800;letter-spacing:-.03em;margin-bottom:8px}
@@ -157,4 +157,5 @@ button{font-family:inherit;cursor:pointer}
   .auth-shell{grid-template-columns:1fr}
   .brand-panel{display:none}
   .form-panel{min-height:100vh}
+  .brand-sm{display:flex}
 }
