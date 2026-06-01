@@ -8,23 +8,26 @@
     }catch(e){return;}
     const partners=d.partners||d.entities||d.data||d.items||[];
     if(!partners.length)return;
+    if(typeof PARTNERS==='undefined'||!Array.isArray(PARTNERS))return;
 
-    const list=document.querySelector('.partners-list,.teaming-list,.feed-list');
-    if(!list)return;
+    const mapped=partners.map((p,i)=>({
+      id:'live-'+i,
+      name:p.legal_business_name||p.name||'',
+      loc:[(p.city||''),(p.state||'')].filter(Boolean).join(', '),
+      naics:p.naics_codes||[p.naics||'336413'],
+      certs:p.certifications||p.certs||[p.business_size||'SB'].filter(Boolean),
+      agencies:p.agencies||[],
+      value:p.past_performance_value||p.total_awards||0,
+      insight:p.insight||p.ai_insight||'',
+      cage:p.cage_code||'',
+      uei:p.uei||p.unique_entity_id||''
+    }));
 
-    list.innerHTML=partners.slice(0,30).map(p=>`
-      <div class="partner-row">
-        <div class="partner-name">${p.legal_business_name||p.name||''}</div>
-        <div class="partner-meta">
-          <span class="partner-cage">${p.cage_code||''}</span>
-          <span class="partner-location">${p.city||''}${p.state?', '+p.state:''}</span>
-          <span class="partner-size">${p.business_size||p.size||''}</span>
-        </div>
-        ${p.capabilities?`<div class="partner-caps">${p.capabilities.slice(0,100)}</div>`:''}
-      </div>`).join('');
-
-    const cnt=document.querySelector('.partner-count,.partners-count,.total-count');
-    if(cnt)cnt.textContent=partners.length+' partners';
+    PARTNERS.length=0;
+    PARTNERS.push(...mapped);
+    if(typeof renderList==='function')renderList();
   }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',wire):wire();
+  document.readyState==='loading'
+    ?document.addEventListener('DOMContentLoaded',wire)
+    :wire();
 })();

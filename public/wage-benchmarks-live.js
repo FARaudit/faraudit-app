@@ -1,4 +1,4 @@
-(function(){
+(function(){if(!new URLSearchParams(location.search).has("live"))return;
   async function wire(){
     let d;
     try{
