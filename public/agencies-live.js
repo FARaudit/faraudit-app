@@ -1,8 +1,7 @@
-(function(){if(!new URLSearchParams(location.search).has("live"))return;
-  async function wire(){
+(function(){async function wire(){
     let d;
     try{
-      const r=await fetch('/api/agency-stats',{credentials:'include'});
+      const r=await fetch('/api/agencies',{credentials:'include'});
       if(!r.ok){
         const r2=await fetch('/api/agencies',{credentials:'include'});
         if(!r2.ok)return;
