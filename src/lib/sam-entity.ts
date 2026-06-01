@@ -143,5 +143,12 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
     return [];
   }
   const list = data.entityData || [];
-  return list.map(toSamEntity);
+  const mapped = list.map(toSamEntity);
+  const seen = new Set<string>();
+  return mapped.filter(e => {
+    const key = e.uei || e.cage_code || e.legal_business_name;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

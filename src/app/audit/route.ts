@@ -1,5 +1,5 @@
 /* GET /audit — serves the static Claude Design Run Audit HTML
-   (public/run-audit-design.html) behind the existing Supabase auth gate.
+   (public/run-audit-v2.html) behind the existing Supabase auth gate.
 
    Mirror of /command-center/route.ts (see that file for the rationale on
    why this is a Route Handler instead of page.tsx — App Router can't
