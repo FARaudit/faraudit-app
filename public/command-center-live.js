@@ -77,7 +77,7 @@
       + '<div class="row-agency one-line"><span class="agency-name">' + agencyName + '</span>'
       + (agencySub ? '<span class="agency-sub">' + agencySub + '</span>' : '')
       + '</div>'
-      + '<div class="insight ' + iClass + '"><b>' + iBold + '</b>' + (iRest ? ' — ' + iRest : '') + '</div>'
+      + '<div class="insight ' + iClass + '"><b>' + iBold + '</b>' + (iRest ? '<span style="font-weight:normal"> — ' + iRest + '</span>' : '') + '</div>'
       + '</div>'
       + '<div class="row-right">'
       + '<span class="deadline ' + tlClass + '">' + tlText + '</span>'
