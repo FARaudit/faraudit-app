@@ -12,7 +12,7 @@ async function maybeRedirectToDashboard(): Promise<void> {
     const {
       data: { user }
     } = await sb.auth.getUser();
-    if (user) redirect("/home");
+    if (user) redirect("/command-center");
   } catch {
     /* never block the public landing on a transient auth-check error */
   }
