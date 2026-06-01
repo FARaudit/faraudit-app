@@ -76,3 +76,34 @@
     wirePipeline();
   }
 })();
+
+// Stage rail click filter
+(function(){
+  function attachStageFilter(){
+    var allCards = [];
+    document.querySelectorAll('.stage-cell').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var selected = btn.dataset.stage;
+        document.querySelectorAll('.stage-cell').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        var grid = document.querySelector('.cards-grid');
+        if(!grid) return;
+        var cards = grid.querySelectorAll('.pcard');
+        if(selected === 'all'){
+          cards.forEach(function(c){ c.style.display=''; });
+        } else {
+          cards.forEach(function(c){
+            var pill = c.querySelector('.stage-pill');
+            var match = pill && pill.innerText.startsWith(selected);
+            c.style.display = match ? '' : 'none';
+          });
+        }
+      });
+    });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', attachStageFilter);
+  } else {
+    attachStageFilter();
+  }
+})();
