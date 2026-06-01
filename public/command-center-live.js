@@ -43,7 +43,7 @@
   }
 
   // ── Build feed row ─────────────────────────────────────────────────────────
-  function buildRow(opp) {
+    function buildRow(opp) {
     var score = opp.compliance_score || 0;
     var dl = opp.response_deadline ? Math.ceil((new Date(opp.response_deadline) - Date.now()) / 864e5) : 99;
     var expired = dl < 0;
@@ -53,27 +53,31 @@
     var iText = insightText(opp);
     var tlText = expired ? "expired" : timeLeft(opp.response_deadline);
     var tlClass = expired ? "crit" : dlClass(dl);
-    var agency = (opp.agency || opp.department || "").replace("DEPT OF DEFENSE · ", "").replace("DEPARTMENT OF DEFENSE · ", "");
+    var agency = (opp.agency || opp.department || "").split(" · ").filter(function(p,i,a){ return a.indexOf(p)===i; }).join(" · ");
     var value = opp.award_ceiling ? fmtValue(opp.award_ceiling) : "";
+    var title = opp.title_plain || opp.title || opp.solicitation_title || "Untitled";
+    var solNum = opp.solicitation_number || opp.notice_id || "—";
 
-    return '<div class="row' + urgency + '" data-id="' + (opp.id || "") + '" data-stage="' + (opp.in_pipeline ? "pipeline" : "") + '" data-audited="' + (opp.is_audited ? "true" : "false") + '">'
+    return '<div class="row' + urgency + '" data-id="' + (opp.id || "") + '">'
       + '<div class="score ' + scoreClass(score) + '"><div class="v">' + (score || "--") + '</div><div class="l">' + scoreLabel(score) + '</div></div>'
       + '<div class="row-body">'
-      + '<div class="row-top"><span class="row-id">' + (opp.solicitation_number || opp.notice_id || "—") + '</span>'
-      + '<span class="row-title">' + (opp.title_plain || opp.title || opp.solicitation_title || "Untitled") + '</span></div>'
-      + '<div class="compact-sub">' + (opp.solicitation_number || "") + ' · ' + agency + '</div>'
+      + '<div class="row-top"><span class="row-id">' + solNum + '</span><span class="row-title">' + title + '</span></div>'
+      + '<div class="row-sub">' + agency + '</div>'
       + '<div class="row-meta">'
       + '<span class="badge doc ' + docSub + '">' + (opp.document_type || opp.notice_type || "Notice") + '</span>'
       + (opp.naics_code ? '<span class="badge naics">NAICS ' + opp.naics_code + '</span>' : '')
-      + (opp.set_aside_code ? '<span class="badge setaside">' + (opp.set_aside_description || opp.set_aside_code) + '</span>' : '')
-      + (value ? '<span class="badge value">' + value + '</span>' : '')
+      + (opp.set_aside_description || opp.set_aside_code ? '<span class="badge setaside">' + (opp.set_aside_description || opp.set_aside_code) + '</span>' : '')
       + '</div>'
-      + '<div class="row-agency one-line"><span class="agency-name">' + (opp.agency || opp.department || "—") + '</span></div>'
       + '<div class="insight ' + iClass + '"><span class="insight-dot"></span>' + iText + '</div>'
       + '</div>'
-      + '<div class="row-aside"><span class="deadline ' + tlClass + '">' + tlText + '</span>'
-      + (opp.in_pipeline ? '<span class="badge pipeline-badge">In Pipeline</span>' : '')
-      + (opp.is_audited ? '<a href="/dashboard" class="badge audited-badge">Audited</a>' : '<button class="btn-audit-quick" data-id="' + (opp.id || "") + '">Audit →</button>')
+      + '<div class="row-right">'
+      + '<span class="deadline ' + tlClass + '">' + tlText + '</span>'
+      + (value ? '<span class="row-value">' + value + '</span>' : '')
+      + '<div class="row-actions">'
+      + '<button class="a primary btn-audit-quick" data-id="' + (opp.id || "") + '">Open audit</button>'
+      + '<button class="a btn-pipeline" data-id="' + (opp.id || "") + '">Add to pipeline</button>'
+      + '<a class="a" href="/opportunities">View solicitation</a>'
+      + '</div>'
       + '</div>'
       + '</div>';
   }
