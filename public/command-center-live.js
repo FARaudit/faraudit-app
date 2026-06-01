@@ -44,7 +44,7 @@
 
   // ── Build feed row ─────────────────────────────────────────────────────────
       function buildRow(opp) {
-    var score = opp.compliance_score || 0;
+    var score = opp.compliance_score || 0; var hasScore = opp.compliance_score !== null && opp.compliance_score !== undefined;
     var dl = opp.response_deadline ? Math.ceil((new Date(opp.response_deadline) - Date.now()) / 864e5) : 99;
     var expired = dl < 0;
     var urgency = expired ? "" : dl <= 2 ? " urgent" : dl <= 7 ? " priority" : "";
@@ -61,11 +61,11 @@
     var agencyName = agencyParts[0] || agencyRaw;
     var agencySub = agencyParts.slice(1).join(' · ');
     var value = opp.award_ceiling ? fmtValue(opp.award_ceiling) : "";
-    var title = opp.title_plain || opp.title || opp.solicitation_title || "Untitled";
+    var title = opp.title || opp.title_plain || opp.solicitation_title || "Untitled";
     var solNum = opp.solicitation_number || opp.notice_id || "—";
 
     return '<div class="row' + urgency + '" data-id="' + (opp.id || "") + '">'
-      + '<div class="score ' + scoreClass(score) + '"><div class="v">' + (score || "--") + '</div><div class="l">' + scoreLabel(score) + '</div></div>'
+      + '<div class="score ' + (hasScore ? scoreClass(score) : (dl <= 2 ? "s-no" : dl <= 7 ? "s-lo" : "s-mid")) + '"><div class="v">' + (hasScore ? score : (dl <= 2 ? "!" : dl <= 7 ? "↑" : "·")) + '</div><div class="l">' + (hasScore ? scoreLabel(score) : (dl <= 2 ? "Urgent" : dl <= 7 ? "Watch" : "New")) + '</div></div>'
       + '<div class="row-body">'
       + '<div class="row-top"><span class="row-id">' + solNum + '</span><span class="row-title">' + title + '</span></div>'
       + '<div class="compact-sub">' + solNum + ' · ' + agencyName + '</div>'
