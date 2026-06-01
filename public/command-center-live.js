@@ -3,16 +3,42 @@
 
   // ── Tier + format helpers (every class verified in command-center-design.html) ──
   function scoreClass(s) {
-    return s >= 80 ? "s-hi" : s >= 50 ? "s-mid" : s > 0 ? "s-lo" : "s-no";
+    return s >= 80 ? "s-hi" : s >= 50 ? "s-md" : s > 0 ? "s-lo" : "s-no";
   }
   function scoreLabel(s) {
     return s >= 80 ? "Match" : s >= 50 ? "Score" : s > 0 ? "Trap" : "—";
   }
   function urgencyTier(days) {
-    if (days == null) return "s-mid";
+    if (days == null) return "s-md";
     if (days <= 2) return "s-no";
     if (days <= 7) return "s-lo";
-    return "s-mid";
+    return "s-md";
+  }
+  function docBadgeClass(docType) {
+    if (!docType) return "badge doc";
+    var d = String(docType).toLowerCase();
+    if (d.indexOf("rfq") !== -1) return "badge doc rfq";
+    if (d.indexOf("combined") !== -1 || d.indexOf("synopsis") !== -1) return "badge doc combined";
+    return "badge doc";
+  }
+  function setasideBadgeClass(sa) {
+    if (!sa) return null;
+    var s = String(sa).toLowerCase();
+    if (s.indexOf("full") !== -1 || s.indexOf("open") !== -1) return "badge setaside full";
+    return "badge setaside";
+  }
+  function insightVariant(opp) {
+    var rec = (opp.recommendation || "").toLowerCase();
+    if (opp.bid_no_bid === "no-bid" || rec.indexOf("disqualif") !== -1 || rec.indexOf("no-bid") !== -1 || rec.indexOf("no bid") !== -1) {
+      return "alert";
+    }
+    if (opp.risk_level === "HIGH" || rec.indexOf("warn") !== -1 || rec.indexOf("required") !== -1 || rec.indexOf("renew") !== -1 || rec.indexOf("expire") !== -1) {
+      return "warn";
+    }
+    if ((opp.compliance_score || 0) >= 80 || rec.indexOf("strong fit") !== -1 || rec.indexOf("recommend bid") !== -1) {
+      return "win";
+    }
+    return "info";
   }
   function urgencyClass(days, riskLevel) {
     if (riskLevel === "HIGH") return "row urgent";
@@ -56,11 +82,15 @@
     var agency = opp.agency || "";
     var title  = opp.title || opp.title_plain || "Untitled";
     var naics  = opp.naics_code ? '<span class="badge naics">NAICS ' + opp.naics_code + '</span>' : "";
-    var sa     = opp.set_aside ? '<span class="badge setaside">' + opp.set_aside + '</span>' : "";
+    var saCls  = setasideBadgeClass(opp.set_aside);
+    var sa     = saCls ? '<span class="' + saCls + '">' + opp.set_aside + '</span>' : "";
+    var docCls = docBadgeClass(opp.document_type);
+    var docTxt = opp.document_type || "RFQ";
     var value  = opp.award_ceiling ? '<span class="row-value">' + fmtValue(opp.award_ceiling) + '</span>' : "";
     var insight = opp.recommendation
-      ? '<div class="insight win"><b>' + opp.recommendation.slice(0, 140) + '</b></div>'
+      ? '<div class="insight ' + insightVariant(opp) + '"><b>' + opp.recommendation.slice(0, 140) + '</b></div>'
       : "";
+    var agencySub = opp.incumbent_name ? '<span class="agency-sub">' + opp.incumbent_name + '</span>' : '<span class="agency-sub"></span>';
 
     return '<div class="' + rowCls + '">'
       + '<div class="score ' + sClass + '"><div class="v">' + sValue + '</div><div class="l">' + sLabel + '</div></div>'
@@ -68,10 +98,10 @@
       + '<div class="row-top"><span class="row-id">' + id + '</span><span class="row-title">' + title.slice(0, 80) + '</span></div>'
       + '<div class="compact-sub">' + id + ' · ' + agency + '</div>'
       + '<div class="row-meta">'
-      + '<span class="badge doc">' + (opp.document_type || "RFQ") + '</span>'
+      + '<span class="' + docCls + '">' + docTxt + '</span>'
       + naics + sa
       + '</div>'
-      + '<div class="row-agency one-line"><span class="agency-name">' + agency + '</span></div>'
+      + '<div class="row-agency one-line"><span class="agency-name">' + agency + '</span>' + agencySub + '</div>'
       + insight
       + '</div>'
       + '<div class="row-right">'
@@ -94,7 +124,6 @@
   function applyFilters() {
     var filtered = ALL_OPPS.filter(function (opp) {
       var days = daysUntil(opp.response_deadline);
-      if (days != null && days < 0) return false;
 
       if (ACTIVE_FILTER === "urgent") return days != null && days <= 2;
       if (ACTIVE_FILTER === "hot match") return (opp.compliance_score || 0) >= 80;
@@ -125,7 +154,6 @@
         VISIBLE_COUNT += 20;
         applyFilters();
       });
-      var feedList = document.querySelector(".feed-list");
       if (feedList) feedList.appendChild(btn);
     }
   }

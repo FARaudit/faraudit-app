@@ -30,12 +30,20 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const [counters, homeStats, opportunities, recentAudits] = await Promise.all([
+    const [counters, homeStats, rawOpps, recentAudits] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
-      fetchOpportunities(supabase, { limit: 100 }).catch(() => []),
+      fetchOpportunities(supabase, { limit: 250 }).catch(() => []),
       fetchRecentAudits(supabase, 200).catch(() => []),
     ]);
+
+    const nowMs = Date.now();
+    const opportunities = (rawOpps as any[]).filter((o) => {
+      if (!o?.response_deadline) return true;
+      const ms = new Date(o.response_deadline).getTime();
+      if (Number.isNaN(ms)) return true;
+      return ms >= nowMs;
+    });
 
     return NextResponse.json({
       liveCount:        homeStats?.live_sam_gov        ?? (opportunities as any[]).length,
