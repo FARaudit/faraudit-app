@@ -125,8 +125,8 @@
         VISIBLE_COUNT += 20;
         applyFilters();
       });
-      var feedEl = document.querySelector(".feed");
-      if (feedEl) feedEl.appendChild(btn);
+      var feedList = document.querySelector(".feed-list");
+      if (feedList) feedList.appendChild(btn);
     }
   }
 
