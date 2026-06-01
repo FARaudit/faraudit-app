@@ -33,7 +33,7 @@ export async function GET() {
     const [counters, homeStats, opportunities, recentAudits] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
-      fetchOpportunities(supabase, { limit: 20 }).catch(() => []),
+      fetchOpportunities(supabase, { limit: 100 }).catch(() => []),
       fetchRecentAudits(supabase, 200).catch(() => []),
     ]);
 
