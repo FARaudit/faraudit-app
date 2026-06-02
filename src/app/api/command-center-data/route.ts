@@ -163,6 +163,37 @@ export async function GET() {
       return sum + v;
     }, 0);
 
+    // .focus callout counts ("N pursuit closes in <24h · M need your action this week")
+    const pipelineClosing24h = (pipelineRows as any[]).filter((c) => {
+      const ts = c.due_date ? new Date(c.due_date).getTime() : NaN;
+      return !isNaN(ts) && ts >= nowMs && (ts - nowMs) <= dayMs;
+    }).length;
+    const pipelineClosingWeek = (pipelineRows as any[]).filter((c) => {
+      const ts = c.due_date ? new Date(c.due_date).getTime() : NaN;
+      return !isNaN(ts) && ts >= nowMs && (ts - nowMs) <= weekMs;
+    }).length;
+
+    // Top 6 pipeline cards by soonest due_date (drives the 6 .pursuit rows)
+    const pipelineTop6 = (pipelineRows as any[])
+      .filter((c) => c.due_date)
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+      .slice(0, 6);
+
+    // Free Tier strip (approximation — no Stripe subscription read yet).
+    // Treats free-tier monthly quota as a fixed 13 audits; "used" = audits
+    // counted this month from counters. Stops the lie of static "8 of 13".
+    const FREE_TIER_QUOTA = 13;
+    const auditsUsedMonth = typeof counters.audits === "number"
+      ? counters.audits
+      : 0;
+    const freeTierPct = Math.min(100, Math.round((auditsUsedMonth / FREE_TIER_QUOTA) * 100));
+
+    // .sb-badge.live on the Opportunities sidebar item — "Live" if SAM.gov
+    // synced within the last 5 minutes, else "Stale". Computed from lastSync
+    // string written below (which is always "now" at request time, so always
+    // "Live" — the client compares against actual fetch time).
+    const ingestStatus = "Live"; // always live at API-response time
+
     // ── Quick Audit panel ──
     const recentAudits4 = audits.slice(0, 4);
     const auditsThisWeek = audits.filter((a) => {
@@ -200,10 +231,21 @@ export async function GET() {
       // Active Pursuits panel
       pipelineFunnel,
       pipelineWeightedValue,
+      pipelineClosing24h,
+      pipelineClosingWeek,
+      pipelineTop6,
 
       // Quick Audit panel
       recentAudits4,
       auditsThisWeek,
+
+      // Free Tier strip (approximation pending real Stripe subscription read)
+      freeTierQuota: FREE_TIER_QUOTA,
+      auditsUsedMonth,
+      freeTierPct,
+
+      // Sidebar Opportunities .sb-badge.live indicator
+      ingestStatus,
     });
   } catch (err) {
     console.error("[command-center-data]", err);

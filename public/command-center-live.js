@@ -411,6 +411,126 @@
         seg.textContent = String(funnel[key]);
       }
     });
+    // .focus callout — "N pursuit closes in <24h · M need your action this week"
+    var critNums = document.querySelectorAll(".pursuits-summary .focus .crit-num");
+    if (critNums[0] && typeof data.pipelineClosing24h === "number") {
+      critNums[0].textContent = String(data.pipelineClosing24h);
+    }
+    if (critNums[1] && typeof data.pipelineClosingWeek === "number") {
+      critNums[1].textContent = String(data.pipelineClosingWeek);
+    }
+  }
+
+  // .pursuit rows — build 6 cards from data.pipelineTop6. Replaces the static
+  // sample rows under .pursuits-spark inside the Active Pursuits panel.
+  function buildPursuitCard(card) {
+    var dueMs = card.due_date ? new Date(card.due_date).getTime() : NaN;
+    var days = isNaN(dueMs) ? null : Math.ceil((dueMs - Date.now()) / 864e5);
+    var hours = isNaN(dueMs) ? null : Math.ceil((dueMs - Date.now()) / 3.6e6);
+    var dueText, dueCls;
+    if (days == null)             { dueText = "—";              dueCls = ""; }
+    else if (days < 0)            { dueText = "expired";         dueCls = "crit"; }
+    else if (hours != null && hours <= 24) { dueText = Math.max(1, hours) + "h left"; dueCls = "crit"; }
+    else if (days <= 7)           { dueText = days + "d left";   dueCls = "crit"; }
+    else if (days <= 30)          { dueText = days + "d left";   dueCls = "warn"; }
+    else                          { dueText = days + "d left";   dueCls = ""; }
+
+    var STAGE_MAP = {
+      "01": { label: "PRE-SOL",         cls: "draft"  },
+      "02": { label: "SOURCES SOUGHT",  cls: "draft"  },
+      "03": { label: "SOLICITATION",    cls: "draft"  },
+      "04": { label: "DRAFTING",        cls: "draft"  },
+      "05": { label: "PRICING",         cls: "review" },
+      "06": { label: "FINAL REVIEW",    cls: "ready"  },
+      "07": { label: "AWARD",           cls: "ready"  },
+      "08": { label: "POST-AWARD",      cls: "ready"  }
+    };
+    var stage = STAGE_MAP[card.stage] || { label: "UNKNOWN", cls: "" };
+    var stageNum = parseInt(card.stage || "01", 10);
+    if (isNaN(stageNum) || stageNum < 1) stageNum = 1;
+    // Progress bar: stage 1 = ~14%, stage 8 = ~96%
+    var barWidth = Math.min(96, Math.max(14, stageNum * 12));
+    var barCls = (days != null && days <= 2) ? "red" : (days != null && days <= 7) ? "amber" : (stageNum >= 6 ? "green" : "navy");
+
+    var nm = (card.title || "Untitled").trim().slice(0, 30);
+    var ag = card.agency || "—";
+    var ctx = card.notes ? card.notes.trim().slice(0, 24) : "";
+    var val = card.estimated_value ? fmtValue(card.estimated_value) : "—";
+    var flagDot = (days != null && days <= 7) ? '<span class="flag-dot" title="Action needed"></span>' : "";
+
+    return '<div class="pursuit">'
+      + flagDot
+      + '<div class="p-row1">'
+      +   '<span class="nm">' + nm + '</span>'
+      +   '<span class="ag">' + ag + '</span>'
+      +   '<span class="due ' + dueCls + '">' + dueText + '</span>'
+      + '</div>'
+      + '<div class="p-row2">'
+      +   '<span class="stage ' + stage.cls + '">' + stage.label + '</span>'
+      +   '<span class="ctx">' + ctx + '</span>'
+      +   '<div class="bar ' + barCls + '"><i style="width:' + barWidth + '%"></i></div>'
+      +   '<span class="val">' + val + '</span>'
+      +   '<span class="pwin flat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg> —</span>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function renderPursuitRows(data) {
+    var cards = data.pipelineTop6 || [];
+    if (cards.length === 0) return; // keep static design rows if no live pipeline
+    // Find the Active Pursuits panel by locating .pursuits-summary's parent.
+    var summary = document.querySelector(".pursuits-summary");
+    if (!summary) return;
+    var panel = summary.parentElement;
+    if (!panel) return;
+    // Remove every existing .pursuit row (the 6 hardcoded ones)
+    panel.querySelectorAll(".pursuit").forEach(function (p) { p.remove(); });
+    // Append the new ones after .pursuits-spark (or .pursuits-summary if spark missing).
+    var anchor = panel.querySelector(".pursuits-spark") || summary;
+    cards.forEach(function (card) {
+      var tpl = document.createElement("div");
+      tpl.innerHTML = buildPursuitCard(card);
+      var el = tpl.firstElementChild;
+      if (el) anchor.parentElement.insertBefore(el, anchor.nextSibling);
+      // After insertion, advance anchor so the next card lands AFTER this one
+      // (preserves the cards' sorted order in the DOM).
+      if (el) anchor = el;
+    });
+  }
+
+  // .free-strip in Quick Audit panel — Free Tier quota progress.
+  function renderFreeStrip(data) {
+    var strip = document.querySelector(".free-strip");
+    if (!strip) return;
+    var used = typeof data.auditsUsedMonth === "number" ? data.auditsUsedMonth : null;
+    var quota = typeof data.freeTierQuota === "number" ? data.freeTierQuota : null;
+    var pct = typeof data.freeTierPct === "number" ? data.freeTierPct : null;
+    if (used == null || quota == null) return;
+    var topLeft = strip.querySelector(".ft-top span:first-child");
+    var topRight = strip.querySelector(".ft-top span:last-child");
+    var bar = strip.querySelector(".ft-bar i");
+    var desc = strip.querySelector(".ft-d");
+    if (topLeft) topLeft.textContent = "Free Tier · " + quota + " monthly";
+    if (topRight && pct != null) topRight.textContent = pct + "%";
+    if (bar && pct != null) bar.style.width = pct + "%";
+    if (desc) {
+      // Days remaining until end of current month for the "resets in" text
+      var now = new Date();
+      var endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      var daysToReset = Math.max(1, Math.ceil((endOfMonth.getTime() - now.getTime()) / 864e5));
+      desc.textContent = used + " of " + quota + " audits used · resets in " + daysToReset + "d";
+    }
+  }
+
+  // Opportunities sidebar item — .sb-badge.live shows "Live" if synced
+  // within the last 5 minutes, else "Stale". Uses data.lastSync ISO timestamp.
+  function renderOpportunitiesBadge(data) {
+    var badge = document.querySelector('.sb-icon[href="/opportunities"] .sb-badge.live');
+    if (!badge) return;
+    var sync = data.lastSync ? new Date(data.lastSync).getTime() : NaN;
+    if (isNaN(sync)) return;
+    var ageMs = Date.now() - sync;
+    badge.textContent = (ageMs < 5 * 60 * 1000) ? "Live" : "Stale";
   }
 
   function renderActNow(opps) {
@@ -666,7 +786,10 @@
       var actNowPicks = renderActNow(opps);
       renderMoving(opps, actNowPicks);
       renderActivePursuits(data);
+      renderPursuitRows(data);
       renderQuickAuditPanel(data);
+      renderFreeStrip(data);
+      renderOpportunitiesBadge(data);
       wireActCards();
       wireMoveRows();
       // Re-wire .qa-recent .qa-item clicks since renderQuickAuditPanel may have
