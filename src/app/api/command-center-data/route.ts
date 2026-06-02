@@ -57,12 +57,18 @@ export async function GET() {
       : "";
     const fullName = (metaName || emailLocal || "User").replace(/\s+/g, " ").trim();
     const firstName = fullName.split(/\s+/)[0] || "User";
-    const initials = fullName
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((s) => s[0].toUpperCase())
-      .slice(0, 2)
-      .join("") || "U";
+    // Initials = first word's initial + last "real" word's initial. Filter out
+    // generational suffixes (Jr, Sr, II, III, IV, V) so "Jose Antonio Rodriguez Jr"
+    // gives "JR" not "JJ". One-word names degrade to a single letter.
+    const SUFFIXES = new Set(["JR", "SR", "II", "III", "IV", "V"]);
+    const _tokens = fullName.split(/\s+/).filter(Boolean);
+    const _meaningful = _tokens.filter((t) => !SUFFIXES.has(t.toUpperCase()));
+    const _useTokens = _meaningful.length > 0 ? _meaningful : _tokens;
+    const initials = _useTokens.length === 0
+      ? "U"
+      : _useTokens.length === 1
+        ? _useTokens[0][0].toUpperCase()
+        : (_useTokens[0][0] + _useTokens[_useTokens.length - 1][0]).toUpperCase();
 
     const [counters, homeStats, rawOpps, recentAudits, pipelineRows] = await Promise.all([
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
