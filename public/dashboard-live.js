@@ -2,31 +2,33 @@
   "use strict";
 
   // ═══════════════════════════════════════════════════════
-  // Past Audits / Dashboard live wiring — SELF-SUFFICIENT MODE.
+  // Past Audits / Dashboard live wiring — NON-INVASIVE MODE.
   //
-  // The design ships with inline JS that renders a static AUDITS array
-  // and wires its own sort/filter handlers. We DON'T cooperate with it
-  // — instead:
-  //   1. Strip the inline event listeners by cloneNode-replacing the
-  //      target elements (#filters and each th.sortable). This removes
-  //      the inline handlers entirely.
-  //   2. Manage our own STATE (rows + filter + sortKey + sortDir + search).
-  //   3. Render the table + KPIs + distribution + filter counts + page
-  //      sub all from live /api/audits data.
-  //   4. Attach our own filter/sort/search handlers that re-render from
-  //      live data.
+  // Principle: dashboard-design.html is the source of truth for STRUCTURE.
+  // This script only updates DATA VALUES inside existing elements. Never
+  // cloneNode, never replace structural wrappers, never change class names
+  // on layout elements.
   //
-  // The inline AUDITS const + render() become dead weight but harmless —
-  // their last render() call painted a frame of static rows; our DOMContentLoaded
-  // handler replaces those rows before paint settles.
+  // What we update:
+  //   - #ledgerBody innerHTML (the design's inline JS does this too, same pattern)
+  //   - .kpi-val × 4 (textContent / innerHTML where the design itself uses inner HTML)
+  //   - .dist-bar segment widths (inline style.width only)
+  //   - .dist-legend .dl b textContent
+  //   - .fbtn .n textContent
+  //   - .page-header .sub innerHTML (it already contains <b>N records</b>)
+  //   - #visCount textContent
+  //   - #filters click handler (additive — runs AFTER inline handler;
+  //     re-renders our live data on top of inline's static render)
+  //   - th.sortable click handler (additive — same pattern)
+  //   - .search input swap-on-click
+  //   - tr click → /audit/{sol}
   // ═══════════════════════════════════════════════════════
 
-  // ── State ──
   var STATE = {
     rows: [],
     filter: "all",
     sortKey: "score",
-    sortDir: -1,    // -1 desc, 1 asc
+    sortDir: -1,
     search: ""
   };
 
@@ -37,12 +39,12 @@
     if (isNaN(ms)) return { label: "—", ageHours: Infinity };
     var diffMs = Date.now() - ms;
     var ageHours = diffMs / 3600000;
-    if (diffMs < 60 * 1000)               return { label: "just now",                                          ageHours: ageHours };
-    if (diffMs < 60 * 60 * 1000)          return { label: Math.max(1, Math.round(diffMs / 60000)) + "m ago",   ageHours: ageHours };
-    if (diffMs < 24 * 60 * 60 * 1000)     return { label: Math.round(diffMs / (60 * 60 * 1000)) + "h ago",     ageHours: ageHours };
-    if (diffMs < 48 * 60 * 60 * 1000)     return { label: "Yesterday",                                         ageHours: ageHours };
-    if (diffMs < 7 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago",ageHours: ageHours };
-    if (diffMs < 30 * 24 * 60 * 60 * 1000)return { label: Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)) + "w ago", ageHours: ageHours };
+    if (diffMs < 60 * 1000)                return { label: "just now",                                          ageHours: ageHours };
+    if (diffMs < 60 * 60 * 1000)           return { label: Math.max(1, Math.round(diffMs / 60000)) + "m ago",   ageHours: ageHours };
+    if (diffMs < 24 * 60 * 60 * 1000)      return { label: Math.round(diffMs / (60 * 60 * 1000)) + "h ago",     ageHours: ageHours };
+    if (diffMs < 48 * 60 * 60 * 1000)      return { label: "Yesterday",                                         ageHours: ageHours };
+    if (diffMs < 7 * 24 * 60 * 60 * 1000)  return { label: Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago",ageHours: ageHours };
+    if (diffMs < 30 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)) + "w ago", ageHours: ageHours };
     return { label: Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)) + "mo ago", ageHours: ageHours };
   }
 
@@ -89,30 +91,20 @@
     return "s-no";
   }
 
-  function recClass(r) {
-    return r ? r.toLowerCase() : "none";
-  }
-
-  // Escape user content before insertion — defends against any malformed
-  // title/agency text that could break the table.
   function esc(s) {
     if (s == null) return "";
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  // Row HTML — exact column structure from the design's inline render():
-  // id · title · date · type · score · rec · status · View link
+  // Build the EXACT row markup the design's inline render() uses (verbatim copy).
   function buildRowHTML(a) {
     var tone = scoreTone(a.score);
     var scoreCell = a.score == null
       ? '<span class="score s-none">—</span>'
       : '<div class="score-cell"><span class="score-meter"><i class="si ' + tone + '" style="width:' + a.score + '%"></i></span><span class="score ' + tone + '">' + a.score + '</span></div>';
+    var recClassStr = a.rec ? a.rec.toLowerCase() : "none";
     var recCell = a.rec
-      ? '<span class="rec ' + recClass(a.rec) + '">' + esc(a.rec) + '</span>'
+      ? '<span class="rec ' + recClassStr + '">' + esc(a.rec) + '</span>'
       : '<span class="rec none">—</span>';
     var slug = encodeURIComponent(a.id);
     return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '">'
@@ -143,29 +135,28 @@
   function sortedRows() {
     var copy = STATE.rows.slice();
     copy.sort(function (x, y) {
-      var xv, yv;
       if (STATE.sortKey === "score") {
-        xv = x.score == null ? -1 : x.score;
-        yv = y.score == null ? -1 : y.score;
-        return STATE.sortDir * (xv - yv);
+        var xs = x.score == null ? -1 : x.score;
+        var ys = y.score == null ? -1 : y.score;
+        return STATE.sortDir * (xs - ys);
       }
       if (STATE.sortKey === "date") {
         return STATE.sortDir * (x.age - y.age);
       }
-      // id (string)
-      xv = (x.id || "").toLowerCase();
-      yv = (y.id || "").toLowerCase();
-      return STATE.sortDir * xv.localeCompare(yv);
+      var xi = (x.id || "").toLowerCase();
+      var yi = (y.id || "").toLowerCase();
+      return STATE.sortDir * xi.localeCompare(yi);
     });
     return copy;
   }
 
-  // ── Render functions ──
-  function renderTable() {
+  // ── Data writes (no structure changes) ──
+  function writeTable() {
     var body = document.getElementById("ledgerBody");
     if (!body) return;
     var sorted = sortedRows();
     var visible = sorted.filter(function (a) { return rowMatchesFilter(a) && rowMatchesSearch(a); });
+
     if (sorted.length === 0) {
       body.innerHTML = '<tr><td colspan="8" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
@@ -182,7 +173,7 @@
     wireRowClicks();
   }
 
-  function renderKPIs() {
+  function writeKPIs() {
     var rows = STATE.rows;
     var total = rows.length;
     var completed = rows.filter(function (r) { return r.status === "complete"; });
@@ -195,24 +186,20 @@
     var proceedPct = completed.length > 0
       ? Math.round((proceedRows.length / completed.length) * 100)
       : 0;
-
     var kpis = document.querySelectorAll(".kpi-strip .kpi");
-    function setVal(idx, val, html) {
-      if (!kpis[idx]) return;
-      var v = kpis[idx].querySelector(".kpi-val");
-      if (v) { if (html) v.innerHTML = val; else v.textContent = val; }
-    }
-    setVal(0, String(total));
-    setVal(1, String(proceedRows.length));
+    if (kpis[0]) { var v0 = kpis[0].querySelector(".kpi-val"); if (v0) v0.textContent = String(total); }
     if (kpis[1]) {
-      var f = kpis[1].querySelector(".foot");
-      if (f) f.innerHTML = '<b>' + proceedPct + '%</b> of completed — clear to bid';
+      var v1 = kpis[1].querySelector(".kpi-val"); if (v1) v1.textContent = String(proceedRows.length);
+      var f1 = kpis[1].querySelector(".foot");    if (f1) f1.innerHTML = '<b>' + proceedPct + '%</b> of completed — clear to bid';
     }
-    setVal(2, String(declineRows.length));
-    setVal(3, String(avgScore) + '<span class="unit">/100</span>', true);
+    if (kpis[2]) { var v2 = kpis[2].querySelector(".kpi-val"); if (v2) v2.textContent = String(declineRows.length); }
+    if (kpis[3]) {
+      var v3 = kpis[3].querySelector(".kpi-val");
+      if (v3) v3.innerHTML = String(avgScore) + '<span class="unit">/100</span>';
+    }
   }
 
-  function renderDistribution() {
+  function writeDistribution() {
     var rows = STATE.rows;
     var total = rows.length;
     if (total === 0) return;
@@ -222,7 +209,6 @@
       else if (r.rec) buckets[r.rec] = (buckets[r.rec] || 0) + 1;
     });
     function pct(n) { return Math.round((n / total) * 100); }
-
     var bar = document.querySelector(".dist-bar");
     if (bar) {
       var widths = {
@@ -249,7 +235,7 @@
     }
   }
 
-  function renderFilterCounts() {
+  function writeFilterCounts() {
     var rows = STATE.rows;
     var counts = {
       all:     rows.length,
@@ -265,7 +251,7 @@
     });
   }
 
-  function renderPageHeaderSub() {
+  function writeHeaderSub() {
     var sub = document.querySelector(".page-header .sub");
     if (!sub) return;
     var n = STATE.rows.length;
@@ -273,53 +259,47 @@
       + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
-  function renderAll() {
-    renderTable();
-    renderKPIs();
-    renderDistribution();
-    renderFilterCounts();
-    renderPageHeaderSub();
+  function writeAll() {
+    writeKPIs();
+    writeDistribution();
+    writeFilterCounts();
+    writeHeaderSub();
+    writeTable();
   }
 
-  // ── Wire interactions — strip inline listeners by cloneNode-replace ──
+  // ── Wires (additive — never replace inline handlers) ──
   function wireFilters() {
     var filters = document.getElementById("filters");
-    if (!filters) return;
-    // Replace with a clone to drop the inline JS click listener
-    var fresh = filters.cloneNode(true);
-    filters.parentNode.replaceChild(fresh, filters);
-    fresh.addEventListener("click", function (e) {
+    if (!filters || filters.dataset.ccWired) return;
+    filters.dataset.ccWired = "1";
+    // Inline handler fires FIRST (was attached at parse time). It re-renders
+    // the static AUDITS. Our handler fires AFTER (addEventListener order)
+    // and overwrites the table with our live data.
+    filters.addEventListener("click", function (e) {
       var btn = e.target.closest && e.target.closest(".fbtn");
       if (!btn) return;
-      fresh.querySelectorAll(".fbtn").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      // Inline handler already set .active on the clicked button — read it.
       STATE.filter = btn.dataset.filter || "all";
-      renderTable();
+      writeTable();
     });
   }
 
   function wireSort() {
     document.querySelectorAll("th.sortable").forEach(function (th) {
-      // Replace each sortable header with a clone to drop inline listener
-      var fresh = th.cloneNode(true);
-      th.parentNode.replaceChild(fresh, th);
-    });
-    document.querySelectorAll("th.sortable").forEach(function (th) {
+      if (th.dataset.ccWired) return;
+      th.dataset.ccWired = "1";
       th.addEventListener("click", function () {
+        // Inline handler already updated its own sortKey/sortDir + the .arr
+        // arrow element. Read the resulting state from DOM.
         var k = th.dataset.sort;
+        var arr = th.querySelector(".arr");
+        var arrowText = arr ? (arr.textContent || "▼").trim() : "▼";
         if (STATE.sortKey === k) STATE.sortDir *= -1;
         else { STATE.sortKey = k; STATE.sortDir = (k === "id") ? 1 : -1; }
-        // Remove arrow indicators from all sortables, add to this one
-        document.querySelectorAll("th.sortable").forEach(function (x) {
-          x.classList.remove("sorted");
-          var a = x.querySelector(".arr");
-          if (a) a.remove();
-        });
-        th.classList.add("sorted");
-        var arr = document.createElement("span");
-        arr.className = "arr";
-        arr.textContent = STATE.sortDir < 0 ? "▼" : "▲";
-        th.appendChild(arr);
-        renderTable();
+        // Override sortDir from the visible arrow indicator the inline handler
+        // already set (so we agree with the displayed arrow).
+        STATE.sortDir = arrowText === "▲" ? 1 : -1;
+        writeTable();
       });
     });
   }
@@ -345,7 +325,7 @@
       input.focus();
       input.addEventListener("keyup", function () {
         STATE.search = (input.value || "").trim().toLowerCase();
-        renderTable();
+        writeTable();
       });
     });
   }
@@ -355,9 +335,6 @@
       if (row.dataset.ccWired) return;
       row.dataset.ccWired = "1";
       var sol = row.getAttribute("data-sol") || "";
-      // View link inside the row already navigates via native href; row-body
-      // click also navigates so the whole row is hot. View link gets preventDefault
-      // bubble blocked so we don't double-fire.
       row.querySelectorAll(".view-link").forEach(function (link) {
         link.addEventListener("click", function (e) { e.stopPropagation(); });
       });
@@ -366,7 +343,6 @@
         if (sol) window.location.href = "/audit/" + encodeURIComponent(sol);
       });
     });
-    // Clear-filter link in empty-match state
     var clear = document.querySelector(".cc-clear-filters");
     if (clear && !clear.dataset.ccWired) {
       clear.dataset.ccWired = "1";
@@ -379,19 +355,20 @@
         });
         var input = document.querySelector(".cc-search-input");
         if (input) input.value = "";
-        renderTable();
+        writeTable();
       });
     }
   }
 
-  // ── Main wire ──
+  // ── Main ──
   async function wireDashboard() {
-    // 1. Strip inline listeners (filters + sort headers) and re-attach our own
+    // Attach additive listeners FIRST (before fetch).
+    // Inline handlers are already in place from parse-time; ours run after.
     wireFilters();
     wireSort();
     wireSearch();
 
-    // 2. Fetch live audits
+    // Fetch and map
     var data;
     try {
       var r = await fetch("/api/audits?limit=200", { credentials: "include" });
@@ -408,9 +385,9 @@
       STATE.rows = [];
     }
 
-    // 3. Render everything
-    renderAll();
-    console.log("[dashboard-live] rendered " + STATE.rows.length + " audits (self-sufficient)");
+    // Write all data into existing elements
+    writeAll();
+    console.log("[dashboard-live] rendered " + STATE.rows.length + " audits (non-invasive)");
   }
 
   if (document.readyState === "loading") {
