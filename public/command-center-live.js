@@ -160,6 +160,24 @@
   var VISIBLE_COUNT = 20;
   var ACTIVE_FILTER = "all";
 
+  // Mirror the design's lift-out IIFE (command-center-design.html:2503-2506):
+  // compact CSS expects badge.doc to be a grid item inside .row-right (which
+  // uses display:contents in compact mode so its children flow into .row's
+  // 5-column grid). Without this clone, the live rows are short one grid item
+  // in compact view and content gets clipped/reflowed. Idempotent — guarded by
+  // !right.querySelector(".badge.doc"). Runs after every innerHTML replace.
+  function liftDocBadgeForCompact() {
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      var meta = row.querySelector(".row-meta");
+      var right = row.querySelector(".row-right");
+      if (!meta || !right) return;
+      if (right.querySelector(".badge.doc")) return;
+      var docBadge = meta.querySelector(".badge.doc");
+      if (!docBadge) return;
+      right.insertBefore(docBadge.cloneNode(true), right.firstChild);
+    });
+  }
+
   function applyFilters() {
     var filtered = ALL_OPPS.filter(function (opp) {
       var days = daysUntil(opp.response_deadline);
@@ -182,9 +200,16 @@
     var feedCount = document.querySelector(".feed-head h2 .count");
     if (feedCount) feedCount.textContent = visible.length + " of " + filtered.length;
 
-    // Newly-injected rows have no listeners — re-bind action buttons + row menu
+    // Newly-injected rows have no listeners — re-bind action buttons + row menu.
+    // Also re-run interaction wiring for chips/field-pills/filters since the
+    // ccWired guards make these idempotent (and defensive against future
+    // changes that might rebuild .filter-bar too).
     wireRowActions();
     wireRowMenu();
+    liftDocBadgeForCompact();
+    wireChips();
+    wireFiltersButton();
+    wireFieldPills();
 
     var existing = document.querySelector(".cc-load-more");
     if (existing) existing.remove();
@@ -581,28 +606,136 @@
     });
   }
 
+  // ── Field-pill + Add-filter dropdown menu ────────────────────────────
+  // Toggleable inline dropdown anchored under a clicked pill. Closes on outside
+  // click or a second click on the same pill. No HTML/CSS file changes — element
+  // is created via JS with inline styles. Selecting an option updates the pill's
+  // .fp-value text (visual feedback) and logs the chosen filter; full multi-pill
+  // ALL_OPPS narrowing is out of scope for this fix.
+  function closeFieldDropdowns() {
+    var existing = document.querySelector(".cc-pill-menu");
+    if (existing) existing.remove();
+    document.querySelectorAll(".field-pill[data-cc-open]").forEach(function (p) {
+      p.removeAttribute("data-cc-open");
+    });
+  }
+  function openFieldDropdown(pill, options, onPick) {
+    closeFieldDropdowns();
+    pill.setAttribute("data-cc-open", "1");
+    var menu = document.createElement("div");
+    menu.className = "cc-pill-menu";
+    menu.style.cssText =
+      "position:fixed;background:#fff;border:1px solid #cbd5e1;border-radius:8px;" +
+      "box-shadow:0 8px 28px -6px rgba(15,23,42,0.20);min-width:200px;max-width:280px;" +
+      "padding:6px;z-index:200;font:500 12.5px/1.4 system-ui,-apple-system,sans-serif;color:#0f172a;";
+    var r = pill.getBoundingClientRect();
+    menu.style.left = r.left + "px";
+    menu.style.top = (r.bottom + 4) + "px";
+    options.forEach(function (opt) {
+      var item = document.createElement("button");
+      item.type = "button";
+      item.textContent = opt.label;
+      item.style.cssText =
+        "display:block;width:100%;text-align:left;background:transparent;border:0;" +
+        "padding:7px 10px;border-radius:6px;cursor:pointer;font:inherit;color:inherit;";
+      item.addEventListener("mouseenter", function () { item.style.background = "#f1f5f9"; });
+      item.addEventListener("mouseleave", function () { item.style.background = "transparent"; });
+      item.addEventListener("click", function (e) {
+        e.stopPropagation();
+        onPick(opt);
+        closeFieldDropdowns();
+      });
+      menu.appendChild(item);
+    });
+    document.body.appendChild(menu);
+    setTimeout(function () {
+      document.addEventListener("click", function once(ev) {
+        if (!menu.contains(ev.target) && !pill.contains(ev.target)) {
+          closeFieldDropdowns();
+          document.removeEventListener("click", once);
+        }
+      });
+    }, 0);
+  }
+
   function wireFieldPills() {
     document.querySelectorAll(".field-pill").forEach(function (pill) {
       if (pill.dataset.ccWired) return;
       pill.dataset.ccWired = "1";
       pill.style.cursor = "pointer";
       pill.addEventListener("click", function (e) {
-        // Clear-X icon: clear instead of toggle
+        // Clear-X icon: clear the pill value
         if (e.target && e.target.closest && e.target.closest(".fp-x")) {
-          pill.classList.remove("cc-active");
-          pill.style.outline = "";
-          pill.style.outlineOffset = "";
+          e.stopPropagation();
+          var val = pill.querySelector(".fp-value");
+          if (val) val.textContent = "—";
+          pill.removeAttribute("data-cc-set");
           return;
         }
-        // "Add filter" (+) pill → full filter UI on /opportunities
+        // Toggle: second click on same open pill closes the menu
+        if (pill.hasAttribute("data-cc-open")) { closeFieldDropdowns(); return; }
+
+        // Add-filter (+) pill → menu of filter types to add (no navigation)
         if (pill.classList.contains("add")) {
-          window.location.href = "/opportunities";
+          openFieldDropdown(pill, [
+            { key: "naics",     label: "NAICS code"        },
+            { key: "setaside",  label: "Set-Aside type"    },
+            { key: "agency",    label: "Agency"            },
+            { key: "value",     label: "$ Value range"     },
+            { key: "deadline",  label: "Deadline window"   }
+          ], function (opt) {
+            console.log("[cc-live] Add filter:", opt.key);
+          });
           return;
         }
-        var on = !pill.classList.contains("cc-active");
-        pill.classList.toggle("cc-active", on);
-        pill.style.outline = on ? "2px solid #2563eb" : "";
-        pill.style.outlineOffset = on ? "1px" : "";
+
+        // Existing field pill → pick a value to filter by. Options derived
+        // from .fp-label so each pill (NAICS / Set-Aside / Notice / Posted)
+        // shows its own list.
+        var lblEl = pill.querySelector(".fp-label");
+        var lbl = lblEl ? (lblEl.textContent || "").trim().toLowerCase() : "";
+        var opts;
+        if (lbl.indexOf("naics") !== -1) {
+          opts = [
+            { key: "541330", label: "541330 · Engineering Services" },
+            { key: "541512", label: "541512 · Computer Systems Design" },
+            { key: "541715", label: "541715 · R&D Physical Sciences" },
+            { key: "541611", label: "541611 · Management Consulting" },
+            { key: "all",    label: "Any NAICS" }
+          ];
+        } else if (lbl.indexOf("set-aside") !== -1) {
+          opts = [
+            { key: "SDVOSB",   label: "SDVOSB Set-Aside" },
+            { key: "8(a)",     label: "8(a) Set-Aside" },
+            { key: "WOSB",     label: "WOSB Set-Aside" },
+            { key: "Full",     label: "Full & Open" },
+            { key: "all",      label: "Any set-aside" }
+          ];
+        } else if (lbl.indexOf("notice") !== -1) {
+          opts = [
+            { key: "RFP",      label: "RFP" },
+            { key: "RFQ",      label: "RFQ" },
+            { key: "Combined", label: "Combined Synopsis" },
+            { key: "Sources",  label: "Sources Sought" },
+            { key: "all",      label: "Any notice type" }
+          ];
+        } else if (lbl.indexOf("posted") !== -1) {
+          opts = [
+            { key: "24h", label: "Last 24h" },
+            { key: "7d",  label: "Last 7 days" },
+            { key: "30d", label: "Last 30 days" },
+            { key: "all", label: "Any time" }
+          ];
+        } else {
+          opts = [{ key: "all", label: "Any" }];
+        }
+
+        openFieldDropdown(pill, opts, function (opt) {
+          var val = pill.querySelector(".fp-value");
+          if (val) val.textContent = opt.key === "all" ? "—" : opt.key;
+          pill.setAttribute("data-cc-set", opt.key);
+          console.log("[cc-live] field-pill " + lbl + " = " + opt.key);
+        });
       });
     });
   }
@@ -812,19 +945,12 @@
     // live regardless of whether we replace the feed or keep the static design.
     wireInteractions();
 
-    var opps = data.opportunities || [];
-    var hasScored = opps.some(function (o) { return o && o.compliance_score != null; });
-    if (!hasScored) {
-      // No AI verdict yet — leave the static design rows in place but dedupe
-      // them first (the design HTML duplicates each unique row 6×). Chips,
-      // sort, and search then operate on the 9 unique rows.
-      dedupeStaticRows();
-      console.log("[cc-live] no scored rows — keeping static feed (deduped + interactions wired)");
-      return;
-    }
-
-    ALL_OPPS = sortOpps(opps);
-    applyFilters(); // also re-wires row actions on the freshly-injected rows
+    // FIX 1 (2026-06-01): Always render from live API data. Un-audited rows
+    // (compliance_score=null) are valid feed entries — buildRow's TODO chip
+    // variant handles them. Previously this returned early on !hasScored,
+    // capping the feed at the static 9-row design.
+    ALL_OPPS = sortOpps(data.opportunities || []);
+    applyFilters(); // also re-wires row actions + lifts doc badges for compact
 
     console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
   }
