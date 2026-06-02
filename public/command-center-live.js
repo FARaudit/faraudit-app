@@ -239,32 +239,75 @@
       var today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
       dateEl.textContent = today + " · SAM.gov synced just now";
     }
-    // .since items — only override when API supplies the delta fields.
-    // Static defaults remain visible until the API is extended.
+    // .brief-greeting — "Good morning, {firstName}." from API user identity
+    var greetEl = document.querySelector(".brief-greeting");
+    if (greetEl && data.user && data.user.firstName) {
+      greetEl.textContent = "Good morning, " + data.user.firstName + ".";
+    }
+    // .since items × 4 — delta values from API; falls back to static design defaults
     var sinceItems = document.querySelectorAll(".since .since-item");
     if (sinceItems[0] && typeof data.newMatches24h === "number") {
       sinceItems[0].innerHTML = '<b>+' + data.newMatches24h + '</b> new matches';
     }
     if (sinceItems[1] && typeof data.newTraps === "number") {
-      sinceItems[1].innerHTML = '<b>' + data.newTraps + '</b> new traps';
+      sinceItems[1].innerHTML = '<b>' + data.newTraps + '</b> new trap' + (data.newTraps === 1 ? "" : "s");
     }
     if (sinceItems[2] && typeof data.pursuitsAdvanced === "number") {
-      sinceItems[2].innerHTML = '<b>' + data.pursuitsAdvanced + '</b> pursuit' + (data.pursuitsAdvanced === 1 ? "" : "s") + ' advanced to Final Review';
+      sinceItems[2].innerHTML = '<b>' + data.pursuitsAdvanced + '</b> pursuit' + (data.pursuitsAdvanced === 1 ? "" : "s") + ' advanced this week';
     }
     if (sinceItems[3] && typeof data.qaWindowsClosing === "number") {
       sinceItems[3].innerHTML = '<b>' + data.qaWindowsClosing + '</b> Q&amp;A window' + (data.qaWindowsClosing === 1 ? "" : "s") + ' close today';
     }
   }
 
+  // .user-chip in the topbar — initials + full name from session.
+  function renderUserChip(data) {
+    if (!data.user) return;
+    var av = document.querySelector(".user-chip .av");
+    if (av && data.user.initials) av.textContent = data.user.initials;
+    var nm = document.querySelector(".user-chip .nm");
+    if (nm && data.user.fullName) nm.textContent = data.user.fullName;
+  }
+
+  // Notification bell badge — count of urgent items needing attention today.
+  function renderNotificationBadge(data) {
+    var n = document.querySelector('.icon-btn[title="Notifications"] .nbadge');
+    if (!n) return;
+    var traps = typeof data.newTraps === "number" ? data.newTraps : 0;
+    var qa = typeof data.qaWindowsClosing === "number" ? data.qaWindowsClosing : 0;
+    var total = traps + qa;
+    n.textContent = total > 0 ? String(total) : "0";
+    n.style.display = total > 0 ? "" : "none";
+  }
+
+  // Sidebar nav badges — wire counts that map to API data. Selectors target
+  // the specific .sb-icon[href=...] anchors in the new design's sidebar.
+  function renderSidebarBadges(data) {
+    function setBadge(href, selector, value) {
+      var icon = document.querySelector('.sb-icon[href="' + href + '"]');
+      if (!icon) return;
+      var badge = icon.querySelector(selector);
+      if (badge && value != null) badge.textContent = String(value);
+    }
+    // Past Audits (.sb-badge.count) — total completed audits
+    setBadge("/dashboard", ".sb-badge.count", data.auditTotal);
+    // Pipeline (.sb-badge.danger) — at-risk pipeline count
+    setBadge("/pipeline", ".sb-badge.danger", data.pipelineAtRisk);
+    // Defense Agencies (.sb-badge.count) — distinct agency count
+    setBadge("/agencies", ".sb-badge.count", data.agencyCount);
+  }
+
   function renderPulseBar(data) {
     var pulses = document.querySelectorAll(".pulse-bar .pulse");
     if (pulses.length === 0) return;
     // Cell order matches design: navy / red / amber / teal.
+    // For .p-delta: writing empty string clears the misleading "+14"/"+33%"
+    // statics until we have snapshot data to compute real day-over-day deltas.
     var values = [
-      { num: data.liveCount,       delta: (typeof data.liveCountDelta === "number") ? (data.liveCountDelta >= 0 ? "+" + data.liveCountDelta : String(data.liveCountDelta)) : null },
-      { num: data.trapCount,       delta: null }, // keep "today" static
-      { num: data.deadlineSoon,    delta: (typeof data.deadlineSoonNext48h === "number") ? (data.deadlineSoonNext48h + " in 48h") : null },
-      { num: data.auditsThisMonth, delta: null }
+      { num: data.liveCount,       delta: (typeof data.liveCountDelta === "number") ? (data.liveCountDelta >= 0 ? "+" + data.liveCountDelta : String(data.liveCountDelta)) : "" },
+      { num: data.trapCount,       delta: null }, // keep static "today" qualifier
+      { num: data.deadlineSoon,    delta: (typeof data.deadlineSoonNext48h === "number") ? (data.deadlineSoonNext48h + " in 48h") : "" },
+      { num: data.auditsThisMonth, delta: "" }
     ];
     pulses.forEach(function (pulse, i) {
       if (i >= values.length) return;
@@ -272,6 +315,89 @@
       var delta = pulse.querySelector(".p-delta");
       if (num && values[i].num != null) num.textContent = fmt(values[i].num);
       if (delta && values[i].delta != null) delta.textContent = values[i].delta;
+    });
+  }
+
+  // ── Quick Audit panel (right rail) ──
+  function buildQaItem(audit) {
+    var docType = (audit.document_type || "PDF").toUpperCase();
+    var icCls = docType.indexOf("DOCX") !== -1 || docType.indexOf("DOC") !== -1 ? "ic docx" : "ic pdf";
+    var sol = audit.solicitation_number || audit.notice_id || "";
+    var title = (audit.title || "Untitled").trim();
+    var displayTitle = sol ? (sol + " — " + title.slice(0, 40)) : title.slice(0, 60);
+    var ts = audit.completed_at || audit.created_at;
+    var ago = "—";
+    if (ts) {
+      var diffMs = Date.now() - new Date(ts).getTime();
+      if (diffMs < 60 * 60 * 1000) ago = Math.max(1, Math.round(diffMs / 60000)) + "m ago";
+      else if (diffMs < 24 * 60 * 60 * 1000) ago = Math.round(diffMs / (60 * 60 * 1000)) + "h ago";
+      else if (diffMs < 48 * 60 * 60 * 1000) ago = "Yesterday";
+      else ago = Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago";
+    }
+    var mt = ago;
+    if (audit.bid_no_bid === "no-bid") mt += " · 1 disqualifier";
+    var s = audit.compliance_score;
+    var scCls = s == null ? "" : (s >= 80 ? "sc hi" : s >= 50 ? "sc md" : "sc lo");
+    var scTxt = s == null ? "—" : String(s);
+    return '<div class="qa-item" data-sol="' + sol + '">'
+      + '<div class="' + icCls + '">' + (docType.indexOf("DOCX") !== -1 ? "DOCX" : "PDF") + '</div>'
+      + '<div class="bd">'
+      +   '<div class="ttl">' + displayTitle + '</div>'
+      +   '<div class="mt">' + mt + '</div>'
+      + '</div>'
+      + '<span class="' + scCls + '">' + scTxt + '</span>'
+      + '</div>';
+  }
+  function renderQuickAuditPanel(data) {
+    // .badge-compl "94 ran this week" → auditsThisWeek count
+    var compl = document.querySelector(".panel-head .badge-compl");
+    if (compl && typeof data.auditsThisWeek === "number") {
+      compl.textContent = data.auditsThisWeek + " ran this week";
+    }
+    // .qa-recent list — replace 4 hardcoded items with live recent audits
+    var list = document.querySelector(".qa-recent");
+    if (!list) return;
+    var items = data.recentAudits4 || [];
+    if (items.length === 0) return; // keep static items if API has no data
+    // Preserve the "Recent audits" header div (first child) and rebuild items below.
+    var header = list.querySelector("div");
+    var headerHtml = header ? header.outerHTML : '<div style="font-size:10.5px;color:var(--mute);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 2px 2px">Recent audits</div>';
+    list.innerHTML = headerHtml + items.map(buildQaItem).join("");
+  }
+
+  // ── Active Pursuits panel (right rail) ──
+  function renderActivePursuits(data) {
+    // .ps-mid → "Top N active" + "X in flight"
+    var psMidLead = document.querySelector(".pursuits-summary .ps-mid .lead");
+    var psMidSub = document.querySelector(".pursuits-summary .ps-mid .sub");
+    var total = typeof data.pipelineTotal === "number" ? data.pipelineTotal : null;
+    if (psMidLead && total != null) {
+      psMidLead.textContent = "Top " + Math.min(6, total) + " active";
+    }
+    if (psMidSub && total != null) {
+      psMidSub.textContent = total + " in flight";
+    }
+    // .ps-right → weighted $ + share
+    var psRightLead = document.querySelector(".pursuits-summary .ps-right .lead");
+    var psRightSub = document.querySelector(".pursuits-summary .ps-right .sub");
+    if (psRightLead && typeof data.pipelineWeightedValue === "number" && data.pipelineWeightedValue > 0) {
+      psRightLead.textContent = fmtValue(data.pipelineWeightedValue) + " weighted";
+    }
+    if (psRightSub && total != null && total > 0) {
+      // Weighted-vs-total ratio is unknown without per-card weights; show "of pipeline"
+      // with at-risk percent as the meaningful side-stat.
+      var atRiskPct = typeof data.pipelineAtRisk === "number"
+        ? Math.round((data.pipelineAtRisk / total) * 100)
+        : 0;
+      psRightSub.textContent = atRiskPct + "% at risk";
+    }
+    // Funnel cells .fseg.s0–s4 — bucket counts from pipelineFunnel
+    var funnel = data.pipelineFunnel || {};
+    ["s0", "s1", "s2", "s3", "s4"].forEach(function (key) {
+      var seg = document.querySelector(".pursuits-summary .funnel .fseg." + key);
+      if (seg && typeof funnel[key] === "number") {
+        seg.textContent = String(funnel[key]);
+      }
     });
   }
 
@@ -498,12 +624,20 @@
 
     try {
       renderBriefHead(data);
+      renderUserChip(data);
+      renderNotificationBadge(data);
+      renderSidebarBadges(data);
       renderPulseBar(data);
       var actNowPicks = renderActNow(opps);
       renderMoving(opps, actNowPicks);
+      renderActivePursuits(data);
+      renderQuickAuditPanel(data);
       wireActCards();
       wireMoveRows();
-      console.log("[cc-live] rendered Brief surface · " + opps.length + " opps total");
+      // Re-wire .qa-recent .qa-item clicks since renderQuickAuditPanel may have
+      // replaced the static items — wireQaItems is idempotent via dataset.ccWired.
+      wireQaItems();
+      console.log("[cc-live] rendered Brief surface · " + opps.length + " opps · user=" + (data.user && data.user.firstName || "?"));
     } catch (e) {
       console.error("[cc-live] render threw:", e);
     }
