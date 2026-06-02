@@ -2,18 +2,33 @@
   "use strict";
 
   // ═══════════════════════════════════════════════════════
-  // Past Audits / Dashboard live wiring (Phase 5 · 2026-06-02).
-  // Targets the new Bid Decision Ledger DOM in dashboard-design.html.
+  // Past Audits / Dashboard live wiring — SELF-SUFFICIENT MODE.
   //
-  // The design ships with inline JS that renders an `AUDITS` array into
-  // #ledgerBody + wires sort/filter handlers. Live mode:
-  //   1. dashboard-design.html exposes window.AUDITS + window.__renderDashboard
-  //   2. We fetch /api/audits, map AuditRow → design row shape, mutate the
-  //      same AUDITS array in place (so the inline sort/filter handlers keep
-  //      working against live data), then invoke window.__renderDashboard().
-  //   3. Update KPI strip, distribution bar, filter chip counts, and the
-  //      page-header "N records" line from the same data.
+  // The design ships with inline JS that renders a static AUDITS array
+  // and wires its own sort/filter handlers. We DON'T cooperate with it
+  // — instead:
+  //   1. Strip the inline event listeners by cloneNode-replacing the
+  //      target elements (#filters and each th.sortable). This removes
+  //      the inline handlers entirely.
+  //   2. Manage our own STATE (rows + filter + sortKey + sortDir + search).
+  //   3. Render the table + KPIs + distribution + filter counts + page
+  //      sub all from live /api/audits data.
+  //   4. Attach our own filter/sort/search handlers that re-render from
+  //      live data.
+  //
+  // The inline AUDITS const + render() become dead weight but harmless —
+  // their last render() call painted a frame of static rows; our DOMContentLoaded
+  // handler replaces those rows before paint settles.
   // ═══════════════════════════════════════════════════════
+
+  // ── State ──
+  var STATE = {
+    rows: [],
+    filter: "all",
+    sortKey: "score",
+    sortDir: -1,    // -1 desc, 1 asc
+    search: ""
+  };
 
   // ── Helpers ──
   function relativeAgo(iso) {
@@ -22,16 +37,15 @@
     if (isNaN(ms)) return { label: "—", ageHours: Infinity };
     var diffMs = Date.now() - ms;
     var ageHours = diffMs / 3600000;
-    if (diffMs < 60 * 1000)               return { label: "just now",                                  ageHours: ageHours };
-    if (diffMs < 60 * 60 * 1000)          return { label: Math.max(1, Math.round(diffMs / 60000)) + "m ago", ageHours: ageHours };
-    if (diffMs < 24 * 60 * 60 * 1000)     return { label: Math.round(diffMs / (60 * 60 * 1000)) + "h ago",   ageHours: ageHours };
-    if (diffMs < 48 * 60 * 60 * 1000)     return { label: "Yesterday",                                 ageHours: ageHours };
-    if (diffMs < 7 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago", ageHours: ageHours };
-    if (diffMs < 30 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)) + "w ago", ageHours: ageHours };
+    if (diffMs < 60 * 1000)               return { label: "just now",                                          ageHours: ageHours };
+    if (diffMs < 60 * 60 * 1000)          return { label: Math.max(1, Math.round(diffMs / 60000)) + "m ago",   ageHours: ageHours };
+    if (diffMs < 24 * 60 * 60 * 1000)     return { label: Math.round(diffMs / (60 * 60 * 1000)) + "h ago",     ageHours: ageHours };
+    if (diffMs < 48 * 60 * 60 * 1000)     return { label: "Yesterday",                                         ageHours: ageHours };
+    if (diffMs < 7 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago",ageHours: ageHours };
+    if (diffMs < 30 * 24 * 60 * 60 * 1000)return { label: Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)) + "w ago", ageHours: ageHours };
     return { label: Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)) + "mo ago", ageHours: ageHours };
   }
 
-  // Decide which recommendation bucket an audit lands in.
   function recommendationBucket(audit) {
     if ((audit.status || "").toLowerCase() !== "complete") return null;
     var bnb = (audit.bid_no_bid || "").toLowerCase();
@@ -67,8 +81,109 @@
     };
   }
 
-  // ── KPI strip ──
-  function renderKPIStrip(rows) {
+  function scoreTone(s) {
+    if (s == null) return "s-none";
+    if (s >= 80) return "s-hi";
+    if (s >= 65) return "s-md";
+    if (s >= 40) return "s-lo";
+    return "s-no";
+  }
+
+  function recClass(r) {
+    return r ? r.toLowerCase() : "none";
+  }
+
+  // Escape user content before insertion — defends against any malformed
+  // title/agency text that could break the table.
+  function esc(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // Row HTML — exact column structure from the design's inline render():
+  // id · title · date · type · score · rec · status · View link
+  function buildRowHTML(a) {
+    var tone = scoreTone(a.score);
+    var scoreCell = a.score == null
+      ? '<span class="score s-none">—</span>'
+      : '<div class="score-cell"><span class="score-meter"><i class="si ' + tone + '" style="width:' + a.score + '%"></i></span><span class="score ' + tone + '">' + a.score + '</span></div>';
+    var recCell = a.rec
+      ? '<span class="rec ' + recClass(a.rec) + '">' + esc(a.rec) + '</span>'
+      : '<span class="rec none">—</span>';
+    var slug = encodeURIComponent(a.id);
+    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '">'
+      + '<td class="cell-id">' + esc(a.id) + '</td>'
+      + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
+      + '<td class="cell-date">' + esc(a.date) + '</td>'
+      + '<td><span class="doctype">' + esc(a.type) + '</span></td>'
+      + '<td class="right">' + scoreCell + '</td>'
+      + '<td>' + recCell + '</td>'
+      + '<td><span class="status ' + esc(a.status) + '">' + esc(a.status) + '</span></td>'
+      + '<td class="right"><a class="view-link" href="/audit/' + slug + '">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
+      + '</tr>';
+  }
+
+  // ── Filter + sort + search pipeline ──
+  function rowMatchesFilter(a) {
+    if (STATE.filter === "all") return true;
+    if (STATE.filter === "open") return a.status !== "complete";
+    return a.rec === STATE.filter;
+  }
+  function rowMatchesSearch(a) {
+    if (!STATE.search) return true;
+    var q = STATE.search;
+    return (a.id   && a.id.toLowerCase().indexOf(q)    !== -1)
+        || (a.title && a.title.toLowerCase().indexOf(q) !== -1)
+        || (a.type  && a.type.toLowerCase().indexOf(q)  !== -1);
+  }
+  function sortedRows() {
+    var copy = STATE.rows.slice();
+    copy.sort(function (x, y) {
+      var xv, yv;
+      if (STATE.sortKey === "score") {
+        xv = x.score == null ? -1 : x.score;
+        yv = y.score == null ? -1 : y.score;
+        return STATE.sortDir * (xv - yv);
+      }
+      if (STATE.sortKey === "date") {
+        return STATE.sortDir * (x.age - y.age);
+      }
+      // id (string)
+      xv = (x.id || "").toLowerCase();
+      yv = (y.id || "").toLowerCase();
+      return STATE.sortDir * xv.localeCompare(yv);
+    });
+    return copy;
+  }
+
+  // ── Render functions ──
+  function renderTable() {
+    var body = document.getElementById("ledgerBody");
+    if (!body) return;
+    var sorted = sortedRows();
+    var visible = sorted.filter(function (a) { return rowMatchesFilter(a) && rowMatchesSearch(a); });
+    if (sorted.length === 0) {
+      body.innerHTML = '<tr><td colspan="8" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+        + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
+        + '</td></tr>';
+    } else if (visible.length === 0) {
+      body.innerHTML = '<tr><td colspan="8" style="padding:28px 16px;text-align:center;color:var(--mute);font-size:13px">'
+        + 'No audits match this filter/search. <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">Clear →</a>'
+        + '</td></tr>';
+    } else {
+      body.innerHTML = visible.map(buildRowHTML).join("");
+    }
+    var vc = document.getElementById("visCount");
+    if (vc) vc.textContent = visible.length + " of " + sorted.length;
+    wireRowClicks();
+  }
+
+  function renderKPIs() {
+    var rows = STATE.rows;
     var total = rows.length;
     var completed = rows.filter(function (r) { return r.status === "complete"; });
     var proceedRows = completed.filter(function (r) { return r.rec === "Proceed"; });
@@ -97,8 +212,8 @@
     setVal(3, String(avgScore) + '<span class="unit">/100</span>', true);
   }
 
-  // ── Distribution bar + legend ──
-  function renderDistribution(rows) {
+  function renderDistribution() {
+    var rows = STATE.rows;
     var total = rows.length;
     if (total === 0) return;
     var buckets = { Proceed: 0, Caution: 0, Decline: 0, pending: 0 };
@@ -110,15 +225,15 @@
 
     var bar = document.querySelector(".dist-bar");
     if (bar) {
-      var segs = {
+      var widths = {
         ".d-proceed": pct(buckets.Proceed),
         ".d-caution": pct(buckets.Caution),
         ".d-decline": pct(buckets.Decline),
         ".d-pending": pct(buckets.pending)
       };
-      Object.keys(segs).forEach(function (sel) {
+      Object.keys(widths).forEach(function (sel) {
         var s = bar.querySelector(sel);
-        if (s) s.style.width = segs[sel] + "%";
+        if (s) s.style.width = widths[sel] + "%";
       });
     }
     var legend = document.querySelector(".dist-legend");
@@ -134,8 +249,8 @@
     }
   }
 
-  // ── Filter chip counts (.fbtn .n × 5) ──
-  function renderFilterCounts(rows) {
+  function renderFilterCounts() {
+    var rows = STATE.rows;
     var counts = {
       all:     rows.length,
       Proceed: rows.filter(function (r) { return r.rec === "Proceed" && r.status === "complete"; }).length,
@@ -150,77 +265,157 @@
     });
   }
 
-  // ── Page-header sub-text ──
-  function renderPageHeaderSub(rows) {
+  function renderPageHeaderSub() {
     var sub = document.querySelector(".page-header .sub");
     if (!sub) return;
+    var n = STATE.rows.length;
     sub.innerHTML = 'Every solicitation FARaudit has scored for you — <b>'
-      + rows.length + ' record' + (rows.length === 1 ? '' : 's') + '</b>, newest first.';
+      + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
-  // ── Empty state when zero audits ──
-  function renderEmptyState() {
-    var body = document.getElementById("ledgerBody");
-    if (body) {
-      body.innerHTML = '<tr><td colspan="8" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
-        + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
-        + '</td></tr>';
+  function renderAll() {
+    renderTable();
+    renderKPIs();
+    renderDistribution();
+    renderFilterCounts();
+    renderPageHeaderSub();
+  }
+
+  // ── Wire interactions — strip inline listeners by cloneNode-replace ──
+  function wireFilters() {
+    var filters = document.getElementById("filters");
+    if (!filters) return;
+    // Replace with a clone to drop the inline JS click listener
+    var fresh = filters.cloneNode(true);
+    filters.parentNode.replaceChild(fresh, filters);
+    fresh.addEventListener("click", function (e) {
+      var btn = e.target.closest && e.target.closest(".fbtn");
+      if (!btn) return;
+      fresh.querySelectorAll(".fbtn").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      STATE.filter = btn.dataset.filter || "all";
+      renderTable();
+    });
+  }
+
+  function wireSort() {
+    document.querySelectorAll("th.sortable").forEach(function (th) {
+      // Replace each sortable header with a clone to drop inline listener
+      var fresh = th.cloneNode(true);
+      th.parentNode.replaceChild(fresh, th);
+    });
+    document.querySelectorAll("th.sortable").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var k = th.dataset.sort;
+        if (STATE.sortKey === k) STATE.sortDir *= -1;
+        else { STATE.sortKey = k; STATE.sortDir = (k === "id") ? 1 : -1; }
+        // Remove arrow indicators from all sortables, add to this one
+        document.querySelectorAll("th.sortable").forEach(function (x) {
+          x.classList.remove("sorted");
+          var a = x.querySelector(".arr");
+          if (a) a.remove();
+        });
+        th.classList.add("sorted");
+        var arr = document.createElement("span");
+        arr.className = "arr";
+        arr.textContent = STATE.sortDir < 0 ? "▼" : "▲";
+        th.appendChild(arr);
+        renderTable();
+      });
+    });
+  }
+
+  function wireSearch() {
+    var sb = document.querySelector(".search");
+    if (!sb || sb.dataset.ccWired) return;
+    sb.dataset.ccWired = "1";
+    sb.style.cursor = "text";
+    sb.addEventListener("click", function () {
+      if (sb.querySelector(".cc-search-input")) return;
+      var placeholder = null;
+      sb.querySelectorAll("span").forEach(function (s) {
+        if (!s.classList.contains("kbd") && placeholder === null) placeholder = s;
+      });
+      if (!placeholder) return;
+      var input = document.createElement("input");
+      input.type = "text";
+      input.className = "cc-search-input";
+      input.placeholder = (placeholder.textContent || "").trim() || "Search audits…";
+      input.style.cssText = "background:transparent;border:none;outline:none;color:inherit;font:inherit;flex:1;min-width:0;padding:0;margin:0;";
+      placeholder.replaceWith(input);
+      input.focus();
+      input.addEventListener("keyup", function () {
+        STATE.search = (input.value || "").trim().toLowerCase();
+        renderTable();
+      });
+    });
+  }
+
+  function wireRowClicks() {
+    document.querySelectorAll("#ledgerBody tr[data-sol]").forEach(function (row) {
+      if (row.dataset.ccWired) return;
+      row.dataset.ccWired = "1";
+      var sol = row.getAttribute("data-sol") || "";
+      // View link inside the row already navigates via native href; row-body
+      // click also navigates so the whole row is hot. View link gets preventDefault
+      // bubble blocked so we don't double-fire.
+      row.querySelectorAll(".view-link").forEach(function (link) {
+        link.addEventListener("click", function (e) { e.stopPropagation(); });
+      });
+      row.style.cursor = "pointer";
+      row.addEventListener("click", function () {
+        if (sol) window.location.href = "/audit/" + encodeURIComponent(sol);
+      });
+    });
+    // Clear-filter link in empty-match state
+    var clear = document.querySelector(".cc-clear-filters");
+    if (clear && !clear.dataset.ccWired) {
+      clear.dataset.ccWired = "1";
+      clear.addEventListener("click", function (e) {
+        e.preventDefault();
+        STATE.filter = "all";
+        STATE.search = "";
+        document.querySelectorAll(".fbtn").forEach(function (b) {
+          b.classList.toggle("active", b.dataset.filter === "all");
+        });
+        var input = document.querySelector(".cc-search-input");
+        if (input) input.value = "";
+        renderTable();
+      });
     }
-    var vc = document.getElementById("visCount");
-    if (vc) vc.textContent = "0 of 0";
   }
 
   // ── Main wire ──
   async function wireDashboard() {
+    // 1. Strip inline listeners (filters + sort headers) and re-attach our own
+    wireFilters();
+    wireSort();
+    wireSearch();
+
+    // 2. Fetch live audits
     var data;
     try {
       var r = await fetch("/api/audits?limit=200", { credentials: "include" });
       if (!r.ok) {
-        console.warn("[dashboard-live] /api/audits returned", r.status, "— keeping static");
-        return;
+        console.warn("[dashboard-live] /api/audits returned", r.status);
+        STATE.rows = [];
+      } else {
+        data = await r.json();
+        var audits = (data && data.audits) || [];
+        STATE.rows = audits.map(mapAuditToRow);
       }
-      data = await r.json();
     } catch (e) {
       console.warn("[dashboard-live] fetch failed", e);
-      return;
-    }
-    var audits = (data && data.audits) || [];
-    var rows = audits.map(mapAuditToRow);
-
-    // Update non-table surfaces regardless of row count
-    renderPageHeaderSub(rows);
-    renderKPIStrip(rows);
-    renderDistribution(rows);
-    renderFilterCounts(rows);
-
-    if (rows.length === 0) {
-      renderEmptyState();
-      console.log("[dashboard-live] 0 audits · empty state rendered");
-      return;
+      STATE.rows = [];
     }
 
-    // Mutate window.AUDITS in place so inline sort/filter handlers keep working.
-    if (window.AUDITS && Array.isArray(window.AUDITS)) {
-      window.AUDITS.length = 0;
-      Array.prototype.push.apply(window.AUDITS, rows);
-    } else {
-      console.warn("[dashboard-live] window.AUDITS not exposed by inline JS");
-    }
-
-    // Re-run the design's render() (now reading live AUDITS).
-    if (typeof window.__renderDashboard === "function") {
-      try { window.__renderDashboard(); }
-      catch (e) { console.error("[dashboard-live] __renderDashboard threw", e); }
-    }
-
-    console.log("[dashboard-live] rendered " + rows.length + " audits");
+    // 3. Render everything
+    renderAll();
+    console.log("[dashboard-live] rendered " + STATE.rows.length + " audits (self-sufficient)");
   }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", wireDashboard);
   } else {
-    // Defer one tick so the design's inline render() (which also runs at
-    // load) populates #ledgerBody first — our render then replaces it.
-    setTimeout(wireDashboard, 0);
+    wireDashboard();
   }
 })();
