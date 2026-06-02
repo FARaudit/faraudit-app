@@ -1,6 +1,18 @@
 (function () {
   "use strict";
 
+  // ── Immediate date write — runs as soon as the script loads, BEFORE the
+  // API fetch resolves. Prevents the static "Sunday, May 24 · SAM.gov synced
+  // 2m ago" string from being visible to the user during the API round-trip
+  // (renderBriefHead also writes this later; idempotent overwrite).
+  (function () {
+    var d = document.querySelector(".bh-date");
+    if (d) {
+      var today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      d.textContent = today + " · SAM.gov synced just now";
+    }
+  })();
+
   // ═══════════════════════════════════════════════════════
   // Intelligence Brief live wiring (Phases 1-3, 2026-06-02).
   // Targets the new Brief DOM emitted by command-center-design.html:
@@ -590,6 +602,28 @@
     });
   }
 
+  // .pulse-bar cells — clickable filters that drop the user onto the relevant
+  // explore surface. Tier is identified by the inner .p-ico.{navy|red|amber|teal}
+  // class (the outer .pulse element has no tier modifier in this design).
+  function wirePulseClicks() {
+    var routes = {
+      navy:  "/opportunities",                       // Live solicitations
+      red:   "/opportunities?filter=traps",          // Compliance traps
+      amber: "/opportunities?filter=deadline",       // Closing · 7 days
+      teal:  "/dashboard"                            // Audits this month → Past Audits
+    };
+    document.querySelectorAll(".pulse-bar .pulse").forEach(function (pulse) {
+      if (pulse.dataset.ccWired) return;
+      var ico = pulse.querySelector(".p-ico");
+      if (!ico) return;
+      var tier = ["navy", "red", "amber", "teal"].find(function (t) { return ico.classList.contains(t); });
+      if (!tier) return;
+      pulse.dataset.ccWired = "1";
+      pulse.style.cursor = "pointer";
+      pulse.addEventListener("click", function () { window.location.href = routes[tier]; });
+    });
+  }
+
   function wireInteractions() {
     wireSearch();
     wireNotificationBell();
@@ -597,6 +631,7 @@
     wireQaDrop();
     wireQaItems();
     wireViewAll();
+    wirePulseClicks();
     // wireActCards / wireMoveRows are called from inside wireCommandCenter
     // after the .sec-actnow / .sec-moving innerHTML is replaced.
   }
