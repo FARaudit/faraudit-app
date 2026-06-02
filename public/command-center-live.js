@@ -168,6 +168,102 @@
     }
   }
 
+  // The design HTML duplicates each unique sample row 6× (9 unique × 6 = 54
+  // rows total in .feed-list, hardcoded for "filling out" the scrollable feed
+  // visually). For real interaction — filtering, sorting, counting — we need
+  // ONE row per unique solicitation. Idempotent: runs once, marks duplicates
+  // with data-cc-duplicate + display:none, then bypasses on subsequent calls.
+  function dedupeStaticRows() {
+    var feedList = document.querySelector(".feed-list");
+    if (!feedList) return;
+    if (feedList.dataset.ccDeduped) return;
+    feedList.dataset.ccDeduped = "1";
+    var seen = {};
+    var unique = 0;
+    Array.prototype.forEach.call(feedList.querySelectorAll(".row"), function (row) {
+      var idEl = row.querySelector(".row-id");
+      var id = idEl ? (idEl.textContent || "").trim() : "";
+      if (!id) { unique++; return; }
+      if (seen[id]) {
+        row.dataset.ccDuplicate = "1";
+        row.style.display = "none";
+      } else {
+        seen[id] = true;
+        unique++;
+      }
+    });
+    var countEl = document.querySelector(".feed-head h2 .count");
+    if (countEl) countEl.textContent = unique + " of " + unique;
+  }
+
+  // Extract days-remaining from a row's .deadline text. Returns null if no
+  // signal. Shared by readStaticRowSortKeys and the chip filter.
+  function readRowDeadlineDays(row) {
+    var dlEl = row.querySelector(".deadline");
+    var dlTxt = dlEl ? (dlEl.textContent || "").trim().toLowerCase() : "";
+    if (!dlTxt || dlTxt === "—") return null;
+    if (dlTxt.indexOf("expired") !== -1) return -1;
+    if (dlTxt === "today") return 0;
+    var mD = dlTxt.match(/(\d+)\s*d/);
+    if (mD) return parseInt(mD[1], 10);
+    var mH = dlTxt.match(/(\d+)\s*h/);
+    if (mH) return parseInt(mH[1], 10) / 24;
+    return null;
+  }
+
+  // ── Static-row filter: hide/show .feed-list rows by class hints (used when
+  // the live API has no scored rows and we're keeping the design's sample feed) ──
+  function staticRowMatchesFilter(row, label) {
+    if (!label || label === "all") return true;
+    if (label === "urgent") return row.classList.contains("urgent");
+    if (label === "hot match" || label === "hot") return !!row.querySelector(".score.s-hi");
+    if (label === "new 24h" || label === "new") {
+      // No posted-date in static markup. Use deadline ≤7d as the urgency proxy.
+      var d = readRowDeadlineDays(row);
+      return d != null && d >= 0 && d <= 7;
+    }
+    if (label === "in pipeline") {
+      // No reliable signal in the static design — no row qualifies.
+      return false;
+    }
+    if (label === "at risk" || label === "risk") {
+      return row.classList.contains("urgent")
+        || !!row.querySelector(".score.s-no")
+        || !!row.querySelector(".insight.alert")
+        || !!row.querySelector(".insight.warn");
+    }
+    return true;
+  }
+  function filterStaticRows(label) {
+    dedupeStaticRows();
+    var lbl = (label || "").toLowerCase();
+    var countEl = document.querySelector(".feed-head h2 .count");
+
+    // "In Pipeline" has no signal on static rows — show "—" state and hide all.
+    // (When the API later provides an in_pipeline count, the live-data path
+    // takes over and this branch is bypassed.)
+    if (lbl === "in pipeline") {
+      document.querySelectorAll(".feed-list .row").forEach(function (row) {
+        row.style.display = "none";
+      });
+      if (countEl) countEl.textContent = "—";
+      return;
+    }
+
+    var visible = 0, total = 0;
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      if (row.dataset.ccDuplicate) {
+        row.style.display = "none";
+        return;
+      }
+      total++;
+      var show = staticRowMatchesFilter(row, lbl);
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    if (countEl) countEl.textContent = visible + " of " + total;
+  }
+
   function wireChips() {
     document.querySelectorAll(".chip-tab").forEach(function (chip) {
       if (chip.dataset.ccWired) return;
@@ -177,9 +273,15 @@
         document.querySelectorAll(".chip-tab").forEach(function (c) { c.classList.remove("active"); });
         chip.classList.add("active");
         var label = (chip.innerText || "").toLowerCase().replace(/\s*\d+\s*$/, "").trim();
-        ACTIVE_FILTER = label || "all";
-        VISIBLE_COUNT = 20;
-        applyFilters();
+        if (ALL_OPPS && ALL_OPPS.length) {
+          // Live data mode — drive the existing applyFilters pipeline
+          ACTIVE_FILTER = label || "all";
+          VISIBLE_COUNT = 20;
+          applyFilters();
+        } else {
+          // Static-design mode — show/hide existing DOM rows in place
+          filterStaticRows(label || "all");
+        }
       });
     });
   }
@@ -265,6 +367,72 @@
     });
   }
 
+  // Read sort keys from a static row's existing DOM content. Mirrors the
+  // shape of sortOpps() but pulls from text nodes the design already
+  // rendered (score, deadline, value). "Posted" has no DOM signal in the
+  // static markup — falls back to original DOM order (cached on first sort).
+  function readStaticRowSortKeys(row) {
+    var vEl = row.querySelector(".score .v");
+    var rawScore = vEl ? (vEl.textContent || "").trim() : "";
+    var score = /^\d+$/.test(rawScore) ? parseInt(rawScore, 10) : NaN;
+
+    var d = readRowDeadlineDays(row);
+    var days = d == null ? Infinity : (d < 0 ? Infinity : d); // expired/null go last on asc
+
+    var vvEl = row.querySelector(".row-value");
+    var vTxt = vvEl ? (vvEl.textContent || "").trim() : "";
+    var value = NaN;
+    var mM = vTxt.match(/\$?([\d.]+)\s*M/i);
+    var mK = vTxt.match(/\$?([\d.]+)\s*K/i);
+    if (mM)      value = parseFloat(mM[1]) * 1e6;
+    else if (mK) value = parseFloat(mK[1]) * 1e3;
+
+    return { score: score, days: days, value: value };
+  }
+
+  function sortStaticRows() {
+    var feedList = document.querySelector(".feed-list");
+    if (!feedList) return;
+    dedupeStaticRows();
+    // Only consider unique (non-duplicate) rows. Sorting the duplicates would
+    // surface 6 copies of the same score/deadline at the top of the feed.
+    var rows = Array.prototype.slice.call(feedList.querySelectorAll(".row"))
+      .filter(function (row) { return !row.dataset.ccDuplicate; });
+    if (rows.length === 0) return;
+    rows.forEach(function (row, i) {
+      if (row.dataset.ccOrigIdx == null) row.dataset.ccOrigIdx = String(i);
+    });
+    var keyed = rows.map(function (row) {
+      return { row: row, k: readStaticRowSortKeys(row), orig: parseInt(row.dataset.ccOrigIdx, 10) || 0 };
+    });
+    keyed.sort(function (a, b) {
+      if (SORT_MODE === "Score") {
+        var sa = a.k.score, sb = b.k.score;
+        if (isNaN(sa) && isNaN(sb)) return a.orig - b.orig;
+        if (isNaN(sa)) return 1;
+        if (isNaN(sb)) return -1;
+        return sb - sa;                   // desc
+      }
+      if (SORT_MODE === "Deadline") {
+        return a.k.days - b.k.days;       // asc — soonest first; Infinity stays last
+      }
+      if (SORT_MODE === "Posted") {
+        return a.orig - b.orig;           // no DOM signal — preserve original order
+      }
+      if (SORT_MODE === "Value") {
+        var va = a.k.value, vb = b.k.value;
+        if (isNaN(va) && isNaN(vb)) return a.orig - b.orig;
+        if (isNaN(va)) return 1;
+        if (isNaN(vb)) return -1;
+        return vb - va;                   // desc
+      }
+      return 0;
+    });
+    // appendChild on an in-DOM element moves it. Iterate in sorted order →
+    // each row gets pushed to the end → final DOM order matches keyed[].
+    keyed.forEach(function (item) { feedList.appendChild(item.row); });
+  }
+
   function wireSortAndView() {
     document.querySelectorAll(".sort-pill").forEach(function (sp) {
       if (sp.dataset.ccWired) return;
@@ -278,9 +446,15 @@
         var next = modes[(modes.indexOf(cur) + 1) % modes.length] || "Score";
         valEl.textContent = next;
         SORT_MODE = next;
-        ALL_OPPS = sortOpps(ALL_OPPS);
-        VISIBLE_COUNT = 20;
-        applyFilters();
+        if (ALL_OPPS && ALL_OPPS.length) {
+          // Live-data path — sort the array + re-render
+          ALL_OPPS = sortOpps(ALL_OPPS);
+          VISIBLE_COUNT = 20;
+          applyFilters();
+        } else {
+          // Static-feed path — reorder existing DOM rows in place
+          sortStaticRows();
+        }
       });
     });
     document.querySelectorAll('.view-seg button[data-value]').forEach(function (btn) {
@@ -417,8 +591,13 @@
   }
 
   function filterRowsByQuery(q) {
+    dedupeStaticRows();
     var visible = 0, total = 0;
     document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      if (row.dataset.ccDuplicate) {
+        row.style.display = "none";
+        return;
+      }
       total++;
       var hay = "";
       var rid = row.querySelector(".row-id");
@@ -586,12 +765,22 @@
       sbBadges[0].textContent = String(data.auditTotal);
     }
 
+    // Wire ALL interactions unconditionally — every button/chip/tile must be
+    // live regardless of whether we replace the feed or keep the static design.
     wireInteractions();
 
-    // Always render from live API data — no static-feed fallback path. Rows
-    // without a compliance_score show the urgency-tier color in the score
-    // chip and "—"/"Pending" in place of a number (buildRow handles this).
-    ALL_OPPS = sortOpps(data.opportunities || []);
+    var opps = data.opportunities || [];
+    var hasScored = opps.some(function (o) { return o && o.compliance_score != null; });
+    if (!hasScored) {
+      // No AI verdict yet — leave the static design rows in place but dedupe
+      // them first (the design HTML duplicates each unique row 6×). Chips,
+      // sort, and search then operate on the 9 unique rows.
+      dedupeStaticRows();
+      console.log("[cc-live] no scored rows — keeping static feed (deduped + interactions wired)");
+      return;
+    }
+
+    ALL_OPPS = sortOpps(opps);
     applyFilters(); // also re-wires row actions on the freshly-injected rows
 
     console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
