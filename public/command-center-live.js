@@ -96,14 +96,14 @@
       + '<div class="score ' + sClass + '"><div class="v">' + sValue + '</div><div class="l">' + sLabel + '</div></div>'
       + '<div class="row-body">'
       + '<div class="row-top"><span class="row-id">' + id + '</span><span class="row-title">' + title.slice(0, 80) + '</span></div>'
-      + '<div class="compact-sub">' + id + ' · ' + agency + '</div>'
+      + '<div class="compact-sub">' + id + '</div>'
       + '<div class="row-meta">'
       + '<span class="' + docCls + '">' + docTxt + '</span>'
       + naics + sa
       + '</div>'
       + '<div class="row-agency one-line"><span class="agency-name">' + agency + '</span>' + agencySub + '</div>'
-      + insight
       + '</div>'
+      + insight
       + '<div class="row-right">'
       + '<span class="deadline ' + dlCls + '">' + timeLeft(days) + '</span>'
       + value
