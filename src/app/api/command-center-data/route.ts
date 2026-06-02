@@ -51,7 +51,9 @@ export async function GET() {
       (typeof meta.name === "string" && meta.name) ||
       "";
     const emailLocal = user.email
-      ? user.email.split("@")[0].replace(/[._\-]/g, " ")
+      ? user.email.split("@")[0]
+          .replace(/[._\-]/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase())
       : "";
     const fullName = (metaName || emailLocal || "User").replace(/\s+/g, " ").trim();
     const firstName = fullName.split(/\s+/)[0] || "User";
