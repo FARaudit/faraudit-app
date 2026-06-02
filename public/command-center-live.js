@@ -298,6 +298,79 @@
     });
   }
 
+  // Read sort keys from a static row's existing DOM content. Mirrors the
+  // shape of sortOpps() but pulls from text nodes the design already
+  // rendered (score, deadline, value). "Posted" has no DOM signal in the
+  // static markup — falls back to original DOM order (cached on first sort).
+  function readStaticRowSortKeys(row) {
+    var vEl = row.querySelector(".score .v");
+    var rawScore = vEl ? (vEl.textContent || "").trim() : "";
+    var score = /^\d+$/.test(rawScore) ? parseInt(rawScore, 10) : NaN;
+
+    var dlEl = row.querySelector(".deadline");
+    var dlTxt = dlEl ? (dlEl.textContent || "").trim().toLowerCase() : "";
+    var days;
+    if (!dlTxt || dlTxt === "—") days = Infinity;
+    else if (dlTxt.indexOf("expired") !== -1) days = Infinity; // expired → last on asc
+    else if (dlTxt === "today") days = 0;
+    else {
+      var mD = dlTxt.match(/(\d+)\s*d/);
+      var mH = dlTxt.match(/(\d+)\s*h/);
+      if (mD)      days = parseInt(mD[1], 10);
+      else if (mH) days = parseInt(mH[1], 10) / 24;
+      else         days = Infinity;
+    }
+
+    var vvEl = row.querySelector(".row-value");
+    var vTxt = vvEl ? (vvEl.textContent || "").trim() : "";
+    var value = NaN;
+    var mM = vTxt.match(/\$?([\d.]+)\s*M/i);
+    var mK = vTxt.match(/\$?([\d.]+)\s*K/i);
+    if (mM)      value = parseFloat(mM[1]) * 1e6;
+    else if (mK) value = parseFloat(mK[1]) * 1e3;
+
+    return { score: score, days: days, value: value };
+  }
+
+  function sortStaticRows() {
+    var feedList = document.querySelector(".feed-list");
+    if (!feedList) return;
+    var rows = Array.prototype.slice.call(feedList.querySelectorAll(".row"));
+    if (rows.length === 0) return;
+    rows.forEach(function (row, i) {
+      if (row.dataset.ccOrigIdx == null) row.dataset.ccOrigIdx = String(i);
+    });
+    var keyed = rows.map(function (row) {
+      return { row: row, k: readStaticRowSortKeys(row), orig: parseInt(row.dataset.ccOrigIdx, 10) || 0 };
+    });
+    keyed.sort(function (a, b) {
+      if (SORT_MODE === "Score") {
+        var sa = a.k.score, sb = b.k.score;
+        if (isNaN(sa) && isNaN(sb)) return a.orig - b.orig;
+        if (isNaN(sa)) return 1;
+        if (isNaN(sb)) return -1;
+        return sb - sa;                   // desc
+      }
+      if (SORT_MODE === "Deadline") {
+        return a.k.days - b.k.days;       // asc — soonest first; Infinity stays last
+      }
+      if (SORT_MODE === "Posted") {
+        return a.orig - b.orig;           // no DOM signal — preserve original order
+      }
+      if (SORT_MODE === "Value") {
+        var va = a.k.value, vb = b.k.value;
+        if (isNaN(va) && isNaN(vb)) return a.orig - b.orig;
+        if (isNaN(va)) return 1;
+        if (isNaN(vb)) return -1;
+        return vb - va;                   // desc
+      }
+      return 0;
+    });
+    // appendChild on an in-DOM element moves it. Iterate in sorted order →
+    // each row gets pushed to the end → final DOM order matches keyed[].
+    keyed.forEach(function (item) { feedList.appendChild(item.row); });
+  }
+
   function wireSortAndView() {
     document.querySelectorAll(".sort-pill").forEach(function (sp) {
       if (sp.dataset.ccWired) return;
@@ -311,12 +384,14 @@
         var next = modes[(modes.indexOf(cur) + 1) % modes.length] || "Score";
         valEl.textContent = next;
         SORT_MODE = next;
-        // Re-sort + re-render only if we actually have live data driving the feed.
-        // Static rows can't be re-ordered without DOM rewrites we want to avoid.
         if (ALL_OPPS && ALL_OPPS.length) {
+          // Live-data path — sort the array + re-render
           ALL_OPPS = sortOpps(ALL_OPPS);
           VISIBLE_COUNT = 20;
           applyFilters();
+        } else {
+          // Static-feed path — reorder existing DOM rows in place
+          sortStaticRows();
         }
       });
     });
