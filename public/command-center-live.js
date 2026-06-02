@@ -82,6 +82,14 @@
     return Math.ceil((new Date(dl) - Date.now()) / 864e5);
   }
 
+  // Emits the POST-IIFE design structure (the form the design's lift-out
+  // script at command-center-design.html:2497-2527 produces). The CSS grid
+  // at line 707 has areas `score/body/right` on row 1, `ins` spanning cols
+  // 2-3 on row 2, `acts` spanning cols 2-3 on row 3 — so insight and
+  // row-actions MUST be direct children of .row, not nested in row-body or
+  // row-right. row-id moves into row-meta (last child). badge.doc is
+  // duplicated into row-right (first child) so compact view's
+  // `[data-feed-view=compact] .row-right .badge.doc` selector matches.
   function buildRow(opp) {
     var hasScore = opp.compliance_score != null;
     var rawScore = opp.compliance_score || 0;
@@ -89,14 +97,9 @@
     var sClass = hasScore ? scoreClass(rawScore) : urgencyTier(days);
     var sValue = hasScore ? (rawScore || "--") : "—";
     var sLabel = hasScore ? scoreLabel(rawScore) : "Pending";
-    // Un-audited rows render the TODO chip (lightning bolt + days + Audit Now)
-    // instead of the standard score chip. Clickable → /audit.
     var scoreChip;
     if (hasScore) {
-      scoreChip = '<div class="score ' + sClass + '">'
-        + '<div class="v">' + sValue + '</div>'
-        + '<div class="l">' + sLabel + '</div>'
-        + '</div>';
+      scoreChip = '<div class="score ' + sClass + '"><div class="v">' + sValue + '</div><div class="l">' + sLabel + '</div></div>';
     } else {
       var uTier = todoUrgencyTier(days);
       var daysTxt = (days != null && days >= 0) ? String(days) : "—";
@@ -109,18 +112,20 @@
         + '<div class="tip">' + todoTipText(days) + '</div>'
         + '</div>';
     }
-    var rowCls = urgencyClass(days, opp.risk_level);
-    var dlCls  = deadlineTier(days);
-    var id     = opp.solicitation_number || opp.notice_id || "";
-    var agency = opp.agency || "";
-    var title  = opp.title || opp.title_plain || "Untitled";
-    var naics  = opp.naics_code ? '<span class="badge naics">NAICS ' + opp.naics_code + '</span>' : "";
-    var saCls  = setasideBadgeClass(opp.set_aside);
-    var sa     = saCls ? '<span class="' + saCls + '">' + opp.set_aside + '</span>' : "";
-    var docCls = docBadgeClass(opp.document_type);
-    var docTxt = opp.document_type || "RFQ";
-    var value  = opp.award_ceiling ? '<span class="row-value">' + fmtValue(opp.award_ceiling) + '</span>' : "";
-    var insight = opp.recommendation
+    var rowCls    = urgencyClass(days, opp.risk_level);
+    var dlCls     = deadlineTier(days);
+    var id        = opp.solicitation_number || opp.notice_id || "";
+    var agency    = opp.agency || "";
+    var subAgency = opp.incumbent_name || "";
+    var title     = (opp.title || opp.title_plain || "Untitled").slice(0, 80);
+    var naics     = opp.naics_code ? '<span class="badge naics">NAICS ' + opp.naics_code + '</span>' : "";
+    var saCls     = setasideBadgeClass(opp.set_aside);
+    var sa        = saCls ? '<span class="' + saCls + '">' + opp.set_aside + '</span>' : "";
+    var docCls    = docBadgeClass(opp.document_type);
+    var docTxt    = opp.document_type || "RFQ";
+    var docBadge  = '<span class="' + docCls + '">' + docTxt + '</span>';
+    var value     = opp.award_ceiling ? '<span class="row-value">' + fmtValue(opp.award_ceiling) + '</span>' : '<span class="row-value"></span>';
+    var insight   = opp.recommendation
       ? '<div class="insight ' + insightVariant(opp) + '">'
         + '<div class="ai-row">'
         + '<span class="ai-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg></span>'
@@ -129,28 +134,32 @@
         + '<div class="ai-desc">' + opp.recommendation.slice(0, 220) + '</div>'
         + '</div>'
       : "";
-    var agencySub = opp.incumbent_name ? '<span class="agency-sub">' + opp.incumbent_name + '</span>' : '<span class="agency-sub"></span>';
+    // compact-sub matches design ROW 1 format: "{id} · {sub-agency}"
+    var compactSub = subAgency ? (id + " · " + subAgency) : id;
 
     return '<div class="' + rowCls + '">'
       + scoreChip
       + '<div class="row-body">'
-      + '<div class="row-top"><span class="row-id">' + id + '</span><span class="row-title">' + title.slice(0, 80) + '</span></div>'
-      + '<div class="compact-sub">' + id + '</div>'
-      + '<div class="row-meta">'
-      + '<span class="' + docCls + '">' + docTxt + '</span>'
-      + naics + sa
+      +   '<div class="row-top"><span class="row-title">' + title + '</span></div>'
+      +   '<div class="compact-sub">' + compactSub + '</div>'
+      +   '<div class="row-meta">'
+      +     docBadge
+      +     naics
+      +     sa
+      +     '<span class="row-id">' + id + '</span>'
+      +   '</div>'
+      +   '<div class="row-agency one-line"><span class="agency-name">' + agency + '</span><span class="agency-sub">' + subAgency + '</span></div>'
       + '</div>'
-      + '<div class="row-agency one-line"><span class="agency-name">' + agency + '</span>' + agencySub + '</div>'
+      + '<div class="row-right">'
+      +   docBadge
+      +   '<span class="deadline ' + dlCls + '">' + timeLeft(days) + '</span>'
+      +   value
       + '</div>'
       + insight
-      + '<div class="row-right">'
-      + '<span class="deadline ' + dlCls + '">' + timeLeft(days) + '</span>'
-      + value
       + '<div class="row-actions">'
-      + '<button class="a primary btn-audit-quick" data-id="' + (opp.id || "") + '">Open audit</button>'
-      + '<button class="a btn-pipeline" data-id="' + (opp.id || "") + '">Add to pipeline</button>'
-      + '<a class="a" href="/opportunities">View solicitation</a>'
-      + '</div>'
+      +   '<button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>'
+      +   '<button class="a">Add to pipeline</button>'
+      +   '<button class="a">View solicitation</button>'
       + '</div>'
       + '</div>';
   }
