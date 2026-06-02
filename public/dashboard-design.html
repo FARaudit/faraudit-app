@@ -468,7 +468,7 @@ function render(){
       <td class="right"><a class="view-link" href="/audit/${slug}">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>
     </tr>`;
   }).join('');
-  document.getElementById('visCount').textContent = vis+' of 15';
+  document.getElementById('visCount').textContent = vis+' of '+AUDITS.length;
 }
 
 /* filters */
@@ -490,6 +490,8 @@ document.querySelectorAll('th.sortable').forEach(th=>{
   });
 });
 
+window.AUDITS = AUDITS;
+window.__renderDashboard = render;
 render();
 </script>
 
@@ -512,5 +514,6 @@ render();
   });
 })();
 </script>
+<script src="/dashboard-live.js"></script>
 </body>
 </html>
