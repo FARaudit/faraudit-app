@@ -42,11 +42,16 @@ export interface PendingAudit {
 }
 
 export async function fetchPending(limit: number): Promise<PendingAudit[]> {
+  // Prioritize soonest-deadline non-expired rows so the daily cron burns its
+  // Claude budget on opportunities that still have time to bid. The prior
+  // "oldest-created first" order could surface already-expired rows when the
+  // queue had backlog.
   const { data, error } = await supabase
     .from("pending_audits")
     .select("*")
     .eq("status", "pending")
-    .order("created_at", { ascending: true })
+    .gt("response_deadline", new Date().toISOString())
+    .order("response_deadline", { ascending: true })
     .limit(limit);
   if (error) throw new Error(`fetchPending: ${error.message}`);
   return (data as PendingAudit[]) || [];
