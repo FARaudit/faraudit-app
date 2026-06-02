@@ -502,10 +502,16 @@
   function renderFreeStrip(data) {
     var strip = document.querySelector(".free-strip");
     if (!strip) return;
-    var used = typeof data.auditsUsedMonth === "number" ? data.auditsUsedMonth : null;
+    var rawUsed = typeof data.auditsUsedMonth === "number" ? data.auditsUsedMonth : null;
     var quota = typeof data.freeTierQuota === "number" ? data.freeTierQuota : null;
-    var pct = typeof data.freeTierPct === "number" ? data.freeTierPct : null;
-    if (used == null || quota == null) return;
+    var rawPct = typeof data.freeTierPct === "number" ? data.freeTierPct : null;
+    if (rawUsed == null || quota == null) return;
+    // Cap displayed values defensively — API already auto-bumps quota to
+    // match auditsUsedMonth, but this prevents "15 of 13 · 115%" if the
+    // API ever returns inconsistent fields (e.g., quota fixed at 13 while
+    // used = 15 due to stale subscription cache).
+    var used = Math.min(rawUsed, quota);
+    var pct = rawPct != null ? Math.min(100, Math.max(0, rawPct)) : null;
     var topLeft = strip.querySelector(".ft-top span:first-child");
     var topRight = strip.querySelector(".ft-top span:last-child");
     var bar = strip.querySelector(".ft-bar i");

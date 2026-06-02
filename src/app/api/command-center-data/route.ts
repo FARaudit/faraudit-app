@@ -182,11 +182,17 @@ export async function GET() {
     // Free Tier strip (approximation — no Stripe subscription read yet).
     // Treats free-tier monthly quota as a fixed 13 audits; "used" = audits
     // counted this month from counters. Stops the lie of static "8 of 13".
-    const FREE_TIER_QUOTA = 13;
+    // Quota = base monthly cap of 13, auto-bumped to never trail
+    // auditsUsedMonth so the UI never shows "15 of 13". When real Stripe
+    // subscription data lands, this becomes the actual plan quota.
+    const FREE_TIER_BASE = 13;
     const auditsUsedMonth = typeof counters.audits === "number"
       ? counters.audits
       : 0;
-    const freeTierPct = Math.min(100, Math.round((auditsUsedMonth / FREE_TIER_QUOTA) * 100));
+    const FREE_TIER_QUOTA = Math.max(FREE_TIER_BASE, auditsUsedMonth);
+    const freeTierPct = FREE_TIER_QUOTA > 0
+      ? Math.min(100, Math.round((auditsUsedMonth / FREE_TIER_QUOTA) * 100))
+      : 0;
 
     // .sb-badge.live on the Opportunities sidebar item — "Live" if SAM.gov
     // synced within the last 5 minutes, else "Stale". Computed from lastSync
