@@ -149,8 +149,9 @@
     var feedCount = document.querySelector(".feed-head h2 .count");
     if (feedCount) feedCount.textContent = visible.length + " of " + filtered.length;
 
-    // Newly-injected rows have no listeners — re-bind action buttons
+    // Newly-injected rows have no listeners — re-bind action buttons + row menu
     wireRowActions();
+    wireRowMenu();
 
     var existing = document.querySelector(".cc-load-more");
     if (existing) existing.remove();
@@ -297,11 +298,211 @@
   }
 
   function wireRecentAudits() {
+    var SOL_RE = /\b([A-Z0-9]{2,}-?[A-Z0-9]{2,}-[A-Z]-[A-Z0-9]{3,})\b/i;
     document.querySelectorAll(".qa-recent .qa-item").forEach(function (item) {
       if (item.dataset.ccWired) return;
       item.dataset.ccWired = "1";
       item.style.cursor = "pointer";
-      item.addEventListener("click", function () { window.location.href = "/dashboard"; });
+      item.addEventListener("click", function () {
+        var ttl = item.querySelector(".ttl");
+        var txt = ttl ? (ttl.textContent || "") : "";
+        var m = txt.match(SOL_RE);
+        if (m && m[1]) {
+          window.location.href = "/dashboard?audit=" + encodeURIComponent(m[1]);
+        } else {
+          window.location.href = "/dashboard";
+        }
+      });
+    });
+  }
+
+  function wireOpenFeed() {
+    document.querySelectorAll(".btn").forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      if (btn.classList.contains("ghost")) return;
+      var txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt.indexOf("open feed") !== 0) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function () { window.location.href = "/opportunities"; });
+    });
+  }
+
+  function wireFiltersButton() {
+    document.querySelectorAll(".btn.ghost").forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      var txt = (btn.textContent || "").trim().toLowerCase();
+      if (txt !== "filters") return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function () {
+        var fb = document.querySelector(".filter-bar");
+        if (!fb) return;
+        fb.style.display = (fb.style.display === "none") ? "" : "none";
+      });
+    });
+  }
+
+  function wireFieldPills() {
+    document.querySelectorAll(".field-pill").forEach(function (pill) {
+      if (pill.dataset.ccWired) return;
+      pill.dataset.ccWired = "1";
+      pill.style.cursor = "pointer";
+      pill.addEventListener("click", function (e) {
+        // Clear-X icon: clear instead of toggle
+        if (e.target && e.target.closest && e.target.closest(".fp-x")) {
+          pill.classList.remove("cc-active");
+          pill.style.outline = "";
+          pill.style.outlineOffset = "";
+          return;
+        }
+        // "Add filter" (+) pill → full filter UI on /opportunities
+        if (pill.classList.contains("add")) {
+          window.location.href = "/opportunities";
+          return;
+        }
+        var on = !pill.classList.contains("cc-active");
+        pill.classList.toggle("cc-active", on);
+        pill.style.outline = on ? "2px solid #2563eb" : "";
+        pill.style.outlineOffset = on ? "1px" : "";
+      });
+    });
+  }
+
+  function wireNotificationBell() {
+    document.querySelectorAll('.icon-btn[title="Notifications"]').forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function () { window.location.href = "/dashboard"; });
+    });
+  }
+
+  function wireSignOut() {
+    document.querySelectorAll(".sb-signout").forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      // Native <form action="/api/auth/sign-out" method="post"> wraps it — let
+      // the form submit work natively. We only wire here if there's NO parent
+      // form (defensive: in case the form was unwrapped by a layout change).
+      if (btn.closest('form[action="/api/auth/sign-out"]')) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        fetch("/api/auth/sign-out", { method: "POST", credentials: "include" })
+          .finally(function () { window.location.href = "/"; });
+      });
+    });
+  }
+
+  function filterRowsByQuery(q) {
+    var visible = 0, total = 0;
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      total++;
+      var hay = "";
+      var rid = row.querySelector(".row-id");
+      var rtitle = row.querySelector(".row-title");
+      var ragency = row.querySelector(".agency-name");
+      if (rid)     hay += " " + (rid.textContent || "");
+      if (rtitle)  hay += " " + (rtitle.textContent || "");
+      if (ragency) hay += " " + (ragency.textContent || "");
+      hay = hay.toLowerCase();
+      var show = !q || hay.indexOf(q) !== -1;
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    var countEl = document.querySelector(".feed-head h2 .count");
+    if (countEl) countEl.textContent = visible + " of " + total;
+  }
+
+  function wireSearch() {
+    document.querySelectorAll(".search").forEach(function (sb) {
+      if (sb.dataset.ccWired) return;
+      sb.dataset.ccWired = "1";
+      sb.style.cursor = "text";
+      sb.addEventListener("click", function () {
+        if (sb.querySelector(".cc-search-input")) return; // already converted
+        var placeholder = null;
+        sb.querySelectorAll("span").forEach(function (s) {
+          if (!s.classList.contains("kbd") && placeholder === null) placeholder = s;
+        });
+        if (!placeholder) return;
+        var input = document.createElement("input");
+        input.type = "text";
+        input.className = "cc-search-input";
+        input.placeholder = (placeholder.textContent || "").trim() || "Search…";
+        input.style.cssText = "background:transparent;border:none;outline:none;color:inherit;font:inherit;flex:1;min-width:0;padding:0;margin:0;";
+        placeholder.replaceWith(input);
+        input.focus();
+        input.addEventListener("keyup", function () {
+          filterRowsByQuery((input.value || "").trim().toLowerCase());
+        });
+      });
+    });
+  }
+
+  function wireUploadZone() {
+    document.querySelectorAll(".qa-drop").forEach(function (drop) {
+      if (drop.dataset.ccWired) return;
+      drop.dataset.ccWired = "1";
+      // Strip inline onclick="location.href='/audit'" so we can intercept
+      drop.onclick = null;
+      drop.removeAttribute("onclick");
+      drop.style.cursor = "pointer";
+      drop.addEventListener("click", function () {
+        var input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".pdf,.docx,.doc";
+        input.style.display = "none";
+        input.addEventListener("change", function () {
+          window.location.href = "/audit";
+        });
+        document.body.appendChild(input);
+        input.click();
+        // Cleanup if user cancels the picker (no change fired)
+        setTimeout(function () { if (input.parentNode) input.remove(); }, 120000);
+      });
+    });
+  }
+
+  function wireAccountIntelMetrics() {
+    document.querySelectorAll(".ai2 .m").forEach(function (m) {
+      if (m.dataset.ccWired) return;
+      m.dataset.ccWired = "1";
+      m.style.cursor = "pointer";
+      m.addEventListener("click", function () { window.location.href = "/dashboard"; });
+    });
+  }
+
+  function wireRowMenu() {
+    // .row-menu is injected by the design's own IIFE on page load (line ~3712)
+    // for static rows. Live rows replaced by buildRow() won't have it — inject
+    // one if missing, then bind navigation. Idempotent via dataset.ccWired.
+    var MENU_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      var btn = row.querySelector(".row-menu");
+      if (!btn) {
+        btn = document.createElement("button");
+        btn.className = "row-menu";
+        btn.type = "button";
+        btn.setAttribute("aria-label", "More options");
+        btn.innerHTML = MENU_SVG;
+        row.appendChild(btn);
+      }
+      if (btn.dataset.ccWired) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var idEl = row.querySelector(".row-id");
+        var solId = idEl ? (idEl.textContent || "").trim() : "";
+        if (solId) {
+          window.location.href = "/opportunities?focus=" + encodeURIComponent(solId);
+        } else {
+          window.location.href = "/opportunities";
+        }
+      });
     });
   }
 
@@ -312,6 +513,15 @@
     wireSortAndView();
     wireViewAllPursuits();
     wireRecentAudits();
+    wireOpenFeed();
+    wireFiltersButton();
+    wireFieldPills();
+    wireNotificationBell();
+    wireSignOut();
+    wireSearch();
+    wireUploadZone();
+    wireAccountIntelMetrics();
+    wireRowMenu();
   }
 
   async function wireCommandCenter() {
