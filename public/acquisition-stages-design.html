@@ -1,115 +1,208 @@
-<!DOCTYPE html>
-<html lang="en" data-sb="open">
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
 <title>FARaudit — Acquisition Stages</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --navy:#0A1628;--navy2:#0D1F35;--blue:#185FA5;--mid:#378ADD;
-  --light:#B5D4F4;--pale:#E6F1FB;
-  --page-bg:#f0f4f8;--card:#ffffff;
-  --text:#1f2937;--muted:#6b7280;--subtle:#9ca3af;
-  --border:#e5e7eb;--border2:#d1d5db;
-  --green-bg:#dcfce7;--green-txt:#166534;
-  --amber-bg:#fef3c7;--amber-txt:#92400e;
-  --red-bg:#fee2e2;--red-txt:#991b1b;
-  --radius:8px;--radius-lg:12px;
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Acquisition Stages — lifecycle intelligence map
+   Shares the canonical token chain, sidebar, and topbar.
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
 }
-body{font-family:'Manrope',system-ui,-apple-system,sans-serif;background:var(--page-bg);color:var(--text);display:flex;min-height:100vh}
+[data-theme="light"]{
+  --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+}
 
-/* ── Sidebar ── */
-.sidebar{width:220px;min-height:100vh;background:var(--navy);display:flex;flex-direction:column;padding:0;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100}
-.sb-logo{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;border-bottom:.5px solid rgba(255,255,255,.08)}
-.sb-logo-mark{width:32px;height:32px;background:var(--mid);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
-.sb-logo-text{font-size:16px;font-weight:700;color:#e2e8f2;letter-spacing:-.01em}.sb-logo-text span{color:var(--mid)}
-.sb-section{padding:16px 12px 4px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)}
-.sb-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin:1px 8px;cursor:pointer;text-decoration:none;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:all .15s;position:relative}
-.sb-item:hover{background:rgba(255,255,255,.06);color:#e2e8f2}
-.sb-item.active{background:rgba(55,138,221,.15);color:var(--mid)}
-.sb-badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(55,138,221,.2);color:var(--mid)}
-.sb-badge.red{background:rgba(239,68,68,.2);color:#f87171}
-.sb-badge.green{background:rgba(34,197,94,.2);color:#4ade80}
-.sb-divider{height:.5px;background:rgba(255,255,255,.06);margin:8px 16px}
-.sb-item svg{width:16px;height:16px;opacity:.7;flex-shrink:0}
-.sb-item.active svg{opacity:1}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 
-/* ── Main ── */
-.main{flex:1;display:flex;flex-direction:column;min-height:100vh}
-.topbar{height:56px;background:var(--card);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;position:sticky;top:0;z-index:50}
-.topbar-breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
-.topbar-breadcrumb span{color:var(--text);font-weight:600}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
-.topbar-search{display:flex;align-items:center;gap:8px;background:var(--page-bg);border:.5px solid var(--border2);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--muted);width:260px}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+.main{display:flex;flex-direction:column;min-width:0}
 
-/* ── Content ── */
-.content{padding:28px 32px;flex:1}
-.page-header{margin-bottom:24px}
-.page-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.page-title{font-size:26px;font-weight:700;color:var(--navy);margin-bottom:4px}
-.page-sub{font-size:13px;color:var(--muted)}
+/* topbar (canonical) */
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;position:sticky;top:0;z-index:40;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:360px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
 
-/* ── Stage Rail ── */
-.stage-rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:20px}
-.stage-pip{border:.5px solid var(--border2);border-radius:var(--radius);padding:12px 8px;cursor:pointer;background:var(--card);transition:all .15s;text-align:center;position:relative}
-.stage-pip:hover{border-color:var(--mid);background:var(--pale)}
-.stage-pip.active{border-color:var(--mid);background:var(--navy);color:#e2e8f2}
-.stage-pip.faraudit{border-left:3px solid var(--mid)}
-.stage-pip.inactive{opacity:.5}
-.pip-num{font-size:9px;font-weight:700;letter-spacing:.06em;color:var(--subtle);margin-bottom:4px}
-.stage-pip.active .pip-num{color:var(--light)}
-.pip-name{font-size:10px;font-weight:600;line-height:1.3;color:var(--text)}
-.stage-pip.active .pip-name{color:#e2e8f2}
-.pip-indicator{width:6px;height:6px;border-radius:50%;background:var(--mid);margin:6px auto 0}
-.stage-pip:not(.faraudit) .pip-indicator{background:var(--border2)}
+/* ═══ CONTENT ═══ */
+.body{flex:1;padding:30px 36px 60px;max-width:1320px;width:100%;margin:0 auto}
 
-/* ── Coverage bar ── */
-.coverage-bar{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius);padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px}
-.coverage-stat{font-size:22px;font-weight:700;color:var(--navy)}
-.coverage-label{font-size:12px;color:var(--muted)}
-.coverage-pill{background:var(--green-bg);color:var(--green-txt);font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;margin-left:auto}
+/* page header */
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px}
+.ph-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.ph-title{margin:0 0 8px;font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:38px;letter-spacing:-.02em;line-height:1.04;color:var(--ink)}
+.ph-sub{margin:0;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.6;color:var(--mute);max-width:560px}
+.ph-sub b{color:var(--ink-2);font-weight:600}
 
-/* ── Stage Detail ── */
-.stage-detail{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.detail-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px}
-.detail-card.fa-card{border-color:var(--light);background:var(--pale)}
-.detail-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px}
-.fa-label{background:var(--navy);color:var(--light);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:10px}
-.detail-headline{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px}
-.detail-body{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px}
-.item-list{display:flex;flex-direction:column;gap:5px}
-.item-row{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text);line-height:1.5}
-.item-dot{width:4px;height:4px;border-radius:50%;background:var(--mid);flex-shrink:0;margin-top:6px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.chip{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600}
-.chip-output{background:var(--card);border:.5px solid var(--light);color:var(--blue)}
-.chip-green{background:var(--green-bg);color:var(--green-txt)}
+/* coverage scoreboard */
+.scoreboard{display:flex;gap:0;background:linear-gradient(160deg,var(--navy-800),var(--navy-900));border:1px solid var(--navy-700);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-pop);flex-shrink:0}
+.sbx{padding:14px 20px;display:flex;flex-direction:column;gap:3px;position:relative}
+.sbx + .sbx{border-left:1px solid rgba(255,255,255,.08)}
+.sbx-num{font-family:"IBM Plex Mono",monospace;font-size:23px;font-weight:600;color:#fff;letter-spacing:-.01em;line-height:1}
+.sbx-num .of{color:var(--accent-light);font-size:14px;font-weight:500}
+.sbx-lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.04em;color:#8aa0bd;text-transform:uppercase;max-width:150px;line-height:1.4}
+.sbx-live{position:absolute;top:14px;right:18px;display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;color:#6ee7b7}
+.sbx-live::before{content:"";width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
 
-/* ── Clauses + Risks ── */
-.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.bottom-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
-.bottom-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px}
-.clause-row{display:flex;gap:10px;padding:6px 0;border-bottom:.5px solid var(--border);align-items:flex-start;font-size:11px}
-.clause-row:last-child{border-bottom:none}
-.clause-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue);font-weight:600;min-width:110px;flex-shrink:0}
-.clause-title{color:var(--text);line-height:1.4;flex:1}
-.clause-badge{font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;flex-shrink:0}
-.badge-trap{background:var(--red-bg);color:var(--red-txt)}
-.badge-req{background:var(--amber-bg);color:var(--amber-txt)}
-.badge-ref{background:#f3f4f6;color:var(--muted)}
-.risk-row{padding:8px 10px;border-radius:6px;margin-bottom:6px;font-size:11px}
+/* ═══ LIFECYCLE TIMELINE ═══ */
+.section-bar{display:flex;align-items:center;gap:12px;margin:34px 0 22px}
+.section-bar .t{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
+.section-bar .rule{height:1px;flex:1;background:var(--line)}
+.section-bar .legend{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.lg-item{display:flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--mute);text-transform:uppercase}
+.lg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.lg-dot.covered{background:var(--accent)}
+.lg-dot.active{background:var(--navy-800);box-shadow:0 0 0 2px var(--accent)}
+.lg-dot.road{background:transparent;border:1.5px dashed var(--mute-2)}
+
+.lifecycle{position:relative;padding:8px 0 4px}
+.lc-track{position:absolute;left:0;right:0;top:38px;height:2px;background:var(--line);border-radius:2px}
+.lc-track .cover{position:absolute;left:6.25%;width:81.25%;height:100%;background:linear-gradient(90deg,var(--accent-light),var(--accent));border-radius:2px}
+.lc-track .cover::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid var(--accent)}
+.lc-nodes{position:relative;display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.lc-node{background:transparent;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;font:inherit}
+.lc-marker{width:30px;height:30px;border-radius:50%;background:var(--card);border:2px solid var(--accent);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--accent-deep);position:relative;z-index:2;transition:transform .16s,box-shadow .16s,background .16s,color .16s}
+.lc-node:hover .lc-marker{transform:scale(1.08)}
+.lc-node.road .lc-marker{border-style:dashed;border-color:var(--mute-2);color:var(--mute);background:var(--card)}
+.lc-node.active .lc-marker{background:var(--navy-800);border-color:var(--navy-800);color:#fff;transform:scale(1.18);box-shadow:0 0 0 4px rgba(55,138,221,.18),var(--shadow)}
+.lc-node.road.active .lc-marker{background:var(--navy-800);border-color:var(--navy-800)}
+.lc-marker .chk{position:absolute;right:-5px;bottom:-5px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--card);display:grid;place-items:center}
+.lc-marker .chk svg{width:8px;height:8px;color:#fff}
+.lc-node.road .lc-marker .chk{display:none}
+.lc-node.active .lc-marker .chk{background:var(--green-500)}
+.lc-cap{display:flex;flex-direction:column;gap:2px;padding:0 2px}
+.lc-stage{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--mute-2);text-transform:uppercase}
+.lc-name{font-size:11.5px;font-weight:700;line-height:1.25;color:var(--ink-2);letter-spacing:-.005em}
+.lc-node.active .lc-name{color:var(--accent-deep)}
+[data-theme="dark"] .lc-node.active .lc-name{color:var(--accent-light)}
+.lc-node.road .lc-name{color:var(--mute)}
+
+/* ═══ STAGE DETAIL ═══ */
+.detail{margin-top:30px}
+.detail-hero{display:flex;align-items:flex-start;gap:18px;margin-bottom:20px}
+.dh-index{flex-shrink:0;width:62px;height:62px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 10px 22px -8px rgba(55,138,221,.55)}
+.dh-index .s{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;letter-spacing:.14em;opacity:.8}
+.dh-index .n{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:600;line-height:1}
+.dh-index.road{background:linear-gradient(135deg,#64748b,#334155);box-shadow:none}
+.dh-meta{min-width:0;padding-top:2px}
+.dh-name{font-family:"Fraunces",serif;font-style:italic;font-weight:600;font-size:27px;letter-spacing:-.015em;color:var(--ink);line-height:1.1;margin:0 0 7px}
+.dh-sub{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;color:var(--mute)}
+.dh-sub .tag{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 9px;color:var(--ink-2);font-weight:600;letter-spacing:.01em}
+.dh-nav{margin-left:auto;display:flex;gap:8px;flex-shrink:0;padding-top:6px}
+.dh-navbtn{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:border-color .14s,background .14s,color .14s}
+.dh-navbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent-deep)}
+.dh-navbtn:disabled{opacity:.35;cursor:not-allowed}
+.dh-navbtn svg{width:16px;height:16px}
+
+/* split: government vs faraudit */
+.split{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-bottom:16px}
+.panel{border-radius:16px;padding:22px 24px}
+.panel-gov{background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+.panel-head{display:flex;align-items:center;gap:9px;margin-bottom:16px}
+.panel-tag{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:6px}
+.panel-gov .panel-tag{background:var(--line-3);color:var(--mute);border:1px solid var(--line)}
+.panel-head .ph-h{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.gov-list{display:flex;flex-direction:column;gap:0}
+.gov-row{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:13px;line-height:1.45;color:var(--ink-2)}
+.gov-row:last-child{border-bottom:0;padding-bottom:0}
+.gov-row:first-child{padding-top:0}
+.gov-tick{flex-shrink:0;width:18px;height:18px;border-radius:6px;background:var(--line-3);border:1px solid var(--line);display:grid;place-items:center;margin-top:1px}
+.gov-tick svg{width:11px;height:11px;color:var(--mute)}
+
+.panel-fa{background:linear-gradient(165deg,var(--navy-800),var(--navy-900));border:1px solid var(--navy-700);box-shadow:var(--shadow-pop);color:#e8eef6;position:relative;overflow:hidden}
+.panel-fa::before{content:"";position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.22),transparent 70%);pointer-events:none}
+.panel-fa .panel-tag{background:rgba(55,138,221,.18);color:var(--accent-light);border:1px solid rgba(55,138,221,.35);display:inline-flex;align-items:center;gap:5px;position:relative}
+.panel-fa .panel-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.panel-fa .ph-h{color:#fff}
+.fa-headline{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:18px;line-height:1.35;color:#fff;margin:0 0 12px;letter-spacing:-.01em;position:relative}
+.fa-body{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.7;color:#aebbcf;margin:0 0 18px;position:relative}
+.fa-microlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7d8ba0;margin-bottom:9px;position:relative}
+.chips{display:flex;flex-wrap:wrap;gap:6px;position:relative}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.01em;padding:4px 10px;border-radius:7px;line-height:1.3}
+.chip-out{background:rgba(255,255,255,.05);border:1px solid rgba(181,212,244,.22);color:#cfe0f4}
+.chip-win{background:rgba(16,185,129,.13);border:1px solid rgba(16,185,129,.3);color:#86efac;display:inline-flex;align-items:center;gap:5px}
+.chip-win svg{width:10px;height:10px}
+.fa-outcomes{margin-top:16px;position:relative}
+
+/* bottom grid */
+.bottom{display:grid;grid-template-columns:1.25fr 1fr;gap:16px}
+.bcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow-sm)}
+.bcard-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bcard-title{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.bcard-title svg{width:15px;height:15px;color:var(--accent-deep)}
+.bcard-count{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+.clause-row{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line-2)}
+.clause-row:last-child{border-bottom:0;padding-bottom:0}
+.clause-num{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);font-weight:600;min-width:118px;flex-shrink:0;letter-spacing:-.01em}
+[data-theme="dark"] .clause-num{color:var(--accent-light)}
+.clause-title{color:var(--ink-2);line-height:1.5;flex:1;font-size:12.5px}
+.clause-badge{font-family:"IBM Plex Mono",monospace;font-size:8.5px;padding:3px 7px;border-radius:6px;font-weight:700;flex-shrink:0;letter-spacing:.04em;text-transform:uppercase;line-height:1.2}
+.badge-trap{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.badge-req{background:var(--amber-50);color:var(--amber-800);border:1px solid var(--amber-200)}
+.badge-ref{background:var(--line-3);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .badge-trap{background:rgba(220,38,38,.14);border-color:rgba(220,38,38,.3)}
+[data-theme="dark"] .badge-req{background:rgba(217,119,6,.14);border-color:rgba(217,119,6,.3);color:#fcd34d}
+.risk-row{padding:13px 14px;border-radius:11px;margin-bottom:10px;border:1px solid}
 .risk-row:last-child{margin-bottom:0}
-.risk-row.p0{background:#fff1f2;border:.5px solid #fecdd3}
-.risk-row.p1{background:var(--amber-bg);border:.5px solid #fde68a}
-.risk-title{font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between}
-.risk-desc{color:var(--muted);line-height:1.5;font-size:10px}
-.sev{font-size:9px;padding:1px 6px;border-radius:6px;font-weight:700}
-.sev-p0{background:var(--red-bg);color:var(--red-txt)}
-.sev-p1{background:var(--amber-bg);color:var(--amber-txt)}
+.risk-row.p0{background:var(--red-50);border-color:var(--red-200)}
+.risk-row.p1{background:var(--amber-50);border-color:var(--amber-200)}
+[data-theme="dark"] .risk-row.p0{background:rgba(220,38,38,.1);border-color:rgba(220,38,38,.28)}
+[data-theme="dark"] .risk-row.p1{background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.28)}
+.risk-title{font-weight:700;color:var(--ink);margin-bottom:5px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-size:12.5px;line-height:1.4}
+.risk-desc{color:var(--ink-2);line-height:1.55;font-size:11.5px}
+.sev{font-family:"IBM Plex Mono",monospace;font-size:8.5px;padding:2px 7px;border-radius:5px;font-weight:700;flex-shrink:0;letter-spacing:.05em;line-height:1.3}
+.sev-p0{background:var(--red-600);color:#fff}
+.sev-p1{background:var(--amber-600);color:#fff}
+.empty{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);font-style:italic;padding:6px 0}
 
-/* ── canonical toggle sidebar — collapsed icon-rail + expanded labels (2026-05-29 v2) ── */
+@media (max-width:1180px){
+  .split{grid-template-columns:1fr}
+  .bottom{grid-template-columns:1fr}
+  .lc-name{font-size:10px}
+}
+
+/* ── canonical toggle sidebar — collapsed icon-rail + expanded labels ── */
 :root{--sb-width:56px}
 [data-sb="open"]{--sb-width:232px}
 .sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
@@ -160,8 +253,10 @@ body{font-family:'Manrope',system-ui,-apple-system,sans-serif;background:var(--p
 </head>
 <body>
 
-<!-- Sidebar -->
-<aside class="sidebar">
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR ═════════════ -->
+  <aside class="sidebar">
   <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
   <div class="sb-group-label">WORKSPACE</div>
@@ -192,54 +287,82 @@ body{font-family:'Manrope',system-ui,-apple-system,sans-serif;background:var(--p
   <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
 </aside>
 
-<!-- Main -->
-<div class="main">
-  <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-breadcrumb">Acquisition Stages <span>/ Lifecycle Intelligence</span></div>
-    <div class="topbar-right">
-      <div class="topbar-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search stages, clauses, risks...</div>
-      <div class="user-avatar">JR</div>
-    </div>
-  </div>
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
 
-  <!-- Content -->
-  <div class="content">
-    <div class="page-header">
-      <div class="page-label">Workspace</div>
-      <div class="page-title">Acquisition Stages</div>
-      <div class="page-sub">The complete federal acquisition lifecycle — where FARaudit gives you the edge at every stage</div>
-    </div>
-
-    <!-- Coverage bar -->
-    <div class="coverage-bar">
-      <div>
-        <div class="coverage-stat">7 of 8</div>
-        <div class="coverage-label">stages covered by FARaudit</div>
+    <!-- topbar -->
+    <div class="topbar">
+      <div class="crumbs"><b>Acquisition Stages</b><span class="sep">/</span><span>Lifecycle Intelligence</span></div>
+      <span class="live-pill">LIVE</span>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Search stages, clauses, risks…</span>
+        <span class="kbd">⌘K</span>
       </div>
-      <div style="width:1px;height:36px;background:var(--border);margin:0 8px"></div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:var(--navy)">60–90 day head start</div>
-        <div class="coverage-label">FARaudit starts at Stage 01, before competitors see the solicitation</div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
+          <span class="nbadge">7</span>
+        </button>
+        <div class="user-chip">
+          <div class="av">JR</div>
+          <div><div class="nm">Jose Rodriguez</div></div>
+        </div>
       </div>
-      <div class="coverage-pill">● Active coverage</div>
     </div>
 
-    <!-- Stage Rail -->
-    <div class="stage-rail" id="rail">
-      <div class="stage-pip faraudit" onclick="selectStage(0)" id="pip-0"><div class="pip-num">01</div><div class="pip-name">Pre-Sol Synopsis</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="selectStage(1)" id="pip-1"><div class="pip-num">02</div><div class="pip-name">Sources Sought / RFI</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit active" onclick="selectStage(2)" id="pip-2"><div class="pip-num">03</div><div class="pip-name">Solicitation Drops</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="selectStage(3)" id="pip-3"><div class="pip-num">04</div><div class="pip-name">Proposal Dev</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="selectStage(4)" id="pip-4"><div class="pip-num">05</div><div class="pip-name">Submission</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="selectStage(5)" id="pip-5"><div class="pip-num">06</div><div class="pip-name">Evaluation</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip faraudit" onclick="selectStage(6)" id="pip-6"><div class="pip-num">07</div><div class="pip-name">Award</div><div class="pip-indicator"></div></div>
-      <div class="stage-pip inactive" onclick="selectStage(7)" id="pip-7"><div class="pip-num">08</div><div class="pip-name">Post-Award</div><div class="pip-indicator" style="background:var(--border2)"></div></div>
-    </div>
+    <!-- content -->
+    <div class="body">
 
-    <!-- Stage Detail (dynamic) -->
-    <div id="stage-detail"></div>
-  </div>
+      <!-- page header + scoreboard -->
+      <div class="page-head">
+        <div>
+          <p class="ph-eyebrow">Workspace · Lifecycle Map</p>
+          <h1 class="ph-title">The Federal Acquisition Lifecycle</h1>
+          <p class="ph-sub">Eight stages from synopsis to closeout. FARaudit gives you the edge at <b>every stage you can still win from</b> — starting 60–90 days before competitors see the solicitation.</p>
+        </div>
+        <div class="scoreboard">
+          <div class="sbx">
+            <div class="sbx-num">7<span class="of">&nbsp;/&nbsp;8</span></div>
+            <div class="sbx-lbl">Stages covered<br>by FARaudit</div>
+          </div>
+          <div class="sbx">
+            <div class="sbx-num">60–90</div>
+            <div class="sbx-lbl">Day head start<br>before competitors</div>
+          </div>
+          <div class="sbx">
+            <div class="sbx-num">01</div>
+            <div class="sbx-lbl">Entry point —<br>pre-solicitation</div>
+            <div class="sbx-live">COVERAGE ACTIVE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- lifecycle timeline -->
+      <div class="section-bar">
+        <span class="t">Select a stage</span>
+        <span class="rule"></span>
+        <div class="legend">
+          <span class="lg-item"><span class="lg-dot covered"></span>FARaudit coverage</span>
+          <span class="lg-item"><span class="lg-dot active"></span>Selected</span>
+          <span class="lg-item"><span class="lg-dot road"></span>Roadmap</span>
+        </div>
+      </div>
+
+      <div class="lifecycle">
+        <div class="lc-track"><div class="cover"></div></div>
+        <div class="lc-nodes" id="nodes"></div>
+      </div>
+
+      <!-- stage detail (dynamic) -->
+      <div class="detail" id="detail"></div>
+
+    </div>
+  </main>
 </div>
 
 <script>
@@ -315,7 +438,7 @@ const STAGES = [
     risks:[{sev:'p1',title:'Wrong WAWF document type — payment delay',desc:'Physical deliverables require Combo document type. Using Invoice 2in1 triggers rejection and restarts the 30-day payment clock.'},{sev:'p1',title:'Missing base access form — delivery blocked at gate',desc:'5352.242-9000 requires written request on company letterhead with employee names before delivery.'}]
   },
   {
-    num:'08', name:'Post-Award', sub:'Contract administration · Modifications · Recompete prep',
+    num:'08', name:'Post-Award', sub:'Contract administration · Modifications · Recompete prep', road:true,
     headline:'FARaudit coverage at this stage is roadmap',
     what:['Contract administration and modification tracking','Past performance record building','Incumbent advantage analysis for recompete','Final deliverable acceptance and closeout'],
     fa:'Post-award intelligence is on the FARaudit roadmap. Recompete alerting (180 days out) is live at Stage 07. Full contract administration monitoring and modification tracking are planned for Phase 2 of the corpus build.',
@@ -326,64 +449,112 @@ const STAGES = [
   }
 ];
 
+// short labels for the rail
+const SHORT = ['Pre-Sol Synopsis','Sources Sought / RFI','Solicitation Drops','Proposal Dev','Submission','Evaluation','Award','Post-Award'];
+
 let active = 2;
 
-function selectStage(i) {
-  active = i;
-  document.querySelectorAll('.stage-pip').forEach((p,idx) => {
-    p.classList.toggle('active', idx===i);
-  });
+/* build rail */
+(function buildNodes(){
+  const wrap = document.getElementById('nodes');
+  wrap.innerHTML = STAGES.map((s,i)=>`
+    <button class="lc-node${s.road?' road':''}" data-i="${i}" type="button">
+      <span class="lc-marker">${s.num}<span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span></span>
+      <span class="lc-cap"><span class="lc-stage">Stage ${s.num}</span><span class="lc-name">${SHORT[i]}</span></span>
+    </button>`).join('');
+  wrap.querySelectorAll('.lc-node').forEach(n=>n.addEventListener('click',()=>selectStage(+n.dataset.i)));
+})();
+
+function selectStage(i){
+  active = Math.max(0, Math.min(STAGES.length-1, i));
+  document.querySelectorAll('.lc-node').forEach((n,idx)=>n.classList.toggle('active', idx===active));
   render();
 }
 
 function badgeClass(b){return b==='trap'?'badge-trap':b==='req'?'badge-req':'badge-ref';}
-function badgeLabel(b){return b==='trap'?'TRAP':b==='req'?'Required':'Reference';}
+function badgeLabel(b){return b==='trap'?'Trap':b==='req'?'Required':'Reference';}
 
-function render() {
+function render(){
   const s = STAGES[active];
-  const el = document.getElementById('stage-detail');
+  const tags = s.sub.split(' · ');
+  const el = document.getElementById('detail');
   el.innerHTML = `
-    <div class="stage-detail">
-      <div class="detail-card">
-        <div class="detail-label">Stage ${s.num} — What's happening</div>
-        <div class="detail-headline">${s.name}</div>
-        <div class="detail-body">${s.sub}</div>
-        <div class="item-list">${s.what.map(w=>`<div class="item-row"><div class="item-dot"></div>${w}</div>`).join('')}</div>
+    <div class="detail-hero">
+      <div class="dh-index${s.road?' road':''}"><span class="s">STAGE</span><span class="n">${s.num}</span></div>
+      <div class="dh-meta">
+        <h2 class="dh-name">${s.name}</h2>
+        <div class="dh-sub">${tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
       </div>
-      <div class="detail-card fa-card">
-        <div class="fa-label">FARaudit</div>
-        <div class="detail-headline">${s.headline}</div>
-        <div class="detail-body">${s.fa}</div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px">Outputs</div>
-        <div class="chips">${s.outputs.map(o=>`<span class="chip chip-output">${o}</span>`).join('')}</div>
-        ${s.outcomes.length?`<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin:10px 0 8px">Outcomes</div><div class="chips">${s.outcomes.map(o=>`<span class="chip chip-green">${o}</span>`).join('')}</div>`:''}
+      <div class="dh-nav">
+        <button class="dh-navbtn" id="prevBtn" ${active===0?'disabled':''} aria-label="Previous stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="dh-navbtn" id="nextBtn" ${active===STAGES.length-1?'disabled':''} aria-label="Next stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
     </div>
-    <div class="bottom-grid">
-      <div class="bottom-card">
-        <div class="bottom-title">Key clauses at this stage (${s.clauses.length})</div>
-        ${s.clauses.length?s.clauses.map(c=>`<div class="clause-row"><div class="clause-num">${c.num}</div><div class="clause-title">${c.title}</div><div class="clause-badge ${badgeClass(c.badge)}">${badgeLabel(c.badge)}</div></div>`).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic">No active clauses at this stage.</div>'}
+
+    <div class="split">
+      <div class="panel panel-gov">
+        <div class="panel-head"><span class="panel-tag">Government Side</span><span class="ph-h">What's happening</span></div>
+        <div class="gov-list">
+          ${s.what.map(w=>`<div class="gov-row"><span class="gov-tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span>${w}</div>`).join('')}
+        </div>
       </div>
-      <div class="bottom-card">
-        <div class="bottom-title">Risks flagged at this stage (${s.risks.length})</div>
-        ${s.risks.length?s.risks.map(r=>`<div class="risk-row ${r.sev}"><div class="risk-title">${r.title}<span class="sev sev-${r.sev}">${r.sev.toUpperCase()}</span></div><div class="risk-desc">${r.desc}</div></div>`).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic">No flagged risks at this stage.</div>'}
+
+      <div class="panel panel-fa">
+        <div class="panel-head"><span class="panel-tag">FARaudit Edge</span></div>
+        <p class="fa-headline">${s.headline}</p>
+        <p class="fa-body">${s.fa}</p>
+        <div class="fa-microlabel">Outputs you receive</div>
+        <div class="chips">${s.outputs.map(o=>`<span class="chip chip-out">${o}</span>`).join('')}</div>
+        ${s.outcomes.length?`<div class="fa-outcomes"><div class="fa-microlabel">Outcomes</div><div class="chips">${s.outcomes.map(o=>`<span class="chip chip-win"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>${o}</span>`).join('')}</div></div>`:''}
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="bcard">
+        <div class="bcard-head">
+          <div class="bcard-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Key clauses at this stage</div>
+          <span class="bcard-count">${s.clauses.length}</span>
+        </div>
+        ${s.clauses.length?s.clauses.map(c=>`<div class="clause-row"><div class="clause-num">${c.num}</div><div class="clause-title">${c.title}</div><div class="clause-badge ${badgeClass(c.badge)}">${badgeLabel(c.badge)}</div></div>`).join(''):'<div class="empty">No active clauses at this stage.</div>'}
+      </div>
+      <div class="bcard">
+        <div class="bcard-head">
+          <div class="bcard-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Risks flagged here</div>
+          <span class="bcard-count">${s.risks.length}</span>
+        </div>
+        ${s.risks.length?s.risks.map(r=>`<div class="risk-row ${r.sev}"><div class="risk-title">${r.title}<span class="sev sev-${r.sev}">${r.sev.toUpperCase()}</span></div><div class="risk-desc">${r.desc}</div></div>`).join(''):'<div class="empty">No flagged risks at this stage.</div>'}
       </div>
     </div>`;
+
+  document.getElementById('prevBtn').addEventListener('click',()=>selectStage(active-1));
+  document.getElementById('nextBtn').addEventListener('click',()=>selectStage(active+1));
 }
 
 selectStage(2);
+
+/* keyboard nav */
+document.addEventListener('keydown',function(e){
+  if(e.target.matches('input,textarea')) return;
+  if(e.key==='ArrowLeft') selectStage(active-1);
+  else if(e.key==='ArrowRight') selectStage(active+1);
+});
 </script>
 
-<script>/* sb-toggle handler v2 */
+<script>/* theme toggle */
 (function(){
-  var KEY='faraudit-sb';
-  var html=document.documentElement;
-  try{var saved=localStorage.getItem(KEY); if(saved==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
+  var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
+  function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+  try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
+  sync();
+  if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
+})();
+/* sidebar toggle */
+(function(){
+  var KEY='faraudit-sb', html=document.documentElement;
+  try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
   document.addEventListener('click',function(e){
-    var t=e.target && e.target.closest && e.target.closest('#sbToggle');
-    if(!t) return;
-    var cur=html.getAttribute('data-sb');
-    var next=cur==='open'?'closed':'open';
+    var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
+    var next=html.getAttribute('data-sb')==='open'?'closed':'open';
     html.setAttribute('data-sb',next);
     try{localStorage.setItem(KEY,next);}catch(e){}
   });

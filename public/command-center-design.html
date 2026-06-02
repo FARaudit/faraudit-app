@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-density="cozy" data-feed-view="cards" data-sb="open">
+<html lang="en" data-theme="light" data-density="cozy" data-feed-view="cards">
 <head>
 <meta charset="utf-8" />
 <title>FARaudit — Intelligence Command Center</title>
@@ -17,25 +17,15 @@
     --navy-800: #0A1628;
     --navy-700: #142545;
     --navy-600: #1e3a8a;
-
-    /* ━━━ Brand accent (2026-05-25): blue from linkedin-thumbnail.html ━━━
-       Defined here so var(--accent*) references resolve. Without this block
-       every var(--accent) in the file would silently fall back to unset.
-       --gold-* below are kept as aliases that resolve to the same blues. */
-    --accent:        #378ADD;
-    --accent-blue:   #378ADD;
-    --accent-deep:   #185FA5;
-    --accent-light:  #B5D4F4;
-
-    --gold-100: #dbeafe;
-    --gold-200: #bfdbfe;
-    --gold-300: #B5D4F4;
-    --gold-400: #378ADD;
-    --gold-500: #378ADD;
-    --gold-600: #185FA5;
-    --gold-700: #185FA5;
-    --gold-800: #185FA5;
-    --gold-900: #185FA5;
+    --gold-100: #fef3c7;
+    --gold-200: #fde68a;
+    --gold-300: #fcd34d;
+    --gold-400: #fbbf24;
+    --gold-500: #f59e0b;
+    --gold-600: #d97706;
+    --gold-700: #b45309;
+    --gold-800: #92400e;
+    --gold-900: #78350f;
 
     --blue-50:  #eff6ff;
     --blue-100: #dbeafe;
@@ -62,9 +52,9 @@
     --red-800: #991b1b;
     --red-900: #7f1d1d;
 
-    --amber-50:  #eff6ff;
-    --amber-100: #dbeafe;
-    --amber-200: #bfdbfe;
+    --amber-50:  #fffbeb;
+    --amber-100: #fef3c7;
+    --amber-200: #fde68a;
 
     /* density */
     --row-pad-y:    12px;
@@ -157,11 +147,11 @@
     --sb-divider:  rgba(255,255,255,0.06);
 
     --tab-active-ink: #fff;
-    --tab-active-line: var(--accent);
+    --tab-active-line: var(--gold-500);
     --tab-count-bg: rgba(255,255,255,0.06);
     --tab-count-ink: #b6c2d3;
-    --tab-count-active-bg: var(--accent);
-    --tab-count-active-ink: #ffffff;
+    --tab-count-active-bg: var(--gold-500);
+    --tab-count-active-ink: #1a1408;
 
     --insight-amber-bg: rgba(253, 230, 138, 0.18);
     --insight-amber-line: rgba(253, 230, 138, 0.32);
@@ -218,10 +208,9 @@
     margin:0 auto;
     background:var(--bg);
     display:grid;
-    grid-template-columns:var(--sb-width) 1fr;
+    grid-template-columns:56px 1fr;
     min-height:100vh;
-    align-items:stretch;
-    transition:background-color .25s ease,grid-template-columns .22s cubic-bezier(0.16,1,0.3,1);
+    transition:background-color .25s ease;
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -230,37 +219,32 @@
   .sidebar{
     background:var(--sb-bg);
     color:var(--sb-text);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding:14px 0 18px;
+    position:sticky;
+    top:0;
+    height:100vh;
     border-right:1px solid var(--sb-border);
-    position:relative;
-    min-height:100%;
-    align-self:stretch;
-    overflow:visible;
   }
-  .sidebar-sticky{
-    position:sticky; top:0; height:100vh;
-    overflow-y:auto; overflow-x:visible;
-    display:flex; flex-direction:column; align-items:center;
-    gap:6px; padding:14px 0 18px; width:100%;
-    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.10) transparent;
-  }
-  .sidebar-sticky::-webkit-scrollbar{width:6px}
-  .sidebar-sticky::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
-  .sidebar-sticky::-webkit-scrollbar-track{background:transparent}
   .sb-logo{
     width:34px;height:34px;border-radius:9px;
-    background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));
-    display:grid;place-items:center;color:#ffffff;font-weight:800;font-size:14px;
-    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);
+    background:linear-gradient(135deg,var(--gold-400),var(--gold-500) 55%,var(--gold-700));
+    display:grid;place-items:center;color:#1a1408;font-weight:800;font-size:14px;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(245,158,11,.55);
     margin-bottom:10px; position:relative;
   }
+  .sb-logo::after{content:"§";position:absolute;right:-1px;bottom:-1px;font-size:9px;color:#3f2304;font-family:"IBM Plex Mono"}
   .sb-divider{width:24px;height:1px;background:var(--sb-divider);margin:6px 0}
   .sb-icon{
     width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--sb-text-mute);
     position:relative;cursor:pointer;transition:all .15s;
   }
   .sb-icon:hover{background:var(--sb-hover);color:#e2e8f0}
-  .sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
-  .sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--accent);border-radius:2px}
+  .sb-icon.active{background:var(--sb-active);color:#fff;box-shadow:inset 2px 0 0 var(--gold-400)}
+  .sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:var(--gold-400);border-radius:2px}
   .sb-icon svg{width:18px;height:18px}
   .sb-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--red-500);box-shadow:0 0 0 2px var(--sb-bg)}
   .sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
@@ -312,8 +296,8 @@
   .icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
   .upgrade-btn{
     height:34px;padding:0 14px;border-radius:9px;border:0;cursor:pointer;
-    background:linear-gradient(180deg,var(--accent),var(--accent));color:#ffffff;font-weight:700;font-size:12.5px;
-    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(55,138,221,.55);
+    background:linear-gradient(180deg,var(--gold-400),var(--gold-500));color:#3f2304;font-weight:700;font-size:12.5px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(245,158,11,.55);
     display:inline-flex;align-items:center;gap:7px;
     transition:transform .15s;
   }
@@ -511,8 +495,8 @@
     margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;
   }
   .greeting .muted{color:var(--mute);font-weight:600}
-  .greeting .num{color:#d97706;font-weight:800}
-  [data-theme="dark"] .greeting .num{color:#fbbf24}
+  .greeting .num{color:var(--gold-600);font-weight:800}
+  [data-theme="dark"] .greeting .num{color:var(--gold-400)}
   [data-density="compact"] .greeting{font-size:19px}
 
   /* ─── drop strip ─────────────────────────────────── */
@@ -538,15 +522,15 @@
   }
   .mini-pill.b{background:var(--blue-50);color:var(--blue-700);border-color:var(--blue-200)}
   .mini-pill.g{background:var(--green-50);color:var(--green-800);border-color:var(--green-200)}
-  .mini-pill.a{background:#fffbeb;color:#92400e;border-color:#fde68a}
+  .mini-pill.a{background:var(--amber-50);color:var(--gold-800);border-color:var(--amber-200)}
   [data-theme="dark"] .mini-pill{background:rgba(255,255,255,0.04);color:var(--ink-2);border-color:var(--line)}
   [data-theme="dark"] .mini-pill.b{background:rgba(59,130,246,0.10);color:#bfdbfe;border-color:rgba(96,165,250,0.30)}
   [data-theme="dark"] .mini-pill.g{background:rgba(16,185,129,0.10);color:#a7f3d0;border-color:rgba(110,231,183,0.30)}
   [data-theme="dark"] .mini-pill.a{background:rgba(245,158,11,0.10);color:#fde68a;border-color:rgba(252,211,77,0.30)}
   .drop-cta{
     height:38px;padding:0 16px;border-radius:9px;border:0;cursor:pointer;flex-shrink:0;
-    background:linear-gradient(180deg,var(--accent),var(--accent));color:#ffffff;font-weight:800;font-size:12.5px;
-    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(55,138,221,.6);
+    background:linear-gradient(180deg,var(--gold-400),var(--gold-500));color:#3f2304;font-weight:800;font-size:12.5px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(245,158,11,.6);
     display:inline-flex;align-items:center;gap:7px;letter-spacing:.02em;
     transition:transform .15s;
   }
@@ -648,7 +632,7 @@
   .chip-tab .ct-num{font-family:"IBM Plex Mono";font-size:10.5px;background:var(--line-2);color:var(--ink-2);padding:1px 5px;border-radius:4px;font-weight:700}
   .chip-tab.active{background:var(--line-3);border-color:var(--line);color:var(--ink)}
   .chip-tab.active .ct-num{background:var(--navy-800);color:#fff}
-  [data-theme="dark"] .chip-tab.active .ct-num{background:var(--accent);color:#ffffff}
+  [data-theme="dark"] .chip-tab.active .ct-num{background:var(--gold-500);color:#1a1408}
   /* leading glyph on scan-type chips */
   .chip-tab .ct-glyph{
     display:inline-flex;align-items:center;justify-content:center;
@@ -658,8 +642,8 @@
   .chip-tab.hot      .ct-glyph{color:var(--red-600)}
   .chip-tab.new      .ct-glyph{color:var(--green-600)}
   .chip-tab.recompete .ct-glyph{color:var(--blue-600)}
-  .chip-tab.sources  .ct-glyph{color:#d97706}
-  .chip-tab.risk     .ct-glyph{color:#854f0b}
+  .chip-tab.sources  .ct-glyph{color:var(--gold-600)}
+  .chip-tab.risk     .ct-glyph{color:var(--amber-600,#854f0b)}
   [data-theme="dark"] .chip-tab.hot      .ct-glyph{color:#fca5a5}
   [data-theme="dark"] .chip-tab.new      .ct-glyph{color:#86efac}
   [data-theme="dark"] .chip-tab.recompete .ct-glyph{color:#93c5fd}
@@ -739,7 +723,7 @@
   .row:hover{border-color:var(--mute-2);box-shadow:0 4px 14px -6px rgba(15,23,42,.12);transform:translateY(-1px)}
   [data-theme="dark"] .row:hover{box-shadow:0 4px 14px -2px rgba(0,0,0,.5)}
   .row.urgent{border-left:3px solid var(--red-500);padding-left:13px}
-  .row.priority{border-left:3px solid #f59e0b;padding-left:13px}
+  .row.priority{border-left:3px solid var(--gold-500);padding-left:13px}
 
   .score{
     width:60px;height:60px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -757,7 +741,7 @@
   .score .l{display:none}
   .score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500));box-shadow:0 0 0 4px rgba(16,185,129,0.18), inset 0 1px 0 rgba(255,255,255,0.18)}
   .score.s-md{background:linear-gradient(135deg,var(--blue-700),var(--blue-500));box-shadow:0 0 0 4px rgba(55,138,221,0.18), inset 0 1px 0 rgba(255,255,255,0.18)}
-  .score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b);box-shadow:0 0 0 4px rgba(239,159,39,0.20), inset 0 1px 0 rgba(255,255,255,0.18)}
+  .score.s-lo{background:linear-gradient(135deg,var(--gold-700),var(--gold-500));box-shadow:0 0 0 4px rgba(239,159,39,0.20), inset 0 1px 0 rgba(255,255,255,0.18)}
   .score.s-no{background:linear-gradient(135deg,var(--red-900),var(--red-600));box-shadow:0 0 0 4px rgba(226,75,74,0.20), inset 0 1px 0 rgba(255,255,255,0.18)}
 
   .row-body{min-width:0}
@@ -773,7 +757,7 @@
   .badge.doc.rfq{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
   .badge.doc.sources{background:#faf5ff;color:#6b21a8;border:1px solid #d8b4fe}
   .badge.doc.combined{background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc}
-  .badge.doc.presol{background:#fef3c7;color:#854d0e;border:1px solid #fcd34d}
+  .badge.doc.presol{background:var(--amber-100);color:#854d0e;border:1px solid var(--gold-300)}
   .badge.naics{background:var(--line-3);color:var(--ink-2);border:1px solid var(--line)}
   .badge.setaside{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
   .badge.setaside.full{background:var(--line-3);color:var(--ink-2);border:1px solid var(--line)}
@@ -825,10 +809,10 @@
   .insight.alert .ai-icon svg{color:var(--red-700)}
   .insight.win   .ai-icon{background:linear-gradient(135deg, #d1fae5, #a7f3d0);border-color:var(--green-200)}
   .insight.win   .ai-icon svg{color:var(--green-700)}
-  .insight.warn  .ai-icon{background:linear-gradient(135deg, #fef3c7, #fde68a);border-color:#fde68a}
-  .insight.warn  .ai-icon svg{color:#854f0b}
-  [data-theme="dark"] .insight.warn .ai-icon{background:linear-gradient(135deg, rgba(253,230,138,0.18), rgba(180,83,9,0.10));border-color:rgba(253,230,138,0.30)}
-  [data-theme="dark"] .insight.warn .ai-icon svg{color:#fde68a}
+  .insight.warn  .ai-icon{background:linear-gradient(135deg, var(--amber-100), var(--amber-200));border-color:var(--amber-200)}
+  .insight.warn  .ai-icon svg{color:var(--amber-600,#854f0b)}
+  [data-theme="dark"] .insight.warn .ai-icon{background:linear-gradient(135deg, rgba(245,158,11,0.20), rgba(180,83,9,0.10));border-color:rgba(252,211,77,0.30)}
+  [data-theme="dark"] .insight.warn .ai-icon svg{color:#fcd34d}
   .insight.info  .ai-icon{background:linear-gradient(135deg, var(--blue-100), var(--blue-200));border-color:var(--blue-200)}
   .insight.info  .ai-icon svg{color:var(--blue-700)}
   .insight .ai-label{margin-bottom:0;color:var(--blue-700)}
@@ -837,8 +821,8 @@
   [data-theme="dark"] .insight.alert .ai-label{color:#fca5a5}
   .insight.win   .ai-label{color:var(--green-700)}
   [data-theme="dark"] .insight.win   .ai-label{color:#a7f3d0}
-  .insight.warn  .ai-label{color:#854f0b}
-  [data-theme="dark"] .insight.warn  .ai-label{color:#fde68a}
+  .insight.warn  .ai-label{color:var(--amber-600,#854f0b)}
+  [data-theme="dark"] .insight.warn  .ai-label{color:#fcd34d}
   .insight .ai-desc{font-weight:500}
   .insight .ai-desc b{font-weight:600;color:var(--ink)}
   [data-theme="dark"] .insight .ai-desc b{color:#fff}
@@ -868,11 +852,11 @@
     font-family:"IBM Plex Mono";font-size:11px;font-weight:600;
   }
   .deadline.crit{background:var(--red-50);color:#991b1b;border:1px solid var(--red-200)}
-  .deadline.warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+  .deadline.warn{background:var(--amber-50);color:#92400e;border:1px solid var(--amber-200)}
   .deadline.ok{background:var(--green-50);color:#166534;border:1px solid var(--green-200)}
   .deadline.cold{background:var(--line-3);color:var(--ink-2);border:1px solid var(--line)}
   [data-theme="dark"] .deadline.crit{background:rgba(220,38,38,0.14);color:#fecaca;border-color:rgba(252,165,165,0.30)}
-  [data-theme="dark"] .deadline.warn{background:rgba(245,158,11,0.14);color:#fcd34d;border-color:rgba(252,211,77,0.30)}
+  [data-theme="dark"] .deadline.warn{background:rgba(245,158,11,0.14);color:#fde68a;border-color:rgba(252,211,77,0.30)}
   [data-theme="dark"] .deadline.ok{background:rgba(16,185,129,0.14);color:#a7f3d0;border-color:rgba(110,231,183,0.30)}
   [data-theme="dark"] .deadline.cold{background:rgba(255,255,255,0.04);color:var(--ink-2);border-color:var(--line)}
   .deadline svg{width:11px;height:11px}
@@ -887,8 +871,8 @@
   .row-actions .a:hover{border-color:var(--mute-2)}
   .row-actions .a.primary{background:var(--navy-800);color:#fff;border-color:var(--navy-800)}
   .row-actions .a.primary:hover{background:#142545;border-color:#142545}
-  [data-theme="dark"] .row-actions .a.primary{background:var(--accent);color:#ffffff;border-color:var(--accent)}
-  [data-theme="dark"] .row-actions .a.primary:hover{background:var(--accent);border-color:var(--accent)}
+  [data-theme="dark"] .row-actions .a.primary{background:var(--gold-500);color:#1a1408;border-color:var(--gold-500)}
+  [data-theme="dark"] .row-actions .a.primary:hover{background:var(--gold-400);border-color:var(--gold-400)}
   .row-actions .a svg{width:10px;height:10px}
   /* plain text-link variant */
   .row-actions .a.link{
@@ -965,7 +949,7 @@
   .pursuit .p-row1 .ag{font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute);font-weight:600;flex-shrink:0}
   .pursuit .p-row1 .due{margin-left:auto;font-family:"IBM Plex Mono";font-size:11px;font-weight:700;letter-spacing:.02em;flex-shrink:0}
   .pursuit .p-row1 .due.crit{color:var(--red-600)}
-  .pursuit .p-row1 .due.warn{color:#d97706}
+  .pursuit .p-row1 .due.warn{color:var(--gold-600)}
   .pursuit .p-row1 .due.cold{color:var(--mute)}
   [data-theme="dark"] .pursuit .p-row1 .due.crit{color:#fca5a5}
   [data-theme="dark"] .pursuit .p-row1 .due.warn{color:#fcd34d}
@@ -996,7 +980,7 @@
   .pursuit .p-row3{display:flex;align-items:center;gap:10px;min-width:0}
   .pursuit .p-row3 .stage{font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.08em;padding:3px 7px;border-radius:5px;flex-shrink:0;text-transform:uppercase}
   .pursuit .p-row3 .stage.ready{background:rgba(5,150,105,0.12);color:var(--green-700)}
-  .pursuit .p-row3 .stage.review{background:rgba(217,119,6,0.12);color:#b45309}
+  .pursuit .p-row3 .stage.review{background:rgba(217,119,6,0.12);color:var(--gold-700)}
   .pursuit .p-row3 .stage.draft{background:rgba(37,99,235,0.10);color:var(--blue-700)}
   .pursuit .p-row3 .stage.risk{background:rgba(220,38,38,0.12);color:var(--red-700)}
   [data-theme="dark"] .pursuit .p-row3 .stage.ready{background:rgba(16,185,129,0.18);color:#a7f3d0}
@@ -1050,7 +1034,7 @@
   .pursuit .p-row2.legacy{display:flex;align-items:center;gap:9px;min-width:0}
   .pursuit .p-row2.legacy .stage{font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:3px 7px;border-radius:5px;flex-shrink:0}
   .pursuit .p-row2.legacy .stage.ready{background:rgba(5,150,105,0.12);color:var(--green-700)}
-  .pursuit .p-row2.legacy .stage.review{background:rgba(217,119,6,0.12);color:#b45309}
+  .pursuit .p-row2.legacy .stage.review{background:rgba(217,119,6,0.12);color:var(--gold-700)}
   .pursuit .p-row2.legacy .stage.draft{background:rgba(37,99,235,0.10);color:var(--blue-700)}
   .pursuit .p-row2.legacy .stage.risk{background:rgba(220,38,38,0.12);color:var(--red-700)}
   [data-theme="dark"] .pursuit .p-row2 .stage.ready{background:rgba(16,185,129,0.18);color:#a7f3d0}
@@ -1065,7 +1049,7 @@
   .bar{height:5px;border-radius:99px;background:var(--line-2);overflow:hidden;position:relative}
   .bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#0A1628,#1e3a8a);transition:width .6s cubic-bezier(0.16,1,0.3,1)}
   .bar.green > i{background:linear-gradient(90deg,var(--green-700),var(--green-500))}
-  .bar.amber > i{background:linear-gradient(90deg,#b45309,#f59e0b)}
+  .bar.amber > i{background:linear-gradient(90deg,var(--gold-700),var(--gold-500))}
   .bar.red > i{background:linear-gradient(90deg,var(--red-800),var(--red-600))}
   .bar.navy > i{background:linear-gradient(90deg,var(--navy-800),var(--blue-500))}
   [data-theme="dark"] .bar.navy > i{background:linear-gradient(90deg,var(--blue-500),#93c5fd)}
@@ -1156,9 +1140,9 @@
   .qa-cta-wrap{padding:0 14px 4px}
   .qa-cta{
     width:100%;height:36px;border-radius:9px;border:0;cursor:pointer;
-    background:linear-gradient(180deg,var(--accent),var(--accent));color:#ffffff;
+    background:linear-gradient(180deg,var(--gold-400),var(--gold-500));color:#3f2304;
     font-family:inherit;font-weight:800;font-size:12.5px;letter-spacing:.02em;
-    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(55,138,221,.55);
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 8px 20px -8px rgba(245,158,11,.55);
     display:inline-flex;align-items:center;justify-content:center;gap:7px;
     transition:transform .15s;
   }
@@ -1215,22 +1199,22 @@
   .qa-item .sc{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:5px;flex-shrink:0}
   .qa-item .sc.hi{background:var(--green-50);color:var(--green-800)}
   .qa-item .sc.md{background:var(--blue-50);color:var(--blue-700)}
-  .qa-item .sc.lo{background:#fffbeb;color:#92400e}
+  .qa-item .sc.lo{background:var(--amber-50);color:var(--gold-800)}
   [data-theme="dark"] .qa-item .sc.hi{background:rgba(16,185,129,0.18);color:#a7f3d0}
   [data-theme="dark"] .qa-item .sc.md{background:rgba(37,99,235,0.18);color:#bfdbfe}
   [data-theme="dark"] .qa-item .sc.lo{background:rgba(245,158,11,0.18);color:#fde68a}
 
   /* ─── free tier strip ────────────────────────────── */
   .free-strip{
-    padding:11px 14px;background:linear-gradient(180deg,#fffbeb,#fef3c7);border-top:1px solid #fde68a;
+    padding:11px 14px;background:linear-gradient(180deg,var(--amber-50),var(--amber-100));border-top:1px solid var(--amber-200);
   }
   [data-theme="dark"] .free-strip{background:linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.06));border-top-color:rgba(252,211,77,0.22)}
-  .free-strip .ft-top{display:flex;align-items:center;font-size:11px;font-weight:700;color:#78350f;margin-bottom:6px;letter-spacing:.02em;text-transform:uppercase}
+  .free-strip .ft-top{display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--gold-900);margin-bottom:6px;letter-spacing:.02em;text-transform:uppercase}
   [data-theme="dark"] .free-strip .ft-top{color:#fde68a}
-  .free-strip .ft-bar{height:5px;border-radius:99px;background:#fde68a;overflow:hidden}
+  .free-strip .ft-bar{height:5px;border-radius:99px;background:var(--amber-200);overflow:hidden}
   [data-theme="dark"] .free-strip .ft-bar{background:rgba(252,211,77,0.18)}
-  .free-strip .ft-bar > i{display:block;height:100%;width:62%;background:linear-gradient(90deg,#b45309,#f59e0b)}
-  .free-strip .ft-d{font-size:10.5px;color:#92400e;font-weight:600;margin-top:6px;font-family:"IBM Plex Mono"}
+  .free-strip .ft-bar > i{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--gold-600),var(--gold-500))}
+  .free-strip .ft-d{font-size:10.5px;color:var(--gold-800);font-weight:600;margin-top:6px;font-family:"IBM Plex Mono"}
   [data-theme="dark"] .free-strip .ft-d{color:#fde68a}
 
   /* mini sparkline */
@@ -1305,7 +1289,7 @@
   }
   .pursuits-summary .fseg.s0{background:linear-gradient(135deg,var(--blue-700),var(--blue-500))}
   .pursuits-summary .fseg.s1{background:linear-gradient(135deg,var(--blue-600),#5eead4)}
-  .pursuits-summary .fseg.s2{background:linear-gradient(135deg,#b45309,#f59e0b)}
+  .pursuits-summary .fseg.s2{background:linear-gradient(135deg,var(--gold-600),var(--gold-500))}
   .pursuits-summary .fseg.s3{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
   .pursuits-summary .fseg.s4{background:linear-gradient(135deg,var(--navy-800),var(--navy-700));color:#cfe2ff}
   .pursuits-summary .flabels{
@@ -1337,7 +1321,7 @@
   .pursuits-metrics .m-cell.col-sub{grid-column:5}
   .pursuits-metrics .m-lbl{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;color:var(--mute);font-weight:700;letter-spacing:.10em;text-transform:uppercase;line-height:1}
   .pursuits-metrics .m-lbl .m-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-  .pursuits-metrics .m-cell.amber .m-dot{background:var(--accent)}
+  .pursuits-metrics .m-cell.amber .m-dot{background:var(--gold-500)}
   .pursuits-metrics .m-cell.green .m-dot{background:var(--green-500)}
   .pursuits-metrics .m-cell.red   .m-dot{background:var(--red-500);box-shadow:0 0 0 0 rgba(239,68,68,0.5);animation:flagPulse 1.8s ease-in-out infinite}
   .pursuits-metrics .m-val{
@@ -1346,10 +1330,10 @@
   }
   .pursuits-metrics .m-val .num{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.03em}
   .pursuits-metrics .m-val .dol{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.005em}
-  .pursuits-metrics .m-cell.amber .num{color:var(--accent-deep)}
+  .pursuits-metrics .m-cell.amber .num{color:var(--gold-700)}
   .pursuits-metrics .m-cell.green .num{color:var(--green-700)}
   .pursuits-metrics .m-cell.red   .num{color:var(--red-700)}
-  [data-theme="dark"] .pursuits-metrics .m-cell.amber .num{color:#B5D4F4}
+  [data-theme="dark"] .pursuits-metrics .m-cell.amber .num{color:#fcd34d}
   [data-theme="dark"] .pursuits-metrics .m-cell.green .num{color:#86efac}
   [data-theme="dark"] .pursuits-metrics .m-cell.red   .num{color:#fca5a5}
   .pursuits-metrics .m-val{font-family:"IBM Plex Mono";font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.1}
@@ -1376,7 +1360,7 @@
   /* Pursuit row — segmented bar + pwin + colored left edge + flag dot */
   .pursuit{position:relative;border-left:3px solid transparent;padding-left:11px;transition:border-color .2s}
   .pursuit:has(.stage.ready){border-left-color:var(--green-500)}
-  .pursuit:has(.stage.review){border-left-color:#f59e0b}
+  .pursuit:has(.stage.review){border-left-color:var(--gold-500)}
   .pursuit:has(.stage.draft){border-left-color:var(--blue-500)}
   .pursuit:has(.stage.risk){border-left-color:var(--red-500)}
   .pursuit .bar{position:relative;overflow:hidden}
@@ -1412,13 +1396,13 @@
   /* ----- sidebar v2 — expandable with sections + badges ----- */
   .frame{grid-template-columns:var(--sb-width, 56px) 1fr;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
   [data-sb="open"] .frame{--sb-width:232px}
-  .sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);min-height:100%}
-  [data-sb="open"] .sidebar-sticky{align-items:stretch;padding:14px 10px 14px}
+  .sidebar{transition:width .22s cubic-bezier(0.16,1,0.3,1);width:var(--sb-width, 56px);overflow:visible;position:relative}
+  [data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
   .sb-wordmark{display:none}
   [data-sb="open"] .sb-logo-row{display:flex;align-items:center;justify-content:flex-start;gap:10px;align-self:stretch;margin:0 0 8px 2px}
   [data-sb="open"] .sb-logo{margin:0}
   [data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
-  [data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+  [data-sb="open"] .sb-wordmark .wm-au{color:var(--gold-400)}
   [data-sb="open"] .sb-divider{display:none}
   [data-sb="open"] .sb-icon{width:100%;height:36px;justify-content:flex-start;gap:11px;padding:0 10px;border-radius:9px}
   [data-sb="open"] .sb-icon.active::before{left:-12px}
@@ -1426,7 +1410,7 @@
   [data-sb="open"] .sb-icon .sb-tip{display:none !important}
   [data-sb="open"] .sb-icon .sb-badge{display:inline-flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono";font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1}
   [data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78)}
-  [data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#ffffff}
+  [data-sb="open"] .sb-icon .sb-badge.new{background:var(--gold-500);color:#1a1408}
   [data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,0.18);color:#86efac;gap:4px;padding-left:5px}
   [data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
   .sb-icon .sb-label,.sb-icon .sb-badge{display:none}
@@ -1458,7 +1442,7 @@
     background:var(--card);
   }
   [data-feed-view="compact"] .row.urgent{border-left-color:var(--red-500)}
-  [data-feed-view="compact"] .row.priority{border-left-color:#f59e0b}
+  [data-feed-view="compact"] .row.priority{border-left-color:var(--gold-500)}
   [data-feed-view="compact"] .row > .score{width:34px;height:34px;border-radius:8px;font-size:14px;flex-shrink:0}
   [data-feed-view="compact"] .row > .score .v{font-size:14px;line-height:1}
   [data-feed-view="compact"] .row > .score .l{display:none}
@@ -1490,10 +1474,10 @@
 
 
   /* sidebar v3 — match reference: active gold tint, danger count, shield logo */
-  .sb-logo{background:transparent;box-shadow:none;color:var(--accent)}
-  [data-sb="open"] .sb-icon.active{background:rgba(181,212,244,0.08);color:#fff;box-shadow:none}
+  .sb-logo{background:transparent;box-shadow:none;color:var(--gold-400)}
+  [data-sb="open"] .sb-icon.active{background:rgba(252,211,77,0.08);color:#fff;box-shadow:none}
   [data-sb="open"] .sb-icon.active::before{display:none}
-  [data-sb="open"] .sb-icon.active svg{color:var(--accent)}
+  [data-sb="open"] .sb-icon.active svg{color:var(--gold-400)}
   [data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,0.18);color:#fca5a5;border:1px solid rgba(220,38,38,0.30)}
   [data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,0.08)}
 
@@ -1534,10 +1518,10 @@
   /* logo row — left-aligned, F tile + wordmark inline */
   .sb-logo{
     width:34px;height:34px;border-radius:9px;
-    background:linear-gradient(135deg,var(--accent),var(--accent) 55%,var(--accent-deep));
-    color:#ffffff;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--gold-400),var(--gold-500) 55%,var(--gold-700));
+    color:#1a1408;display:grid;place-items:center;
     font-weight:800;font-size:14px;flex-shrink:0;
-    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(55,138,221,.55);
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18), 0 6px 12px -4px rgba(245,158,11,.55);
   }
   [data-sb="open"] .sb-logo-row{
     display:flex !important;align-items:center;gap:10px;
@@ -1549,10 +1533,10 @@
   /* sidebar upgrade pill (next to JR avatar) */
   .sb-upgrade-pill{
     height:32px;padding:0 10px;border-radius:8px;border:0;cursor:pointer;
-    background:linear-gradient(180deg,var(--accent),var(--accent));color:#ffffff;
+    background:linear-gradient(180deg,var(--gold-400),var(--gold-500));color:#3f2304;
     font-family:inherit;font-weight:700;font-size:11px;letter-spacing:.04em;
     display:none;align-items:center;gap:5px;
-    box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 4px 12px -4px rgba(55,138,221,.45);
+    box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 4px 12px -4px rgba(245,158,11,.45);
     transition:transform .15s;
   }
   .sb-upgrade-pill:hover{transform:translateY(-1px)}
@@ -1561,68 +1545,6 @@
   .sb-upgrade-pill svg{flex-shrink:0}
   [data-sb="open"] .sb-bottom{flex-direction:column;align-items:flex-start;gap:6px}
 
-/* ── canonical toggle sidebar — collapsed icon-rail + expanded labels (2026-05-29 v2) ── */
-:root{--sb-width:56px}
-[data-sb="open"]{--sb-width:232px}
-.sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
-.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:#0A1628;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s,color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
-.sb-toggle:hover{background:rgba(255,255,255,.06);color:#fff}
-.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
-[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
-.sb-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
-.sb-wordmark{display:none}
-[data-sb="open"] .sb-logo-row{justify-content:flex-start;gap:10px;margin:0 0 8px 4px;align-self:flex-start}
-[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
-[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
-.sb-group-label{display:none}
-[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 12px 6px;align-self:stretch}
-.sb-divider{width:24px;height:1px;background:rgba(255,255,255,.06);margin:6px 0}
-[data-sb="open"] .sb-divider{display:none}
-.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:rgba(255,255,255,.6);position:relative;cursor:pointer;transition:all .15s;text-decoration:none;border:0;background:transparent;font:inherit;padding:0}
-.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
-.sb-icon.active{background:rgba(55,138,221,.15);color:#fff;box-shadow:inset 2px 0 0 #378ADD}
-.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:#378ADD;border-radius:2px}
-.sb-icon > svg{width:18px;height:18px;flex-shrink:0}
-.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
-.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s,transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
-.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
-.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
-[data-sb="open"] .sb-icon .sb-tip{display:none!important}
-[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
-[data-sb="open"] .sb-icon{display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;height:36px;gap:11px!important;padding:0 10px!important;border-radius:9px;flex-direction:row!important}
-[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
-[data-sb="open"] .sb-icon .sb-label{display:inline-flex!important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
-[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,.08);color:#fff;box-shadow:none}
-[data-sb="open"] .sb-icon.active::before{display:none}
-[data-sb="open"] .sb-icon.active svg{color:#378ADD}
-[data-sb="open"] .sb-icon .sb-badge{display:inline-flex!important;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1;white-space:nowrap}
-[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
-[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#fff}
-[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
-[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
-[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
-.sb-icon.sb-signout:hover{color:#fca5a5}
-[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
-.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
-[data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
-.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
-/* ── /canonical toggle sidebar ── */
-
-/* ── TODO score-chip variant (un-audited rows · ported from ceo/Score Chip Variant) ── */
-.score.todo{color:var(--ink-2);background:var(--card-soft)}
-.score.todo .vrow{display:flex;align-items:center;gap:3px;line-height:1}
-.score.todo .bolt{width:11px;height:13px;flex-shrink:0;margin-top:-1px}
-.score.todo .v{font-size:19px}
-.score.todo .l{display:block;margin-top:4px;font-size:7.5px;letter-spacing:.05em;opacity:1;font-family:"IBM Plex Mono";font-weight:700;text-transform:uppercase;line-height:1}
-.score.todo.u-crit{background:rgba(220,38,38,.09);border:1.5px solid rgba(220,38,38,.55);color:var(--red-700);box-shadow:0 0 0 4px rgba(220,38,38,.10);animation:todo-pulse 1.9s ease-in-out infinite}
-.score.todo.u-warn{background:#fffbeb;border:1.5px solid #f0bf63;color:#92400e;box-shadow:0 0 0 4px rgba(245,158,11,.13)}
-.score.todo.u-cold{background:#eff6ff;border:1.5px solid #a3c8fb;color:var(--blue-700);box-shadow:0 0 0 4px rgba(59,130,246,.12)}
-@keyframes todo-pulse{0%,100%{box-shadow:0 0 0 4px rgba(220,38,38,.13)}50%{box-shadow:0 0 0 7px rgba(220,38,38,.03)}}
-.score .tip{position:absolute;bottom:calc(100% + 11px);left:50%;transform:translateX(-50%) translateY(4px);width:172px;background:var(--navy-800);color:#e8eef6;font-family:"Manrope";font-size:11.5px;font-weight:500;line-height:1.42;padding:9px 11px;border-radius:9px;text-align:center;box-shadow:0 10px 26px -8px rgba(11,24,40,.45);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:60}
-.score .tip b{font-weight:700;color:#fff}
-.score .tip::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--navy-800)}
-.score.todo:hover .tip,.score.todo.show-tip .tip{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -1634,15 +1556,15 @@
         <rect width="120" height="120" rx="26" fill="url(#g)"/>
         <defs>
           <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stop-color="#378ADD"/>
-            <stop offset="55%" stop-color="#378ADD"/>
-            <stop offset="100%" stop-color="#185FA5"/>
+            <stop offset="0%" stop-color="#fbbf24"/>
+            <stop offset="55%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#b45309"/>
           </linearGradient>
         </defs>
-        <text x="60" y="82" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-size="56" font-weight="800" fill="#ffffff">F</text>
+        <text x="60" y="82" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-size="56" font-weight="800" fill="#1a1408">F</text>
       </g>
       <text x="600" y="500" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-size="36" font-weight="800" letter-spacing="-0.02em" fill="#ffffff">FARaudit</text>
-      <text x="600" y="540" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-size="13" font-weight="700" letter-spacing="0.18em" fill="#B5D4F4">INTELLIGENCE COMMAND CENTER</text>
+      <text x="600" y="540" text-anchor="middle" font-family="Manrope, system-ui, sans-serif" font-size="13" font-weight="700" letter-spacing="0.18em" fill="#fcd34d">INTELLIGENCE COMMAND CENTER</text>
     </svg>
   </template>
 
@@ -1650,35 +1572,93 @@
 
   <!-- ═════════════ SIDEBAR ═════════════ -->
   <aside class="sidebar">
-  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
-  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
-  <div class="sb-group-label">WORKSPACE</div>
-  <a class="sb-icon active" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
-  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
-  <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
-  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
-  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
-  <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
-  <div class="sb-divider"></div>
-  <div class="sb-group-label">INTELLIGENCE</div>
-  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
-  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
-  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
-  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
-  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
-  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
-  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
-  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
-  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
-  <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
-  <div class="sb-divider"></div>
-  <div class="sb-group-label">ACCOUNT</div>
-  <a class="sb-icon" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
-  <form action="/api/auth/sign-out" method="post" style="display:contents">
-    <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
-  </form>
-  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
-</aside>
+    <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+
+    <div class="sb-logo-row">
+      <div class="sb-logo">F</div>
+      <span class="sb-wordmark">FAR<span class="wm-au">audit</span></span>
+    </div>
+
+    <div class="sb-group-label">WORKSPACE</div>
+    <div class="sb-icon active" data-tip="Today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span class="sb-label">Today</span><span class="sb-tip">Today</span>
+    </div>
+    <div class="sb-icon" onclick="location.href='faraudit-run-audit.html'" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg>
+      <span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+      <span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span>
+    </div>
+
+    <div class="sb-group-label">INTELLIGENCE</div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+      <span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg>
+      <span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg>
+      <span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg>
+      <span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>
+      <span class="sb-label">Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Agencies</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg>
+      <span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg>
+      <span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span>
+    </div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg>
+      <span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span>
+    </div>
+
+    <div class="sb-group-label">ACCOUNT</div>
+    <div class="sb-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+      <span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span>
+    </div>
+    <div class="sb-icon sb-signout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      <span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span>
+    </div>
+
+    <div class="sb-bottom">
+      <div class="sb-avatar">JR</div>
+      </div>
+  </aside>
 
   <!-- ═════════════ MAIN ═════════════ -->
   <main class="main">
@@ -1820,10 +1800,10 @@
         <div class="feed">
           <div class="feed-head">
             <div class="fh-top">
-              <h2>Intelligence Feed <span class="count">9 of 9</span></h2>
+              <h2>Intelligence Feed <span class="count">7 of 7</span></h2>
               <div class="fh-controls">
                 <button class="sort-pill" type="button">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h13M3 12h9M3 18h5M17 8V20m0 0 3-3m-3 3-3-3"></path></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h13M3 12h9M3 18h5M17 8V20m0 0 3-3m-3 3-3-3"/></svg>
                   Sort: <span class="val">Score</span>
                 </button>
                 <div class="view-seg seg" id="feedViewSeg" data-tweak="feedView">
@@ -1838,19 +1818,19 @@
           <div class="filter-bar">
             <div class="tier1">
               <span class="tier-label">View</span>
-              <button class="chip-tab active">All<span class="ct-num">9</span></button>
-              <button class="chip-tab">Urgent<span class="ct-num">3</span></button>
+              <button class="chip-tab active">All<span class="ct-num">7</span></button>
+              <button class="chip-tab">Urgent<span class="ct-num">2</span></button>
               <button class="chip-tab hot">
-                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2c0 4-4 5-4 9a4 4 0 008 0c0-1-1-2-1-3 2 1 4 3 4 6a7 7 0 11-14 0c0-5 4-7 4-12z"></path></svg></span>
-                Hot Match<span class="ct-num">2</span>
+                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2c0 4-4 5-4 9a4 4 0 008 0c0-1-1-2-1-3 2 1 4 3 4 6a7 7 0 11-14 0c0-5 4-7 4-12z"/></svg></span>
+                Hot Match<span class="ct-num">3</span>
               </button>
               <button class="chip-tab new">
-                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"></circle></svg></span>
-                New 24h<span class="ct-num">3</span>
+                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg></span>
+                New 24h<span class="ct-num">4</span>
               </button>
               <button class="chip-tab">In Pipeline<span class="ct-num">3</span></button>
               <button class="chip-tab risk">
-                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"></path><path d="M12 9v6M12 19v.5"></path></svg></span>
+                <span class="ct-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"/><path d="M12 9v6M12 19v.5"/></svg></span>
                 At Risk<span class="ct-num">1</span>
               </button>
             </div>
@@ -1858,50 +1838,53 @@
               <span class="tier-label">Filter by</span>
               <button class="field-pill" type="button">
                 <span class="fp-label">NAICS:</span><span class="fp-value">541330</span><span class="fp-count">+2</span>
-                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
-                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
               </button>
               <button class="field-pill" type="button">
                 <span class="fp-label">Set-Aside:</span><span class="fp-value">SDVOSB</span>
-                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
-                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
               </button>
               <button class="field-pill" type="button">
                 <span class="fp-label">Notice:</span><span class="fp-value">RFP</span><span class="fp-count">+1</span>
-                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
-                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"></path></svg></span>
+                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <span class="fp-x" role="button" aria-label="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
               </button>
               <button class="field-pill" type="button">
                 <span class="fp-label">Posted:</span><span class="fp-value">7d</span>
-                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
+                <svg class="fp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
               </button>
               <button class="field-pill add" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
                 Add filter
               </button>
             </div>
           </div>
 
-          <div class="feed-toolbar" hidden="" style="display:none">
-            <button class="filter-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Agency · <b>All DoD</b></button>
+          <div class="feed-toolbar" hidden style="display:none">
+            <button class="filter-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Agency · <b>All DoD</b></button>
             <button class="filter-btn">NAICS · <b>541330 · 541512 · 541715</b></button>
             <button class="filter-btn">Set-aside · <b>SDVOSB · WOSB</b></button>
             <button class="filter-btn">Posted · <b>Last 7d</b></button>
             <button class="filter-btn">$ Range · <b>$50k–$25M</b></button>
-            <button class="filter-btn add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>Add filter</button>
+            <button class="filter-btn add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add filter</button>
             <div class="sort-right">
               Sort: <b>FARaudit Score ↓</b>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M6 9l6 6 6-6"></path></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M6 9l6 6 6-6"/></svg>
             </div>
           </div>
 
           <div class="feed-list">
 
-            <!-- ROW 1 · audited -->
+            <!-- ROW 1 -->
             <div class="row urgent">
               <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">N00024-26-R-2207</span><span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span></div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
                 <div class="row-meta">
                   <span class="badge doc">RFP</span>
                   <span class="badge naics">NAICS 541330</span>
@@ -1915,43 +1898,21 @@
                 <span class="deadline crit">14h left</span>
                 <span class="row-value">$18.4M</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-            <!-- ROW 2 · UN-AUDITED -->
-            <div class="row urgent">
-              <div class="score todo u-crit"><span class="vrow"><svg class="bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"></path></svg><span class="v">2d</span></span><span class="l">Audit Now</span><span class="tip"><b>Run audit</b> to get your match score.</span></div>
-              <div class="row-body">
-                <div class="row-top"><span class="row-id">70Z02326-R-0188</span><span class="row-title">CISA — Continuous Diagnostics &amp; Mitigation (CDM) Dashboard Modernization</span></div><div class="compact-sub">70Z02326-R-0188 · DHS CISA · Arlington, VA</div>
-                <div class="row-meta">
-                  <span class="badge doc">RFP</span>
-                  <span class="badge naics">NAICS 541512</span>
-                  <span class="badge naics">PSC D310</span>
-                  <span class="badge setaside full">Full &amp; Open</span>
-                </div>
-                <div class="row-agency one-line"><span class="agency-name">Dept. of Homeland Security</span><span class="agency-sub">CISA · Arlington, VA</span></div>
-                <div class="insight info"><b>Not yet audited.</b> Run the three-call engine to surface CLIN traps, FAR/DFARS gaps, and your match score before the Q&amp;A window closes Wednesday.</div>
-              </div>
-              <div class="row-right">
-                <span class="deadline crit">2d left</span>
-                <span class="row-value">$12.5M</span>
-                <div class="row-actions">
-                  <button class="a primary">Run audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
-                  <button class="a">Add to pipeline</button>
-                  <button class="a">View solicitation</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ROW 3 · audited -->
+            <!-- ROW 2 -->
             <div class="row">
               <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">FA8730-26-Q-0114</span><span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span></div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
                 <div class="row-meta">
                   <span class="badge doc rfq">RFQ</span>
                   <span class="badge naics">NAICS 541715</span>
@@ -1965,43 +1926,21 @@
                 <span class="deadline warn">5d left</span>
                 <span class="row-value">$7.9M</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-            <!-- ROW 4 · UN-AUDITED -->
-            <div class="row priority">
-              <div class="score todo u-warn"><span class="vrow"><svg class="bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"></path></svg><span class="v">6d</span></span><span class="l">Audit Now</span><span class="tip"><b>Run audit</b> to get your match score.</span></div>
-              <div class="row-body">
-                <div class="row-top"><span class="row-id">SP4701-26-Q-1033</span><span class="row-title">DLA Aviation — F/A-18 Auxiliary Power Unit Overhaul &amp; Supply Chain</span></div><div class="compact-sub">SP4701-26-Q-1033 · DLA Aviation · Richmond, VA</div>
-                <div class="row-meta">
-                  <span class="badge doc rfq">RFQ</span>
-                  <span class="badge naics">NAICS 336412</span>
-                  <span class="badge naics">PSC 1680</span>
-                  <span class="badge setaside">SDVOSB</span>
-                </div>
-                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
-                <div class="insight info"><b>Not yet audited.</b> A quick audit will confirm CLIN structure and FOB-destination terms before you commit BD hours to a pursuit.</div>
-              </div>
-              <div class="row-right">
-                <span class="deadline warn">6d left</span>
-                <span class="row-value">$4.3M</span>
-                <div class="row-actions">
-                  <button class="a primary">Run audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
-                  <button class="a">Add to pipeline</button>
-                  <button class="a">View solicitation</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ROW 5 · audited -->
+            <!-- ROW 3 -->
             <div class="row priority">
               <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">W912DY-26-R-0089</span><span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span></div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
                 <div class="row-meta">
                   <span class="badge doc combined">Combined Synopsis</span>
                   <span class="badge naics">NAICS 541512</span>
@@ -2015,18 +1954,21 @@
                 <span class="deadline warn">6d left</span>
                 <span class="row-value">$3.2M</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-            <!-- ROW 6 · audited · trap -->
+            <!-- ROW 4 — trap -->
             <div class="row urgent">
               <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">N00178-26-R-3071</span><span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span></div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
                 <div class="row-meta">
                   <span class="badge doc">RFP</span>
                   <span class="badge naics">NAICS 236220</span>
@@ -2040,89 +1982,1326 @@
                 <span class="deadline cold">11d left</span>
                 <span class="row-value">$1.8M</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-            <!-- ROW 7 · UN-AUDITED -->
-            <div class="row">
-              <div class="score todo u-cold"><span class="vrow"><svg class="bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"></path></svg><span class="v">13d</span></span><span class="l">Audit Now</span><span class="tip"><b>Run audit</b> to get your match score.</span></div>
-              <div class="row-body">
-                <div class="row-top"><span class="row-id">W56KGY-26-R-0042</span><span class="row-title">CECOM — Tactical Network Modernization Engineering Support (Pre-Solicitation)</span></div><div class="compact-sub">W56KGY-26-R-0042 · CECOM · Aberdeen Proving Ground</div>
-                <div class="row-meta">
-                  <span class="badge doc presol">Pre-Sol</span>
-                  <span class="badge naics">NAICS 541330</span>
-                  <span class="badge naics">PSC AR25</span>
-                  <span class="badge setaside">WOSB</span>
-                </div>
-                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
-                <div class="insight info"><b>Not yet audited · posted 13 days out.</b> Audit early to shape capture strategy and flag teaming needs before the formal RFP drops.</div>
-              </div>
-              <div class="row-right">
-                <span class="deadline cold">13d left</span>
-                <span class="row-value">$9.6M</span>
-                <div class="row-actions">
-                  <button class="a primary">Run audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
-                  <button class="a">Add to pipeline</button>
-                  <button class="a">View solicitation</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ROW 8 · audited -->
+            <!-- ROW 5 -->
             <div class="row">
               <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">FA8807-26-R-0205</span><span class="row-title">SSC — GPS III Follow-On Ground Segment Sustainment Engineering</span></div><div class="compact-sub">FA8807-26-R-0205 · Space Systems Command · Los Angeles AFB</div>
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
                 <div class="row-meta">
-                  <span class="badge doc">RFP</span>
+                  <span class="badge doc sources">Sources Sought</span>
                   <span class="badge naics">NAICS 541715</span>
-                  <span class="badge naics">PSC AR25</span>
-                  <span class="badge setaside full">Full &amp; Open</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
                 </div>
-                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">Space Systems Command · Los Angeles AFB</span></div>
-                <div class="insight info"><b>Large-ceiling IDIQ.</b> Section M weights past performance 40%. Confirm your GPS ground-segment refs before committing — likely 4–5 incumbent-favored competitors.</div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
               </div>
               <div class="row-right">
-                <span class="deadline warn">7d left</span>
-                <span class="row-value">$22.0M</span>
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-            <!-- ROW 9 · audited -->
+            <!-- ROW 6 -->
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ROW 7 -->
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ROW 8 -->
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ROW 9 -->
             <div class="row priority">
               <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
               <div class="row-body">
-                <div class="row-top"><span class="row-id">70B04C26-R-0119</span><span class="row-title">USCG — Fast Response Cutter Hull Maintenance Availability</span></div><div class="compact-sub">70B04C26-R-0119 · U.S. Coast Guard · Baltimore Yard</div>
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
                 <div class="row-meta">
-                  <span class="badge doc">RFP</span>
-                  <span class="badge naics">NAICS 336611</span>
-                  <span class="badge naics">PSC 1905</span>
-                  <span class="badge setaside">SDVOSB</span>
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
                 </div>
-                <div class="row-agency one-line"><span class="agency-name">Dept. of Homeland Security</span><span class="agency-sub">U.S. Coast Guard · Baltimore Yard</span></div>
-                <div class="insight warn"><b>Match capped at 58 — NAICS 336611 (ship building) sits outside your core past performance.</b> Strong teaming candidate, weak prime. Identify a shipyard partner before pursuing.</div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
               </div>
               <div class="row-right">
-                <span class="deadline cold">16d left</span>
-                <span class="row-value">$6.7M</span>
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
                 <div class="row-actions">
-                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                   <button class="a">Add to pipeline</button>
                   <button class="a">View solicitation</button>
                 </div>
               </div>
             </div>
 
-          </div>
+          
+            <div class="row urgent">
+              <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">SDVOSB Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVSEA · PEO IWS 2.0</span></div>
+                <div class="insight win"><b>Strong fit · 9 of 12 SOW capabilities map to your past performance.</b> Incumbent contract ends Q4. CO Donna Reyes responds ~2.3 days. Suggest teaming with Leidos on radar S/W integration.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline crit">14h left</span>
+                <span class="row-value">$18.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R408</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Air Force</span><span class="agency-sub">AFLCMC · Hanscom AFB</span></div>
+                <div class="insight info"><b>Q&amp;A deadline closes Thursday.</b> Section L requires DO-178C DAL-B history — confirmed in your past performance. Pricing model favors fixed-price LOE.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">5d left</span>
+                <span class="row-value">$7.9M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D310</span>
+                  <span class="badge setaside">8(a) Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">USACE Huntsville</span></div>
+                <div class="insight warn"><b>CMMC L2 required before award.</b> Your CMMC L2 cert expires Aug 2026 — renew before submission. Past performance ref needed in DoD CIP space.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">6d left</span>
+                <span class="row-value">$3.2M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 236220</span>
+                  <span class="badge naics">PSC Y1HZ</span>
+                  <span class="badge setaside">SDVOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NSWC Indian Head</span></div>
+                <div class="insight alert"><b>Disqualifying clause detected — DFARS 252.225-7039 (Defense-related construction).</b> Your prior performance is in IT services; recommend no-bid unless teaming with a 236220-qualified prime.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline cold">11d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
+                <div class="row-meta">
+                  <span class="badge doc sources">Sources Sought</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">SDVOSB Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVSEA · PEO IWS 2.0</span></div>
+                <div class="insight win"><b>Strong fit · 9 of 12 SOW capabilities map to your past performance.</b> Incumbent contract ends Q4. CO Donna Reyes responds ~2.3 days. Suggest teaming with Leidos on radar S/W integration.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline crit">14h left</span>
+                <span class="row-value">$18.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R408</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Air Force</span><span class="agency-sub">AFLCMC · Hanscom AFB</span></div>
+                <div class="insight info"><b>Q&amp;A deadline closes Thursday.</b> Section L requires DO-178C DAL-B history — confirmed in your past performance. Pricing model favors fixed-price LOE.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">5d left</span>
+                <span class="row-value">$7.9M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D310</span>
+                  <span class="badge setaside">8(a) Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">USACE Huntsville</span></div>
+                <div class="insight warn"><b>CMMC L2 required before award.</b> Your CMMC L2 cert expires Aug 2026 — renew before submission. Past performance ref needed in DoD CIP space.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">6d left</span>
+                <span class="row-value">$3.2M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 236220</span>
+                  <span class="badge naics">PSC Y1HZ</span>
+                  <span class="badge setaside">SDVOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NSWC Indian Head</span></div>
+                <div class="insight alert"><b>Disqualifying clause detected — DFARS 252.225-7039 (Defense-related construction).</b> Your prior performance is in IT services; recommend no-bid unless teaming with a 236220-qualified prime.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline cold">11d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
+                <div class="row-meta">
+                  <span class="badge doc sources">Sources Sought</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">SDVOSB Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVSEA · PEO IWS 2.0</span></div>
+                <div class="insight win"><b>Strong fit · 9 of 12 SOW capabilities map to your past performance.</b> Incumbent contract ends Q4. CO Donna Reyes responds ~2.3 days. Suggest teaming with Leidos on radar S/W integration.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline crit">14h left</span>
+                <span class="row-value">$18.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R408</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Air Force</span><span class="agency-sub">AFLCMC · Hanscom AFB</span></div>
+                <div class="insight info"><b>Q&amp;A deadline closes Thursday.</b> Section L requires DO-178C DAL-B history — confirmed in your past performance. Pricing model favors fixed-price LOE.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">5d left</span>
+                <span class="row-value">$7.9M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D310</span>
+                  <span class="badge setaside">8(a) Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">USACE Huntsville</span></div>
+                <div class="insight warn"><b>CMMC L2 required before award.</b> Your CMMC L2 cert expires Aug 2026 — renew before submission. Past performance ref needed in DoD CIP space.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">6d left</span>
+                <span class="row-value">$3.2M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 236220</span>
+                  <span class="badge naics">PSC Y1HZ</span>
+                  <span class="badge setaside">SDVOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NSWC Indian Head</span></div>
+                <div class="insight alert"><b>Disqualifying clause detected — DFARS 252.225-7039 (Defense-related construction).</b> Your prior performance is in IT services; recommend no-bid unless teaming with a 236220-qualified prime.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline cold">11d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
+                <div class="row-meta">
+                  <span class="badge doc sources">Sources Sought</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">SDVOSB Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVSEA · PEO IWS 2.0</span></div>
+                <div class="insight win"><b>Strong fit · 9 of 12 SOW capabilities map to your past performance.</b> Incumbent contract ends Q4. CO Donna Reyes responds ~2.3 days. Suggest teaming with Leidos on radar S/W integration.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline crit">14h left</span>
+                <span class="row-value">$18.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R408</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Air Force</span><span class="agency-sub">AFLCMC · Hanscom AFB</span></div>
+                <div class="insight info"><b>Q&amp;A deadline closes Thursday.</b> Section L requires DO-178C DAL-B history — confirmed in your past performance. Pricing model favors fixed-price LOE.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">5d left</span>
+                <span class="row-value">$7.9M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D310</span>
+                  <span class="badge setaside">8(a) Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">USACE Huntsville</span></div>
+                <div class="insight warn"><b>CMMC L2 required before award.</b> Your CMMC L2 cert expires Aug 2026 — renew before submission. Past performance ref needed in DoD CIP space.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">6d left</span>
+                <span class="row-value">$3.2M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 236220</span>
+                  <span class="badge naics">PSC Y1HZ</span>
+                  <span class="badge setaside">SDVOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NSWC Indian Head</span></div>
+                <div class="insight alert"><b>Disqualifying clause detected — DFARS 252.225-7039 (Defense-related construction).</b> Your prior performance is in IT services; recommend no-bid unless teaming with a 236220-qualified prime.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline cold">11d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
+                <div class="row-meta">
+                  <span class="badge doc sources">Sources Sought</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-hi"><div class="v">94</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00024-26-R-2207</span>
+                  <span class="row-title">SPY-6 Radar Sustainment Engineering — Phase IV CDRL Refresh</span>
+                </div><div class="compact-sub">N00024-26-R-2207 · NAVSEA · PEO IWS 2.0</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">SDVOSB Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVSEA · PEO IWS 2.0</span></div>
+                <div class="insight win"><b>Strong fit · 9 of 12 SOW capabilities map to your past performance.</b> Incumbent contract ends Q4. CO Donna Reyes responds ~2.3 days. Suggest teaming with Leidos on radar S/W integration.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline crit">14h left</span>
+                <span class="row-value">$18.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">88</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA8730-26-Q-0114</span>
+                  <span class="row-title">F-35 Mission Systems — Software Test Harness Refactor &amp; CI Pipeline</span>
+                </div><div class="compact-sub">FA8730-26-Q-0114 · AFLCMC · Hanscom AFB</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R408</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Air Force</span><span class="agency-sub">AFLCMC · Hanscom AFB</span></div>
+                <div class="insight info"><b>Q&amp;A deadline closes Thursday.</b> Section L requires DO-178C DAL-B history — confirmed in your past performance. Pricing model favors fixed-price LOE.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">5d left</span>
+                <span class="row-value">$7.9M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-md"><div class="v">81</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W912DY-26-R-0089</span>
+                  <span class="row-title">USACE Huntsville — Cyber Resilience Assessment, Critical Infrastructure</span>
+                </div><div class="compact-sub">W912DY-26-R-0089 · USACE Huntsville</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D310</span>
+                  <span class="badge setaside">8(a) Set-Aside</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">USACE Huntsville</span></div>
+                <div class="insight warn"><b>CMMC L2 required before award.</b> Your CMMC L2 cert expires Aug 2026 — renew before submission. Past performance ref needed in DoD CIP space.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">6d left</span>
+                <span class="row-value">$3.2M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row urgent">
+              <div class="score s-no"><div class="v">42</div><div class="l">Trap</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N00178-26-R-3071</span>
+                  <span class="row-title">NSWC Indian Head — Energetics Material Handling, Bldg. 4042 Modification</span>
+                </div><div class="compact-sub">N00178-26-R-3071 · NSWC Indian Head</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 236220</span>
+                  <span class="badge naics">PSC Y1HZ</span>
+                  <span class="badge setaside">SDVOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NSWC Indian Head</span></div>
+                <div class="insight alert"><b>Disqualifying clause detected — DFARS 252.225-7039 (Defense-related construction).</b> Your prior performance is in IT services; recommend no-bid unless teaming with a 236220-qualified prime.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline cold">11d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">76</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">SP4701-26-Q-0942</span>
+                  <span class="row-title">DLA Aviation — Predictive Maintenance Analytics, H-60 Powertrain Fleet</span>
+                </div><div class="compact-sub">SP4701-26-Q-0942 · DLA Aviation · Richmond, VA</div>
+                <div class="row-meta">
+                  <span class="badge doc sources">Sources Sought</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside full">TBD</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Defense Logistics Agency</span><span class="agency-sub">DLA Aviation · Richmond, VA</span></div>
+                <div class="insight info"><b>Shape the requirement.</b> Respond by Fri to influence Section M evaluation criteria. 3 similar capability statements requested last quarter — none from SDVOSBs.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">Response · 9d left</span>
+                <span class="row-value">$12M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">71</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">HQ0034-26-R-2058</span>
+                  <span class="row-title">DARPA — Resilient Tactical Edge Compute, Phase 2 SBIR Open Topic</span>
+                </div><div class="compact-sub">HQ0034-26-R-2058 · DARPA I2O</div>
+                <div class="row-meta">
+                  <span class="badge doc presol">Pre-solicitation</span>
+                  <span class="badge naics">NAICS 541715</span>
+                  <span class="badge naics">PSC AC12</span>
+                  <span class="badge setaside">Small Business</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">DARPA</span><span class="agency-sub">DARPA I2O</span></div>
+                <div class="insight win"><b>Open topic — proposal flexibility high.</b> Your Phase 1 close-out (Apr 2026) qualifies you for direct-to-Phase-2. Avg award $1.8M / 24mo.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">18d left</span>
+                <span class="row-value">$1.8M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-hi"><div class="v">86</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">FA2517-26-R-0033</span>
+                  <span class="row-title">Space Force — Ground Station Software Modernization, GPS III Constellation</span>
+                </div><div class="compact-sub">FA2517-26-R-0033 · SSC · Peterson SFB, CO</div>
+                <div class="row-meta">
+                  <span class="badge doc">RFP</span>
+                  <span class="badge naics">NAICS 541512</span>
+                  <span class="badge naics">PSC D316</span>
+                  <span class="badge setaside full">Full &amp; Open</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">U.S. Space Force</span><span class="agency-sub">SSC · Peterson SFB, CO</span></div>
+                <div class="insight win"><b>3 teaming partners matched — Booz Allen, CACI, Parsons (all OASIS+ holders).</b> Section L requires SECRET-cleared PM minimum — your bench has 4 qualified.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">4d left</span>
+                <span class="row-value">$24.6M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="score s-md"><div class="v">68</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">W56KGY-26-R-0014</span>
+                  <span class="row-title">CECOM — Tactical Network Sustainment Support, Aberdeen Proving Ground</span>
+                </div><div class="compact-sub">W56KGY-26-R-0014 · CECOM · Aberdeen Proving Ground</div>
+                <div class="row-meta">
+                  <span class="badge doc combined">Combined Synopsis</span>
+                  <span class="badge naics">NAICS 541330</span>
+                  <span class="badge naics">PSC R425</span>
+                  <span class="badge setaside">WOSB</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Army</span><span class="agency-sub">CECOM · Aberdeen Proving Ground</span></div>
+                <div class="insight warn"><b>Watch item.</b> Page count limited to 40 — your typical proposals exceed by 35%. Recommend lean proposal team kickoff if pursuing.</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline ok">14d left</span>
+                <span class="row-value">$5.4M</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div>
+            <div class="row priority">
+              <div class="score s-lo"><div class="v">58</div><div class="l">Match</div></div>
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="row-id">N40192-26-Q-1188</span>
+                  <span class="row-title">NAVFAC Pacific — Energetics Storage Magazine Inspection Services, Guam</span>
+                </div><div class="compact-sub">N40192-26-Q-1188 · NAVFAC Pacific · JBPHH, HI</div>
+                <div class="row-meta">
+                  <span class="badge doc rfq">RFQ</span>
+                  <span class="badge naics">NAICS 541620</span>
+                  <span class="badge naics">PSC R702</span>
+                  <span class="badge setaside">HUBZone</span>
+                </div>
+                <div class="row-agency one-line"><span class="agency-name">Dept. of the Navy</span><span class="agency-sub">NAVFAC Pacific · JBPHH, HI</span></div>
+                <div class="insight info"><b>OCONUS performance — travel &amp; cleared escort required.</b> Pricing model favors T&amp;M with not-to-exceed ceiling. Light teaming pool (3 firms in last 18mo).</div>
+              </div>
+              <div class="row-right">
+                <span class="deadline warn">7d left</span>
+                <span class="row-value">$890K</span>
+                <div class="row-actions">
+                  <button class="a primary">Open audit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  <button class="a">Add to pipeline</button>
+                  <button class="a">View solicitation</button>
+                </div>
+              </div>
+            </div></div>
+
+          
         </div>
 
       </div>
@@ -2247,7 +3426,7 @@
             <div class="ph-sub" style="display:none"></div>
           </div>
 
-          <div class="qa-drop" onclick="location.href='/audit'" style="cursor:pointer">
+          <div class="qa-drop">
             <div class="ic">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
             </div>
@@ -2539,21 +3718,5 @@ applyAll();
 })();
 </script>
 
-<script>/* sb-toggle handler v2 */
-(function(){
-  var KEY='faraudit-sb';
-  var html=document.documentElement;
-  try{var saved=localStorage.getItem(KEY); if(saved==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
-  document.addEventListener('click',function(e){
-    var t=e.target && e.target.closest && e.target.closest('#sbToggle');
-    if(!t) return;
-    var cur=html.getAttribute('data-sb');
-    var next=cur==='open'?'closed':'open';
-    html.setAttribute('data-sb',next);
-    try{localStorage.setItem(KEY,next);}catch(e){}
-  });
-})();
-</script>
-<script src="/command-center-live.js"></script>
 </body>
 </html>
