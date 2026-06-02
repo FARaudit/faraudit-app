@@ -258,6 +258,46 @@
     });
   }
 
+  // Current sort mode (Score|Deadline|Posted|Value). Read by applyFilters
+  // when rendering live data so the displayed order matches the sort label.
+  var SORT_MODE = "Score";
+  function sortOpps(arr) {
+    var key = SORT_MODE;
+    return arr.slice().sort(function (a, b) {
+      if (key === "Score") {
+        var sa = a.compliance_score, sb = b.compliance_score;
+        if (sa == null && sb == null) return 0;
+        if (sa == null) return 1;   // nulls last
+        if (sb == null) return -1;
+        return sb - sa;             // desc
+      }
+      if (key === "Deadline") {
+        var da = a.response_deadline ? new Date(a.response_deadline).getTime() : NaN;
+        var db = b.response_deadline ? new Date(b.response_deadline).getTime() : NaN;
+        if (isNaN(da) && isNaN(db)) return 0;
+        if (isNaN(da)) return 1;    // nulls last
+        if (isNaN(db)) return -1;
+        return da - db;             // asc (soonest first)
+      }
+      if (key === "Posted") {
+        var pa = (a.posted_date || a.created_at) ? new Date(a.posted_date || a.created_at).getTime() : NaN;
+        var pb = (b.posted_date || b.created_at) ? new Date(b.posted_date || b.created_at).getTime() : NaN;
+        if (isNaN(pa) && isNaN(pb)) return 0;
+        if (isNaN(pa)) return 1;
+        if (isNaN(pb)) return -1;
+        return pb - pa;             // desc (newest first)
+      }
+      if (key === "Value") {
+        var va = a.award_ceiling, vb = b.award_ceiling;
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        return vb - va;             // desc
+      }
+      return 0;
+    });
+  }
+
   function wireSortAndView() {
     document.querySelectorAll(".sort-pill").forEach(function (sp) {
       if (sp.dataset.ccWired) return;
@@ -270,6 +310,14 @@
         var cur = (valEl.textContent || "Score").trim();
         var next = modes[(modes.indexOf(cur) + 1) % modes.length] || "Score";
         valEl.textContent = next;
+        SORT_MODE = next;
+        // Re-sort + re-render only if we actually have live data driving the feed.
+        // Static rows can't be re-ordered without DOM rewrites we want to avoid.
+        if (ALL_OPPS && ALL_OPPS.length) {
+          ALL_OPPS = sortOpps(ALL_OPPS);
+          VISIBLE_COUNT = 20;
+          applyFilters();
+        }
       });
     });
     document.querySelectorAll('.view-seg button[data-value]').forEach(function (btn) {
@@ -278,7 +326,13 @@
       btn.style.cursor = "pointer";
       btn.addEventListener("click", function () {
         var v = btn.getAttribute("data-value") || "cards";
+        // CSS selector is [data-feed-view="compact"] .row — attribute selector
+        // without an element prefix matches any ancestor. The design's tweaks
+        // JS sets it on <html>; mirror that AND set on <body> as a hardening
+        // measure so the CSS engages regardless of which ancestor the browser
+        // resolves the selector against.
         document.documentElement.setAttribute("data-feed-view", v);
+        if (document.body) document.body.setAttribute("data-feed-view", v);
         var parent = btn.parentElement;
         if (parent) {
           parent.querySelectorAll('button[data-value]').forEach(function (s) { s.removeAttribute("data-on"); });
@@ -338,7 +392,11 @@
       btn.addEventListener("click", function () {
         var fb = document.querySelector(".filter-bar");
         if (!fb) return;
-        fb.style.display = (fb.style.display === "none") ? "" : "none";
+        // Use computed style — fb.style.display is "" by default (CSS sets
+        // display:flex via stylesheet, not inline), so the previous
+        // inline-only check toggled in the wrong direction on first click.
+        var current = window.getComputedStyle(fb).display;
+        fb.style.display = (current === "none") ? "flex" : "none";
       });
     });
   }
@@ -578,7 +636,7 @@
       return;
     }
 
-    ALL_OPPS = opps;
+    ALL_OPPS = sortOpps(opps);
     applyFilters(); // also re-wires row actions on the freshly-injected rows
 
     console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
