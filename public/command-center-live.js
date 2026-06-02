@@ -14,6 +14,19 @@
     if (days <= 7) return "s-lo";
     return "s-md";
   }
+  // TODO chip urgency (u-crit/u-warn/u-cold) — matches the .score.todo CSS variant.
+  function todoUrgencyTier(days) {
+    if (days == null) return "u-cold";
+    if (days <= 2)   return "u-crit";
+    if (days <= 7)   return "u-warn";
+    return "u-cold";
+  }
+  function todoTipText(days) {
+    if (days == null || days < 0) return 'Pending audit — <b>queue this</b> for review';
+    if (days === 0) return 'Audit this <b>now</b> — closes <b>today</b>';
+    if (days === 1) return 'Audit this <b>now</b> — deadline in <b>1 day</b>';
+    return 'Audit this <b>now</b> — deadline in <b>' + days + ' days</b>';
+  }
   function docBadgeClass(docType) {
     if (!docType) return "badge doc";
     var d = String(docType).toLowerCase();
@@ -76,6 +89,26 @@
     var sClass = hasScore ? scoreClass(rawScore) : urgencyTier(days);
     var sValue = hasScore ? (rawScore || "--") : "—";
     var sLabel = hasScore ? scoreLabel(rawScore) : "Pending";
+    // Un-audited rows render the TODO chip (lightning bolt + days + Audit Now)
+    // instead of the standard score chip. Clickable → /audit.
+    var scoreChip;
+    if (hasScore) {
+      scoreChip = '<div class="score ' + sClass + '">'
+        + '<div class="v">' + sValue + '</div>'
+        + '<div class="l">' + sLabel + '</div>'
+        + '</div>';
+    } else {
+      var uTier = todoUrgencyTier(days);
+      var daysTxt = (days != null && days >= 0) ? String(days) : "—";
+      scoreChip = '<div class="score todo ' + uTier + '" data-cc-audit-now="1" title="Audit Now">'
+        + '<div class="vrow">'
+        + '<svg class="bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></svg>'
+        + '<div class="v">' + daysTxt + '</div>'
+        + '</div>'
+        + '<div class="l">Audit Now</div>'
+        + '<div class="tip">' + todoTipText(days) + '</div>'
+        + '</div>';
+    }
     var rowCls = urgencyClass(days, opp.risk_level);
     var dlCls  = deadlineTier(days);
     var id     = opp.solicitation_number || opp.notice_id || "";
@@ -99,7 +132,7 @@
     var agencySub = opp.incumbent_name ? '<span class="agency-sub">' + opp.incumbent_name + '</span>' : '<span class="agency-sub"></span>';
 
     return '<div class="' + rowCls + '">'
-      + '<div class="score ' + sClass + '"><div class="v">' + sValue + '</div><div class="l">' + sLabel + '</div></div>'
+      + scoreChip
       + '<div class="row-body">'
       + '<div class="row-top"><span class="row-id">' + id + '</span><span class="row-title">' + title.slice(0, 80) + '</span></div>'
       + '<div class="compact-sub">' + id + '</div>'
@@ -324,6 +357,16 @@
           }
         });
       });
+      // TODO chip on un-audited rows — click navigates to /audit
+      var todo = row.querySelector(".score.todo");
+      if (todo) {
+        todo.style.cursor = "pointer";
+        todo.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.location.href = "/audit";
+        });
+      }
     });
   }
 
