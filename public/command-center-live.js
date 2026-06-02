@@ -232,9 +232,22 @@
     }
 
     wireKpiClicks();
-    wireChipFilters();
 
-    ALL_OPPS = data.opportunities || [];
+    var opps = data.opportunities || [];
+    var hasScored = opps.some(function (o) { return o && o.compliance_score != null; });
+    if (!hasScored) {
+      // No row has a real AI verdict — leave the static design rows in place
+      // so the design's curated sample feed stays visible. Chip filters and
+      // pagination stay un-wired because clicking them would erase the static
+      // rows by replacing .feed-list innerHTML with an empty (or score-less)
+      // render. KPIs, date, sync, greeting, and sidebar counts already
+      // updated above.
+      console.log("[cc-live] no scored rows — keeping static feed (KPIs updated)");
+      return;
+    }
+
+    wireChipFilters();
+    ALL_OPPS = opps;
     applyFilters();
 
     console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
