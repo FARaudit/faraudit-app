@@ -149,6 +149,9 @@
     var feedCount = document.querySelector(".feed-head h2 .count");
     if (feedCount) feedCount.textContent = visible.length + " of " + filtered.length;
 
+    // Newly-injected rows have no listeners — re-bind action buttons
+    wireRowActions();
+
     var existing = document.querySelector(".cc-load-more");
     if (existing) existing.remove();
     if (filtered.length > VISIBLE_COUNT) {
@@ -164,16 +167,51 @@
     }
   }
 
-  function wireChipFilters() {
+  // ── Static-row filter: hide/show .feed-list rows by class hints (used when
+  // the live API has no scored rows and we're keeping the design's sample feed) ──
+  function staticRowMatchesFilter(row, label) {
+    if (!label || label === "all") return true;
+    if (label === "urgent") return row.classList.contains("urgent");
+    if (label === "hot match" || label === "hot") return !!row.querySelector(".score.s-hi");
+    if (label === "at risk" || label === "risk") {
+      return row.classList.contains("urgent")
+        || !!row.querySelector(".score.s-no")
+        || !!row.querySelector(".insight.alert")
+        || !!row.querySelector(".insight.warn");
+    }
+    // "new 24h" and "in pipeline" have no truthy signal in static markup → show all
+    return true;
+  }
+  function filterStaticRows(label) {
+    var visible = 0, total = 0;
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      total++;
+      var show = staticRowMatchesFilter(row, label);
+      row.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    var countEl = document.querySelector(".feed-head h2 .count");
+    if (countEl) countEl.textContent = visible + " of " + total;
+  }
+
+  function wireChips() {
     document.querySelectorAll(".chip-tab").forEach(function (chip) {
+      if (chip.dataset.ccWired) return;
+      chip.dataset.ccWired = "1";
       chip.style.cursor = "pointer";
       chip.addEventListener("click", function () {
         document.querySelectorAll(".chip-tab").forEach(function (c) { c.classList.remove("active"); });
         chip.classList.add("active");
         var label = (chip.innerText || "").toLowerCase().replace(/\s*\d+\s*$/, "").trim();
-        ACTIVE_FILTER = label || "all";
-        VISIBLE_COUNT = 20;
-        applyFilters();
+        if (ALL_OPPS && ALL_OPPS.length) {
+          // Live data mode — drive the existing applyFilters pipeline
+          ACTIVE_FILTER = label || "all";
+          VISIBLE_COUNT = 20;
+          applyFilters();
+        } else {
+          // Static-design mode — show/hide existing DOM rows in place
+          filterStaticRows(label || "all");
+        }
       });
     });
   }
@@ -181,13 +219,99 @@
   function wireKpiClicks() {
     var routes = { navy: "/opportunities", red: "/dashboard", amber: "/opportunities", teal: "/dashboard" };
     document.querySelectorAll(".kpi").forEach(function (kpi) {
+      if (kpi.dataset.ccWired) return;
       var tier = ["navy", "red", "amber", "teal"].find(function (t) { return kpi.classList.contains(t); });
       if (!tier) return;
+      kpi.dataset.ccWired = "1";
       kpi.style.cursor = "pointer";
-      kpi.addEventListener("click", function () {
-        window.location.href = routes[tier];
+      kpi.addEventListener("click", function () { window.location.href = routes[tier]; });
+    });
+  }
+
+  function wireRowActions() {
+    document.querySelectorAll(".feed-list .row").forEach(function (row) {
+      if (row.dataset.ccActionsWired) return;
+      row.dataset.ccActionsWired = "1";
+      var idEl = row.querySelector(".row-id");
+      var solId = idEl ? (idEl.textContent || "").trim() : "";
+      row.querySelectorAll(".row-actions .a").forEach(function (btn) {
+        btn.style.cursor = "pointer";
+        var label = (btn.textContent || "").trim().toLowerCase();
+        btn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (label.indexOf("open audit") !== -1) {
+            var dataId = btn.getAttribute("data-id") || "";
+            window.location.href = dataId ? "/audit/" + dataId : "/audit";
+          } else if (label.indexOf("add to pipeline") !== -1) {
+            window.location.href = "/pipeline";
+          } else if (label.indexOf("view solicitation") !== -1) {
+            if (solId) {
+              window.open("https://sam.gov/search/?keywords=" + encodeURIComponent(solId) + "&index=opp&page=1", "_blank", "noopener,noreferrer");
+            } else {
+              window.location.href = "/opportunities";
+            }
+          }
+        });
       });
     });
+  }
+
+  function wireSortAndView() {
+    document.querySelectorAll(".sort-pill").forEach(function (sp) {
+      if (sp.dataset.ccWired) return;
+      sp.dataset.ccWired = "1";
+      sp.style.cursor = "pointer";
+      var modes = ["Score", "Deadline", "Posted", "Value"];
+      sp.addEventListener("click", function () {
+        var valEl = sp.querySelector(".val");
+        if (!valEl) return;
+        var cur = (valEl.textContent || "Score").trim();
+        var next = modes[(modes.indexOf(cur) + 1) % modes.length] || "Score";
+        valEl.textContent = next;
+      });
+    });
+    document.querySelectorAll('.view-seg button[data-value]').forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function () {
+        var v = btn.getAttribute("data-value") || "cards";
+        document.documentElement.setAttribute("data-feed-view", v);
+        var parent = btn.parentElement;
+        if (parent) {
+          parent.querySelectorAll('button[data-value]').forEach(function (s) { s.removeAttribute("data-on"); });
+        }
+        btn.setAttribute("data-on", "true");
+      });
+    });
+  }
+
+  function wireViewAllPursuits() {
+    document.querySelectorAll(".view-all").forEach(function (btn) {
+      if (btn.dataset.ccWired) return;
+      btn.dataset.ccWired = "1";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", function () { window.location.href = "/pipeline"; });
+    });
+  }
+
+  function wireRecentAudits() {
+    document.querySelectorAll(".qa-recent .qa-item").forEach(function (item) {
+      if (item.dataset.ccWired) return;
+      item.dataset.ccWired = "1";
+      item.style.cursor = "pointer";
+      item.addEventListener("click", function () { window.location.href = "/dashboard"; });
+    });
+  }
+
+  function wireInteractions() {
+    wireKpiClicks();
+    wireChips();
+    wireRowActions();
+    wireSortAndView();
+    wireViewAllPursuits();
+    wireRecentAudits();
   }
 
   async function wireCommandCenter() {
@@ -231,24 +355,21 @@
       sbBadges[0].textContent = String(data.auditTotal);
     }
 
-    wireKpiClicks();
+    // Wire ALL interactions unconditionally — every button/chip/tile must be
+    // live regardless of whether we replace the feed or keep the static design.
+    wireInteractions();
 
     var opps = data.opportunities || [];
     var hasScored = opps.some(function (o) { return o && o.compliance_score != null; });
     if (!hasScored) {
-      // No row has a real AI verdict — leave the static design rows in place
-      // so the design's curated sample feed stays visible. Chip filters and
-      // pagination stay un-wired because clicking them would erase the static
-      // rows by replacing .feed-list innerHTML with an empty (or score-less)
-      // render. KPIs, date, sync, greeting, and sidebar counts already
-      // updated above.
-      console.log("[cc-live] no scored rows — keeping static feed (KPIs updated)");
+      // No AI verdict yet — leave the static design rows in place. Chips will
+      // filter the static DOM rows via filterStaticRows() (wired in wireChips).
+      console.log("[cc-live] no scored rows — keeping static feed (interactions wired)");
       return;
     }
 
-    wireChipFilters();
     ALL_OPPS = opps;
-    applyFilters();
+    applyFilters(); // also re-wires row actions on the freshly-injected rows
 
     console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
   }
