@@ -477,16 +477,31 @@
 
   function renderPursuitRows(data) {
     var cards = data.pipelineTop6 || [];
-    if (cards.length === 0) return; // keep static design rows if no live pipeline
     // Find the Active Pursuits panel by locating .pursuits-summary's parent.
     var summary = document.querySelector(".pursuits-summary");
     if (!summary) return;
     var panel = summary.parentElement;
     if (!panel) return;
-    // Remove every existing .pursuit row (the 6 hardcoded ones)
+    // Remove every existing .pursuit row (the 6 hardcoded static ones AND
+    // any prior live render) + any prior empty-state we may have inserted.
     panel.querySelectorAll(".pursuit").forEach(function (p) { p.remove(); });
-    // Append the new ones after .pursuits-spark (or .pursuits-summary if spark missing).
+    panel.querySelectorAll(".cc-empty-pursuits").forEach(function (e) { e.remove(); });
+
+    // Anchor: insert after .pursuits-spark (or .pursuits-summary if absent).
     var anchor = panel.querySelector(".pursuits-spark") || summary;
+
+    if (cards.length === 0) {
+      // Empty state — replaces the 6 mock cards rather than leaving them
+      // visible as misleading other-user content. Inline styles avoid
+      // introducing a new design selector.
+      var empty = document.createElement("div");
+      empty.className = "cc-empty-pursuits";
+      empty.style.cssText = "padding:20px 14px;text-align:center;font-size:12.5px;color:var(--mute);font-weight:500;border-top:1px solid var(--line-2);margin-top:8px";
+      empty.innerHTML = 'No active pursuits yet — <a href="/pipeline" style="color:var(--blue-600);font-weight:600;text-decoration:none">add one →</a>';
+      anchor.parentElement.insertBefore(empty, anchor.nextSibling);
+      return;
+    }
+
     cards.forEach(function (card) {
       var tpl = document.createElement("div");
       tpl.innerHTML = buildPursuitCard(card);
