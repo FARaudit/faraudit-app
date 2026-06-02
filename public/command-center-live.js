@@ -88,7 +88,13 @@
     var docTxt = opp.document_type || "RFQ";
     var value  = opp.award_ceiling ? '<span class="row-value">' + fmtValue(opp.award_ceiling) + '</span>' : "";
     var insight = opp.recommendation
-      ? '<div class="insight ' + insightVariant(opp) + '"><b>' + opp.recommendation.slice(0, 140) + '</b></div>'
+      ? '<div class="insight ' + insightVariant(opp) + '">'
+        + '<div class="ai-row">'
+        + '<span class="ai-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg></span>'
+        + '<span class="ai-label">AI INSIGHT</span>'
+        + '</div>'
+        + '<div class="ai-desc">' + opp.recommendation.slice(0, 220) + '</div>'
+        + '</div>'
       : "";
     var agencySub = opp.incumbent_name ? '<span class="agency-sub">' + opp.incumbent_name + '</span>' : '<span class="agency-sub"></span>';
 

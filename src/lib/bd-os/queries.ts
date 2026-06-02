@@ -136,15 +136,32 @@ export async function fetchOpportunities(
     rawRows = (data || []) as unknown[];
     break;
   }
-  // FA-89f: cross-reference audits table for is_audited flag. A row is
-  // "audited" only when a corresponding audits.notice_id exists with
-  // status='complete' — independent of pending_audits.status which is the
-  // ingest-queue state, not whether a real audit was produced.
-  const { data: auditedRows } = await client.from("audits").select("notice_id").eq("status", "complete");
-  const auditedSet = new Set((auditedRows || []).map((r: { notice_id: string | null }) => r.notice_id).filter(Boolean) as string[]);
+  // FA-89f: cross-reference audits table — both for is_audited flag AND for
+  // backfilling compliance_score/recommendation. pending_audits is the SAM.gov
+  // ingest queue; AI-derived score+recommendation live in the audits table.
+  // For each pending row, look up the latest completed audit by notice_id
+  // (sorted desc on completed_at) and let those values override the queue's
+  // empty placeholders. Without this, command-center insights stay null
+  // because the queue row never gets the AI verdict written back to it.
+  const { data: completedAudits } = await client
+    .from("audits")
+    .select("notice_id, compliance_score, recommendation, completed_at")
+    .eq("status", "complete")
+    .order("completed_at", { ascending: false });
+  const auditByNotice = new Map<string, { compliance_score: number | null; recommendation: string | null }>();
+  for (const a of (completedAudits || []) as Array<{ notice_id: string | null; compliance_score: number | null; recommendation: string | null }>) {
+    if (!a.notice_id) continue;
+    if (auditByNotice.has(a.notice_id)) continue; // first hit wins = latest by completed_at desc
+    auditByNotice.set(a.notice_id, { compliance_score: a.compliance_score, recommendation: a.recommendation });
+  }
   return rawRows.map((r) => {
     const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, ...(r as object) } as OpportunityRow;
-    base.is_audited = auditedSet.has(base.notice_id);
+    const matched = base.notice_id ? auditByNotice.get(base.notice_id) : null;
+    base.is_audited = !!matched;
+    if (matched) {
+      if (matched.compliance_score != null) base.compliance_score = matched.compliance_score;
+      if (matched.recommendation != null) base.recommendation = matched.recommendation;
+    }
     return base;
   });
 }
