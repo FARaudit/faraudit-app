@@ -624,12 +624,17 @@
     pill.setAttribute("data-cc-open", "1");
     var menu = document.createElement("div");
     menu.className = "cc-pill-menu";
+    // z-index 99999 — design has elements at z-index:1000 (tweaks panel) and
+    // z-index:300 (sidebar tooltips). Earlier menu was at 200, would render
+    // behind them and appear "not in DOM" to the user inspecting visible area.
     menu.style.cssText =
       "position:fixed;background:#fff;border:1px solid #cbd5e1;border-radius:8px;" +
       "box-shadow:0 8px 28px -6px rgba(15,23,42,0.20);min-width:200px;max-width:280px;" +
-      "padding:6px;z-index:200;font:500 12.5px/1.4 system-ui,-apple-system,sans-serif;color:#0f172a;";
+      "padding:6px;z-index:99999;font:500 12.5px/1.4 system-ui,-apple-system,sans-serif;color:#0f172a;";
     var r = pill.getBoundingClientRect();
-    menu.style.left = r.left + "px";
+    // Clamp to viewport so menu never lands off-screen on right-edge pills
+    var left = Math.min(r.left, window.innerWidth - 300);
+    menu.style.left = Math.max(8, left) + "px";
     menu.style.top = (r.bottom + 4) + "px";
     options.forEach(function (opt) {
       var item = document.createElement("button");
@@ -941,18 +946,27 @@
       sbBadges[0].textContent = String(data.auditTotal);
     }
 
-    // Wire ALL interactions unconditionally — every button/chip/tile must be
-    // live regardless of whether we replace the feed or keep the static design.
-    wireInteractions();
+    // Wire ALL interactions unconditionally. Wrap in try/catch so a throw in
+    // any single wire function (e.g., a missing element on a future redesign)
+    // can't prevent applyFilters from running — the symptom would be "feed
+    // stuck at static 9 of 9" and we'd see no console trace without this.
+    try { wireInteractions(); }
+    catch (e) { console.error("[cc-live] wireInteractions threw:", e); }
+
+    var oppCount = (data.opportunities && data.opportunities.length) || 0;
+    console.log("[cc-live] API ok · opportunities=" + oppCount + " · liveCount=" + data.liveCount);
 
     // FIX 1 (2026-06-01): Always render from live API data. Un-audited rows
     // (compliance_score=null) are valid feed entries — buildRow's TODO chip
     // variant handles them. Previously this returned early on !hasScored,
     // capping the feed at the static 9-row design.
-    ALL_OPPS = sortOpps(data.opportunities || []);
-    applyFilters(); // also re-wires row actions + lifts doc badges for compact
-
-    console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities ·", data.liveCount, "total in DB");
+    try {
+      ALL_OPPS = sortOpps(data.opportunities || []);
+      applyFilters(); // also re-wires row actions + lifts doc badges for compact
+      console.log("[cc-live] rendered", ALL_OPPS.length, "opportunities");
+    } catch (e) {
+      console.error("[cc-live] applyFilters threw:", e);
+    }
   }
 
   if (document.readyState === "loading") {
