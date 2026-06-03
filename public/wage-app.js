@@ -175,6 +175,6 @@
   function renderAll() { renderKPIs(); renderWage(); renderPanel(); renderList(); renderFlags(); renderWD(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderWage, 200); }); }
-  window.WAGE_APP = { onThemeChange };
+  window.WAGE_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
