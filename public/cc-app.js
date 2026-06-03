@@ -3,42 +3,45 @@
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-  // domain palette
-  const DESK = {
-    opp:   { label: 'Opportunities', color: '#378ADD', href: 'Opportunities (best-in-class).html', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
-    co:    { label: 'Contracting Officers', color: '#185FA5', href: 'Contracting Officers (best-in-class).html', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
-    cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: 'CMMC Readiness (best-in-class).html', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
-    gao:   { label: 'GAO Protests', color: '#dc2626', href: 'GAO Protests (best-in-class).html', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
-    far:   { label: 'FAR/DFARS', color: '#7c3aed', href: 'FAR-DFARS Updates (best-in-class).html', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
-    wage:  { label: 'Wage Benchmarks', color: '#d97706', href: 'Wage Benchmarks (best-in-class).html', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
-    team:  { label: 'Teaming Partners', color: '#059669', href: 'Teaming Partners (best-in-class).html', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
-    spend: { label: 'Defense Spending', color: '#2C6CB4', href: 'Defense Spending (best-in-class).html', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
+  // Promote DESK / ACTIONS / WEEK to window.CC so command-center-live.js
+  // can mutate the arrays/objects in place. Keep the IIFE-local refs so
+  // render logic doesn't change.
+  window.CC = window.CC || {
+    DESK: {
+      opp:   { label: 'Opportunities', color: '#378ADD', href: 'Opportunities (best-in-class).html', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
+      co:    { label: 'Contracting Officers', color: '#185FA5', href: 'Contracting Officers (best-in-class).html', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
+      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: 'CMMC Readiness (best-in-class).html', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
+      gao:   { label: 'GAO Protests', color: '#dc2626', href: 'GAO Protests (best-in-class).html', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
+      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: 'FAR-DFARS Updates (best-in-class).html', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
+      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: 'Wage Benchmarks (best-in-class).html', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
+      team:  { label: 'Teaming Partners', color: '#059669', href: 'Teaming Partners (best-in-class).html', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
+      spend: { label: 'Defense Spending', color: '#2C6CB4', href: 'Defense Spending (best-in-class).html', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
+    },
+    ACTIONS: [
+      { desk: 'opp', urg: 'crit', days: 6, title: 'SPY-6 Radar Sustainment — submit in 6 days', why: 'Fit 94, SDVOSB set-aside, $18.4M ceiling. Your strongest open pursuit and the clock is running.', cta: 'Open pursuit', val: '$18.4M' },
+      { desk: 'gao', urg: 'crit', days: 0, title: '$5.4M of tracked award value is contestable', why: 'Active AFMC C-17 protest could vacate an award you are tracking. Watch for corrective action this week.', cta: 'Review protest', val: '$5.4M' },
+      { desk: 'cmmc', urg: 'warn', days: 161, title: 'CMMC SSP incomplete — CM & CA domains failing', why: 'You are 78% ready but the System Security Plan is the #1 C3PAO deliverable. 16 controls open before enforcement.', cta: 'Open readiness', val: '78%' },
+      { desk: 'far', urg: 'warn', days: 15, title: 'CMMC clause 252.204-7021 effective in 15 days', why: 'Lowered to >$100K with CUI. 7 of your tracked solicitations now require Level 2 certification to bid.', cta: 'See redline', val: '7 sols' },
+      { desk: 'co', urg: 'warn', days: 47, title: 'Re-warm Greg Bauer (TACOM) — 47 days quiet', why: 'Controls $87M in your codes but has gone cold. A recompete is coming — re-engage before it posts.', cta: 'Open profile', val: '$87M' },
+      { desk: 'wage', urg: 'warn', days: 22, title: 'Aircraft Inspector pay 3.4% below market', why: 'Two inspector categories at JBSA are under market. Adjust before the WD renews in 22 days or risk losing staff.', cta: 'Open benchmarks', val: '−3.4%' },
+      { desk: 'team', urg: 'ok', days: null, title: 'Desert Aerospace unlocks the T-38 sol', why: 'Their SDVOSB cert + C-130J past performance makes the $14.2M T-38 depot IDIQ winnable. Request an intro.', cta: 'Open partners', val: '$14.2M' },
+      { desk: 'spend', urg: 'ok', days: null, title: 'WA, OH, GA are high-spend BD gaps', why: 'Real obligations in your NAICS with no recorded activity from you. Whitespace worth a territory plan.', cta: 'Open map', val: '3 states' }
+    ],
+    WEEK: [
+      { d: 'Jun 5', day: 2, label: 'Field Feeding precision parts — quote due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
+      { d: 'Jun 9', day: 6, label: 'SPY-6 Radar — proposal due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
+      { d: 'Jun 18', day: 15, label: 'CMMC §252.204-7021 effective', tag: 'Regulatory', tone: 'warn', desk: 'far' },
+      { d: 'Jun 25', day: 22, label: 'WD 2015-4267 renewal (JBSA)', tag: 'Wage', tone: 'warn', desk: 'wage' },
+      { d: 'Jun 30', day: 27, label: 'FY26 Q3 close — agency obligation push', tag: 'Fiscal Year', tone: 'warn', gov: true },
+      { d: 'Jul 2', day: 29, label: 'AFMC C-17 protest decision window', tag: 'Protest', tone: 'ok', desk: 'gao' },
+      { d: 'Jul 31', day: 58, label: 'FY27 defense budget markups begin', tag: 'Budget', tone: 'ok', gov: true },
+      { d: 'Aug 29', day: 87, label: 'SAM.gov annual registration renewal', tag: 'Registration', tone: 'warn', gov: true },
+      { d: 'Sep 30', day: 119, label: 'FY26 year-end — use-it-or-lose-it surge', tag: 'Fiscal Year', tone: 'crit', gov: true, big: true }
+    ]
   };
-
-  // curated: the ONE thing that matters from each desk, ranked by urgency
-  const ACTIONS = [
-    { desk: 'opp', urg: 'crit', days: 6, title: 'SPY-6 Radar Sustainment — submit in 6 days', why: 'Fit 94, SDVOSB set-aside, $18.4M ceiling. Your strongest open pursuit and the clock is running.', cta: 'Open pursuit', val: '$18.4M' },
-    { desk: 'gao', urg: 'crit', days: 0, title: '$5.4M of tracked award value is contestable', why: 'Active AFMC C-17 protest could vacate an award you are tracking. Watch for corrective action this week.', cta: 'Review protest', val: '$5.4M' },
-    { desk: 'cmmc', urg: 'warn', days: 161, title: 'CMMC SSP incomplete — CM & CA domains failing', why: 'You are 78% ready but the System Security Plan is the #1 C3PAO deliverable. 16 controls open before enforcement.', cta: 'Open readiness', val: '78%' },
-    { desk: 'far', urg: 'warn', days: 15, title: 'CMMC clause 252.204-7021 effective in 15 days', why: 'Lowered to >$100K with CUI. 7 of your tracked solicitations now require Level 2 certification to bid.', cta: 'See redline', val: '7 sols' },
-    { desk: 'co', urg: 'warn', days: 47, title: 'Re-warm Greg Bauer (TACOM) — 47 days quiet', why: 'Controls $87M in your codes but has gone cold. A recompete is coming — re-engage before it posts.', cta: 'Open profile', val: '$87M' },
-    { desk: 'wage', urg: 'warn', days: 22, title: 'Aircraft Inspector pay 3.4% below market', why: 'Two inspector categories at JBSA are under market. Adjust before the WD renews in 22 days or risk losing staff.', cta: 'Open benchmarks', val: '−3.4%' },
-    { desk: 'team', urg: 'ok', days: null, title: 'Desert Aerospace unlocks the T-38 sol', why: 'Their SDVOSB cert + C-130J past performance makes the $14.2M T-38 depot IDIQ winnable. Request an intro.', cta: 'Open partners', val: '$14.2M' },
-    { desk: 'spend', urg: 'ok', days: null, title: 'WA, OH, GA are high-spend BD gaps', why: 'Real obligations in your NAICS with no recorded activity from you. Whitespace worth a territory plan.', cta: 'Open map', val: '3 states' }
-  ];
-
-  // key dates ahead — your items + the GovCon fiscal calendar
-  const WEEK = [
-    { d: 'Jun 5', day: 2, label: 'Field Feeding precision parts — quote due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
-    { d: 'Jun 9', day: 6, label: 'SPY-6 Radar — proposal due', tag: 'Opportunity', tone: 'crit', desk: 'opp' },
-    { d: 'Jun 18', day: 15, label: 'CMMC §252.204-7021 effective', tag: 'Regulatory', tone: 'warn', desk: 'far' },
-    { d: 'Jun 25', day: 22, label: 'WD 2015-4267 renewal (JBSA)', tag: 'Wage', tone: 'warn', desk: 'wage' },
-    { d: 'Jun 30', day: 27, label: 'FY26 Q3 close — agency obligation push', tag: 'Fiscal Year', tone: 'warn', gov: true },
-    { d: 'Jul 2', day: 29, label: 'AFMC C-17 protest decision window', tag: 'Protest', tone: 'ok', desk: 'gao' },
-    { d: 'Jul 31', day: 58, label: 'FY27 defense budget markups begin', tag: 'Budget', tone: 'ok', gov: true },
-    { d: 'Aug 29', day: 87, label: 'SAM.gov annual registration renewal', tag: 'Registration', tone: 'warn', gov: true },
-    { d: 'Sep 30', day: 119, label: 'FY26 year-end — use-it-or-lose-it surge', tag: 'Fiscal Year', tone: 'crit', gov: true, big: true }
-  ];
+  const DESK = window.CC.DESK;
+  const ACTIONS = window.CC.ACTIONS;
+  const WEEK = window.CC.WEEK;
 
   const URG = { crit: { c: '#dc2626', l: 'Critical' }, warn: { c: '#d97706', l: 'This week' }, ok: { c: '#059669', l: 'Plan ahead' } };
   let filter = 'all';
@@ -154,6 +157,6 @@
 
   function renderAll() { renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
   function init() { renderAll(); }
-  window.CC_APP = { onThemeChange: renderAll };
+  window.CC_APP = { render: renderAll, onThemeChange: renderAll };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
