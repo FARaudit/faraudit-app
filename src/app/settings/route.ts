@@ -10,7 +10,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in?next=/settings");
 
-  const filePath = path.join(process.cwd(), "public", "profile-settings-design.html");
+  const filePath = path.join(process.cwd(), "public", "profile-settings.html");
   const html = await readFile(filePath, "utf8");
 
   return new Response(html, {
