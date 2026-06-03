@@ -1,31 +1,74 @@
-(function(){if(!new URLSearchParams(location.search).has("live"))return;
-  async function wire(){
-    let d;
-    try{
-      const r=await fetch('/api/ko-intelligence',{credentials:'include'});
-      if(!r.ok)return;
-      d=await r.json();
-    }catch(e){return;}
-    const kos=d.kos||d.officers||d.data||d.items||[];
-    if(!kos.length)return;
+/* FARaudit · Contracting Officers — Fork B live wiring.
+   Fetches /api/ko-intelligence (shared route — also serves
+   audit/[id]/AuditReport for per-email KO lookups), mutates window.DCO
+   IN PLACE if response is in DCO shape, else no-op (mock preserved).
 
-    const list=document.querySelector('.ko-list,.officers-list,.feed-list,.co-list');
-    if(!list)return;
+   Bug B fix: dropped `?live` URL gate that prevented this from ever
+   firing in production.
 
-    list.innerHTML=kos.slice(0,30).map(k=>`
-      <div class="ko-row">
-        <div class="ko-name">${k.name||k.full_name||''}</div>
-        <div class="ko-meta">
-          <span class="ko-agency">${k.agency||''}</span>
-          <span class="ko-email">${k.email||''}</span>
-          <span class="ko-phone">${k.phone||''}</span>
-        </div>
-        ${k.active_solicitations?`<span class="ko-active">${k.active_solicitations} active</span>`:''}
-        ${k.responsiveness_score?`<span class="ko-score">Score: ${k.responsiveness_score}</span>`:''}
-      </div>`).join('');
+   TODO: API currently returns flat { kos: [...] } from ko_intelligence
+   table. DCO needs OFFICERS array with computed fit/rel/respDays/timeline,
+   plus REL_META/KIND_META lookups. Needs new fetchKODetail() query that
+   joins ko_intelligence + audits + new ko_interactions table. */
+(function () {
+  'use strict';
 
-    const cnt=document.querySelector('.ko-count,.officers-count,.total-count');
-    if(cnt)cnt.textContent=kos.length+' contracting officers';
+  function replaceArr(name, next) {
+    if (!Array.isArray(next)) return;
+    const arr = window.DCO[name];
+    if (!Array.isArray(arr)) { window.DCO[name] = next.slice(); return; }
+    arr.length = 0;
+    arr.push(...next);
   }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',wire):wire();
+
+  function replaceObj(name, next) {
+    if (!next || typeof next !== 'object') return;
+    const cur = window.DCO[name];
+    if (cur && typeof cur === 'object') {
+      for (const k of Object.keys(cur)) delete cur[k];
+      Object.assign(cur, next);
+    } else {
+      window.DCO[name] = next;
+    }
+  }
+
+  async function wire() {
+    try {
+      const res = await fetch('/api/ko-intelligence', { credentials: 'include' });
+      if (!res.ok) throw new Error('ko-intelligence fetch failed: ' + res.status);
+      const data = await res.json();
+
+      if (data._source === 'unwired-mock-preserved') return;
+      // Legacy shape { kos: [...] } — bail until fetchKODetail ships DCO shape.
+      if (!Array.isArray(data.OFFICERS)) return;
+
+      if (!window.DCO) return;
+
+      replaceArr('OFFICERS',        data.OFFICERS);
+      replaceArr('AGENCY_FILTERS',  data.AGENCY_FILTERS);
+      replaceArr('SAVED_SEGMENTS',  data.SAVED_SEGMENTS);
+      replaceObj('REL_META',        data.REL_META);
+      replaceObj('KIND_META',       data.KIND_META);
+      replaceObj('NAICS_COLORS',    data.NAICS_COLORS);
+
+      if (window.DCO_APP && typeof window.DCO_APP.render === 'function') {
+        window.DCO_APP.render();
+      }
+    } catch (e) {
+      console.error('[contracting-officers-live] wire failed:', e);
+    }
+  }
+
+  const obs = new MutationObserver(() => {
+    if (window.DCO_APP && typeof window.DCO_APP.onThemeChange === 'function') {
+      window.DCO_APP.onThemeChange();
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();

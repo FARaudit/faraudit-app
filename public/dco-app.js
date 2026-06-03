@@ -351,6 +351,6 @@
     buildControls(); renderAll();
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderScatter, 220); });
   }
-  window.DCO_APP = { onThemeChange };
+  window.DCO_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
