@@ -6,7 +6,26 @@
   const $ = (id) => document.getElementById(id);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-  const S = { agency: 'all', seg: null, q: '', sel: 'co-hartwell' };
+  const S = { agency: 'all', seg: null, q: '', sel: 'co-hartwell', funnelStage: null, funnelMode: 'in' };
+
+  /* ─── viz style flags (flip to revert) ───────────────────────────────
+     resp:   'number' = hero reply-% + vs-avg chip (new)  |  'bar' = solid bar (old)
+     funnel: 'funnel' = centered tapering funnel (new)    |  'bars' = flat bars (old) */
+  const VIZ = { resp: 'number', funnel: 'funnel' };
+  const NET_AVG_RESP = Math.round(D.OFFICERS.reduce((s, o) => s + o.resp, 0) / D.OFFICERS.length);
+
+  /* ─── funnel stages (nested predicates; single source of truth for funnel + drill-down) ─── */
+  const _contacted = o => o.timeline.some(t => t.kind === 'out');
+  const _replied = o => _contacted(o) && (o.resp >= 60 || o.timeline.some(t => t.kind === 'in'));
+  const _met = o => _replied(o) && o.timeline.some(t => t.kind === 'call' || t.kind === 'event');
+  const _awarded = o => _met(o) && o.timeline.some(t => t.kind === 'win');
+  const STAGES = [
+    { key: 'identified', label: 'Identified', sub: 'in your NAICS', color: '#94a3b8', test: () => true },
+    { key: 'contacted', label: 'Contacted', sub: 'you reached out', color: '#378ADD', test: _contacted },
+    { key: 'replied', label: 'Replied', sub: 'engaged back', color: '#185FA5', test: _replied },
+    { key: 'met', label: 'Met / Called', sub: 'real conversation', color: '#7c3aed', test: _met },
+    { key: 'awarded', label: 'Awarded', sub: 'won work', color: '#059669', test: _awarded }
+  ];
 
   const relColor = (r) => D.REL_META[r].color;
 
@@ -25,7 +44,7 @@
     $('peopleTabs').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; $('peopleTabs').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); renderPeople(); });
 
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
-    $('resetBtn').onclick = () => { S.agency = 'all'; S.seg = null; S.q = ''; $('searchInput').value = ''; sync(); renderAll(); };
+    $('resetBtn').onclick = () => { S.agency = 'all'; S.seg = null; S.q = ''; S.funnelStage = null; $('searchInput').value = ''; sync(); renderAll(); };
   }
   function sync() {
     $('agencyFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.agency === S.agency));
@@ -89,7 +108,7 @@
     svg.selectAll('circle.dot').data(data, d => d.id).join('circle')
       .attr('class', d => 'dot' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
       .attr('cx', d => x(d.resp)).attr('cy', d => y(Math.min(158, d.awards))).attr('r', d => r(d.fit))
-      .attr('fill', d => relColor(d.rel)).attr('opacity', .68).attr('stroke', d => relColor(d.rel)).attr('stroke-width', .5)
+      .attr('fill', d => relColor(d.rel)).attr('opacity', .9).attr('stroke', css('--card')).attr('stroke-width', 1.6)
       .on('mousemove', (ev, d) => {
         const tip = $('coTip');
         tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12.5px;margin-bottom:3px">${d.name}</div>
@@ -115,6 +134,8 @@
       <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
     </svg>`;
   }
+  function fitVerdict(f){ if(f>=85)return{label:'MATCH',tone:'green'}; if(f>=70)return{label:'WORKABLE',tone:'blue'}; if(f>=60)return{label:'STRETCH',tone:'amber'}; return{label:'TRAP',tone:'red'}; }
+  function fitTile(f,lg){ const v=fitVerdict(f); return `<div class="fit-tile${lg?' lg':''} tone-${v.tone}"><span class="ft-num">${f}</span><span class="ft-lbl">${v.label}</span></div>`; }
   function renderPanel() {
     const o = D.OFFICERS.find(x => x.id === S.sel);
     const el = $('coPanel');
@@ -143,7 +164,7 @@
         <div class="cop-m"><span class="mv">${o.warrant}</span><span class="ml">Warrant</span></div>
       </div>
       <div class="cop-ring-wrap">
-        <div class="cop-ring">${ring(o.fit, 62)}<div class="rn">${o.fit}<small>FIT</small></div></div>
+        ${fitTile(o.fit, true)}
         <div class="cop-ring-txt"><div class="t">${fitTxt}</div><div class="d">Buys ${o.naics.join(', ')} · last contact ${o.lastContact}d ago${o.lastContact >= 30 ? ' — re-warm soon' : ''}.</div></div>
       </div>
       <div class="cop-note"><b>Your note</b>${o.note}</div>
@@ -156,23 +177,47 @@
   /* ─── people rail ─── */
   function renderPeople() {
     let data = filtered().slice();
+    let drillNote = '';
+    if (S.funnelStage) {
+      const idx = STAGES.findIndex(s => s.key === S.funnelStage);
+      const st = STAGES[idx];
+      if (S.funnelMode === 'dropped' && idx > 0) {
+        const prev = STAGES[idx - 1];
+        data = data.filter(o => prev.test(o) && !st.test(o));
+        drillNote = `Dropped off before <b>${st.label}</b>`;
+      } else {
+        data = data.filter(st.test);
+        drillNote = `Reached <b>${st.label}</b>`;
+      }
+    }
     const sort = S.sort || 'fit';
     if (sort === 'fit') data.sort((a, b) => b.fit - a.fit);
     else if (sort === 'resp') data.sort((a, b) => b.resp - a.resp);
     else if (sort === 'awards') data.sort((a, b) => b.awards - a.awards);
     else if (sort === 'cold') data.sort((a, b) => b.lastContact - a.lastContact);
-    $('pplCount').innerHTML = `${data.length} officers · click to open profile`;
+    $('pplCount').innerHTML = drillNote
+      ? `<span class="ppl-drill">Funnel</span>${drillNote} · <b>${data.length}</b> ${data.length === 1 ? 'CO' : 'COs'} <button class="ppl-clear" id="pplClear">clear ✕</button>`
+      : `${data.length} officers · click to open profile`;
+    if (drillNote) $('pplClear').onclick = clearDrill;
     $('pplList').innerHTML = data.map(o => {
       const rm = D.REL_META[o.rel];
       const respCol = o.resp >= 75 ? css('--green-600') : o.resp >= 55 ? css('--amber-600') : css('--red-500');
       const fc = o.fit >= 85 ? css('--green-600') : o.fit >= 70 ? css('--accent') : css('--mute-2');
       const cR = 16, circ = 2 * Math.PI * cR, off = circ * (1 - o.fit / 100);
+      const dlt = o.resp - NET_AVG_RESP;
+      const replyCell = VIZ.resp === 'number'
+        ? `<div class="ppl-reply">
+             <div class="pr-top"><span class="pr-pct" style="color:${respCol}">${o.resp}<small>%</small></span><span class="pr-delta ${dlt >= 0 ? 'up' : 'down'}">${dlt >= 0 ? '+' : '−'}${Math.abs(dlt)} vs avg</span></div>
+             <div class="pr-sub">~${o.respDays}d to first reply</div>
+           </div>`
+        : `<div class="ppl-reply"><div class="ppl-resp-bar"><i style="width:${o.resp}%;background:${respCol}"></i></div><span class="pr-sub"><b style="color:${respCol}">${o.resp}%</b> reply · ~${o.respDays}d</span></div>`;
       return `<div class="ppl-row${S.sel === o.id ? ' sel' : ''}" data-id="${o.id}">
         <div class="ppl-av" style="background:linear-gradient(135deg,${rm.color},${shade(rm.color)})">${o.initials}<span class="reldot" style="background:${rm.color}"></span></div>
         <div class="ppl-info"><div class="ppl-name">${o.name}</div><div class="ppl-sub">${o.agency} · ${o.office}</div></div>
-        <div class="ppl-resp"><div class="ppl-resp-bar"><i style="width:${o.resp}%;background:${respCol}"></i></div><span class="ppl-resp-lbl">${o.resp}% · ~${o.respDays}d</span></div>
-        <div class="ppl-awd">$${o.awards}M<small>${o.lastContact}d ago</small></div>
-        <div class="ppl-fit"><svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${cR}" fill="none" stroke="var(--line-2)" stroke-width="3.5"/><circle cx="20" cy="20" r="${cR}" fill="none" stroke="${fc}" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${off}"/></svg><span class="fn">${o.fit}</span></div>
+        ${replyCell}
+        <div class="ppl-awd2"><span class="pa-v">$${o.awards}M</span><span class="pa-l">obligated</span></div>
+        <div class="ppl-touch"><span class="pt-v">${o.lastContact}d ago</span><span class="pt-l" style="color:${rm.color}">${rm.label}</span></div>
+        ${fitTile(o.fit)}
       </div>`;
     }).join('') || `<div class="tl-empty">No officers match your filters.</div>`;
     $('pplList').querySelectorAll('.ppl-row').forEach(r => r.onclick = () => { S.sel = r.dataset.id; renderAll(); });
@@ -210,28 +255,64 @@
   /* ─── outreach funnel (network-wide) ─── */
   function renderFunnel() {
     const f = filtered();
-    const identified = f.length;
-    const contacted = f.filter(o => o.timeline.some(t => t.kind === 'out')).length;
-    const replied = f.filter(o => o.resp >= 60 || o.timeline.some(t => t.kind === 'in')).length;
-    const meetings = f.filter(o => o.timeline.some(t => t.kind === 'call' || t.kind === 'event')).length;
-    const awarded = f.filter(o => o.timeline.some(t => t.kind === 'win')).length;
-    const steps = [
-      { label: 'Identified', sub: 'in your NAICS', val: identified, color: '#94a3b8' },
-      { label: 'Contacted', sub: 'you reached out', val: contacted, color: '#378ADD' },
-      { label: 'Replied', sub: 'engaged back', val: replied, color: '#185FA5' },
-      { label: 'Met / Called', sub: 'real conversation', val: meetings, color: '#7c3aed' },
-      { label: 'Awarded', sub: 'won work', val: awarded, color: '#059669' }
-    ];
+    /* nested subsets via shared STAGES predicates (each test ⊆ the one above) */
+    const steps = STAGES.map(st => ({ ...st, val: f.filter(st.test).length }));
+    const identified = steps[0].val;
     const max = identified || 1;
-    $('funnel').innerHTML = steps.map((s, i) => {
-      const conv = i === 0 ? 100 : steps[i - 1].val ? Math.round(s.val / steps[i - 1].val * 100) : 0;
-      return `<div class="fn-row">
-        <div class="fn-label">${s.label}<small>${s.sub}</small></div>
-        <div class="fn-track"><div class="fn-fill" style="width:${Math.max(8, s.val / max * 100)}%;background:${s.color}">${s.val}</div></div>
-        <div class="fn-conv">${i === 0 ? '—' : conv + '%'}</div>
-      </div>`;
+    const fnEl = $('funnel');
+    if (VIZ.funnel === 'bars') {
+      fnEl.classList.remove('fn-shape');
+      fnEl.innerHTML = steps.map((s, i) => {
+        const conv = i === 0 ? 100 : steps[i - 1].val ? Math.round(s.val / steps[i - 1].val * 100) : 0;
+        return `<div class="fn-row">
+          <div class="fn-label">${s.label}<small>${s.sub}</small></div>
+          <div class="fn-track"><div class="fn-fill" style="width:${Math.max(8, s.val / max * 100)}%;background:${s.color}">${s.val}</div></div>
+          <div class="fn-conv">${i === 0 ? '—' : conv + '%'}</div>
+        </div>`;
+      }).join('');
+      return;
+    }
+    /* clean corporate funnel — continuous taper, crisp seams, click-to-drill */
+    fnEl.classList.add('fn-shape');
+    const wf = v => 0.16 + 0.84 * (v / max);
+    const tz = (tp, bt) => `polygon(${(50 - tp * 50).toFixed(2)}% 0,${(50 + tp * 50).toFixed(2)}% 0,${(50 + bt * 50).toFixed(2)}% 100%,${(50 - bt * 50).toFixed(2)}% 100%)`;
+    /* find the bottleneck: worst step-conversion (stage you advance INTO) */
+    let botIdx = -1, botConv = 101;
+    steps.forEach((s, i) => { if (i > 0 && steps[i - 1].val) { const c = s.val / steps[i - 1].val * 100; if (c < botConv) { botConv = c; botIdx = i; } } });
+    fnEl.innerHTML = steps.map((s, i) => {
+      const nextV = i < steps.length - 1 ? steps[i + 1].val : s.val;
+      const clip = tz(wf(s.val), wf(nextV));
+      const pctTop = Math.round(s.val / (steps[0].val || 1) * 100);
+      const conv = i === 0 ? null : steps[i - 1].val ? Math.round(s.val / steps[i - 1].val * 100) : 0;
+      const leak = i === 0 ? 0 : Math.max(0, steps[i - 1].val - s.val);
+      const isBot = i === botIdx;
+      const activeIn = S.funnelStage === s.key && S.funnelMode === 'in';
+      const activeDrop = S.funnelStage === s.key && S.funnelMode === 'dropped';
+      const leakBtn = leak ? `<button class="fn-leak2 fn-drillbtn${activeDrop ? ' on' : ''}" data-stage="${s.key}" data-mode="dropped">${leak} dropped off →</button>` : `<span class="fn-leak2">0 dropped off</span>`;
+      const meta = i === 0
+        ? `<span class="fn-meta-top">top of funnel</span>`
+        : `<span class="fn-conv2${isBot ? ' hot' : ''}"><b>${conv}%</b> advance</span>${leakBtn}${isBot ? '<span class="fn-flag">◆ biggest drop</span>' : ''}`;
+      return `<div class="fn-lbl"><span class="fn-l-name">${s.label}</span><span class="fn-l-sub">${s.sub}</span><span class="fn-l-top">${pctTop}% of network</span></div>
+        <button class="fn-body fn-drill${activeIn ? ' on' : ''}" data-stage="${s.key}" data-mode="in" title="Show the ${s.val} COs who reached ${s.label}"><div class="fn-tz" style="clip-path:${clip};-webkit-clip-path:${clip};background:linear-gradient(180deg,${s.color},${shade(s.color)})"><span class="fn-num">${s.val}</span></div>${i < steps.length - 1 ? '<span class="fn-arrow"></span>' : ''}</button>
+        <div class="fn-meta">${meta}</div>`;
     }).join('');
+    fnEl.querySelectorAll('[data-stage]').forEach(el => el.onclick = (e) => {
+      e.stopPropagation();
+      drillToStage(el.dataset.stage, el.dataset.mode);
+    });
   }
+
+  /* ─── funnel → CO Network drill-down ─── */
+  function drillToStage(key, mode) {
+    if (S.funnelStage === key && S.funnelMode === mode) S.funnelStage = null;
+    else { S.funnelStage = key; S.funnelMode = mode; }
+    renderPeople(); renderFunnel();
+    if (S.funnelStage) {
+      const card = $('pplList').closest('.widget');
+      if (card) window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - 18, behavior: 'smooth' });
+    }
+  }
+  function clearDrill() { S.funnelStage = null; renderPeople(); renderFunnel(); }
 
   /* ─── insight ─── */
   function renderInsight() {

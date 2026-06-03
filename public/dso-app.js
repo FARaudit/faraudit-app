@@ -9,9 +9,22 @@
 
   const S = { naics: new Set(D.NAICS.map(n => n.code)), stage: 'all', sa: 'all', q: '', view: null, sort: 'fit', sel: null, tracked: new Set() };
 
-  const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : css('--mute-2');
+  const fitColor = (f) => f >= 85 ? css('--green-600') : f >= 70 ? css('--accent') : f >= 60 ? css('--amber-600') : css('--red-600');
   const fitTier = (f) => f >= 85 ? 'Strong fit' : f >= 70 ? 'Workable' : 'Stretch';
   const urg = (d) => d <= 3 ? 'crit' : d <= 7 ? 'warn' : 'ok';
+
+  // one-line advisory drawn from existing fields — guidance, not clutter
+  function pursuitInsight(o) {
+    const newReq = /new requirement|market research/i.test(o.incumbent);
+    const rec = /recompete/i.test(o.incumbent);
+    const inc = o.incumbent.replace(/\s*\(recompete\)/i, '');
+    const upstream = o.stage === 'sources' || o.stage === 'presol';
+    const saElig = ['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa);
+    if (upstream) return `Upstream window — shape the requirement before the RFP drops${saElig ? `, and it's ${o.sa}-eligible` : ''}.`;
+    if (newReq) return `<em>No incumbent to unseat</em> — best odds at this ${o.fit} fit${o.days <= 7 ? ', and it closes this week' : ''}.`;
+    if (rec) return `Recompete vs <em>${inc}</em> — incumbents win 70–90%, so lead on your ${o.fit} fit and price.`;
+    return `${fitTier(o.fit)} at ${o.fit}/100 — ${o.days <= 7 ? 'move now, the window is closing.' : 'time to prep a strong bid.'}`;
+  }
 
   /* ─── controls ─── */
   function buildControls() {
@@ -85,6 +98,17 @@
     </svg><span class="fr-num">${f}</span></div>`;
   }
 
+  function fitVerdict(f) {
+    if (f >= 85) return { label: 'MATCH', tone: 'green' };
+    if (f >= 70) return { label: 'WORKABLE', tone: 'blue' };
+    if (f >= 60) return { label: 'STRETCH', tone: 'amber' };
+    return { label: 'TRAP', tone: 'red' };
+  }
+  function fitTile(f) {
+    const v = fitVerdict(f);
+    return `<div class="fit-tile tone-${v.tone}"><span class="ft-num">${f}</span><span class="ft-lbl">${v.label}</span></div>`;
+  }
+
   /* ─── bubble chart ─── */
   function renderBubble() {
     const svg = d3.select('#bubbleSvg'); svg.selectAll('*').remove();
@@ -149,27 +173,30 @@
       const u = urg(o.days), sm = D.STAGE_META[o.stage];
       const w = Math.max(6, (1 - Math.min(o.days, maxDays) / maxDays) * 100);
       const saCls = ['SB', 'SDVOSB', '8(a)', 'HUBZone'].includes(o.sa) ? 'sa' : 'sa full';
+      const aiTip = pursuitInsight(o);
       return `<div class="pcard stage-${o.stage}${S.sel === o.id ? ' sel' : ''}" id="pc-${cssId(o.id)}" data-id="${o.id}">
-        ${fitRing(o.fit, true)}
+        ${fitTile(o.fit)}
         <div class="pc-main">
-          <div class="pc-id">${o.id} · ${o.posted}</div>
           <div class="pc-title">${o.title}</div>
-          <div class="pc-agy">${o.agency} · ${o.office}</div>
+          <div class="pc-agy">${o.agency} · ${o.office} · <span class="pc-idin">${o.id}</span></div>
           <div class="pc-chips">
             <span class="chip naics">${o.naics}</span>
             <span class="chip ${saCls}">${o.sa === 'Full' ? 'Full &amp; Open' : o.sa}</span>
             <span class="chip stage" style="background:${sm.color}">${sm.label}</span>
-            <span class="chip naics">${o.incumbent}</span>
           </div>
         </div>
         <div class="pc-mid">
           <div class="pc-ceiling">${money(o.ceiling)}<small>CEILING</small></div>
-          <div class="pc-urg"><div class="urg-bar"><i class="${u}" style="width:${w}%"></i></div><span class="urg-lbl ${u}">${o.days}d to ${o.stage === 'sources' || o.stage === 'presol' ? 'respond' : 'submit'}</span></div>
+          <div class="pc-urg ${u}">
+            <div class="pc-days"><span class="pd-num">${o.days}<small>d</small></span><span class="pd-lbl">${o.days <= 3 ? 'ACT NOW' : 'to ' + (o.stage === 'sources' || o.stage === 'presol' ? 'respond' : 'submit')}</span></div>
+            <div class="urg-bar"><i class="${u}" style="width:${w}%"></i></div>
+          </div>
         </div>
         <div class="pc-actions">
           <a class="btn-open" href="#" onclick="return false">Run Audit</a>
-          <button class="btn-save" data-track="${o.id}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">Tracking</span></button>
+          <button class="btn-save" data-track="${o.id}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
         </div>
+        <div class="pc-insight"><span class="ai-tag">AI Insight</span><span class="ai-txt">${aiTip}</span></div>
       </div>`;
     }).join('') : `<div class="empty">No pursuits match your filters. Try widening NAICS or clearing a saved view.</div>`;
     $('plist').querySelectorAll('.pcard').forEach(c => c.onclick = (e) => { if (e.target.closest('a,button')) return; S.sel = (S.sel === c.dataset.id ? null : c.dataset.id); renderBubble(); renderActList(); renderList(); });

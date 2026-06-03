@@ -217,10 +217,10 @@
 
     const leaves = h.leaves();
     svg.selectAll('rect.cell').data(leaves).join('rect')
-      .attr('class', d => 'cell' + (S.agency !== 'all' && d.data.agency !== S.agency ? ' dim' : ''))
+      .attr('class', d => 'cell' + (S.agency !== 'all' && d.data.agency !== S.agency ? ' dim' : '') + (S.agency !== 'all' && d.data.agency === S.agency ? ' sel' : ''))
       .attr('x', d => d.x0).attr('y', d => d.y0).attr('width', d => Math.max(0, d.x1 - d.x0)).attr('height', d => Math.max(0, d.y1 - d.y0))
       .attr('fill', d => NAICS_COLORS[d.data.name] || css('--accent')).attr('rx', 3)
-      .on('mousemove', (ev, d) => { const tip = $('geoTip'); tip.innerHTML = `<div class="t">${d.data.short} · ${d.data.name}<span class="v">${fmtM(d.value)}</span></div><div class="r">click to filter by agency</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
+      .on('mousemove', (ev, d) => { const tip = $('geoTip'); const act = (S.agency === d.data.agency) ? 'click to clear filter — show all' : (S.agency === 'all' ? 'click to focus this agency' : 'click to switch focus here'); tip.innerHTML = `<div class="t">${d.data.short} · ${d.data.name}<span class="v">${fmtM(d.value)}</span></div><div class="r">${act}</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
       .on('mouseleave', hideTip)
       .on('click', (ev, d) => { S.agency = (S.agency === d.data.agency ? 'all' : d.data.agency); syncControls(); renderAll(); });
 
@@ -236,6 +236,16 @@
       .text(d => (d.x1 - d.x0) > 40 ? d.data.short : '');
 
     $('treeLegend').innerHTML = Object.entries(NAICS_COLORS).map(([c, col]) => `<span class="lg"><i style="background:${col}"></i>${c}</span>`).join('');
+
+    const tc = $('treeClear');
+    if (tc) {
+      if (S.agency !== 'all') {
+        const a = D.AGENCIES.find(x => x.key === S.agency);
+        $('treeClearTxt').textContent = a ? ('Show all · clear ' + a.short) : 'Show all agencies';
+        tc.style.display = 'inline-flex';
+      } else { tc.style.display = 'none'; }
+      tc.onclick = () => { S.agency = 'all'; syncControls(); renderAll(); };
+    }
   }
 
   /* ════════════════ SCATTER (opportunity matrix) ════════════════ */

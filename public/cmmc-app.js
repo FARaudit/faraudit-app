@@ -17,7 +17,7 @@
   function buildControls() {
     $('prioFilters').innerHTML = D.PRIORITIES.map(p => `<button class="fpill ${p.key === S.prio ? 'active' : ''}" data-prio="${p.key}">${p.label}</button>`).join('');
     $('prioFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.prio = b.dataset.prio; sync(); renderAll(); });
-    $('sortSeg').innerHTML = ['Priority', 'Score ↑', 'Score ↓'].map(s => `<button data-sort="${s}" class="${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
+    $('sortSeg').innerHTML = ['Priority', 'Score ↑', 'Score ↓'].map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderDomains(); });
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
     $('resetBtn').onclick = () => { S.prio = 'all'; S.q = ''; S.sort = 'Priority'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
@@ -79,6 +79,10 @@
     grad.append('stop').attr('offset', '0%').attr('stop-color', css('--accent')).attr('stop-opacity', .35);
     grad.append('stop').attr('offset', '100%').attr('stop-color', css('--accent')).attr('stop-opacity', .12);
     svg.append('path').attr('d', path).attr('fill', 'url(#radg)').attr('stroke', css('--accent')).attr('stroke-width', 2);
+    // 80% target ring — the assessment-ready threshold
+    const tR = R * 80 / 100;
+    svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', tR).attr('fill', 'none').attr('stroke', css('--green-600')).attr('stroke-width', 1.5).attr('stroke-dasharray', '4 4').attr('opacity', .85);
+    svg.append('text').attr('x', cx).attr('y', cy - tR - 5).attr('text-anchor', 'middle').attr('font-family', 'IBM Plex Mono').attr('font-size', 8.5).attr('font-weight', 700).attr('fill', css('--green-600')).text('80% READY \u2192');
     // dots
     data.forEach((d, i) => {
       svg.append('circle').attr('cx', pts[i][0]).attr('cy', pts[i][1]).attr('r', S.sel === d.code ? 6 : 4)
@@ -87,7 +91,8 @@
         .on('mousemove', (ev) => { const tip = $('coTip'); tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:2px">${d.code} · ${d.name}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1">${d.pct}% · ${d.met}/${d.total} met</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 200) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
         .on('mouseleave', () => $('coTip').style.display = 'none');
     });
-    $('radarLegend').innerHTML = `<span class="lg"><i style="background:${css('--green-600')}"></i>≥80%</span><span class="lg"><i style="background:${css('--amber-600')}"></i>50–79%</span><span class="lg"><i style="background:${css('--red-600')}"></i>&lt;50%</span>`;
+    const weakest = data.slice().sort((a, b) => a.pct - b.pct).slice(0, 3).map(d => d.code).join(', ');
+    $('radarLegend').innerHTML = `<span class="lg"><i style="background:${css('--green-600')}"></i>≥80% ready</span><span class="lg"><i style="background:${css('--amber-600')}"></i>50–79%</span><span class="lg"><i style="background:${css('--red-600')}"></i>&lt;50%</span><span class="lg rad-weak">◆ Fix first: ${weakest}</span>`;
   }
 
   /* readiness gauge ring + domain detail */

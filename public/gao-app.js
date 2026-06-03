@@ -14,7 +14,7 @@
     $('statusFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.status = b.dataset.st; sync(); renderAll(); });
     $('agencyFilters').innerHTML = D.AGENCY_FILTERS.map(a => `<button class="fpill ${a.key === S.agency ? 'active' : ''}" data-ag="${a.key}">${a.label}</button>`).join('');
     $('agencyFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.agency = b.dataset.ag; sync(); renderAll(); });
-    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
+    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderFeed(); });
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
     $('resetBtn').onclick = () => { S.status = 'all'; S.agency = 'all'; S.q = ''; S.sort = 'Newest'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
@@ -67,7 +67,7 @@
     const maxV = steps[0].val;
     const bandH = (H - m.t - m.b - (steps.length - 1) * 14) / steps.length;
     steps.forEach((s, i) => {
-      const w = Math.max(60, s.val / maxV * (W - m.l - m.r));
+      const w = Math.max(176, s.val / maxV * (W - m.l - m.r));
       const y = m.t + i * (bandH + 14), x0 = m.l + ((W - m.l - m.r) - w) / 2;
       svg.append('rect').attr('x', x0).attr('y', y).attr('width', w).attr('height', bandH).attr('rx', 9).attr('fill', s.color).attr('opacity', .9);
       svg.append('text').attr('x', W / 2).attr('y', y + bandH / 2 - 5).attr('text-anchor', 'middle').attr('font-family', 'Manrope').attr('font-size', 24).attr('font-weight', 800).attr('fill', '#fff').text(s.val.toLocaleString());

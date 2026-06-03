@@ -22,7 +22,15 @@ window.WAGE = (function () {
     { wd: 'WD 2015-2188', cat: 'Materials Handler', loc: 'Robins AFB GA', site: 'Robins', sca: 18.4, yours: 19.0, market: 18.6, var: 2.2, status: 'Compliant' },
     { wd: 'WD 2015-4419', cat: 'NDT Technician', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 30.6, yours: 31.5, market: 31.0, var: 1.6, status: 'Compliant' },
     { wd: 'WD 2015-4419', cat: 'Composite Tech', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 27.7, yours: 27.9, market: 28.7, var: -2.8, status: 'FLAG', insight: 'Composite techs 2.8% below market. Growing demand — adjust to hold your bench.' },
-    { wd: 'WD 2015-4419', cat: 'Calibration Tech', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 29.2, yours: 29.8, market: 29.5, var: 1.0, status: 'Compliant' }
+    { wd: 'WD 2015-4419', cat: 'Calibration Tech', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 29.2, yours: 29.8, market: 29.5, var: 1.0, status: 'Compliant' },
+    { wd: 'WD 2015-4267', cat: 'Electronics Technician II', loc: 'JBSA San Antonio TX', site: 'JBSA', sca: 33.5, yours: 34.0, market: 34.3, var: -0.9, status: 'Watch' },
+    { wd: 'WD 2015-4267', cat: 'Aircraft Painter / Coatings', loc: 'JBSA San Antonio TX', site: 'JBSA', sca: 25.5, yours: 26.0, market: 25.8, var: 0.8, status: 'Compliant' },
+    { wd: 'WD 2015-3119', cat: 'Tool & Die Maker', loc: 'Tinker AFB OK', site: 'Tinker', sca: 30.2, yours: 30.0, market: 31.3, var: -4.2, status: 'FLAG', insight: 'Tool & die makers 4.2% under market — the widest gap in your shop. Critical skill; raise before the next recompete or risk losing them to depot hiring.' },
+    { wd: 'WD 2015-3119', cat: 'Production Controller', loc: 'Tinker AFB OK', site: 'Tinker', sca: 26.9, yours: 27.2, market: 27.6, var: -1.4, status: 'Watch' },
+    { wd: 'WD 2015-2188', cat: 'Machinist (Conventional)', loc: 'Robins AFB GA', site: 'Robins', sca: 25.8, yours: 25.6, market: 26.7, var: -4.1, status: 'FLAG', insight: 'Manual machinists 4.1% below market. Hard-to-fill in this region — adjust to hold your bench.' },
+    { wd: 'WD 2015-2188', cat: 'Maintenance Electrician', loc: 'Robins AFB GA', site: 'Robins', sca: 28.0, yours: 28.4, market: 28.2, var: 0.7, status: 'Compliant' },
+    { wd: 'WD 2015-4419', cat: 'Functional Test Technician', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 31.0, yours: 31.8, market: 31.4, var: 1.3, status: 'Compliant' },
+    { wd: 'WD 2015-4419', cat: 'Warehouse / Materials Specialist', loc: 'Wright-Patterson OH', site: 'WPAFB', sca: 19.8, yours: 20.4, market: 20.0, var: 2.0, status: 'Compliant' }
   ];
 
   const LOCATIONS = [
@@ -45,6 +53,6 @@ window.WAGE = (function () {
     { wd: 'WD 2015-2188', loc: 'Robins AFB GA', days: 95, tone: 'blue' }
   ];
 
-  const SORTS = ['Variance', 'Your rate', 'Category'];
+  const SORTS = ['Variance', 'Your rate', 'Category', 'Site'];
   return { WAGES, LOCATIONS, STATUSES, STATUS_META, RENEWALS, SORTS };
 })();

@@ -12,7 +12,7 @@
     $('locFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.loc = b.dataset.loc; sync(); renderAll(); });
     $('statusFilters').innerHTML = D.STATUSES.map(s => `<button class="fpill ${s.key === S.status ? 'active' : ''}" data-st="${s.key}">${s.label}</button>`).join('');
     $('statusFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.status = b.dataset.st; sync(); renderAll(); });
-    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
+    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderList(); renderWage(); });
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
     $('resetBtn').onclick = () => { S.loc = 'all'; S.status = 'all'; S.q = ''; S.sort = 'Variance'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
@@ -32,6 +32,7 @@
     });
     if (S.sort === 'Variance') d.sort((a, b) => a.var - b.var);
     else if (S.sort === 'Your rate') d.sort((a, b) => b.yours - a.yours);
+    else if (S.sort === 'Site') d.sort((a, b) => a.site.localeCompare(b.site) || a.var - b.var);
     else d.sort((a, b) => a.cat.localeCompare(b.cat));
     return d;
   }
@@ -57,8 +58,8 @@
   function renderWage() {
     const svg = d3.select('#wageSvg'); svg.selectAll('*').remove();
     const node = $('wageSvg'); if (!node) return;
-    const data = filtered();
-    const rowH = 24, m = { t: 14, r: 24, b: 26, l: 150 };
+    const data = filtered().slice().sort((a, b) => a.cat.localeCompare(b.cat));
+    const rowH = 24, m = { t: 14, r: 24, b: 26, l: 186 };
     const W = node.clientWidth || 660, H = m.t + data.length * rowH + m.b;
     svg.attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H);
     const lo = d3.min(data, d => Math.min(d.sca, d.yours, d.market)) - 1;
@@ -73,8 +74,8 @@
       const g = svg.append('g').style('cursor', 'pointer').on('click', () => { S.sel = d.cat; renderAll(); })
         .on('mousemove', (ev) => { const tip = $('coTip'); tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:2px">${d.cat}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">SCA $${d.sca} · you $${d.yours} · mkt $${d.market}<br>${d.var >= 0 ? '+' : ''}${d.var}% vs market</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 210) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
         .on('mouseleave', () => $('coTip').style.display = 'none');
-      if (S.sel === d.cat) g.append('rect').attr('x', m.l - 146).attr('y', cy - rowH / 2 + 1).attr('width', W - m.r - (m.l - 146)).attr('height', rowH - 2).attr('rx', 5).attr('fill', css('--accent-pale')).attr('opacity', .7);
-      g.append('text').attr('x', m.l - 12).attr('y', cy + 3).attr('text-anchor', 'end').attr('font-family', 'IBM Plex Mono').attr('font-size', 10).attr('font-weight', 700).attr('fill', css('--ink')).text(d.cat.length > 20 ? d.cat.slice(0, 19) + '…' : d.cat);
+      if (S.sel === d.cat) g.append('rect').attr('x', 2).attr('y', cy - rowH / 2 + 1).attr('width', W - m.r - 2).attr('height', rowH - 2).attr('rx', 5).attr('fill', css('--accent-pale')).attr('opacity', .7);
+      g.append('text').attr('x', 4).attr('y', cy + 3).attr('text-anchor', 'start').attr('font-family', 'IBM Plex Mono').attr('font-size', 9.5).attr('font-weight', 700).attr('fill', css('--ink')).text(d.cat.length > 30 ? d.cat.slice(0, 29) + '…' : d.cat);
       // connector your→market
       g.append('line').attr('x1', x(d.yours)).attr('x2', x(d.market)).attr('y1', cy).attr('y2', cy).attr('stroke', col).attr('stroke-width', 2).attr('opacity', .5);
       // SCA floor tick
@@ -117,10 +118,13 @@
   function renderList() {
     const data = filtered();
     $('feedCount').innerHTML = `${data.length} categories · click a row to inspect`;
-    $('wageList').innerHTML = `<div class="wt-head"><span>Labor Category</span><span>SCA</span><span>You</span><span>Market</span><span>Var</span><span>Status</span></div>` + data.map(w => {
+    const ROLE = { 'Aircraft Mechanic':'Installs & repairs airframe systems','Aircraft Inspector':'Verifies airworthiness & QC sign-off','Sheet Metal Worker':'Forms & fastens structural skins','Hydraulics Mechanic':'Services flight-control hydraulics','Avionics Technician':'Tests & repairs electronic systems','CNC Machinist':'Programs & runs CNC machine tools','Quality Inspector':'Inspects parts to spec / AS9100','Welder / Fabricator':'TIG/MIG welds airframe assemblies','Assembler':'Builds sub-assemblies to drawing','Precision Grinder':'Grinds parts to tight tolerance','CMM Operator':'Runs coordinate-measuring QA','Toolmaker':'Builds jigs, fixtures & tooling','Materials Handler':'Receives, kits & moves materials','NDT Technician':'Non-destructive flaw detection','Composite Tech':'Lays up & cures composite parts','Calibration Tech':'Calibrates gauges & test equipment','Electronics Technician':'Tests & repairs electronic assemblies','Aircraft Painter':'Preps, primes & coats airframes','Tool & Die Maker':'Builds precision dies, jigs & molds','Production Controller':'Schedules & tracks shop workflow','Machinist':'Runs manual lathes & mills','Maintenance Electrician':'Maintains facility & line power','Functional Test Technician':'Runs end-item functional tests','Warehouse':'Receives, kits & ships materials' };
+    const roleOf = (c) => { const k = Object.keys(ROLE).find(k => c.startsWith(k)); return k ? ROLE[k] : '—'; };
+    $('wageList').innerHTML = `<div class="wt-head"><span>Labor Category</span><span>What they do</span><span>SCA</span><span>You</span><span>Market</span><span>Var</span><span>Status</span></div>` + data.map(w => {
       const col = stColor(w.status), vcol = w.var >= 0 ? css('--green-600') : css('--red-600');
       return `<div class="wt-row${S.sel === w.cat ? ' sel' : ''}" data-cat="${w.cat}">
         <span class="wt-cat"><i style="background:${col}"></i><b>${w.cat}</b><small>${w.site}</small></span>
+        <span class="wt-role">${roleOf(w.cat)}</span>
         <span class="wt-num">$${w.sca.toFixed(2)}</span>
         <span class="wt-num" style="font-weight:800;color:${col}">$${w.yours.toFixed(2)}</span>
         <span class="wt-num">$${w.market.toFixed(2)}</span>

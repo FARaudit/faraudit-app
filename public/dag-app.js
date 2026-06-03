@@ -30,7 +30,7 @@
       `<button class="fpill ${d.key === S.dept ? 'active' : ''}" data-dept="${d.key}">${d.short}</button>`).join('');
     $('deptFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.dept = b.dataset.dept; sync(); renderAll(); });
 
-    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s.key}" class="${s.key === S.sort ? 'active' : ''}">${s.label}</button>`).join('');
+    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s.key}" class="fpill ${s.key === S.sort ? 'active' : ''}">${s.label}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderTree(); renderList(); });
 
     $('sortTabs').innerHTML = D.SORTS.map(s => `<button class="people-tab ${s.key === S.sort ? 'active' : ''}" data-sort="${s.key}">${s.label}</button>`).join('');
@@ -118,6 +118,16 @@
       .attr('fill', d => css('--mute')).text(d => (d.x1 - d.x0) > 46 ? d.data.name.toUpperCase() : '');
 
     $('treeLegend').innerHTML = `<span class="grad">low fit <span class="bar"></span> high fit</span><span>· block size = $ in your NAICS</span>`;
+
+    const tc = $('treeClear');
+    if (tc) {
+      if (S.sel) {
+        const c = allCmds().find(x => x.key === S.sel);
+        $('treeClearTxt').textContent = c ? ('Show all · clear ' + c.name) : 'Show all commands';
+        tc.style.display = 'inline-flex';
+      } else { tc.style.display = 'none'; }
+      tc.onclick = () => { S.sel = null; renderAll(); };
+    }
   }
 
   /* ─── ring helper ─── */

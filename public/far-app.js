@@ -13,7 +13,7 @@
     $('typeFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.type = b.dataset.type; sync(); renderAll(); });
     $('impactFilters').innerHTML = D.IMPACTS.map(t => `<button class="fpill ${t.key === S.impact ? 'active' : ''}" data-imp="${t.key}">${t.label}</button>`).join('');
     $('impactFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.impact = b.dataset.imp; sync(); renderAll(); });
-    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
+    $('sortSeg').innerHTML = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').querySelectorAll('button').forEach(b => b.onclick = () => { S.sort = b.dataset.sort; syncSort(); renderFeed(); });
     $('searchInput').addEventListener('input', e => { S.q = e.target.value.toLowerCase(); renderAll(); });
     $('resetBtn').onclick = () => { S.type = 'all'; S.impact = 'all'; S.q = ''; S.sort = 'Newest'; $('searchInput').value = ''; sync(); syncSort(); renderAll(); };
@@ -61,7 +61,7 @@
     const x = d3.scaleTime().domain([d3.min(dates), d3.max(dates)]).range([m.l, W - m.r]).nice();
     const bands = ['HIGH', 'MEDIUM', 'LOW'];
     const y = d3.scalePoint().domain(bands).range([m.t + 14, H - m.b - 10]).padding(0.5);
-    const r = d3.scaleSqrt().domain([1, 7]).range([5, 16]);
+    const r = d3.scaleSqrt().domain([1, 7]).range([6, 18]);
     // band rows
     bands.forEach(b => {
       svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(b)).attr('y2', y(b)).attr('stroke', css('--line-2')).attr('stroke-width', 1);
@@ -75,7 +75,7 @@
     svg.selectAll('circle.tld').data(data, d => d.clause).join('circle')
       .attr('class', d => 'tld' + (S.sel === d.clause ? ' sel' : '') + (S.sel && S.sel !== d.clause ? ' dim' : ''))
       .attr('cx', d => x(new Date(d.date))).attr('cy', d => y(d.impact)).attr('r', d => r(d.affects))
-      .attr('fill', d => D.TYPE_COLOR[d.type]).attr('opacity', .7).attr('stroke', d => D.TYPE_COLOR[d.type]).attr('stroke-width', .6)
+      .attr('fill', d => D.TYPE_COLOR[d.type]).attr('opacity', 1).attr('stroke', css('--card')).attr('stroke-width', 1.8)
       .style('cursor', 'pointer')
       .on('click', (ev, d) => { S.sel = d.clause; renderAll(); })
       .on('mousemove', (ev, d) => {

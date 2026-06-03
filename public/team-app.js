@@ -13,7 +13,7 @@
     $('naicsFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.naics = b.dataset.naics; sync(); renderAll(); });
     $('certFilters').innerHTML = D.CERT_FILTERS.map(c => `<button class="fpill ${c.key === S.cert ? 'active' : ''}" data-cert="${c.key}">${c.label}</button>`).join('');
     $('certFilters').querySelectorAll('button').forEach(b => b.onclick = () => { S.cert = b.dataset.cert; sync(); renderAll(); });
-    const sortHtml = D.SORTS.map(s => `<button data-sort="${s}" class="${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
+    const sortHtml = D.SORTS.map(s => `<button data-sort="${s}" class="fpill ${s === S.sort ? 'active' : ''}">${s}</button>`).join('');
     $('sortSeg').innerHTML = sortHtml;
     $('sortTabs').innerHTML = D.SORTS.map(s => `<button class="people-tab ${s === S.sort ? 'active' : ''}" data-sort="${s}">${s}</button>`).join('');
     const onSort = (b) => { S.sort = b.dataset.sort; syncSort(); renderList(); };
@@ -83,7 +83,7 @@
     svg.selectAll('circle.dot').data(data, d => d.id).join('circle')
       .attr('class', d => 'dot' + (S.sel === d.id ? ' sel' : '') + (S.sel && S.sel !== d.id ? ' dim' : ''))
       .attr('cx', d => x(d.complement)).attr('cy', d => y(d.fit)).attr('r', d => r(d.value))
-      .attr('fill', d => certCol(topCert(d))).attr('opacity', .66).attr('stroke', d => certCol(topCert(d))).attr('stroke-width', .6).style('cursor', 'pointer')
+      .attr('fill', d => certCol(topCert(d))).attr('opacity', 1).attr('stroke', css('--card')).attr('stroke-width', 1.8).style('cursor', 'pointer')
       .on('click', (ev, d) => { S.sel = d.id; renderAll(); })
       .on('mousemove', (ev, d) => { const tip = $('coTip'); tip.innerHTML = `<div style="font-family:Manrope;font-weight:800;font-size:12px;margin-bottom:2px">${d.name}</div><div style="font-family:'IBM Plex Mono';font-size:10px;color:#cbd5e1;line-height:1.5">fit ${d.fit} · complement ${d.complement}<br>${d.certs.join(', ')} · $${d.value}M past perf</div>`; tip.style.display = 'block'; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 220) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; })
       .on('mouseleave', () => $('coTip').style.display = 'none');
