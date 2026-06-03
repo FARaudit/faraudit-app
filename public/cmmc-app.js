@@ -180,6 +180,6 @@
   function renderAll() { renderKPIs(); renderRadar(); renderPanel(); renderDomains(); renderC3(); renderGaps(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderRadar, 200); }); }
-  window.CMMC_APP = { onThemeChange };
+  window.CMMC_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
