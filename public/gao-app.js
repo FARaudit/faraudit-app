@@ -173,6 +173,6 @@
   function renderAll() { renderKPIs(); renderFunnel(); renderPanel(); renderFeed(); renderAgencyBars(); renderGrounds(); renderSignals(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderFunnel, 200); }); }
-  window.GAO_APP = { onThemeChange };
+  window.GAO_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
