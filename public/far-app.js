@@ -175,6 +175,6 @@
   function renderAll() { renderKPIs(); renderTimeline(); renderPanel(); renderFeed(); renderByType(); renderEffective(); renderAffected(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderTimeline, 200); }); }
-  window.FAR_APP = { onThemeChange };
+  window.FAR_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
