@@ -1,31 +1,64 @@
-(function(){async function wire(){
-    let d;
-    try{
-      const r=await fetch('/api/agencies',{credentials:'include'});
-      if(!r.ok){
-        const r2=await fetch('/api/agencies',{credentials:'include'});
-        if(!r2.ok)return;
-        d=await r2.json();
-      } else { d=await r.json(); }
-    }catch(e){return;}
-    const agencies=d.agencies||d.stats||d.data||d.items||[];
-    if(!agencies.length)return;
+/* FARaudit · Defense Agencies — Fork B live wiring.
+   Fetches /api/agencies, mutates window.DAG IN PLACE, re-renders.
+   When API ships `_source: "unwired-mock-preserved"`, this script is a no-op
+   and the client-side mock in dag-data.js continues to display.
+   When real DAG shape lands in the API, mutations + render fire normally. */
+(function () {
+  'use strict';
 
-    const list=document.querySelector('.agency-list,.agencies-list,.feed-list');
-    if(!list)return;
-
-    list.innerHTML=agencies.slice(0,30).map(a=>`
-      <div class="agency-row">
-        <div class="agency-name">${a.agency||a.name||''}</div>
-        <div class="agency-meta">
-          ${a.active_solicitations!=null?`<span class="agency-active">${a.active_solicitations} active</span>`:''}
-          ${a.total_awards!=null?`<span class="agency-awards">${a.total_awards} awards</span>`:''}
-          ${a.avg_award_value?`<span class="agency-value">Avg $${(a.avg_award_value/1e6).toFixed(1)}M</span>`:''}
-        </div>
-      </div>`).join('');
-
-    const cnt=document.querySelector('.agency-count,.agencies-count,.total-count');
-    if(cnt)cnt.textContent=agencies.length+' agencies';
+  function replaceArr(name, next) {
+    if (!Array.isArray(next)) return;
+    const arr = window.DAG[name];
+    if (!Array.isArray(arr)) { window.DAG[name] = next.slice(); return; }
+    arr.length = 0;
+    arr.push(...next);
   }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',wire):wire();
+
+  function replaceObj(name, next) {
+    if (!next || typeof next !== 'object') return;
+    const cur = window.DAG[name];
+    if (cur && typeof cur === 'object') {
+      for (const k of Object.keys(cur)) delete cur[k];
+      Object.assign(cur, next);
+    } else {
+      window.DAG[name] = next;
+    }
+  }
+
+  async function wire() {
+    try {
+      const res = await fetch('/api/agencies', { credentials: 'include' });
+      if (!res.ok) throw new Error('agencies fetch failed: ' + res.status);
+      const data = await res.json();
+
+      if (data._source === 'unwired-mock-preserved') return;
+      if (!window.DAG) return;
+
+      replaceArr('DEPTS',      data.DEPTS);
+      replaceArr('SETASIDES',  data.SETASIDES);
+      replaceArr('SORTS',      data.SORTS);
+      replaceObj('POSTURE',    data.POSTURE);
+      replaceObj('FORECAST',   data.FORECAST);
+      replaceObj('NAICS_COLORS', data.NAICS_COLORS);
+
+      if (window.DAG_APP && typeof window.DAG_APP.render === 'function') {
+        window.DAG_APP.render();
+      }
+    } catch (e) {
+      console.error('[agencies-live] wire failed:', e);
+    }
+  }
+
+  const obs = new MutationObserver(() => {
+    if (window.DAG_APP && typeof window.DAG_APP.onThemeChange === 'function') {
+      window.DAG_APP.onThemeChange();
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();

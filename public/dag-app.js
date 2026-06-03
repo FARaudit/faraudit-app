@@ -295,6 +295,6 @@
     buildControls(); renderAll();
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(() => { renderTree(); renderForecast(); }, 220); });
   }
-  window.DAG_APP = { onThemeChange };
+  window.DAG_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
