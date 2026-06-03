@@ -255,6 +255,6 @@
     buildControls(); renderAll();
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderBubble, 220); });
   }
-  window.DSO_APP = { onThemeChange };
+  window.DSO_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

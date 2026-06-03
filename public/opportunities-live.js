@@ -1,55 +1,102 @@
-(function(){async function wire(){
-    let d;
-    try{
-      const r=await fetch('/api/command-center-data',{credentials:'include'});
-      if(!r.ok)return;
-      d=await r.json();
-    }catch(e){return;}
-    if(!d||!d.opportunities||!d.opportunities.length)return;
+/* FARaudit · Defense Opportunities — Fork B live wiring.
+   Fetches /api/command-center-data, maps data.opportunities → window.DSO.OPPS
+   in place, then calls window.DSO_APP.render(). dso-app.js is the render
+   layer; this file only swaps data. */
+(function () {
+  'use strict';
 
-    const feed=document.querySelector('.feed-list,.opp-list,.opportunities-list');
-    if(!feed)return;
-
-    const sc=s=>s>=80?'s-hi':s>=50?'s-mid':'s-lo';
-    const tl=dl=>{
-      if(!dl)return'';
-      const h=Math.round((new Date(dl)-Date.now())/36e5);
-      return h<0?'expired':h<24?h+'h left':Math.round(h/24)+'d left';
-    };
-    const fv=v=>{
-      if(!v)return'';
-      return v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+(v/1e3).toFixed(0)+'K';
-    };
-
-    feed.innerHTML=d.opportunities.map(o=>`
-      <div class="row${o.risk_level==='HIGH'?' urgent':''}">
-        <div class="score ${sc(o.compliance_score||0)}">
-          <div class="v">${o.compliance_score||'--'}</div>
-          <div class="l">Score</div>
-        </div>
-        <div class="row-body">
-          <div class="row-top">
-            <span class="row-id">${o.solicitation_number||o.notice_id||''}</span>
-            <span class="row-title">${(o.title||'Untitled').slice(0,80)}</span>
-          </div>
-          <div class="row-meta">
-            <span class="badge doc">${o.document_type||'RFQ'}</span>
-            ${o.naics_code?`<span class="badge naics">NAICS ${o.naics_code}</span>`:''}
-            ${o.set_aside?`<span class="badge setaside">${o.set_aside}</span>`:''}
-          </div>
-          <div class="row-agency one-line">
-            <span class="agency-name">${o.agency||''}</span>
-          </div>
-          ${o.recommendation?`<div class="insight win">${o.recommendation.slice(0,140)}</div>`:''}
-        </div>
-        <div class="row-right">
-          <span class="deadline ${o.risk_level==='HIGH'?'crit':'warn'}">${tl(o.response_deadline)}</span>
-          <span class="row-value">${fv(o.award_ceiling)}</span>
-        </div>
-      </div>`).join('');
-
-    const cnt=document.querySelector('.feed-head h2 .count,.opp-count,.total-count');
-    if(cnt)cnt.textContent=d.opportunities.length+' of '+d.liveCount;
+  // SAM set-aside string → DSO sa key. Empty/full-and-open → "Full".
+  function normSetaside(s) {
+    if (!s) return 'Full';
+    const u = String(s).toLowerCase();
+    if (u.includes('sdvosb') || u.includes('service-disabled')) return 'SDVOSB';
+    if (u.includes('8(a)') || u === '8a' || u.includes('8 a')) return '8(a)';
+    if (u.includes('hubzone') || u.includes('hub zone')) return 'HUBZone';
+    if (u.includes('wosb') || u.includes('woman')) return 'SB';
+    if (u.includes('small business') || u.includes('total small') || u === 'sba') return 'SB';
+    if (u.includes('full') || u.includes('open') || u.includes('unrestricted')) return 'Full';
+    return 'SB';
   }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',wire):wire();
+
+  // SAM document_type → DSO stage (presol|sources|rfp|eval).
+  function normStage(docType, status) {
+    const d = String(docType || '').toLowerCase();
+    const s = String(status || '').toLowerCase();
+    if (d.includes('pre-sol') || d.includes('presol') || d.includes('synopsis only')) return 'presol';
+    if (d.includes('sources sought') || d.includes('rfi') || d.includes('combined')) return 'sources';
+    if (d.includes('award') || d.includes('justification') || s.includes('award') || s.includes('eval')) return 'eval';
+    return 'rfp'; // RFP/RFQ/IFB/Solicitation default
+  }
+
+  function daysUntil(iso) {
+    if (!iso) return 999;
+    const ms = new Date(iso).getTime();
+    if (isNaN(ms)) return 999;
+    return Math.ceil((ms - Date.now()) / 86400000);
+  }
+
+  function postedAgo(iso) {
+    if (!iso) return '';
+    const ms = new Date(iso).getTime();
+    if (isNaN(ms)) return '';
+    const diff = Date.now() - ms;
+    const d = Math.floor(diff / 86400000);
+    if (d <= 0) return 'today';
+    if (d === 1) return '1d ago';
+    if (d < 30) return d + 'd ago';
+    const mo = Math.floor(d / 30);
+    return mo + 'mo ago';
+  }
+
+  function mapOpp(o) {
+    return {
+      id: o.solicitation_number || o.notice_id || o.id || '',
+      title: o.title || 'Untitled',
+      agency: o.agency || '',
+      office: '',
+      naics: o.naics_code || '',
+      sa: normSetaside(o.set_aside),
+      stage: normStage(o.document_type, o.status),
+      type: o.document_type || 'RFP',
+      ceiling: o.award_ceiling ? Number(o.award_ceiling) / 1e6 : 0,
+      days: daysUntil(o.response_deadline),
+      fit: typeof o.compliance_score === 'number' ? o.compliance_score : 0,
+      incumbent: o.incumbent_name || 'New requirement',
+      posted: postedAgo(o.created_at)
+    };
+  }
+
+  async function wire() {
+    try {
+      const res = await fetch('/api/command-center-data', { credentials: 'include' });
+      if (!res.ok) throw new Error('opportunities fetch failed: ' + res.status);
+      const data = await res.json();
+      if (!window.DSO) return;
+      const opps = Array.isArray(data.opportunities) ? data.opportunities : [];
+      if (!opps.length) return; // empty state — keep design's empty render path
+
+      const mapped = opps.map(mapOpp);
+      window.DSO.OPPS.length = 0;
+      window.DSO.OPPS.push(...mapped);
+
+      if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
+        window.DSO_APP.render();
+      }
+    } catch (e) {
+      console.error('[opportunities-live] wire failed:', e);
+    }
+  }
+
+  const obs = new MutationObserver(() => {
+    if (window.DSO_APP && typeof window.DSO_APP.onThemeChange === 'function') {
+      window.DSO_APP.onThemeChange();
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();
