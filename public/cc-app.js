@@ -8,14 +8,14 @@
   // render logic doesn't change.
   window.CC = window.CC || {
     DESK: {
-      opp:   { label: 'Opportunities', color: '#378ADD', href: 'Opportunities (best-in-class).html', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
-      co:    { label: 'Contracting Officers', color: '#185FA5', href: 'Contracting Officers (best-in-class).html', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
-      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: 'CMMC Readiness (best-in-class).html', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
-      gao:   { label: 'GAO Protests', color: '#dc2626', href: 'GAO Protests (best-in-class).html', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
-      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: 'FAR-DFARS Updates (best-in-class).html', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
-      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: 'Wage Benchmarks (best-in-class).html', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
-      team:  { label: 'Teaming Partners', color: '#059669', href: 'Teaming Partners (best-in-class).html', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
-      spend: { label: 'Defense Spending', color: '#2C6CB4', href: 'Defense Spending (best-in-class).html', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
+      opp:   { label: 'Opportunities', color: '#378ADD', href: '/opportunities', icon: 'M12 2a9 9 0 100 18 9 9 0 000-18zM9 12l2 2 4-4' },
+      co:    { label: 'Contracting Officers', color: '#185FA5', href: '/contracting-officers', icon: 'M9 9a3 3 0 100-6 3 3 0 000 6zM3 20c1-3 3-5 6-5s5 2 6 5' },
+      cmmc:  { label: 'CMMC Readiness', color: '#0891b2', href: '/cmmc', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4' },
+      gao:   { label: 'GAO Protests', color: '#dc2626', href: '/gao-protests', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18' },
+      far:   { label: 'FAR/DFARS', color: '#7c3aed', href: '/far-dfars-updates', icon: 'M4 3h16v18H4zM8 8h8M8 12h8M8 16h5' },
+      wage:  { label: 'Wage Benchmarks', color: '#d97706', href: '/wage-benchmarks', icon: 'M3 20h18M6 16v-5M11 16V8M16 16v-3' },
+      team:  { label: 'Teaming Partners', color: '#059669', href: '/teaming-partners', icon: 'M7 9a3 3 0 100-6 3 3 0 000 6zM17 9a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 2.5-5 5-5M22 20c0-3-2.5-5-5-5' },
+      spend: { label: 'Defense Spending', color: '#2C6CB4', href: '/defense-spending', icon: 'M4 19V5M4 19h16M8 16v-4M13 16V9M18 16v-2' }
     },
     ACTIONS: [
       { desk: 'opp', urg: 'crit', days: 6, title: 'SPY-6 Radar Sustainment — submit in 6 days', why: 'Fit 94, SDVOSB set-aside, $18.4M ceiling. Your strongest open pursuit and the clock is running.', cta: 'Open pursuit', val: '$18.4M' },
