@@ -111,7 +111,7 @@
 
   function fmtIn(day) { return day === 0 ? 'today' : day <= 31 ? 'in ' + day + 'd' : day <= 90 ? 'in ' + Math.round(day / 7) + 'w' : 'in ' + Math.round(day / 30) + 'mo'; }
   function wkRow(w) {
-    const u = URG[w.tone], d = DESK[w.desk] || { color: '#64748b', href: 'Defense Spending (best-in-class).html' };
+    const u = URG[w.tone], d = DESK[w.desk] || { color: '#64748b', href: '/command-center' };
     const node = w.gov ? `<span class="wk-node gov" style="border-color:${u.c}"></span>` : `<span class="wk-node" style="background:${u.c}"></span>`;
     const tag = w.gov ? `<span class="wk-tag gov">◆ ${w.tag}</span>` : `<span class="wk-tag" style="color:${d.color};background:${hexA(d.color,.1)}">${w.tag}</span>`;
     return `<a class="wk-row${w.big ? ' big' : ''}" href="${d.href}">
