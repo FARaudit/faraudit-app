@@ -175,6 +175,6 @@
   function renderAll() { renderKPIs(); renderScatter(); renderPanel(); renderList(); renderCerts(); renderOpps(); renderInsight(); }
   function onThemeChange() { renderAll(); }
   function init() { buildControls(); renderAll(); let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(renderScatter, 200); }); }
-  window.TEAM_APP = { onThemeChange };
+  window.TEAM_APP = { render: renderAll, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
