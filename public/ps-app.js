@@ -13,46 +13,57 @@
   ];
   let active = 'company';
 
-  const COMPANY = {
-    name: 'Apex Precision Machining LLC', cage: '7R4X2', uei: 'APX7R4X2000000',
-    address: '2847 Industrial Blvd, San Antonio TX 78219', contact: 'Jose Rodriguez, CEO',
-    email: 'jose@apexprecision.com', phone: '(210) 555-0147'
+  // Promote mock data to window.PS so profile-settings-live.js can mutate in place.
+  // Mutate keys/array contents — never reassign the namespace or its arrays.
+  window.PS = window.PS || {
+    COMPANY: {
+      name: 'Apex Precision Machining LLC', cage: '7R4X2', uei: 'APX7R4X2000000',
+      address: '2847 Industrial Blvd, San Antonio TX 78219', contact: 'Jose Rodriguez, CEO',
+      email: 'jose@apexprecision.com', phone: '(210) 555-0147'
+    },
+    CERTS: [
+      { k: 'Small Business · NAICS 336413 (≤1,250 employees)', on: true }, { k: 'WOSB', on: false },
+      { k: 'SDVOSB', on: false }, { k: '8(a)', on: false }, { k: 'HUBZone', on: false }
+    ],
+    NAICS: [
+      { code: '336413', desc: 'Aircraft Engine & Parts Mfg', tag: 'PRIMARY' },
+      { code: '332710', desc: 'Machine Shops', tag: 'SECONDARY' },
+      { code: '332721', desc: 'Precision Turned Product Mfg', tag: 'SECONDARY' },
+      { code: '332722', desc: 'Bolt/Nut/Screw/Rivet Mfg', tag: 'SECONDARY' },
+      { code: '336411', desc: 'Aircraft Mfg', tag: 'MONITOR ONLY' }
+    ],
+    AGENCIES: [
+      { code: '502 CONS/CL', base: 'JBSA Lackland', type: 'Air Force', on: true },
+      { code: '502 CONS/PKC', base: 'JBSA Randolph', type: 'Air Force', on: true },
+      { code: '772 ESS/PK', base: 'Wright-Patterson', type: 'Engineering', on: true },
+      { code: 'OC-ALC/76 CONS', base: 'Tinker AFB', type: 'Maintenance', on: true },
+      { code: 'WR-ALC/402 SCMG', base: 'Robins AFB', type: 'Manufacturing', on: true },
+      { code: 'DLA Aviation', base: 'Richmond VA', type: 'Logistics', on: true },
+      { code: 'OO-ALC/309th', base: 'Hill AFB', type: 'Overhaul', on: false }
+    ],
+    NOTIFS: [
+      { t: 'New Pre-Solicitation Synopsis in your NAICS', d: 'Sources Sought / RFI alerts as soon as they hit SAM.gov', on: true },
+      { t: 'New Sources Sought / RFI in your NAICS', d: 'Combined market research stage notifications', on: true },
+      { t: 'New solicitation posted in your NAICS', d: 'Full RFP / RFQ / IFB stage alerts', on: true },
+      { t: 'HIGH impact FAR/DFARS change', d: 'Regulatory changes affecting your active contracts', on: true },
+      { t: 'GAO protest filed on a solicitation you bid', d: 'Award protest activity on contracts you participated in', on: true },
+      { t: 'Contracting officer responsiveness changes', d: 'Score shifts for COs in your network', on: false }
+    ],
+    TEAM: [{ name: 'Jose Rodriguez', email: 'jose@apexprecision.com', role: 'OWNER', you: true }],
+    USAGE: [
+      { l: 'Audits this month', v: '19 of 25' },
+      { l: 'Solicitations tracked', v: '12' },
+      { l: 'Synopsis alerts sent', s: 'Pre-sol + Sources Sought · 9 NAICS', v: '34' },
+      { l: 'Team members', s: 'Single-seat license', v: '1 of 1' }
+    ]
   };
-  const CERTS = [
-    { k: 'Small Business · NAICS 336413 (≤1,250 employees)', on: true }, { k: 'WOSB', on: false },
-    { k: 'SDVOSB', on: false }, { k: '8(a)', on: false }, { k: 'HUBZone', on: false }
-  ];
-  const NAICS = [
-    { code: '336413', desc: 'Aircraft Engine & Parts Mfg', tag: 'PRIMARY' },
-    { code: '332710', desc: 'Machine Shops', tag: 'SECONDARY' },
-    { code: '332721', desc: 'Precision Turned Product Mfg', tag: 'SECONDARY' },
-    { code: '332722', desc: 'Bolt/Nut/Screw/Rivet Mfg', tag: 'SECONDARY' },
-    { code: '336411', desc: 'Aircraft Mfg', tag: 'MONITOR ONLY' }
-  ];
-  const AGENCIES = [
-    { code: '502 CONS/CL', base: 'JBSA Lackland', type: 'Air Force', on: true },
-    { code: '502 CONS/PKC', base: 'JBSA Randolph', type: 'Air Force', on: true },
-    { code: '772 ESS/PK', base: 'Wright-Patterson', type: 'Engineering', on: true },
-    { code: 'OC-ALC/76 CONS', base: 'Tinker AFB', type: 'Maintenance', on: true },
-    { code: 'WR-ALC/402 SCMG', base: 'Robins AFB', type: 'Manufacturing', on: true },
-    { code: 'DLA Aviation', base: 'Richmond VA', type: 'Logistics', on: true },
-    { code: 'OO-ALC/309th', base: 'Hill AFB', type: 'Overhaul', on: false }
-  ];
-  const NOTIFS = [
-    { t: 'New Pre-Solicitation Synopsis in your NAICS', d: 'Sources Sought / RFI alerts as soon as they hit SAM.gov', on: true },
-    { t: 'New Sources Sought / RFI in your NAICS', d: 'Combined market research stage notifications', on: true },
-    { t: 'New solicitation posted in your NAICS', d: 'Full RFP / RFQ / IFB stage alerts', on: true },
-    { t: 'HIGH impact FAR/DFARS change', d: 'Regulatory changes affecting your active contracts', on: true },
-    { t: 'GAO protest filed on a solicitation you bid', d: 'Award protest activity on contracts you participated in', on: true },
-    { t: 'Contracting officer responsiveness changes', d: 'Score shifts for COs in your network', on: false }
-  ];
-  const TEAM = [{ name: 'Jose Rodriguez', email: 'jose@apexprecision.com', role: 'OWNER', you: true }];
-  const USAGE = [
-    { l: 'Audits this month', v: '19 of 25' },
-    { l: 'Solicitations tracked', v: '12' },
-    { l: 'Synopsis alerts sent', s: 'Pre-sol + Sources Sought · 9 NAICS', v: '34' },
-    { l: 'Team members', s: 'Single-seat license', v: '1 of 1' }
-  ];
+  const COMPANY = window.PS.COMPANY;
+  const CERTS = window.PS.CERTS;
+  const NAICS = window.PS.NAICS;
+  const AGENCIES = window.PS.AGENCIES;
+  const NOTIFS = window.PS.NOTIFS;
+  const TEAM = window.PS.TEAM;
+  const USAGE = window.PS.USAGE;
 
   function tog(on) { return `<span class="tgl ${on ? 'on' : ''}"><i></i></span>`; }
   function field(label, val, ph) { return `<div class="fld"><label>${label}</label><input type="text" value="${val || ''}" placeholder="${ph || ''}"></div>`; }
@@ -135,6 +146,6 @@
   function flash() { const el = $('savedAt'); if (el) { el.textContent = 'saved just now'; setTimeout(() => el.textContent = 'changes save automatically', 2200); } }
 
   function init() { renderNav(); renderPanel(); }
-  window.PS_APP = { onThemeChange: () => renderPanel() };
+  window.PS_APP = { render: init, onThemeChange: () => renderPanel() };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
