@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Redesigned Tabs</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,72,600;1,72,600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+    --navy-900:#050d1a; --navy-800:#0A1628;
+    --page-bg:#eef2f7; --card:#ffffff; --ink:#0A1628; --ink-2:#334155;
+    --mute:#64748b; --mute-2:#94a3b8; --line:#e5e7eb; --line-2:#eef2f6;
+    --green-500:#10b981; --green-700:#047857; --green-50:#ecfdf5; --green-200:#a7f3d0;
+    --shadow:0 1px 2px rgba(15,23,42,.06), 0 12px 30px -14px rgba(15,23,42,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+  .wrap{max-width:1100px;margin:0 auto;padding:56px 32px 80px}
+
+  .top{display:flex;align-items:center;gap:13px;margin-bottom:34px}
+  .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:17px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
+  .wordmark{font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .wordmark .au{color:#378ADD}
+
+  header.head{display:flex;flex-direction:column;gap:9px;margin-bottom:38px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0}
+  h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:40px;letter-spacing:-.02em;margin:0;line-height:1.02}
+  .sub{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--mute);margin:0}
+  .sub b{color:var(--ink-2);font-weight:600}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .card{display:flex;flex-direction:column;gap:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);text-decoration:none;color:inherit;overflow:hidden;transition:transform .16s cubic-bezier(.16,1,.3,1), box-shadow .16s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 1px 2px rgba(15,23,42,.06), 0 22px 44px -16px rgba(15,23,42,.28)}
+  .card-vis{height:118px;position:relative;background:var(--navy-800);overflow:hidden;display:grid;place-items:center}
+  .card-vis svg{width:46px;height:46px;color:var(--accent-light)}
+  .card-vis .glow{position:absolute;inset:0;background:radial-gradient(120% 140% at 80% 0%, rgba(55,138,221,.35), transparent 60%)}
+  .card-body{padding:17px 19px 19px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .card-kicker{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+  .card h2{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:21px;letter-spacing:-.01em;margin:0;line-height:1.1}
+  .card p{font-size:12.5px;color:var(--ink-2);line-height:1.55;margin:0}
+  .badge-row{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:6px}
+  .pill{display:inline-flex;align-items:center;gap:6px;height:23px;padding:0 9px;border-radius:999px;background:var(--green-50);color:var(--green-700);font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.03em;border:1px solid var(--green-200)}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500)}
+  .go{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--accent-deep)}
+  .go svg{width:13px;height:13px}
+  .pill.neutral{background:var(--line-2);color:var(--mute);border-color:var(--line)}
+  .pill.neutral::before{background:var(--mute-2)}
+  .section-label{display:flex;align-items:center;gap:12px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin:0 0 16px}
+  .section-label::after{content:"";flex:1;height:1px;background:var(--line)}
+  .section-label .count{color:var(--mute-2);font-weight:600;letter-spacing:.06em}
+  .section-gap{height:38px}
+  .foot{margin-top:30px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute-2)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top"><div class="logo">F</div><span class="wordmark">FAR<span class="au">audit</span></span></div>
+
+    <header class="head">
+      <p class="eyebrow">Redesign Delivery · 16 Tabs</p>
+      <h1>Redesigned Tabs</h1>
+      <p class="sub">Every redesigned screen in one place — <b>Workspace</b> tools and the five <b>best-in-class</b> intelligence tabs. Click any card to open.</p>
+    </header>
+
+    <div class="section-label">Workspace <span class="count">· 6</span></div>
+    <div class="grid">
+      <a class="card" href="today.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace · Best in class</span>
+          <h2>Today</h2>
+          <p>Command center — a ranked priority feed pulling the one urgent item from every desk, a 30-day deadline agenda, and cross-desk signals.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="run-audit.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace</span>
+          <h2>Run Audit</h2>
+          <p>Paste a solicitation and get an instant FAR/DFARS compliance audit — clause-by-clause findings, risks, and fixes.</p>
+          <div class="badge-row"><span class="pill neutral">Redesign</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="acquisition-stages.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace</span>
+          <h2>Acquisition Stages</h2>
+          <p>Track each pursuit through the acquisition lifecycle — from market research to award — with stage gates and timelines.</p>
+          <div class="badge-row"><span class="pill neutral">Redesign</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="past-audits.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace</span>
+          <h2>Past Audits</h2>
+          <p>Your archive of completed FAR/DFARS audits — searchable history with scores, findings, and re-run shortcuts.</p>
+          <div class="badge-row"><span class="pill neutral">Redesign</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="pipeline.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace</span>
+          <h2>Pipeline</h2>
+          <p>Your tracked pursuits in a Kanban-style flow — value, deadlines, and win-probability across every active opportunity.</p>
+          <div class="badge-row"><span class="pill neutral">Redesign</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="capability-statement.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Workspace</span>
+          <h2>Capability Statement</h2>
+          <p>Build and tailor a polished, agency-ready capability statement — NAICS, past performance, certifications, and differentiators.</p>
+          <div class="badge-row"><span class="pill neutral">Redesign</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+    </div>
+
+    <div class="section-gap"></div>
+    <div class="section-label">Intelligence <span class="count">· 5 · best in class</span></div>
+    <div class="grid">
+      <a class="card" href="opportunities.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>Opportunities</h2>
+          <p>Pursuit-intelligence workspace — deadline×value bubble map, fit-scored pipeline, saved views, and live filters so you triage without SAM.gov.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="defense-news.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>Defense News</h2>
+          <p>News outlet + intelligence band — KPI strip, 14-day story-volume chart, clickable topic-mix bars, lead hero, and the “why it matters” layer.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="defense-spending.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>Defense Spending</h2>
+          <p>Interactive US map, agency×NAICS treemap, opportunity-matrix scatter, and global filters that drive every widget.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="defense-agencies.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>Defense Agencies</h2>
+          <p>Org-map treemap (dept → command), set-aside posture heatmap, per-command fit scores, and a 4-quarter procurement forecast.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="contracting-officers.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>Contracting Officers</h2>
+          <p>Relationship CRM — responsiveness×buying-power scatter, fit-scored people rail, engagement timeline, and an outreach-to-award funnel.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+    </div>
+
+    <div class="section-gap"></div>
+    <div class="section-label">Compliance &amp; BD <span class="count">· 5 · best in class</span></div>
+    <div class="grid">
+      <a class="card" href="far-dfars-updates.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Compliance · Best in class</span>
+          <h2>FAR/DFARS Updates</h2>
+          <p>Regulatory change timeline (date × impact), clause detail with “why it matters,” impact-by-type, effective-date countdowns, affected contracts.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="cmmc-readiness.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Compliance · Best in class</span>
+          <h2>CMMC Readiness</h2>
+          <p>14-domain compliance radar, readiness gauge, gap analysis by NIST family, priority fixes, and an estimated C3PAO path to Level 2.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="wage-benchmarks.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Compliance · Best in class</span>
+          <h2>Wage Benchmarks</h2>
+          <p>Wage-position plot — your rate vs SCA floor vs market per labor category — with below-market flags and WD-renewal countdowns.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="teaming-partners.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Business Dev · Best in class</span>
+          <h2>Teaming Partners</h2>
+          <p>Partner-fit scatter (complementarity × strength), cert coverage you unlock via teaming, partner profiles, and active teaming opps.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+
+      <a class="card" href="gao-protests.html">
+        <div class="card-vis"><div class="glow"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg></div>
+        <div class="card-body">
+          <span class="card-kicker">Intelligence · Best in class</span>
+          <h2>GAO Protests</h2>
+          <p>FY25 outcome funnel (filed → merit → sustained), sustain-rate by agency, protest-grounds odds, case docket, and live risk signals.</p>
+          <div class="badge-row"><span class="pill">Best in class</span><span class="go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </a>
+    </div>
+
+    <p class="foot">FARaudit · redesign delivery · 16 screens · 6 Workspace + 5 Intelligence + 5 Compliance &amp; BD (all best in class)</p>
+  </div>
+</body>
+</html>

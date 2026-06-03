@@ -10,7 +10,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in?next=/cmmc");
 
-  const filePath = path.join(process.cwd(), "public", "cmmc-readiness-design.html");
+  const filePath = path.join(process.cwd(), "public", "cmmc-readiness.html");
   const html = await readFile(filePath, "utf8");
 
   return new Response(html, {

@@ -28,7 +28,7 @@ export async function GET() {
   const filePath = path.join(
     process.cwd(),
     "public",
-    "dashboard-design.html"
+    "past-audits.html"
   );
   const html = await readFile(filePath, "utf8");
 

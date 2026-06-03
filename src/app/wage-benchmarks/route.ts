@@ -10,7 +10,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in?next=/wage-benchmarks");
 
-  const filePath = path.join(process.cwd(), "public", "wage-benchmarks-design.html");
+  const filePath = path.join(process.cwd(), "public", "wage-benchmarks.html");
   const html = await readFile(filePath, "utf8");
 
   return new Response(html, {

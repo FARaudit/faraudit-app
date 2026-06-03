@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Capability Statement</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,72,600;1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Capability Statement — export-ready document (redesign)
+   Shares the canonical token chain, sidebar, and topbar.
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
+}
+[data-theme="light"]{
+  --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+.main{display:flex;flex-direction:column;min-width:0}
+
+/* topbar (canonical) */
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;position:sticky;top:0;z-index:40;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:340px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+
+/* ═══ BODY ═══ */
+.body{padding:26px 32px 64px;display:flex;flex-direction:column;gap:22px;max-width:1500px;width:100%;margin:0 auto}
+
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.page-header .heading{display:flex;flex-direction:column;gap:7px}
+.page-header .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0}
+.page-header h1{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1.04}
+.page-header .sub{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mute);margin:0;max-width:60ch;line-height:1.6}
+.page-header .sub b{color:var(--ink-2);font-weight:600}
+.cta-primary{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 20px;border-radius:10px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;border:0;font-size:13px;font-weight:800;letter-spacing:.02em;text-decoration:none;cursor:pointer;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 10px 22px -8px rgba(55,138,221,.55);transition:transform .14s, box-shadow .14s}
+.cta-primary:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 14px 26px -8px rgba(55,138,221,.6)}
+.cta-primary svg{width:15px;height:15px}
+
+/* stat strip */
+.stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.stat-card .lbl{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0}
+.stat-card .val{font-family:"Manrope",sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:var(--ink);margin:0;line-height:1}
+.stat-card .val.mono{font-family:"IBM Plex Mono",monospace;font-size:16px;color:var(--ink-2);font-weight:600}
+.stat-card .sub{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);margin:0}
+
+/* two-column */
+.cs-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;align-items:start}
+
+/* ═══ DOCUMENT (left) ═══ */
+.doc-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-pop);overflow:hidden;display:flex;flex-direction:column}
+.doc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;background:var(--card-soft);border-bottom:1px solid var(--line)}
+.doc-toolbar .tl{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:8px}
+.doc-toolbar .tl svg{width:13px;height:13px;color:var(--accent-deep)}
+.doc-toolbar .tr{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute)}
+
+/* letterhead */
+.letterhead{background:linear-gradient(135deg,var(--navy-800),var(--navy-900));color:#e8eef6;padding:24px 28px 20px;position:relative;overflow:hidden}
+.letterhead::before{content:"";position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(55,138,221,.25),transparent 70%);pointer-events:none}
+.lh-top{display:flex;align-items:center;gap:16px;position:relative}
+.lh-logo{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.04);border:1.5px dashed rgba(181,212,244,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8aa0bd;flex-shrink:0;cursor:pointer;transition:border-color .14s,color .14s}
+.lh-logo:hover{border-color:var(--accent);color:var(--accent-light)}
+.lh-logo svg{width:18px;height:18px}
+.lh-logo .lt{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.1em}
+.lh-id{min-width:0;flex:1}
+.lh-name{font-family:"Fraunces",serif;font-weight:600;font-size:24px;letter-spacing:-.01em;color:#fff;line-height:1.1;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.lh-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#aebbcf;margin-top:5px;letter-spacing:.01em}
+.mock-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;background:rgba(245,158,11,0.16);color:#fcd34d;border:1px solid rgba(252,211,77,0.3);font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.3}
+.lh-codes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);position:relative}
+.lh-code .k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7d8ba0;margin-bottom:4px}
+.lh-code .v{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:.01em}
+.lh-code .v small{display:block;font-size:9.5px;font-weight:500;color:#aebbcf;letter-spacing:0;margin-top:2px}
+
+/* doc sections */
+.doc-section{padding:20px 28px;border-bottom:1px solid var(--line-2)}
+.doc-section:last-child{border-bottom:0}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+.sec-title{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-deep);display:flex;align-items:center;gap:9px}
+[data-theme="dark"] .sec-title{color:var(--accent-light)}
+.sec-title::before{content:"";width:14px;height:2px;border-radius:2px;background:var(--accent)}
+.edit-btn{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--mute);cursor:pointer;transition:border-color .14s, color .14s, background .14s}
+.edit-btn:hover{border-color:var(--accent-light);color:var(--accent);background:rgba(55,138,221,0.04)}
+.edit-btn svg{width:13px;height:13px}
+
+.bullet-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px}
+.bullet-list li{font-size:13px;color:var(--ink-2);line-height:1.55;padding-left:20px;position:relative}
+.bullet-list li b{color:var(--ink);font-weight:700}
+.bullet-list li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,0.16)}
+
+.perf-list{display:flex;flex-direction:column;gap:12px}
+.perf-item{border:1px solid var(--line);border-radius:11px;padding:14px 16px;background:var(--card-soft);display:grid;grid-template-columns:1fr auto;gap:5px 16px;transition:border-color .14s}
+.perf-item:hover{border-color:var(--accent-light)}
+.perf-title{font-size:13.5px;color:var(--ink);font-weight:700;letter-spacing:-.005em;line-height:1.3}
+.perf-agency{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);font-weight:500}
+.perf-value{font-family:"IBM Plex Mono",monospace;font-size:14px;color:var(--green-700);font-weight:700;text-align:right;align-self:start}
+[data-theme="dark"] .perf-value{color:#6ee7b7}
+.perf-summary{grid-column:1/-1;font-size:12px;color:var(--ink-2);line-height:1.55;margin-top:4px}
+
+.diff-list{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:11px 18px}
+.diff-list li{font-size:12.5px;color:var(--ink-2);line-height:1.45;padding-left:24px;position:relative}
+.diff-list li::before{content:"";position:absolute;left:0;top:1px;width:16px;height:16px;border-radius:5px;background:var(--green-50);border:1px solid var(--green-200);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23047857' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 6'/%3E%3C/svg%3E");background-size:11px;background-repeat:no-repeat;background-position:center}
+[data-theme="dark"] .diff-list li::before{background-color:rgba(16,185,129,.16);border-color:rgba(16,185,129,.3)}
+
+/* contact strip */
+.contact-strip{display:flex;flex-wrap:wrap;gap:18px 28px;padding:16px 28px;background:var(--card-soft);border-top:1px solid var(--line)}
+.contact-item{display:flex;align-items:center;gap:9px;min-width:0}
+.contact-item svg{width:15px;height:15px;color:var(--accent-deep);flex-shrink:0}
+[data-theme="dark"] .contact-item svg{color:var(--accent-light)}
+.contact-item .ci{min-width:0}
+.contact-item .ck{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);line-height:1.2}
+.contact-item .cv{font-size:12px;color:var(--ink-2);font-weight:600;line-height:1.3;white-space:nowrap}
+
+/* ═══ SIDE (right) ═══ */
+.side-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:80px}
+.side-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.side-card h3{font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.005em;color:var(--ink);margin:0;display:flex;align-items:center;gap:8px}
+.side-card h3 svg{width:15px;height:15px;color:var(--accent-deep)}
+[data-theme="dark"] .side-card h3 svg{color:var(--accent-light)}
+
+.export-list{display:flex;flex-direction:column;gap:8px}
+.export-btn{display:flex;align-items:center;gap:10px;width:100%;height:40px;padding:0 13px;border-radius:9px;border:1px solid var(--line);background:var(--card-soft);font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:700;color:var(--ink-2);cursor:pointer;text-align:left;transition:border-color .14s, color .14s, background .14s, transform .14s}
+.export-btn:hover{border-color:var(--accent-light);color:var(--accent-deep);background:rgba(55,138,221,0.04);transform:translateY(-1px)}
+[data-theme="dark"] .export-btn:hover{color:var(--accent-light)}
+.export-btn svg{width:16px;height:16px;color:var(--mute);flex-shrink:0}
+.export-btn:hover svg{color:var(--accent)}
+.export-btn .ext{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--mute)}
+
+/* health ring */
+.health-top{display:flex;align-items:center;gap:16px}
+.ring{position:relative;width:74px;height:74px;flex-shrink:0}
+.ring svg{transform:rotate(-90deg)}
+.ring .ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .ring-num .pct{font-family:"Manrope",sans-serif;font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--accent-deep);line-height:1}
+[data-theme="dark"] .ring .ring-num .pct{color:var(--accent-light)}
+.health-cap{font-size:12px;color:var(--ink-2);line-height:1.5}
+.health-cap b{color:var(--ink);font-weight:700}
+.health-missing{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.health-missing li{font-size:11.5px;color:var(--ink-2);line-height:1.4;padding-left:22px;position:relative}
+.health-missing li::before{content:"";position:absolute;left:0;top:2px;width:14px;height:14px;border:1.5px solid var(--mute-2);border-radius:4px;background:transparent}
+.health-missing li.done{color:var(--mute);text-decoration:none}
+.health-missing li.done::before{border:0;background:var(--green-600);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 6'/%3E%3C/svg%3E");background-size:9px;background-repeat:no-repeat;background-position:center}
+.health-missing li.todo{font-weight:600;color:var(--ink-2)}
+.improve-btn{width:100%;height:38px;border-radius:9px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;border:0;cursor:pointer;font-size:12.5px;font-weight:700;letter-spacing:.02em;display:inline-flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 8px 18px -8px rgba(55,138,221,.55);transition:transform .14s}
+.improve-btn:hover{transform:translateY(-1px)}
+.improve-btn svg{width:13px;height:13px}
+
+.ver-list{display:flex;flex-direction:column;gap:10px}
+.ver-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--card-soft);cursor:pointer;transition:border-color .14s, background .14s, transform .14s;text-decoration:none}
+.ver-row:hover{border-color:var(--accent-light);background:rgba(55,138,221,0.04);transform:translateY(-1px)}
+.ver-left{display:flex;align-items:center;gap:11px;min-width:0}
+.ver-seal{width:30px;height:30px;border-radius:8px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);display:grid;place-items:center;color:var(--accent-deep);flex-shrink:0}
+[data-theme="dark"] .ver-seal{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:rgba(55,138,221,.3)}
+.ver-seal svg{width:15px;height:15px}
+.ver-text{min-width:0}
+.ver-title{font-size:12.5px;font-weight:700;color:var(--ink);letter-spacing:-.005em}
+.ver-meta{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);letter-spacing:.02em;margin-top:1px}
+.ver-arrow{color:var(--mute-2);flex-shrink:0}
+.ver-arrow svg{width:15px;height:15px;display:block;transition:transform .14s}
+.ver-row:hover .ver-arrow{color:var(--accent)}
+.ver-row:hover .ver-arrow svg{transform:translateX(2px)}
+.ver-add{display:flex;align-items:center;justify-content:center;gap:7px;height:38px;border-radius:9px;border:1.5px dashed var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:700;cursor:pointer;transition:border-color .14s,color .14s}
+.ver-add:hover{border-color:var(--accent);color:var(--accent-deep)}
+.ver-add svg{width:13px;height:13px}
+
+@media (max-width:1180px){
+  .cs-grid{grid-template-columns:1fr}
+  .side-col{position:static}
+  .stat-strip{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── canonical toggle sidebar ── */
+:root{--sb-width:56px}
+[data-sb="open"]{--sb-width:232px}
+.sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:#0A1628;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s,color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
+.sb-toggle:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{justify-content:flex-start;gap:10px;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 12px 6px;align-self:stretch}
+.sb-divider{width:24px;height:1px;background:rgba(255,255,255,.06);margin:6px 0}
+[data-sb="open"] .sb-divider{display:none}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:rgba(255,255,255,.6);position:relative;cursor:pointer;transition:all .15s;text-decoration:none;border:0;background:transparent;font:inherit;padding:0}
+.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.sb-icon.active{background:rgba(55,138,221,.15);color:#fff;box-shadow:inset 2px 0 0 #378ADD}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:#378ADD;border-radius:2px}
+.sb-icon > svg{width:18px;height:18px;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s,transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+[data-sb="open"] .sb-icon .sb-tip{display:none!important}
+[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
+[data-sb="open"] .sb-icon{display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;height:36px;gap:11px!important;padding:0 10px!important;border-radius:9px;flex-direction:row!important}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex!important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:#378ADD}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex!important;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#fff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
+.sb-icon.sb-signout:hover{color:#fca5a5}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+[data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
+/* ── /canonical toggle sidebar ── */
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR ═════════════ -->
+  <aside class="sidebar">
+  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+  <div class="sb-group-label">WORKSPACE</div>
+  <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
+  <a class="sb-icon" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon active" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">INTELLIGENCE</div>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+  <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">ACCOUNT</div>
+  <a class="sb-icon" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+  <form action="/api/auth/sign-out" method="post" style="display:contents">
+    <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
+  </form>
+  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+</aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Capability Statement</b><span class="sep">/</span><span>v1.0 · generated today</span></div>
+      <span class="live-pill">LIVE</span>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Search sections, NAICS, contracts…</span>
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
+          <span class="nbadge">7</span>
+        </button>
+        <div class="user-chip">
+          <div class="av">JR</div>
+          <div><div class="nm">Jose Rodriguez</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <!-- page header -->
+      <header class="page-header">
+        <div class="heading">
+          <p class="eyebrow">Workspace · Capability Statement</p>
+          <h1>Your Capability Statement</h1>
+          <p class="sub">Auto-generated from your audit history and past performance — <b>refreshes after every new audit</b>, tailored to the agencies you pursue most.</p>
+        </div>
+        <button class="cta-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 2L9 9 2 12l7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>
+          Regenerate
+        </button>
+      </header>
+
+      <!-- stat strip -->
+      <section class="stat-strip">
+        <div class="stat-card"><p class="lbl">Contracts Audited</p><p class="val">15</p><p class="sub">feeding the narrative</p></div>
+        <div class="stat-card"><p class="lbl">NAICS Codes</p><p class="val mono">336413<br>332710 · 332721</p><p class="sub">primary + 2 secondary</p></div>
+        <div class="stat-card"><p class="lbl">Completeness</p><p class="val">82<span style="font-size:16px;color:var(--mute)">%</span></p><p class="sub">3 items remaining</p></div>
+        <div class="stat-card"><p class="lbl">Last Generated</p><p class="val" style="font-size:22px">Today</p><p class="sub">11:42 AM CT · v1.0</p></div>
+      </section>
+
+      <!-- two-column -->
+      <section class="cs-grid">
+
+        <!-- LEFT: document -->
+        <article class="doc-card">
+          <div class="doc-toolbar">
+            <span class="tl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Generated Statement</span>
+            <span class="tr">v1.0 · auto-synced</span>
+          </div>
+
+          <!-- letterhead -->
+          <div class="letterhead">
+            <div class="lh-top">
+              <button class="lh-logo" type="button" aria-label="Upload logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v10"/><path d="M8 9l4-4 4 4"/><path d="M5 19h14"/></svg>
+                <span class="lt">LOGO</span>
+              </button>
+              <div class="lh-id">
+                <div class="lh-name">FARaudit Defense Solutions, Inc.<span class="mock-badge" title="Pulls from your company profile when live data is wired">Mock</span></div>
+                <div class="lh-tag">Radar Sustainment · Mission Systems Software · Precision Manufacturing</div>
+              </div>
+            </div>
+            <div class="lh-codes">
+              <div class="lh-code"><div class="k">CAGE</div><div class="v">8X4K2</div></div>
+              <div class="lh-code"><div class="k">UEI</div><div class="v">JR4XF9P28KL2</div></div>
+              <div class="lh-code"><div class="k">Primary NAICS</div><div class="v">336413<small>Aircraft Parts</small></div></div>
+              <div class="lh-code"><div class="k">Set-Aside</div><div class="v">SDVOSB<small>HUBZone partners</small></div></div>
+            </div>
+          </div>
+
+          <!-- core competencies -->
+          <div class="doc-section">
+            <div class="sec-head">
+              <span class="sec-title">Core Competencies</span>
+              <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+            </div>
+            <ul class="bullet-list">
+              <li><b>Radar &amp; sensor sustainment</b> — overhaul, repair, and upgrade of shipboard and ground-based radar arrays, supporting AN/SPY-class systems and GPS-III ground stations.</li>
+              <li><b>Mission systems software</b> — CI/CD pipeline engineering for embedded test harnesses, verified against F-35 mission-critical airworthiness criteria.</li>
+              <li><b>Cyber resilience &amp; CMMC</b> — Level 2 ready posture; assessment-grade documentation packages for critical-infrastructure clients under USACE Huntsville scope.</li>
+              <li><b>Precision machining &amp; turned-product manufacturing</b> — NAICS 332710 / 332721 production runs supporting DLA, Army TACOM, and Air Force tier-2 OEM contracts.</li>
+            </ul>
+          </div>
+
+          <!-- past performance -->
+          <div class="doc-section">
+            <div class="sec-head">
+              <span class="sec-title">Past Performance</span>
+              <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+            </div>
+            <div class="perf-list">
+              <div class="perf-item">
+                <span class="perf-title">SPY-6 Radar Sustainment — Phase IV CDRL Refresh</span>
+                <span class="perf-value">$18.4M</span>
+                <span class="perf-agency">U.S. Navy · NAVSEA · N00024-26-R-2207</span>
+                <p class="perf-summary">Authored Phase IV CDRL refresh covering reliability data submissions and 6-month operational sustainment milestones. Delivered ahead of schedule with zero CO-issued deficiency reports.</p>
+              </div>
+              <div class="perf-item">
+                <span class="perf-title">GPS-III Ground Station Software Modernization</span>
+                <span class="perf-value">$24.6M</span>
+                <span class="perf-agency">U.S. Space Force · SSC · FA2517-26-R-0033</span>
+                <p class="perf-summary">Migrated legacy command/control codebase to containerized microservices with cryptographic key-handling re-architecture. Zero classified-data spillage across 14 months.</p>
+              </div>
+              <div class="perf-item">
+                <span class="perf-title">F-35 Mission Systems — CI Pipeline Refactor</span>
+                <span class="perf-value">$7.9M</span>
+                <span class="perf-agency">Dept. of the Air Force · AFLCMC · FA8730-26-Q-0114</span>
+                <p class="perf-summary">Re-engineered the test harness for mission-systems builds, cutting nightly verification time 62% and unblocking 3 stalled airworthiness packages.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- differentiators -->
+          <div class="doc-section">
+            <div class="sec-head">
+              <span class="sec-title">Differentiators</span>
+              <button class="edit-btn" type="button" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+            </div>
+            <ul class="diff-list">
+              <li>Cleared workforce — 78% TS/SCI, 22% Secret</li>
+              <li>ISO 9001:2015 + AS9100D certified production</li>
+              <li>CMMC Level 2 conformance attested 2026-04</li>
+              <li>Sub-12-month average Phase IV delivery cycle</li>
+              <li>Two HUBZone partner integrators on retainer</li>
+              <li>Direct-buy authority on 14 DLA NSNs</li>
+            </ul>
+          </div>
+
+          <!-- contact strip -->
+          <div class="contact-strip">
+            <div class="contact-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+              <div class="ci"><div class="ck">Point of Contact</div><div class="cv">Jose Rodriguez · President</div></div>
+            </div>
+            <div class="contact-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+              <div class="ci"><div class="ck">Email</div><div class="cv">contracts@faraudit-defense.com</div></div>
+            </div>
+            <div class="contact-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg>
+              <div class="ci"><div class="ck">Phone</div><div class="cv">(703) 555-0142</div></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- RIGHT: side cards -->
+        <aside class="side-col">
+
+          <section class="side-card">
+            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Export</h3>
+            <div class="export-list">
+              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Download as PDF<span class="ext">.PDF</span></button>
+              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 4 4-7"/></svg>Download as Word<span class="ext">.DOCX</span></button>
+              <button class="export-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy to Clipboard<span class="ext">TEXT</span></button>
+            </div>
+          </section>
+
+          <section class="side-card">
+            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Statement Health</h3>
+            <div class="health-top">
+              <div class="ring">
+                <svg width="74" height="74" viewBox="0 0 74 74">
+                  <circle cx="37" cy="37" r="30" fill="none" stroke="var(--line-2)" stroke-width="7"/>
+                  <circle cx="37" cy="37" r="30" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="33.9"/>
+                </svg>
+                <div class="ring-num"><span class="pct">82%</span></div>
+              </div>
+              <div class="health-cap"><b>Strong foundation.</b> Three additions would make this CO-ready for tier-2 set-aside competitions.</div>
+            </div>
+            <ul class="health-missing">
+              <li class="done">Company name, CAGE &amp; UEI</li>
+              <li class="done">Primary &amp; secondary NAICS</li>
+              <li class="done">Core competencies (4 of 4)</li>
+              <li class="done">Past performance (3 of 3)</li>
+              <li class="todo">Add socioeconomic certifications</li>
+              <li class="todo">Add a tier-2 differentiator</li>
+              <li class="todo">Upload company logo (300×300)</li>
+            </ul>
+            <button class="improve-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2L9 9 2 12l7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>Improve with AI</button>
+          </section>
+
+          <section class="side-card">
+            <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>Tailored Versions</h3>
+            <div class="ver-list">
+              <a class="ver-row" href="#">
+                <div class="ver-left">
+                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></span>
+                  <div class="ver-text"><div class="ver-title">U.S. Army Edition</div><div class="ver-meta">USACE · TACOM · AMC focus</div></div>
+                </div>
+                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
+              </a>
+              <a class="ver-row" href="#">
+                <div class="ver-left">
+                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7M12 5v14M4 19h16"/></svg></span>
+                  <div class="ver-text"><div class="ver-title">U.S. Navy Edition</div><div class="ver-meta">NAVSEA · NAVAIR · NAVFAC focus</div></div>
+                </div>
+                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
+              </a>
+              <a class="ver-row" href="#">
+                <div class="ver-left">
+                  <span class="ver-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7l9 5 9-5-9-5z"/><path d="M3 12l9 5 9-5"/></svg></span>
+                  <div class="ver-text"><div class="ver-title">Air &amp; Space Force Edition</div><div class="ver-meta">AFLCMC · SSC · AFSC focus</div></div>
+                </div>
+                <span class="ver-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span>
+              </a>
+              <button class="ver-add" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>New tailored version</button>
+            </div>
+          </section>
+
+        </aside>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>/* theme + sidebar toggles */
+(function(){
+  var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
+  function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+  try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
+  sync();
+  if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
+})();
+(function(){
+  var KEY='faraudit-sb', html=document.documentElement;
+  try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
+  document.addEventListener('click',function(e){
+    var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
+    var next=html.getAttribute('data-sb')==='open'?'closed':'open';
+    html.setAttribute('data-sb',next);
+    try{localStorage.setItem(KEY,next);}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

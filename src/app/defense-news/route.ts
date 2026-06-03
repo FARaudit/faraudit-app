@@ -80,7 +80,7 @@ export async function GET() {
   const filePath = path.join(
     process.cwd(),
     "public",
-    "defense-news-design.html"
+    "defense-news.html"
   );
   let html = await readFile(filePath, "utf8");
 

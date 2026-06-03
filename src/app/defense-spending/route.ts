@@ -21,7 +21,7 @@ export async function GET() {
   const filePath = path.join(
     process.cwd(),
     "public",
-    "defense-spending-design.html"
+    "defense-spending.html"
   );
   const html = await readFile(filePath, "utf8");
 

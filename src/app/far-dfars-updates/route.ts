@@ -10,7 +10,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in?next=/far-dfars-updates");
 
-  const filePath = path.join(process.cwd(), "public", "far-dfars-updates-design.html");
+  const filePath = path.join(process.cwd(), "public", "far-dfars-updates.html");
   const html = await readFile(filePath, "utf8");
 
   return new Response(html, {
