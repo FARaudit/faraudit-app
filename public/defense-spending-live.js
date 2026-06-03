@@ -1,30 +1,74 @@
-(function(){
-  async function wire(){
-    let d;
-    try{
-      const r=await fetch('/api/defense-spending',{credentials:'include'});
-      if(!r.ok)return;
-      d=await r.json();
-    }catch(e){return;}
-    const spending=d.spending||d.data||d.items||[];
-    if(!spending.length)return;
+/* FARaudit · Defense Spending — Fork B live wiring.
+   Fetches /api/defense-spending, mutates window.DSB IN PLACE, re-renders.
+   When API ships `_source: "unwired-mock-preserved"`, this script is a no-op
+   and the client-side mock in dsb-data.js continues to display.
+   When real DSB shape lands in the API, mutations + render fire normally. */
+(function () {
+  'use strict';
 
-    const list=document.querySelector('.spending-list,.spending-feed,.feed-list,.awards-list');
-    if(!list)return;
-
-    list.innerHTML=spending.slice(0,30).map(s=>`
-      <div class="spending-row">
-        <div class="spending-agency">${s.agency||s.awarding_agency||''}</div>
-        <div class="spending-meta">
-          <span class="spending-amount">${s.total_amount||s.amount?'$'+(Number(s.total_amount||s.amount)/1e6).toFixed(1)+'M':''}</span>
-          <span class="spending-naics">${s.naics_code||s.naics||''}</span>
-          <span class="spending-date">${s.period||s.award_date||s.fiscal_year||''}</span>
-        </div>
-        ${s.description||s.title?`<div class="spending-desc">${(s.description||s.title||'').slice(0,120)}</div>`:''}
-      </div>`).join('');
-
-    const cnt=document.querySelector('.spending-count,.awards-count,.total-count');
-    if(cnt)cnt.textContent=spending.length+' awards';
+  function replaceArr(name, next) {
+    if (!Array.isArray(next)) return;
+    const arr = window.DSB[name];
+    if (!Array.isArray(arr)) { window.DSB[name] = next.slice(); return; }
+    arr.length = 0;
+    arr.push(...next);
   }
-  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',wire):wire();
+
+  function replaceObj(name, next) {
+    if (!next || typeof next !== 'object') return;
+    const cur = window.DSB[name];
+    if (cur && typeof cur === 'object') {
+      for (const k of Object.keys(cur)) delete cur[k];
+      Object.assign(cur, next);
+    } else {
+      window.DSB[name] = next;
+    }
+  }
+
+  async function wire() {
+    try {
+      const res = await fetch('/api/defense-spending', { credentials: 'include' });
+      if (!res.ok) throw new Error('defense-spending fetch failed: ' + res.status);
+      const data = await res.json();
+
+      // Architecture stub — server hasn't shipped real data yet.
+      if (data._source === 'unwired-mock-preserved') return;
+
+      if (!window.DSB) return;
+
+      if (Array.isArray(data.FYS))            replaceArr('FYS', data.FYS);
+      if (Array.isArray(data.AGENCY_FILTERS)) replaceArr('AGENCY_FILTERS', data.AGENCY_FILTERS);
+
+      replaceObj('KPIS',         data.KPIS);
+      replaceObj('STATES',       data.STATES);
+      replaceObj('MARKET_TREND', data.MARKET_TREND);
+
+      replaceArr('AGENCIES',    data.AGENCIES);
+      replaceArr('COMPETITION', data.COMPETITION);
+      replaceArr('BUDGET',      data.BUDGET);
+      replaceArr('RECOMPETES',  data.RECOMPETES);
+      replaceArr('INCUMBENTS',  data.INCUMBENTS);
+      replaceArr('PRICING',     data.PRICING);
+      replaceArr('NDAA',        data.NDAA);
+
+      if (window.DSB_APP && typeof window.DSB_APP.render === 'function') {
+        window.DSB_APP.render();
+      }
+    } catch (e) {
+      console.error('[defense-spending-live] wire failed:', e);
+    }
+  }
+
+  const obs = new MutationObserver(() => {
+    if (window.DSB_APP && typeof window.DSB_APP.onThemeChange === 'function') {
+      window.DSB_APP.onThemeChange();
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
 })();

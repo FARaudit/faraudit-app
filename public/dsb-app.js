@@ -523,6 +523,6 @@
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(() => { renderMap(); renderTreemap(); renderScatter(); }, 220); });
   }
 
-  window.DSB_APP = { onThemeChange };
+  window.DSB_APP = { render: () => { renderStatic(); renderAll(); }, onThemeChange };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
