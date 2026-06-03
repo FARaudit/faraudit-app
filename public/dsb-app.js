@@ -507,7 +507,7 @@
   function init() {
     buildControls(); renderLegend(); renderRankTabs();
     renderStatic(); renderAll();
-    fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
+    fetch('/vendor/states-10m.json')
       .then(r => r.json()).then(j => { usGeo = j; renderMap(); })
       .catch(() => { console.warn('us-atlas failed'); });
     let to; window.addEventListener('resize', () => { clearTimeout(to); to = setTimeout(() => { renderMap(); renderTreemap(); renderScatter(); }, 220); });
