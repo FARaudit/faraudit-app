@@ -1036,6 +1036,14 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   function isPdfUpload(a){
     return typeof a.notice_id === 'string' && /^pdf-/i.test(a.notice_id);
   }
+  // SAM.gov notice_ids are often 32-char opaque hex blobs (e.g.
+  // "7e13f96a69c04c10ba8a0fd004e9ac1b") — those aren't human-readable, so we
+  // skip them and fall through to the title-based headline candidates. Real
+  // solicitation numbers (FA301626Q0068, N00024-26-R-2207, 36C78626Q501270002)
+  // always contain non-hex letters or hyphens and don't match.
+  function isOpaqueHexId(s){
+    return typeof s === 'string' && /^[0-9a-f]{20,}$/i.test(s);
+  }
   // Try to pull a real-looking solicitation number out of a free-text title
   // (e.g. "Solicitation FA301626Q0068 — F-35 Harness" → "FA301626Q0068").
   // Matches 8–20 chars of letters/digits/hyphens with at least one letter and
@@ -1049,10 +1057,10 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     return s.toUpperCase();
   }
   // Headline + tag + meta resolver. Per CEO 2026-06-03 the headline must
-  // *never* show a.id (UUID) or a synthetic "pdf-<ts>" notice_id — those are
-  // the two ways the old code surfaced unreadable strings. Priority:
+  // *never* show a.id (UUID), a synthetic "pdf-<ts>" notice_id, or an opaque
+  // hex-blob notice_id — those all read as junk to a human. Priority:
   //   1) solicitation_number
-  //   2) notice_id, unless it's a "pdf-<ts>" synthetic
+  //   2) notice_id, unless it's a "pdf-<ts>" synthetic OR an opaque hex blob
   //   3) extracted sol-num from title text
   //   4) cleaned title
   //   5) "Uploaded PDF"
@@ -1061,7 +1069,9 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     var pdfUp = isPdfUpload(a) || a.pdfUpload === true;
     if (a.sol)                 return { sol: String(a.sol),                 pdfUpload: pdfUp };
     if (a.solicitation_number) return { sol: String(a.solicitation_number), pdfUpload: pdfUp };
-    if (!pdfUp && a.notice_id) return { sol: String(a.notice_id),           pdfUpload: false };
+    if (!pdfUp && a.notice_id && !isOpaqueHexId(a.notice_id)) {
+      return { sol: String(a.notice_id), pdfUpload: false };
+    }
     var extracted = extractSolNum(a.title);
     if (extracted)             return { sol: extracted,                     pdfUpload: pdfUp };
     var t = (a.title || '').trim();
