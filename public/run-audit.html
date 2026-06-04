@@ -232,12 +232,8 @@ button{font-family:inherit}
 
 /* ═══ 3-CALL PIPELINE EXPLAINER (Q2 live loader + Q5 collapsible) ═══ */
 .pipeline{width:100%;max-width:980px;margin-top:38px;text-align:left;background:transparent;border:0;padding:0}
-.pipeline > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);padding:8px 0;margin-bottom:12px;user-select:none}
-.pipeline > summary::-webkit-details-marker{display:none}
-.pipeline > summary .rule{height:1px;flex:1;background:var(--line)}
-.pipeline > summary .caret{font-family:"Manrope",sans-serif;font-size:14px;color:var(--mute-2);transition:transform .2s}
-.pipeline[open] > summary .caret{transform:rotate(90deg)}
-.pipeline > summary:hover{color:var(--ink-2)}
+.pipeline > .pipeline-label{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);padding:8px 0;margin-bottom:12px}
+.pipeline > .pipeline-label .rule{height:1px;flex:1;background:var(--line)}
 .pipeline-track{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto auto;align-items:stretch;gap:0}
 .pcall{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow-sm);padding:16px 16px 15px;display:flex;flex-direction:column;gap:10px;transition:border-color .25s, box-shadow .25s, opacity .2s;position:relative}
 .pcall-top{display:flex;align-items:center;gap:10px}
@@ -499,7 +495,7 @@ button{font-family:inherit}
         <!-- Q5 — RECENTLY AUDITED now appears ABOVE the pipeline explainer -->
         <div class="ra-recent" id="recentBlock">
           <div class="ra-recent-head">
-            <div class="ra-recent-label">Recently audited ·</div>
+            <div class="ra-recent-label">Recently audited</div>
             <a class="ra-recent-all" href="/dashboard" id="recentAll">View all →</a>
           </div>
           <div class="ra-recent-grid" id="recentGrid">
@@ -510,13 +506,12 @@ button{font-family:inherit}
           </div>
         </div>
 
-        <!-- Q5 — collapsible pipeline explainer (also serves as Q2 live loader) -->
-        <details class="pipeline" id="pipelineDetails">
-          <summary>
+        <!-- Pipeline explainer — always visible (core value prop). Q2 loader animates pcalls. -->
+        <div class="pipeline" id="pipelineDetails">
+          <div class="pipeline-label">
             <span class="t" id="pipelineSummaryT">What runs when you submit</span>
             <span class="rule"></span>
-            <span class="caret">›</span>
-          </summary>
+          </div>
           <div class="pipeline-track">
 
             <div class="pcall" id="pcall1">
@@ -583,7 +578,7 @@ button{font-family:inherit}
             <span class="pl-elapsed" id="plElapsed" aria-live="polite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="plElapsedText"></span></span>
             <a class="pl-done" id="plDone" href="#" aria-live="polite">View report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </div>
-        </details>
+        </div>
 
       </div>
     </div>
@@ -927,7 +922,7 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   window.startPipeline = function(){
     if(!pipelineEl) return;
     resetPipeline();
-    if(!pipelineEl.open) pipelineEl.open = true;
+    // pipeline is always visible; no open/close to manage
     // mark all pending, then progress through them
     STAGES.forEach(function(s){ var el=document.getElementById(s.id); if(el) el.classList.add('pending'); });
     elapsedT0 = Date.now();
@@ -982,23 +977,6 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     // Auto-redirect after a brief reveal so the user sees the green check
     setTimeout(function(){ window.location.href = href; }, 900);
   };
-})();
-
-/* ── Q5 — Pipeline explainer: collapsed after first audit (persisted) ── */
-(function(){
-  var pipelineEl = document.getElementById('pipelineDetails');
-  var KEY = 'faraudit-ra-explainer';
-  if(!pipelineEl) return;
-  try {
-    var ran = localStorage.getItem('faraudit-ra-has-run') === '1';
-    var saved = localStorage.getItem(KEY);
-    if (saved === 'open')      pipelineEl.open = true;
-    else if (saved === 'closed') pipelineEl.open = false;
-    else                        pipelineEl.open = !ran; // default open for first-timers, collapsed for repeat
-  } catch (e) { pipelineEl.open = true; }
-  pipelineEl.addEventListener('toggle', function(){
-    try { localStorage.setItem(KEY, pipelineEl.open ? 'open' : 'closed'); } catch (e) {}
-  });
 })();
 
 /* ── Q6 — Recent audits + sample link wired to /api/audits ── */
