@@ -295,13 +295,23 @@ export async function POST(req: NextRequest) {
   try {
     const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
 
+    // audit-engine 13f4743 emits score_confidence + is_not_solicitation on
+    // the result root. Fold them into compliance_json so the renderer can
+    // read them directly instead of falling back to its own derivation.
+    // Persisted alongside compliance_score per the engine's honesty flags.
+    const persistedComplianceJson = {
+      ...result.compliance.json,
+      score_confidence: result.score_confidence ?? null,
+      is_not_solicitation: result.is_not_solicitation ?? false
+    };
+
     const { error: updateError } = await supabase
       .from("audits")
       .update({
         overview_summary: result.overview.summary,
         overview_json: result.overview.json,
         compliance_summary: result.compliance.summary,
-        compliance_json: result.compliance.json,
+        compliance_json: persistedComplianceJson,
         risks_summary: result.risks.summary,
         risks_json: result.risks.json,
         compliance_score: result.compliance_score,
