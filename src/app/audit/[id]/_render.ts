@@ -391,13 +391,48 @@ function injectCtaHandlers(html: string, auditId: string, noticeId: string): str
     });
   });
 
-  // Track this opportunity — watcher surface not yet built. The renderer
-  // currently maps "watch" → "upload" so this CTA shouldn't be visible in
-  // production today, but stub a friendly message in case it leaks.
+  // Track this opportunity — POST/DELETE /api/audit/<id>/watch.
+  // The template ships a demo click handler that does a visual-only toggle;
+  // we clone each button to drop the demo listener before binding ours, so
+  // the API round-trip is the single source of truth for the tracking state.
   document.querySelectorAll('[data-track]').forEach(function(btn){
-    btn.addEventListener('click', function(e){
+    var fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click', function(e){
       e.preventDefault();
-      if (typeof window.showToast === 'function') window.showToast('Tracking is on our roadmap — for now, upload the PDF when it posts.');
+      if (fresh.dataset._busy === '1') return;
+      fresh.dataset._busy = '1';
+      var on = fresh.classList.contains('is-tracking');
+      var method = on ? 'DELETE' : 'POST';
+      fetch('/api/audit/' + AUDIT_ID + '/watch', { method: method, credentials: 'include' })
+        .then(function(r){ return r.json().catch(function(){return{}}).then(function(d){ return {ok:r.ok,status:r.status,data:d}; }); })
+        .then(function(out){
+          fresh.dataset._busy = '';
+          var note = fresh.parentElement && fresh.parentElement.querySelector('.mhv-sub-note');
+          if (!out.ok) {
+            var msg = (out.data && out.data.error) || ('Could not update tracking (HTTP ' + out.status + ')');
+            if (typeof window.showToast === 'function') window.showToast(msg);
+            else alert(msg);
+            return;
+          }
+          if (on) {
+            fresh.classList.remove('is-tracking');
+            fresh.innerHTML = 'Track this opportunity →';
+            if (note) note.textContent = 'We’ll auto-run the full audit the moment the RFP posts.';
+            if (typeof window.showToast === 'function') window.showToast('Stopped tracking');
+          } else {
+            fresh.classList.add('is-tracking');
+            fresh.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg>Tracking';
+            if (note) note.textContent = 'Watching SAM.gov — we’ll email you the moment it posts.';
+            if (typeof window.showToast === 'function') window.showToast('Tracking — we’ll auto-run the audit when the solicitation posts');
+          }
+        })
+        .catch(function(err){
+          fresh.dataset._busy = '';
+          var msg = 'Network error: ' + (err && err.message ? err.message : String(err));
+          if (typeof window.showToast === 'function') window.showToast(msg);
+          else alert(msg);
+        });
     });
   });
 
@@ -1067,6 +1102,23 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   // Dev-only HANDOFF block — not for the wire.
   html = stripHandoffComment(html);
+
+  // Stamp the initial "✓ Tracking" state on the [data-track] CTA + sub-note
+  // when the current user is already watching this notice. The production
+  // click handler (below) handles further toggling.
+  if (vm.is_watching) {
+    html = html.replace(
+      '<a class="mhv-cta" data-track>Track this opportunity &rarr;</a>',
+      '<a class="mhv-cta is-tracking" data-track><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg>Tracking</a>'
+    );
+    // Swap the sub-note paired with the watch CTA. The mock uses the same
+    // .mhv-sub-note class for the watch + (future) other modes; we target
+    // the one inside the data-pm="watch" container.
+    html = html.replace(
+      'We&rsquo;ll auto-run the full audit the moment the RFP posts.',
+      'Watching SAM.gov — we&rsquo;ll email you the moment it posts.'
+    );
+  }
 
   // Production CTA handlers — fetch/track/upload routed to real actions.
   // Stamped late so AUDIT_ID is correct for the in-flight audit.

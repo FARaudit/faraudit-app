@@ -51,6 +51,10 @@
   function mapOpp(o) {
     return {
       id: o.solicitation_number || o.notice_id || o.id || '',
+      // notice_id is the durable SAM identifier the watcher keys off. Kept
+      // alongside the display `id` so the Track button can target it
+      // regardless of whether the display fell back to solicitation_number.
+      notice_id: o.notice_id || '',
       title: o.title || 'Untitled',
       agency: o.agency || '',
       office: '',
@@ -58,12 +62,27 @@
       sa: normSetaside(o.set_aside),
       stage: normStage(o.document_type, o.status),
       type: o.document_type || 'RFP',
+      notice_type: o.document_type || null,
+      response_deadline: o.response_deadline || null,
       ceiling: o.award_ceiling ? Number(o.award_ceiling) / 1e6 : 0,
       days: daysUntil(o.response_deadline),
       fit: typeof o.compliance_score === 'number' ? o.compliance_score : 0,
       incumbent: o.incumbent_name || 'New requirement',
       posted: postedAgo(o.created_at)
     };
+  }
+
+  async function hydrateWatchedSet(opps) {
+    const noticeIds = opps.map(o => o.notice_id).filter(Boolean);
+    if (!noticeIds.length) return new Set();
+    try {
+      const res = await fetch('/api/watch?noticeIds=' + encodeURIComponent(noticeIds.join(',')), { credentials: 'include' });
+      if (!res.ok) return new Set();
+      const data = await res.json();
+      return new Set(Object.keys(data.watching || {}));
+    } catch (_) {
+      return new Set();
+    }
   }
 
   async function wire() {
@@ -78,6 +97,10 @@
       const mapped = opps.map(mapOpp);
       window.DSO.OPPS.length = 0;
       window.DSO.OPPS.push(...mapped);
+
+      // Hydrate the watcher state for visible rows — populated as a Set on
+      // window so dso-app.js's renderList can read it without re-fetching.
+      window.DSO.WATCHED_NOTICE_IDS = await hydrateWatchedSet(mapped);
 
       if (window.DSO_APP && typeof window.DSO_APP.render === 'function') {
         window.DSO_APP.render();

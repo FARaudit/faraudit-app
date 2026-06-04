@@ -107,7 +107,15 @@
 
     notifs: () => `
       <div class="sp-hd"><div class="sp-t">Notification Preferences</div><div class="sp-s">Control what triggers alerts in your inbox</div></div>
-      <div class="sp-bd">
+      <div class="sp-bd" id="alerts">
+        <div class="nf-row" data-pref-row>
+          <div class="nf-l">
+            <div class="nf-t">Weekly digest of watched opportunities</div>
+            <div class="nf-d">Mondays at 6am · summary of what's still pre-solicitation, what posted, and what auto-audited last week.</div>
+          </div>
+          <span class="nf-ch">Email</span>
+          <button class="nf-tg" data-pref-tg="weekly_digest_watched"><span class="tgl"><i></i></span></button>
+        </div>
         ${NOTIFS.map((n, i) => `<div class="nf-row"><div class="nf-l"><div class="nf-t">${n.t}</div><div class="nf-d">${n.d}</div></div><span class="nf-ch">Email + In-app</span><button class="nf-tg" data-nf="${i}">${tog(n.on)}</button></div>`).join('')}
         <div class="note">Delivered to <b>${COMPANY.email}</b>. Critical alerts also push to the bell in your top bar.</div>
       </div>
@@ -142,6 +150,49 @@
     $('setContent').querySelectorAll('.tgl').forEach(t => t.parentElement.onclick = (e) => { e.preventDefault(); t.classList.toggle('on'); flash(); });
     $('setContent').querySelectorAll('.cert-tg').forEach(b => b.onclick = () => { b.classList.toggle('on'); b.textContent = (b.classList.contains('on') ? '✓ ' : '') + b.dataset.cert; flash(); });
     const sb = $('setContent').querySelector('.save-btn'); if (sb) sb.onclick = () => flash();
+    wireServerPrefs();
+  }
+  // Server-backed preference toggles. data-pref-tg="<key>" looks up the
+  // current state from /api/preferences (cached after first hit), sets the
+  // initial .tgl.on, and PATCHes on click. Defaults to ON when the row hasn't
+  // been persisted yet, mirroring the server default.
+  var _prefsLoaded = null;
+  function loadPrefs() {
+    if (_prefsLoaded) return _prefsLoaded;
+    _prefsLoaded = fetch('/api/preferences', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { preferences: null })
+      .then(d => d.preferences || {})
+      .catch(() => ({}));
+    return _prefsLoaded;
+  }
+  function savePref(key, value) {
+    return fetch('/api/preferences', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ [key]: value })
+    }).then(r => r.ok);
+  }
+  function wireServerPrefs() {
+    var btns = $('setContent').querySelectorAll('[data-pref-tg]');
+    if (!btns.length) return;
+    loadPrefs().then(prefs => {
+      btns.forEach(b => {
+        var key = b.getAttribute('data-pref-tg');
+        var current = prefs[key];
+        // Server default for weekly_digest_watched is true — interpret null/undefined as on.
+        var on = current === undefined || current === null ? true : !!current;
+        var tgl = b.querySelector('.tgl');
+        if (on) tgl.classList.add('on'); else tgl.classList.remove('on');
+        b.onclick = function(e){
+          e.preventDefault();
+          var next = !tgl.classList.contains('on');
+          tgl.classList.toggle('on', next);
+          b.disabled = true;
+          savePref(key, next).then(ok => { b.disabled = false; if (ok) { prefs[key] = next; flash(); } else { tgl.classList.toggle('on', !next); } });
+        };
+      });
+    });
   }
   function flash() { const el = $('savedAt'); if (el) { el.textContent = 'saved just now'; setTimeout(() => el.textContent = 'changes save automatically', 2200); } }
 

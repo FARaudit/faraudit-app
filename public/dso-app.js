@@ -195,6 +195,7 @@
         <div class="pc-actions">
           <a class="btn-open" href="#" onclick="return false">Run Audit</a>
           <button class="btn-save" data-track="${o.id}"><svg class="ic-add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg><span class="bs-add">Pipeline</span><span class="bs-on">In Pipeline</span></button>
+          <button class="btn-watch" data-watch-notice="${o.notice_id || ''}" data-watch-title="${(o.title || '').replace(/"/g, '&quot;')}" data-watch-agency="${(o.agency || '').replace(/"/g, '&quot;')}" data-watch-naics="${o.naics || ''}" data-watch-type="${(o.notice_type || '').replace(/"/g, '&quot;')}" data-watch-deadline="${o.response_deadline || ''}" data-watch-sol="${(o.id || '').replace(/"/g, '&quot;')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="bw-off">Track</span><span class="bw-on">Tracking</span></button>
         </div>
         <div class="pc-insight"><span class="ai-tag">AI Insight</span><span class="ai-txt">${aiTip}</span></div>
       </div>`;
@@ -204,6 +205,47 @@
       const id = b.dataset.track;
       if (S.tracked.has(id)) b.classList.add('on');
       b.onclick = (e) => { e.stopPropagation(); if (S.tracked.has(id)) S.tracked.delete(id); else S.tracked.add(id); renderList(); };
+    });
+    // Watcher Phase 2 — Track button per row, wired to /api/watch.
+    var WATCHED = (window.DSO && window.DSO.WATCHED_NOTICE_IDS) || new Set();
+    $('plist').querySelectorAll('.btn-watch').forEach(b => {
+      const noticeId = b.dataset.watchNotice;
+      if (!noticeId) { b.disabled = true; b.title = 'No notice id'; return; }
+      if (WATCHED.has(noticeId)) b.classList.add('on');
+      b.onclick = (e) => {
+        e.stopPropagation();
+        if (b.dataset._busy === '1') return;
+        b.dataset._busy = '1';
+        const on = b.classList.contains('on');
+        const method = on ? 'DELETE' : 'POST';
+        const url = on
+          ? '/api/watch?noticeId=' + encodeURIComponent(noticeId)
+          : '/api/watch';
+        const init = on
+          ? { method, credentials: 'include' }
+          : {
+              method,
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                noticeId,
+                title: b.dataset.watchTitle || null,
+                agency: b.dataset.watchAgency || null,
+                solicitationNumber: b.dataset.watchSol || null,
+                noticeType: b.dataset.watchType || null,
+                responseDeadline: b.dataset.watchDeadline || null
+              })
+            };
+        fetch(url, init)
+          .then(r => r.json().catch(() => ({})).then(d => ({ ok: r.ok, status: r.status, data: d })))
+          .then(out => {
+            b.dataset._busy = '';
+            if (!out.ok) { console.warn('[watch] failed', out); return; }
+            if (on) { WATCHED.delete(noticeId); b.classList.remove('on'); }
+            else    { WATCHED.add(noticeId);    b.classList.add('on'); }
+          })
+          .catch(err => { b.dataset._busy = ''; console.warn('[watch] error', err); });
+      };
     });
   }
   const cssId = (s) => s.replace(/[^a-z0-9]/gi, '');

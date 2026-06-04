@@ -176,6 +176,7 @@ export interface AuditViewModel {
 
   // misc
   is_metadata_only: boolean;
+  is_watching: boolean;
   pdf_export_url: string;
   conf_ring_pct: number;
 }
@@ -579,7 +580,7 @@ Respectfully,
 
 // ─── main ───────────────────────────────────────────────────────────────────
 
-export function buildViewModel(audit: AuditRow): AuditViewModel {
+export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean }): AuditViewModel {
   const displayId = displaySolicitationId({
     solicitation_number: audit.solicitation_number as string | null | undefined,
     notice_id: audit.notice_id as string | null | undefined,
@@ -659,11 +660,9 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     return "upload";
   }
   const prelimMode = classifyPrelimMode();
-  // Watch falls back to upload until the watcher ships (Code-side gate per
-  // 2025-06-04 task spec). Re-enable by removing the ternary when the
-  // watcher surface lands.
-  const renderedPrelimMode: "fetch" | "watch" | "upload" =
-    prelimMode === "watch" ? "upload" : prelimMode;
+  // Watcher surface shipped 2026-06-04: pre-solicitation audits now render
+  // the [data-track] watch CTA directly instead of falling back to upload.
+  const renderedPrelimMode: "fetch" | "watch" | "upload" = prelimMode;
 
   // Dates — only show what we actually have. DESIGN ruling 2026-06-04: a Q&A
   // deadline or anticipated-award date presented as fact when we derived it
@@ -867,6 +866,7 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     ko_email_body: koBody,
 
     is_metadata_only: !!isMetadataOnly,
+    is_watching: !!opts?.isWatching,
     pdf_export_url: `/api/audit/${audit.id}/pdf`,
 
     conf_ring_pct: conf.pct

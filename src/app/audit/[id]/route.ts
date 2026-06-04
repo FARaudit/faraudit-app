@@ -67,7 +67,21 @@ export async function GET(
 
   if (!audit) notFound();
 
-  const vm = buildViewModel(audit);
+  // Is the current user watching this notice? Drives the data-track CTA's
+  // initial .is-tracking state. Failure is non-fatal (just renders untracked).
+  let isWatching = false;
+  const noticeId = String(audit.notice_id ?? "");
+  if (noticeId) {
+    const { data: watchRow } = await supabase
+      .from("watched_notices")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("notice_id", noticeId)
+      .maybeSingle();
+    isWatching = !!watchRow;
+  }
+
+  const vm = buildViewModel(audit, { isWatching });
 
   const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");

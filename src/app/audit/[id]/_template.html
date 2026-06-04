@@ -115,6 +115,7 @@ button{font-family:inherit}
 .v-unscored[data-prelim-mode="fetch"] .pm-head[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-head[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-head[data-pm="upload"]{display:block}
 .v-unscored[data-prelim-mode="fetch"] .pm-cta[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-cta[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-cta[data-pm="upload"]{display:flex;flex-direction:column;gap:8px;margin-top:16px}
 .v-unscored .pm-cta .mhv-cta{margin-top:0}
+.mhv-cta.is-tracking{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.45)}
 .mhv-cta-2{display:inline-flex;align-items:center;justify-content:center;height:32px;color:rgba(255,255,255,.8);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;border-radius:8px;transition:color .15s}
 .mhv-cta-2:hover{color:#fff;text-decoration:underline}
 .mhv-sub-note{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.03em;color:rgba(255,255,255,.6);line-height:1.45;padding:0 6px}
@@ -602,6 +603,7 @@ button{font-family:inherit}
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
   <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
   <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
@@ -1180,7 +1182,7 @@ button{font-family:inherit}
     <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="dr-meta">
-    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to">contracting-officer@agency.mil</span></div>
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="80ebe1f2e5eeaee1ecf6e1f2e5fac0e4ece1aeede9ec">[email&#160;protected]</a></span></div>
     <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
   </div>
   <div class="dr-body">
@@ -1210,13 +1212,29 @@ Capture Lead, [Company]
 <!-- toast -->
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg><span id="toastMsg">Copied</span></div>
 
-<script>
+<!-- metadata-only demo toggle (reviewer aid — Claude Code: drive from is_metadata_only, remove this control) -->
+<div class="demo-toggle" id="demoToggle">
+  <span class="dt-k">Preview state</span>
+  <span class="dt-sw" id="demoSw"></span>
+  <span class="dt-state" id="demoState">Full report</span>
+</div>
+<!-- prelim-mode cycler (reviewer aid — shows only in metadata-only; Code drives data-prelim-mode from the case classifier) -->
+<div class="prelim-modes" id="prelimModes" style="display:none">
+  <span class="pm-mlbl">Metadata case</span>
+  <span class="pm-pill on" data-mode="fetch">Fetchable</span>
+  <span class="pm-pill" data-mode="watch">Pre-solicitation</span>
+  <span class="pm-pill" data-mode="upload">Upload-only</span>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 /* ───── metadata-only state ─────
    Claude Code: replace IS_METADATA_ONLY with the API's is_metadata_only flag.
    true  → sections 04/05 + the analyst-flag band render the locked treatment.
    false → full data renders. */
 (function(){
   var IS_METADATA_ONLY = false;
+  var toggle=document.getElementById('demoToggle'), sw=document.getElementById('demoSw'), label=document.getElementById('demoState');
+  var modesEl=document.getElementById('prelimModes');
   /* per-case copy for the supporting CTAs (analyst-flag band + §04/§05 locked teasers) so the whole
      page stays coherent with the verdict panel's mode. Code: drive from the case classifier. */
   var PRELIM = {
@@ -1230,10 +1248,14 @@ Capture Lead, [Company]
     document.querySelectorAll('[data-pm-btn]').forEach(function(b){ b.textContent=cfg.btn; });
     var k=document.querySelector('.band-k'); if(k) k.textContent=cfg.bandK;
     var u=document.querySelector('.band-unlock'); if(u) u.textContent=cfg.unlock;
+    if(modesEl) modesEl.querySelectorAll('.pm-pill').forEach(function(p){ p.classList.toggle('on', p.getAttribute('data-mode')===mode); });
   }
   function apply(meta){
     document.querySelectorAll('[data-state="full"]').forEach(function(el){ el.style.display = meta?'none':''; });
     document.querySelectorAll('[data-state="locked"]').forEach(function(el){ el.style.display = meta?'':'none'; });
+    toggle.classList.toggle('on', meta);
+    label.textContent = meta?'Metadata only':'Full report';
+    if(modesEl) modesEl.style.display = meta?'flex':'none';
     // re-trigger the confidence ring when it becomes visible
     if(!meta) setTimeout(drawRing, 60);
   }
@@ -1241,6 +1263,8 @@ Capture Lead, [Company]
   setPrelimMode('fetch');
   apply(IS_METADATA_ONLY);
   drawRing();
+  toggle.addEventListener('click', function(){ IS_METADATA_ONLY=!IS_METADATA_ONLY; apply(IS_METADATA_ONLY); });
+  if(modesEl) modesEl.querySelectorAll('.pm-pill').forEach(function(p){ p.addEventListener('click', function(){ setPrelimMode(p.getAttribute('data-mode')); }); });
 })();
 
 /* ───── graceful degradation for net-new fields ─────
@@ -1293,9 +1317,28 @@ document.querySelectorAll('.risk-head').forEach(function(h){
   });
 })();
 
-/* ───── upload (metadata-only CTA) ───── */
+/* ───── metadata-only CTAs (demo actions) ───── */
 document.querySelectorAll('[data-upload]').forEach(function(b){
   b.addEventListener('click', function(){ showToast('Opening upload — drop the solicitation PDF'); });
+});
+document.querySelectorAll('[data-track]').forEach(function(b){
+  b.addEventListener('click', function(e){
+    e.preventDefault();
+    var on=b.classList.toggle('is-tracking');
+    var note=b.parentElement.querySelector('.mhv-sub-note');
+    if(on){ b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg>Tracking'; if(note) note.textContent='Watching SAM.gov — we’ll email you the moment it posts.'; showToast('Tracking — we’ll auto-run the audit when the solicitation posts'); }
+    else { b.innerHTML='Track this opportunity →'; if(note) note.textContent='We’ll auto-run the full audit the moment the RFP posts.'; showToast('Stopped tracking'); }
+  });
+});
+document.querySelectorAll('[data-fetch]').forEach(function(b){
+  b.addEventListener('click', function(e){
+    e.preventDefault();
+    if(b.dataset.busy) return; b.dataset.busy='1';
+    var orig=b.innerHTML;
+    b.innerHTML='<span class="spin"></span>Fetching from SAM.gov…';
+    showToast('Pulling the solicitation from SAM.gov — re-running the audit…');
+    setTimeout(function(){ b.innerHTML=orig; delete b.dataset.busy; showToast('Audit complete — full scored verdict unlocked'); }, 2200);
+  });
 });
 
 /* ───── toast ───── */
@@ -1514,5 +1557,6 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        public/audit-report-checkpoint*.html
        public/*.bak
      ═══════════════════════════════════════════════════════════════════════════ -->
+<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script>
 </body>
 </html>

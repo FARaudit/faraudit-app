@@ -259,6 +259,15 @@ button{font-family:inherit}
 .btn-save.on .ic-add,.btn-save.on .bs-add{display:none}
 .btn-save.on .ic-on,.btn-save.on .bs-on{display:inline-flex}
 [data-theme="dark"] .btn-save.on{background:rgba(16,185,129,.14);color:#86efac;border-color:rgba(16,185,129,.4)}
+.btn-watch{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 12px;border-radius:8px;background:transparent;color:var(--ink-2);border:1px solid var(--line);font-size:11px;font-weight:700;cursor:pointer;transition:border-color .12s,color .12s,background .12s}
+.btn-watch:hover{border-color:var(--accent);color:var(--accent-deep)}
+.btn-watch:disabled{opacity:.5;cursor:not-allowed}
+.btn-watch svg{width:12px;height:12px}
+.btn-watch .bw-on{display:none}
+.btn-watch.on{border-color:var(--accent-deep);color:#fff;background:linear-gradient(180deg,var(--accent),var(--accent-deep))}
+.btn-watch.on .bw-off{display:none}
+.btn-watch.on .bw-on{display:inline-flex}
+[data-theme="dark"] .btn-watch.on{background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;border-color:transparent}
 .empty{padding:48px 20px;text-align:center;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:12px}
 
 /* sidebar (canonical) */
@@ -328,6 +337,7 @@ button{font-family:inherit}
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
   <a class="sb-icon active" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
   <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
@@ -455,5 +465,6 @@ button{font-family:inherit}
   });
 })();
 </script>
+<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script>
 </body>
 </html>

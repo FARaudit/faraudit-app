@@ -4,7 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 10;
 
-const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme"]);
+const ALLOWED = new Set(["sidebar_pinned", "display_name", "timezone", "alerts_enabled", "theme", "weekly_digest_watched"]);
 const VALID_THEMES = new Set(["dark", "auto"]);
 
 export async function GET() {

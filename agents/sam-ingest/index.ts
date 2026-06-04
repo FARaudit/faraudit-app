@@ -176,6 +176,34 @@ async function main() {
   const { inserted, skipped } = await insertNew(rows);
   console.log(`[sam-ingest] queue updated · inserted=${inserted} skipped=${skipped}`);
 
+  // Watcher Phase 2 — fan out to the watcher-tick endpoint. Bearer auth
+  // uses SUPABASE_SERVICE_ROLE_KEY (already in env). DRY_RUN is forwarded
+  // so local runs don't write or run audits. Failure is non-fatal; the
+  // sam-ingest pass itself succeeded and the watcher endpoint can be
+  // retried on the next cron tick.
+  try {
+    const base = (process.env.WATCHER_TICK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://faraudit.com").replace(/\/+$/, "");
+    const qs = DRY_RUN ? "?dryRun=1" : "";
+    const tickUrl = `${base}/api/internal/watcher-tick${qs}`;
+    console.log(`[sam-ingest] watcher-tick → ${tickUrl}`);
+    const res = await fetch(tickUrl, {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "content-type": "application/json"
+      }
+    });
+    const text = await res.text();
+    if (res.ok) {
+      console.log(`[sam-ingest] watcher-tick ok · ${text.slice(0, 240)}`);
+    } else {
+      console.warn(`[sam-ingest] watcher-tick non-2xx · HTTP ${res.status} · ${text.slice(0, 240)}`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[sam-ingest] watcher-tick fan-out failed: ${msg}`);
+  }
+
   const finishedAt = new Date();
   console.log(`[sam-ingest] done ${finishedAt.toISOString()} · duration=${finishedAt.getTime() - startedAt.getTime()}ms`);
 }
