@@ -10,10 +10,10 @@
 <style>
 /* ═══════════════════════════════════════════════════════════════
    FARaudit · Run Audit — redesign
-   Token chain + sidebar + topbar mirror the canonical fleet.
+   Spec: ceo/redesign-final/Review/run-audit-interaction-spec.html
    ─────────────────────────────────────────────────────────────── */
 :root {
-  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --accent-pale:#E6F1FB;
   --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
   --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
   --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
@@ -44,6 +44,10 @@ html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-
 button{font-family:inherit}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 
+/* Q6 a11y · global focus ring */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:5px}
+
 .frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
 
 /* ═══ MAIN ═══ */
@@ -60,38 +64,68 @@ button{font-family:inherit}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
 .search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:360px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
 .search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
-.top-actions{display:flex;align-items:center;gap:8px}
+.top-actions{display:flex;align-items:center;gap:8px;position:relative}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
 .icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn.on{border-color:var(--accent-light);background:var(--accent-pale);color:var(--accent-deep)}
+[data-theme="dark"] .icon-btn.on{background:rgba(55,138,221,.16);color:var(--accent-light)}
 .icon-btn svg{width:16px;height:16px}
 .icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
 .user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
 .user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
 .user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
 
+/* Q6 — notifications panel (reused from Today) */
+.notif-panel{position:absolute;top:46px;right:0;width:362px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;z-index:60;transform-origin:top right;opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .16s ease,transform .16s cubic-bezier(.16,1,.3,1)}
+.notif-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.np-head{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--line-2)}
+.np-head h3{font-size:14px;font-weight:800;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.np-count{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 7px}
+.np-mark{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0}
+.np-mark:hover{text-decoration:underline}
+[data-theme="dark"] .np-mark{color:var(--accent-light)}
+.np-scroll{max-height:340px;overflow-y:auto}
+.np-grp{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:11px 16px 5px;display:flex;align-items:center;gap:8px}
+.np-grp::after{content:"";flex:1;height:1px;background:var(--line-2)}
+.np-item{display:grid;grid-template-columns:9px 1fr auto;gap:11px;align-items:start;padding:10px 16px 11px;text-decoration:none;color:inherit;border-left:3px solid transparent;cursor:pointer;transition:background .12s}
+.np-item:hover{background:var(--card-soft)}
+.np-item.unread{background:var(--accent-pale);border-left-color:var(--accent)}
+.np-item.unread:hover{background:var(--accent-light)}
+[data-theme="dark"] .np-item.unread{background:rgba(55,138,221,.1)}
+[data-theme="dark"] .np-item.unread:hover{background:rgba(55,138,221,.16)}
+.np-dot{width:9px;height:9px;border-radius:50%;margin-top:5px}
+.np-body{min-width:0}
+.np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}
+.np-t .np-desk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}
+.np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:2px}
+.np-time{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute-2);white-space:nowrap;padding-top:2px}
+.np-foot{padding:11px 16px;border-top:1px solid var(--line-2);text-align:center}
+.np-foot a{font-size:12px;font-weight:700;color:var(--accent-deep);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.np-foot a svg{width:13px;height:13px}
+[data-theme="dark"] .np-foot a{color:var(--accent-light)}
+
 /* ═══ LAUNCHPAD STAGE ═══ */
-.body{flex:1;display:flex;flex-direction:column;align-items:center;padding:56px 42px 64px;position:relative;overflow:hidden}
-/* faint dotted backdrop to give the focused stage depth */
+.body{flex:1;display:flex;flex-direction:column;align-items:center;padding:36px 42px 64px;position:relative;overflow:hidden}
+/* faint dotted backdrop to give the focused stage depth (KEEP per spec) */
 .body::before{content:"";position:absolute;inset:0;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 30%,#000 0%,transparent 72%);mask-image:radial-gradient(ellipse 80% 55% at 50% 30%,#000 0%,transparent 72%);opacity:.55;pointer-events:none}
 [data-theme="dark"] .body::before{opacity:.35}
 .stage{position:relative;z-index:1;width:100%;max-width:880px;display:flex;flex-direction:column;align-items:center;text-align:center}
 
-.ra-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
-
-.ra-shield{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--card),var(--card-soft));border:1px solid var(--line);box-shadow:var(--shadow-pop);display:grid;place-items:center;color:var(--accent);margin-bottom:20px;position:relative}
-.ra-shield::after{content:"";position:absolute;inset:-1px;border-radius:17px;background:linear-gradient(135deg,rgba(55,138,221,0.35),transparent 50%,rgba(55,138,221,0.15));z-index:-1;filter:blur(16px);opacity:.7}
-.ra-shield svg{width:30px;height:30px}
+/* Q6 — tightened hero (was: eyebrow + 64px shield + 48px italic + mono sub stacked) */
+.ra-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.ra-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.ra-shield{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--card),var(--card-soft));border:1px solid var(--line);box-shadow:var(--shadow-sm);display:grid;place-items:center;color:var(--accent);position:relative;flex-shrink:0}
+.ra-shield svg{width:22px;height:22px}
 [data-theme="dark"] .ra-shield{background:linear-gradient(135deg,#152033,#0e1727)}
-
-.ra-title{margin:0 0 16px;font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:48px;letter-spacing:-.02em;line-height:1.05;color:var(--ink)}
-.ra-sub{margin:0 0 30px;max-width:600px;font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:400;line-height:1.7;letter-spacing:.005em;color:var(--mute)}
+.ra-title{margin:0;font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;line-height:1.05;color:var(--ink)}
+.ra-sub{margin:0 0 22px;max-width:600px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:400;line-height:1.6;letter-spacing:.005em;color:var(--mute)}
 .ra-sub b{color:var(--ink-2);font-weight:600}
 
-/* ── COMPOSER (hero) ── */
+/* ── COMPOSER (hero · KEEP focus-ring, gradient, dotted bg per spec) ── */
 .composer{width:100%;max-width:720px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-pop);padding:14px;text-align:left}
 .composer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 4px 12px}
 .ra-mode{display:inline-flex;background:var(--card-soft);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
-.ra-mode-btn{height:34px;padding:0 13px;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--mute);letter-spacing:.01em;display:inline-flex;align-items:center;gap:7px;transition:all .14s}
+.ra-mode-btn{min-height:44px;height:auto;padding:0 14px;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--mute);letter-spacing:.01em;display:inline-flex;align-items:center;gap:7px;transition:all .14s}
 .ra-mode-btn:hover{color:var(--ink-2)}
 .ra-mode-btn svg{width:13px;height:13px;opacity:.85}
 .ra-mode-btn.active{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08), inset 0 0 0 1px var(--line)}
@@ -102,53 +136,130 @@ button{font-family:inherit}
 .ra-input-row{display:flex;gap:10px;align-items:stretch;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:8px;transition:border-color .15s, box-shadow .15s}
 .ra-input-row[hidden]{display:none !important}
 .ra-input-row:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px rgba(55,138,221,0.12)}
-.ra-input-lead{display:grid;place-items:center;width:38px;flex-shrink:0;color:var(--mute-2)}
+.ra-input-lead{display:grid;place-items:center;width:38px;flex-shrink:0;color:var(--mute-2);transition:color .14s}
+.ra-input-row.is-url .ra-input-lead{color:var(--accent-deep)}
+.ra-input-row.is-id .ra-input-lead{color:var(--accent-deep)}
 .ra-input-lead svg{width:17px;height:17px}
 .ra-input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--ink);padding:0}
 .ra-input::placeholder{color:var(--mute-2);font-weight:400}
-.ra-run-btn{flex-shrink:0;border:0;cursor:pointer;height:46px;padding:0 18px;border-radius:9px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;font-weight:800;font-size:13px;letter-spacing:.03em;display:inline-flex;align-items:center;gap:9px;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 10px 20px -8px rgba(55,138,221,.55);transition:transform .14s, box-shadow .14s}
-.ra-run-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 14px 26px -8px rgba(55,138,221,.6)}
+.ra-run-btn{flex-shrink:0;border:0;cursor:pointer;height:46px;min-height:44px;padding:0 18px;border-radius:9px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;font-weight:800;font-size:13px;letter-spacing:.03em;display:inline-flex;align-items:center;gap:9px;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 10px 20px -8px rgba(55,138,221,.55);transition:transform .14s, box-shadow .14s, opacity .14s}
+.ra-run-btn:hover:not([disabled]){transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 14px 26px -8px rgba(55,138,221,.6)}
+.ra-run-btn[disabled]{opacity:.5;cursor:not-allowed}
 .ra-run-btn svg{width:14px;height:14px}
 
-/* dropzone */
-.ra-dropzone{flex:1;cursor:pointer;border:1.5px dashed var(--line);border-radius:10px;background:transparent;padding:26px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;transition:border-color .15s, background .15s}
+/* Q1 — detect chip / Q4 inline error row */
+.detect{min-height:0;display:none;align-items:center;gap:9px;padding:9px 12px;margin-top:8px;border-radius:9px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);transition:all .14s;line-height:1.4}
+.detect.show{display:flex}
+.detect.ok{background:rgba(16,185,129,0.08);color:var(--green-700);border:1px solid rgba(16,185,129,0.18)}
+.detect.err{background:rgba(220,38,38,0.06);color:var(--red-700);border:1px solid rgba(220,38,38,0.18)}
+.d-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:rgba(0,0,0,0.04);font-weight:700;font-size:10px;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0}
+.detect.err .d-chip{background:rgba(220,38,38,0.14);color:var(--red-700)}
+.detect.ok .d-chip{background:rgba(16,185,129,0.14);color:var(--green-700)}
+.d-chip svg{width:12px;height:12px}
+.d-res{flex:1;line-height:1.45;min-width:0}
+.d-res b{color:var(--ink);font-weight:700}
+.detect.err .d-res b{color:var(--red-800)}
+[data-theme="dark"] .detect.err{color:#fca5a5}
+[data-theme="dark"] .detect.err .d-res b{color:#fee2e2}
+[data-theme="dark"] .detect.ok{color:#6ee7b7}
+
+/* dropzone (Q3: real drag + drop) */
+.ra-dropzone{flex:1;cursor:pointer;border:1.5px dashed var(--line);border-radius:10px;background:transparent;padding:26px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;transition:border-color .15s, background .15s, transform .15s}
 .ra-dropzone:hover{border-color:var(--accent);background:rgba(55,138,221,0.04)}
+.ra-dropzone.dragover{border-color:var(--accent);border-style:solid;background:rgba(55,138,221,0.10);transform:scale(1.005)}
 .ra-dropzone svg{width:26px;height:26px;color:var(--accent)}
 .ra-dz-title{font-size:13px;font-weight:600;color:var(--ink)}
 .ra-dz-browse{color:var(--accent-deep);text-decoration:underline;text-underline-offset:3px}
 [data-theme="dark"] .ra-dz-browse{color:var(--accent-light)}
 .ra-dz-types{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
 
-/* composer footer: meta + chips */
+/* Q3 — file chip + explicit Run row */
+.file-chip{display:none;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2);margin-top:8px}
+.file-chip.show{display:flex}
+.file-chip .fc-ico{width:32px;height:32px;border-radius:7px;background:var(--accent-pale);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+.file-chip .fc-ico svg{width:16px;height:16px}
+[data-theme="dark"] .file-chip .fc-ico{background:rgba(55,138,221,0.18);color:var(--accent-light)}
+.file-chip .fc-name{flex:1;font-weight:700;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-chip .fc-size{color:var(--mute);font-size:11px;flex-shrink:0}
+.file-chip .fc-x{border:0;background:transparent;color:var(--mute);cursor:pointer;padding:0;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
+.file-chip .fc-x:hover{background:rgba(220,38,38,0.08);color:var(--red-600)}
+.file-chip .fc-x svg{width:14px;height:14px}
+.upload-run-row{display:none;justify-content:center;margin-top:10px}
+.upload-run-row.show{display:flex}
+.upload-run-row .ra-run-btn{height:42px;padding:0 22px}
+
+/* Q6 composer footer — format hint (was: 6 fake-button chips) */
 .composer-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 6px 4px;margin-top:2px;border-top:1px solid var(--line-2)}
 .composer-foot .meta{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;color:var(--mute);letter-spacing:.005em}
 .composer-foot .meta svg{width:12px;height:12px;opacity:.7}
 .composer-foot .meta b{color:var(--ink-2);font-weight:700}
 .composer-foot .sep{width:1px;height:12px;background:var(--line);flex-shrink:0}
-.composer-foot .chips{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
-.ra-chip{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px;background:var(--card-soft);border:1px solid var(--line);color:var(--ink-2)}
-[data-theme="dark"] .ra-chip{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.08);color:#cfd6e1}
+.composer-foot .format-hint{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);letter-spacing:.02em;font-weight:500}
+.composer-foot .format-hint b{color:var(--mute);font-weight:600}
 
 .sample-link{margin-top:18px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--accent-deep);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .sample-link:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 [data-theme="dark"] .sample-link{color:var(--accent-light)}
 
-/* ── 3-CALL PIPELINE ── */
-.pipeline{width:100%;max-width:980px;margin-top:54px;text-align:left}
-.pipeline-label{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-.pipeline-label .t{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
-.pipeline-label .rule{height:1px;flex:1;background:var(--line)}
+/* ═══ RECENTLY AUDITED (Q5: now above the pipeline explainer) ═══ */
+.ra-recent{width:100%;max-width:980px;margin-top:38px;text-align:left}
+.ra-recent-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ra-recent-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+.ra-recent-all{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-decoration:none}
+.ra-recent-all:hover{text-decoration:underline;text-underline-offset:3px}
+[data-theme="dark"] .ra-recent-all{color:var(--accent-light)}
+.ra-recent-grid{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px}
+.ra-recent-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:transform .14s, border-color .14s, box-shadow .14s;position:relative}
+.ra-recent-card:hover{transform:translateY(-2px);border-color:var(--mute-2);box-shadow:var(--shadow)}
+.ra-recent-score{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;position:relative}
+.ra-recent-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
+.ra-recent-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
+.ra-recent-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
+.ra-recent-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
+.ra-recent-body{min-width:0;flex:1}
+.ra-recent-title{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
+.ra-recent-sub{font-size:11px;color:var(--mute);font-weight:500;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Q6 — full card clickable + → arrow (same pattern as Today signal cards) */
+.ra-recent-arrow{margin-left:auto;width:18px;height:18px;color:var(--mute-2);display:grid;place-items:center;flex-shrink:0;transition:color .14s, transform .14s}
+.ra-recent-arrow svg{width:15px;height:15px}
+.ra-recent-card:hover .ra-recent-arrow{color:var(--accent-deep);transform:translateX(3px)}
+[data-theme="dark"] .ra-recent-card:hover .ra-recent-arrow{color:var(--accent-light)}
+/* Q6 — sr-only score text label (colorblind a11y) */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ra-recent-empty{padding:36px 18px;text-align:center;border:1.5px dashed var(--line);border-radius:14px;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.ra-recent-empty b{color:var(--ink-2);font-weight:700}
+
+/* ═══ 3-CALL PIPELINE EXPLAINER (Q2 live loader + Q5 collapsible) ═══ */
+.pipeline{width:100%;max-width:980px;margin-top:38px;text-align:left;background:transparent;border:0;padding:0}
+.pipeline > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);padding:8px 0;margin-bottom:12px;user-select:none}
+.pipeline > summary::-webkit-details-marker{display:none}
+.pipeline > summary .rule{height:1px;flex:1;background:var(--line)}
+.pipeline > summary .caret{font-family:"Manrope",sans-serif;font-size:14px;color:var(--mute-2);transition:transform .2s}
+.pipeline[open] > summary .caret{transform:rotate(90deg)}
+.pipeline > summary:hover{color:var(--ink-2)}
 .pipeline-track{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto auto;align-items:stretch;gap:0}
-.pcall{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow-sm);padding:16px 16px 15px;display:flex;flex-direction:column;gap:10px}
+.pcall{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow-sm);padding:16px 16px 15px;display:flex;flex-direction:column;gap:10px;transition:border-color .25s, box-shadow .25s, opacity .2s;position:relative}
 .pcall-top{display:flex;align-items:center;gap:10px}
 .pcall-num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-deep));width:30px;height:22px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
-.pcall-icon{width:30px;height:30px;border-radius:8px;background:rgba(55,138,221,0.08);border:1px solid var(--accent-light);display:grid;place-items:center;color:var(--accent-deep);flex-shrink:0;margin-left:auto}
-[data-theme="dark"] .pcall-icon{background:rgba(55,138,221,0.14);border-color:rgba(55,138,221,0.3);color:var(--accent-light)}
-.pcall-icon svg{width:15px;height:15px}
-.pcall-title{font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.2}
+.pcall-title{font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.2;flex:1;min-width:0}
+.pcall-state{width:22px;height:22px;display:grid;place-items:center;flex-shrink:0}
+.pcall-state .spin{width:14px;height:14px;border:2px solid rgba(55,138,221,0.2);border-top-color:var(--accent);border-radius:50%;animation:spinner .8s linear infinite;display:none}
+.pcall-state .chk{width:17px;height:17px;color:var(--green-600);display:none}
+.pcall.active{border-color:var(--accent-light);box-shadow:0 0 0 3px rgba(55,138,221,0.10), var(--shadow-sm)}
+.pcall.active .pcall-state .spin{display:block}
+.pcall.done{border-color:rgba(16,185,129,0.32);box-shadow:0 0 0 3px rgba(16,185,129,0.08), var(--shadow-sm)}
+.pcall.done .pcall-state .chk{display:block}
+.pcall.pending{opacity:.55}
+.pcall.err{border-color:var(--red-200);box-shadow:0 0 0 3px rgba(220,38,38,0.08), var(--shadow-sm)}
+.pcall.err .pcall-state .chk{display:block;color:var(--red-600)}
+@keyframes spinner{to{transform:rotate(360deg)}}
 .pcall-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .pcall-list li{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.45;color:var(--mute);padding-left:14px;position:relative}
 .pcall-list li::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
+.pcall-bar{height:3px;border-radius:2px;background:var(--line-3);overflow:hidden;margin-top:2px}
+.pcall-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));width:0%;transition:width .35s ease}
+.pcall.done .pcall-bar i{background:linear-gradient(90deg,var(--green-500),var(--green-700));width:100%}
+.pcall.err .pcall-bar i{background:linear-gradient(90deg,var(--red-500),var(--red-700));width:100%}
 .pcall-arrow{display:grid;place-items:center;color:var(--mute-2);padding:0 6px}
 .pcall-arrow svg{width:18px;height:18px}
 /* delivers */
@@ -160,24 +271,18 @@ button{font-family:inherit}
 .pcall-deliver .d-list li{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.35;color:#b6c2d3;padding-left:18px;position:relative}
 .pcall-deliver .d-list li::before{content:"✓";position:absolute;left:0;top:0;color:#6ee7b7;font-weight:800;font-family:"Manrope"}
 
-/* ── RECENTLY AUDITED ── */
-.ra-recent{width:100%;max-width:980px;margin-top:48px;text-align:left}
-.ra-recent-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.ra-recent-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
-.ra-recent-all{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-decoration:none}
-.ra-recent-all:hover{text-decoration:underline;text-underline-offset:3px}
-[data-theme="dark"] .ra-recent-all{color:var(--accent-light)}
-.ra-recent-grid{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px}
-.ra-recent-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:transform .14s, border-color .14s, box-shadow .14s}
-.ra-recent-card:hover{transform:translateY(-2px);border-color:var(--mute-2);box-shadow:var(--shadow)}
-.ra-recent-score{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px}
-.ra-recent-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
-.ra-recent-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
-.ra-recent-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
-.ra-recent-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
-.ra-recent-body{min-width:0}
-.ra-recent-title{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
-.ra-recent-sub{font-size:11px;color:var(--mute);font-weight:500;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Q2 — pipeline footer (elapsed + view-report reveal) */
+.pl-foot{display:flex;align-items:center;gap:14px;margin-top:18px;justify-content:center}
+.pl-elapsed{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);min-height:22px;display:none;align-items:center;gap:6px}
+.pl-elapsed.show{display:inline-flex}
+.pl-elapsed b{color:var(--ink-2);font-weight:700}
+.pl-elapsed.slow{color:var(--amber-700)}
+[data-theme="dark"] .pl-elapsed.slow{color:#fcd34d}
+.pl-done{display:none;align-items:center;gap:7px;padding:11px 18px;border-radius:9px;background:var(--green-700);color:#fff;text-decoration:none;font-weight:700;font-size:13px;box-shadow:0 8px 18px -6px rgba(16,185,129,0.5);transition:transform .14s}
+.pl-done.show{display:inline-flex;animation:fadeUp .35s ease}
+.pl-done:hover{transform:translateY(-2px)}
+.pl-done svg{width:14px;height:14px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 @media (max-width:1180px){
   .pipeline-track{grid-template-columns:1fr 1fr;gap:10px}
@@ -290,13 +395,22 @@ button{font-family:inherit}
           <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
           <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
-        <button class="icon-btn" title="Notifications">
+        <button class="icon-btn" id="bellBtn" title="Notifications" aria-label="Notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
-          <span class="nbadge">7</span>
+          <span class="nbadge" id="bellBadge">7</span>
         </button>
         <div class="user-chip">
           <div class="av">JR</div>
           <div><div class="nm">Jose Rodriguez</div></div>
+        </div>
+        <!-- Q6 — Notifications panel (same structure as Today) -->
+        <div class="notif-panel" id="notifPanel" role="dialog" aria-label="Notifications">
+          <div class="np-head">
+            <h3>Notifications</h3><span class="np-count" id="npCount">0</span>
+            <button class="np-mark" id="npMark" type="button">Mark all read</button>
+          </div>
+          <div class="np-scroll" id="npScroll"></div>
+          <div class="np-foot"><a href="/dashboard">View all activity <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
         </div>
       </div>
     </div>
@@ -307,120 +421,144 @@ button{font-family:inherit}
 
         <p class="ra-eyebrow">New Audit</p>
 
-        <div class="ra-shield">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        <!-- Q6 — tightened hero: shield beside title, not stacked -->
+        <div class="ra-head">
+          <div class="ra-shield">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h1 class="ra-title">Run a New Audit</h1>
         </div>
-
-        <h1 class="ra-title">Run a New Audit</h1>
         <p class="ra-sub">Drop in any federal solicitation. FARaudit runs <b>three sequential intelligence calls</b> and returns a ranked report — with a KO clarification email drafted and ready to send.</p>
 
         <!-- COMPOSER -->
         <div class="composer">
           <div class="composer-head">
+            <!-- Q1 — 2 modes (collapsed from 3) -->
             <div class="ra-mode" role="tablist" aria-label="Input method">
-              <button class="ra-mode-btn active" data-mode="id" role="tab" aria-selected="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-                Notice ID
-              </button>
-              <button class="ra-mode-btn" data-mode="upload" role="tab" aria-selected="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
-                Upload PDF
-              </button>
-              <button class="ra-mode-btn" data-mode="url" role="tab" aria-selected="false">
+              <button class="ra-mode-btn active" data-mode="smart" role="tab" aria-selected="true" aria-controls="panel-smart" id="tab-smart">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
-                SAM.gov URL
+                Paste link or ID
+              </button>
+              <button class="ra-mode-btn" data-mode="upload" role="tab" aria-selected="false" aria-controls="panel-upload" id="tab-upload">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+                Upload
               </button>
             </div>
             <span class="paste-hint">⌘V to paste</span>
           </div>
 
-          <!-- Mode: Notice ID -->
-          <div class="ra-input-row" data-mode-panel="id">
-            <span class="ra-input-lead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>
-            <input type="text" class="ra-input" placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068" />
-            <button class="ra-run-btn">Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <!-- Mode: Smart field (URL or ID auto-detect) -->
+          <div class="ra-input-row" data-mode-panel="smart" id="panel-smart" role="tabpanel" aria-labelledby="tab-smart">
+            <span class="ra-input-lead" id="smartLead">
+              <svg id="smartLeadIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            </span>
+            <input type="text" class="ra-input" id="smartInput" placeholder="Paste a SAM.gov URL or Notice ID — we figure out which" autocomplete="off" />
+            <button class="ra-run-btn" id="smartRun" type="button" disabled>Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           </div>
+          <!-- Q1/Q4 — detect/error row -->
+          <div class="detect" id="smartDetect" role="status" aria-live="polite"></div>
 
-          <!-- Mode: Upload PDF -->
-          <div class="ra-input-row" data-mode-panel="upload" hidden>
-            <label class="ra-dropzone">
+          <!-- Mode: Upload (Q3: real drag-drop + file chip + explicit Run) -->
+          <div class="ra-input-row" data-mode-panel="upload" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" hidden>
+            <label class="ra-dropzone" id="dropzone">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
               <span class="ra-dz-title">Drop a solicitation PDF or <span class="ra-dz-browse">browse</span></span>
               <span class="ra-dz-types">PDF · DOCX · max 25MB</span>
-              <input type="file" hidden accept=".pdf,.docx" />
+              <input type="file" id="fileInput" hidden accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             </label>
           </div>
-
-          <!-- Mode: URL -->
-          <div class="ra-input-row" data-mode-panel="url" hidden>
-            <span class="ra-input-lead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg></span>
-            <input type="text" class="ra-input" placeholder="Paste full SAM.gov opportunity URL" />
-            <button class="ra-run-btn">Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <!-- Q3 — file chip + explicit Run -->
+          <div class="file-chip" id="fileChip" role="group" aria-label="Selected file">
+            <span class="fc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fc-name" id="fcName"></span>
+            <span class="fc-size" id="fcSize"></span>
+            <button class="fc-x" id="fcRemove" type="button" aria-label="Remove file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
+          <div class="upload-run-row" id="uploadRunRow">
+            <button class="ra-run-btn" id="uploadRun" type="button">Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+          <!-- Q4 — upload-side inline error -->
+          <div class="detect" id="uploadDetect" role="status" aria-live="polite"></div>
 
           <div class="composer-foot">
             <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Avg <b>38&nbsp;sec</b></span>
             <span class="sep"></span>
             <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Private · <b>SOC 2 Type II</b></span>
-            <div class="chips">
-              <span class="ra-chip">RFQ</span>
-              <span class="ra-chip">RFP</span>
-              <span class="ra-chip">IDIQ</span>
-              <span class="ra-chip">IFB</span>
-              <span class="ra-chip">Sources Sought</span>
-              <span class="ra-chip">Task Order</span>
-            </div>
+            <!-- Q6 — format hint caption (was: 6 fake-button chips) -->
+            <span class="format-hint">Handles <b>RFQ, RFP, IDIQ, IFB, Sources Sought, Task Orders</b></span>
           </div>
         </div>
 
-        <a class="sample-link" href="#">View a sample audit report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:12px;height:12px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <!-- Q6 — sample link (href wired in JS to most-recent high-score audit) -->
+        <a class="sample-link" id="sampleLink" href="/dashboard">View a sample audit report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:12px;height:12px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
 
-        <!-- 3-CALL PIPELINE -->
-        <div class="pipeline">
-          <div class="pipeline-label"><span class="t">What runs when you submit</span><span class="rule"></span></div>
+        <!-- Q5 — RECENTLY AUDITED now appears ABOVE the pipeline explainer -->
+        <div class="ra-recent" id="recentBlock">
+          <div class="ra-recent-head">
+            <div class="ra-recent-label">Recently audited</div>
+            <a class="ra-recent-all" href="/dashboard" id="recentAll">View all →</a>
+          </div>
+          <div class="ra-recent-grid" id="recentGrid">
+            <!-- populated by JS from /api/audits -->
+          </div>
+          <div class="ra-recent-empty" id="recentEmpty" style="display:none">
+            <b>No audits yet.</b> Run your first audit above — it'll land here.
+          </div>
+        </div>
+
+        <!-- Q5 — collapsible pipeline explainer (also serves as Q2 live loader) -->
+        <details class="pipeline" id="pipelineDetails">
+          <summary>
+            <span class="t" id="pipelineSummaryT">What runs when you submit</span>
+            <span class="rule"></span>
+            <span class="caret">›</span>
+          </summary>
           <div class="pipeline-track">
 
-            <div class="pcall">
+            <div class="pcall" id="pcall1">
               <div class="pcall-top">
                 <span class="pcall-num">01</span>
-                <span class="pcall-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span class="pcall-title">Overview</span>
+                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
               </div>
-              <div class="pcall-title">Overview</div>
               <ul class="pcall-list">
                 <li>CLIN ambiguities</li>
                 <li>FOB / delivery conflicts</li>
                 <li>Pricing traps</li>
               </ul>
+              <div class="pcall-bar"><i></i></div>
             </div>
 
             <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
 
-            <div class="pcall">
+            <div class="pcall" id="pcall2">
               <div class="pcall-top">
                 <span class="pcall-num">02</span>
-                <span class="pcall-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+                <span class="pcall-title">FAR / DFARS Compliance</span>
+                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
               </div>
-              <div class="pcall-title">FAR / DFARS Compliance</div>
               <ul class="pcall-list">
                 <li>Every clause vs. current regs</li>
                 <li>Offeror-action flags</li>
                 <li>Set-aside eligibility</li>
               </ul>
+              <div class="pcall-bar"><i></i></div>
             </div>
 
             <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
 
-            <div class="pcall">
+            <div class="pcall" id="pcall3">
               <div class="pcall-top">
                 <span class="pcall-num">03</span>
-                <span class="pcall-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+                <span class="pcall-title">Risk Extraction</span>
+                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
               </div>
-              <div class="pcall-title">Risk Extraction</div>
               <ul class="pcall-list">
                 <li>6 high-DQ DFARS traps</li>
                 <li>Severity ratings P0–P2</li>
                 <li>Citations attached</li>
               </ul>
+              <div class="pcall-bar"><i></i></div>
             </div>
 
             <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
@@ -436,33 +574,12 @@ button{font-family:inherit}
             </div>
 
           </div>
-        </div>
-
-        <!-- RECENTLY AUDITED -->
-        <div class="ra-recent">
-          <div class="ra-recent-head">
-            <div class="ra-recent-label">Recently audited</div>
-            <a class="ra-recent-all" href="/dashboard">View all 15 →</a>
+          <!-- Q2 — live elapsed counter + reveal-on-done CTA -->
+          <div class="pl-foot">
+            <span class="pl-elapsed" id="plElapsed" aria-live="polite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="plElapsedText"></span></span>
+            <a class="pl-done" id="plDone" href="#" aria-live="polite">View report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </div>
-          <div class="ra-recent-grid">
-            <a class="ra-recent-card" href="#">
-              <span class="ra-recent-score s-hi">94</span>
-              <div class="ra-recent-body"><div class="ra-recent-title">N00024-26-R-2207</div><div class="ra-recent-sub">SPY-6 Phase IV · 2m ago</div></div>
-            </a>
-            <a class="ra-recent-card" href="#">
-              <span class="ra-recent-score s-hi">88</span>
-              <div class="ra-recent-body"><div class="ra-recent-title">FA8730-26-Q-0114</div><div class="ra-recent-sub">F-35 Test Harness · 38m ago</div></div>
-            </a>
-            <a class="ra-recent-card" href="#">
-              <span class="ra-recent-score s-lo">58</span>
-              <div class="ra-recent-body"><div class="ra-recent-title">W56KGY-26-R-0014</div><div class="ra-recent-sub">CECOM TNSS · 2h ago</div></div>
-            </a>
-            <a class="ra-recent-card" href="#">
-              <span class="ra-recent-score s-no">42</span>
-              <div class="ra-recent-body"><div class="ra-recent-title">N00178-26-R-3071</div><div class="ra-recent-sub">Indian Head · yesterday</div></div>
-            </a>
-          </div>
-        </div>
+        </details>
 
       </div>
     </div>
@@ -470,64 +587,12 @@ button{font-family:inherit}
 </div>
 
 <script>
-/* mode toggle */
-(function(){
-  var modeBtns = document.querySelectorAll(".ra-mode-btn");
-  var modePanels = document.querySelectorAll("[data-mode-panel]");
-  modeBtns.forEach(function(btn){
-    btn.addEventListener("click", function(){
-      var mode = btn.dataset.mode;
-      modeBtns.forEach(function(b){
-        var on = b.dataset.mode === mode;
-        b.classList.toggle("active", on);
-        b.setAttribute("aria-selected", on ? "true" : "false");
-      });
-      modePanels.forEach(function(p){ p.hidden = p.dataset.modePanel !== mode; });
-      var input = document.querySelector('[data-mode-panel="'+mode+'"] .ra-input');
-      if (input) input.focus();
-    });
-  });
-})();
+/* ═══════════════════════════════════════════════════════════════
+   Run Audit — interaction script
+   Spec: ceo/redesign-final/Review/run-audit-interaction-spec.html
+   ─────────────────────────────────────────────────────────────── */
 
-/* submit handler — POSTs to /api/audit, redirects to /audit/<slug> */
-(function () {
-  function extractNoticeIdFromUrl(url){ var m=(url||"").trim().match(/\/opp\/([A-Za-z0-9]+)/i); return m?m[1]:null; }
-  function setBusy(btn, busy){
-    if(!btn) return;
-    if(busy){ btn.dataset._label=btn.innerHTML; btn.innerHTML="Running…"; btn.disabled=true; }
-    else if(btn.dataset._label){ btn.innerHTML=btn.dataset._label; btn.disabled=false; }
-  }
-  function submitAudit(noticeId, pdfFile, sourceBtn){
-    var fd=new FormData();
-    fd.append("noticeId", noticeId||"");
-    if(pdfFile) fd.append("pdf", pdfFile);
-    setBusy(sourceBtn, true);
-    fetch("/api/audit",{method:"POST",body:fd,credentials:"include"})
-      .then(function(r){ return r.json().catch(function(){return{};}).then(function(d){return{ok:r.ok,status:r.status,data:d};}); })
-      .then(function(out){
-        if(!out.ok){ alert((out.data&&out.data.error)||("Audit failed: HTTP "+out.status)); setBusy(sourceBtn,false); return; }
-        var slug=((out.data.solicitationNumber||out.data.auditId||"")+"").trim().toLowerCase();
-        if(!slug){ alert("Audit started but no audit ID returned."); setBusy(sourceBtn,false); return; }
-        window.location.href="/audit/"+encodeURIComponent(slug);
-      })
-      .catch(function(err){ alert("Network error: "+(err&&err.message?err.message:String(err))); setBusy(sourceBtn,false); });
-  }
-  document.querySelectorAll(".ra-run-btn").forEach(function(btn){
-    btn.addEventListener("click", function(e){
-      e.preventDefault();
-      var panel=btn.closest("[data-mode-panel]");
-      var mode=panel?panel.dataset.modePanel:"id";
-      var input=panel?panel.querySelector(".ra-input"):null;
-      var value=input?input.value.trim():"";
-      if(mode==="id"){ if(!value){alert("Enter a SAM.gov Notice ID.");return;} submitAudit(value,null,btn); }
-      else if(mode==="url"){ var n=extractNoticeIdFromUrl(value); if(!n){alert("Could not extract Notice ID from that URL.");return;} submitAudit(n,null,btn); }
-    });
-  });
-  var fileInput=document.querySelector(".ra-dropzone input[type=file]");
-  if(fileInput){ fileInput.addEventListener("change", function(e){ var f=e.target.files&&e.target.files[0]; if(f) submitAudit("",f,null); }); }
-})();
-
-/* theme toggle */
+/* ── Theme toggle ── */
 (function(){
   var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
   function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
@@ -536,7 +601,7 @@ button{font-family:inherit}
   if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
 })();
 
-/* sidebar toggle */
+/* ── Sidebar toggle ── */
 (function(){
   var KEY='faraudit-sb', html=document.documentElement;
   try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
@@ -547,6 +612,533 @@ button{font-family:inherit}
     try{localStorage.setItem(KEY,next);}catch(e){}
   });
 })();
+
+/* ── Q1 — Mode switch (2 modes: smart + upload) + Q6 a11y keyboard nav ── */
+(function(){
+  var modeBtns=document.querySelectorAll('.ra-mode-btn');
+  var modePanels=document.querySelectorAll('[data-mode-panel]');
+  function activate(mode){
+    modeBtns.forEach(function(b){
+      var on=b.dataset.mode===mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on?'true':'false');
+      b.tabIndex=on?0:-1;
+    });
+    modePanels.forEach(function(p){ p.hidden=p.dataset.modePanel!==mode; });
+    // Auto-focus the input in the new panel (KEEP per spec)
+    var el = mode==='upload'
+      ? document.getElementById('dropzone')
+      : document.getElementById('smartInput');
+    if(el) el.focus();
+  }
+  modeBtns.forEach(function(btn, idx){
+    btn.addEventListener('click', function(){ activate(btn.dataset.mode); });
+    // Q6 a11y — left/right arrow navigates between mode tabs
+    btn.addEventListener('keydown', function(e){
+      if(e.key==='ArrowRight' || e.key==='ArrowLeft'){
+        e.preventDefault();
+        var dir = e.key==='ArrowRight' ? 1 : -1;
+        var next = modeBtns[(idx+dir+modeBtns.length)%modeBtns.length];
+        next.focus();
+        activate(next.dataset.mode);
+      }
+    });
+  });
+})();
+
+/* ── Q1 — Smart-field detection (URL vs ID) ── */
+var DETECT = (function(){
+  // URL must look like a URL with sam.gov/opp/ID
+  var URL_RE   = /^https?:\/\/[^\s]+/i;
+  var SAMOPP   = /\/opp\/([A-Za-z0-9][A-Za-z0-9-]*)/i;
+  // Notice IDs: allow hyphens (real solicitations like N00024-26-R-2207)
+  var ID_RE    = /^[A-Za-z0-9][A-Za-z0-9-]{6,}$/;
+
+  function detect(raw){
+    var v = (raw||'').trim();
+    if(!v) return { kind:'empty' };
+    if(URL_RE.test(v)){
+      var m = v.match(SAMOPP);
+      if(m && m[1]) return { kind:'url', noticeId: m[1] };
+      return { kind:'bad-url' };
+    }
+    if(ID_RE.test(v)) return { kind:'id', noticeId: v };
+    return { kind:'bad-id' };
+  }
+  return { detect: detect };
+})();
+
+/* ── Q1 + Q4 — Smart input wiring (detect chip + inline errors) ── */
+(function(){
+  var input  = document.getElementById('smartInput');
+  var lead   = document.getElementById('smartLead');
+  var leadIco= document.getElementById('smartLeadIcon');
+  var run    = document.getElementById('smartRun');
+  var detect = document.getElementById('smartDetect');
+  var row    = input ? input.closest('.ra-input-row') : null;
+  if(!input||!run||!detect||!row) return;
+
+  // SVG paths for the morphing lead icon
+  var ICON_HASH = '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';
+  var ICON_LINK = '<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>';
+  function setLead(kind){
+    row.classList.remove('is-url','is-id');
+    if(kind==='url'){ row.classList.add('is-url'); leadIco.innerHTML = ICON_LINK; }
+    else if(kind==='id'){ row.classList.add('is-id'); leadIco.innerHTML = ICON_HASH; }
+    else { leadIco.innerHTML = ICON_HASH; }
+  }
+  function show(state, html){
+    detect.className = 'detect show ' + state;
+    detect.innerHTML = html;
+  }
+  function hide(){ detect.className='detect'; detect.innerHTML=''; }
+
+  function evaluate(){
+    var d = DETECT.detect(input.value);
+    run.dataset.noticeId = '';
+    switch(d.kind){
+      case 'empty':
+        hide();
+        setLead('id');
+        run.disabled = true;
+        break;
+      case 'url':
+        show('ok',
+          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>URL</span>'+
+          '<span class="d-res">Resolves to Notice ID <b>'+escapeHtml(d.noticeId)+'</b></span>');
+        setLead('url');
+        run.disabled = false;
+        run.dataset.noticeId = d.noticeId;
+        break;
+      case 'id':
+        show('ok',
+          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>ID</span>'+
+          '<span class="d-res">Notice ID <b>'+escapeHtml(d.noticeId)+'</b></span>');
+        setLead('id');
+        run.disabled = false;
+        run.dataset.noticeId = d.noticeId;
+        break;
+      case 'bad-url':
+        show('err',
+          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Bad URL</span>'+
+          '<span class="d-res">No Notice ID found in that link — <b>check it\'s a /opp/ URL</b>.</span>');
+        setLead('url');
+        run.disabled = true;
+        break;
+      case 'bad-id':
+        show('err',
+          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Invalid</span>'+
+          '<span class="d-res">That doesn\'t look like a SAM.gov Notice ID or URL.</span>');
+        setLead('id');
+        run.disabled = true;
+        break;
+    }
+  }
+  input.addEventListener('input', evaluate);
+  // Q-engineering: Enter submits when valid
+  input.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !run.disabled){
+      e.preventDefault();
+      run.click();
+    }
+  });
+  run.addEventListener('click', function(){
+    var nid = run.dataset.noticeId;
+    if(!nid) return;
+    submitAudit({ noticeId: nid, pdfFile: null, sourceBtn: run, errorTarget: detect });
+  });
+  evaluate(); // initial state
+})();
+
+/* ── Q3 — Dropzone (real drag + drop + file chip + explicit Run) ── */
+(function(){
+  var dz       = document.getElementById('dropzone');
+  var fileInp  = document.getElementById('fileInput');
+  var chip     = document.getElementById('fileChip');
+  var fcName   = document.getElementById('fcName');
+  var fcSize   = document.getElementById('fcSize');
+  var fcX      = document.getElementById('fcRemove');
+  var uRow     = document.getElementById('uploadRunRow');
+  var uRun     = document.getElementById('uploadRun');
+  var uDetect  = document.getElementById('uploadDetect');
+  if(!dz||!fileInp||!chip||!uRun||!uDetect) return;
+
+  var MAX_BYTES = 25 * 1024 * 1024;
+  var ACCEPT_EXT = /\.(pdf|docx)$/i;
+  var selected = null;
+
+  function fmtSize(b){
+    if(b<1024) return b+' B';
+    if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+  }
+  function showErr(html){
+    uDetect.className='detect show err';
+    uDetect.innerHTML = '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>File</span><span class="d-res">'+html+'</span>';
+  }
+  function hideErr(){ uDetect.className='detect'; uDetect.innerHTML=''; }
+
+  function setFile(f){
+    if(!f){ selected=null; chip.classList.remove('show'); uRow.classList.remove('show'); dz.style.display=''; hideErr(); return; }
+    if(!ACCEPT_EXT.test(f.name)){
+      showErr('PDF or DOCX only · <b>that file is ' + escapeHtml(f.name.split('.').pop().toUpperCase()) + '</b>.');
+      return;
+    }
+    if(f.size > MAX_BYTES){
+      showErr('PDF or DOCX only · 25MB max. <b>That file is '+fmtSize(f.size)+'</b>.');
+      return;
+    }
+    selected = f;
+    fcName.textContent = f.name;
+    fcSize.textContent = fmtSize(f.size);
+    chip.classList.add('show');
+    uRow.classList.add('show');
+    dz.style.display='none';
+    hideErr();
+  }
+  function clearFile(){ selected=null; fileInp.value=''; setFile(null); }
+
+  // dragover / dragleave / drop
+  ['dragenter','dragover'].forEach(function(ev){
+    dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover'); });
+  });
+  ['dragleave','dragend'].forEach(function(ev){
+    dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover'); });
+  });
+  dz.addEventListener('drop', function(e){
+    e.preventDefault(); e.stopPropagation();
+    dz.classList.remove('dragover');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) setFile(f);
+  });
+  // file picker (NOT auto-submit — chip + explicit Run only)
+  fileInp.addEventListener('change', function(e){
+    var f = e.target.files && e.target.files[0];
+    if(f) setFile(f);
+  });
+  fcX.addEventListener('click', clearFile);
+  uRun.addEventListener('click', function(){
+    if(!selected) return;
+    submitAudit({ noticeId: '', pdfFile: selected, sourceBtn: uRun, errorTarget: uDetect });
+  });
+})();
+
+/* ── Q2 — Submit + live pipeline loader ── */
+var __submitting = false;
+function submitAudit(opts){
+  if(__submitting) return; // Q-engineering: double-submit guard
+  __submitting = true;
+  // Q5 collapse-persistence: remember the user has run ≥1 audit.
+  try { localStorage.setItem('faraudit-ra-has-run','1'); } catch(e) {}
+
+  var noticeId   = opts.noticeId || '';
+  var pdfFile    = opts.pdfFile  || null;
+  var sourceBtn  = opts.sourceBtn;
+  var errorTarget= opts.errorTarget;
+
+  if(sourceBtn){ sourceBtn.disabled = true; sourceBtn.dataset._label = sourceBtn.innerHTML; sourceBtn.innerHTML = 'Running…'; }
+
+  startPipeline();
+
+  var fd = new FormData();
+  fd.append('noticeId', noticeId);
+  if(pdfFile) fd.append('pdf', pdfFile);
+
+  fetch('/api/audit', { method:'POST', body:fd, credentials:'include' })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok:r.ok, status:r.status, data:d }; }); })
+    .then(function(out){
+      if(!out.ok){
+        markPipelineErr();
+        var msg = (out.data && out.data.error) || ('Audit didn\'t start (HTTP '+out.status+').');
+        renderInlineServerError(errorTarget, msg, function retry(){
+          hideErrTarget(errorTarget);
+          __submitting = false;
+          if(sourceBtn){ sourceBtn.innerHTML = sourceBtn.dataset._label || 'Run Audit'; sourceBtn.disabled = false; }
+          if(opts.onRetry) opts.onRetry(); else submitAudit(opts);
+        });
+        unBusy(sourceBtn);
+        __submitting = false;
+        return;
+      }
+      var slug = ((out.data.solicitationNumber || out.data.auditId || '') + '').trim().toLowerCase();
+      if(!slug){
+        markPipelineErr();
+        renderInlineServerError(errorTarget, 'Audit started but no audit ID was returned. <b>Nothing was charged.</b>', null);
+        unBusy(sourceBtn);
+        __submitting = false;
+        return;
+      }
+      finishPipeline('/audit/' + encodeURIComponent(slug));
+    })
+    .catch(function(err){
+      markPipelineErr();
+      renderInlineServerError(errorTarget, 'Network error — '+escapeHtml(err && err.message ? err.message : String(err))+'. <b>Nothing was charged.</b>', function(){
+        hideErrTarget(errorTarget);
+        __submitting = false;
+        if(sourceBtn){ sourceBtn.innerHTML = sourceBtn.dataset._label || 'Run Audit'; sourceBtn.disabled = false; }
+        submitAudit(opts);
+      });
+      unBusy(sourceBtn);
+      __submitting = false;
+    });
+}
+function unBusy(btn){ if(!btn) return; if(btn.dataset._label){ btn.innerHTML = btn.dataset._label; } btn.disabled = false; }
+function renderInlineServerError(target, msg, retryFn){
+  if(!target){ return; }
+  target.className = 'detect show err';
+  target.setAttribute('role','alert');
+  target.innerHTML = '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Server</span>'+
+                    '<span class="d-res">'+msg+(retryFn?' <button type="button" id="srvRetry" style="background:none;border:0;color:inherit;cursor:pointer;font:inherit;text-decoration:underline;font-weight:700;padding:0">Retry</button>':'')+'</span>';
+  var btn = document.getElementById('srvRetry');
+  if(btn && retryFn) btn.addEventListener('click', retryFn);
+}
+function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.removeAttribute('role'); } }
+
+/* ── Q2 — pipeline animation state machine ── */
+(function(){
+  var pipelineEl = document.getElementById('pipelineDetails');
+  var elapsedEl  = document.getElementById('plElapsed');
+  var elapsedTxt = document.getElementById('plElapsedText');
+  var doneCta    = document.getElementById('plDone');
+  var STAGES     = [
+    { id:'pcall1', barTo:100, dur:9000  },
+    { id:'pcall2', barTo:100, dur:14000 },
+    { id:'pcall3', barTo:100, dur:12000 }
+  ];
+  var elapsedT0 = 0, elapsedTimer = null, stageTimers = [];
+  function resetPipeline(){
+    STAGES.forEach(function(s){
+      var el = document.getElementById(s.id);
+      if(!el) return;
+      el.classList.remove('active','done','err','pending');
+      var bar = el.querySelector('.pcall-bar i');
+      if(bar) bar.style.width = '0%';
+    });
+    if(doneCta) doneCta.classList.remove('show');
+    if(elapsedEl) elapsedEl.classList.remove('show','slow');
+    if(elapsedTxt) elapsedTxt.innerHTML = '';
+    stageTimers.forEach(clearTimeout); stageTimers = [];
+    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
+  }
+  window.startPipeline = function(){
+    if(!pipelineEl) return;
+    resetPipeline();
+    if(!pipelineEl.open) pipelineEl.open = true;
+    // mark all pending, then progress through them
+    STAGES.forEach(function(s){ var el=document.getElementById(s.id); if(el) el.classList.add('pending'); });
+    elapsedT0 = Date.now();
+    elapsedEl.classList.add('show');
+    elapsedTimer = setInterval(function(){
+      var sec = Math.floor((Date.now()-elapsedT0)/1000);
+      elapsedTxt.innerHTML = sec + 's elapsed · avg <b>38s</b>';
+      if(sec > 57) elapsedEl.classList.add('slow');
+      if(sec > 57) elapsedTxt.innerHTML = sec + 's elapsed · <b>still working — large solicitation.</b>';
+    }, 1000);
+
+    var t = 0;
+    STAGES.forEach(function(s, i){
+      stageTimers.push(setTimeout(function(){
+        var el = document.getElementById(s.id);
+        if(!el) return;
+        el.classList.remove('pending');
+        el.classList.add('active');
+        var bar = el.querySelector('.pcall-bar i');
+        if(bar) bar.style.width = (s.barTo - 8) + '%'; // fill while active, leaves headroom
+      }, t));
+      t += Math.max(800, Math.floor(s.dur * 0.18));
+      stageTimers.push(setTimeout(function(){
+        var el = document.getElementById(s.id);
+        if(!el) return;
+        el.classList.remove('active');
+        el.classList.add('done');
+      }, t));
+      t += Math.floor(s.dur * 0.82);
+    });
+  };
+  window.markPipelineErr = function(){
+    // Mark currently-active stage as err; leave others alone.
+    stageTimers.forEach(clearTimeout); stageTimers = [];
+    var hit = null;
+    STAGES.forEach(function(s){
+      var el = document.getElementById(s.id);
+      if(el && el.classList.contains('active')) hit = el;
+    });
+    if(!hit) hit = document.getElementById(STAGES[0].id);
+    if(hit){ hit.classList.remove('active','pending'); hit.classList.add('err'); }
+    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
+  };
+  window.finishPipeline = function(href){
+    stageTimers.forEach(clearTimeout); stageTimers = [];
+    STAGES.forEach(function(s){
+      var el = document.getElementById(s.id);
+      if(el){ el.classList.remove('pending','active','err'); el.classList.add('done'); }
+    });
+    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
+    if(doneCta){ doneCta.setAttribute('href', href); doneCta.classList.add('show'); doneCta.focus(); }
+    // Auto-redirect after a brief reveal so the user sees the green check
+    setTimeout(function(){ window.location.href = href; }, 900);
+  };
+})();
+
+/* ── Q5 — Pipeline explainer: collapsed after first audit (persisted) ── */
+(function(){
+  var pipelineEl = document.getElementById('pipelineDetails');
+  var KEY = 'faraudit-ra-explainer';
+  if(!pipelineEl) return;
+  try {
+    var ran = localStorage.getItem('faraudit-ra-has-run') === '1';
+    var saved = localStorage.getItem(KEY);
+    if (saved === 'open')      pipelineEl.open = true;
+    else if (saved === 'closed') pipelineEl.open = false;
+    else                        pipelineEl.open = !ran; // default open for first-timers, collapsed for repeat
+  } catch (e) { pipelineEl.open = true; }
+  pipelineEl.addEventListener('toggle', function(){
+    try { localStorage.setItem(KEY, pipelineEl.open ? 'open' : 'closed'); } catch (e) {}
+  });
+})();
+
+/* ── Q6 — Recent audits + sample link wired to /api/audits ── */
+(function(){
+  var grid       = document.getElementById('recentGrid');
+  var empty      = document.getElementById('recentEmpty');
+  var allLink    = document.getElementById('recentAll');
+  var sampleLink = document.getElementById('sampleLink');
+  if(!grid) return;
+
+  function toneClass(s){
+    if(s == null || isNaN(s)) return 's-no';
+    if(s >= 80) return 's-hi';
+    if(s >= 65) return 's-md';
+    if(s >= 40) return 's-lo';
+    return 's-no';
+  }
+  function toneText(s){
+    if(s == null || isNaN(s)) return 'Pending';
+    if(s >= 80) return 'Go';
+    if(s >= 65) return 'Caution';
+    if(s >= 40) return 'Caution';
+    return 'Decline';
+  }
+  function ago(iso){
+    if(!iso) return '';
+    var ms = Date.now() - new Date(iso).getTime();
+    if(isNaN(ms) || ms < 0) return '';
+    if(ms < 60000) return 'just now';
+    if(ms < 3600000) return Math.round(ms/60000)+'m ago';
+    if(ms < 86400000) return Math.round(ms/3600000)+'h ago';
+    if(ms < 7*86400000) return Math.round(ms/86400000)+'d ago';
+    return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  function arrowSvg(){
+    return '<span class="ra-recent-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>';
+  }
+  function render(audits){
+    if(!audits || !audits.length){
+      grid.innerHTML = '';
+      grid.style.display = 'none';
+      empty.style.display = 'block';
+      if(allLink) allLink.textContent = 'View all →';
+      if(sampleLink) sampleLink.setAttribute('href', '/dashboard');
+      return;
+    }
+    empty.style.display = 'none';
+    grid.style.display = '';
+    var top4 = audits.slice(0, 4);
+    grid.innerHTML = top4.map(function(a){
+      var sol = a.solicitation_number || a.notice_id || a.id || '—';
+      var slug = encodeURIComponent(String(sol).toLowerCase());
+      var score = (typeof a.compliance_score === 'number') ? a.compliance_score : null;
+      var tone = toneClass(score);
+      var label = toneText(score);
+      var title = (a.title || sol).slice(0, 48);
+      var when = ago(a.completed_at || a.created_at);
+      return '<a class="ra-recent-card" href="/audit/'+slug+'">'+
+        '<span class="ra-recent-score '+tone+'">'+(score==null?'—':score)+'<span class="sr-only"> · '+label+'</span></span>'+
+        '<div class="ra-recent-body"><div class="ra-recent-title">'+escapeHtml(sol)+'</div><div class="ra-recent-sub">'+escapeHtml(title)+' · '+escapeHtml(when)+'</div></div>'+
+        arrowSvg()+
+      '</a>';
+    }).join('');
+    if(allLink) allLink.textContent = 'View all ' + audits.length + ' →';
+    // Sample link → highest-score complete audit
+    if(sampleLink){
+      var best = audits.filter(function(a){ return typeof a.compliance_score === 'number'; })
+                       .sort(function(x,y){ return (y.compliance_score||0) - (x.compliance_score||0); })[0];
+      if(best){
+        var bsol = best.solicitation_number || best.notice_id || best.id;
+        sampleLink.setAttribute('href', '/audit/' + encodeURIComponent(String(bsol).toLowerCase()));
+      } else {
+        sampleLink.setAttribute('href', '/dashboard');
+      }
+    }
+  }
+  fetch('/api/audits?limit=20', { credentials:'include' })
+    .then(function(r){ return r.ok ? r.json() : { audits: [] }; })
+    .then(function(d){ render((d && d.audits) || []); })
+    .catch(function(){ render([]); });
+})();
+
+/* ── Q6 — Notifications panel (reused from Today) ── */
+(function(){
+  var NDESK = {
+    opp:   { c:'#378ADD', l:'Opportunities', href:'/opportunities' },
+    gao:   { c:'#dc2626', l:'GAO',            href:'/gao-protests' },
+    cmmc:  { c:'#0891b2', l:'CMMC',           href:'/cmmc' },
+    far:   { c:'#7c3aed', l:'FAR/DFARS',      href:'/far-dfars-updates' },
+    co:    { c:'#185FA5', l:'Contracting',    href:'/contracting-officers' },
+    wage:  { c:'#d97706', l:'Wage',           href:'/wage-benchmarks' },
+    spend: { c:'#2C6CB4', l:'Spending',       href:'/defense-spending' }
+  };
+  var ITEMS = [
+    { grp:'Today',   desk:'gao',  t:'AFMC corrective action filed',                d:'Your tracked $5.4M C-17 award may be re-evaluated.',  time:'18m', unread:true  },
+    { grp:'Today',   desk:'opp',  t:'SPY-6 Radar — amendment 0003 posted',          d:'Q&A cutoff moved up 2 days. Re-check your timeline.', time:'1h',  unread:true  },
+    { grp:'Today',   desk:'far',  t:'Clause 252.204-7021 redline published',        d:'Effective in 15 days — 7 of your sols affected.',     time:'3h',  unread:true  },
+    { grp:'Today',   desk:'co',   t:'Greg Bauer (TACOM) opened your capability brief', d:'47 days quiet — good moment to re-warm.',          time:'5h',  unread:true  },
+    { grp:'Earlier', desk:'wage', t:'WD 2015-4267 renewal scheduled',                d:'JBSA inspector categories renew in 22 days.',         time:'Tue', unread:false },
+    { grp:'Earlier', desk:'cmmc', t:'2 controls moved to "Met"',                     d:'You\'re now 78% ready. CM & CA still open.',          time:'Mon', unread:false },
+    { grp:'Earlier', desk:'spend',t:'New FY26 obligations in NAICS 336413',          d:'WA, OH, GA show fresh spend, no activity from you.',  time:'Mon', unread:false }
+  ];
+  var panel = document.getElementById('notifPanel');
+  var bell  = document.getElementById('bellBtn');
+  var scroll= document.getElementById('npScroll');
+  var badge = document.getElementById('bellBadge');
+  var count = document.getElementById('npCount');
+  var mark  = document.getElementById('npMark');
+  if(!panel || !bell || !scroll) return;
+
+  function render(){
+    var html = '', last = '';
+    ITEMS.forEach(function(n, i){
+      if(n.grp !== last){ html += '<div class="np-grp">'+n.grp+'</div>'; last = n.grp; }
+      var dk = NDESK[n.desk] || { c:'#64748b', l:'', href:'/dashboard' };
+      html += '<a class="np-item'+(n.unread?' unread':'')+'" data-i="'+i+'" href="'+dk.href+'">'+
+        '<span class="np-dot" style="background:'+dk.c+'"></span>'+
+        '<div class="np-body"><div class="np-t"><span class="np-desk" style="color:'+dk.c+'">'+dk.l+'</span>'+n.t+'</div><div class="np-d">'+n.d+'</div></div>'+
+        '<span class="np-time">'+n.time+'</span>'+
+      '</a>';
+    });
+    scroll.innerHTML = html;
+    var u = ITEMS.filter(function(n){ return n.unread; }).length;
+    if(count) count.textContent = String(u);
+    if(badge){ badge.textContent = u ? String(u) : ''; badge.style.display = u===0 ? 'none' : ''; }
+    scroll.querySelectorAll('.np-item').forEach(function(a){
+      a.addEventListener('click', function(){
+        var i = +a.dataset.i;
+        if(ITEMS[i]){ ITEMS[i].unread = false; render(); }
+      });
+    });
+  }
+  render();
+
+  function open(){ panel.classList.add('open'); bell.classList.add('on'); }
+  function close(){ panel.classList.remove('open'); bell.classList.remove('on'); }
+  bell.addEventListener('click', function(e){ e.stopPropagation(); panel.classList.contains('open') ? close() : open(); });
+  if(mark) mark.addEventListener('click', function(e){ e.stopPropagation(); ITEMS.forEach(function(n){ n.unread = false; }); render(); });
+  document.addEventListener('click', function(e){ if(!panel.contains(e.target) && !bell.contains(e.target)) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+})();
+
+/* ── shared HTML escape ── */
+function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 </script>
 </body>
 </html>
