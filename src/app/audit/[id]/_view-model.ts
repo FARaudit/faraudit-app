@@ -1,0 +1,698 @@
+// View model for the audit-report page.
+//
+// Maps a raw `audits` Supabase row + its sibling JSONB columns into the shape
+// the design template's data-field attributes expect. Fields the design needs
+// that the current schema doesn't carry (score_factors, win_themes, qa_deadline,
+// award_date) are derived from neighbors or filled with sensible defaults so
+// the 1:1 visual port renders without demo strings or blank sections.
+
+import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
+
+type AuditRow = Record<string, unknown>;
+
+export interface ComplianceFlag {
+  clause: string;
+  title: string;
+  severity: "P0" | "P1" | "P2";
+  description: string;
+  required_action: string;
+}
+
+export interface Risk {
+  title: string;
+  severity: "high" | "med" | "low";
+  citation: string;
+  description: string;
+  faraudit_action: string;
+}
+
+export interface ScoreFactor {
+  name: string;
+  weight: number; // 0-100 (percent of total)
+  score: number;  // 0-100
+  note: string;
+  tone: "good" | "ok" | "warn";
+  drag?: boolean;
+}
+
+export interface ClinLineItem {
+  clin: string;
+  description: string;
+  type: string;
+  qty: string;
+  has_flag: boolean;
+  flag_label?: string;
+}
+
+export interface HierarchyNode {
+  text: string;
+  leaf: boolean;
+}
+
+export interface AuditViewModel {
+  // identity
+  solicitation_number: string;
+  audit_id_short: string;
+  audit_id_full: string;
+  generated_at: string;
+  page_title: string;
+
+  // header
+  title: string;
+  agency: string;
+  agency_sub: string;
+  naics: string;
+  naics_sub: string;
+  set_aside: string;
+  set_aside_sub: string;
+  contract_type: string;
+  contract_type_sub: string;
+
+  // verdict block
+  recommendation: "GO" | "CAUTION" | "DECLINE";
+  recommendation_class: "v-go" | "v-caution" | "v-decline";
+  recommendation_tagline: string;
+  recommendation_pill_text: string;
+  score: number;
+  win_probability: number | null; // null when basis is 0 / unknown
+  win_probability_benchmark: string;
+
+  // key dates (qa_deadline + award_date are intentionally not derived; the
+  // renderer drops the ribbon item + rail clock when has_* is false)
+  qa_deadline: string;
+  qa_days: string;
+  qa_days_num: string;
+  response_deadline: string;
+  response_days: string;
+  award_date: string;
+  has_response_deadline: boolean;
+  has_qa_deadline: boolean;
+  has_award_date: boolean;
+
+  // classification
+  document_type: string;
+  document_type_full: string;
+  document_type_confidence: number; // 0-100
+  document_type_confidence_label: string;
+  document_type_reasoning: string;
+
+  // incumbent
+  incumbent: {
+    has_data: boolean;          // false → hide entire §02
+    has_expiry: boolean;        // false → hide .inc-expiry block within §02
+    show_status_pill: boolean;  // false → hide section pill ("Recompete window open")
+    status_label: string;
+    name: string;
+    initial: string;
+    uei: string;
+    award_value: string;
+    expiry: string;
+    days_to_expiry: number;
+    last_lookup: string;
+    track_width_pct: number; // for .inc-track i width
+    expiry_note: string;     // derived caption (replaces hardcoded "<4 months" narrative)
+    days_color_override: string | null; // null = default amber; non-null overrides for long-horizon
+  };
+
+  // scope/CLIN
+  clin_summary: string;
+  primary_objective: string;
+  period_of_performance: string;
+  customer_office: string;
+  customer_hierarchy: HierarchyNode[];
+  contract_type_detail: string;
+  clin_line_items: ClinLineItem[];
+
+  // compliance + risks
+  compliance_flags: ComplianceFlag[];
+  compliance_pill_text: string;     // "1 P0 · 2 P1 · 1 P2" derived from real counts
+  risks: Risk[];
+  risk_pill_text: string;           // "4 open" derived from real count
+  headline_risk: Risk;
+  show_moment_band: boolean;        // false when risks.length === 0 → hide whole band
+  score_factors: ScoreFactor[];
+
+  // recommendation
+  recommendation_rationale: string;
+  recommendation_win_themes: string[];
+
+  // ko email
+  ko_email_to: string;
+  ko_email_body: string;
+
+  // misc
+  is_metadata_only: boolean;
+  pdf_export_url: string;
+  conf_ring_pct: number;
+}
+
+// ─── date helpers ───────────────────────────────────────────────────────────
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  if (typeof v !== "string") return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDayMonYear(d: Date | null): string {
+  if (!d) return "—";
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function fmtMonYear(d: Date | null): string {
+  if (!d) return "—";
+  return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function fmtStamp(d: Date | null): string {
+  if (!d) return "—";
+  const m = MONTHS_SHORT[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const yr = d.getUTCFullYear();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${m} ${day}, ${yr} · ${hh}:${mm} UTC`;
+}
+
+function fmtLookup(d: Date | null): string {
+  if (!d) return "Not looked up yet";
+  const m = MONTHS_SHORT[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `Looked up ${m} ${day} · ${hh}:${mm} UTC`;
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+}
+
+function fmtCountdown(days: number | null): string {
+  if (days == null) return "—";
+  if (days < 0) return `${Math.abs(days)} days ago`;
+  if (days === 0) return "today";
+  if (days === 1) return "in 1 day";
+  return `in ${days} days`;
+}
+
+// ─── verdict mapping ────────────────────────────────────────────────────────
+
+function mapVerdict(v: unknown): { word: "GO" | "CAUTION" | "DECLINE"; cls: "v-go" | "v-caution" | "v-decline" } {
+  const s = String(v ?? "").toUpperCase();
+  if (s === "PROCEED" || s === "GO" || s === "BID") return { word: "GO", cls: "v-go" };
+  if (s === "DECLINE" || s === "NO_BID" || s === "NO-BID") return { word: "DECLINE", cls: "v-decline" };
+  return { word: "CAUTION", cls: "v-caution" };
+}
+
+function verdictTagline(verdict: "GO" | "CAUTION" | "DECLINE", bidRecommendation: string): string {
+  if (bidRecommendation) {
+    // Take the first sentence (up to ~140 chars) as the tagline.
+    const first = bidRecommendation.split(/(?<=[.!?])\s+/)[0] || bidRecommendation;
+    return first.length > 200 ? first.slice(0, 197) + "…" : first;
+  }
+  if (verdict === "GO") return "Biddable — the timing and fit are working in your favor.";
+  if (verdict === "DECLINE") return "Pass — the compliance gaps and risk profile don't support a bid.";
+  return "Biddable — but only after the open compliance gaps are closed.";
+}
+
+// ─── confidence label ───────────────────────────────────────────────────────
+
+function confidenceLabel(c: unknown): { pct: number; label: string } {
+  const raw = String(c ?? "").toLowerCase();
+  if (raw === "high") return { pct: 94, label: "High confidence" };
+  if (raw === "medium" || raw === "med") return { pct: 72, label: "Medium confidence" };
+  if (raw === "low") return { pct: 48, label: "Low confidence" };
+  // numeric?
+  const n = Number(raw);
+  if (!Number.isNaN(n) && n >= 0 && n <= 100) {
+    const lab = n >= 80 ? "High confidence" : n >= 60 ? "Medium confidence" : "Low confidence";
+    return { pct: Math.round(n), label: lab };
+  }
+  return { pct: 72, label: "Medium confidence" };
+}
+
+function documentTypeFull(t: string): string {
+  const code = t.toUpperCase().trim();
+  switch (code) {
+    case "RFQ": return "Request for Quote";
+    case "RFP": return "Request for Proposal";
+    case "IFB": return "Invitation for Bid";
+    case "SOURCES SOUGHT": return "Sources Sought";
+    case "COMBINED SYNOPSIS": return "Combined Synopsis/Solicitation";
+    case "RFI": return "Request for Information";
+    case "PWS": return "Performance Work Statement";
+    case "SOW": return "Statement of Work";
+    default: return t || "Solicitation";
+  }
+}
+
+// ─── customer hierarchy from fullParentPathName ─────────────────────────────
+
+function deriveHierarchy(agency: string, fullPath: string | null): HierarchyNode[] {
+  const path = (fullPath || agency || "").trim();
+  if (!path) return [{ text: "—", leaf: true }];
+  // SAM v2 uses dot or arrow separators. Examples:
+  //   "DEPT OF DEFENSE.DEPT OF THE NAVY.NAVAL SEA SYSTEMS COMMAND"
+  //   "DEPT OF DEFENSE > DEPT OF NAVY > NAVSEA"
+  const parts = path.split(/\.|>/).map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) return [{ text: agency || "—", leaf: true }];
+  return parts.map((text, i) => ({ text, leaf: i === parts.length - 1 }));
+}
+
+// ─── compliance flags ───────────────────────────────────────────────────────
+
+function pickSeverity(raw: unknown): "P0" | "P1" | "P2" {
+  const s = String(raw ?? "").toUpperCase();
+  if (s === "P0" || s === "HIGH" || s === "CRITICAL" || s === "BLOCKER") return "P0";
+  if (s === "P2" || s === "LOW" || s === "ADVISORY") return "P2";
+  return "P1";
+}
+
+interface RawDfarsFlag {
+  clause?: string;
+  title?: string;
+  detected?: boolean;
+  severity?: string;
+  description?: string;
+  required_action?: string;
+}
+
+function mapComplianceFlags(compJson: Record<string, unknown>): ComplianceFlag[] {
+  // Prefer dfars_flags[] when present — that's the structured analyst output.
+  const flags = Array.isArray(compJson.dfars_flags) ? (compJson.dfars_flags as RawDfarsFlag[]) : [];
+  const detected = flags.filter((f) => f && f.detected);
+  if (detected.length > 0) {
+    return detected.map((f) => ({
+      clause: String(f.clause ?? "").trim() || "—",
+      title: String(f.title ?? "").trim() || "Compliance flag",
+      severity: pickSeverity(f.severity),
+      description: String(f.description ?? "").trim() || "Clause-level detail not extracted.",
+      required_action: String(f.required_action ?? "").trim() || "Verify compliance with this clause before quoting."
+    }));
+  }
+  // Fallback: synthesize from raw far/dfars clause lists. We don't have
+  // severity for these — surface as P1 advisories.
+  const far = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as string[]) : [];
+  const dfars = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as string[]) : [];
+  const all = [...dfars, ...far].slice(0, 6);
+  return all.map((c) => ({
+    clause: String(c).trim(),
+    title: "Offeror-action clause",
+    severity: "P1",
+    description: "Required clause flagged in the solicitation — confirm your response addresses it.",
+    required_action: "Verify your proposal addresses this clause before submission."
+  }));
+}
+
+// ─── risks ──────────────────────────────────────────────────────────────────
+
+interface RawRisk {
+  text?: string;
+  title?: string;
+  priority?: string;
+  severity?: string;
+  category?: string;
+  citation?: string;
+  description?: string;
+  recommended_action?: string;
+  faraudit_action?: string;
+  impact?: string;
+}
+
+function priorityToSev(raw: unknown): "high" | "med" | "low" {
+  const s = String(raw ?? "").toUpperCase();
+  if (s === "P0" || s === "HIGH" || s === "CRITICAL") return "high";
+  if (s === "P2" || s === "LOW" || s === "ADVISORY") return "low";
+  return "med";
+}
+
+function mapRisks(risksJson: Record<string, unknown>): Risk[] {
+  const prioritized = Array.isArray(risksJson.prioritized_risks)
+    ? (risksJson.prioritized_risks as RawRisk[])
+    : null;
+  if (prioritized && prioritized.length > 0) {
+    return prioritized
+      .filter((r) => r && (r.text || r.title))
+      .map((r) => {
+        const text = String(r.text ?? r.title ?? "").trim();
+        const cite = r.citation || text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1] || "";
+        return {
+          title: String(r.title ?? text.split(".")[0] ?? text).slice(0, 160),
+          severity: priorityToSev(r.priority ?? r.severity),
+          citation: String(cite),
+          description: text,
+          faraudit_action: String(r.faraudit_action ?? r.recommended_action ?? "").trim() ||
+            "Address this risk before submission — see KO email draft for the clarification."
+        };
+      });
+  }
+  // Fallback: pull from category buckets.
+  const buckets: Array<{ key: string; sev: "high" | "med" | "low" }> = [
+    { key: "top_3_risks", sev: "high" },
+    { key: "technical_risks", sev: "med" },
+    { key: "schedule_risks", sev: "med" },
+    { key: "price_risks", sev: "med" },
+    { key: "evaluation_risks", sev: "low" }
+  ];
+  const out: Risk[] = [];
+  for (const b of buckets) {
+    const arr = risksJson[b.key];
+    if (!Array.isArray(arr)) continue;
+    for (const r of arr) {
+      if (typeof r !== "string" || !r.trim()) continue;
+      const text = r.trim();
+      const cite = text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1] || "";
+      out.push({
+        title: text.split(/[.!?]/)[0].slice(0, 160),
+        severity: b.sev,
+        citation: cite,
+        description: text,
+        faraudit_action: "Address this risk before submission."
+      });
+    }
+  }
+  return out;
+}
+
+function pickHeadlineRisk(risks: Risk[]): Risk {
+  if (risks.length === 0) {
+    return {
+      title: "No risks surfaced",
+      severity: "low",
+      citation: "",
+      description: "FARaudit did not flag a critical exposure in this solicitation.",
+      faraudit_action: "Proceed with the standard pre-quote checklist."
+    };
+  }
+  const order = { high: 0, med: 1, low: 2 } as const;
+  const sorted = [...risks].sort((a, b) => order[a.severity] - order[b.severity]);
+  return sorted[0];
+}
+
+// ─── score factors ──────────────────────────────────────────────────────────
+//
+// DESIGN ruling 2026-06-04: derive only when the source data is REAL signal,
+// not arithmetic offsets from the overall score. We don't have the per-factor
+// scoring engine yet, so return [] and let the renderer hide §00 Scorecard.
+// Synthesizing factors from compliance_score ±N% is cosmetic precision and
+// gets flagged on the page customers bet $2,500/mo on.
+
+function deriveScoreFactors(): ScoreFactor[] {
+  return [];
+}
+
+// ─── CLINs ──────────────────────────────────────────────────────────────────
+
+interface RawClin {
+  clin?: string;
+  description?: string;
+  quantity?: string | number;
+  unit?: string;
+  pricing_arrangement?: string;
+  fob?: string;
+  status?: string;
+}
+
+function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineItem[] {
+  const raw = Array.isArray(compJson.clins) ? (compJson.clins as RawClin[]) : [];
+  if (raw.length === 0) return [];
+  return raw.map((c) => {
+    const desc = String(c.description ?? "—");
+    const linkedRisk = risks.find((r) => r.description.includes(String(c.clin ?? "____")) || r.title.includes(String(c.clin ?? "____")));
+    const status = String(c.status ?? "").toLowerCase();
+    const hasFlag = status === "conflict" || status === "ambiguous" || !!linkedRisk;
+    const qtyParts: string[] = [];
+    if (c.quantity != null && c.quantity !== "") qtyParts.push(String(c.quantity));
+    if (c.unit) qtyParts.push(String(c.unit));
+    return {
+      clin: String(c.clin ?? "—"),
+      description: desc,
+      type: String(c.pricing_arrangement ?? "—"),
+      qty: qtyParts.join(" ") || "—",
+      has_flag: hasFlag,
+      flag_label: hasFlag ? (linkedRisk ? linkedRisk.title.slice(0, 64) : status === "conflict" ? "Conflict flagged" : "Ambiguity flagged") : undefined
+    };
+  });
+}
+
+// ─── win themes (derived) ───────────────────────────────────────────────────
+
+function deriveWinThemes(overviewJson: Record<string, unknown>): string[] {
+  // Prefer explicit win_themes if present.
+  if (Array.isArray(overviewJson.win_themes)) {
+    return (overviewJson.win_themes as unknown[])
+      .filter((s) => typeof s === "string" && (s as string).trim())
+      .map((s) => (s as string).trim())
+      .slice(0, 3);
+  }
+  if (Array.isArray(overviewJson.key_strengths)) {
+    return (overviewJson.key_strengths as unknown[])
+      .filter((s) => typeof s === "string" && (s as string).trim())
+      .map((s) => (s as string).trim())
+      .slice(0, 3);
+  }
+  return [];
+}
+
+// ─── KO email body (derive a generic draft if none) ─────────────────────────
+
+function deriveKoBody(audit: AuditRow, headline: Risk, displayId: string): string {
+  const stored = audit.ko_email_body as string | undefined;
+  if (stored && stored.trim()) return stored;
+  const koName = (audit.ko_name as string) || "Contracting Officer";
+  const title = String(audit.title ?? displayId);
+  const cite = headline.citation || "the open clarification items below";
+  return `Dear ${koName},
+
+Thank you for the opportunity to respond to ${displayId} (${title}). We intend to submit and have one clarification that affects how offerors price and structure their responses:
+
+${headline.title}${cite ? ` (${cite})` : ""}. ${headline.description}
+
+${headline.faraudit_action}
+
+We appreciate your time and look forward to your response ahead of the Q&A deadline.
+
+Respectfully,
+[Your Name]
+[Company]`;
+}
+
+// ─── main ───────────────────────────────────────────────────────────────────
+
+export function buildViewModel(audit: AuditRow): AuditViewModel {
+  const displayId = displaySolicitationId({
+    solicitation_number: audit.solicitation_number as string | null | undefined,
+    notice_id: audit.notice_id as string | null | undefined,
+    title: audit.title as string | null | undefined
+  });
+  const title = auditDisplayName({
+    title: audit.title as string | null | undefined,
+    notice_id: audit.notice_id as string | null | undefined,
+    solicitation_number: audit.solicitation_number as string | null | undefined,
+    created_at: audit.created_at as string | null | undefined
+  });
+
+  const compJson = (audit.compliance_json as Record<string, unknown>) || {};
+  const risksJson = (audit.risks_json as Record<string, unknown>) || {};
+  const overviewJson = (audit.overview_json as Record<string, unknown>) || {};
+
+  const verdict = mapVerdict(audit.recommendation);
+  const score = typeof audit.compliance_score === "number" ? (audit.compliance_score as number) : 0;
+  const isMetadataOnly = compJson.pdf_source === "sam_unavailable";
+
+  // Dates — only show what we actually have. DESIGN ruling 2026-06-04: a Q&A
+  // deadline or anticipated-award date presented as fact when we derived it
+  // from response_deadline ± offset is a customer liability. Hide > fabricate.
+  // qa_deadline + award_date are not in the current schema → never rendered;
+  // the renderer drops the corresponding ribbon items + rail clock.
+  const now = new Date();
+  const responseDeadline = parseDate(audit.response_deadline);
+  const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
+
+  // Incumbent
+  const incumbentExpiry = parseDate(audit.incumbent_expiry);
+  const incumbentLookup = parseDate(audit.incumbent_lookup_at);
+  const incumbentAwardValueRaw = audit.incumbent_award_value;
+  const incumbentName = (audit.incumbent_name as string) || "";
+  const incumbentInitial = incumbentName.trim()[0]?.toUpperCase() || "—";
+  const daysToExpiry = incumbentExpiry ? Math.max(0, daysBetween(now, incumbentExpiry)) : 0;
+  // Track width is "% of a 5-year cycle elapsed" — bigger = closer to expiry.
+  // Use min(120 days / 5 years cycle, 1.0) — but anchor visually so 30 days = ~80%.
+  const trackPct = incumbentExpiry
+    ? Math.min(100, Math.max(0, 100 - (daysToExpiry / 365) * 50))
+    : 50;
+
+  // Classification
+  const docTypeRaw = String(audit.document_type ?? "Solicitation");
+  const conf = confidenceLabel(audit.document_type_confidence);
+
+  // Compliance + risks
+  const complianceFlags = mapComplianceFlags(compJson);
+  const risks = mapRisks(risksJson);
+  const headlineRisk = pickHeadlineRisk(risks);
+  const scoreFactors = deriveScoreFactors();
+  const clinLineItems = mapClins(compJson, risks);
+  const winThemes = deriveWinThemes(overviewJson);
+
+  // KO email
+  const koTo = (audit.ko_email_recipient as string) || "contracting-officer@agency.mil";
+  const koBody = deriveKoBody(audit, headlineRisk, displayId);
+
+  // Win probability — null when basis is 0 or value is missing.
+  // DESIGN ruling 2026-06-04: "0%" reads as "0% chance" — show "—" instead.
+  const winBasis = typeof audit.win_probability_basis === "number" ? (audit.win_probability_basis as number) : 0;
+  const wp: number | null =
+    typeof audit.win_probability === "number" && winBasis > 0
+      ? Math.round(audit.win_probability as number)
+      : null;
+  const wpBenchmark = wp != null
+    ? `Based on ${winBasis} comparable audit${winBasis === 1 ? "" : "s"}`
+    : "Add outcomes to seed the model";
+
+  // Customer hierarchy
+  const fullParentPath = (overviewJson.full_parent_path as string) || null;
+  const hierarchy = deriveHierarchy((audit.agency as string) || "", fullParentPath);
+  const customerOffice = hierarchy[hierarchy.length - 1]?.text || (audit.agency as string) || "—";
+
+  // Incumbent gating — hide entire §02 when no name; hide the .inc-expiry
+  // sub-block when no expiry; hide the section-pill unless expiry is within
+  // ~6 months (DESIGN ruling: "Recompete window open" pill shouldn't fire on
+  // 1,410 days remaining nor on a notice with no incumbent).
+  const incumbentHasData = incumbentName.trim().length > 0;
+  const incumbentHasExpiry = !!incumbentExpiry;
+  const incumbentShowStatus = incumbentHasExpiry && daysToExpiry <= 180;
+  const incumbentStatusLabel = incumbentHasExpiry
+    ? daysToExpiry <= 180
+      ? "Recompete window open"
+      : "Long horizon"
+    : "";
+  // Derived expiry narrative (replaces hardcoded "<4 months… strongest timing
+  // signal" caption). DESIGN BLOCKER B 2026-06-04: the demo copy fires on 1410
+  // days remaining and contradicts the header. Scale color the same way —
+  // amber only when ≤180d, neutral otherwise.
+  const incumbentExpiryNote = !incumbentHasExpiry
+    ? ""
+    : daysToExpiry <= 90
+      ? `Expiry inside the next quarter — no recompete posted yet. <b>This is the strongest timing signal a challenger can get.</b>`
+      : daysToExpiry <= 180
+        ? `Expiry within the next two quarters. With no recompete posted, the timing window is open — track for the solicitation to drop.`
+        : daysToExpiry <= 365
+          ? `Roughly a year remaining on the current contract. Outside the typical recompete window, but worth shadowing as the period closes.`
+          : `Long horizon — ${daysToExpiry.toLocaleString()} days remaining. Track for the next option-exercise decision or recompete cycle.`;
+  const incumbentDaysColorOverride = incumbentHasExpiry && daysToExpiry > 180 ? "var(--ink-2)" : null;
+
+  // Derived pill texts (DESIGN #7 + #8)
+  const p0 = complianceFlags.filter((f) => f.severity === "P0").length;
+  const p1 = complianceFlags.filter((f) => f.severity === "P1").length;
+  const p2 = complianceFlags.filter((f) => f.severity === "P2").length;
+  const compliancePill = complianceFlags.length === 0
+    ? ""
+    : [p0 > 0 && `${p0} P0`, p1 > 0 && `${p1} P1`, p2 > 0 && `${p2} P2`].filter(Boolean).join(" · ");
+  const riskPill = risks.length === 0 ? "" : `${risks.length} open`;
+  const recommendationPill = verdict.word === "GO"
+    ? "Bid with confidence"
+    : verdict.word === "DECLINE"
+      ? "Pass — bid not recommended"
+      : "Caution → close gaps before bid";
+
+  return {
+    solicitation_number: displayId,
+    audit_id_short: String(audit.id ?? "").slice(0, 8),
+    audit_id_full: String(audit.id ?? ""),
+    generated_at: fmtStamp(parseDate(audit.completed_at ?? audit.created_at)),
+    page_title: `FARaudit — Audit Report · ${displayId}`,
+
+    title,
+    agency: (audit.agency as string) || "—",
+    agency_sub: "",
+    naics: (audit.naics_code as string) || "—",
+    naics_sub: "",
+    set_aside: (audit.set_aside as string) || "Full and open",
+    set_aside_sub: "",
+    contract_type: (overviewJson.contract_type as string) || "—",
+    contract_type_sub: (overviewJson.period_of_performance as string) || "",
+
+    recommendation: verdict.word,
+    recommendation_class: verdict.cls,
+    recommendation_tagline: verdictTagline(verdict.word, (audit.bid_recommendation as string) || ""),
+    recommendation_pill_text: recommendationPill,
+    score,
+    win_probability: wp,
+    win_probability_benchmark: wpBenchmark,
+
+    qa_deadline: "",
+    qa_days: "",
+    qa_days_num: "",
+    response_deadline: fmtDayMonYear(responseDeadline),
+    response_days: fmtCountdown(responseDays),
+    award_date: "",
+    has_response_deadline: !!responseDeadline,
+    has_qa_deadline: false,
+    has_award_date: false,
+
+    document_type: docTypeRaw,
+    document_type_full: documentTypeFull(docTypeRaw),
+    document_type_confidence: conf.pct,
+    document_type_confidence_label: conf.label,
+    document_type_reasoning: (audit.document_type_rationale as string) || "Classification reasoning not recorded.",
+
+    incumbent: {
+      has_data: incumbentHasData,
+      has_expiry: incumbentHasExpiry,
+      show_status_pill: incumbentShowStatus,
+      status_label: incumbentStatusLabel,
+      name: incumbentName || "No incumbent identified",
+      initial: incumbentInitial,
+      uei: (audit.incumbent_uei as string) || "—",
+      award_value: typeof incumbentAwardValueRaw === "number"
+        ? fmtMoney(incumbentAwardValueRaw as number)
+        : (incumbentAwardValueRaw as string) || "—",
+      expiry: fmtDayMonYear(incumbentExpiry),
+      days_to_expiry: daysToExpiry,
+      last_lookup: fmtLookup(incumbentLookup),
+      track_width_pct: trackPct,
+      expiry_note: incumbentExpiryNote,
+      days_color_override: incumbentDaysColorOverride
+    },
+
+    clin_summary: (overviewJson.summary as string) || "Scope summary not available — upload the full PDF to extract scope detail.",
+    primary_objective: (overviewJson.primary_objective as string) || "Primary objective not extracted.",
+    period_of_performance: (overviewJson.period_of_performance as string) || "Period of performance not extracted.",
+    customer_office: customerOffice,
+    customer_hierarchy: hierarchy,
+    contract_type_detail: (overviewJson.contract_type_detail as string) || (overviewJson.contract_type as string) || "Contract vehicle detail not extracted.",
+    clin_line_items: clinLineItems,
+
+    compliance_flags: complianceFlags,
+    compliance_pill_text: compliancePill,
+    risks,
+    risk_pill_text: riskPill,
+    headline_risk: headlineRisk,
+    show_moment_band: risks.length > 0,
+    score_factors: scoreFactors,
+
+    recommendation_rationale: (audit.bid_recommendation as string) || "Recommendation rationale not recorded.",
+    recommendation_win_themes: winThemes,
+
+    ko_email_to: koTo,
+    ko_email_body: koBody,
+
+    is_metadata_only: !!isMetadataOnly,
+    pdf_export_url: `/api/audit/${audit.id}/pdf`,
+
+    conf_ring_pct: conf.pct
+  };
+}
+
+// ─── money formatter ────────────────────────────────────────────────────────
+
+function fmtMoney(n: number): string {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n.toLocaleString("en-US")}`;
+}

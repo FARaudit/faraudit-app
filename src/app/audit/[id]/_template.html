@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Audit Report · SP4701-26-Q-0942</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Audit Report — the commercial moat page
+   Institutional-research deliverable. Bloomberg credibility,
+   Bain clarity. Shares the canonical token chain + sidebar + topbar.
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-500:#f59e0b; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
+}
+:root,[data-theme="light"],[data-theme="auto"]{
+  --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --sb-bg:var(--navy-800); --sb-border:#0b1a30; --sb-text:#cbd5e1; --sb-text-mute:#6f8099; --sb-hover:#0f1f3a; --sb-active:#13294b; --sb-divider:#1f2e48;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --sb-bg:#02070f; --sb-border:rgba(255,255,255,0.06); --sb-text:#b6c2d3; --sb-text-mute:#5b6778; --sb-hover:rgba(255,255,255,0.04); --sb-active:rgba(59,130,246,0.14); --sb-divider:rgba(255,255,255,0.06);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+.main{display:flex;flex-direction:column;min-width:0}
+
+/* ═══ topbar (canonical) ═══ */
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;position:sticky;top:0;z-index:60;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs a{color:var(--mute);text-decoration:none}.crumbs a:hover{color:var(--ink-2)}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--green-50);color:var(--green-800);font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid var(--green-200)}
+[data-theme="dark"] .live-pill{background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(110,231,183,0.30)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}100%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+.search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:340px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+
+/* ═══ BODY ═══ */
+.body{padding:24px 30px 96px;display:flex;flex-direction:column;gap:18px;max-width:1480px;width:100%;margin:0 auto}
+
+/* ── return rail ── */
+.rpt-return{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.back-link{display:inline-flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--mute);text-decoration:none;letter-spacing:.02em}
+.back-link svg{width:13px;height:13px}
+.back-link:hover{color:var(--ink-2)}
+.rpt-stamp{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);display:flex;align-items:center;gap:10px}
+.rpt-stamp b{color:var(--ink-2);font-weight:600}
+.rpt-stamp .dot{width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
+
+/* ═══════════ MASTHEAD ═══════════ */
+.masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+.mh-left{padding:26px 30px 24px;min-width:0}
+.mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
+.mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}
+[data-theme="dark"] .mh-eyebrow .doc-pill{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:rgba(181,212,244,.28)}
+.mh-id{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent-deep);letter-spacing:.01em;margin:0 0 6px}
+[data-theme="dark"] .mh-id{color:var(--accent-light)}
+.mh-title{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:33px;line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:0 0 18px;text-wrap:balance;max-width:24ch}
+.mh-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--card-soft)}
+.mh-fact{flex:1;min-width:150px;padding:11px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mh-fact:last-child{border-right:0}
+.mh-fact i{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-style:normal;margin-bottom:4px}
+.mh-fact b{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.25}
+.mh-fact b .mono{font-size:12px}
+.mh-fact .sub{font-size:10.5px;color:var(--mute);font-weight:500;margin-top:1px}
+
+/* verdict block */
+.mh-verdict{padding:26px 26px 24px;display:flex;flex-direction:column;color:#fff;position:relative;isolation:isolate}
+.mh-verdict::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.16;background-image:radial-gradient(rgba(255,255,255,.9) 1px,transparent 1px);background-size:16px 16px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 70%);mask-image:linear-gradient(180deg,#000,transparent 70%)}
+.v-go{background:linear-gradient(160deg,#047857,#065f46 70%,#053d30)}
+.v-caution{background:linear-gradient(160deg,#b45309,#92400e 72%,#6b3408)}
+.v-decline{background:linear-gradient(160deg,#b91c1c,#991b1b 72%,#6e1414)}
+.mhv-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.mhv-label .ico{width:18px;height:18px;display:grid;place-items:center}
+.mhv-label .ico svg{width:16px;height:16px}
+.mhv-word{font-family:"Manrope",sans-serif;font-size:46px;font-weight:800;letter-spacing:-.03em;line-height:.92;margin:0 0 4px}
+.mhv-tag{font-size:12.5px;font-weight:600;color:rgba(255,255,255,.85);line-height:1.4;margin:0 0 20px;max-width:30ch}
+.mhv-metrics{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.18);border-radius:11px;overflow:hidden}
+.mhv-metric{background:rgba(0,0,0,.14);padding:12px 14px}
+.mhv-metric .n{font-family:"IBM Plex Mono",monospace;font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1;display:flex;align-items:baseline;gap:3px}
+.mhv-metric .n .u{font-size:11px;font-weight:500;color:rgba(255,255,255,.7);letter-spacing:0}
+.mhv-metric .k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:6px}
+.mhv-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.22);overflow:hidden;margin-top:8px}
+.mhv-bar i{display:block;height:100%;border-radius:3px;background:rgba(255,255,255,.92)}
+
+/* ═══════════ ANALYST FLAG — the moment ═══════════ */
+.moment{position:relative;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);padding:22px 26px 22px 28px;display:grid;grid-template-columns:1fr auto;gap:26px;align-items:center}
+[data-theme="dark"] .moment{background:linear-gradient(98deg,rgba(217,119,6,.12),var(--card) 64%);border-color:rgba(217,119,6,.4)}
+.moment.is-decline{background:linear-gradient(98deg,var(--red-50),var(--card) 64%);border-color:var(--red-200);border-left-color:var(--red-600)}
+.moment-main{min-width:0}
+.moment-flag{display:inline-flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin-bottom:11px}
+[data-theme="dark"] .moment-flag{color:#fcd34d}
+.moment-flag .pulse{width:7px;height:7px;border-radius:50%;background:var(--amber-600);box-shadow:0 0 0 3px rgba(217,119,6,.18);animation:pulse2 1.8s ease-out infinite}
+@keyframes pulse2{0%{box-shadow:0 0 0 0 rgba(217,119,6,.4)}100%{box-shadow:0 0 0 7px rgba(217,119,6,0)}}
+.moment-flag .clause{font-weight:600;color:var(--amber-700);background:rgba(217,119,6,.1);border:1px solid var(--amber-200);border-radius:5px;padding:2px 7px;letter-spacing:.02em}
+[data-theme="dark"] .moment-flag .clause{color:#fcd34d;border-color:rgba(217,119,6,.35);background:rgba(217,119,6,.16)}
+.moment-headline{font-family:"Manrope",sans-serif;font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.22;color:var(--ink);margin:0 0 9px;text-wrap:balance}
+.moment-headline em{font-style:normal;color:var(--amber-700);border-bottom:2px solid var(--amber-200)}
+[data-theme="dark"] .moment-headline em{color:#fcd34d;border-color:rgba(217,119,6,.4)}
+.moment-detail{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin:0;max-width:74ch}
+.moment-detail b{color:var(--ink);font-weight:700}
+.moment-aside{flex-shrink:0;width:188px;display:flex;flex-direction:column;gap:10px;border-left:1px solid var(--amber-200);padding-left:24px}
+[data-theme="dark"] .moment-aside{border-color:rgba(217,119,6,.3)}
+.moment-aside .ma-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.moment-aside .ma-v{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35}
+.moment-aside .ma-btn{margin-top:2px;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;border-radius:9px;border:1px solid var(--amber-600);background:var(--amber-600);color:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .14s,box-shadow .14s;box-shadow:0 8px 18px -8px rgba(217,119,6,.6)}
+.moment-aside .ma-btn:hover{transform:translateY(-1px)}
+.moment-aside .ma-btn svg{width:13px;height:13px}
+
+/* ═══════════ LAYOUT: main + rail ═══════════ */
+.rpt-grid{display:grid;grid-template-columns:1fr 312px;gap:18px;align-items:start}
+
+/* sections */
+.sec{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:78px}
+.sec + .sec{margin-top:18px}
+.sec-head{display:flex;align-items:center;gap:13px;padding:17px 24px;border-bottom:1px solid var(--line)}
+.sec-num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--accent-deep);background:rgba(55,138,221,.08);border:1px solid var(--accent-light);border-radius:6px;width:30px;height:24px;display:grid;place-items:center;flex-shrink:0}
+[data-theme="dark"] .sec-num{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:rgba(181,212,244,.28)}
+.sec-title{font-size:15.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.1}
+.sec-title .st-sub{display:block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--mute);margin-top:3px;text-transform:none}
+.sec-head .sh-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sec-body{padding:22px 24px}
+.sh-pill{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;border:1px solid var(--line);color:var(--mute);background:var(--card-soft)}
+.sh-pill.ok{color:var(--green-700);background:var(--green-50);border-color:var(--green-200)}
+.sh-pill.warn{color:var(--amber-700);background:var(--amber-50);border-color:var(--amber-200)}
+.sh-pill.bad{color:var(--red-700);background:var(--red-50);border-color:var(--red-200)}
+[data-theme="dark"] .sh-pill.ok{background:rgba(16,185,129,.14);color:#6ee7b7;border-color:transparent}
+[data-theme="dark"] .sh-pill.warn{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
+[data-theme="dark"] .sh-pill.bad{background:rgba(220,38,38,.16);color:#fca5a5;border-color:transparent}
+
+/* ── Section 01 — Classification ── */
+.classify{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start}
+.cls-conf{width:128px;display:flex;flex-direction:column;align-items:center;gap:10px;padding-right:24px;border-right:1px solid var(--line-2)}
+.cls-ring{width:104px;height:104px;position:relative;display:grid;place-items:center}
+.cls-ring svg{width:104px;height:104px;transform:rotate(-90deg)}
+.cls-ring .rbg{fill:none;stroke:var(--line-3);stroke-width:9}
+.cls-ring .rfg{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1)}
+.cls-ring .rt{position:absolute;text-align:center}
+.cls-ring .rt .pc{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:600;color:var(--ink);letter-spacing:-.02em;line-height:1}
+.cls-ring .rt .lb{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-top:3px}
+.cls-conf .doc-big{font-family:"Manrope",sans-serif;font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.cls-conf .doc-cap{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);text-align:center;line-height:1.4}
+.cls-reason{min-width:0}
+.cls-reason .rh{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 9px}
+.cls-reason p{font-size:13.5px;line-height:1.62;color:var(--ink-2);margin:0 0 14px}
+.cls-reason p b{color:var(--ink);font-weight:700}
+.cls-altrow{display:flex;flex-wrap:wrap;gap:7px}
+.cls-alt{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);border-radius:6px;padding:4px 9px}
+.cls-alt b{color:var(--ink-2);font-weight:700}
+.cls-alt.ruled{opacity:.6}.cls-alt.ruled b{text-decoration:line-through;text-decoration-color:var(--mute-2)}
+
+/* ── Section 02 — Incumbent ── */
+.incumbent{display:grid;grid-template-columns:1.3fr 1fr;gap:22px}
+.inc-card{display:flex;flex-direction:column;gap:14px}
+.inc-name{display:flex;align-items:center;gap:12px}
+.inc-logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--navy-700),var(--navy-900));color:#fff;display:grid;place-items:center;font-size:15px;font-weight:800;flex-shrink:0}
+.inc-name .nm{font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.15}
+.inc-name .nm .sub{display:block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:500;color:var(--mute);margin-top:2px;letter-spacing:.01em}
+.inc-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inc-fact{background:var(--card-soft);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.inc-fact i{display:block;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-style:normal;margin-bottom:5px}
+.inc-fact b{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.inc-fact.flag b{color:var(--amber-700)}
+[data-theme="dark"] .inc-fact.flag b{color:#fcd34d}
+/* expiry meter */
+.inc-expiry{background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:16px 16px 15px;display:flex;flex-direction:column;gap:12px}
+.inc-expiry .eh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.inc-expiry .eh .ek{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.inc-expiry .eh .ed{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2);font-weight:600}
+.inc-expiry .days{font-family:"Manrope",sans-serif;font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:.9;color:var(--amber-700);display:flex;align-items:baseline;gap:8px}
+[data-theme="dark"] .inc-expiry .days{color:#fcd34d}
+.inc-expiry .days .u{font-size:13px;font-weight:700;color:var(--mute);letter-spacing:0}
+.inc-track{height:7px;border-radius:4px;background:var(--line-3);overflow:hidden;position:relative}
+.inc-track i{position:absolute;left:0;top:0;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--amber-500),var(--amber-700))}
+.inc-track .now{position:absolute;top:-3px;width:2px;height:13px;background:var(--ink);border-radius:2px}
+.inc-expiry .ecap{font-size:12px;line-height:1.5;color:var(--ink-2);margin:0}
+.inc-expiry .ecap b{color:var(--ink);font-weight:700}
+
+/* ── Section 03 — Scope / CLIN ── */
+.scope-lead{font-size:14px;line-height:1.66;color:var(--ink-2);margin:0 0 20px;max-width:88ch}
+.scope-lead b{color:var(--ink);font-weight:700}
+.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.scope-block{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.scope-block .sb-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:10px 14px;background:var(--card-soft);border-bottom:1px solid var(--line)}
+.scope-block .sb-c{padding:13px 15px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.scope-block .sb-c b{color:var(--ink);font-weight:700}
+/* hierarchy */
+.hier{display:flex;flex-direction:column;gap:0}
+.hier-node{display:flex;align-items:center;gap:10px;padding:6px 0;position:relative}
+.hier-node .hdot{width:9px;height:9px;border-radius:50%;border:2px solid var(--accent);background:var(--card);flex-shrink:0;margin-left:var(--ind,0)}
+.hier-node .htxt{font-size:12.5px;color:var(--ink-2)}
+.hier-node.leaf .hdot{background:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,.16)}
+.hier-node.leaf .htxt{font-weight:700;color:var(--ink)}
+.hier-line{width:2px;background:var(--line);height:8px;margin-left:calc(var(--ind,0) + 3.5px)}
+/* CLIN table */
+.clin-tbl{width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.clin-tbl thead th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);background:var(--card-soft);padding:10px 14px;border-bottom:1px solid var(--line)}
+.clin-tbl thead th.right{text-align:right}
+.clin-tbl td{padding:11px 14px;border-top:1px solid var(--line-2);vertical-align:top;color:var(--ink-2)}
+.clin-tbl td.cid{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);white-space:nowrap}
+.clin-tbl td.right{text-align:right;font-family:"IBM Plex Mono",monospace}
+.clin-tbl tr.has-flag td{background:rgba(217,119,6,.05)}
+.clin-tbl .cflag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--amber-700);background:rgba(217,119,6,.1);border:1px solid var(--amber-200);border-radius:5px;padding:2px 6px;margin-top:5px}
+[data-theme="dark"] .clin-tbl .cflag{color:#fcd34d;background:rgba(217,119,6,.16);border-color:transparent}
+
+/* ── Section 04 — Compliance flags ── */
+.flags{display:flex;flex-direction:column;gap:12px}
+.flag-row{display:grid;grid-template-columns:54px 1fr;gap:16px;border:1px solid var(--line);border-radius:13px;padding:15px 17px;background:var(--card);transition:border-color .14s,box-shadow .14s}
+.flag-row:hover{border-color:var(--mute-2);box-shadow:var(--shadow-sm)}
+.sev{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:10px;padding:8px 0;color:#fff;text-align:center}
+.sev .lvl{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;line-height:1}
+.sev .wd{font-family:"IBM Plex Mono",monospace;font-size:7px;font-weight:700;letter-spacing:.08em;opacity:.92}
+.sev.p0{background:linear-gradient(150deg,var(--red-600),var(--red-800))}
+.sev.p1{background:linear-gradient(150deg,var(--amber-500),var(--amber-700))}
+.sev.p2{background:linear-gradient(150deg,var(--accent),var(--accent-deep))}
+.flag-main{min-width:0}
+.flag-top{display:block;margin-bottom:9px;line-height:1.4}
+.flag-clause{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;margin-right:10px}
+.flag-title{font-size:13px;font-weight:700;color:var(--ink-2)}
+.flag-desc{font-size:12.5px;line-height:1.55;color:var(--mute);margin:0 0 10px}
+.flag-action{display:flex;align-items:flex-start;gap:9px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.flag-action svg{width:14px;height:14px;color:var(--accent-deep);flex-shrink:0;margin-top:2px}
+.flag-action b{color:var(--ink);font-weight:700}
+[data-theme="dark"] .flag-action svg{color:var(--accent-light)}
+
+/* ── Section 05 — Risk register ── */
+.risks{display:flex;flex-direction:column;gap:12px}
+.risk{border:1px solid var(--line);border-radius:13px;overflow:hidden}
+.risk-head{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;user-select:none;background:var(--card)}
+.risk-head:hover{background:var(--card-soft)}
+.risk-sev{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:6px;flex-shrink:0}
+.risk-sev.high{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.risk-sev.med{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+.risk-sev.low{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--accent-light)}
+[data-theme="dark"] .risk-sev.high{background:rgba(220,38,38,.16);color:#fca5a5;border-color:transparent}
+[data-theme="dark"] .risk-sev.med{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
+[data-theme="dark"] .risk-sev.low{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:transparent}
+.risk-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0}
+.risk-cite{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:auto;white-space:nowrap}
+.risk-chev{width:16px;height:16px;color:var(--mute-2);transition:transform .2s;flex-shrink:0}
+.risk.open .risk-chev{transform:rotate(180deg)}
+.risk-body{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.risk.open .risk-body{max-height:420px}
+.risk-body-inner{padding:2px 16px 16px;border-top:1px solid var(--line-2)}
+.risk-body-inner .rb-desc{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:13px 0 13px}
+.risk-action{display:flex;align-items:flex-start;gap:10px;background:rgba(55,138,221,.05);border:1px solid var(--accent-light);border-radius:10px;padding:11px 13px}
+[data-theme="dark"] .risk-action{background:rgba(55,138,221,.1);border-color:rgba(181,212,244,.25)}
+.risk-action .ra-ico{width:24px;height:24px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.risk-action .ra-ico svg{width:14px;height:14px}
+.risk-action .ra-txt{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.risk-action .ra-txt b{color:var(--ink);font-weight:700;display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:3px}
+[data-theme="dark"] .risk-action .ra-txt b{color:var(--accent-light)}
+
+/* ── Section 06 — Recommendation ── */
+.reco-rationale{font-size:14.5px;line-height:1.65;color:var(--ink-2);margin:0 0 20px;max-width:86ch}
+.reco-rationale b{color:var(--ink);font-weight:700}
+.win-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
+.win-themes{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.win-theme{border:1px solid var(--line);border-radius:12px;padding:15px 16px;background:var(--card-soft);position:relative}
+.win-theme .wt-n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--green-700);background:var(--green-50);border:1px solid var(--green-200);border-radius:6px;width:24px;height:24px;display:grid;place-items:center;margin-bottom:10px}
+[data-theme="dark"] .win-theme .wt-n{background:rgba(16,185,129,.16);color:#6ee7b7;border-color:transparent}
+.win-theme p{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin:0}
+.win-theme p b{color:var(--ink);font-weight:700}
+
+/* ── verdict benchmark chips ── */
+.mhv-bench{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.01em;color:rgba(255,255,255,.92);margin-top:7px;display:inline-flex;align-items:center;gap:4px;line-height:1}
+.mhv-bench svg{width:9px;height:9px}
+
+/* ═══════════ KEY-DATES RIBBON ═══════════ */
+.keydates{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:3px 4px;overflow:hidden;flex-wrap:wrap}
+.kd-item{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:11px 20px;position:relative}
+.kd-item .kd-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.kd-item .kd-v{font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-.01em;display:flex;align-items:baseline;gap:8px}
+.kd-item .kd-v .cnt{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--mute)}
+.kd-item.urgent{padding-left:24px}
+.kd-item.urgent::before{content:"";position:absolute;left:6px;top:13px;bottom:13px;width:3px;border-radius:3px;background:var(--amber-600)}
+.kd-item.urgent .kd-v .cnt{color:var(--amber-700)}
+[data-theme="dark"] .kd-item.urgent .kd-v .cnt{color:#fcd34d}
+.kd-sep{width:1px;align-self:stretch;background:var(--line);margin:11px 0}
+.kd-note{margin-left:auto;display:flex;align-items:center;gap:9px;padding:11px 20px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--amber-700);font-weight:600;line-height:1.45;max-width:330px}
+.kd-note svg{width:14px;height:14px;flex-shrink:0}
+.kd-note b{color:var(--ink);font-weight:700}
+[data-theme="dark"] .kd-note{color:#fcd34d}[data-theme="dark"] .kd-note b{color:var(--ink)}
+
+/* ═══════════ DECISION SCORECARD ═══════════ */
+.scorecard .sec-num{background:var(--amber-50);border-color:var(--amber-200);color:var(--amber-700)}
+[data-theme="dark"] .scorecard .sec-num{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
+.scorecard .sec-num svg{width:15px;height:15px}
+.sc-body{display:grid;grid-template-columns:188px 1fr;gap:32px;align-items:center}
+.sc-hero{display:flex;flex-direction:column;align-items:center;gap:11px;padding-right:32px;border-right:1px solid var(--line-2);text-align:center}
+.sc-hero .sc-num{font-family:"Manrope",sans-serif;font-size:66px;font-weight:800;letter-spacing:-.045em;line-height:.82;color:var(--amber-700);display:flex;align-items:baseline;gap:4px}
+[data-theme="dark"] .sc-hero .sc-num{color:#fcd34d}
+.sc-hero .sc-num .u{font-size:19px;color:var(--mute);font-weight:700;letter-spacing:-.01em}
+.sc-hero .sc-cap{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.sc-hero .sc-verdict{font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--amber-700);background:var(--amber-50);border:1px solid var(--amber-200);border-radius:999px;padding:5px 14px}
+[data-theme="dark"] .sc-hero .sc-verdict{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
+.sc-factors{display:flex;flex-direction:column;gap:15px}
+.sfactor{display:flex;flex-direction:column;gap:6px}
+.sf-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.sf-name{font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap}
+.sf-name .sf-w{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;color:var(--mute-2);margin-left:9px;letter-spacing:.02em}
+.sf-right{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1;justify-content:flex-end}
+.sf-note{font-size:11.5px;color:var(--mute);line-height:1.4;text-align:left;margin-top:1px}
+.sf-note b{font-weight:700;color:var(--ink-2)}
+.sfactor.drag .sf-note b{color:var(--amber-700)}
+[data-theme="dark"] .sfactor.drag .sf-note b{color:#fcd34d}
+.sf-score{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;flex-shrink:0;width:26px;text-align:right}
+.sf-score.good{color:var(--green-700)}.sf-score.ok{color:var(--accent-deep)}.sf-score.warn{color:var(--amber-700)}
+[data-theme="dark"] .sf-score.good{color:#6ee7b7}[data-theme="dark"] .sf-score.ok{color:var(--accent-light)}[data-theme="dark"] .sf-score.warn{color:#fcd34d}
+.sf-bar{height:7px;border-radius:4px;background:var(--line-3);overflow:hidden}
+.sf-bar i{display:block;height:100%;border-radius:4px}
+.sf-bar i.good{background:linear-gradient(90deg,var(--green-500),var(--green-700))}
+.sf-bar i.ok{background:linear-gradient(90deg,var(--accent),var(--accent-deep))}
+.sf-bar i.warn{background:linear-gradient(90deg,var(--amber-500),var(--amber-700))}
+
+/* ── sticky deadline clock (rail) ── */
+.rail-deadline{border-color:var(--amber-200);background:linear-gradient(180deg,var(--amber-50),var(--card) 86%)}
+[data-theme="dark"] .rail-deadline{border-color:rgba(217,119,6,.4);background:linear-gradient(180deg,rgba(217,119,6,.12),var(--card) 86%)}
+.rd-inner{padding:14px 16px 16px}
+.rd-k{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber-700)}
+[data-theme="dark"] .rd-k{color:#fcd34d}
+.rd-days{font-family:"Manrope",sans-serif;font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--amber-700);margin:5px 0 5px;display:flex;align-items:baseline;gap:8px}
+[data-theme="dark"] .rd-days{color:#fcd34d}
+.rd-days span{font-size:13px;font-weight:700;color:var(--mute)}
+.rd-date{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2);font-weight:600;margin-bottom:11px}
+.rd-bar{height:6px;border-radius:4px;background:var(--line-3);overflow:hidden;margin-bottom:11px}
+.rd-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber-500),var(--amber-700));border-radius:4px}
+.rd-note{font-size:11.5px;line-height:1.5;color:var(--ink-2)}
+.rd-note b{color:var(--ink);font-weight:700}
+
+/* ═══════════ PRINT — board-ready report ═══════════ */
+@media print{
+  @page{margin:13mm}
+  html,body,.frame,.bg{background:#fff!important}
+  .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.toast,.rpt-return{display:none!important}
+  .frame{display:block!important;min-width:0!important;max-width:none!important;grid-template-columns:none!important}
+  .body{max-width:none!important;padding:0!important;gap:12px!important}
+  .rpt-grid{display:block!important;grid-template-columns:none!important}
+  .rpt-main>.sec{margin-top:12px}
+  .sec,.masthead,.moment,.keydates,.scorecard{break-inside:avoid;box-shadow:none!important}
+  .risk-body{max-height:none!important}
+  .risk-chev,.kd-note{display:none!important}
+  [data-state="locked"]{display:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+
+/* ═══════════ STICKY RAIL ═══════════ */
+.rail{position:sticky;top:78px;display:flex;flex-direction:column;gap:14px}
+.rail-card{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow-sm);overflow:hidden}
+.rail-card .rc-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:13px 16px 0}
+/* next actions */
+.actions{padding:14px 16px 16px;display:flex;flex-direction:column;gap:9px}
+.act{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--card);cursor:pointer;text-decoration:none;color:inherit;transition:border-color .14s,transform .14s,box-shadow .14s}
+.act:hover{border-color:var(--accent-light);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.act-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+.act-ico svg{width:17px;height:17px}
+.act.primary{background:linear-gradient(180deg,var(--accent),var(--accent-deep));border-color:var(--accent-deep)}
+.act.primary .act-ico{background:rgba(255,255,255,.18);color:#fff}
+.act.primary .a-t,.act.primary .a-s{color:#fff}
+.act.primary .a-s{color:rgba(255,255,255,.8)}
+.act.primary:hover{box-shadow:0 12px 24px -10px rgba(55,138,221,.6)}
+.act:not(.primary) .act-ico{background:rgba(55,138,221,.08);color:var(--accent-deep)}
+[data-theme="dark"] .act:not(.primary) .act-ico{background:rgba(55,138,221,.16);color:var(--accent-light)}
+.act .a-main{min-width:0}
+.act .a-t{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.2}
+.act .a-s{font-size:11px;color:var(--mute);margin-top:2px;line-height:1.3}
+.act .a-arrow{margin-left:auto;color:var(--mute-2);flex-shrink:0}
+.act .a-arrow svg{width:15px;height:15px}
+.act.primary .a-arrow{color:rgba(255,255,255,.8)}
+/* readiness mini */
+.ready{padding:6px 16px 16px}
+.ready-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line-2)}
+.ready-row:first-child{border-top:0}
+.ready-dot{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
+.ready-dot svg{width:11px;height:11px;color:#fff}
+.ready-dot.done{background:var(--green-500)}
+.ready-dot.todo{background:var(--card-soft);border:1.5px solid var(--mute-2)}
+.ready-dot.warn{background:var(--amber-600)}
+.ready-txt{font-size:12px;color:var(--ink-2);line-height:1.3;font-weight:500}
+.ready-txt.is-todo{color:var(--mute)}
+.ready-meta{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute-2);white-space:nowrap}
+/* jump nav */
+.jump{padding:8px 10px 12px}
+.jump a{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:9px;text-decoration:none;color:var(--ink-2);font-size:12.5px;font-weight:600;transition:background .14s,color .14s}
+.jump a:hover{background:var(--card-soft);color:var(--ink)}
+.jump a .jn{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute-2)}
+.jump a .jb{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px}
+.jump a .jb.bad{background:var(--red-50);color:var(--red-700)}
+.jump a .jb.warn{background:var(--amber-50);color:var(--amber-700)}
+[data-theme="dark"] .jump a .jb.bad{background:rgba(220,38,38,.16);color:#fca5a5}
+[data-theme="dark"] .jump a .jb.warn{background:rgba(217,119,6,.16);color:#fcd34d}
+
+/* ═══════════ METADATA-ONLY · LOCKED STATE ═══════════ */
+.locked{position:relative;border-radius:13px;overflow:hidden;border:1px solid var(--line);min-height:312px}
+.locked-ghost{padding:18px;display:flex;flex-direction:column;gap:11px;filter:blur(3px);opacity:.5;pointer-events:none;-webkit-user-select:none;user-select:none;min-height:312px}
+.lg-row{height:62px;border-radius:10px;background:linear-gradient(90deg,var(--card-soft),var(--line-3));border:1px solid var(--line)}
+.lg-row:nth-child(2){width:92%}.lg-row:nth-child(3){width:78%}
+.locked-veil{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;padding:26px;background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.94));backdrop-filter:blur(1px)}
+[data-theme="dark"] .locked-veil{background:linear-gradient(180deg,rgba(12,27,48,.72),rgba(12,27,48,.95))}
+.locked-veil .lk-ico{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));display:grid;place-items:center;color:#fff;box-shadow:0 12px 28px -10px rgba(55,138,221,.6);margin-bottom:4px}
+.locked-veil .lk-ico svg{width:22px;height:22px}
+.locked-veil .lk-stat{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-700)}
+.locked-veil .lk-h{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.01em;max-width:34ch;line-height:1.25}
+.locked-veil .lk-h em{font-style:normal;color:var(--accent-deep)}
+[data-theme="dark"] .locked-veil .lk-h em{color:var(--accent-light)}
+.locked-veil .lk-sub{font-size:12.5px;color:var(--mute);max-width:46ch;line-height:1.5;margin:0}
+.locked-veil .lk-btn{margin-top:8px;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;border-radius:10px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;border:0;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px -8px rgba(55,138,221,.55);transition:transform .14s}
+.locked-veil .lk-btn:hover{transform:translateY(-1px)}
+.locked-veil .lk-btn svg{width:14px;height:14px}
+/* state visibility is driven by JS (IS_METADATA_ONLY); locked blocks start hidden inline to avoid flash */
+
+/* ═══════════ KO EMAIL DRAWER ═══════════ */
+.scrim{position:fixed;inset:0;background:rgba(8,15,28,.5);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .25s;z-index:200}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:560px;max-width:94vw;background:var(--card);border-left:1px solid var(--line);box-shadow:-30px 0 60px -20px rgba(8,15,28,.4);transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);z-index:210;display:flex;flex-direction:column}
+.drawer.show{transform:translateX(0)}
+.dr-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px}
+.dr-head .dh-ico{width:38px;height:38px;border-radius:10px;background:rgba(55,138,221,.08);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+[data-theme="dark"] .dr-head .dh-ico{background:rgba(55,138,221,.16);color:var(--accent-light)}
+.dr-head .dh-ico svg{width:19px;height:19px}
+.dr-head .dh-t{font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.dr-head .dh-s{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);margin-top:3px}
+.dr-close{margin-left:auto;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);cursor:pointer;display:grid;place-items:center;flex-shrink:0}
+.dr-close:hover{border-color:var(--mute-2)}
+.dr-close svg{width:15px;height:15px}
+.dr-meta{padding:14px 24px;border-bottom:1px solid var(--line);background:var(--card-soft);display:flex;flex-direction:column;gap:7px}
+.dr-mrow{display:flex;gap:10px;font-size:12.5px;align-items:baseline}
+.dr-mrow .mk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);width:54px;flex-shrink:0;padding-top:2px}
+.dr-mrow .mv{color:var(--ink);font-weight:600;line-height:1.4}
+.dr-mrow .mv.mono{font-size:12px}
+.dr-body{flex:1;overflow-y:auto;padding:22px 24px}
+.dr-body .email-text{font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.72;color:var(--ink-2);white-space:pre-wrap;margin:0}
+.dr-body .email-text b{color:var(--ink);font-weight:600}
+.dr-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:10px;background:var(--card)}
+.dr-btn{flex:1;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:border-color .14s,transform .14s}
+.dr-btn:hover{border-color:var(--mute-2)}
+.dr-btn svg{width:15px;height:15px}
+.dr-btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-deep));border-color:var(--accent-deep);color:#fff;box-shadow:0 10px 22px -8px rgba(55,138,221,.5)}
+.dr-btn.primary:hover{transform:translateY(-1px)}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);background:var(--navy-800);color:#fff;font-size:13px;font-weight:600;padding:12px 20px;border-radius:11px;box-shadow:0 18px 40px -12px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:300;display:flex;align-items:center;gap:9px}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast svg{width:15px;height:15px;color:#6ee7b7}
+
+/* metadata-only demo toggle (reviewer aid — remove in prod) */
+.demo-toggle{position:fixed;left:18px;bottom:18px;z-index:120;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:9px 12px;display:flex;align-items:center;gap:11px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute)}
+.demo-toggle .dt-k{letter-spacing:.06em;text-transform:uppercase}
+.demo-toggle .dt-sw{position:relative;width:36px;height:20px;border-radius:999px;background:var(--line);cursor:pointer;transition:background .18s;flex-shrink:0}
+.demo-toggle .dt-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s}
+.demo-toggle.on .dt-sw{background:var(--accent)}
+.demo-toggle.on .dt-sw::after{transform:translateX(16px)}
+.demo-toggle .dt-state{color:var(--ink-2);font-weight:700;min-width:64px}
+
+@media (max-width:1240px){
+  .rpt-grid{grid-template-columns:1fr}
+  .rail{position:static}
+  .masthead{grid-template-columns:1fr}
+  .incumbent,.scope-grid,.win-themes{grid-template-columns:1fr}
+  .classify{grid-template-columns:1fr}
+  .cls-conf{flex-direction:row;border-right:0;border-bottom:1px solid var(--line-2);padding:0 0 18px;width:auto;justify-content:flex-start}
+}
+
+/* ── canonical toggle sidebar ── */
+:root{--sb-width:56px}
+[data-sb="open"]{--sb-width:232px}
+.sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:#0A1628;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s,color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
+.sb-toggle:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{justify-content:flex-start;gap:10px;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 12px 6px;align-self:stretch}
+.sb-divider{width:24px;height:1px;background:rgba(255,255,255,.06);margin:6px 0}
+[data-sb="open"] .sb-divider{display:none}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:rgba(255,255,255,.6);position:relative;cursor:pointer;transition:all .15s;text-decoration:none;border:0;background:transparent;font:inherit;padding:0}
+.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.sb-icon.active{background:rgba(55,138,221,.15);color:#fff;box-shadow:inset 2px 0 0 #378ADD}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:#378ADD;border-radius:2px}
+.sb-icon > svg{width:18px;height:18px;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s,transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+[data-sb="open"] .sb-icon .sb-tip{display:none!important}
+[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
+[data-sb="open"] .sb-icon{display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;height:36px;gap:11px!important;padding:0 10px!important;border-radius:9px;flex-direction:row!important}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex!important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:#378ADD}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex!important;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#fff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
+.sb-icon.sb-signout:hover{color:#fca5a5}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+[data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
+/* ── /canonical toggle sidebar ── */
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR (canonical) ═════════════ -->
+  <aside class="sidebar">
+  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+  <div class="sb-group-label">WORKSPACE</div>
+  <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
+  <a class="sb-icon active" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">INTELLIGENCE</div>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">COMPLIANCE &amp; BD</div>
+  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"/><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"/></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+  <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"/></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">ACCOUNT</div>
+  <a class="sb-icon" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+  <form action="/api/auth/sign-out" method="post" style="display:contents">
+    <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
+  </form>
+  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+</aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
+
+    <!-- topbar -->
+    <div class="topbar">
+      <div class="crumbs"><a href="/dashboard">Past Audits</a><span class="sep">/</span><b data-field="solicitation_number">SP4701-26-Q-0942</b></div>
+      <span class="live-pill">LIVE</span>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span>Search audits, notice IDs, NAICS…</span>
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg>
+          <span class="nbadge">7</span>
+        </button>
+        <div class="user-chip">
+          <div class="av">JR</div>
+          <div><div class="nm">Jose Rodriguez</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- report body -->
+    <div class="body">
+
+      <!-- return rail -->
+      <div class="rpt-return">
+        <a class="back-link" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Back to Past Audits</a>
+        <div class="rpt-stamp">
+          <span>Audit <b data-field="audit_id">69f98703</b></span><span class="dot"></span>
+          <span>Generated <b data-field="generated_at">Jun 4, 2026 · 09:14 ET</b></span><span class="dot"></span>
+          <span>3 intelligence calls · <b>38s</b></span>
+        </div>
+      </div>
+
+      <!-- ═══════════ MASTHEAD ═══════════ -->
+      <header class="masthead">
+        <div class="mh-left">
+          <p class="mh-eyebrow">
+            Audit Report
+            <span class="dot" style="color:var(--mute-2)">·</span>
+            <span class="doc-pill" data-field="document_type"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>RFQ</span>
+          </p>
+          <p class="mh-id" data-field="solicitation_number">SP4701-26-Q-0942</p>
+          <h1 class="mh-title" data-field="title">Predictive Maintenance Analytics — H-60 Fleet Sustainment</h1>
+          <div class="mh-meta">
+            <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span></div>
+            <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span></div>
+            <div class="mh-fact"><i>Set-Aside</i><b data-field="set_aside">Total Small Business</b><span class="sub" data-field="set_aside_detail">SBA size std · $34.0M</span></div>
+            <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span></div>
+          </div>
+        </div>
+        <div class="mh-verdict v-caution" data-field="recommendation_block">
+          <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>Recommendation</p>
+          <p class="mhv-word" data-field="recommendation">CAUTION</p>
+          <p class="mhv-tag" data-field="recommendation_tagline">Biddable — but only after you close two unpriced compliance gaps.</p>
+          <div class="mhv-metrics">
+            <div class="mhv-metric">
+              <div class="n"><span data-field="score">76</span><span class="u">/100</span></div>
+              <div class="k">Fit Score</div>
+              <div class="mhv-bar"><i style="width:76%"></i></div>
+              <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="score_benchmark">Top quartile of your audits</span></div>
+            </div>
+            <div class="mhv-metric">
+              <div class="n"><span data-field="win_probability">41</span><span class="u">%</span></div>
+              <div class="k">Win Probability</div>
+              <div class="mhv-bar"><i style="width:41%"></i></div>
+              <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="win_probability_benchmark">+23 vs 18% category avg</span></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ═══════════ KEY-DATES RIBBON ═══════════ -->
+      <div class="keydates">
+        <div class="kd-item urgent">
+          <span class="kd-k">Questions due</span>
+          <span class="kd-v"><span data-field="qa_deadline">18 Jun 2026</span><span class="cnt" data-field="qa_days">in 14 days</span></span>
+        </div>
+        <div class="kd-sep"></div>
+        <div class="kd-item">
+          <span class="kd-k">Quote due</span>
+          <span class="kd-v"><span data-field="response_deadline">2 Jul 2026</span><span class="cnt" data-field="response_days">in 28 days</span></span>
+        </div>
+        <div class="kd-sep"></div>
+        <div class="kd-item">
+          <span class="kd-k">Anticipated award</span>
+          <span class="kd-v"><span data-field="award_date">Sep 2026</span><span class="cnt">~Q4 FY26</span></span>
+        </div>
+        <div class="kd-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>The data-rights clarification must clear <b>before questions close</b> — 14 days.</span></div>
+      </div>
+
+      <!-- ═══════════ ANALYST FLAG · THE MOMENT (full data) ═══════════ -->
+      <section class="moment" data-state="full" data-field="headline_risk">
+        <div class="moment-main">
+          <div class="moment-flag">
+            <span class="pulse"></span>
+            The catch you'd have missed
+            <span class="clause mono" data-field="headline_risk.citation">DFARS 252.227-7014</span>
+          </div>
+          <h2 class="moment-headline" data-field="headline_risk.title">CLIN&nbsp;0002 hands the Government <em>unlimited rights</em> to algorithms you already own.</h2>
+          <p class="moment-detail" data-field="headline_risk.description">The SOW requires delivery of <b>"all developed algorithms and models,"</b> but CLIN&nbsp;0002 carries no data-rights assertion table. Under the DFARS default, silence is read as <b>unlimited Government rights</b> — sweeping in the pre-trained predictive models you built on your own dime. One clarification, filed before the Q&amp;A deadline, walls off the IP that is your competitive moat.</p>
+        </div>
+        <div class="moment-aside">
+          <span class="ma-k">Exposure if unaddressed</span>
+          <span class="ma-v" data-field="headline_risk.impact">Loss of restricted rights to your core IP</span>
+          <button class="ma-btn" data-open-ko>Fix it in the KO email<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </section>
+
+      <!-- ═══════════ ANALYST FLAG · METADATA-ONLY (locked teaser) ═══════════ -->
+      <section class="moment" data-state="locked" style="display:none">
+        <div class="moment-main">
+          <div class="moment-flag"><span class="pulse"></span>Intelligence detected · Not yet unlocked</div>
+          <h2 class="moment-headline"><em>4 DFARS traps</em> and <em>9 compliance clauses</em> were flagged in this notice's metadata.</h2>
+          <p class="moment-detail">FARaudit scored this solicitation from SAM.gov metadata alone. The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read. <b>Upload it to unlock the catch.</b></p>
+        </div>
+        <div class="moment-aside">
+          <span class="ma-k">Unlocks with PDF</span>
+          <span class="ma-v">Compliance &amp; risk register</span>
+          <button class="ma-btn" data-upload>Upload the PDF<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></button>
+        </div>
+      </section>
+
+      <!-- ═══════════ GRID: main + rail ═══════════ -->
+      <div class="rpt-grid">
+
+        <!-- ───── MAIN COLUMN ───── -->
+        <div class="rpt-main">
+
+          <!-- 00 · DECISION SCORECARD -->
+          <section class="sec scorecard" id="sec-scorecard">
+            <div class="sec-head">
+              <span class="sec-num"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 12l5-3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span>
+              <div class="sec-title">Decision Scorecard<span class="st-sub">What drives the 76 — and what's dragging it down</span></div>
+              <div class="sh-right"><span class="sh-pill warn">Compliance is the drag</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="sc-body">
+                <div class="sc-hero">
+                  <div class="sc-num"><span data-field="score">76</span><span class="u">/100</span></div>
+                  <div class="sc-cap">Weighted fit</div>
+                  <div class="sc-verdict" data-field="recommendation">CAUTION</div>
+                </div>
+                <div class="sc-factors" data-field="score_factors">
+                  <div class="sfactor">
+                    <div class="sf-top"><span class="sf-name">Technical Fit<span class="sf-w">35% weight</span></span><span class="sf-score good">90</span></div>
+                    <div class="sf-bar"><i class="good" style="width:90%"></i></div>
+                    <div class="sf-note"><b>Exact NAICS 541512 match;</b> fielded H-60 predictive-maintenance past performance.</div>
+                  </div>
+                  <div class="sfactor">
+                    <div class="sf-top"><span class="sf-name">Competitive Timing<span class="sf-w">20% weight</span></span><span class="sf-score good">84</span></div>
+                    <div class="sf-bar"><i class="good" style="width:84%"></i></div>
+                    <div class="sf-note"><b>Incumbent expires in 118 days</b> with no recompete posted.</div>
+                  </div>
+                  <div class="sfactor">
+                    <div class="sf-top"><span class="sf-name">Pricing &amp; Cost Risk<span class="sf-w">15% weight</span></span><span class="sf-score ok">68</span></div>
+                    <div class="sf-bar"><i class="ok" style="width:68%"></i></div>
+                    <div class="sf-note">Workable ceilings, but the <b>stale wage determination needs repricing</b>.</div>
+                  </div>
+                  <div class="sfactor drag">
+                    <div class="sf-top"><span class="sf-name">Compliance Posture<span class="sf-w">30% weight</span></span><span class="sf-score warn">58</span></div>
+                    <div class="sf-bar"><i class="warn" style="width:58%"></i></div>
+                    <div class="sf-note"><b>Unposted SPRS score and the CLIN 0002 data-rights exposure</b> drag the score.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 01 · CLASSIFICATION -->
+          <section class="sec" id="sec-classify">
+            <div class="sec-head">
+              <span class="sec-num">01</span>
+              <div class="sec-title">Document Classification<span class="st-sub">How FARaudit read this notice</span></div>
+              <div class="sh-right"><span class="sh-pill ok" data-field="document_type_confidence_label">High confidence</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="classify">
+                <div class="cls-conf">
+                  <div class="cls-ring">
+                    <svg viewBox="0 0 104 104"><circle class="rbg" cx="52" cy="52" r="46"/><circle class="rfg" id="confRing" cx="52" cy="52" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
+                    <div class="rt"><div class="pc"><span data-field="document_type_confidence">94</span>%</div><div class="lb">Confidence</div></div>
+                  </div>
+                  <div class="doc-big" data-field="document_type_full">Request for Quote</div>
+                  <div class="doc-cap" data-field="far_basis">FAR Part 13 · Simplified Acquisition</div>
+                </div>
+                <div class="cls-reason">
+                  <p class="rh">Classification reasoning</p>
+                  <p data-field="document_type_reasoning">Classified as an <b>RFQ</b>. The notice incorporates FAR&nbsp;52.212-1 and 52.212-4 commercial-item provisions and requests <b>price quotes against a fixed Statement of Work</b> — not proposals. There is no tradeoff or technical-evaluation narrative (which would indicate an RFP), and the full SOW with priced CLINs is attached rather than synopsized (ruling out a Combined Synopsis/Solicitation). Award is anticipated on a lowest-price, technically-acceptable basis.</p>
+                  <div class="cls-altrow" data-field="classification_alternatives">
+                    <span class="cls-alt"><b>RFQ</b> · 94%</span>
+                    <span class="cls-alt ruled"><b>Combined Synopsis</b> · 4%</span>
+                    <span class="cls-alt ruled"><b>RFP</b> · 2%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 02 · INCUMBENT -->
+          <section class="sec" id="sec-incumbent">
+            <div class="sec-head">
+              <span class="sec-num">02</span>
+              <div class="sec-title">Incumbent Intelligence<span class="st-sub">Who holds it now — and for how long</span></div>
+              <div class="sh-right"><span class="sh-pill warn" data-field="incumbent_status">Recompete window open</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="incumbent">
+                <div class="inc-card">
+                  <div class="inc-name">
+                    <div class="inc-logo">M</div>
+                    <div class="nm"><span data-field="incumbent.name">Meridian Defense Analytics, LLC</span><span class="sub">UEI <span data-field="incumbent.uei">HVVVK7M3R8P2</span> · CAGE 8J4T9</span></div>
+                  </div>
+                  <div class="inc-facts">
+                    <div class="inc-fact"><i>Award Value</i><b data-field="incumbent.award_value">$14.2M</b></div>
+                    <div class="inc-fact"><i>Vehicle</i><b style="font-size:12px">FFP IDIQ</b></div>
+                    <div class="inc-fact flag"><i>Expires</i><b data-field="incumbent.expiry">30 Sep 2026</b></div>
+                    <div class="inc-fact"><i>Place of Perf.</i><b style="font-size:12px">Richmond, VA</b></div>
+                  </div>
+                </div>
+                <div class="inc-expiry">
+                  <div class="eh"><span class="ek">Time to expiry</span><span class="ed" data-field="incumbent.last_lookup">Looked up Jun 4 · 09:12 ET</span></div>
+                  <div class="days"><span data-field="incumbent.days_to_expiry">118</span><span class="u">days left</span></div>
+                  <div class="inc-track"><i style="width:68%"></i><span class="now" style="left:68%"></span></div>
+                  <p class="ecap" data-field="incumbent.expiry_note">No follow-on has been posted. A <b>5-year award expiring in &lt;4 months</b> with no recompete on the street is the strongest timing signal a challenger can get.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 03 · SCOPE / CLIN -->
+          <section class="sec" id="sec-scope">
+            <div class="sec-head">
+              <span class="sec-num">03</span>
+              <div class="sec-title">Scope &amp; CLIN Structure<span class="st-sub">What they're actually buying</span></div>
+            </div>
+            <div class="sec-body">
+              <p class="scope-lead" data-field="clin_summary">DLA Aviation seeks a <b>predictive-maintenance analytics platform</b> for the H-60 Black Hawk fleet — ingesting flight, fault, and supply data to forecast component failures and drive demand planning. The award is a single-award IDIQ: a firm-fixed-price platform stand-up (CLIN 0001), licensed analytics + model delivery (CLIN 0002), and surge analyst support priced as labor-hour task orders (CLIN 0003–0004).</p>
+
+              <div class="scope-grid">
+                <div class="scope-block">
+                  <div class="sb-h">Primary Objective</div>
+                  <div class="sb-c" data-field="primary_objective">Cut unscheduled H-60 component removals by forecasting failures <b>≥30 days out</b>, feeding DLA's demand-planning system so parts are positioned before aircraft go down.</div>
+                </div>
+                <div class="scope-block">
+                  <div class="sb-h">Period of Performance</div>
+                  <div class="sb-c" data-field="period_of_performance"><b>12-month base</b> + four 12-month options. Phase-in NTE 30 days. Anticipated award <b>Q4 FY26</b>; base start on/about 1 Oct 2026.</div>
+                </div>
+                <div class="scope-block">
+                  <div class="sb-h">Customer Hierarchy</div>
+                  <div class="sb-c">
+                    <div class="hier">
+                      <div class="hier-node"><span class="hdot" style="--ind:0"></span><span class="htxt">Dept. of Defense</span></div>
+                      <div class="hier-line" style="--ind:0"></div>
+                      <div class="hier-node"><span class="hdot" style="--ind:14px"></span><span class="htxt">Defense Logistics Agency</span></div>
+                      <div class="hier-line" style="--ind:14px"></div>
+                      <div class="hier-node"><span class="hdot" style="--ind:28px"></span><span class="htxt">DLA Aviation (Richmond)</span></div>
+                      <div class="hier-line" style="--ind:28px"></div>
+                      <div class="hier-node leaf"><span class="hdot" style="--ind:42px"></span><span class="htxt" data-field="customer_office">Maintenance Engineering Directorate</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="scope-block">
+                  <div class="sb-h">Contract Vehicle</div>
+                  <div class="sb-c" data-field="contract_type_detail"><b>Single-award IDIQ</b>, FFP for CLINs 0001–0002; labor-hour for 0003–0004. Guaranteed minimum $25K; ceiling <b>$34.0M</b> over the ordering period.</div>
+                </div>
+              </div>
+
+              <table class="clin-tbl" data-field="clin_table">
+                <thead><tr><th>CLIN</th><th>Description</th><th>Type</th><th class="right">Qty / Ceiling</th></tr></thead>
+                <tbody>
+                  <tr><td class="cid">0001</td><td>Platform stand-up &amp; data integration</td><td>FFP</td><td class="right">1 LO</td></tr>
+                  <tr class="has-flag"><td class="cid">0002</td><td>Analytics licenses &amp; model delivery<div class="cflag"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>Data-rights table missing</div></td><td>FFP</td><td class="right">60 mo</td></tr>
+                  <tr><td class="cid">0003</td><td>Surge analyst support</td><td>LH</td><td class="right">12,000 hrs</td></tr>
+                  <tr><td class="cid">0004</td><td>Training &amp; knowledge transfer</td><td>LH</td><td class="right">1,500 hrs</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 04 · COMPLIANCE FLAGS -->
+          <section class="sec" id="sec-compliance">
+            <div class="sec-head">
+              <span class="sec-num">04</span>
+              <div class="sec-title">Compliance Flags<span class="st-sub">Clauses that require an offeror action</span></div>
+              <div class="sh-right"><span class="sh-pill bad" data-state="full" data-field="compliance_summary">1 P0 · 2 P1 · 1 P2</span></div>
+            </div>
+            <div class="sec-body">
+              <!-- full data -->
+              <div class="flags" data-state="full" data-field="compliance_flags">
+                <div class="flag-row">
+                  <div class="sev p0"><span class="lvl">P0</span><span class="wd">Blocker</span></div>
+                  <div class="flag-main">
+                    <div class="flag-top"><span class="flag-clause mono">DFARS 252.204-7012</span><span class="flag-title">Safeguarding Covered Defense Information &amp; Cyber Incident Reporting</span></div>
+                    <p class="flag-desc">Requires NIST SP 800-171 (110 controls) implemented across any system that stores or processes covered defense information, plus 72-hour incident reporting. Non-negotiable for award.</p>
+                    <div class="flag-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg><span><b>Action:</b> Confirm all 110 controls implemented and a current SPRS score is posted <b>before quoting</b> — there is no path to award without it.</span></div>
+                  </div>
+                </div>
+                <div class="flag-row">
+                  <div class="sev p1"><span class="lvl">P1</span><span class="wd">Critical</span></div>
+                  <div class="flag-main">
+                    <div class="flag-top"><span class="flag-clause mono">DFARS 252.204-7020</span><span class="flag-title">NIST SP 800-171 DoD Assessment Requirements</span></div>
+                    <p class="flag-desc">A current (within 3 years) Basic Assessment must exist in SPRS, and the requirement must flow down to any subcontractor handling covered information.</p>
+                    <div class="flag-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg><span><b>Action:</b> Verify your SPRS Basic Assessment is dated within 3 years; add the flow-down clause to your teaming agreement.</span></div>
+                  </div>
+                </div>
+                <div class="flag-row">
+                  <div class="sev p1"><span class="lvl">P1</span><span class="wd">Critical</span></div>
+                  <div class="flag-main">
+                    <div class="flag-top"><span class="flag-clause mono">FAR 52.219-14</span><span class="flag-title">Limitations on Subcontracting</span></div>
+                    <p class="flag-desc">On this small-business set-aside, the prime must perform at least <b>50%</b> of the cost of contract performance incurred for personnel.</p>
+                    <div class="flag-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg><span><b>Action:</b> Structure the teaming split so your firm retains ≥50% of labor cost; document it in the proposal to pre-empt a responsibility challenge.</span></div>
+                  </div>
+                </div>
+                <div class="flag-row">
+                  <div class="sev p2"><span class="lvl">P2</span><span class="wd">Advisory</span></div>
+                  <div class="flag-main">
+                    <div class="flag-top"><span class="flag-clause mono">DFARS 252.239-7010</span><span class="flag-title">Cloud Computing Services</span></div>
+                    <p class="flag-desc">Any cloud solution must use a DoD-authorized (IL4/IL5) offering with a provisional authorization on file.</p>
+                    <div class="flag-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg><span><b>Action:</b> Cite your hosting environment's DoD PA / IL level in the technical volume; confirm data stays within the authorized boundary.</span></div>
+                  </div>
+                </div>
+              </div>
+              <!-- metadata-only locked -->
+              <div class="locked" data-state="locked" style="display:none">
+                <div class="locked-ghost"><div class="lg-row"></div><div class="lg-row"></div><div class="lg-row"></div></div>
+                <div class="locked-veil">
+                  <div class="lk-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+                  <div class="lk-stat">9 clauses detected · Locked</div>
+                  <div class="lk-h">Clause-level compliance is read <em>from the solicitation PDF</em>.</div>
+                  <p class="lk-sub">This audit ran on SAM.gov metadata only. Upload the full solicitation and FARaudit will return every offeror-action clause with severity and the exact step to clear it.</p>
+                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the PDF to unlock</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 05 · RISK REGISTER -->
+          <section class="sec" id="sec-risks">
+            <div class="sec-head">
+              <span class="sec-num">05</span>
+              <div class="sec-title">Risk Register<span class="st-sub">Traps, ambiguities &amp; the move that neutralizes each</span></div>
+              <div class="sh-right"><span class="sh-pill warn" data-state="full">4 open</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="risks" data-state="full" data-field="risks">
+                <div class="risk open">
+                  <div class="risk-head"><span class="risk-sev high">High</span><span class="risk-title">CLIN 0002 omits a data-rights assertion table</span><span class="risk-cite mono">DFARS 252.227-7014</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">The SOW demands delivery of "all developed algorithms and models," yet the CLIN provides no place to assert limited or restricted rights. DFARS treats silence as a grant of unlimited Government rights — meaning your pre-existing IP could become Government property the moment you deliver.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Submit a clarification before the Q&amp;A deadline asserting restricted rights on all pre-existing models; request a data-rights table be added to CLIN 0002. Drafted in your KO email.</div></div>
+                  </div></div>
+                </div>
+                <div class="risk">
+                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-title">SCA wage determination is one revision stale</span><span class="risk-cite mono">WD 2015-4281 r24</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">The referenced Service Contract Act wage determination (rev 24) predates a May 2026 revision. Pricing labor categories to the stale rates risks a post-award price adjustment that erodes margin on the labor-hour CLINs.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Price to the current WD revision and note the discrepancy in your quote; ask the KO to confirm the applicable revision in writing.</div></div>
+                  </div></div>
+                </div>
+                <div class="risk">
+                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-title">Page limit counts key-personnel resumes</span><span class="risk-cite mono">§L.4 (b)</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">The quote is capped at 15 pages including price — and, unusually, resumes are not carved out of the count. Teams that assume the standard resume exemption will blow the limit and risk a non-conforming quote.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Budget the 15 pages with resumes counted; request via Q&amp;A that resumes move to a non-counted appendix and proceed conservatively until confirmed.</div></div>
+                  </div></div>
+                </div>
+                <div class="risk">
+                  <div class="risk-head"><span class="risk-sev low">Low</span><span class="risk-title">FOB term conflicts between synopsis and CLIN 0004</span><span class="risk-cite mono">FAR 52.247-34/-35</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">The synopsis states FOB Destination while CLIN 0004 specifies FOB Origin. The conflict is minor for a services-led award but should be resolved so freight liability is unambiguous.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Add a one-line Q&amp;A asking the KO to confirm the governing FOB term; price to FOB Destination unless told otherwise.</div></div>
+                  </div></div>
+                </div>
+              </div>
+              <!-- metadata-only locked -->
+              <div class="locked" data-state="locked" style="display:none">
+                <div class="locked-ghost"><div class="lg-row"></div><div class="lg-row"></div><div class="lg-row"></div></div>
+                <div class="locked-veil">
+                  <div class="lk-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+                  <div class="lk-stat">4 traps detected · Locked</div>
+                  <div class="lk-h">The risk register needs the <em>full document</em> to extract citations.</div>
+                  <p class="lk-sub">FARaudit flagged risks in the metadata but can only cite clause, severity, and the neutralizing move once it reads the solicitation. This is the difference between knowing a trap exists and knowing how to clear it.</p>
+                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the PDF to unlock</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 06 · RECOMMENDATION -->
+          <section class="sec" id="sec-reco">
+            <div class="sec-head">
+              <span class="sec-num">06</span>
+              <div class="sec-title">Recommendation<span class="st-amend" data-field="win_themes_title_suffix"> &amp; Win Themes</span><span class="st-sub">The bottom line, and how to win it</span></div>
+              <div class="sh-right"><span class="sh-pill warn" data-field="recommendation_status">Caution → bid after gaps closed</span></div>
+            </div>
+            <div class="sec-body">
+              <p class="reco-rationale" data-field="recommendation_rationale">A <b>strong technical fit</b> — exact NAICS match, demonstrated H-60 analytics past performance — collides with an aging incumbent contract to create a real opening. But two unpriced compliance gaps (a current SPRS score and the CLIN 0002 data-rights exposure) keep this at <b>CAUTION, not GO</b>. Close both before the Q&amp;A deadline and this converts to a confident bid with the timing in your favor.</p>
+              <p class="win-h">Win themes — why you, why now</p>
+              <div class="win-themes" data-field="recommendation_win_themes">
+                <div class="win-theme"><div class="wt-n">1</div><p><b>Timing.</b> The incumbent's 5-year award expires in 118 days with no recompete posted — challengers rarely get a cleaner window.</p></div>
+                <div class="win-theme"><div class="wt-n">2</div><p><b>Discriminator.</b> A posted SPRS score and CMMC L2 readiness is something most small-business competitors can't show on day one.</p></div>
+                <div class="win-theme"><div class="wt-n">3</div><p><b>Past performance.</b> Your fielded H-60 predictive-maintenance work maps directly to the primary objective — not adjacent, identical.</p></div>
+              </div>
+            </div>
+          </section>
+
+        </div><!-- /rpt-main -->
+
+        <!-- ───── STICKY RAIL ───── -->
+        <aside class="rail">
+          <div class="rail-card rail-deadline">
+            <div class="rd-inner">
+              <div class="rd-k">Questions close in</div>
+              <div class="rd-days"><span data-field="qa_days_num">14</span><span>days</span></div>
+              <div class="rd-date" data-field="qa_deadline">18 Jun 2026 · 2:00 PM ET</div>
+              <div class="rd-bar"><i style="width:50%"></i></div>
+              <div class="rd-note">File the <b>data-rights clarification</b> and confirm the wage determination before this date.</div>
+            </div>
+          </div>
+          <div class="rail-card">
+            <div class="rc-h">Next actions</div>
+            <div class="actions">
+              <button class="act primary" data-open-ko>
+                <span class="act-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
+                <span class="a-main"><span class="a-t">Send KO email</span><span class="a-s">Clarification draft — ready</span></span>
+                <span class="a-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </button>
+              <a class="act" href="/api/audit/sp4701-26-q-0942/export.pdf" data-field="pdf_export_url">
+                <span class="act-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg></span>
+                <span class="a-main"><span class="a-t">Export PDF</span><span class="a-s">Full report · share-ready</span></span>
+                <span class="a-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </a>
+              <a class="act" href="#sec-compliance">
+                <span class="act-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+                <span class="a-main"><span class="a-t">Work the checklist</span><span class="a-s">4 compliance items</span></span>
+                <span class="a-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </a>
+            </div>
+          </div>
+
+          <div class="rail-card">
+            <div class="rc-h">Pre-quote readiness</div>
+            <div class="ready">
+              <div class="ready-row"><span class="ready-dot warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg></span><span class="ready-txt">SPRS score posted</span><span class="ready-meta">P0 · verify</span></div>
+              <div class="ready-row"><span class="ready-dot warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg></span><span class="ready-txt">Data-rights clarification filed</span><span class="ready-meta">High · open</span></div>
+              <div class="ready-row"><span class="ready-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span><span class="ready-txt">NAICS 541512 size-eligible</span><span class="ready-meta">OK</span></div>
+              <div class="ready-row"><span class="ready-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span><span class="ready-txt">SAM.gov registration active</span><span class="ready-meta">OK</span></div>
+              <div class="ready-row"><span class="ready-dot todo"></span><span class="ready-txt is-todo">≥50% self-performance plan</span><span class="ready-meta">P1 · todo</span></div>
+            </div>
+          </div>
+
+          <div class="rail-card">
+            <div class="rc-h">Jump to</div>
+            <nav class="jump">
+              <a href="#sec-scorecard"><span class="jn">◆</span>Scorecard</a>
+              <a href="#sec-classify"><span class="jn">01</span>Classification</a>
+              <a href="#sec-incumbent"><span class="jn">02</span>Incumbent</a>
+              <a href="#sec-scope"><span class="jn">03</span>Scope &amp; CLINs</a>
+              <a href="#sec-compliance"><span class="jn">04</span>Compliance<span class="jb bad">4</span></a>
+              <a href="#sec-risks"><span class="jn">05</span>Risk register<span class="jb warn">4</span></a>
+              <a href="#sec-reco"><span class="jn">06</span>Recommendation</a>
+            </nav>
+          </div>
+        </aside>
+
+      </div><!-- /rpt-grid -->
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════ KO EMAIL DRAWER ═══════════ -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="koDrawer" aria-hidden="true">
+  <div class="dr-head">
+    <div class="dh-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+    <div>
+      <div class="dh-t">KO Clarification Email</div>
+      <div class="dh-s">Drafted from your audit · review &amp; send</div>
+    </div>
+    <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="dr-meta">
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to">contracting-officer@agency.mil</span></div>
+    <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
+  </div>
+  <div class="dr-body">
+    <p class="email-text" data-field="ko_email.body">Ms. Alvarez,
+
+Thank you for the opportunity to quote on SP4701-26-Q-0942, Predictive Maintenance Analytics for the H-60 fleet. We intend to submit and have three clarifications that affect how offerors price and structure their quotes:
+
+1. Data rights — CLIN 0002. The SOW requires delivery of "all developed algorithms and models," but CLIN 0002 does not include a data-rights assertion table. We intend to assert restricted rights in our pre-existing predictive models under DFARS 252.227-7014. Could the Government confirm that a data-rights assertion table may be submitted with the quote, and add it to CLIN 0002?
+
+2. Service Contract Act wage determination. The solicitation references WD 2015-4281, revision 24. Our records indicate a more recent revision was issued in May 2026. Please confirm the applicable revision so all offerors price to the same determination.
+
+3. Page limitation — Section L. The 15-page limit appears to include key-personnel resumes. Would the Government consider allowing resumes in a separate, non-counted appendix, consistent with common practice?
+
+We appreciate your time and look forward to your response ahead of the Q&A deadline.
+
+Respectfully,
+Jose Rodriguez
+Capture Lead, [Company]
+(555) 014-2207</p>
+  </div>
+  <div class="dr-foot">
+    <button class="dr-btn" id="koCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Copy text</button>
+    <a class="dr-btn primary" id="koSend" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Open in email</a>
+  </div>
+</aside>
+
+<!-- toast -->
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg><span id="toastMsg">Copied</span></div>
+
+<script>
+/* ───── metadata-only state ─────
+   Claude Code: replace IS_METADATA_ONLY with the API's is_metadata_only flag.
+   true  → sections 04/05 + the analyst-flag band render the locked treatment.
+   false → full data renders. */
+(function(){
+  var IS_METADATA_ONLY = false;
+  function apply(meta){
+    document.querySelectorAll('[data-state="full"]').forEach(function(el){ el.style.display = meta?'none':''; });
+    document.querySelectorAll('[data-state="locked"]').forEach(function(el){ el.style.display = meta?'':'none'; });
+    // re-trigger the confidence ring when it becomes visible
+    if(!meta) setTimeout(drawRing, 60);
+  }
+  function drawRing(){ var r=document.getElementById('confRing'); if(!r) return; var pc=94; var c=2*Math.PI*46; r.style.strokeDasharray=c; r.style.strokeDashoffset=c*(1-pc/100); }
+  apply(IS_METADATA_ONLY);
+  drawRing();
+})();
+
+/* ───── graceful degradation for net-new fields ─────
+   PRODUCT DECISION: degrade gracefully — no backend changes required to ship.
+   Claude Code: set each flag from data presence (or omit the markup server-side).
+   Default true = render. When false, the block hides and layout reflows cleanly.
+     score_factors             → Decision Scorecard (§00) + its Jump-to entry
+     win_probability_benchmark → both verdict benchmark chips (score + win prob)
+     key_dates                 → key-dates ribbon + sticky deadline clock + countdowns */
+(function(){
+  var AVAILABLE = { score_factors:true, win_probability_benchmark:true, key_dates:true };
+  function show(sel,on){ document.querySelectorAll(sel).forEach(function(el){ el.style.display = on?'':'none'; }); }
+  window.applyAvailability = function(av){
+    av = av || AVAILABLE;
+    show('#sec-scorecard', av.score_factors);
+    var j=document.querySelector('.jump a[href="#sec-scorecard"]'); if(j) j.style.display = av.score_factors?'':'none';
+    show('.mhv-bench', av.win_probability_benchmark);
+    show('.keydates', av.key_dates); show('.rail-deadline', av.key_dates);
+  };
+  window.applyAvailability();
+})();
+
+/* ───── risk accordions ───── */
+document.querySelectorAll('.risk-head').forEach(function(h){
+  h.addEventListener('click', function(){ h.parentElement.classList.toggle('open'); });
+});
+
+/* ───── KO drawer ───── */
+(function(){
+  var scrim=document.getElementById('scrim'), drawer=document.getElementById('koDrawer');
+  function open(){ scrim.classList.add('show'); drawer.classList.add('show'); drawer.setAttribute('aria-hidden','false'); }
+  function close(){ scrim.classList.remove('show'); drawer.classList.remove('show'); drawer.setAttribute('aria-hidden','true'); }
+  document.querySelectorAll('[data-open-ko]').forEach(function(b){ b.addEventListener('click', open); });
+  document.getElementById('koClose').addEventListener('click', close);
+  scrim.addEventListener('click', close);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  /* copy */
+  document.getElementById('koCopy').addEventListener('click', function(){
+    var t=document.querySelector('#koDrawer .email-text').innerText;
+    navigator.clipboard&&navigator.clipboard.writeText(t);
+    showToast('KO email copied to clipboard');
+  });
+  /* mailto */
+  document.getElementById('koSend').addEventListener('click', function(e){
+    e.preventDefault();
+    var to=document.querySelector('[data-field="ko_email.to"]').innerText.trim();
+    var sub='SP4701-26-Q-0942 — Pre-quote clarifications';
+    var body=document.querySelector('#koDrawer .email-text').innerText;
+    window.location.href='mailto:'+to+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);
+  });
+})();
+
+/* ───── upload (metadata-only CTA) ───── */
+document.querySelectorAll('[data-upload]').forEach(function(b){
+  b.addEventListener('click', function(){ showToast('Opening upload — drop the solicitation PDF'); });
+});
+
+/* ───── toast ───── */
+var _toastT;
+function showToast(msg){
+  var t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg||'Done';
+  t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(function(){ t.classList.remove('show'); },2400);
+}
+
+/* ───── smooth jump ───── */
+document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    var id=a.getAttribute('href'); if(id&&id.charAt(0)==='#'){ var el=document.querySelector(id); if(el){ e.preventDefault(); window.scrollTo({top:el.getBoundingClientRect().top+window.pageYOffset-72,behavior:'smooth'}); } }
+  });
+});
+
+/* ───── theme toggle ───── */
+(function(){
+  var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
+  function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+  try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
+  sync();
+  if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
+})();
+
+/* ───── sidebar toggle ───── */
+(function(){
+  var KEY='faraudit-sb', html=document.documentElement;
+  try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
+  document.addEventListener('click',function(e){
+    var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
+    var next=html.getAttribute('data-sb')==='open'?'closed':'open';
+    html.setAttribute('data-sb',next);
+    try{localStorage.setItem(KEY,next);}catch(e){}
+  });
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CLAUDE CODE · HANDOFF BLOCK — audit report page
+     Route handler: src/app/audit/[id]/route.ts  (renders this template)
+     ───────────────────────────────────────────────────────────────────────────
+     RULE 0 — 1:1 VISUAL PORT. Do not redesign. Wire data into the markup as-is.
+
+     DATA-FIELD → API JSON KEY MAP
+       data-field="solicitation_number"        → solicitation.id
+       data-field="title"                       → solicitation.title
+       data-field="agency"                       → solicitation.agency
+       data-field="naics"                        → solicitation.naics
+       data-field="set_aside"                    → solicitation.set_aside
+       data-field="contract_type"                → solicitation.contract_type        (masthead short form)
+       data-field="contract_type_detail"         → clin.contract_type                 (§03 long form)
+       data-field="audit_id"                     → audit.id  (short hash shown in stamp)
+       data-field="generated_at"                 → audit.generated_at
+       data-field="recommendation"               → recommendation.verdict  (GO|CAUTION|DECLINE)
+       data-field="recommendation_tagline"       → recommendation.tagline
+       data-field="recommendation_block"         → set class v-go|v-caution|v-decline from verdict
+       data-field="score"                        → audit.score            (0–100)
+       data-field="win_probability"              → audit.win_probability  (int %)
+       data-field="win_probability_benchmark"    → audit.win_probability_benchmark  (e.g. "+23 vs 18% category avg")
+       data-field="score_factors"                → audit.score_factors[]  {name,weight,score,note,tone:good|ok|warn}  (Decision Scorecard §00; weighted sum = score)
+       data-field="qa_deadline"                  → solicitation.qa_deadline  (questions-due date; ribbon + rail clock)
+       data-field="qa_days" / "qa_days_num"       → derived countdown to qa_deadline ("in 14 days" / 14)
+       data-field="response_deadline"            → solicitation.response_deadline  (quote due)
+       data-field="response_days"                → derived countdown to response_deadline
+       data-field="award_date"                   → solicitation.anticipated_award
+       data-field="document_type"                → classification.type    (RFQ|RFP|IFB|Sources Sought|Combined Synopsis)
+       data-field="document_type_full"           → classification.type_full
+       data-field="document_type_confidence"     → classification.confidence (int %)  — also drives #confRing
+       data-field="document_type_confidence_label"→ classification.confidence_label
+       data-field="document_type_reasoning"      → classification.reasoning
+       data-field="incumbent.name"               → incumbent.name
+       data-field="incumbent.uei"                → incumbent.uei
+       data-field="incumbent.award_value"        → incumbent.award_value
+       data-field="incumbent.expiry"             → incumbent.expiry
+       data-field="incumbent.days_to_expiry"     → incumbent.days_to_expiry (derive; also sets .inc-track width)
+       data-field="incumbent.last_lookup"        → incumbent.last_lookup
+       data-field="clin_summary"                 → clin.summary
+       data-field="primary_objective"            → clin.primary_objective
+       data-field="period_of_performance"        → clin.period_of_performance
+       data-field="customer_office"              → clin.customer_hierarchy[last]  (leaf node of §03 tree)
+       data-field="clin_table"                   → clin.line_items[]  (repeat <tr>; add .has-flag + .cflag when item has a linked risk)
+       data-field="compliance_flags"             → compliance_flags[]  {clause,title,severity:P0|P1|P2,description,required_action}
+       data-field="risks"                        → risks[]  {title,severity:high|med|low,citation,description,faraudit_action}
+       data-field="headline_risk"                → risks[0] OR highest-severity risk (drives the analyst-flag band)
+       data-field="headline_risk.citation|.title|.description|.impact" → fields of that risk
+       data-field="recommendation_rationale"     → recommendation.rationale
+       data-field="recommendation_win_themes"    → recommendation.win_themes[]  (repeat .win-theme)
+       data-field="ko_email.to"                  → ko_email.to
+       data-field="ko_email.body"                → ko_email.body  (preserve whitespace; rendered in <pre>-style .email-text)
+       data-field="pdf_export_url"               → pdf_export_url  (href on Export PDF action)
+
+     is_metadata_only HANDLING
+       Set `var IS_METADATA_ONLY` (top <script>) from the API flag, OR server-render:
+       toggle [data-state="full"] vs [data-state="locked"] visibility.
+       Affects: the analyst-flag band (#moment), §04 Compliance Flags, §05 Risk Register.
+       Locked treatment shows ghosted rows + an "Upload the PDF to unlock" CTA — never a white void.
+       Remove the #demoToggle control in production (reviewer aid only).
+
+     GRACEFUL DEGRADATION (product decision — no backend changes to ship)
+       Four fields are optional. When ABSENT, hide the block — never show empty UI:
+         score_factors[]            → hide #sec-scorecard + its .jump entry; page still
+                                      leads with the masthead score. (No scoring engine now.)
+         win_probability_benchmark  → hide .mhv-bench chips; show win_probability alone.
+         score_benchmark            → same treatment (fit-score chip).
+         qa_deadline/response_deadline/anticipated_award → these ARE parsed from SAM.gov
+                                      metadata; CHECK the audits table before assuming.
+                                      If none exist, hide .keydates + .rail-deadline.
+         countdowns (qa_days*/response_days/days_to_expiry) → derive from whatever dates
+                                      exist; hide the individual count if its date is null.
+       window.applyAvailability({score_factors,win_probability_benchmark,key_dates}) wires
+       this client-side; preferred is to omit the markup server-side when data is null.
+
+     SECONDARY FIELDS — WIRE OR HIDE (added after visual review; do NOT leave demo text)
+       data-field="agency_detail"        → agency parent org + location  (sub-line under Agency)
+       data-field="naics_label"          → NAICS description  (must match the code, e.g. 541330 = Engineering Svcs)
+       data-field="set_aside_detail"     → set-aside size std; HIDE when Full & Open
+       data-field="contract_term"        → base + options phrase; HIDE when contract_type is empty/"—"
+       data-field="far_basis"            → FAR basis caption (RFP = Part 15 negotiated; RFQ = Part 13). HIDE if unknown.
+       data-field="classification_alternatives" → real alt-type distribution; HIDE the row if none
+                                            (do NOT show the demo "RFQ 94% / ..." — it contradicts the ring + doc type)
+       data-field="incumbent_status"     → recompete-window pill; show ONLY if expiry within ~6 mo, else HIDE
+       data-field="incumbent.expiry_note"→ expiry caption; HIDE the whole .inc-expiry block (days/bar/note) when
+                                            there is NO incumbent or NO expiry date (never render "0 days left")
+       data-field="compliance_summary"   → "N P0 · N P1 · N P2" from real counts; HIDE when locked/metadata-only
+       data-field="recommendation_status"→ section pill; wire to verdict or HIDE (never "Caution…" on a GO/DECLINE)
+
+     EMPTY-STATE RULES (confirmed in review of GO / DECLINE / METADATA samples)
+       • CLIN table: render rows from clin.line_items; when empty (metadata-only) show a
+         "CLIN structure not extracted — upload the PDF" empty row, NOT demo CLINs.
+       • win_probability: when null/unknown render "—", NOT "0%".
+       • Decision Scorecard + Pre-quote Readiness card: HIDE until their data engines ship
+         (product decision — false precision otherwise). Same gate as score_factors.
+       • Analyst-flag #moment band: HIDE entirely when zero risks (no "no risks surfaced" filler).
+       • Recommendation: keep rationale always; render the "Win themes — why you, why now"
+         subhead + cards ONLY when win_themes is non-empty. ALSO drop the "&amp; Win Themes"
+         title suffix (span.st-amend / data-field="win_themes_title_suffix") in the same
+         condition, so the §06 heading reads just "Recommendation" when themes are empty.
+       • Jump-nav count badges (Compliance/Risk): wire to real array lengths; hide when 0 or locked.
+
+     KO EMAIL PANEL TRIGGER
+       Any element with [data-open-ko] opens #koDrawer (the masthead moment button + rail action).
+       Copy button uses navigator.clipboard; "Open in email" builds a mailto: from ko_email.to + body.
+
+     PDF EXPORT HREF PATTERN
+       /api/audit/<solicitation_number_lowercased>/export.pdf
+
+     VERDICT COLOR CLASS
+       .v-go (green) | .v-caution (amber) | .v-decline (red) on .mh-verdict.
+       Moment band: add .is-decline for the red treatment on DECLINE verdicts.
+
+     LOAD ORDER / TOKENS
+       Keep the :root token block in a GLOBAL stylesheet (borders/cards/shadows depend on it).
+       No external JS libs required — all interactions are vanilla.
+
+     OLD FILES TO DELETE
+       public/audit-report.html
+       public/audit-report-design.html
+       public/audit-report-checkpoint*.html
+       public/*.bak
+     ═══════════════════════════════════════════════════════════════════════════ -->
+</body>
+</html>
