@@ -243,27 +243,69 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
   );
 }
 
-// Unscored verdict: swap the entire .mh-verdict element with Design's
-// .v-unscored treatment (HANDOFF block, ~line 1374). NO fit-score /
-// win-prob tiles, NO score number, NO recommendation pill text — a canned
-// score reads as false precision on an audit we didn't grade. Just
-// "Assessment pending" / "NOT SCORED" / upload-prompt subtext + CTA.
+// Dual verdict-block selector. The template ships two sibling .mh-verdict
+// elements in the masthead: a scored one (data-state="full") and a
+// preliminary-read one (data-state="locked" data-field="preliminary_block").
+// Pick which one survives server-side rather than relying on JS toggle — the
+// template's @media print rule `[data-state="locked"]{display:none!important}`
+// would hide the prelim block on PDF print otherwise.
 //
-// The replacement element keeps data-field="recommendation_block" so the
-// rest of the markup-tracking stays consistent; the new .v-unscored class
-// pulls the neutral slate gradient from the template's CSS.
-function applyUnscoredVerdictBlock(html: string): string {
-  const idx = html.indexOf('<div class="mh-verdict ');
-  if (idx === -1) return html;
-  const range = findMatchingClose(html, idx, "div");
-  if (!range) return html;
-  const replacement = `<div class="mh-verdict v-unscored" data-field="recommendation_block">
-          <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></span>Assessment pending</p>
-          <p class="mhv-word">NOT SCORED</p>
-          <p class="mhv-tag">Metadata only — upload the solicitation PDF to unlock a scored verdict, clause-level compliance, and a document-grounded risk register.</p>
-          <a class="mhv-cta" data-upload>Upload the solicitation PDF <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        </div>`;
-  return html.slice(0, idx) + replacement + html.slice(range.closeEnd);
+// Mode "scored"      → strip the prelim block; leave scored block to be wired.
+// Mode "preliminary" → strip the scored block; un-hide prelim block and clear
+//                       its data-state="locked" so the print rule doesn't fire.
+function pickVerdictBlock(html: string, mode: "scored" | "preliminary"): string {
+  if (mode === "scored") {
+    // Drop the preliminary block.
+    const idx = html.indexOf('<div class="mh-verdict v-unscored"');
+    if (idx === -1) return html;
+    const range = findMatchingClose(html, idx, "div");
+    if (!range) return html;
+    let cutEnd = range.closeEnd;
+    const ws = html.slice(cutEnd).match(/^\s*/);
+    if (ws) cutEnd += ws[0].length;
+    return html.slice(0, idx) + html.slice(cutEnd);
+  }
+  // mode === "preliminary": drop the scored block + un-hide the prelim block.
+  const scoredIdx = html.indexOf('<div class="mh-verdict v-');
+  if (scoredIdx === -1) return html;
+  // The prelim block also starts with "mh-verdict v-unscored" — make sure we
+  // don't accidentally grab it first. The scored block uses v-go/v-caution/
+  // v-decline; the prelim uses v-unscored. Anchor explicitly.
+  const scoredMatch = html.slice(scoredIdx).match(/^<div class="mh-verdict (?:v-go|v-caution|v-decline)" data-state="full"/);
+  if (!scoredMatch) return html;
+  const scoredRange = findMatchingClose(html, scoredIdx, "div");
+  if (!scoredRange) return html;
+  let out = html.slice(0, scoredIdx) + html.slice(scoredRange.closeEnd);
+  // Trim the empty-line gap left between the masthead text + the prelim block.
+  out = out.replace(/\n\s*\n(\s*<!-- ═+ PRELIMINARY READ)/, "\n$1");
+  // On the prelim block: remove inline display:none + data-state="locked" so
+  // both the screen and the print stylesheet treat it as a normal element.
+  out = out.replace(
+    /(<div class="mh-verdict v-unscored")\s+data-state="locked"\s+data-field="preliminary_block"\s+style="display:none"/,
+    `$1 data-field="preliminary_block"`
+  );
+  return out;
+}
+
+// Tile A omission: when the audit has no response_deadline, drop the entire
+// prelim_deadline_tile div. Tile B then spans the prelim_metrics grid.
+function removePrelimDeadlineTile(html: string): string {
+  return removeFieldElement(html, "prelim_deadline_tile");
+}
+
+// Eligibility note omission: when set_aside_eligibility is empty, drop the
+// whole .mhv-note line inside prelim_setaside_tile (leaves the .t set-aside
+// label + .k "Set-aside fit" caption).
+function removePrelimSetasideNote(html: string): string {
+  // The note we want to strip is the LAST .mhv-note inside the
+  // prelim_setaside_tile div. Anchor by data-field marker + walk.
+  const tileIdx = html.indexOf('data-field="prelim_setaside_tile"');
+  if (tileIdx === -1) return html;
+  const noteRe = /<div class="mhv-note">[\s\S]*?<\/div>/g;
+  noteRe.lastIndex = tileIdx;
+  const m = noteRe.exec(html);
+  if (!m) return html;
+  return html.slice(0, m.index) + html.slice(m.index + m[0].length);
 }
 
 // is_not_solicitation = true: surgically excise the entire .mh-verdict half
@@ -703,11 +745,26 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeVerdictBlock(html);
     html = insertNotSolicitationBanner(html);
   } else if (vm.is_unscored) {
-    // DESIGN spec: swap the entire .mh-verdict block — no fit-score / win-
-    // prob tiles, no canned score, no verdict word. The replacement renders
-    // "Assessment pending" / "NOT SCORED" / upload CTA in neutral slate.
-    html = applyUnscoredVerdictBlock(html);
+    // DESIGN dual-block spec: keep the prelim .v-unscored block, drop the
+    // scored block. Then wire Tile A (response_deadline) + Tile B
+    // (set-aside + eligibility note).
+    html = pickVerdictBlock(html, "preliminary");
+    if (vm.prelim_has_deadline) {
+      html = replaceFieldText(html, "response_days_num", vm.response_days_num);
+      html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
+    } else {
+      html = removePrelimDeadlineTile(html);
+    }
+    // set_aside replacement is handled below in the normal masthead pass
+    // (data-field="set_aside" exists on both .mh-fact and the prelim tile;
+    // when scored block is gone only the prelim copy remains).
+    if (vm.set_aside_eligibility) {
+      html = replaceFieldText(html, "set_aside_eligibility", vm.set_aside_eligibility);
+    } else {
+      html = removePrelimSetasideNote(html);
+    }
   } else {
+    html = pickVerdictBlock(html, "scored");
     html = setVerdictClass(html, vm.recommendation_class);
     html = setMomentDecline(html, vm.recommendation_class === "v-decline");
     html = replaceFieldText(html, "recommendation", vm.recommendation);

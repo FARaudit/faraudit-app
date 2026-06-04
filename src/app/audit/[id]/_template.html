@@ -109,7 +109,14 @@ button{font-family:inherit}
 .mhv-cta{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;border-radius:11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.30);color:#fff;font-size:13px;font-weight:800;letter-spacing:.01em;cursor:pointer;text-decoration:none;transition:background .15s,transform .14s}
 .mhv-cta:hover{background:rgba(255,255,255,.22);transform:translateY(-1px)}
 .mhv-cta svg{width:15px;height:15px}
-.v-unscored .mhv-word{font-size:38px;letter-spacing:-.02em}
+.v-unscored .mhv-word{font-size:36px;line-height:.95;letter-spacing:-.025em;margin-bottom:11px}
+.v-unscored .mhv-tag{max-width:31ch;margin-bottom:18px}
+.v-unscored .mhv-cta{margin-top:16px}
+/* preliminary-read tiles — same chassis as the scored .mhv-metric tiles so they read as intentional, not empty */
+.mhv-metrics--prelim{margin-top:auto}
+.mhv-metric .t{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:1.12;text-wrap:balance}
+.mhv-note{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.01em;color:rgba(255,255,255,.78);margin-top:8px;display:flex;align-items:center;gap:5px;line-height:1.25}
+.mhv-note svg{width:11px;height:11px;flex-shrink:0;stroke:rgba(255,255,255,.85)}
 .mhv-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 10px;display:flex;align-items:center;gap:8px}
 .mhv-label .ico{width:18px;height:18px;display:grid;place-items:center}
 .mhv-label .ico svg{width:16px;height:16px}
@@ -657,7 +664,7 @@ button{font-family:inherit}
             <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span></div>
           </div>
         </div>
-        <div class="mh-verdict v-caution" data-field="recommendation_block">
+        <div class="mh-verdict v-caution" data-state="full" data-field="recommendation_block">
           <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>Recommendation</p>
           <p class="mhv-word" data-field="recommendation">CAUTION</p>
           <p class="mhv-tag" data-field="recommendation_tagline">Biddable — but only after you close two unpriced compliance gaps.</p>
@@ -675,6 +682,31 @@ button{font-family:inherit}
               <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="win_probability_benchmark">+23 vs 18% category avg</span></div>
             </div>
           </div>
+        </div>
+
+        <!-- ═══════════ PRELIMINARY READ · metadata-only (no document retrieved) ═══════════
+             NEUTRAL slate — never a green/amber/red verdict, never a numeric fit score (false precision).
+             Code: render this block (and hide .v-caution/.v-go/.v-decline) when is_metadata_only === true.
+             Tiles are driven by SAM.gov metadata that we DO have; omit Tile A if no response_deadline. -->
+        <div class="mh-verdict v-unscored" data-state="locked" data-field="preliminary_block" style="display:none">
+          <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></span>Preliminary · SAM metadata</p>
+          <p class="mhv-word">Preliminary<br>read</p>
+          <p class="mhv-tag">We&rsquo;ve read the SAM.gov metadata. Upload the solicitation to unlock your scored verdict, the clause-level compliance map, and the specific traps in this RFP.</p>
+          <div class="mhv-metrics mhv-metrics--prelim">
+            <!-- Tile A — RESPONSE DEADLINE (omit entire tile if response_deadline is null) -->
+            <div class="mhv-metric" data-field="prelim_deadline_tile">
+              <div class="n"><span data-field="response_days_num">28</span><span class="u">days</span></div>
+              <div class="k">Response deadline</div>
+              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-field="response_deadline_short">due 2 Jul</span></div>
+            </div>
+            <!-- Tile B — SET-ASIDE FIT (set_aside is always present from SAM; eligibility note optional) -->
+            <div class="mhv-metric" data-field="prelim_setaside_tile">
+              <div class="t" data-field="set_aside">Total Small Business</div>
+              <div class="k">Set-aside fit</div>
+              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg><span data-field="set_aside_eligibility">NAICS 332710 · size-eligible</span></div>
+            </div>
+          </div>
+          <a class="mhv-cta" data-upload>Upload the solicitation PDF &rarr;</a>
         </div>
       </header>
 
@@ -1359,15 +1391,34 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        .v-go (green) | .v-caution (amber) | .v-decline (red) on .mh-verdict.
        .v-unscored (NEUTRAL slate) when score is null / document not retrieved (metadata-only,
        SAM-unretrieved). NEVER show a green/amber/red verdict or a numeric fit score in this
-       state — a canned score reads as false precision. Render the verdict block as:
-         &lt;div class="mh-verdict v-unscored"&gt;
-           &lt;p class="mhv-label"&gt;… Assessment pending&lt;/p&gt;
-           &lt;p class="mhv-word"&gt;NOT SCORED&lt;/p&gt;
-           &lt;p class="mhv-tag"&gt;Metadata only — upload the solicitation PDF to unlock a scored
-             verdict, clause-level compliance, and a document-grounded risk register.&lt;/p&gt;
-           &lt;a class="mhv-cta" data-upload&gt;Upload the solicitation PDF →&lt;/a&gt;
+       state — a canned score reads as false precision. The "PRELIMINARY READ" block is now
+       PINNED in the template (the .v-unscored .mh-verdict with data-state="locked", hidden by
+       default). It is the metadata-only sibling of the scored .v-caution/.v-go/.v-decline block
+       (data-state="full"). The #demoToggle / is_metadata_only flag swaps which one shows — Code
+       does NOT author markup here, only wires data into the data-field hooks below and flips
+       is_metadata_only. The pinned block:
+         &lt;div class="mh-verdict v-unscored" data-state="locked" data-field="preliminary_block"&gt;
+           &lt;p class="mhv-label"&gt;… PRELIMINARY · SAM METADATA&lt;/p&gt;     (static copy — do not wire)
+           &lt;p class="mhv-word"&gt;Preliminary&lt;br&gt;read&lt;/p&gt;            (static copy — do not wire)
+           &lt;p class="mhv-tag"&gt;We've read the SAM.gov metadata. Upload…&lt;/p&gt;  (static copy)
+           &lt;div class="mhv-metrics mhv-metrics--prelim"&gt;
+             TILE A — RESPONSE DEADLINE (.mhv-metric data-field="prelim_deadline_tile"):
+               data-field="response_days_num"       → integer days-to-deadline ONLY, e.g. "28" (the big number;
+                                                       unit "days" is static). DISTINCT from the ribbon's
+                                                       data-field="response_days" ("in 28 days") — do NOT reuse that one.
+               data-field="response_deadline_short" → short date string, e.g. "due 2 Jul"
+               → OMIT the entire prelim_deadline_tile div when response_deadline is null
+                 (then prelim_setaside_tile spans both columns — grid handles it).
+             TILE B — SET-ASIDE FIT (.mhv-metric data-field="prelim_setaside_tile"):
+               data-field="set_aside"               → set-aside type, e.g. "Total Small Business"
+                                                       (rendered in .t — Manrope, NOT mono digits)
+               data-field="set_aside_eligibility"   → eligibility note, e.g. "NAICS 332710 · size-eligible";
+                                                       HIDE the .mhv-note line if no eligibility determination.
+           &lt;/div&gt;
+           &lt;a class="mhv-cta" data-upload&gt;Upload the solicitation PDF →&lt;/a&gt;   (static CTA)
          &lt;/div&gt;
-       (Replaces the .mhv-metrics block — no fit-score / win-prob tiles in unscored state.)
+       NEVER show a numeric fit score / win-prob in this block — the two tiles use ONLY
+       SAM.gov metadata we already hold (deadline + set-aside), never a derived verdict.
        Moment band: add .is-decline for the red treatment on DECLINE verdicts.
 
      LOAD ORDER / TOKENS

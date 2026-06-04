@@ -97,10 +97,22 @@ export interface AuditViewModel {
   qa_days_num: string;
   response_deadline: string;
   response_days: string;
+  // Integer-only countdown for the prelim verdict tile (e.g. "28"). Distinct
+  // from response_days ("in 28 days") which drives the keydates ribbon.
+  response_days_num: string;
+  // Short-form date prefixed with "due " (e.g. "due 6 Jul") for the prelim
+  // tile's .mhv-note line. Empty when response_deadline is null.
+  response_deadline_short: string;
   award_date: string;
   has_response_deadline: boolean;
   has_qa_deadline: boolean;
   has_award_date: boolean;
+
+  // Preliminary-read verdict block (metadata-only state) — Design ruling
+  // 2026-06-04: when no document was retrieved, surface SAM-metadata tiles
+  // instead of a fabricated fit score.
+  prelim_has_deadline: boolean;     // false → renderer omits Tile A entirely
+  set_aside_eligibility: string;    // empty → renderer hides the .mhv-note line
 
   // classification
   document_type: string;
@@ -179,6 +191,13 @@ function fmtDayMonYear(d: Date | null): string {
 function fmtMonYear(d: Date | null): string {
   if (!d) return "—";
   return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// Short form for the prelim verdict tile, e.g. "due 6 Jul".
+// Returns "" when date is null so the renderer omits the .mhv-note line.
+function fmtDueShort(d: Date | null): string {
+  if (!d) return "";
+  return `due ${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
 }
 
 function fmtStamp(d: Date | null): string {
@@ -685,10 +704,19 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     qa_days_num: "",
     response_deadline: fmtDayMonYear(responseDeadline),
     response_days: fmtCountdown(responseDays),
+    response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
+    response_deadline_short: fmtDueShort(responseDeadline),
     award_date: "",
     has_response_deadline: !!responseDeadline,
     has_qa_deadline: false,
     has_award_date: false,
+
+    // Preliminary-read tiles (metadata-only state). Eligibility intentionally
+    // empty until a real per-user determination is wired (capability_statements
+    // NAICS match check is the obvious next step). Empty → renderer hides the
+    // .mhv-note line per Design.
+    prelim_has_deadline: !!responseDeadline,
+    set_aside_eligibility: "",
 
     document_type: docTypeRaw,
     document_type_full: documentTypeFull(docTypeRaw),
