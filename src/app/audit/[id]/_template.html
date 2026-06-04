@@ -104,6 +104,12 @@ button{font-family:inherit}
 .v-go{background:linear-gradient(160deg,#047857,#065f46 70%,#053d30)}
 .v-caution{background:linear-gradient(160deg,#b45309,#92400e 72%,#6b3408)}
 .v-decline{background:linear-gradient(160deg,#b91c1c,#991b1b 72%,#6e1414)}
+/* unscored — metadata-only / document not retrieved. NEUTRAL slate (never green/amber/red) so it never reads as a verdict. */
+.v-unscored{background:linear-gradient(160deg,#3b4759,#28323f 72%,#161d27)}
+.mhv-cta{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;border-radius:11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.30);color:#fff;font-size:13px;font-weight:800;letter-spacing:.01em;cursor:pointer;text-decoration:none;transition:background .15s,transform .14s}
+.mhv-cta:hover{background:rgba(255,255,255,.22);transform:translateY(-1px)}
+.mhv-cta svg{width:15px;height:15px}
+.v-unscored .mhv-word{font-size:38px;letter-spacing:-.02em}
 .mhv-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 10px;display:flex;align-items:center;gap:8px}
 .mhv-label .ico{width:18px;height:18px;display:grid;place-items:center}
 .mhv-label .ico svg{width:16px;height:16px}
@@ -271,6 +277,17 @@ button{font-family:inherit}
 [data-theme="dark"] .risk-sev.low{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:transparent}
 .risk-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0}
 .risk-cite{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:auto;white-space:nowrap}
+/* risk provenance — verified-from-document vs inferred-pattern (trust tier) */
+.risk-prov{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:5px;flex-shrink:0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.risk-prov.doc{background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)}
+.risk-prov.pattern{background:var(--line-3);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .risk-prov.doc{background:rgba(16,185,129,.16);color:#6ee7b7;border-color:transparent}
+[data-theme="dark"] .risk-prov.pattern{background:rgba(255,255,255,.05);color:var(--mute);border-color:transparent}
+.risk-group-label{display:flex;align-items:center;gap:11px;margin:14px 2px 4px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2)}
+.risk-group-label::after{content:"";flex:1;height:1px;background:var(--line)}
+.risk-group-label .rg-note{font-weight:500;letter-spacing:.01em;text-transform:none;font-size:10.5px;color:var(--mute-2);white-space:normal}
+.risk.is-pattern{background:var(--card-soft)}
+.risk.is-pattern .risk-title{font-weight:600;color:var(--ink-2)}
 .risk-chev{width:16px;height:16px;color:var(--mute-2);transition:transform .2s;flex-shrink:0}
 .risk.open .risk-chev{transform:rotate(180deg)}
 .risk-body{max-height:0;overflow:hidden;transition:max-height .28s ease}
@@ -936,31 +953,49 @@ button{font-family:inherit}
             <div class="sec-body">
               <div class="risks" data-state="full" data-field="risks">
                 <div class="risk open">
-                  <div class="risk-head"><span class="risk-sev high">High</span><span class="risk-title">CLIN 0002 omits a data-rights assertion table</span><span class="risk-cite mono">DFARS 252.227-7014</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-head"><span class="risk-sev high">High</span><span class="risk-prov doc">✓ Document</span><span class="risk-title">CLIN 0002 omits a data-rights assertion table</span><span class="risk-cite mono">DFARS 252.227-7014</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">The SOW demands delivery of "all developed algorithms and models," yet the CLIN provides no place to assert limited or restricted rights. DFARS treats silence as a grant of unlimited Government rights — meaning your pre-existing IP could become Government property the moment you deliver.</p>
                     <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Submit a clarification before the Q&amp;A deadline asserting restricted rights on all pre-existing models; request a data-rights table be added to CLIN 0002. Drafted in your KO email.</div></div>
                   </div></div>
                 </div>
                 <div class="risk">
-                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-title">SCA wage determination is one revision stale</span><span class="risk-cite mono">WD 2015-4281 r24</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-prov doc">✓ Document</span><span class="risk-title">SCA wage determination is one revision stale</span><span class="risk-cite mono">WD 2015-4281 r24</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">The referenced Service Contract Act wage determination (rev 24) predates a May 2026 revision. Pricing labor categories to the stale rates risks a post-award price adjustment that erodes margin on the labor-hour CLINs.</p>
                     <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Price to the current WD revision and note the discrepancy in your quote; ask the KO to confirm the applicable revision in writing.</div></div>
                   </div></div>
                 </div>
                 <div class="risk">
-                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-title">Page limit counts key-personnel resumes</span><span class="risk-cite mono">§L.4 (b)</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-prov doc">✓ Document</span><span class="risk-title">Page limit counts key-personnel resumes</span><span class="risk-cite mono">§L.4 (b)</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">The quote is capped at 15 pages including price — and, unusually, resumes are not carved out of the count. Teams that assume the standard resume exemption will blow the limit and risk a non-conforming quote.</p>
                     <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Budget the 15 pages with resumes counted; request via Q&amp;A that resumes move to a non-counted appendix and proceed conservatively until confirmed.</div></div>
                   </div></div>
                 </div>
                 <div class="risk">
-                  <div class="risk-head"><span class="risk-sev low">Low</span><span class="risk-title">FOB term conflicts between synopsis and CLIN 0004</span><span class="risk-cite mono">FAR 52.247-34/-35</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-head"><span class="risk-sev low">Low</span><span class="risk-prov doc">✓ Document</span><span class="risk-title">FOB term conflicts between synopsis and CLIN 0004</span><span class="risk-cite mono">FAR 52.247-34/-35</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">The synopsis states FOB Destination while CLIN 0004 specifies FOB Origin. The conflict is minor for a services-led award but should be resolved so freight liability is unambiguous.</p>
                     <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Add a one-line Q&amp;A asking the KO to confirm the governing FOB term; price to FOB Destination unless told otherwise.</div></div>
+                  </div></div>
+                </div>
+                <!-- PATTERN-BASED GROUP — inferred from NAICS/agency norms, NOT extracted from this document.
+                     Renderer: any risk whose description starts "[Inferred from typical patterns]" goes here with
+                     .is-pattern + risk-prov.pattern; omit the whole group (label included) when there are none. -->
+                <div class="risk-group-label">Pattern-based considerations<span class="rg-note">General to this NAICS / agency — not found in your document</span></div>
+                <div class="risk is-pattern">
+                  <div class="risk-head"><span class="risk-sev med">Medium</span><span class="risk-prov pattern">≈ Pattern</span><span class="risk-title">Source-approval / QPL may block an unapproved offeror</span><span class="risk-cite mono">typical for FSC 49</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">DLA Aviation supply items in this FSC frequently carry a QPL / source-approval requirement. This was <b>not confirmed in your document</b> — it's a pattern common to this NAICS and buying office. Verify against the actual solicitation before relying on it.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Confirm QPL / source-approval status before investing capture time; upload the full PDF to convert this from a likelihood to a confirmed finding.</div></div>
+                  </div></div>
+                </div>
+                <div class="risk is-pattern">
+                  <div class="risk-head"><span class="risk-sev low">Low</span><span class="risk-prov pattern">≈ Pattern</span><span class="risk-title">FFP with no EPA clause exposes material-cost volatility</span><span class="risk-cite mono">typical for FFP supply</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-body"><div class="risk-body-inner">
+                    <p class="rb-desc">Firm-fixed-price supply awards often lack an economic-price-adjustment clause, leaving raw-material spikes uncovered. <b>Not confirmed in your document</b> — a general pattern for this contract type.</p>
+                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>Lock supplier pricing at quote time; confirm whether an EPA clause is present once the full document is read.</div></div>
                   </div></div>
                 </div>
               </div>
@@ -1322,6 +1357,17 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
 
      VERDICT COLOR CLASS
        .v-go (green) | .v-caution (amber) | .v-decline (red) on .mh-verdict.
+       .v-unscored (NEUTRAL slate) when score is null / document not retrieved (metadata-only,
+       SAM-unretrieved). NEVER show a green/amber/red verdict or a numeric fit score in this
+       state — a canned score reads as false precision. Render the verdict block as:
+         &lt;div class="mh-verdict v-unscored"&gt;
+           &lt;p class="mhv-label"&gt;… Assessment pending&lt;/p&gt;
+           &lt;p class="mhv-word"&gt;NOT SCORED&lt;/p&gt;
+           &lt;p class="mhv-tag"&gt;Metadata only — upload the solicitation PDF to unlock a scored
+             verdict, clause-level compliance, and a document-grounded risk register.&lt;/p&gt;
+           &lt;a class="mhv-cta" data-upload&gt;Upload the solicitation PDF →&lt;/a&gt;
+         &lt;/div&gt;
+       (Replaces the .mhv-metrics block — no fit-score / win-prob tiles in unscored state.)
        Moment band: add .is-decline for the red treatment on DECLINE verdicts.
 
      LOAD ORDER / TOKENS

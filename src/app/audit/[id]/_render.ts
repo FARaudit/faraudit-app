@@ -243,33 +243,27 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
   );
 }
 
-// Unscored verdict: replace v-* with a neutral slate gradient, override the
-// score to "—", suppress the fit-score bench chip ("Top quartile…"), and add
-// a sub-line explaining how to upgrade ("Upload the PDF to get a full audit
-// score."). Inline style on .mh-verdict overrides the v-* class background.
-function setUnscoredVerdictBlock(html: string, scoreDisplay: string): string {
-  // Strip the v-* class entirely + inject a neutral slate-gray gradient.
-  let out = html.replace(
-    /(<div class="mh-verdict )v-(?:go|caution|decline)("\s+[^>]*data-field="recommendation_block")(>)/,
-    `$1$2 style="background:linear-gradient(160deg,#475569,#334155 70%,#1e293b)"$3`
-  );
-  // Replace the score "76" → "—". Same for the bar fill width (0%).
-  out = out.replace(
-    /(<span data-field="score">)\d+(<\/span>)/,
-    `$1${escapeHtml(scoreDisplay)}$2`
-  );
-  out = out.replace(
-    /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
-    `$10%$2`
-  );
-  // Suppress the demo "Top quartile of your audits" bench chip — meaningless
-  // when the audit isn't scored. The win_probability bench is data-driven
-  // (replaceFieldText elsewhere) and stays.
-  out = out.replace(
-    /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:0%"[^>]*><\/i><\/div>)\s*<div class="mhv-bench">[\s\S]*?<\/div>/,
-    `$1`
-  );
-  return out;
+// Unscored verdict: swap the entire .mh-verdict element with Design's
+// .v-unscored treatment (HANDOFF block, ~line 1374). NO fit-score /
+// win-prob tiles, NO score number, NO recommendation pill text — a canned
+// score reads as false precision on an audit we didn't grade. Just
+// "Assessment pending" / "NOT SCORED" / upload-prompt subtext + CTA.
+//
+// The replacement element keeps data-field="recommendation_block" so the
+// rest of the markup-tracking stays consistent; the new .v-unscored class
+// pulls the neutral slate gradient from the template's CSS.
+function applyUnscoredVerdictBlock(html: string): string {
+  const idx = html.indexOf('<div class="mh-verdict ');
+  if (idx === -1) return html;
+  const range = findMatchingClose(html, idx, "div");
+  if (!range) return html;
+  const replacement = `<div class="mh-verdict v-unscored" data-field="recommendation_block">
+          <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></span>Assessment pending</p>
+          <p class="mhv-word">NOT SCORED</p>
+          <p class="mhv-tag">Metadata only — upload the solicitation PDF to unlock a scored verdict, clause-level compliance, and a document-grounded risk register.</p>
+          <a class="mhv-cta" data-upload>Upload the solicitation PDF <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>`;
+  return html.slice(0, idx) + replacement + html.slice(range.closeEnd);
 }
 
 // is_not_solicitation = true: surgically excise the entire .mh-verdict half
@@ -709,16 +703,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeVerdictBlock(html);
     html = insertNotSolicitationBanner(html);
   } else if (vm.is_unscored) {
-    html = setUnscoredVerdictBlock(html, vm.score_display);
-    html = replaceFieldText(html, "recommendation", "Not yet scored");
-    html = replaceFieldText(html, "recommendation_tagline", vm.recommendation_tagline);
-    if (vm.win_probability == null) {
-      html = setWinProbabilityNull(html);
-    } else {
-      html = replaceFieldText(html, "win_probability", String(vm.win_probability));
-      html = setMetricBars(html, 0, vm.win_probability);
-    }
-    html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
+    // DESIGN spec: swap the entire .mh-verdict block — no fit-score / win-
+    // prob tiles, no canned score, no verdict word. The replacement renders
+    // "Assessment pending" / "NOT SCORED" / upload CTA in neutral slate.
+    html = applyUnscoredVerdictBlock(html);
   } else {
     html = setVerdictClass(html, vm.recommendation_class);
     html = setMomentDecline(html, vm.recommendation_class === "v-decline");
