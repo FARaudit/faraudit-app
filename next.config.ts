@@ -40,6 +40,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // PDF route (/api/audit/[id]/pdf) launches headless Chromium via
+  // puppeteer-core + @sparticuz/chromium. The latter ships a brotli-
+  // compressed Chromium binary that's extracted at runtime — Next.js's
+  // bundler can't trace those non-JS assets, so it must leave both
+  // packages alone and ship them verbatim in node_modules.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
   async headers() {
     return [
       {
