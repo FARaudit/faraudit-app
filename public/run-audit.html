@@ -493,8 +493,9 @@ button{font-family:inherit}
           </div>
         </div>
 
-        <!-- Q6 — sample link (href wired in JS to most-recent high-score audit) -->
-        <a class="sample-link" id="sampleLink" href="/dashboard">View a sample audit report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:12px;height:12px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <!-- Q6 — sample link pinned to a curated hero audit so the preview is
+             stable across sessions. See HERO_AUDIT_ID in the script block below. -->
+        <a class="sample-link" id="sampleLink" href="/audit/7e389f1a-0fc4-4ba2-8299-c86d23adb62a">View a sample audit report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:12px;height:12px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
 
         <!-- Q5 — RECENTLY AUDITED now appears ABOVE the pipeline explainer -->
         <div class="ra-recent" id="recentBlock">
@@ -1163,17 +1164,10 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
 
     if (allLink) allLink.textContent = hasScored ? ('View all ' + audits.length + ' →') : 'View all 15 →';
 
-    // Sample link → highest-score live audit (if any), else stays /dashboard.
-    if (sampleLink) {
-      var best = (hasScored ? audits : []).filter(function(a){ return typeof a.compliance_score === 'number'; })
-                                          .sort(function(x,y){ return (y.compliance_score||0) - (x.compliance_score||0); })[0];
-      if (best) {
-        var bsol = best.solicitation_number || best.notice_id || best.id;
-        sampleLink.setAttribute('href', '/audit/' + encodeURIComponent(String(bsol).toLowerCase()));
-      } else {
-        sampleLink.setAttribute('href', '/dashboard');
-      }
-    }
+    // Sample link is pinned in HTML to a curated hero audit
+    // (HERO_AUDIT_ID = 7e389f1a-0fc4-4ba2-8299-c86d23adb62a). Don't overwrite
+    // it with a rolling "highest score" pick — the demo target must stay
+    // stable so Design + prospects always see the same showcase audit.
   }
   fetch('/api/audits?limit=20', { credentials:'include' })
     .then(function(r){ return r.ok ? r.json() : { audits: [] }; })
