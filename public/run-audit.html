@@ -216,6 +216,7 @@ button{font-family:inherit}
 .ra-recent-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
 .ra-recent-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
 .ra-recent-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
+.ra-recent-score.s-none{background:var(--mute, #9ca3af);color:#fff;box-shadow:none}
 .ra-recent-body{min-width:0;flex:1}
 .ra-recent-title{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
 .ra-recent-sub{font-size:11px;color:var(--mute);font-weight:500;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -256,7 +257,10 @@ button{font-family:inherit}
 .pcall-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .pcall-list li{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.45;color:var(--mute);padding-left:14px;position:relative}
 .pcall-list li::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
-.pcall-bar{height:3px;border-radius:2px;background:var(--line-3);overflow:hidden;margin-top:2px}
+.pcall-bar{height:3px;border-radius:2px;background:var(--line-3);overflow:hidden;margin-top:2px;display:none}
+.pcall.active .pcall-bar,
+.pcall.done .pcall-bar,
+.pcall.err .pcall-bar{display:block}
 .pcall-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));width:0%;transition:width .35s ease}
 .pcall.done .pcall-bar i{background:linear-gradient(90deg,var(--green-500),var(--green-700));width:100%}
 .pcall.err .pcall-bar i{background:linear-gradient(90deg,var(--red-500),var(--red-700));width:100%}
@@ -1006,7 +1010,7 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   if(!grid) return;
 
   function toneClass(s){
-    if(s == null || isNaN(s)) return 's-no';
+    if(s == null || isNaN(s)) return 's-none';
     if(s >= 80) return 's-hi';
     if(s >= 65) return 's-md';
     if(s >= 40) return 's-lo';
