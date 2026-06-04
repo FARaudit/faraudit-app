@@ -62,3 +62,8 @@ src/app/sign-in/*.bak*
 src/app/pricing/*.bak*
 public/*.bak*
 src/app/globals.css.bak*
+
+# Playwright
+e2e/.auth/
+playwright-report/
+test-results/
