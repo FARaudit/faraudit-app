@@ -1080,14 +1080,23 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   }
   function render(audits){
     audits = Array.isArray(audits) ? audits : [];
-    var hasScored = audits.some(function(a){ return typeof a.compliance_score === 'number'; });
+    // Sort scored-first per CEO 2026-06-03 — /api/audits returns newest first
+    // (created_at DESC), but the 7 most-recent are pinned-pending with null
+    // scores. Surfacing completed work fills the top slots; pending only
+    // backfills when fewer than 4 scored audits exist. The underlying reason
+    // those 7 are unscored is a separate Audit-AI cron issue (P0 carry-over).
+    var scored  = audits.filter(function(a){ return typeof a.compliance_score === 'number'; });
+    var pending = audits.filter(function(a){ return typeof a.compliance_score !== 'number'; });
+    var hasScored = scored.length > 0;
 
     // Per restore-list §A2: always exactly 4 cells in #recentGrid · no inline
     // width · no minmax/auto-fill (CSS owns the 4-column grid via repeat(4,1fr)).
     var rows;
     if (hasScored) {
-      rows = audits.slice(0, 4);
-      // Pad with static fallback when live data has < 4 cards.
+      rows = scored.slice(0, 4);
+      // Backfill with pending audits if fewer than 4 scored.
+      while (rows.length < 4 && pending.length) rows.push(pending.shift());
+      // Final fallback to static if still under 4 (extreme edge case: < 4 audits total).
       while (rows.length < 4) rows.push(STATIC_FALLBACK[rows.length]);
     } else {
       // Live data isn't wired yet — restore the 4 approved static fallback cards.
