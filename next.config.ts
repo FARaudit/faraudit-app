@@ -58,6 +58,43 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Clear-Site-Data", value: '"cache"' }
         ]
+      },
+      // ━━ CACHE STRATEGY (CEO 2026-06-03) ━━
+      // Symptom: deploys took ~17 min to surface in normal browsers because
+      // un-hashed /public/* assets (cc-app.js, run-audit.html, *-live.js)
+      // were being served from the Vercel edge with age=1024s — the CDN
+      // applied its own internal TTL despite Next's default
+      // `Cache-Control: public, max-age=0, must-revalidate`. Browsers also
+      // honored that and kept the cached file across deploys.
+      //
+      // Fix: explicit `s-maxage=0` defeats the CDN cache, and
+      // `must-revalidate` forces browsers to send conditional requests
+      // (ETag-based 304s when nothing changed — cheap revalidation, no
+      // body re-fetch). HTML page route handlers now use `no-store`
+      // directly (see src/app/*/route.ts).
+      //
+      // Latter rule wins per Next.js header-merge semantics: the
+      // /_next/static override below restores long-cache immutability
+      // for content-hashed assets.
+      //
+      // Route handlers that set Cache-Control on their Response (e.g.
+      // /audit, /command-center) override this catch-all explicitly.
+      //
+      // Long-term: hash /public/*.js filenames at build time so they can
+      // use immutable caching too. Today this is fine — every page load
+      // makes one cheap 304 per script.
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate, s-maxage=0" }
+        ]
+      },
+      // Override: Next.js content-hashed assets — safe to cache forever.
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" }
+        ]
       }
     ];
   },

@@ -30,7 +30,7 @@ export async function GET() {
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "private, max-age=30, stale-while-revalidate=10"
+      "cache-control": "no-store"
 }
   });
 }
