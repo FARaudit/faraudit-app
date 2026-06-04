@@ -1105,15 +1105,22 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
       verdict = 'PENDING';
     }
     var when = a.ago || ago(a.completed_at || a.created_at);
+    // Meta line: bold agency · cleaned title. Apply stripTrailingHexBlob() to
+    // the title so sparse-SAM placeholders ("Stranded notice <hex>") read
+    // cleanly here too. Drop the title piece when it duplicates the headline
+    // or matches a known placeholder ("Untitled solicitation"). If agency is
+    // null, the meta is just the cleaned title (no leading separator). If
+    // both are missing, the meta line is empty — never show status strings
+    // like "Audit complete" / "Awaiting score" (those belong to the score
+    // tile's verdict word, not the agency slot).
     var agency = (a.agency || '').trim();
-    var titleText = (a.title || '').trim();
-    // Avoid duplicating the headline in the meta line (happens when title
-    // *is* the solicitation number, e.g. extracted-from-title path).
+    var titleText = stripTrailingHexBlob((a.title || '').trim());
     if (titleText && titleText.toUpperCase() === h.sol.toUpperCase()) titleText = '';
+    if (titleText && titleText.toLowerCase() === 'untitled solicitation') titleText = '';
     var metaParts = [];
     if (agency)    metaParts.push('<span class="agency">'+escapeHtml(agency)+'</span>');
     if (titleText) metaParts.push(escapeHtml(titleText.slice(0, 64)));
-    var metaHtml = metaParts.length ? metaParts.join(' · ') : '<span class="agency">'+escapeHtml(verdict === 'PENDING' ? 'Awaiting score' : 'Audit complete')+'</span>';
+    var metaHtml = metaParts.join(' · ');
     var tagHtml = h.pdfUpload ? ' <span class="ra-row-tag">PDF upload</span>' : '';
     return '<a class="ra-row" href="/audit/'+slug+'">'+
       '<span class="ra-score '+tone+'"><span class="n">'+escapeHtml(text)+'</span><span class="v">'+escapeHtml(verdict)+'</span></span>'+
