@@ -1009,18 +1009,19 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   var sampleLink = document.getElementById('sampleLink');
   if(!grid) return;
 
+  // Score → tone class · thresholds per run-audit-restore-list.md §A1
   function toneClass(s){
     if(s == null || isNaN(s)) return 's-none';
-    if(s >= 80) return 's-hi';
-    if(s >= 65) return 's-md';
-    if(s >= 40) return 's-lo';
+    if(s >= 85) return 's-hi';
+    if(s >= 70) return 's-md';
+    if(s >= 58) return 's-lo';
     return 's-no';
   }
   function toneText(s){
     if(s == null || isNaN(s)) return 'Pending';
-    if(s >= 80) return 'Go';
-    if(s >= 65) return 'Caution';
-    if(s >= 40) return 'Caution';
+    if(s >= 85) return 'Go';
+    if(s >= 70) return 'Caution';
+    if(s >= 58) return 'Caution';
     return 'Decline';
   }
   function ago(iso){
@@ -1036,38 +1037,72 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   function arrowSvg(){
     return '<span class="ra-recent-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>';
   }
-  function render(audits){
-    if(!audits || !audits.length){
-      grid.innerHTML = '';
-      grid.style.display = 'none';
-      empty.style.display = 'block';
-      if(allLink) allLink.textContent = 'View all →';
-      if(sampleLink) sampleLink.setAttribute('href', '/dashboard');
-      return;
+  // Static fallback per run-audit-restore-list.md §B7 — used when live data
+  // returns 0 scored audits ("not wired yet"). Stopgap that keeps the visual
+  // baseline correct even before /api/audits has scoring data.
+  var STATIC_FALLBACK = [
+    { sol:'N00024-26-R-2207', title:'SPY-6 Phase IV',   ago:'2m ago',    score:94, status:'complete' },
+    { sol:'FA8730-26-Q-0114', title:'F-35 Test Harness', ago:'38m ago',   score:88, status:'complete' },
+    { sol:'W56KGY-26-R-0014', title:'CECOM TNSS',        ago:'2h ago',    score:58, status:'complete' },
+    { sol:'N00178-26-R-3071', title:'Indian Head',       ago:'yesterday', score:42, status:'complete' }
+  ];
+  function isComplete(a){
+    var s = (a.status || (typeof a.compliance_score === 'number' ? 'complete' : '')).toLowerCase();
+    return s === 'complete';
+  }
+  function cellHtml(a){
+    var sol = a.sol || a.solicitation_number || a.notice_id || a.id || '—';
+    var slug = encodeURIComponent(String(sol).toLowerCase());
+    var score = (typeof a.score === 'number') ? a.score
+              : (typeof a.compliance_score === 'number') ? a.compliance_score : null;
+    var complete = isComplete(a);
+    var tone, text, label;
+    if (complete && typeof score === 'number') {
+      // Render numeric score — never "—" — for any completed audit.
+      tone = toneClass(score);
+      text = String(score);
+      label = toneText(score);
+    } else {
+      // In-progress / no score yet: neutral grey + "…" (never a bare dash).
+      tone = 's-none';
+      text = '…';
+      label = 'In progress';
     }
-    empty.style.display = 'none';
+    var titleText = (a.title || sol).slice(0, 48);
+    var when = a.ago || ago(a.completed_at || a.created_at);
+    return '<a class="ra-recent-card" href="/audit/'+slug+'">'+
+      '<span class="ra-recent-score '+tone+'">'+escapeHtml(text)+'<span class="sr-only"> · '+escapeHtml(label)+'</span></span>'+
+      '<div class="ra-recent-body"><div class="ra-recent-title">'+escapeHtml(sol)+'</div><div class="ra-recent-sub">'+escapeHtml(titleText)+' · '+escapeHtml(when)+'</div></div>'+
+      arrowSvg()+
+    '</a>';
+  }
+  function render(audits){
+    audits = Array.isArray(audits) ? audits : [];
+    var hasScored = audits.some(function(a){ return typeof a.compliance_score === 'number'; });
+
+    // Per restore-list §A2: always exactly 4 cells in #recentGrid · no inline
+    // width · no minmax/auto-fill (CSS owns the 4-column grid via repeat(4,1fr)).
+    var rows;
+    if (hasScored) {
+      rows = audits.slice(0, 4);
+      // Pad with static fallback when live data has < 4 cards.
+      while (rows.length < 4) rows.push(STATIC_FALLBACK[rows.length]);
+    } else {
+      // Live data isn't wired yet — restore the 4 approved static fallback cards.
+      rows = STATIC_FALLBACK.slice();
+    }
+
     grid.style.display = '';
-    var top4 = audits.slice(0, 4);
-    grid.innerHTML = top4.map(function(a){
-      var sol = a.solicitation_number || a.notice_id || a.id || '—';
-      var slug = encodeURIComponent(String(sol).toLowerCase());
-      var score = (typeof a.compliance_score === 'number') ? a.compliance_score : null;
-      var tone = toneClass(score);
-      var label = toneText(score);
-      var title = (a.title || sol).slice(0, 48);
-      var when = ago(a.completed_at || a.created_at);
-      return '<a class="ra-recent-card" href="/audit/'+slug+'">'+
-        '<span class="ra-recent-score '+tone+'">'+(score==null?'—':score)+'<span class="sr-only"> · '+label+'</span></span>'+
-        '<div class="ra-recent-body"><div class="ra-recent-title">'+escapeHtml(sol)+'</div><div class="ra-recent-sub">'+escapeHtml(title)+' · '+escapeHtml(when)+'</div></div>'+
-        arrowSvg()+
-      '</a>';
-    }).join('');
-    if(allLink) allLink.textContent = 'View all ' + audits.length + ' →';
-    // Sample link → highest-score complete audit
-    if(sampleLink){
-      var best = audits.filter(function(a){ return typeof a.compliance_score === 'number'; })
-                       .sort(function(x,y){ return (y.compliance_score||0) - (x.compliance_score||0); })[0];
-      if(best){
+    if (empty) empty.style.display = 'none';
+    grid.innerHTML = rows.slice(0, 4).map(cellHtml).join('');
+
+    if (allLink) allLink.textContent = hasScored ? ('View all ' + audits.length + ' →') : 'View all 15 →';
+
+    // Sample link → highest-score live audit (if any), else stays /dashboard.
+    if (sampleLink) {
+      var best = (hasScored ? audits : []).filter(function(a){ return typeof a.compliance_score === 'number'; })
+                                          .sort(function(x,y){ return (y.compliance_score||0) - (x.compliance_score||0); })[0];
+      if (best) {
         var bsol = best.solicitation_number || best.notice_id || best.id;
         sampleLink.setAttribute('href', '/audit/' + encodeURIComponent(String(bsol).toLowerCase()));
       } else {
