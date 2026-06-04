@@ -202,29 +202,34 @@ button{font-family:inherit}
 [data-theme="dark"] .sample-link{color:var(--accent-light)}
 
 /* ═══ RECENTLY AUDITED (Q5: now above the pipeline explainer) ═══ */
-.ra-recent{width:100%;max-width:980px;margin-top:38px;text-align:left}
+.ra-recent{width:100%;max-width:980px;margin-top:48px;text-align:left}
 .ra-recent-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .ra-recent-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
 .ra-recent-all{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-decoration:none}
 .ra-recent-all:hover{text-decoration:underline;text-underline-offset:3px}
 [data-theme="dark"] .ra-recent-all{color:var(--accent-light)}
-.ra-recent-grid{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px}
-.ra-recent-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:transform .14s, border-color .14s, box-shadow .14s;position:relative;min-width:0}
-.ra-recent-card:hover{transform:translateY(-2px);border-color:var(--mute-2);box-shadow:var(--shadow)}
-.ra-recent-score{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;position:relative}
-.ra-recent-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
-.ra-recent-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
-.ra-recent-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
-.ra-recent-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
-.ra-recent-score.s-none{background:var(--mute, #9ca3af);color:#fff;box-shadow:none}
-.ra-recent-body{min-width:0;flex:1}
-.ra-recent-title{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.005em}
-.ra-recent-sub{font-size:11px;color:var(--mute);font-weight:500;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Q6 — full card clickable + → arrow (same pattern as Today signal cards) */
-.ra-recent-arrow{margin-left:auto;width:18px;height:18px;color:var(--mute-2);display:grid;place-items:center;flex-shrink:0;transition:color .14s, transform .14s}
-.ra-recent-arrow svg{width:15px;height:15px}
-.ra-recent-card:hover .ra-recent-arrow{color:var(--accent-deep);transform:translateX(3px)}
-[data-theme="dark"] .ra-recent-card:hover .ra-recent-arrow{color:var(--accent-light)}
+.ra-recent-list{display:flex;flex-direction:column;gap:8px}
+.ra-row{display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:center;padding:13px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:border-color .14s,transform .14s,box-shadow .14s}
+.ra-row:hover{border-color:var(--accent-light);transform:translateY(-1px);box-shadow:var(--shadow)}
+.ra-score{width:48px;height:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:11px;color:#fff;font-family:"IBM Plex Mono",monospace}
+.ra-score .n{font-size:17px;font-weight:700;line-height:1}
+.ra-score .v{font-size:7px;font-weight:700;letter-spacing:.06em;opacity:.92}
+.ra-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
+.ra-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
+.ra-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
+.ra-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
+.ra-score.s-none{background:var(--mute-2)}
+.ra-row-main{min-width:0}
+.ra-row-sol{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:.01em;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-row-meta{font-size:12px;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-row-meta .agency{color:var(--ink-2);font-weight:600}
+.ra-row-tag{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);border:1px solid var(--line);color:var(--mute);margin-left:7px;vertical-align:1px}
+.ra-row-right{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.ra-row-date{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute-2);white-space:nowrap}
+.ra-row-arrow{color:var(--mute-2);display:grid;place-items:center;transition:color .14s,transform .14s}
+.ra-row-arrow svg{width:16px;height:16px}
+.ra-row:hover .ra-row-arrow{color:var(--accent-deep);transform:translateX(3px)}
+[data-theme="dark"] .ra-row:hover .ra-row-arrow{color:var(--accent-light)}
 /* Q6 — sr-only score text label (colorblind a11y) */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ra-recent-empty{padding:36px 18px;text-align:center;border:1.5px dashed var(--line);border-radius:14px;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:12px}
@@ -288,7 +293,6 @@ button{font-family:inherit}
   .pipeline-track{grid-template-columns:1fr 1fr;gap:10px}
   .pcall-arrow{display:none}
   .pcall-deliver{grid-column:1 / -1}
-  .ra-recent-grid{grid-template-columns:repeat(2,1fr)}
 }
 
 /* ── canonical toggle sidebar — collapsed icon-rail + expanded labels ── */
@@ -498,7 +502,7 @@ button{font-family:inherit}
             <div class="ra-recent-label">Recently audited</div>
             <a class="ra-recent-all" href="/dashboard" id="recentAll">View all →</a>
           </div>
-          <div class="ra-recent-grid" id="recentGrid">
+          <div class="ra-recent-list" id="recentGrid">
             <!-- populated by JS from /api/audits -->
           </div>
           <div class="ra-recent-empty" id="recentEmpty" style="display:none">
@@ -1013,47 +1017,95 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   }
   function arrowSvg(){
-    return '<span class="ra-recent-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>';
+    return '<span class="ra-row-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>';
   }
-  // Static fallback per run-audit-restore-list.md §B7 — used when live data
-  // returns 0 scored audits ("not wired yet"). Stopgap that keeps the visual
-  // baseline correct even before /api/audits has scoring data.
+  // Static fallback — used when live /api/audits returns 0 scored audits
+  // ("not wired yet"). Mirrors the reference rows from
+  // ceo/redesign-final/platform/run-audit.html.
   var STATIC_FALLBACK = [
-    { sol:'N00024-26-R-2207', title:'SPY-6 Phase IV',   ago:'2m ago',    score:94, status:'complete' },
-    { sol:'FA8730-26-Q-0114', title:'F-35 Test Harness', ago:'38m ago',   score:88, status:'complete' },
-    { sol:'W56KGY-26-R-0014', title:'CECOM TNSS',        ago:'2h ago',    score:58, status:'complete' },
-    { sol:'N00178-26-R-3071', title:'Indian Head',       ago:'yesterday', score:42, status:'complete' }
+    { sol:'N00024-26-R-2207', agency:'Naval Sea Systems Command', title:'SPY-6 Phase IV Radar',         ago:'2m ago',    score:94, status:'complete' },
+    { sol:'FA8730-26-Q-0114', agency:'Dept. of the Air Force',    title:'F-35 Test Harness',             ago:'38m ago',   score:88, status:'complete' },
+    { sol:'W56KGY-26-R-0014', agency:'CECOM',                     title:'Tactical Network Support Svcs', ago:'2h ago',    score:58, status:'complete' },
+    { sol:'N00178-26-R-3071', agency:'NSWC Indian Head',          title:'Energetics Support',            ago:'yesterday', score:42, status:'complete', pdfUpload:true }
   ];
-  // Relaxed per restore-list §A1 follow-up: any audit with a numeric score
-  // renders as complete. Live `status` values vary (complete · completed ·
-  // done · etc.) — score presence is the only reliable signal.
   function isComplete(a){
     return typeof a.compliance_score === 'number' || typeof a.score === 'number';
   }
+  // Is this a PDF-upload audit with a synthetic notice_id? route.ts stamps
+  // those as "pdf-<timestamp>" when no Notice ID is detectable from the file.
+  function isPdfUpload(a){
+    return typeof a.notice_id === 'string' && /^pdf-/i.test(a.notice_id);
+  }
+  // Try to pull a real-looking solicitation number out of a free-text title
+  // (e.g. "Solicitation FA301626Q0068 — F-35 Harness" → "FA301626Q0068").
+  // Matches 8–20 chars of letters/digits/hyphens with at least one letter and
+  // at least one digit, anchored on a word boundary so we don't slice nouns.
+  function extractSolNum(title){
+    if (typeof title !== 'string') return null;
+    var m = title.match(/\b([A-Z0-9][A-Z0-9-]{6,18}[A-Z0-9])\b/i);
+    if (!m) return null;
+    var s = m[1];
+    if (!/[A-Z]/i.test(s) || !/\d/.test(s)) return null;
+    return s.toUpperCase();
+  }
+  // Headline + tag + meta resolver. Per CEO 2026-06-03 the headline must
+  // *never* show a.id (UUID) or a synthetic "pdf-<ts>" notice_id — those are
+  // the two ways the old code surfaced unreadable strings. Priority:
+  //   1) solicitation_number
+  //   2) notice_id, unless it's a "pdf-<ts>" synthetic
+  //   3) extracted sol-num from title text
+  //   4) cleaned title
+  //   5) "Uploaded PDF"
+  // pdfUpload tag shows whenever isPdfUpload(a) or the row is a fallback flagged with pdfUpload:true.
+  function resolveHeadline(a){
+    var pdfUp = isPdfUpload(a) || a.pdfUpload === true;
+    if (a.sol)                 return { sol: String(a.sol),                 pdfUpload: pdfUp };
+    if (a.solicitation_number) return { sol: String(a.solicitation_number), pdfUpload: pdfUp };
+    if (!pdfUp && a.notice_id) return { sol: String(a.notice_id),           pdfUpload: false };
+    var extracted = extractSolNum(a.title);
+    if (extracted)             return { sol: extracted,                     pdfUpload: pdfUp };
+    var t = (a.title || '').trim();
+    if (t && t.toLowerCase() !== 'untitled solicitation') {
+      return { sol: t.slice(0, 60), pdfUpload: pdfUp };
+    }
+    return { sol: 'Uploaded PDF', pdfUpload: true };
+  }
   function cellHtml(a){
-    var sol = a.sol || a.solicitation_number || a.notice_id || a.id || '—';
-    var slug = encodeURIComponent(String(sol).toLowerCase());
+    var h     = resolveHeadline(a);
+    // Link to the audit detail page by stable id; never link by the UUID
+    // shown to no one, never by "pdf-<ts>". a.id is the audits.id PK.
+    var slug  = a.id ? String(a.id) : encodeURIComponent(h.sol.toLowerCase());
     var score = (typeof a.score === 'number') ? a.score
               : (typeof a.compliance_score === 'number') ? a.compliance_score : null;
     var complete = isComplete(a);
-    var tone, text, label;
+    var tone, text, verdict;
     if (complete && typeof score === 'number') {
-      // Render numeric score — never "—" — for any completed audit.
-      tone = toneClass(score);
-      text = String(score);
-      label = toneText(score);
+      tone    = toneClass(score);
+      text    = String(score);
+      verdict = toneText(score).toUpperCase();
     } else {
-      // In-progress / no score yet: neutral grey + "…" (never a bare dash).
-      tone = 's-none';
-      text = '…';
-      label = 'In progress';
+      tone    = 's-none';
+      text    = '…';
+      verdict = 'PENDING';
     }
-    var titleText = (a.title || sol).slice(0, 48);
     var when = a.ago || ago(a.completed_at || a.created_at);
-    return '<a class="ra-recent-card" href="/audit/'+slug+'">'+
-      '<span class="ra-recent-score '+tone+'">'+escapeHtml(text)+'<span class="sr-only"> · '+escapeHtml(label)+'</span></span>'+
-      '<div class="ra-recent-body"><div class="ra-recent-title">'+escapeHtml(sol)+'</div><div class="ra-recent-sub">'+escapeHtml(titleText)+' · '+escapeHtml(when)+'</div></div>'+
-      arrowSvg()+
+    var agency = (a.agency || '').trim();
+    var titleText = (a.title || '').trim();
+    // Avoid duplicating the headline in the meta line (happens when title
+    // *is* the solicitation number, e.g. extracted-from-title path).
+    if (titleText && titleText.toUpperCase() === h.sol.toUpperCase()) titleText = '';
+    var metaParts = [];
+    if (agency)    metaParts.push('<span class="agency">'+escapeHtml(agency)+'</span>');
+    if (titleText) metaParts.push(escapeHtml(titleText.slice(0, 64)));
+    var metaHtml = metaParts.length ? metaParts.join(' · ') : '<span class="agency">'+escapeHtml(verdict === 'PENDING' ? 'Awaiting score' : 'Audit complete')+'</span>';
+    var tagHtml = h.pdfUpload ? ' <span class="ra-row-tag">PDF upload</span>' : '';
+    return '<a class="ra-row" href="/audit/'+slug+'">'+
+      '<span class="ra-score '+tone+'"><span class="n">'+escapeHtml(text)+'</span><span class="v">'+escapeHtml(verdict)+'</span></span>'+
+      '<div class="ra-row-main">'+
+        '<div class="ra-row-sol">'+escapeHtml(h.sol)+tagHtml+'</div>'+
+        '<div class="ra-row-meta">'+metaHtml+'</div>'+
+      '</div>'+
+      '<div class="ra-row-right"><span class="ra-row-date">'+escapeHtml(when)+'</span>'+arrowSvg()+'</div>'+
     '</a>';
   }
   function render(audits){
@@ -1067,8 +1119,9 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     var pending = audits.filter(function(a){ return typeof a.compliance_score !== 'number'; });
     var hasScored = scored.length > 0;
 
-    // Per restore-list §A2: always exactly 4 cells in #recentGrid · no inline
-    // width · no minmax/auto-fill (CSS owns the 4-column grid via repeat(4,1fr)).
+    // Render exactly 4 rows in the .ra-recent-list (matches the reference's
+    // approved row count). Scored audits fill first; pending backfills only
+    // when there are fewer than 4 scored; STATIC_FALLBACK fills the rest.
     var rows;
     if (hasScored) {
       rows = scored.slice(0, 4);
