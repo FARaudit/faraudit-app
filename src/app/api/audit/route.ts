@@ -251,13 +251,29 @@ export async function POST(req: NextRequest) {
   // legacy responses. Without this, all post-2026-05 audits land with
   // agency=NULL — the visible "agency=null" symptom across the existing 8
   // rows that prompted P0-G.
+  //
+  // sam-ingest fallback (2026-06-03): when the live SAM call returns a
+  // solicitation with no agency fields populated, fall back to whatever
+  // agency the sam-ingest cron already persisted on the matching
+  // pending_audits row. Same notice_id, two data sources, prefer non-null.
+  // Skipped for PDF-only uploads (no real notice_id to match on).
+  let agency: string | null = resolveAgency(solicitation);
+  if (!agency && solicitation.noticeId && !/^pdf-/i.test(solicitation.noticeId)) {
+    const { data: pa } = await supabase
+      .from("pending_audits")
+      .select("agency")
+      .eq("notice_id", solicitation.noticeId)
+      .maybeSingle();
+    if (pa?.agency) agency = pa.agency as string;
+  }
+
   const { data: audit, error: insertError } = await supabase
     .from("audits")
     .insert({
       notice_id: solicitation.noticeId,
       solicitation_number: solicitation.solicitationNumber,
       title: solicitation.title,
-      agency: resolveAgency(solicitation),
+      agency,
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,
