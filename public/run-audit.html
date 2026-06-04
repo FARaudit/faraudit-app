@@ -1044,6 +1044,12 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   function isOpaqueHexId(s){
     return typeof s === 'string' && /^[0-9a-f]{20,}$/i.test(s);
   }
+  // Sparse-SAM rows often carry titles like "Stranded notice <hex>" — the
+  // hex blob is the notice_id glued onto a placeholder phrase. Strip the
+  // trailing hex so the headline reads as "Stranded notice".
+  function stripTrailingHexBlob(s){
+    return (typeof s === 'string' ? s : '').replace(/\s+[0-9a-f]{20,}$/i, '').trim();
+  }
   // Try to pull a real-looking solicitation number out of a free-text title
   // (e.g. "Solicitation FA301626Q0068 — F-35 Harness" → "FA301626Q0068").
   // Matches 8–20 chars of letters/digits/hyphens with at least one letter and
@@ -1074,7 +1080,7 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     }
     var extracted = extractSolNum(a.title);
     if (extracted)             return { sol: extracted,                     pdfUpload: pdfUp };
-    var t = (a.title || '').trim();
+    var t = stripTrailingHexBlob((a.title || '').trim());
     if (t && t.toLowerCase() !== 'untitled solicitation') {
       return { sol: t.slice(0, 60), pdfUpload: pdfUp };
     }
