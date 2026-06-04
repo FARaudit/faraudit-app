@@ -103,6 +103,11 @@ export interface PrioritizedRisk {
   priority: "P0" | "P1" | "P2";
   category: string;
   citation?: string;
+  // Per-risk provenance. "verified" = the risk references a FAR/DFARS clause
+  // present in the source. "inferred" = pattern-derived (model prefixed with
+  // [Inferred from typical patterns] OR no clause anchor). Lets the renderer
+  // badge inferred risks so customers don't read them as audited findings.
+  provenance: "verified" | "inferred";
 }
 
 export interface CLIN {
@@ -179,34 +184,33 @@ function extractCitation(text: string): string | undefined {
   return text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1];
 }
 
+// Model is instructed (compliance prompt) to prefix pattern-inferred risks
+// with "[Inferred from typical patterns] ...". Strip the prefix and tag the
+// risk as inferred so the renderer can badge it.
+const INFERRED_PREFIX_RE = /^\[Inferred[^\]]*\]\s*/i;
+
+function deriveRiskFields(raw: string): { text: string; citation: string | undefined; provenance: "verified" | "inferred" } {
+  const isPrefixed = INFERRED_PREFIX_RE.test(raw);
+  const text = raw.replace(INFERRED_PREFIX_RE, "").trim();
+  const citation = extractCitation(text);
+  const provenance: "verified" | "inferred" =
+    isPrefixed ? "inferred" : citation ? "verified" : "inferred";
+  return { text, citation, provenance };
+}
+
 export function assignRiskPriority(risksJson: RisksJSON): PrioritizedRisk[] {
   const items: PrioritizedRisk[] = [];
+  const push = (raw: unknown, priority: "P0" | "P1" | "P2", category: string) => {
+    if (typeof raw !== "string" || !raw.trim()) return;
+    const { text, citation, provenance } = deriveRiskFields(raw);
+    items.push({ text, priority, category, citation, provenance });
+  };
 
-  for (const r of risksJson.top_3_risks ?? []) {
-    if (typeof r === "string" && r.trim()) {
-      items.push({ text: r, priority: "P0", category: "Deal-breaker", citation: extractCitation(r) });
-    }
-  }
-  for (const r of risksJson.technical_risks ?? []) {
-    if (typeof r === "string" && r.trim()) {
-      items.push({ text: r, priority: "P1", category: "Technical", citation: extractCitation(r) });
-    }
-  }
-  for (const r of risksJson.schedule_risks ?? []) {
-    if (typeof r === "string" && r.trim()) {
-      items.push({ text: r, priority: "P1", category: "Schedule", citation: extractCitation(r) });
-    }
-  }
-  for (const r of risksJson.price_risks ?? []) {
-    if (typeof r === "string" && r.trim()) {
-      items.push({ text: r, priority: "P1", category: "Price", citation: extractCitation(r) });
-    }
-  }
-  for (const r of risksJson.evaluation_risks ?? []) {
-    if (typeof r === "string" && r.trim()) {
-      items.push({ text: r, priority: "P2", category: "Evaluation", citation: extractCitation(r) });
-    }
-  }
+  for (const r of risksJson.top_3_risks ?? []) push(r, "P0", "Deal-breaker");
+  for (const r of risksJson.technical_risks ?? []) push(r, "P1", "Technical");
+  for (const r of risksJson.schedule_risks ?? []) push(r, "P1", "Schedule");
+  for (const r of risksJson.price_risks ?? []) push(r, "P1", "Price");
+  for (const r of risksJson.evaluation_risks ?? []) push(r, "P2", "Evaluation");
 
   const seen = new Set<string>();
   const unique = items.filter((item) => {
@@ -236,7 +240,8 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: b
     return {
       text: `Critical DFARS trap clause(s) detected: ${dfarsTriggered.join(", ")}. Confirm representations and flowdown obligations before bidding.`,
       priority: "P0",
-      category: "DFARS trap"
+      category: "DFARS trap",
+      provenance: "verified"
     };
   }
 
@@ -244,14 +249,16 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: b
     return {
       text: "Solicitation context was thin (no PDF attached and SAM.gov metadata limited). Manual review of the full document is required before bid/no-bid decision.",
       priority: "P1",
-      category: "Insufficient context"
+      category: "Insufficient context",
+      provenance: "inferred"
     };
   }
 
   return {
     text: "AI risk extraction returned empty. Manual review of the full document is required to confirm there are no material risks.",
     priority: "P2",
-    category: "Manual review"
+    category: "Manual review",
+    provenance: "inferred"
   };
 }
 
@@ -275,10 +282,23 @@ export interface AuditResult {
   overview: { summary: string; json: OverviewJSON };
   compliance: { summary: string; json: ComplianceJSON };
   risks: { summary: string; json: RisksJSON };
-  compliance_score: number;
+  // null when the source wasn't retrieved (sam_unavailable). Replaces the
+  // previous "cap at 60" fallback, which displayed a fabricated score on
+  // metadata-only audits. Renderer treats null as "—" / unscored.
+  compliance_score: number | null;
+  // Companion confidence flag. "verified" = scored against a real source
+  // (PDF / image / extracted text). "unscored" = no source available, score
+  // is null. Suppresses verdict block + bid/no-bid rhetoric on metadata-only.
+  score_confidence: "verified" | "unscored";
   recommendation: "PROCEED" | "PROCEED_WITH_CAUTION" | "DECLINE";
   bid_recommendation: string;
   classification: DocClassification;
+  // True when the classifier landed on "Other" (covers Award Notice /
+  // attachment / unknown types), OR when the source was retrieved but no
+  // FAR / DFARS clauses were extracted (real solicitations always carry
+  // some). Renderer should suppress the verdict block + show a "not a
+  // solicitation" notice when true.
+  is_not_solicitation: boolean;
   // Default-vs-retry-vs-fallback bookkeeping. model_used = the model the audit
   // ran on by default. retry_escalations = list of call labels that fired a
   // retry and escalated to CLAUDE_RETRY_MODEL. Populated by runAudit; persisted
@@ -813,21 +833,36 @@ JSON only.`;
   const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
   const riskPenalty = severity * 5;
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
-  // Truthful capping: a metadata-only audit can't competently say "Acceptable"
-  // because it never read the SOW. Cap at 60 so recommendation falls into
-  // CAUTION or worse — prevents false positives that could mislead a
-  // customer into a bad bid. Honest data over flattering data.
-  // Cap fires only on sam_unavailable — image / text / pdf paths all provide
-  // genuine source content and are scored at full range.
-  const compliance_score = pdfSource === "sam_unavailable" ? Math.min(rawScore, 60) : rawScore;
+  // Score honesty: when no source was retrieved (sam_unavailable) we emit
+  // null + "unscored" confidence — the renderer surfaces "—" and suppresses
+  // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which
+  // showed a fabricated 60/100 on metadata-only audits.
+  const isRetrieved = pdfSource !== "sam_unavailable";
+  const compliance_score: number | null = isRetrieved ? rawScore : null;
+  const score_confidence: "verified" | "unscored" = isRetrieved ? "verified" : "unscored";
+
+  // is_not_solicitation: the classifier landed on a non-solicitation bucket
+  // (Award Notice / attachment / unknown — all coerced to "Other" by
+  // isDocumentType in classifyDocument), OR the source was retrieved but no
+  // FAR / DFARS clauses were extracted (a real solicitation always cites
+  // some). Either signal tells the renderer to suppress bid/no-bid rhetoric.
+  const is_not_solicitation =
+    classification.document_type === "Other" ||
+    (isRetrieved && farCount === 0 && dfarsCount === 0);
 
   let recommendation: AuditResult["recommendation"];
-  if (compliance_score >= 70) recommendation = "PROCEED";
+  if (compliance_score == null) {
+    // Unscored — default to caution; the renderer should treat
+    // score_confidence === "unscored" as the source of truth and suppress
+    // verdict + score chrome entirely.
+    recommendation = "PROCEED_WITH_CAUTION";
+  } else if (compliance_score >= 70) recommendation = "PROCEED";
   else if (compliance_score >= 40) recommendation = "PROCEED_WITH_CAUTION";
   else recommendation = "DECLINE";
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
-  const bid_recommendation = `${recommendation}. Score ${compliance_score}/100. Top risk: ${topRisk}`;
+  const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;
+  const bid_recommendation = `${recommendation}. Score ${scoreLabel}. Top risk: ${topRisk}`;
 
   return {
     overview: {
@@ -843,9 +878,11 @@ JSON only.`;
       json: risksJson
     },
     compliance_score,
+    score_confidence,
     recommendation,
     bid_recommendation,
     classification,
+    is_not_solicitation,
     model_used: _activeModel || CLAUDE_MODEL,
     retry_escalations: [
       overviewResult.escalated ? "overview" : null,

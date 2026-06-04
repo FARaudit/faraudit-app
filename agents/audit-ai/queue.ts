@@ -67,7 +67,7 @@ export async function markProcessing(id: string): Promise<void> {
 
 export async function markProcessed(
   id: string,
-  result: { audit_id: string | null; recommendation: string; compliance_score: number; bid_no_bid: string | null }
+  result: { audit_id: string | null; recommendation: string; compliance_score: number | null; bid_no_bid: string | null }
 ): Promise<void> {
   const { error } = await supabase
     .from("pending_audits")
