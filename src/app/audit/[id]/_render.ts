@@ -180,10 +180,23 @@ function renderComplianceFlag(f: ComplianceFlag): string {
                 </div>`;
 }
 
+// Provenance badge prefixes each risk title — tells the customer whether the
+// risk is anchored to a real clause citation ("✓ Document") or extrapolated
+// from typical patterns for this NAICS/contract type ("≈ Pattern"). Inline-
+// styled with theme tokens so it adapts to light + dark without template CSS.
+function renderProvenanceBadge(provenance: "verified" | "inferred"): string {
+  const verifiedStyle = "display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200);margin-right:8px;vertical-align:1px;white-space:nowrap";
+  const inferredStyle = "display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);color:var(--mute);border:1px solid var(--line);margin-right:8px;vertical-align:1px;white-space:nowrap";
+  return provenance === "verified"
+    ? `<span style="${verifiedStyle}" title="Anchored to a FAR/DFARS clause in the source">✓ Document</span>`
+    : `<span style="${inferredStyle}" title="Pattern-derived from typical solicitations in this category">≈ Pattern</span>`;
+}
+
 function renderRisk(r: Risk, isFirst: boolean): string {
   const openClass = isFirst ? " open" : "";
+  const badge = renderProvenanceBadge(r.provenance);
   return `<div class="risk${openClass}">
-                  <div class="risk-head"><span class="risk-sev ${r.severity}">${r.severity === "high" ? "High" : r.severity === "med" ? "Medium" : "Low"}</span><span class="risk-title">${escapeHtml(r.title)}</span><span class="risk-cite mono">${escapeHtml(r.citation)}</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
+                  <div class="risk-head"><span class="risk-sev ${r.severity}">${r.severity === "high" ? "High" : r.severity === "med" ? "Medium" : "Low"}</span><span class="risk-title">${badge}${escapeHtml(r.title)}</span><span class="risk-cite mono">${escapeHtml(r.citation)}</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">${escapeHtml(r.description)}</p>
                     <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>${escapeHtml(r.faraudit_action)}</div></div>
@@ -227,6 +240,73 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
   return html.replace(
     /(<div class="mh-verdict )v-(?:go|caution|decline)("\s+[^>]*data-field="recommendation_block")/,
     `$1${verdictClass}$2`
+  );
+}
+
+// Unscored verdict: replace v-* with a neutral slate gradient, override the
+// score to "—", suppress the fit-score bench chip ("Top quartile…"), and add
+// a sub-line explaining how to upgrade ("Upload the PDF to get a full audit
+// score."). Inline style on .mh-verdict overrides the v-* class background.
+function setUnscoredVerdictBlock(html: string, scoreDisplay: string): string {
+  // Strip the v-* class entirely + inject a neutral slate-gray gradient.
+  let out = html.replace(
+    /(<div class="mh-verdict )v-(?:go|caution|decline)("\s+[^>]*data-field="recommendation_block")(>)/,
+    `$1$2 style="background:linear-gradient(160deg,#475569,#334155 70%,#1e293b)"$3`
+  );
+  // Replace the score "76" → "—". Same for the bar fill width (0%).
+  out = out.replace(
+    /(<span data-field="score">)\d+(<\/span>)/,
+    `$1${escapeHtml(scoreDisplay)}$2`
+  );
+  out = out.replace(
+    /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
+    `$10%$2`
+  );
+  // Suppress the demo "Top quartile of your audits" bench chip — meaningless
+  // when the audit isn't scored. The win_probability bench is data-driven
+  // (replaceFieldText elsewhere) and stays.
+  out = out.replace(
+    /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:0%"[^>]*><\/i><\/div>)\s*<div class="mhv-bench">[\s\S]*?<\/div>/,
+    `$1`
+  );
+  return out;
+}
+
+// is_not_solicitation = true: surgically excise the entire .mh-verdict half
+// of the masthead and collapse the grid to single-column. The verdict block
+// reads as a confident BID/CAUTION/DECLINE — wrong-doc audits would lie.
+function removeVerdictBlock(html: string): string {
+  const idx = html.indexOf('<div class="mh-verdict');
+  if (idx === -1) return html;
+  const range = findMatchingClose(html, idx, "div");
+  let out = range ? html.slice(0, idx) + html.slice(range.closeEnd) : html;
+  // Collapse the masthead grid (1fr 340px → 1fr) via inline style override.
+  out = out.replace(
+    /<header class="masthead">/,
+    `<header class="masthead" style="grid-template-columns:1fr">`
+  );
+  return out;
+}
+
+// Amber warning banner inserted immediately before the rpt-grid so it sits
+// above §05 Risk Register (per DESIGN spec). Inline-styled to match the
+// .moment band's amber palette without touching the template's CSS block.
+function insertNotSolicitationBanner(html: string): string {
+  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);margin:18px 0";
+  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--amber-600);color:#fff;display:grid;place-items:center";
+  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin:0 0 6px";
+  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  const banner = `
+      <section style="${bannerStyle}" role="status" aria-label="Document is not a solicitation">
+        <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div style="min-width:0"><p style="${eyebrowStyle}">Not a solicitation</p><p style="${bodyStyle}">This document doesn't appear to be a solicitation — award notice, attachment, or no FAR/DFARS clauses detected. <b>Upload the actual RFP/RFQ/IFB to run a full audit.</b></p></div>
+      </section>
+`;
+  // Insert directly before the rpt-grid so it lands between the masthead/key-
+  // dates region and the §04/§05 sections that follow.
+  return html.replace(
+    /(<div class="rpt-grid">)/,
+    `${banner}      $1`
   );
 }
 
@@ -618,26 +698,48 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   html = replaceFieldOrRemove(html, "set_aside_detail", vm.set_aside_sub);
   html = replaceFieldOrRemove(html, "contract_term", vm.contract_type_sub);
 
-  // Verdict block
-  html = setVerdictClass(html, vm.recommendation_class);
-  html = setMomentDecline(html, vm.recommendation_class === "v-decline");
-  html = replaceFieldText(html, "recommendation", vm.recommendation);
-  html = replaceFieldText(html, "recommendation_tagline", vm.recommendation_tagline);
-  html = replaceFieldText(html, "score", String(Math.round(vm.score)));
-  html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
-  if (vm.win_probability == null) {
-    // DESIGN #8: don't render "0%" — show "—" + zero the bar.
-    html = setWinProbabilityNull(html);
+  // Verdict block — three-way branch based on the audit's honesty flags
+  // (audit-engine 13f4743+):
+  //   1. is_not_solicitation → suppress the verdict half entirely + show a
+  //      "not a solicitation" banner above the risk list.
+  //   2. is_unscored          → neutralize the gradient + render "—" / "Not
+  //      yet scored" / upload-prompt subtext. No green/amber/red allowed.
+  //   3. otherwise            → normal verdict colors + score/win-prob fill.
+  if (vm.is_not_solicitation) {
+    html = removeVerdictBlock(html);
+    html = insertNotSolicitationBanner(html);
+  } else if (vm.is_unscored) {
+    html = setUnscoredVerdictBlock(html, vm.score_display);
+    html = replaceFieldText(html, "recommendation", "Not yet scored");
+    html = replaceFieldText(html, "recommendation_tagline", vm.recommendation_tagline);
+    if (vm.win_probability == null) {
+      html = setWinProbabilityNull(html);
+    } else {
+      html = replaceFieldText(html, "win_probability", String(vm.win_probability));
+      html = setMetricBars(html, 0, vm.win_probability);
+    }
+    html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
   } else {
-    html = replaceFieldText(html, "win_probability", String(vm.win_probability));
-    html = setMetricBars(html, vm.score, vm.win_probability);
-  }
-  // Score bar is always real even when win_prob is null.
-  if (vm.win_probability == null) {
-    html = html.replace(
-      /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
-      `$1${Math.max(0, Math.min(100, vm.score))}%$2`
-    );
+    html = setVerdictClass(html, vm.recommendation_class);
+    html = setMomentDecline(html, vm.recommendation_class === "v-decline");
+    html = replaceFieldText(html, "recommendation", vm.recommendation);
+    html = replaceFieldText(html, "recommendation_tagline", vm.recommendation_tagline);
+    const scoreNum = vm.score ?? 0;
+    html = replaceFieldText(html, "score", String(Math.round(scoreNum)));
+    html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
+    if (vm.win_probability == null) {
+      html = setWinProbabilityNull(html);
+    } else {
+      html = replaceFieldText(html, "win_probability", String(vm.win_probability));
+      html = setMetricBars(html, scoreNum, vm.win_probability);
+    }
+    // Score bar is always real even when win_prob is null.
+    if (vm.win_probability == null) {
+      html = html.replace(
+        /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
+        `$1${Math.max(0, Math.min(100, scoreNum))}%$2`
+      );
+    }
   }
 
   // Key dates ribbon — only render items we actually have, per the

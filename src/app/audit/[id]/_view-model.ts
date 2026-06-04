@@ -24,6 +24,12 @@ export interface Risk {
   citation: string;
   description: string;
   faraudit_action: string;
+  // "verified" = the underlying risk text carried a FAR/DFARS citation.
+  // "inferred" = pattern-derived (engine prefixed with [Inferred…] OR no
+  // clause anchor). Renderer prefixes the risk title with a small badge so
+  // customers can tell a clause-grounded finding from a pattern guess.
+  // Default for legacy audit rows that pre-date the engine flag: "inferred".
+  provenance: "verified" | "inferred";
 }
 
 export interface ScoreFactor {
@@ -73,9 +79,16 @@ export interface AuditViewModel {
   recommendation_class: "v-go" | "v-caution" | "v-decline";
   recommendation_tagline: string;
   recommendation_pill_text: string;
-  score: number;
-  win_probability: number | null; // null when basis is 0 / unknown
+  score: number | null;             // null when retrieval failed (sam_unavailable)
+  score_display: string;            // "—" when null, else String(score)
+  is_unscored: boolean;             // true when score is null or score_confidence === "unscored"
+  win_probability: number | null;   // null when basis is 0 / unknown
   win_probability_benchmark: string;
+
+  // True when the audit ran against a non-solicitation (Award Notice /
+  // attachment / unknown) OR a real source returned zero FAR/DFARS clauses.
+  // Renderer suppresses the verdict block + shows a warning banner instead.
+  is_not_solicitation: boolean;
 
   // key dates (qa_deadline + award_date are intentionally not derived; the
   // renderer drops the ribbon item + rail clock when has_* is false)
@@ -321,6 +334,7 @@ interface RawRisk {
   recommended_action?: string;
   faraudit_action?: string;
   impact?: string;
+  provenance?: "verified" | "inferred";
 }
 
 function priorityToSev(raw: unknown): "high" | "med" | "low" {
@@ -340,13 +354,21 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
       .map((r) => {
         const text = String(r.text ?? r.title ?? "").trim();
         const cite = r.citation || text.match(/((?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?)/i)?.[1] || "";
+        // Provenance from the engine (audit-engine 13f4743+). Old rows pre-
+        // date the field — default to "inferred" so the renderer badges them
+        // as pattern-derived rather than dropping the badge entirely.
+        const provenance: "verified" | "inferred" =
+          r.provenance === "verified" || r.provenance === "inferred"
+            ? r.provenance
+            : "inferred";
         return {
           title: String(r.title ?? text.split(".")[0] ?? text).slice(0, 160),
           severity: priorityToSev(r.priority ?? r.severity),
           citation: String(cite),
           description: text,
           faraudit_action: String(r.faraudit_action ?? r.recommended_action ?? "").trim() ||
-            "Address this risk before submission — see KO email draft for the clarification."
+            "Address this risk before submission — see KO email draft for the clarification.",
+          provenance
         };
       });
   }
@@ -371,7 +393,10 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
         severity: b.sev,
         citation: cite,
         description: text,
-        faraudit_action: "Address this risk before submission."
+        faraudit_action: "Address this risk before submission.",
+        // Fallback path scrapes the old category-bucket arrays. Without an
+        // explicit engine-provided provenance, infer from clause anchor.
+        provenance: cite ? "verified" : "inferred"
       });
     }
   }
@@ -385,7 +410,8 @@ function pickHeadlineRisk(risks: Risk[]): Risk {
       severity: "low",
       citation: "",
       description: "FARaudit did not flag a critical exposure in this solicitation.",
-      faraudit_action: "Proceed with the standard pre-quote checklist."
+      faraudit_action: "Proceed with the standard pre-quote checklist.",
+      provenance: "inferred"
     };
   }
   const order = { high: 0, med: 1, low: 2 } as const;
@@ -501,8 +527,28 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
   const overviewJson = (audit.overview_json as Record<string, unknown>) || {};
 
   const verdict = mapVerdict(audit.recommendation);
-  const score = typeof audit.compliance_score === "number" ? (audit.compliance_score as number) : 0;
+  // Honesty flags from audit-engine 13f4743+. compliance_score is now
+  // number | null; score_confidence + is_not_solicitation are written into
+  // compliance_json by the engine. Pre-13f4743 rows won't have them: derive
+  // is_not_solicitation from doc-type + clause counts, and treat compliance_
+  // score === null as the source of truth for "unscored".
+  const score: number | null = typeof audit.compliance_score === "number"
+    ? (audit.compliance_score as number)
+    : null;
+  const scoreConfidenceRaw = (compJson.score_confidence ?? audit.score_confidence) as string | undefined;
+  const isUnscored = score === null || scoreConfidenceRaw === "unscored";
   const isMetadataOnly = compJson.pdf_source === "sam_unavailable";
+  // Fallback derivation matches what the engine computes when the row was
+  // written by post-13f4743 code, so the rendering stays consistent across
+  // both populated and missing-flag rows.
+  const farCount = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as unknown[]).length : 0;
+  const dfarsCount = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as unknown[]).length : 0;
+  const docType = String(audit.document_type ?? "");
+  const persistedNotSol = (compJson.is_not_solicitation ?? audit.is_not_solicitation) as boolean | undefined;
+  const isNotSolicitation = typeof persistedNotSol === "boolean"
+    ? persistedNotSol
+    : (docType === "Other" || docType === "Award Notice" || docType === "attachment" ||
+       (!isMetadataOnly && farCount === 0 && dfarsCount === 0));
 
   // Dates — only show what we actually have. DESIGN ruling 2026-06-04: a Q&A
   // deadline or anticipated-award date presented as fact when we derived it
@@ -593,11 +639,16 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     ? ""
     : [p0 > 0 && `${p0} P0`, p1 > 0 && `${p1} P1`, p2 > 0 && `${p2} P2`].filter(Boolean).join(" · ");
   const riskPill = risks.length === 0 ? "" : `${risks.length} open`;
-  const recommendationPill = verdict.word === "GO"
-    ? "Bid with confidence"
-    : verdict.word === "DECLINE"
-      ? "Pass — bid not recommended"
-      : "Caution → close gaps before bid";
+  // Unscored audits skip the verdict pill text — the renderer shows
+  // "Not yet scored" instead of a normal verdict.
+  const recommendationPill = isUnscored
+    ? "Not yet scored"
+    : verdict.word === "GO"
+      ? "Bid with confidence"
+      : verdict.word === "DECLINE"
+        ? "Pass — bid not recommended"
+        : "Caution → close gaps before bid";
+  const taglineForUnscored = "Upload the PDF to get a full audit score.";
 
   return {
     solicitation_number: displayId,
@@ -618,9 +669,14 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
 
     recommendation: verdict.word,
     recommendation_class: verdict.cls,
-    recommendation_tagline: verdictTagline(verdict.word, (audit.bid_recommendation as string) || ""),
+    recommendation_tagline: isUnscored
+      ? taglineForUnscored
+      : verdictTagline(verdict.word, (audit.bid_recommendation as string) || ""),
     recommendation_pill_text: recommendationPill,
     score,
+    score_display: score == null ? "—" : String(Math.round(score)),
+    is_unscored: isUnscored,
+    is_not_solicitation: isNotSolicitation,
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
 
@@ -672,7 +728,10 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     risks,
     risk_pill_text: riskPill,
     headline_risk: headlineRisk,
-    show_moment_band: risks.length > 0,
+    // Also suppress the moment band on wrong-doc audits — its "the catch
+    // you'd have missed" copy is meaningless when the document isn't even a
+    // solicitation; the not-solicitation banner covers that messaging.
+    show_moment_band: risks.length > 0 && !isNotSolicitation,
     score_factors: scoreFactors,
 
     recommendation_rationale: (audit.bid_recommendation as string) || "Recommendation rationale not recorded.",
