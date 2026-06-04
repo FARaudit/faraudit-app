@@ -113,6 +113,15 @@ export interface AuditViewModel {
   // instead of a fabricated fit score.
   prelim_has_deadline: boolean;     // false → renderer omits Tile A entirely
   set_aside_eligibility: string;    // empty → renderer hides the .mhv-note line
+  // Classifier output (PRELIMINARY-READ ADAPTIVE MODES, HANDOFF Jun 4):
+  //   "fetch"  → doc exists on SAM but our retrieval failed (re-fetchable)
+  //   "watch"  → pre-solicitation / sources-sought (no doc posted yet)
+  //   "upload" → true manual fallback / unknown
+  // Renderer maps "watch" → "upload" until the watcher surface ships;
+  // prelim_mode stays as the raw classifier output for analytics + future
+  // un-mapping (rendered_prelim_mode is what drives data-prelim-mode).
+  prelim_mode: "fetch" | "watch" | "upload";
+  rendered_prelim_mode: "fetch" | "watch" | "upload";
 
   // classification
   document_type: string;
@@ -611,6 +620,51 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     : (docType === "Other" || docType === "Award Notice" || docType === "attachment" ||
        (!isMetadataOnly && farCount === 0 && dfarsCount === 0));
 
+  // PRELIMINARY-READ ADAPTIVE MODES classifier (HANDOFF Jun 4 2026).
+  // Three cases the panel adapts to:
+  //   "watch"  → pre-solicitation / sources-sought (notice.type signals this)
+  //   "fetch"  → doc EXISTS on SAM but our retrieval failed (oversize, network,
+  //              or just resourceLinks present without success)
+  //   "upload" → true manual fallback (notice claims to be a solicitation but
+  //              offers no document, or we have no fetch error to suggest a
+  //              re-pull would succeed)
+  // Renderer maps "watch" → "upload" until the watcher surface ships.
+  const noticeType = String(compJson.notice_type ?? "").toLowerCase();
+  const unavailReason = String(compJson.pdf_unavailable_reason ?? "").toLowerCase();
+  const titleStr = String(audit.title ?? "").toLowerCase();
+  function classifyPrelimMode(): "fetch" | "watch" | "upload" {
+    // Tier 1 — explicit notice.type from SAM v2 (most reliable).
+    if (
+      noticeType.includes("sources sought") ||
+      noticeType.includes("presolicitation") ||
+      noticeType.includes("special notice") ||
+      noticeType.includes("justification")
+    ) return "watch";
+    // Tier 2 — back-compat for rows that pre-date notice_type persistence.
+    // The title often spells "Pre-Solicitation Synopsis" / "Sources Sought" /
+    // "RFI" / "Synopsis" before the engine writes notice.type.
+    if (
+      titleStr.includes("pre-solicitation") ||
+      titleStr.includes("presolicitation") ||
+      titleStr.includes("sources sought") ||
+      titleStr.startsWith("rfi ") ||
+      titleStr.startsWith("synopsis ")
+    ) return "watch";
+    // Tier 3 — fetch-failure hints (oversize, network, generic fetch error).
+    if (
+      unavailReason.includes("oversize") ||
+      /network|timeout|fetch|http \d{3}/i.test(unavailReason)
+    ) return "fetch";
+    // Tier 4 — manual fallback.
+    return "upload";
+  }
+  const prelimMode = classifyPrelimMode();
+  // Watch falls back to upload until the watcher ships (Code-side gate per
+  // 2025-06-04 task spec). Re-enable by removing the ternary when the
+  // watcher surface lands.
+  const renderedPrelimMode: "fetch" | "watch" | "upload" =
+    prelimMode === "watch" ? "upload" : prelimMode;
+
   // Dates — only show what we actually have. DESIGN ruling 2026-06-04: a Q&A
   // deadline or anticipated-award date presented as fact when we derived it
   // from response_deadline ± offset is a customer liability. Hide > fabricate.
@@ -759,6 +813,8 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     // .mhv-note line per Design.
     prelim_has_deadline: !!responseDeadline,
     set_aside_eligibility: "",
+    prelim_mode: prelimMode,
+    rendered_prelim_mode: renderedPrelimMode,
 
     document_type: docTypeRaw,
     document_type_full: documentTypeFull(docTypeRaw),

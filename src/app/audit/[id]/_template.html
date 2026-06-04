@@ -111,7 +111,13 @@ button{font-family:inherit}
 .mhv-cta svg{width:15px;height:15px}
 .v-unscored .mhv-word{font-size:36px;line-height:.95;letter-spacing:-.025em;margin-bottom:11px}
 .v-unscored .mhv-tag{max-width:31ch;margin-bottom:18px}
-.v-unscored .mhv-cta{margin-top:16px}
+.v-unscored .pm-head,.v-unscored .pm-cta{display:none}
+.v-unscored[data-prelim-mode="fetch"] .pm-head[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-head[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-head[data-pm="upload"]{display:block}
+.v-unscored[data-prelim-mode="fetch"] .pm-cta[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-cta[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-cta[data-pm="upload"]{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.v-unscored .pm-cta .mhv-cta{margin-top:0}
+.mhv-cta-2{display:inline-flex;align-items:center;justify-content:center;height:32px;color:rgba(255,255,255,.8);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;border-radius:8px;transition:color .15s}
+.mhv-cta-2:hover{color:#fff;text-decoration:underline}
+.mhv-sub-note{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.03em;color:rgba(255,255,255,.6);line-height:1.45;padding:0 6px}
 /* preliminary-read tiles — same chassis as the scored .mhv-metric tiles so they read as intentional, not empty */
 .mhv-metrics--prelim{margin-top:auto}
 .mhv-metric .t{font-family:"Manrope",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.01em;line-height:1.12;text-wrap:balance}
@@ -390,7 +396,7 @@ button{font-family:inherit}
 @media print{
   @page{margin:13mm}
   html,body,.frame,.bg{background:#fff!important}
-  .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.toast,.rpt-return{display:none!important}
+  .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.prelim-modes,.toast,.rpt-return{display:none!important}
   .frame{display:block!important;min-width:0!important;max-width:none!important;grid-template-columns:none!important}
   .body{max-width:none!important;padding:0!important;gap:12px!important}
   .rpt-grid{display:block!important;grid-template-columns:none!important}
@@ -398,7 +404,10 @@ button{font-family:inherit}
   .sec,.masthead,.moment,.keydates,.scorecard{break-inside:avoid;box-shadow:none!important}
   .risk-body{max-height:none!important}
   .risk-chev,.kd-note{display:none!important}
-  [data-state="locked"]{display:none!important}
+  /* hide locked-state teasers in print — but NEVER the masthead verdict block: the .v-unscored
+     "Preliminary read" block IS the real verdict in metadata-only state and must print (1:1 web↔PDF).
+     Production strips the unused block server-side; this :not() keeps the design-file demo PDF correct. */
+  [data-state="locked"]:not(.mh-verdict){display:none!important}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 
@@ -509,6 +518,13 @@ button{font-family:inherit}
 .demo-toggle.on .dt-sw{background:var(--accent)}
 .demo-toggle.on .dt-sw::after{transform:translateX(16px)}
 .demo-toggle .dt-state{color:var(--ink-2);font-weight:700;min-width:64px}
+.prelim-modes{position:fixed;left:18px;bottom:62px;z-index:120;background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:6px;display:flex;align-items:center;gap:4px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.prelim-modes .pm-mlbl{color:var(--mute);padding:0 6px 0 3px}
+.prelim-modes .pm-pill{padding:5px 9px;border-radius:7px;color:var(--mute);cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.prelim-modes .pm-pill:hover{color:var(--ink-2);background:var(--card-soft)}
+.prelim-modes .pm-pill.on{color:#fff;background:var(--accent)}
+.mhv-cta .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:pmspin .7s linear infinite;display:inline-block;margin-right:7px;vertical-align:-2px}
+@keyframes pmspin{to{transform:rotate(360deg)}}
 
 @media (max-width:1240px){
   .rpt-grid{grid-template-columns:1fr}
@@ -688,10 +704,24 @@ button{font-family:inherit}
              NEUTRAL slate — never a green/amber/red verdict, never a numeric fit score (false precision).
              Code: render this block (and hide .v-caution/.v-go/.v-decline) when is_metadata_only === true.
              Tiles are driven by SAM.gov metadata that we DO have; omit Tile A if no response_deadline. -->
-        <div class="mh-verdict v-unscored" data-state="locked" data-field="preliminary_block" style="display:none">
-          <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></span>Preliminary · SAM metadata</p>
-          <p class="mhv-word">Preliminary<br>read</p>
-          <p class="mhv-tag">We&rsquo;ve read the SAM.gov metadata. Upload the solicitation to unlock your scored verdict, the clause-level compliance map, and the specific traps in this RFP.</p>
+        <div class="mh-verdict v-unscored" data-state="locked" data-prelim-mode="fetch" data-field="preliminary_block" style="display:none">
+          <!-- HEAD — three modes. Code sets data-prelim-mode on this block; only the matching .pm-head + .pm-cta show.
+               fetch = doc exists on SAM but our retrieval failed · watch = pre-solicitation, no doc posted yet · upload = manual fallback -->
+          <div class="pm-head" data-pm="fetch">
+            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></span>Preliminary · SAM metadata</p>
+            <p class="mhv-word">Preliminary<br>read</p>
+            <p class="mhv-tag">We&rsquo;ve read the SAM.gov metadata. Pull the full solicitation to unlock your scored verdict, the clause-level compliance map, and the specific traps in this RFP.</p>
+          </div>
+          <div class="pm-head" data-pm="watch">
+            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>Pre-solicitation · SAM metadata</p>
+            <p class="mhv-word">Advance<br>notice</p>
+            <p class="mhv-tag">The solicitation isn&rsquo;t posted yet &mdash; this is advance notice. We&rsquo;re watching it and will run the full scored audit automatically the moment it drops.</p>
+          </div>
+          <div class="pm-head" data-pm="upload">
+            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 5h16M4 12h16M4 19h10"/></svg></span>Preliminary · SAM metadata</p>
+            <p class="mhv-word">Preliminary<br>read</p>
+            <p class="mhv-tag">We&rsquo;ve read the SAM.gov metadata. Upload the solicitation to unlock your scored verdict, the clause-level compliance map, and the specific traps in this RFP.</p>
+          </div>
           <div class="mhv-metrics mhv-metrics--prelim">
             <!-- Tile A — RESPONSE DEADLINE (omit entire tile if response_deadline is null) -->
             <div class="mhv-metric" data-field="prelim_deadline_tile">
@@ -706,7 +736,18 @@ button{font-family:inherit}
               <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg><span data-field="set_aside_eligibility">NAICS 332710 · size-eligible</span></div>
             </div>
           </div>
-          <a class="mhv-cta" data-upload>Upload the solicitation PDF &rarr;</a>
+          <!-- CTA — three modes, paired to the head above by data-prelim-mode -->
+          <div class="pm-cta" data-pm="fetch">
+            <a class="mhv-cta" data-fetch>Fetch from SAM.gov &rarr;</a>
+            <a class="mhv-cta-2" data-upload>or upload the PDF yourself</a>
+          </div>
+          <div class="pm-cta" data-pm="watch">
+            <a class="mhv-cta" data-track>Track this opportunity &rarr;</a>
+            <span class="mhv-sub-note">We&rsquo;ll auto-run the full audit the moment the RFP posts.</span>
+          </div>
+          <div class="pm-cta" data-pm="upload">
+            <a class="mhv-cta" data-upload>Upload the solicitation PDF &rarr;</a>
+          </div>
         </div>
       </header>
 
@@ -752,12 +793,12 @@ button{font-family:inherit}
         <div class="moment-main">
           <div class="moment-flag"><span class="pulse"></span>Intelligence detected · Not yet unlocked</div>
           <h2 class="moment-headline"><em>4 DFARS traps</em> and <em>9 compliance clauses</em> were flagged in this notice's metadata.</h2>
-          <p class="moment-detail">FARaudit scored this solicitation from SAM.gov metadata alone. The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read. <b>Upload it to unlock the catch.</b></p>
+          <p class="moment-detail">FARaudit scored this solicitation from SAM.gov metadata alone. The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read. <b class="band-unlock">Upload it to unlock the catch.</b></p>
         </div>
         <div class="moment-aside">
-          <span class="ma-k">Unlocks with PDF</span>
+          <span class="ma-k band-k">Unlocks with PDF</span>
           <span class="ma-v">Compliance &amp; risk register</span>
-          <button class="ma-btn" data-upload>Upload the PDF<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></button>
+          <button class="ma-btn" data-upload><span data-pm-btn>Upload the PDF</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></button>
         </div>
       </section>
 
@@ -968,8 +1009,8 @@ button{font-family:inherit}
                   <div class="lk-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
                   <div class="lk-stat">9 clauses detected · Locked</div>
                   <div class="lk-h">Clause-level compliance is read <em>from the solicitation PDF</em>.</div>
-                  <p class="lk-sub">This audit ran on SAM.gov metadata only. Upload the full solicitation and FARaudit will return every offeror-action clause with severity and the exact step to clear it.</p>
-                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the PDF to unlock</button>
+                  <p class="lk-sub">This audit ran on SAM.gov metadata only. With the full solicitation, FARaudit returns every offeror-action clause with severity and the exact step to clear it.</p>
+                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg><span data-pm-btn>Upload the PDF to unlock</span></button>
                 </div>
               </div>
             </div>
@@ -1039,7 +1080,7 @@ button{font-family:inherit}
                   <div class="lk-stat">4 traps detected · Locked</div>
                   <div class="lk-h">The risk register needs the <em>full document</em> to extract citations.</div>
                   <p class="lk-sub">FARaudit flagged risks in the metadata but can only cite clause, severity, and the neutralizing move once it reads the solicitation. This is the difference between knowing a trap exists and knowing how to clear it.</p>
-                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the PDF to unlock</button>
+                  <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg><span data-pm-btn>Upload the PDF to unlock</span></button>
                 </div>
               </div>
             </div>
@@ -1176,6 +1217,20 @@ Capture Lead, [Company]
    false → full data renders. */
 (function(){
   var IS_METADATA_ONLY = false;
+  /* per-case copy for the supporting CTAs (analyst-flag band + §04/§05 locked teasers) so the whole
+     page stays coherent with the verdict panel's mode. Code: drive from the case classifier. */
+  var PRELIM = {
+    fetch:  { btn:'Fetch from SAM.gov',     bandK:'Unlocks when fetched', unlock:'Fetch it to unlock the catch.' },
+    watch:  { btn:'Track this opportunity', bandK:'Unlocks when posted',  unlock:'We\u2019ll surface these automatically the moment the solicitation posts.' },
+    upload: { btn:'Upload the PDF',          bandK:'Unlocks with PDF',     unlock:'Upload it to unlock the catch.' }
+  };
+  function setPrelimMode(mode){
+    var v=document.querySelector('.v-unscored'); if(v) v.setAttribute('data-prelim-mode', mode);
+    var cfg=PRELIM[mode]||PRELIM.upload;
+    document.querySelectorAll('[data-pm-btn]').forEach(function(b){ b.textContent=cfg.btn; });
+    var k=document.querySelector('.band-k'); if(k) k.textContent=cfg.bandK;
+    var u=document.querySelector('.band-unlock'); if(u) u.textContent=cfg.unlock;
+  }
   function apply(meta){
     document.querySelectorAll('[data-state="full"]').forEach(function(el){ el.style.display = meta?'none':''; });
     document.querySelectorAll('[data-state="locked"]').forEach(function(el){ el.style.display = meta?'':'none'; });
@@ -1183,6 +1238,7 @@ Capture Lead, [Company]
     if(!meta) setTimeout(drawRing, 60);
   }
   function drawRing(){ var r=document.getElementById('confRing'); if(!r) return; var pc=94; var c=2*Math.PI*46; r.style.strokeDasharray=c; r.style.strokeDashoffset=c*(1-pc/100); }
+  setPrelimMode('fetch');
   apply(IS_METADATA_ONLY);
   drawRing();
 })();
@@ -1419,6 +1475,33 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
          &lt;/div&gt;
        NEVER show a numeric fit score / win-prob in this block — the two tiles use ONLY
        SAM.gov metadata we already hold (deadline + set-aside), never a derived verdict.
+
+     PRELIMINARY-READ ADAPTIVE MODES (added Jun 4 2026 — the CTA must fit the case)
+       The .v-unscored block carries data-prelim-mode on the block element; Code sets it from a
+       case classifier. CSS shows the matching .pm-head + .pm-cta; all other mode variants hide.
+       The analyst-flag band + §04/§05 locked CTAs stay coherent via JS (PRELIM map: btn / bandK /
+       unlock copy keyed by mode) — Code drives the same map server-side. Three modes:
+         data-prelim-mode="fetch"  → doc EXISTS on SAM but our retrieval failed. Head "Preliminary
+                                     read", tagline "Pull the full solicitation…". Primary CTA
+                                     [data-fetch] "Fetch from SAM.gov" = one-click server-side
+                                     re-pull + re-audit (30–60s; show the in-button spinner state,
+                                     see the [data-fetch] handler). Secondary [data-upload] "or
+                                     upload the PDF yourself". Keeps it all-in-one.
+         data-prelim-mode="watch"  → PRE-SOLICITATION / sources-sought: NO document exists yet.
+                                     Head "Advance notice" (eye icon), tagline "isn't posted yet…".
+                                     CTA [data-track] "Track this opportunity" + auto-run sub-note.
+                                     NO upload CTA (there's nothing to upload).
+         data-prelim-mode="upload" → true manual fallback (doc unretrievable). Head "Preliminary
+                                     read", CTA [data-upload] "Upload the solicitation PDF". This is
+                                     also the safe interim fallback for "watch" until the watcher
+                                     surface ships (uploading the eventual posted RFP is legit).
+       CLASSIFIER (confirmed feasible by Brain against the codebase — signals already exist):
+         notice.type IN {Sources Sought, Presolicitation, Special Notice}        → watch
+         resourceLinks.length > 0 OR pdf_unavailable_reason ~ oversize/network    → fetch
+         else (Solicitation-type, no doc, no fetch error)                         → upload
+         Persist notice_type (fold into compliance_json like score_confidence — no migration).
+         The re-fetch action is self-correcting: if a re-pull surfaces a doc, promote to a full audit.
+       Tiles (deadline + set-aside) are identical across all three modes — do not vary them.
        Moment band: add .is-decline for the red treatment on DECLINE verdicts.
 
      LOAD ORDER / TOKENS

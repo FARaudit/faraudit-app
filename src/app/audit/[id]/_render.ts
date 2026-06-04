@@ -251,11 +251,12 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
 // would hide the prelim block on PDF print otherwise.
 //
 // Mode "scored"      → strip the prelim block; leave scored block to be wired.
-// Mode "preliminary" → strip the scored block; un-hide prelim block and clear
-//                       its data-state="locked" so the print rule doesn't fire.
-function pickVerdictBlock(html: string, mode: "scored" | "preliminary"): string {
+// Mode "preliminary" → strip the scored block; un-hide prelim block, clear
+//                       its data-state="locked" so the print rule doesn't fire,
+//                       AND stamp data-prelim-mode = fetch/watch/upload on it
+//                       (drives the CSS .pm-head/.pm-cta visibility selectors).
+function pickVerdictBlock(html: string, mode: "scored" | "preliminary", prelimMode?: "fetch" | "watch" | "upload"): string {
   if (mode === "scored") {
-    // Drop the preliminary block.
     const idx = html.indexOf('<div class="mh-verdict v-unscored"');
     if (idx === -1) return html;
     const range = findMatchingClose(html, idx, "div");
@@ -268,22 +269,23 @@ function pickVerdictBlock(html: string, mode: "scored" | "preliminary"): string 
   // mode === "preliminary": drop the scored block + un-hide the prelim block.
   const scoredIdx = html.indexOf('<div class="mh-verdict v-');
   if (scoredIdx === -1) return html;
-  // The prelim block also starts with "mh-verdict v-unscored" — make sure we
-  // don't accidentally grab it first. The scored block uses v-go/v-caution/
-  // v-decline; the prelim uses v-unscored. Anchor explicitly.
   const scoredMatch = html.slice(scoredIdx).match(/^<div class="mh-verdict (?:v-go|v-caution|v-decline)" data-state="full"/);
   if (!scoredMatch) return html;
   const scoredRange = findMatchingClose(html, scoredIdx, "div");
   if (!scoredRange) return html;
   let out = html.slice(0, scoredIdx) + html.slice(scoredRange.closeEnd);
-  // Trim the empty-line gap left between the masthead text + the prelim block.
   out = out.replace(/\n\s*\n(\s*<!-- ═+ PRELIMINARY READ)/, "\n$1");
-  // On the prelim block: remove inline display:none + data-state="locked" so
-  // both the screen and the print stylesheet treat it as a normal element.
+  // On the prelim block: stamp the real data-prelim-mode, remove inline
+  // display:none + data-state="locked" so screen + print treat it normally.
+  const pm = prelimMode ?? "upload";
   out = out.replace(
-    /(<div class="mh-verdict v-unscored")\s+data-state="locked"\s+data-field="preliminary_block"\s+style="display:none"/,
-    `$1 data-field="preliminary_block"`
+    /(<div class="mh-verdict v-unscored")\s+data-state="locked"\s+data-prelim-mode="fetch"\s+data-field="preliminary_block"\s+style="display:none"/,
+    `$1 data-prelim-mode="${pm}" data-field="preliminary_block"`
   );
+  // Also drive the inline-script hardcoded setPrelimMode('fetch') so the
+  // PRELIM map (band-k / band-unlock / data-pm-btn) reflects the real mode
+  // for the moment-band locked variant + §04 / §05 lock teasers.
+  out = out.replace(/setPrelimMode\('fetch'\);/, `setPrelimMode('${pm}');`);
   return out;
 }
 
@@ -322,6 +324,99 @@ function removeVerdictBlock(html: string): string {
     `<header class="masthead" style="grid-template-columns:1fr">`
   );
   return out;
+}
+
+// Inject the production CTA handlers for [data-fetch] / [data-track] /
+// [data-upload]. The template's bundled handler is a placeholder
+// (showToast); these real handlers know the audit id and route accordingly.
+// Stamped just before </body> so it wins the addEventListener race against
+// the template's bundled handler (last listener registered fires last, but
+// both fire — fine for our case since the template's toast is informational).
+//
+//   data-fetch  → POST /api/audit/<id>/refetch · spinner state on the button
+//                  · reload on success · toast on failure.
+//   data-track  → toast "Coming soon — auto-audit when the solicitation
+//                  posts." The watcher surface isn't built; "watch" mode is
+//                  also gated to "upload" rendering until it lands, so this
+//                  handler shouldn't fire in production today, but stub it
+//                  for safety.
+//   data-upload → navigate to /audit (the existing Run Audit page) — that's
+//                  where the file picker lives. The audit's notice_id is
+//                  passed as ?notice= so the smart-input prefills cleanly.
+function injectCtaHandlers(html: string, auditId: string, noticeId: string): string {
+  const script = `
+<script data-cta-handlers="audit-report">
+(function(){
+  var AUDIT_ID = ${JSON.stringify(auditId)};
+  var NOTICE_ID = ${JSON.stringify(noticeId)};
+
+  function setBusy(btn, busy, label){
+    if (!btn) return;
+    if (busy) {
+      if (!btn.dataset._origText) btn.dataset._origText = btn.innerHTML;
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.7';
+      btn.innerHTML = (label || 'Fetching') + '…';
+    } else {
+      btn.style.pointerEvents = '';
+      btn.style.opacity = '';
+      if (btn.dataset._origText) { btn.innerHTML = btn.dataset._origText; delete btn.dataset._origText; }
+    }
+  }
+
+  // Fetch from SAM.gov — re-pull the solicitation server-side + re-audit.
+  document.querySelectorAll('[data-fetch]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      setBusy(btn, true, 'Fetching from SAM.gov');
+      fetch('/api/audit/' + AUDIT_ID + '/refetch', { method: 'POST', credentials: 'include' })
+        .then(function(r){ return r.json().catch(function(){return{}}).then(function(d){ return {ok:r.ok,status:r.status,data:d}; }); })
+        .then(function(out){
+          if (!out.ok) {
+            setBusy(btn, false);
+            var msg = (out.data && out.data.error) || ('Fetch failed (HTTP ' + out.status + ')');
+            if (typeof window.showToast === 'function') window.showToast(msg);
+            else alert(msg);
+            return;
+          }
+          // Reload onto the freshened audit page.
+          window.location.href = (out.data && out.data.redirect) || ('/audit/' + AUDIT_ID);
+        })
+        .catch(function(err){
+          setBusy(btn, false);
+          var msg = 'Network error: ' + (err && err.message ? err.message : String(err));
+          if (typeof window.showToast === 'function') window.showToast(msg);
+          else alert(msg);
+        });
+    });
+  });
+
+  // Track this opportunity — watcher surface not yet built. The renderer
+  // currently maps "watch" → "upload" so this CTA shouldn't be visible in
+  // production today, but stub a friendly message in case it leaks.
+  document.querySelectorAll('[data-track]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      if (typeof window.showToast === 'function') window.showToast('Tracking is on our roadmap — for now, upload the PDF when it posts.');
+    });
+  });
+
+  // Upload — navigate to the existing Run Audit page with the notice prefilled.
+  document.querySelectorAll('[data-upload]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      // The template's bundled handler also fires (toast); we add the
+      // navigation here so the user lands somewhere useful.
+      e.preventDefault();
+      var dest = '/audit';
+      if (NOTICE_ID) dest += '?notice=' + encodeURIComponent(NOTICE_ID);
+      window.location.href = dest;
+    });
+  });
+})();
+</script>
+`;
+  // Slot the script just before </body>.
+  return html.replace(/<\/body>/, `${script}\n</body>`);
 }
 
 // Amber warning banner inserted immediately before the rpt-grid so it sits
@@ -746,9 +841,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = insertNotSolicitationBanner(html);
   } else if (vm.is_unscored) {
     // DESIGN dual-block spec: keep the prelim .v-unscored block, drop the
-    // scored block. Then wire Tile A (response_deadline) + Tile B
-    // (set-aside + eligibility note).
-    html = pickVerdictBlock(html, "preliminary");
+    // scored block. data-prelim-mode is the classifier output mapped through
+    // the watch→upload fallback (until the watcher ships). The matching
+    // .pm-head + .pm-cta show via CSS attribute selectors.
+    html = pickVerdictBlock(html, "preliminary", vm.rendered_prelim_mode);
     if (vm.prelim_has_deadline) {
       html = replaceFieldText(html, "response_days_num", vm.response_days_num);
       html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
@@ -971,6 +1067,15 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   // Dev-only HANDOFF block — not for the wire.
   html = stripHandoffComment(html);
+
+  // Production CTA handlers — fetch/track/upload routed to real actions.
+  // Stamped late so AUDIT_ID is correct for the in-flight audit.
+  html = injectCtaHandlers(
+    html,
+    vm.audit_id_full,
+    (vm.solicitation_number ?? "") // notice_id-or-slug; the run-audit page
+                                    // smart-input accepts either form.
+  );
 
   return html;
 }

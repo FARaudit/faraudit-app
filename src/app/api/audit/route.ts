@@ -299,10 +299,15 @@ export async function POST(req: NextRequest) {
     // the result root. Fold them into compliance_json so the renderer can
     // read them directly instead of falling back to its own derivation.
     // Persisted alongside compliance_score per the engine's honesty flags.
+    //
+    // Also fold notice_type (from the SAM v2 Solicitation interface — e.g.
+    // "Sources Sought", "Presolicitation", "Solicitation") so the view-
+    // model's prelim-mode classifier can read it. No new column needed.
     const persistedComplianceJson = {
       ...result.compliance.json,
       score_confidence: result.score_confidence ?? null,
-      is_not_solicitation: result.is_not_solicitation ?? false
+      is_not_solicitation: result.is_not_solicitation ?? false,
+      notice_type: solicitation.type ?? null
     };
 
     const { error: updateError } = await supabase
