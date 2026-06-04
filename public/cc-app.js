@@ -49,19 +49,23 @@
 
   function renderKPIs() {
     const crit = ACTIONS.filter(a => a.urg === 'crit').length;
+    const arrow = '<span class="kpi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg></span>';
+    // Q1 spec: each KPI drills through to its source surface.
     const cards = [
-      { lbl: 'Closing This Week', val: '$32M', unit: '', foot: '2 proposals due ≤ 6 days', tone: 'blue' },
-      { lbl: 'Compliance Deadline', val: '15', unit: 'd', foot: 'CMMC clause effective', tone: 'amber' },
-      { lbl: 'Protest Exposure', val: '$5.4', unit: 'M', foot: 'tracked award contestable', tone: 'red' },
-      { lbl: 'Pipeline Value', val: '$212', unit: 'M', foot: '18 active pursuits', tone: 'green' }
+      { href: '/opportunities',     lbl: 'Closing This Week',  val: '$32M', unit: '',  foot: '2 proposals due ≤ 6 days', tone: 'blue' },
+      { href: '/far-dfars-updates', lbl: 'Compliance Deadline', val: '15',   unit: 'd', foot: 'CMMC clause effective',    tone: 'amber' },
+      { href: '/gao-protests',      lbl: 'Protest Exposure',    val: '$5.4', unit: 'M', foot: 'tracked award contestable', tone: 'red' },
+      { href: '/pipeline',          lbl: 'Pipeline Value',      val: '$212', unit: 'M', foot: '18 active pursuits',        tone: 'green' }
     ];
-    $('kpiStrip').innerHTML = cards.map(c => `<div class="kpi" data-tone="${c.tone}"><p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></div>`).join('');
+    $('kpiStrip').innerHTML = cards.map(c => `<a class="kpi" data-tone="${c.tone}" href="${c.href}">${arrow}<p class="lbl">${c.lbl}</p><div class="kpi-val">${c.val}<span class="unit">${c.unit}</span></div><div class="foot">${c.foot}</div></a>`).join('');
     $('hsAct').textContent = ACTIONS.filter(a => a.urg !== 'ok').length;
     $('hsCrit').textContent = crit;
   }
 
   function renderInsight() {
-    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span><span class="ib-label">Start here</span>Two things can't wait: the <b>SPY-6 proposal (6 days)</b> and the <b>$5.4M protest exposure</b> on a tracked award. Everything else has runway — work them top-down.</span>`;
+    // Q2 spec: the two bold phrases are links — the rest of the sentence is plain.
+    const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+    $('insightBar').innerHTML = `<span class="ib-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg></span><span><span class="ib-label">Start here</span>Two things can't wait: the <a class="ib-link" href="/opportunities">SPY-6 proposal (6 days)${arrow}</a> and the <a class="ib-link" href="/gao-protests">$5.4M protest exposure${arrow}</a> on a tracked award. Everything else has runway — work them top-down.</span>`;
   }
 
   function rankOrder(a) { return a.urg === 'crit' ? 0 : a.urg === 'warn' ? 1 : 2; }
@@ -69,7 +73,27 @@
   function renderTabs() {
     const tabs = [['all', 'All'], ['crit', 'Critical'], ['warn', 'This week']];
     $('prioTabs').innerHTML = tabs.map(t => `<button class="people-tab ${t[0] === filter ? 'active' : ''}" data-f="${t[0]}">${t[1]}</button>`).join('');
-    $('prioTabs').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.f; renderTabs(); renderFeed(); });
+    $('prioTabs').querySelectorAll('button').forEach(b => b.onclick = () => setFilter(b.dataset.f));
+  }
+
+  // Q3 spec: header stat buttons (.hs[data-f]) two-way synced with priority tabs.
+  // hsAct → warn filter · hsCrit → crit filter · hsDays = readonly readout.
+  function setFilter(f) {
+    filter = f || 'all';
+    renderTabs();
+    renderFeed();
+    document.querySelectorAll('.hdr-stat .hs[data-f]').forEach(b => {
+      b.classList.toggle('active', b.dataset.f === filter);
+    });
+  }
+  function bindHdrStatFilters() {
+    document.querySelectorAll('.hdr-stat .hs[data-f]').forEach(b => {
+      b.addEventListener('click', () => {
+        const f = b.dataset.f;
+        const already = b.classList.contains('active');
+        setFilter(already ? 'all' : f);
+      });
+    });
   }
 
   function renderFeed() {
@@ -147,7 +171,7 @@
     $('sigGrid').innerHTML = sigs.map(s => {
       const d = DESK[s.desk];
       return `<a class="sig-card" href="${d.href}">
-        <div class="sig-top"><span class="sig-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></span><span class="sig-desk">${d.label}</span></div>
+        <div class="sig-top"><span class="sig-ico" style="background:${hexA(d.color,.13)};color:${d.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d.icon}"/></svg></span><span class="sig-desk">${d.label}</span><span class="sig-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
         <div class="sig-t">${s.t}</div><div class="sig-d">${s.d}</div>
       </a>`;
     }).join('');
@@ -156,7 +180,66 @@
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
 
   function renderAll() { renderKPIs(); renderInsight(); renderTabs(); renderFeed(); renderWeek(); renderSignals(); }
-  function init() { renderAll(); }
+
+  // Q5 spec: structured notifications dropdown, grouped by Today/Earlier,
+  // desk-color dots, unread rows, mark-all-read, Esc/outside-click closes.
+  function initNotifications() {
+    const NDESK = {
+      opp:   { c: '#378ADD', l: 'Opportunities',  href: '/opportunities' },
+      gao:   { c: '#dc2626', l: 'GAO',             href: '/gao-protests' },
+      cmmc:  { c: '#0891b2', l: 'CMMC',            href: '/cmmc' },
+      far:   { c: '#7c3aed', l: 'FAR/DFARS',       href: '/far-dfars-updates' },
+      co:    { c: '#185FA5', l: 'Contracting',     href: '/contracting-officers' },
+      wage:  { c: '#d97706', l: 'Wage',            href: '/wage-benchmarks' },
+      spend: { c: '#2C6CB4', l: 'Spending',        href: '/defense-spending' }
+    };
+    const ITEMS = [
+      { grp: 'Today',   desk: 'gao',   t: 'AFMC corrective action filed',                    d: 'Your tracked $5.4M C-17 award may be re-evaluated.',     time: '18m', unread: true  },
+      { grp: 'Today',   desk: 'opp',   t: 'SPY-6 Radar — amendment 0003 posted',             d: 'Q&A cutoff moved up 2 days. Re-check your timeline.',    time: '1h',  unread: true  },
+      { grp: 'Today',   desk: 'far',   t: 'Clause 252.204-7021 redline published',           d: 'Effective in 15 days — 7 of your sols affected.',        time: '3h',  unread: true  },
+      { grp: 'Today',   desk: 'co',    t: 'Greg Bauer (TACOM) opened your capability brief', d: '47 days quiet — good moment to re-warm.',                time: '5h',  unread: true  },
+      { grp: 'Earlier', desk: 'wage',  t: 'WD 2015-4267 renewal scheduled',                  d: 'JBSA inspector categories renew in 22 days.',            time: 'Tue', unread: false },
+      { grp: 'Earlier', desk: 'cmmc',  t: '2 controls moved to "Met"',                       d: 'You\'re now 78% ready. CM & CA still open.',             time: 'Mon', unread: false },
+      { grp: 'Earlier', desk: 'spend', t: 'New FY26 obligations in NAICS 336413',            d: 'WA, OH, GA show fresh spend, no activity from you.',     time: 'Mon', unread: false }
+    ];
+    const panel = $('notifPanel'), bell = $('bellBtn'), scroll = $('npScroll');
+    const badge = $('bellBadge'), count = $('npCount'), mark = $('npMark');
+    if (!panel || !bell || !scroll) return;
+
+    function render() {
+      let html = '', last = '';
+      ITEMS.forEach((n, i) => {
+        if (n.grp !== last) { html += `<div class="np-grp">${n.grp}</div>`; last = n.grp; }
+        const dk = NDESK[n.desk] || { c: '#64748b', l: '', href: '/command-center' };
+        html += `<a class="np-item${n.unread ? ' unread' : ''}" data-i="${i}" href="${dk.href}">
+          <span class="np-dot" style="background:${dk.c}"></span>
+          <div class="np-body"><div class="np-t"><span class="np-desk" style="color:${dk.c}">${dk.l}</span>${n.t}</div><div class="np-d">${n.d}</div></div>
+          <span class="np-time">${n.time}</span>
+        </a>`;
+      });
+      scroll.innerHTML = html;
+      const u = ITEMS.filter(n => n.unread).length;
+      if (count) count.textContent = String(u);
+      if (badge) { badge.textContent = u ? String(u) : ''; badge.style.display = u === 0 ? 'none' : ''; }
+      scroll.querySelectorAll('.np-item').forEach(a => {
+        a.addEventListener('click', () => {
+          const i = +a.dataset.i;
+          if (ITEMS[i]) { ITEMS[i].unread = false; render(); }
+          // Navigation proceeds — href is real route
+        });
+      });
+    }
+    render();
+
+    function open()  { panel.classList.add('open');    bell.classList.add('on');    }
+    function close() { panel.classList.remove('open'); bell.classList.remove('on'); }
+    bell.addEventListener('click', e => { e.stopPropagation(); panel.classList.contains('open') ? close() : open(); });
+    if (mark) mark.addEventListener('click', e => { e.stopPropagation(); ITEMS.forEach(n => n.unread = false); render(); });
+    document.addEventListener('click', e => { if (!panel.contains(e.target) && !bell.contains(e.target)) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  }
+
+  function init() { renderAll(); bindHdrStatFilters(); initNotifications(); }
   window.CC_APP = { render: renderAll, onThemeChange: renderAll };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -317,6 +317,78 @@ button{font-family:inherit}
 .sig-desk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}
 .sig-t{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.3}
 .sig-d{font-size:11.5px;color:var(--mute);line-height:1.5}
+
+/* ───── Interaction Spec · today-interaction-spec.html ───── */
+/* Q1 — KPI cards: clickable drill-through */
+.kpi{cursor:pointer;text-decoration:none;color:inherit;transition:transform .14s cubic-bezier(.16,1,.3,1),box-shadow .14s,border-color .14s;position:relative}
+.kpi:hover{transform:translateY(-3px);border-color:var(--accent-light);box-shadow:var(--shadow)}
+.kpi:active{transform:translateY(0) scale(.992)}
+.kpi-arrow{position:absolute;top:12px;right:12px;width:24px;height:24px;border-radius:7px;background:var(--accent-pale);color:var(--accent-deep);display:grid;place-items:center;opacity:0;transform:translate(-2px,2px);transition:opacity .14s,transform .14s;pointer-events:none}
+.kpi-arrow svg{width:13px;height:13px}
+.kpi:hover .kpi-arrow{opacity:1;transform:translate(0,0)}
+[data-theme="dark"] .kpi-arrow{background:rgba(55,138,221,.2);color:var(--accent-light)}
+.kpi[data-tone="red"] .kpi-val{color:var(--red-700)}
+[data-theme="dark"] .kpi[data-tone="red"] .kpi-val{color:#fca5a5}
+
+/* Q2 — Insight bar: links on bold phrases only */
+.ib-link{color:var(--accent-deep);font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-decoration-thickness:1.5px;text-underline-offset:3px;cursor:pointer;border-radius:4px;padding:0 2px;transition:background .14s,text-decoration-color .14s,color .14s;white-space:nowrap}
+.ib-link svg{width:11px;height:11px;vertical-align:-1px;margin-left:1px;opacity:.7}
+.ib-link:hover{text-decoration-style:solid;background:rgba(55,138,221,.16);color:var(--accent)}
+[data-theme="dark"] .ib-link{color:var(--accent-light)}
+[data-theme="dark"] .ib-link:hover{background:rgba(55,138,221,.24);color:#fff}
+
+/* Q3 — Header stats: 2 filter buttons + 1 readout */
+.hdr-stat .hs{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 16px;border-radius:11px;border:1px solid transparent;background:transparent;cursor:pointer;transition:background .14s,border-color .14s;position:relative;font:inherit;color:inherit}
+.hdr-stat button.hs{font-family:inherit}
+.hdr-stat .hs.readonly{cursor:default}
+.hdr-stat .hs:not(.readonly):hover{background:var(--card-soft);border-color:var(--line)}
+.hdr-stat .hs:not(.readonly):hover .v{color:var(--accent-deep)}
+[data-theme="dark"] .hdr-stat .hs:not(.readonly):hover .v{color:var(--accent-light)}
+.hdr-stat .hs.active{background:var(--accent-pale);border-color:var(--accent-light)}
+.hdr-stat .hs.active .v{color:var(--accent-deep)}
+[data-theme="dark"] .hdr-stat .hs.active{background:rgba(55,138,221,.16)}
+[data-theme="dark"] .hdr-stat .hs.active .v{color:var(--accent-light)}
+.hdr-stat .hs .filterdot{position:absolute;top:7px;right:9px;width:5px;height:5px;border-radius:50%;background:var(--mute-2);opacity:0;transition:opacity .14s}
+.hdr-stat .hs:not(.readonly):hover .filterdot,.hdr-stat .hs.active .filterdot{opacity:1;background:var(--accent)}
+
+/* Q4 — Signal cards: always-on muted → arrow */
+.sig-go{margin-left:auto;width:18px;height:18px;color:var(--mute-2);display:grid;place-items:center;transition:color .14s,transform .14s;flex-shrink:0}
+.sig-go svg{width:15px;height:15px}
+.sig-card:hover .sig-go{color:var(--accent-deep);transform:translateX(3px)}
+[data-theme="dark"] .sig-card:hover .sig-go{color:var(--accent-light)}
+
+/* Q5 — Notifications panel */
+.top-actions{position:relative}
+.icon-btn.on{border-color:var(--accent-light);background:var(--accent-pale);color:var(--accent-deep)}
+[data-theme="dark"] .icon-btn.on{background:rgba(55,138,221,.16);color:var(--accent-light)}
+.notif-panel{position:absolute;top:46px;right:0;width:362px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;z-index:60;transform-origin:top right;opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .16s ease,transform .16s cubic-bezier(.16,1,.3,1)}
+.notif-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.np-head{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--line-2)}
+.np-head h3{font-size:14px;font-weight:800;margin:0;letter-spacing:-.01em;color:var(--ink)}
+.np-count{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 7px}
+.np-mark{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0}
+.np-mark:hover{text-decoration:underline}
+[data-theme="dark"] .np-mark{color:var(--accent-light)}
+.np-scroll{max-height:340px;overflow-y:auto}
+.np-grp{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:11px 16px 5px;display:flex;align-items:center;gap:8px}
+.np-grp::after{content:"";flex:1;height:1px;background:var(--line-2)}
+.np-item{display:grid;grid-template-columns:9px 1fr auto;gap:11px;align-items:start;padding:10px 16px 11px;text-decoration:none;color:inherit;border-left:3px solid transparent;cursor:pointer;transition:background .12s}
+.np-item:hover{background:var(--card-soft)}
+.np-item.unread{background:var(--accent-pale);border-left-color:var(--accent)}
+.np-item.unread:hover{background:var(--accent-light)}
+[data-theme="dark"] .np-item.unread{background:rgba(55,138,221,.1)}
+[data-theme="dark"] .np-item.unread:hover{background:rgba(55,138,221,.16)}
+.np-dot{width:9px;height:9px;border-radius:50%;margin-top:5px}
+.np-body{min-width:0}
+.np-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.32}
+.np-t .np-desk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:6px}
+.np-d{font-size:11px;color:var(--mute);line-height:1.45;margin-top:2px}
+.np-time{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute-2);white-space:nowrap;padding-top:2px}
+.np-foot{padding:11px 16px;border-top:1px solid var(--line-2);text-align:center}
+.np-foot a{font-size:12px;font-weight:700;color:var(--accent-deep);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.np-foot a svg{width:13px;height:13px}
+[data-theme="dark"] .np-foot a{color:var(--accent-light)}
+
 :root{--sb-width:56px}
 [data-sb="open"]{--sb-width:232px}
 .sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
@@ -416,8 +488,16 @@ button{font-family:inherit}
           <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
           <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
-        <button class="icon-btn" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge">7</span></button>
+        <button class="icon-btn" id="bellBtn" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"/><path d="M10 21a2 2 0 004 0"/></svg><span class="nbadge" id="bellBadge">7</span></button>
         <div class="user-chip"><div class="av">JR</div><div><div class="nm">Jose Rodriguez</div></div></div>
+        <div class="notif-panel" id="notifPanel" role="dialog" aria-label="Notifications">
+          <div class="np-head">
+            <h3>Notifications</h3><span class="np-count" id="npCount">0</span>
+            <button class="np-mark" id="npMark" type="button">Mark all read</button>
+          </div>
+          <div class="np-scroll" id="npScroll"></div>
+          <div class="np-foot"><a href="/dashboard">View all activity <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+        </div>
       </div>
     </div>
 
@@ -428,10 +508,10 @@ button{font-family:inherit}
           <h1>Good morning, Jose</h1>
           <p class="sub">Your one thing that matters from each desk — <b>Apex Precision Machining · NAICS 336413 · 332710 · 332721</b></p>
         </div>
-        <div class="hdr-stat">
-          <div class="hs"><span class="v" id="hsAct">6</span><span class="l">Need Action</span></div>
-          <div class="hs"><span class="v warm" id="hsCrit">2</span><span class="l">Critical</span></div>
-          <div class="hs"><span class="v" id="hsDays">6d</span><span class="l">Next Deadline</span></div>
+        <div class="hdr-stat" id="hdrStat">
+          <button class="hs" data-f="warn" type="button"><span class="filterdot"></span><span class="v" id="hsAct">6</span><span class="l">Need Action</span></button>
+          <button class="hs" data-f="crit" type="button"><span class="filterdot"></span><span class="v warm" id="hsCrit">2</span><span class="l">Critical</span></button>
+          <div class="hs readonly"><span class="v" id="hsDays">6d</span><span class="l">Next Deadline</span></div>
         </div>
       </header>
 
