@@ -31,7 +31,7 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
 // @ts-expect-error tsx runtime resolves .ts; tsc strict imports forbid the extension
 const queueNs: any = await import("./queue.ts");
 const queue = queueNs.default ?? queueNs;
-const {fetchPending, markProcessing, markProcessed, markFailed, getCompletedCount } = queue;
+const {fetchPending, markProcessing, markProcessed, markFailed, getCompletedCount, cleanupExpired } = queue;
 type PendingAudit = import("./queue.ts").PendingAudit;
 
 // @ts-expect-error see above
@@ -236,6 +236,22 @@ async function processOne(row: PendingAudit, i: number, total: number): Promise<
 async function main() {
   const startedAt = new Date();
   console.log(`[audit-ai] start ${startedAt.toISOString()} · DRY_RUN=${DRY_RUN} · batch=${BATCH_SIZE}`);
+
+  // Pre-cron sweep: flip already-expired pending rows to failed so they stop
+  // appearing as gray "…" tiles on the Kanban. fetchPending below filters
+  // response_deadline > now(), which means without this sweep those rows are
+  // stuck in 'pending' forever. Always runs (DRY_RUN gated to avoid prod
+  // writes during dry-run sessions).
+  if (!DRY_RUN) {
+    try {
+      const swept = await cleanupExpired();
+      console.log(`[audit-ai] cleanup-expired: pending_audits=${swept.pending_audits} · audits=${swept.audits}`);
+    } catch (e) {
+      console.error(`[audit-ai] cleanup-expired failed (continuing):`, e instanceof Error ? e.message : String(e));
+    }
+  } else {
+    console.log(`[audit-ai] cleanup-expired: skipped (DRY_RUN)`);
+  }
 
   const rows = await fetchPending(BATCH_SIZE);
   if (rows.length === 0) {

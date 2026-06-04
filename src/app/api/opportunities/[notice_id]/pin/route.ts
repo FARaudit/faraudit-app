@@ -33,6 +33,30 @@ export async function POST(
   if (paErr) return NextResponse.json({ error: `pending_audits load failed: ${paErr.message}` }, { status: 503 });
   if (!pa)   return NextResponse.json({ error: "notice_id not found in pending_audits" }, { status: 404 });
 
+  // Step 1a — DEADLINE GUARD (CEO 2026-06-03 · Audit-AI cleanup A).
+  // Reject pins for opportunities whose response_deadline is in the past, or
+  // is closing within 6h (the cron runs daily at 11:30 UTC = 06:30 CT — 6h
+  // is the minimum window we need to score before the bid window closes).
+  // Without this guard, expired pins become orphans: pending_audits rows
+  // that the cron skips forever (per fetchPending's response_deadline > now()
+  // filter in agents/audit-ai/queue.ts), polluting the dashboard with gray
+  // "…" tiles indefinitely. The cleanup-expired pass downstream sweeps the
+  // existing orphans; this guard prevents new ones.
+  if (pa.response_deadline) {
+    const deadlineMs = new Date(pa.response_deadline).getTime();
+    const cutoffMs   = Date.now() + 6 * 60 * 60 * 1000;
+    if (!Number.isNaN(deadlineMs) && deadlineMs < cutoffMs) {
+      const expired = deadlineMs < Date.now();
+      return NextResponse.json({
+        error: expired
+          ? "This opportunity's response deadline has already passed — no time left to audit."
+          : "This opportunity's response deadline is less than 6 hours away — the next Audit-AI run can't score it before the bid window closes.",
+        code: expired ? "deadline_expired" : "deadline_too_soon",
+        response_deadline: pa.response_deadline
+      }, { status: 409 });
+    }
+  }
+
   // Step 2: flip pending_audits.in_pipeline = true.
   const { error: pinPaErr } = await supabase
     .from("pending_audits")

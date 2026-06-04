@@ -112,3 +112,45 @@ export async function getCompletedCount(): Promise<number> {
   return count ?? 0;
 }
 
+// Sweep expired pending rows so they stop polluting the dashboard. fetchPending
+// already filters response_deadline > now() — that means any pending row with a
+// past deadline is stuck forever (gray "…" tile on the Kanban). This marks them
+// as failed with a clear error_message, and mirrors the change to the audits
+// table for opportunities_pin stub rows so the UI tile flips out of gray.
+//
+// Idempotent: re-running is a no-op once rows are flipped to status='failed'.
+const kExpiredMessage = "response_deadline expired before scoring";
+
+export async function cleanupExpired(): Promise<{ pending_audits: number; audits: number }> {
+  const nowIso = new Date().toISOString();
+
+  const { data: paRows, error: paErr } = await supabase
+    .from("pending_audits")
+    .update({
+      status: "failed",
+      error_message: kExpiredMessage,
+      processed_at: nowIso
+    })
+    .eq("status", "pending")
+    .lt("response_deadline", nowIso)
+    .select("notice_id");
+  if (paErr) throw new Error(`cleanupExpired(pending_audits): ${paErr.message}`);
+
+  const { data: auRows, error: auErr } = await supabase
+    .from("audits")
+    .update({
+      status: "failed",
+      error_message: kExpiredMessage
+    })
+    .eq("audit_source", "opportunities_pin")
+    .eq("status", "pending")
+    .lt("response_deadline", nowIso)
+    .select("notice_id");
+  if (auErr) throw new Error(`cleanupExpired(audits): ${auErr.message}`);
+
+  return {
+    pending_audits: paRows?.length || 0,
+    audits: auRows?.length || 0
+  };
+}
+
