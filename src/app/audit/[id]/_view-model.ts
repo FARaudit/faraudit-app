@@ -200,6 +200,48 @@ function fmtDueShort(d: Date | null): string {
   return `due ${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
 }
 
+// ─── display sanitizers ─────────────────────────────────────────────────────
+
+// Audit-AI sometimes appends raw ISO timestamps to its "missing" fallback
+// strings, e.g. period_of_performance:
+//   "Not specified in available metadata; response deadline is 2026-06-18T15:00:00-05:00"
+// Raw timestamps surfaced verbatim in the UI read as junk. Strip the
+// engine's specific noise pattern + reformat any remaining ISO tokens to
+// human form. Idempotent on already-clean text.
+const ISO_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b/g;
+
+function sanitizeDisplayText(s: unknown): string {
+  if (s == null) return "";
+  let out = String(s);
+  // Engine-emitted noise: "; response deadline is <ISO>" — strip the whole
+  // phrase so the user sees just the empty-state copy.
+  out = out.replace(
+    /\s*[;,]?\s*response deadline is\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\.?/gi,
+    ""
+  );
+  // Any remaining bare ISO → "D Mon YYYY" form.
+  out = out.replace(ISO_RE, (m) => {
+    const d = new Date(m);
+    if (Number.isNaN(d.getTime())) return m;
+    return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  });
+  // Clean up doubled spaces / dangling punctuation left by the strip.
+  out = out.replace(/\s+/g, " ").replace(/\s+([.,;])/g, "$1").trim();
+  return out;
+}
+
+// Set-aside normalization. SAM frequently emits "NONE" (or null) for full &
+// open competitions. "NONE" reads as missing-data; "Full & open" is the
+// correct, customer-facing label. Real set-asides ("Total Small Business",
+// "8(a)", etc.) pass through unchanged.
+function normalizeSetAside(s: unknown): string {
+  const v = typeof s === "string" ? s.trim() : "";
+  if (!v) return "Full & open";
+  const upper = v.toUpperCase();
+  if (upper === "NONE" || upper === "FULL AND OPEN" || upper === "FULL & OPEN") return "Full & open";
+  return v;
+}
+
 function fmtStamp(d: Date | null): string {
   if (!d) return "—";
   const m = MONTHS_SHORT[d.getUTCMonth()];
@@ -681,10 +723,10 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
     agency_sub: "",
     naics: (audit.naics_code as string) || "—",
     naics_sub: "",
-    set_aside: (audit.set_aside as string) || "Full and open",
+    set_aside: normalizeSetAside(audit.set_aside),
     set_aside_sub: "",
-    contract_type: (overviewJson.contract_type as string) || "—",
-    contract_type_sub: (overviewJson.period_of_performance as string) || "",
+    contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
+    contract_type_sub: sanitizeDisplayText(overviewJson.period_of_performance),
 
     recommendation: verdict.word,
     recommendation_class: verdict.cls,
@@ -743,12 +785,12 @@ export function buildViewModel(audit: AuditRow): AuditViewModel {
       days_color_override: incumbentDaysColorOverride
     },
 
-    clin_summary: (overviewJson.summary as string) || "Scope summary not available — upload the full PDF to extract scope detail.",
-    primary_objective: (overviewJson.primary_objective as string) || "Primary objective not extracted.",
-    period_of_performance: (overviewJson.period_of_performance as string) || "Period of performance not extracted.",
+    clin_summary: sanitizeDisplayText(overviewJson.summary) || "Scope summary not available — upload the full PDF to extract scope detail.",
+    primary_objective: sanitizeDisplayText(overviewJson.primary_objective) || "Primary objective not extracted.",
+    period_of_performance: sanitizeDisplayText(overviewJson.period_of_performance) || "Period of performance not extracted.",
     customer_office: customerOffice,
     customer_hierarchy: hierarchy,
-    contract_type_detail: (overviewJson.contract_type_detail as string) || (overviewJson.contract_type as string) || "Contract vehicle detail not extracted.",
+    contract_type_detail: sanitizeDisplayText(overviewJson.contract_type_detail) || sanitizeDisplayText(overviewJson.contract_type) || "Contract vehicle detail not extracted.",
     clin_line_items: clinLineItems,
 
     compliance_flags: complianceFlags,
