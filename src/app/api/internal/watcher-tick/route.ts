@@ -30,22 +30,29 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export async function POST(req: Request) {
-  // Dedicated Bearer for the cron→endpoint hop. Falls back to the service
-  // role key during the brief env-propagation window after Phase 2 ship —
-  // both Vercel-prod and Railway sam-ingest already carry the service role
-  // key, so the fallback prevents a deploy-vs-env-rollout race from
-  // wedging the watcher tick. Once WATCHER_TICK_BEARER is set on both
-  // sides, the service-role fallback path is dead code.
-  const primary = process.env.WATCHER_TICK_BEARER;
-  const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!primary && !fallback) {
+  // Accepts any of three bearers — all already in Vercel-prod env:
+  //   WATCHER_TICK_BEARER   — dedicated Phase 2 secret (preferred)
+  //   CRON_SECRET           — Vercel Cron's built-in scheduler header;
+  //                           Vercel hits this endpoint on the schedule in
+  //                           vercel.json with `Authorization: Bearer
+  //                           ${CRON_SECRET}` and the value is unknown to
+  //                           the caller, so we must accept it here
+  //   SUPABASE_SERVICE_ROLE_KEY — emergency manual-tick fallback. The
+  //                           sam-ingest Railway cron used to call us with
+  //                           this key; that service was retired 2026-05-30
+  //                           but the fallback stays for ad-hoc curl ticks
+  const candidates = [
+    process.env.WATCHER_TICK_BEARER,
+    process.env.CRON_SECRET,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  ].filter((v): v is string => !!v && v.length > 0);
+  if (candidates.length === 0) {
     return NextResponse.json({ error: "watcher-tick bearer not configured" }, { status: 503 });
   }
   const auth = req.headers.get("authorization") || "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  const matchPrimary = !!primary && !!bearer && timingSafeEqual(bearer, primary);
-  const matchFallback = !!fallback && !!bearer && timingSafeEqual(bearer, fallback);
-  if (!matchPrimary && !matchFallback) {
+  const matched = !!bearer && candidates.some(c => timingSafeEqual(bearer, c));
+  if (!matched) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
