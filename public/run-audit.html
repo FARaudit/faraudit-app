@@ -209,7 +209,7 @@ button{font-family:inherit}
 .ra-recent-all:hover{text-decoration:underline;text-underline-offset:3px}
 [data-theme="dark"] .ra-recent-all{color:var(--accent-light)}
 .ra-recent-grid{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px}
-.ra-recent-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:transform .14s, border-color .14s, box-shadow .14s;position:relative}
+.ra-recent-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:transform .14s, border-color .14s, box-shadow .14s;position:relative;min-width:0}
 .ra-recent-card:hover{transform:translateY(-2px);border-color:var(--mute-2);box-shadow:var(--shadow)}
 .ra-recent-score{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;position:relative}
 .ra-recent-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
@@ -1046,9 +1046,11 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
     { sol:'W56KGY-26-R-0014', title:'CECOM TNSS',        ago:'2h ago',    score:58, status:'complete' },
     { sol:'N00178-26-R-3071', title:'Indian Head',       ago:'yesterday', score:42, status:'complete' }
   ];
+  // Relaxed per restore-list §A1 follow-up: any audit with a numeric score
+  // renders as complete. Live `status` values vary (complete · completed ·
+  // done · etc.) — score presence is the only reliable signal.
   function isComplete(a){
-    var s = (a.status || (typeof a.compliance_score === 'number' ? 'complete' : '')).toLowerCase();
-    return s === 'complete';
+    return typeof a.compliance_score === 'number' || typeof a.score === 'number';
   }
   function cellHtml(a){
     var sol = a.sol || a.solicitation_number || a.notice_id || a.id || '—';
@@ -1112,7 +1114,20 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   }
   fetch('/api/audits?limit=20', { credentials:'include' })
     .then(function(r){ return r.ok ? r.json() : { audits: [] }; })
-    .then(function(d){ render((d && d.audits) || []); })
+    .then(function(d){
+      var audits = (d && d.audits) || [];
+      // Diagnostic (per restore-list A1 follow-up): one-shot dump of first
+      // audit's keys + scalar values so the live API field shape is visible
+      // in the browser console. Safe to leave in — runs once per page load.
+      if (audits.length && typeof console !== 'undefined' && console.log) {
+        try {
+          var first = audits[0];
+          console.log('[run-audit] /api/audits sample · count=' + audits.length + ' · first.keys=' + Object.keys(first).join(','));
+          console.log('[run-audit] first.compliance_score =', first.compliance_score, '· first.status =', first.status, '· first.recommendation =', first.recommendation);
+        } catch (e) {}
+      }
+      render(audits);
+    })
     .catch(function(){ render([]); });
 })();
 
