@@ -41,18 +41,5 @@
     "libasound2",
     "libatspi2.0-0",
     "fonts-liberation"
-  ],
-  "steps": {
-    "install": {
-      "commands": [
-        "npm ci --omit=dev || npm install --omit=dev"
-      ]
-    },
-    "build": {
-      "commands": []
-    }
-  },
-  "deploy": {
-    "startCommand": "npx tsx index.ts"
-  }
+  ]
 }
