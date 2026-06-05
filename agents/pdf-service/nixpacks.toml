@@ -1,13 +1,6 @@
-# PDF Service Nixpacks config.
-#
-# Activated by setting NIXPACKS_TOML_FILE = agents/pdf-service/nixpacks.toml
-# as a Railway service variable so this file is read instead of the
-# repo-root build path.
-#
-# The cd into agents/pdf-service is necessary because `railway up` from
-# inside agents/pdf-service still walks up to the git root and uploads
-# the whole repo — so the build container's cwd is the repo root, not
-# the agent dir.
+# PDF Service Nixpacks config — active because Railway service config
+# has rootDirectory = agents/pdf-service, so this file is at the build
+# context root. Locks the Node version + disables the build phase.
 
 providers = ["node"]
 
@@ -15,10 +8,10 @@ providers = ["node"]
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["cd agents/pdf-service && (npm ci --omit=dev || npm install --omit=dev)"]
+cmds = ["npm ci --omit=dev || npm install --omit=dev"]
 
 [phases.build]
 cmds = []
 
 [start]
-cmd = "cd agents/pdf-service && npx tsx index.ts"
+cmd = "npx tsx index.ts"
