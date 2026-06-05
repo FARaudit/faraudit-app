@@ -403,8 +403,14 @@ button{font-family:inherit}
   .rpt-grid{display:block!important;grid-template-columns:none!important}
   .rpt-main>.sec{margin-top:12px}
   .sec,.masthead,.moment,.keydates,.scorecard{break-inside:avoid;box-shadow:none!important}
+  .risk,.flag-row,.eval .sfactor,.award-basis{break-inside:avoid}
+  .risk-group-label,.subsec-h{break-after:avoid}
   .risk-body{max-height:none!important}
   .risk-chev,.kd-note{display:none!important}
+  /* provenance + severity badges legible at print scale */
+  .risk-prov{font-size:9px!important;padding:3px 8px!important}
+  .risk-prov.pattern{background:#eef2f6!important;color:#475569!important;border-color:#cbd5e1!important}
+  .risk-prov.doc{background:#ecfdf5!important;color:#047857!important;border-color:#a7f3d0!important}
   /* hide locked-state teasers in print — but NEVER the masthead verdict block: the .v-unscored
      "Preliminary read" block IS the real verdict in metadata-only state and must print (1:1 web↔PDF).
      Production strips the unused block server-side; this :not() keeps the design-file demo PDF correct. */
@@ -1270,7 +1276,7 @@ button{font-family:inherit}
     <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="dr-meta">
-    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="91faf0e3f4ffbff0fde7f0e3f4ebd1f5fdf0bffcf8fd">[email&#160;protected]</a></span></div>
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b4dfd5c6d1da9ad5d8c2d5c6d1cef4d0d8d59ad9ddd8">[email&#160;protected]</a></span></div>
     <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
   </div>
   <div class="dr-body">
