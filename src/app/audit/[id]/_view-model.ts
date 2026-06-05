@@ -262,11 +262,21 @@ function fmtDueShort(d: Date | null): string {
 // Raw timestamps surfaced verbatim in the UI read as junk. Strip the
 // engine's specific noise pattern + reformat any remaining ISO tokens to
 // human form. Idempotent on already-clean text.
+// Defect 4 (2026-06-05): tolerate line-split inside ISO segments. Audit-AI
+// extraction occasionally breaks a date like "2026-06-\n11T11:00" mid-token,
+// which the original \b\d{4}-\d{2}-\d{2}T regex skipped. \s* between segments
+// allows the regex to span line breaks without over-matching unrelated text
+// (anchored on the YYYY-MM-DD prefix). Pre-pass collapses internal whitespace
+// inside ISO-shaped runs before the bare-token sweep.
+const ISO_LINESPLIT_RE = /\b(\d{4}-\d{2}-)\s+(\d{2}T\d{2})/g;
 const ISO_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b/g;
 
 function sanitizeDisplayText(s: unknown): string {
   if (s == null) return "";
   let out = String(s);
+  // Pre-pass: collapse line-split ISO tokens back together so the main regex
+  // can match them. Audit-AI extraction can emit "2026-06-\n11T11:00".
+  out = out.replace(ISO_LINESPLIT_RE, "$1$2");
   // Engine-emitted noise: "; response deadline is <ISO>" — strip the whole
   // phrase so the user sees just the empty-state copy.
   out = out.replace(
@@ -761,11 +771,23 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   // submission_summary) so we trust the values verbatim here.
   const evalBasis = (compJson.eval_basis ?? null) as string | null;
   const evalBasisLabel = (compJson.eval_basis_label ?? null) as string | null;
+  // Defect 4 (2026-06-05): sanitize every rendered text field on §M factors
+  // and §L requirements. Engine emits these from Call 1 (Overview) where the
+  // prompt can land raw ISO timestamps in factor.note / requirement strings.
   const evaluationFactors: EvaluationFactorVM[] = Array.isArray(compJson.evaluation_factors)
-    ? (compJson.evaluation_factors as EvaluationFactorVM[])
+    ? (compJson.evaluation_factors as EvaluationFactorVM[]).map((f) => ({
+        ...f,
+        name: sanitizeDisplayText(f.name),
+        importance: sanitizeDisplayText(f.importance),
+        coverage: sanitizeDisplayText(f.coverage),
+        note: sanitizeDisplayText(f.note)
+      }))
     : [];
   const submissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
-    ? (compJson.submission_requirements as SubmissionRequirementVM[])
+    ? (compJson.submission_requirements as SubmissionRequirementVM[]).map((r) => ({
+        ...r,
+        requirement: sanitizeDisplayText(r.requirement)
+      }))
     : [];
   const submissionSummary = (compJson.submission_summary ?? null) as string | null;
 
@@ -847,7 +869,13 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     agency_sub: "",
     naics: (audit.naics_code as string) || "—",
     naics_sub: "",
-    set_aside: normalizeSetAside(audit.set_aside),
+    // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
+    // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
+    // column. Doc text overrides metadata — masthead must show what the
+    // solicitation actually says.
+    set_aside: normalizeSetAside(
+      (compJson.set_aside_type as string | undefined) ?? (audit.set_aside as string | undefined)
+    ),
     set_aside_sub: "",
     contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
     contract_type_sub: sanitizeDisplayText(overviewJson.period_of_performance),
@@ -856,7 +884,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     recommendation_class: verdict.cls,
     recommendation_tagline: isUnscored
       ? taglineForUnscored
-      : verdictTagline(verdict.word, (audit.bid_recommendation as string) || ""),
+      : verdictTagline(verdict.word, sanitizeDisplayText(audit.bid_recommendation as string) || ""),
     recommendation_pill_text: recommendationPill,
     score,
     score_display: score == null ? "—" : String(Math.round(score)),

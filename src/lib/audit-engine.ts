@@ -943,15 +943,25 @@ export function applySetAsideRegex(docText: string, fallback: string | undefined
 // Fix 6 — sole-source vendor extraction. Deterministic regex on doc text.
 // Returns { name, cage } when a J&A or sole-source-style document names a
 // specific vendor. Gates the score cap + structural-no-bid risk emission.
+// Defense-industry company suffix list. 70Z03826QB0000126 named "Chelton
+// Avionics" — "Avionics" was missing from the original list and the vendor
+// extraction silently failed, which in turn skipped the score cap and the
+// "Structural no-bid" risk emission. Broadened 2026-06-05.
+const COMPANY_SUFFIX_RE = "(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Avionics|Aviation|Systems|Technologies|Technology|Defense|Manufacturing|Engineering|Labs|Laboratories|Group)";
 export function extractSoleSourceVendor(docText: string): { name: string; cage?: string | null } | null {
   if (!docText) return null;
   const cageMatch = docText.match(/CAGE\s+(?:Code\s+)?([A-Z0-9]{5})/i);
   const cage = cageMatch ? cageMatch[1].toUpperCase() : null;
   // Try the "only known source" pattern first — most explicit.
-  let nameMatch = docText.match(/only\s+(?:known\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/);
+  let nameMatch = docText.match(new RegExp(`only\\s+(?:known\\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`));
   // J&A "sole source to NAME" pattern.
   if (!nameMatch) {
-    nameMatch = docText.match(/sole[\s-]source[^.]*?to\s+([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/i);
+    nameMatch = docText.match(new RegExp(`sole[\\s-]source[^.]*?to\\s+([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`, "i"));
+  }
+  // "will compromise the safety" phrase is a J&A tell — fall through to
+  // generic company-suffix match in nearby text.
+  if (!nameMatch) {
+    nameMatch = docText.match(new RegExp(`will\\s*compromise\\s*(?:the\\s*)?safety[^.]*?([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`, "i"));
   }
   if (!nameMatch && !cage) return null;
   const name = nameMatch ? nameMatch[1].replace(/\s+/g, " ").trim() : "(vendor name not extracted)";
@@ -961,9 +971,26 @@ export function extractSoleSourceVendor(docText: string): { name: string; cage?:
 // Fix 6 — score cap. Sole-source J&A naming a specific vendor = structural
 // no-bid for everyone else. Cap at 25 (DECLINE band).
 const SOLE_SOURCE_CAP_SCORE = 25;
-const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1/i;
-export function applySoleSourceCap(baseScore: number, docText: string, classificationDocType: string, vendor: ReturnType<typeof extractSoleSourceVendor>): number {
-  const isJA = SOLE_SOURCE_DOC_RE.test(docText) || /sole[\s-]source/i.test(docText) || /J&A/i.test(classificationDocType);
+// J&A / sole-source signals. Broadened 2026-06-05 to include the
+// "will compromise the safety" phrase that frequently appears in DLA
+// safety-of-flight J&As but isn't captured by the FAR-6.302 / J&A tokens.
+const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1|will\s*compromise\s*(?:the\s*)?safety/i;
+export function applySoleSourceCap(
+  baseScore: number,
+  docText: string,
+  classificationDocType: string,
+  vendor: ReturnType<typeof extractSoleSourceVendor>,
+  farClauses?: string[]
+): number {
+  // FAR 6.302 may appear only in the extracted clause array, not in the
+  // sanitized doc text — check both. Belt-and-suspenders so a clause cite
+  // alone (without "J&A" wording in prose) still trips the cap.
+  const farFire = Array.isArray(farClauses) && farClauses.some((c) => /6\.302/i.test(c));
+  const isJA =
+    farFire ||
+    SOLE_SOURCE_DOC_RE.test(docText) ||
+    /sole[\s-]source/i.test(docText) ||
+    /J&A/i.test(classificationDocType);
   if (isJA && vendor) return Math.min(baseScore, SOLE_SOURCE_CAP_SCORE);
   return baseScore;
 }
@@ -1386,7 +1413,7 @@ JSON only.`;
   // so the cap is visible in logs / debugging. When vendor extraction hit AND
   // the doc-type text looks like a J&A, cap at SOLE_SOURCE_CAP_SCORE (25 →
   // DECLINE band).
-  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor);
+  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor, complianceJson.far_clauses);
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which

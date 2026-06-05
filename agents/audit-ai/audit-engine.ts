@@ -931,13 +931,19 @@ export function applySetAsideRegex(docText: string, fallback: string | undefined
   return fallback;
 }
 
+// Parity mirror — see src/lib/audit-engine.ts. Broadened suffix list +
+// "will compromise the safety" pattern added 2026-06-05.
+const COMPANY_SUFFIX_RE = "(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Avionics|Aviation|Systems|Technologies|Technology|Defense|Manufacturing|Engineering|Labs|Laboratories|Group)";
 export function extractSoleSourceVendor(docText: string): { name: string; cage?: string | null } | null {
   if (!docText) return null;
   const cageMatch = docText.match(/CAGE\s+(?:Code\s+)?([A-Z0-9]{5})/i);
   const cage = cageMatch ? cageMatch[1].toUpperCase() : null;
-  let nameMatch = docText.match(/only\s+(?:known\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/);
+  let nameMatch = docText.match(new RegExp(`only\\s+(?:known\\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`));
   if (!nameMatch) {
-    nameMatch = docText.match(/sole[\s-]source[^.]*?to\s+([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/i);
+    nameMatch = docText.match(new RegExp(`sole[\\s-]source[^.]*?to\\s+([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`, "i"));
+  }
+  if (!nameMatch) {
+    nameMatch = docText.match(new RegExp(`will\\s*compromise\\s*(?:the\\s*)?safety[^.]*?([A-Z][A-Za-z0-9 ,.&'\\-]+?${COMPANY_SUFFIX_RE})\\b`, "i"));
   }
   if (!nameMatch && !cage) return null;
   const name = nameMatch ? nameMatch[1].replace(/\s+/g, " ").trim() : "(vendor name not extracted)";
@@ -945,9 +951,23 @@ export function extractSoleSourceVendor(docText: string): { name: string; cage?:
 }
 
 const SOLE_SOURCE_CAP_SCORE = 25;
-const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1/i;
-export function applySoleSourceCap(baseScore: number, docText: string, classificationDocType: string, vendor: ReturnType<typeof extractSoleSourceVendor>): number {
-  const isJA = SOLE_SOURCE_DOC_RE.test(docText) || /sole[\s-]source/i.test(docText) || /J&A/i.test(classificationDocType);
+// Parity mirror — see src/lib/audit-engine.ts. Includes "will compromise
+// the safety" phrase + far_clauses array check (FAR 6.302 may appear only
+// in the extracted clause list, not the doc text prose).
+const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1|will\s*compromise\s*(?:the\s*)?safety/i;
+export function applySoleSourceCap(
+  baseScore: number,
+  docText: string,
+  classificationDocType: string,
+  vendor: ReturnType<typeof extractSoleSourceVendor>,
+  farClauses?: string[]
+): number {
+  const farFire = Array.isArray(farClauses) && farClauses.some((c) => /6\.302/i.test(c));
+  const isJA =
+    farFire ||
+    SOLE_SOURCE_DOC_RE.test(docText) ||
+    /sole[\s-]source/i.test(docText) ||
+    /J&A/i.test(classificationDocType);
   if (isJA && vendor) return Math.min(baseScore, SOLE_SOURCE_CAP_SCORE);
   return baseScore;
 }
@@ -1336,7 +1356,7 @@ JSON only.`;
   const riskPenalty = severity * 5;
   const baseScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
   // Fix 6 sole-source J&A score cap — parity mirror.
-  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor);
+  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor, complianceJson.far_clauses);
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which

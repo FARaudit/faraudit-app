@@ -385,6 +385,18 @@ function removeNotSolicitationSections(html: string): string {
       new RegExp(`<section\\b[^>]*\\bid="${id}"[^>]*>`),
       "section"
     );
+    // Defect 3 (2026-06-05): strip the matching jump-nav anchor too. The
+    // nav lives in <nav class="jump"> with one <a href="#sec-X">...</a> per
+    // section. Anchors are simple <a>…</a> pairs (one line each in the
+    // template) — a non-greedy single-line regex removes the whole element
+    // including the leading whitespace so the nav collapses cleanly. Without
+    // this, "JUMP TO 05 Risk register 10" remained visible on a wrong-doc
+    // audit even after the section was excised — dead anchors + a phantom
+    // "10 risks" badge.
+    out = out.replace(
+      new RegExp(`\\s*<a\\s+href="#${id}"[^>]*>[\\s\\S]*?</a>`, "g"),
+      ""
+    );
   }
   return out;
 }
