@@ -656,8 +656,7 @@ async function callClaude(
   modelOverride?: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null,
-  temperature?: number  // Fix 2 (2026-06-05): parity mirror — see src/lib/audit-engine.ts
+  pdfFileId?: string | null
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -712,7 +711,6 @@ async function callClaude(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
-        ...(typeof temperature === "number" ? { temperature } : {}),
         system: systemPrompt,
         messages: [{ role: "user", content }]
       }),
@@ -758,14 +756,13 @@ async function callWithRetry(
   label: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null,
-  temperature?: number
+  pdfFileId?: string | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId, temperature);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId, temperature);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -832,8 +829,7 @@ JSON only, no prose.`;
     undefined,
     imageBase64,
     imageMediaType,
-    pdfFileId,
-    0  // Fix 2: classifier is binary/categorical — temperature 0
+    pdfFileId
   );
 
   const json = extractJSON(text) || {};
@@ -1174,8 +1170,7 @@ JSON only.`;
       "overview",
       imageBase64,
       imageMediaType,
-      pdfFileId,
-      0  // Fix 2: structured factors/requirements — determinism
+      pdfFileId
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -1185,8 +1180,7 @@ JSON only.`;
       "compliance",
       imageBase64,
       imageMediaType,
-      pdfFileId,
-      0  // Fix 2: clauses + set-aside + CLINs — categorical
+      pdfFileId
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -1196,8 +1190,7 @@ JSON only.`;
       "risks",
       imageBase64,
       imageMediaType,
-      pdfFileId,
-      0  // Fix 2: severity + prioritized list — categorical
+      pdfFileId
     )
   ]);
 
