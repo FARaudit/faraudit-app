@@ -74,7 +74,7 @@ export async function GET() {
       fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
       fetchHomeStats(supabase).catch(() => null),
       fetchOpportunities(supabase, { limit: 250 }).catch(() => []),
-      fetchRecentAudits(supabase, 200).catch(() => []),
+      fetchRecentAudits(supabase, user.id, 200).catch(() => []),
       // Pipeline rows for the user — feeds Active Pursuits funnel, .ps-mid/.ps-right
       // aggregates, sidebar Pipeline danger badge, and since-bar pursuitsAdvanced.
       // PostgrestBuilder is a thenable but not a real Promise, so we use the

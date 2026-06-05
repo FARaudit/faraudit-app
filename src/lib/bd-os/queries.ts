@@ -226,11 +226,13 @@ export async function fetchDefenseSpending(client: SupabaseClient, naicsCode?: s
 
 export async function fetchRecentAudits(
   client: SupabaseClient,
+  userId: string,
   limit = 25
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
     .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(`fetchRecentAudits: ${error.message}`);

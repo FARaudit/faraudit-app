@@ -24,7 +24,7 @@ export default async function HomePage() {
   const [counter, opportunities, recentAudits, kos, agencies, defenseSpending] = await Promise.all([
     fetchHeaderCounter(supabase).catch(() => ({ audits: 0, traps: 0 })),
     fetchOpportunities(supabase, { limit: 200 }).catch(() => []),
-    fetchRecentAudits(supabase, 200).catch(() => []),
+    fetchRecentAudits(supabase, user.id, 200).catch(() => []),
     fetchKOs(supabase).catch(() => []),
     fetchAgencyStats(supabase).catch(() => []),
     fetchDefenseSpending(supabase).catch(() => [])

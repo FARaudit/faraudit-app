@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "50");
-    const audits = await fetchRecentAudits(supabase, limit).catch(() => []);
+    const audits = await fetchRecentAudits(supabase, user.id, limit).catch(() => []);
     return NextResponse.json({ audits });
   } catch (err) {
     console.error("[api/audits]", err);
