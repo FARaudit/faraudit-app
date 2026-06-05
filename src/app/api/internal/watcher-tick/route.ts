@@ -29,6 +29,19 @@ function timingSafeEqual(a: string, b: string): boolean {
   return r === 0;
 }
 
+// Normalize a bearer string to defang common shell foot-guns: trailing
+// newlines from `echo $VAR | curl`, surrounding double-quotes from
+// `cat .env.local | grep`, leading/trailing whitespace from copy-paste.
+// We MUST apply this identically to the incoming bearer and each
+// candidate so timingSafeEqual sees the same canonical form on both sides.
+function normalizeBearer(s: string | undefined | null): string {
+  if (!s) return "";
+  let v = s.trim();
+  if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+  if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
+  return v;
+}
+
 export async function POST(req: Request) {
   // Accepts any of three bearers — all already in Vercel-prod env:
   //   WATCHER_TICK_BEARER   — dedicated Phase 2 secret (preferred)
@@ -45,15 +58,29 @@ export async function POST(req: Request) {
     process.env.WATCHER_TICK_BEARER,
     process.env.CRON_SECRET,
     process.env.SUPABASE_SERVICE_ROLE_KEY
-  ].filter((v): v is string => !!v && v.length > 0);
+  ]
+    .map(normalizeBearer)
+    .filter(v => v.length > 0);
   if (candidates.length === 0) {
     return NextResponse.json({ error: "watcher-tick bearer not configured" }, { status: 503 });
   }
   const auth = req.headers.get("authorization") || "";
-  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const rawBearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const bearer = normalizeBearer(rawBearer);
   const matched = !!bearer && candidates.some(c => timingSafeEqual(bearer, c));
   if (!matched) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    // Diagnostic-only response: report received-bearer length (NOT value)
+    // and the lengths of the accepted candidates. Lengths leak nothing of
+    // value to an attacker (hex strings of fixed widths) but immediately
+    // tell a debugging operator whether their bearer arrived intact.
+    return NextResponse.json(
+      {
+        error: "unauthorized",
+        bearerRecvLen: bearer.length,
+        acceptedLengths: candidates.map(c => c.length)
+      },
+      { status: 401 }
+    );
   }
 
   const url = new URL(req.url);
