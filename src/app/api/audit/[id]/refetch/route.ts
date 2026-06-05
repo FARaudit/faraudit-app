@@ -11,6 +11,9 @@
 //   2. 24h idempotency check: if the row already has a real PDF source
 //      (anything other than sam_unavailable) AND was refreshed within the
 //      last 24h, return success without re-running the engine.
+//      BYPASS: a POST body of { "force": true } skips this check so an
+//      explicit user-triggered re-run always re-invokes the current engine.
+//      The auto-watcher tick (POST with no body) still gets the cache.
 //   3. Rate limit (shares the existing audit:<user.id> bucket — 10/hr).
 //   4. fetchSolicitationByNoticeId() + fetchPdfFromSamUrl() to re-pull the
 //      SAM resource. If still no resourceLinks → 422 ("not fetchable").
@@ -41,12 +44,21 @@ const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
   if (!id || !UUID_RE.test(id)) {
     return NextResponse.json({ error: "id required (UUID)" }, { status: 400 });
+  }
+
+  // Optional { force?: boolean } body. Body is optional — auto-watcher ticks
+  // POST with no body and inherit force=false. Explicit user re-runs send
+  // { "force": true } to bypass the 24h cache and always re-invoke the engine.
+  let force = false;
+  if ((req.headers.get("content-type") || "").includes("application/json")) {
+    const body = (await req.json().catch(() => null)) as { force?: boolean } | null;
+    force = Boolean(body?.force);
   }
 
   const supabase = await createServerClient();
@@ -86,8 +98,10 @@ export async function POST(
   const lastRefetchedAt = lastRefetchedAtRaw ? new Date(lastRefetchedAtRaw).getTime() : 0;
 
   // 24h idempotency: if the row was successfully refetched recently AND now
-  // carries a real PDF source, skip the model call.
+  // carries a real PDF source, skip the model call. Explicit { force: true }
+  // bypasses so a user-triggered re-run always re-invokes the current engine.
   if (
+    !force &&
     currentPdfSource !== "" &&
     currentPdfSource !== "sam_unavailable" &&
     lastRefetchedAt > Date.now() - TWENTY_FOUR_HOURS_MS
