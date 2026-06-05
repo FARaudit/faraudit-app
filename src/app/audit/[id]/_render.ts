@@ -11,7 +11,9 @@ import type {
   Risk,
   ScoreFactor,
   ClinLineItem,
-  HierarchyNode
+  HierarchyNode,
+  EvaluationFactorVM,
+  SubmissionRequirementVM
 } from "./_view-model";
 
 // ─── safe text helpers ──────────────────────────────────────────────────────
@@ -160,6 +162,37 @@ function renderScoreFactor(f: ScoreFactor): string {
                     <div class="sf-bar"><i class="${f.tone}" style="width:${Math.max(0, Math.min(100, f.score))}%"></i></div>
                     <div class="sf-note">${f.note}</div>
                   </div>`;
+}
+
+// §M Evaluation Factor row inside #sec-eval .eval-factors. Mirrors the
+// design template's .sfactor markup. The tone class flows verbatim onto
+// .sf-cov and .sf-bar i — design CSS defines good/warn/bad/mute on .sf-cov
+// (line 463-466) and good/ok/warn fills on .sf-bar i (line 377-379). bad
+// and mute on the bar have no styled fill, which is intentional: mute
+// always carries coverage_pct=0 anyway (Price + no-profile cases).
+function renderEvalFactor(f: EvaluationFactorVM): string {
+  return `<div class="sfactor">
+                  <div class="sf-top"><span class="sf-name"><span class="sf-rank">${f.rank}</span>${escapeHtml(f.name)}<span class="sf-w">${escapeHtml(f.importance)}</span></span><span class="sf-cov ${f.tone}">${escapeHtml(f.coverage)}</span></div>
+                  <div class="sf-bar"><i class="${f.tone}" style="width:${Math.max(0, Math.min(100, f.coverage_pct))}%"></i></div>
+                  <div class="sf-note">${escapeHtml(f.note)}</div>
+                </div>`;
+}
+
+// §L Submission Requirement row inside #sec-eval .eval-l. Status drives
+// THREE renderable surfaces: the .ready-dot fill class, the SVG icon
+// inside the dot, and the .ready-meta status class. Per design CSS at
+// line 444-446: ok→.done (green fill + checkmark), warn→.warn (amber +
+// alert), todo→.todo (outline only, no fill, no icon — the .todo CSS
+// uses `border:1.5px solid var(--mute-2)` and a card-soft background, so
+// an inner SVG would be invisible).
+function renderReadyRow(r: SubmissionRequirementVM): string {
+  const map: Record<SubmissionRequirementVM["status"], { dot: string; icon: string }> = {
+    ok:   { dot: "done", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>' },
+    warn: { dot: "warn", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg>' },
+    todo: { dot: "todo", icon: "" }
+  };
+  const m = map[r.status];
+  return `<div class="ready-row"><span class="ready-dot ${m.dot}">${m.icon}</span><span class="ready-txt">${escapeHtml(r.requirement)}</span><span class="ready-meta ${r.status}">${escapeHtml(r.meta)}</span></div>`;
 }
 
 function severityWord(s: "P0" | "P1" | "P2"): string {
@@ -717,6 +750,54 @@ function removeScorecard(html: string): string {
   return out;
 }
 
+// Drop §M/§L Evaluation section entirely + its jump-nav entry. Same false-
+// precision gate as #sec-scorecard: when evaluation_factors is empty/null,
+// the data isn't there — render nothing rather than an empty shell.
+function removeEvalSection(html: string): string {
+  const idx = html.indexOf('<section class="sec eval" id="sec-eval">');
+  if (idx === -1) return html;
+  const range = findMatchingClose(html, idx, "section");
+  let out = range ? html.slice(0, idx) + html.slice(range.closeEnd) : html;
+  out = out.replace(/<a href="#sec-eval">[\s\S]*?<\/a>\s*/, "");
+  return out;
+}
+
+// Wire #sec-eval — either strip the whole section (false-precision gate on
+// evaluation_factors) or replace the five data-field surfaces with engine
+// output. eval_basis lives on .award-basis (icon + text); eval_basis_label
+// + submission_summary live on the head pills; evaluation_factors and
+// submission_requirements are repeating-row containers.
+function setEvaluationSection(html: string, vm: AuditViewModel): string {
+  if (vm.evaluation_factors.length === 0) {
+    return removeEvalSection(html);
+  }
+  let out = html;
+  // eval_basis_label pill — replace text when present, remove the element when null.
+  if (vm.eval_basis_label) {
+    out = replaceFieldInner(out, "eval_basis_label", escapeHtml(vm.eval_basis_label));
+  } else {
+    out = removeFieldElement(out, "eval_basis_label");
+  }
+  // eval_basis — replace .award-basis innerHTML (icon + text) or remove the div.
+  if (vm.eval_basis) {
+    const iconSvg = '<div class="ab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></svg></div>';
+    out = replaceFieldInner(out, "eval_basis", `${iconSvg}<div class="ab-txt">${escapeHtml(vm.eval_basis)}</div>`);
+  } else {
+    out = removeFieldElement(out, "eval_basis");
+  }
+  // evaluation_factors — repeating .sfactor rows.
+  out = replaceFieldInner(out, "evaluation_factors", vm.evaluation_factors.map(renderEvalFactor).join("\n"));
+  // submission_requirements — repeating .ready-row.
+  out = replaceFieldInner(out, "submission_requirements", vm.submission_requirements.map(renderReadyRow).join("\n"));
+  // submission_summary pill — show "N to clear" or hide entirely when null/empty.
+  if (vm.submission_summary) {
+    out = replaceFieldInner(out, "submission_summary", escapeHtml(vm.submission_summary));
+  } else {
+    out = removeFieldElement(out, "submission_summary");
+  }
+  return out;
+}
+
 // (stripMastheadSubs / removeClassificationAlts / removeFarBasisCap retired
 // after Design's SECONDARY-FIELDS update — those targets now carry data-field
 // hooks and flow through replaceFieldOrRemove. See history if you need to
@@ -1018,6 +1099,11 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   } else {
     html = replaceFieldInner(html, "score_factors", vm.score_factors.map(renderScoreFactor).join("\n"));
   }
+
+  // §M Evaluation Factors + §L Submission Compliance (#sec-eval). Same
+  // false-precision gate as score_factors — strip the section entirely
+  // when evaluation_factors is empty rather than render an empty shell.
+  html = setEvaluationSection(html, vm);
 
   // §01 Classification — wire-or-hide the demo alt-chips and the FAR-basis
   // caption via Design's new data-field hooks.

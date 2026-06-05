@@ -89,6 +89,42 @@ export interface OverviewJSON {
   contract_type?: string;
   ceiling_value_estimate?: string | null;
   period_of_performance?: string;
+  // Section M/L extracted in Call 1 per CEO spec (Jun 4 2026) and folded
+  // into complianceJson server-side before the engine returns. Stored here
+  // first because the model emits them in the overview pass; assembly hoists
+  // them onto complianceJson.* so the renderer reads one canonical surface.
+  eval_basis?: string | null;
+  eval_basis_label?: string | null;
+  evaluation_factors?: EvaluationFactor[];
+  submission_requirements?: SubmissionRequirement[];
+  submission_summary?: string | null;
+}
+
+// Section M evaluation factor — one entry per stated factor in the
+// solicitation's Section M, in stated order. coverage/coverage_pct/tone
+// require the user's capability profile (not available to this engine
+// call) — when absent, emit the "no profile" shape: coverage="—",
+// coverage_pct=0, tone="mute", note="Complete your capability statement
+// to see fit score". Price/Cost factors are always coverage="Tradeoff",
+// tone="mute" — FARaudit doesn't score price fit.
+export interface EvaluationFactor {
+  rank: number;                       // 1-indexed, matches Section M order
+  name: string;                       // e.g. "Technical Approach"
+  importance: string;                 // e.g. "Most important", "Equal", "Price"
+  coverage: string;                   // "Strong fit" | "Partial" | "Gap" | "Tradeoff" | "—"
+  coverage_pct: number;               // 0–100 bar width; 0 when no profile
+  tone: "good" | "warn" | "bad" | "mute";
+  note: string;                       // one-line explainer below the bar
+}
+
+// Section L submission requirement — concrete, actionable items captured
+// from Section L (page limits, submission portal + deadline, required
+// volumes, format rules, reps & certs, oral presentation rules, etc.).
+// status drives the renderer's dot color + the meta pill copy.
+export interface SubmissionRequirement {
+  requirement: string;
+  status: "ok" | "warn" | "todo";
+  meta: "Clear" | "At risk" | "Action";
 }
 
 export interface DFARSFlag {
@@ -135,6 +171,14 @@ export interface ComplianceJSON {
   // it without a schema migration.
   pdf_source?: PdfSource;
   pdf_unavailable_reason?: string | null;
+  // Section M/L structured fields — extracted in Call 1 (Overview), hoisted
+  // into compliance by runAudit so the renderer reads one canonical surface
+  // for the §M Evaluation Factors + §L Submission Compliance block.
+  eval_basis?: string | null;
+  eval_basis_label?: string | null;
+  evaluation_factors?: EvaluationFactor[];
+  submission_requirements?: SubmissionRequirement[];
+  submission_summary?: string | null;
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -711,6 +755,18 @@ Output ONLY a JSON object with these keys (populate from the actual solicitation
 - contract_type (string): FFP, CPFF, CPIF, IDIQ, BPA, etc.
 - ceiling_value_estimate (string or null): "$X-Y million" if stated; null if not
 - period_of_performance (string): duration with start/end dates if known
+- eval_basis (string or null): 1-2 sentence award method anchored to the controlling FAR rule cited in Section M. Use "FAR 15.101-1" for best-value tradeoff, "FAR 15.101-2" for LPTA, "FAR 14.101" for sealed-bid lowest-price. null if Section M is absent or this is metadata-only.
+- eval_basis_label (string or null): MAX 24 chars. One of "Best-value tradeoff" | "LPTA" | "Lowest price". null if Section M absent.
+- evaluation_factors (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance: string ("Most important" | "Equal" | "Less important" | "Price" | exact stated weight), coverage: string, coverage_pct: number 0-100, tone: "good"|"warn"|"bad"|"mute", note: string}. The customer's capability profile is NOT available to this engine call — therefore: for every NON-PRICE factor emit coverage="—", coverage_pct=0, tone="mute", note="Complete your capability statement to see fit score". For any Price/Cost factor emit coverage="Tradeoff", coverage_pct=0, tone="mute", note="". Empty array if Section M is absent or metadata-only.
+- submission_requirements (object[]): one entry per concrete Section L requirement (page limits, submission portal + deadline, required volumes, format/font rules, reps & certs, oral presentation rules, demo requirements, past performance reference count, etc.). Shape: {requirement: short imperative string, status: "ok"|"warn"|"todo", meta: "Clear"|"At risk"|"Action"}. Map status→meta as ok→Clear, warn→At risk, todo→Action. Empty array if Section L absent.
+- submission_summary (string or null): "{N} to clear" where N = count of submission_requirements with status warn OR todo. null when there are no requirements OR all are "ok".
+
+NEVER FABRICATE §M or §L:
+- If no PDF was provided (metadata-only) → evaluation_factors=[], submission_requirements=[], eval_basis=null, eval_basis_label=null, submission_summary=null.
+- If the document is NOT a solicitation (Award Notice, attachment, sources-sought without an attached Section M) → same empty/null shape.
+- If Section M is absent in the document → evaluation_factors=[] and eval_basis=null and eval_basis_label=null.
+- If Section L is absent → submission_requirements=[] and submission_summary=null.
+- Never invent factors or requirements not stated in the document. Better to emit [] than to guess.
 
 No prose, no markdown, JSON only.`;
 
@@ -813,6 +869,71 @@ JSON only.`;
   complianceJson.dfars_flags = parseDFARSTraps(complianceJson);
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
+
+  // Section M/L hoist — Call 1 (Overview) emits these structured fields per
+  // CEO spec (Jun 4 2026); fold them onto complianceJson so the renderer
+  // reads a single canonical surface for the §M/§L block. Defensively
+  // normalize the shape: rank gets re-numbered 1-indexed in stated order;
+  // Price/Cost factor always reads as Tradeoff/mute; any other factor with
+  // missing coverage data falls back to the no-profile shape; the summary
+  // is recomputed from current warn+todo counts so the pill always reflects
+  // the data the rows render.
+  if (overviewJson.eval_basis !== undefined) complianceJson.eval_basis = overviewJson.eval_basis;
+  if (overviewJson.eval_basis_label !== undefined) {
+    // Pill is capped at 24 chars by design (.sh-pill width); truncate
+    // defensively if the model emitted something longer.
+    const lbl = overviewJson.eval_basis_label;
+    complianceJson.eval_basis_label = lbl == null ? null : String(lbl).slice(0, 24);
+  }
+  if (Array.isArray(overviewJson.evaluation_factors)) {
+    complianceJson.evaluation_factors = overviewJson.evaluation_factors.map((f, i) => {
+      const name = String(f?.name ?? "");
+      const isPrice = /^(price|cost)\b/i.test(name);
+      const tone: EvaluationFactor["tone"] = isPrice ? "mute"
+        : (f?.tone === "good" || f?.tone === "warn" || f?.tone === "bad" || f?.tone === "mute") ? f.tone
+        : "mute";
+      // No capability profile available to the engine — non-price factors
+      // get the "no profile" shape regardless of what the model returned.
+      const coverage = isPrice ? "Tradeoff" : (f?.coverage && f.coverage !== "—" ? "—" : (f?.coverage ?? "—"));
+      const note = isPrice ? (f?.note ?? "")
+        : (coverage === "—" ? "Complete your capability statement to see fit score" : String(f?.note ?? ""));
+      const coverage_pct = isPrice ? 0
+        : (typeof f?.coverage_pct === "number" && coverage !== "—" ? Math.max(0, Math.min(100, Math.round(f.coverage_pct))) : 0);
+      return {
+        rank: i + 1,
+        name,
+        importance: String(f?.importance ?? ""),
+        coverage,
+        coverage_pct,
+        tone,
+        note
+      };
+    });
+  } else {
+    complianceJson.evaluation_factors = [];
+  }
+  if (Array.isArray(overviewJson.submission_requirements)) {
+    complianceJson.submission_requirements = overviewJson.submission_requirements.map((r) => {
+      const status: SubmissionRequirement["status"] =
+        r?.status === "ok" || r?.status === "warn" || r?.status === "todo" ? r.status : "todo";
+      const meta: SubmissionRequirement["meta"] =
+        status === "ok" ? "Clear" : status === "warn" ? "At risk" : "Action";
+      return { requirement: String(r?.requirement ?? ""), status, meta };
+    });
+  } else {
+    complianceJson.submission_requirements = [];
+  }
+  // Recompute submission_summary from the post-normalization shape so the
+  // "N to clear" pill always matches the rows being rendered, and so the
+  // renderer's hide-when-empty gate (false-precision) flips on the right
+  // signal. null when no requirements OR all are "ok".
+  const reqs = complianceJson.submission_requirements;
+  if (Array.isArray(reqs) && reqs.length > 0) {
+    const toClear = reqs.filter((r) => r.status === "warn" || r.status === "todo").length;
+    complianceJson.submission_summary = toClear > 0 ? `${toClear} to clear` : null;
+  } else {
+    complianceJson.submission_summary = null;
+  }
   let prioritized = assignRiskPriority(risksJson);
 
   // Fallback — never let prioritized_risks be empty. Synthesize one entry that

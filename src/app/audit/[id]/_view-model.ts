@@ -41,6 +41,32 @@ export interface ScoreFactor {
   drag?: boolean;
 }
 
+// §M Evaluation Factor — mirrors audit-engine EvaluationFactor. Sourced
+// from compliance_json.evaluation_factors (which the engine hoists from
+// Call 1 / Overview into Call 2 / Compliance for renderer convenience).
+// tone drives the .sf-cov + .sf-bar i CSS classes (good|warn|bad|mute).
+// coverage_pct is the bar width; 0 for Price (tone=mute, coverage=Tradeoff)
+// and for any factor lacking a capability-profile score (coverage="—").
+export interface EvaluationFactorVM {
+  rank: number;
+  name: string;
+  importance: string;
+  coverage: string;
+  coverage_pct: number;
+  tone: "good" | "warn" | "bad" | "mute";
+  note: string;
+}
+
+// §L Submission Requirement — mirrors audit-engine SubmissionRequirement.
+// status drives the .ready-dot class (ok→done, warn→warn, todo→todo per
+// design CSS taxonomy) and the .ready-meta class + text ("Clear" /
+// "At risk" / "Action").
+export interface SubmissionRequirementVM {
+  requirement: string;
+  status: "ok" | "warn" | "todo";
+  meta: "Clear" | "At risk" | "Action";
+}
+
 export interface ClinLineItem {
   clin: string;
   description: string;
@@ -165,6 +191,18 @@ export interface AuditViewModel {
   headline_risk: Risk;
   show_moment_band: boolean;        // false when risks.length === 0 → hide whole band
   score_factors: ScoreFactor[];
+
+  // §M Evaluation Factors + §L Submission Compliance (sec-eval).
+  // Sourced from compliance_json.{eval_basis, eval_basis_label,
+  // evaluation_factors, submission_requirements, submission_summary} —
+  // emitted by Call 1 (Overview) per CEO spec and hoisted into compliance
+  // by runAudit. False-precision gate: when evaluation_factors is empty,
+  // the renderer strips the section + jump-nav entry entirely.
+  eval_basis: string | null;
+  eval_basis_label: string | null;
+  evaluation_factors: EvaluationFactorVM[];
+  submission_requirements: SubmissionRequirementVM[];
+  submission_summary: string | null;
 
   // recommendation
   recommendation_rationale: string;
@@ -698,6 +736,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   const clinLineItems = mapClins(compJson, risks);
   const winThemes = deriveWinThemes(overviewJson);
 
+  // §M Evaluation Factors + §L Submission Compliance — flat passthroughs
+  // from compliance_json. The engine's runAudit hoist normalizes the shape
+  // (1-indexed rank, Price→Tradeoff/mute, no-profile defaults, recomputed
+  // submission_summary) so we trust the values verbatim here.
+  const evalBasis = (compJson.eval_basis ?? null) as string | null;
+  const evalBasisLabel = (compJson.eval_basis_label ?? null) as string | null;
+  const evaluationFactors: EvaluationFactorVM[] = Array.isArray(compJson.evaluation_factors)
+    ? (compJson.evaluation_factors as EvaluationFactorVM[])
+    : [];
+  const submissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
+    ? (compJson.submission_requirements as SubmissionRequirementVM[])
+    : [];
+  const submissionSummary = (compJson.submission_summary ?? null) as string | null;
+
   // KO email
   const koTo = (audit.ko_email_recipient as string) || "contracting-officer@agency.mil";
   const koBody = deriveKoBody(audit, headlineRisk, displayId);
@@ -858,6 +910,16 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     // solicitation; the not-solicitation banner covers that messaging.
     show_moment_band: risks.length > 0 && !isNotSolicitation,
     score_factors: scoreFactors,
+
+    // §M Evaluation Factors + §L Submission Compliance — sourced from
+    // compliance_json which the engine populates via Call 1 (Overview)
+    // extraction + server-side hoist. Empty arrays + nulls signal "hide
+    // the section" to the renderer (false-precision gate).
+    eval_basis: evalBasis,
+    eval_basis_label: evalBasisLabel,
+    evaluation_factors: evaluationFactors,
+    submission_requirements: submissionRequirements,
+    submission_summary: submissionSummary,
 
     recommendation_rationale: (audit.bid_recommendation as string) || "Recommendation rationale not recorded.",
     recommendation_win_themes: winThemes,

@@ -447,6 +447,42 @@ button{font-family:inherit}
 .ready-txt{font-size:12px;color:var(--ink-2);line-height:1.3;font-weight:500}
 .ready-txt.is-todo{color:var(--mute)}
 .ready-meta{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute-2);white-space:nowrap}
+/* ── §M/L · Evaluation Factors & Submission Compliance ── */
+.sec-num.alpha{font-family:"Manrope",sans-serif;font-size:13px;font-weight:800}
+.award-basis{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-radius:12px;background:var(--accent-pale);border:1px solid var(--accent-light);margin-bottom:18px}
+[data-theme="dark"] .award-basis{background:rgba(55,138,221,.1);border-color:rgba(181,212,244,.22)}
+.ab-ico{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff}
+.ab-ico svg{width:18px;height:18px}
+.ab-txt{font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.ab-txt b{color:var(--ink);font-weight:700}
+.eval-lead{font-size:12.5px;line-height:1.55;color:var(--mute);margin:0 0 16px}
+.eval-lead b{color:var(--ink-2);font-weight:600}
+.eval-factors{gap:17px}
+.sf-rank{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--ink-2);margin-right:9px;vertical-align:middle}
+.sf-cov{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:4px 9px;flex-shrink:0;white-space:nowrap;border:1px solid;align-self:center}
+.sf-cov.good{color:var(--green-700);background:var(--green-50);border-color:var(--green-200)}
+.sf-cov.warn{color:var(--amber-700);background:var(--amber-50);border-color:var(--amber-200)}
+.sf-cov.bad{color:var(--red-700);background:var(--red-50);border-color:var(--red-200)}
+.sf-cov.mute{color:var(--mute);background:var(--card-soft);border-color:var(--line)}
+[data-theme="dark"] .sf-cov.good{background:rgba(16,185,129,.14);color:#6ee7b7;border-color:transparent}
+[data-theme="dark"] .sf-cov.warn{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
+[data-theme="dark"] .sf-cov.bad{background:rgba(239,68,68,.16);color:#fca5a5;border-color:transparent}
+.subsec{margin-top:24px;padding-top:20px;border-top:1px solid var(--line-2)}
+.subsec-h{display:flex;align-items:center;gap:11px;margin-bottom:8px;flex-wrap:wrap}
+.subsec-num{width:26px;height:24px;border-radius:6px;display:grid;place-items:center;flex-shrink:0;font-family:"Manrope",sans-serif;font-size:12px;font-weight:800;color:var(--accent-deep);background:rgba(55,138,221,.08);border:1px solid var(--accent-light)}
+[data-theme="dark"] .subsec-num{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:rgba(181,212,244,.28)}
+.subsec-title{font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.subsec-sub{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);font-weight:500}
+.subsec-h .sh-pill{white-space:nowrap;flex-shrink:0}
+.eval-l{padding:2px 0 0}
+.eval-l .ready-row{padding:9px 0;align-items:flex-start}
+.eval-l .ready-txt{font-size:12.5px}
+.eval-l .ready-txt b{color:var(--ink);font-weight:700}
+.eval-l .ready-meta{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
+.eval-l .ready-meta.warn{color:var(--amber-700)}
+.eval-l .ready-meta.todo{color:var(--accent-deep)}
+.eval-l .ready-meta.ok{color:var(--green-700)}
+[data-theme="dark"] .eval-l .ready-meta.warn{color:#fcd34d}[data-theme="dark"] .eval-l .ready-meta.ok{color:#6ee7b7}[data-theme="dark"] .eval-l .ready-meta.todo{color:var(--accent-light)}
 /* jump nav */
 .jump{padding:8px 10px 12px}
 .jump a{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:9px;text-decoration:none;color:var(--ink-2);font-size:12.5px;font-weight:600;transition:background .14s,color .14s}
@@ -961,6 +997,57 @@ button{font-family:inherit}
             </div>
           </section>
 
+          <!-- M · EVALUATION FACTORS (Section M) + SUBMISSION COMPLIANCE (Section L) -->
+          <section class="sec eval" id="sec-eval">
+            <div class="sec-head">
+              <span class="sec-num alpha">M</span>
+              <div class="sec-title">Evaluation Factors<span class="st-sub">How the Government actually scores your proposal &mdash; Section M</span></div>
+              <div class="sh-right"><span class="sh-pill ok" data-field="eval_basis_label">Best-value tradeoff</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="award-basis" data-field="eval_basis">
+                <div class="ab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></svg></div>
+                <div class="ab-txt"><b>Best-value tradeoff (FAR 15.101-1).</b> The non-price factors below, <b>combined, are significantly more important than price</b> &mdash; a higher-priced, technically superior quote can win. Price becomes the deciding lever only once technical merit converges. This is <b>not</b> lowest-price-technically-acceptable.</div>
+              </div>
+
+              <p class="eval-lead">Factors in <b>descending order of importance</b>, as stated in Section M. Your column reads how strongly current capability maps to each &mdash; and where the proposal has to do the work to win the points.</p>
+
+              <div class="sc-factors eval-factors" data-field="evaluation_factors">
+                <div class="sfactor">
+                  <div class="sf-top"><span class="sf-name"><span class="sf-rank">1</span>Technical Approach<span class="sf-w">Most important</span></span><span class="sf-cov good">Strong fit</span></div>
+                  <div class="sf-bar"><i class="good" style="width:88%"></i></div>
+                  <div class="sf-note">Sub-factors: <b>solution architecture, predictive-model accuracy, data-integration plan</b>. Your fielded H-60 analytics map directly &mdash; lead the volume with a measurable forecast-accuracy claim, not capability boilerplate.</div>
+                </div>
+                <div class="sfactor">
+                  <div class="sf-top"><span class="sf-name"><span class="sf-rank">2</span>Past Performance<span class="sf-w">More important than price</span></span><span class="sf-cov good">Strong fit</span></div>
+                  <div class="sf-bar"><i class="good" style="width:82%"></i></div>
+                  <div class="sf-note">Evaluated on <b>recency &amp; relevancy</b>. Your H-60 predictive-maintenance work is squarely on-point &mdash; cite the contract value, scope and measured outcome, not just the customer name.</div>
+                </div>
+                <div class="sfactor">
+                  <div class="sf-top"><span class="sf-name"><span class="sf-rank">3</span>Price<span class="sf-w">Least important &middot; tradeoff lever</span></span><span class="sf-cov mute">Tradeoff</span></div>
+                  <div class="sf-bar"><i class="ok" style="width:50%"></i></div>
+                  <div class="sf-note">Evaluated for <b>realism &amp; reasonableness</b>, not just lowest total. A price that signals you misunderstood the scope <b>hurts the technical score</b> &mdash; hold margin and win on merit, don&rsquo;t buy the work.</div>
+                </div>
+              </div>
+
+              <div class="subsec">
+                <div class="subsec-h">
+                  <span class="subsec-num">L</span>
+                  <span class="subsec-title">Submission Compliance</span>
+                  <span class="subsec-sub">Section L &mdash; the rules that decide if you get scored at all</span>
+                  <span class="sh-pill warn" style="margin-left:auto" data-field="submission_summary">2 to clear</span>
+                </div>
+                <div class="ready eval-l" data-field="submission_requirements">
+                  <div class="ready-row"><span class="ready-dot warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg></span><span class="ready-txt"><b>15-page limit</b> &mdash; and, unusually, key-personnel resumes <b>count</b> against it</span><span class="ready-meta warn">At risk</span></div>
+                  <div class="ready-row"><span class="ready-dot warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg></span><span class="ready-txt">Submit via <b>DoD SAFE</b> by <b>2 Jul 2026, 2:00 PM ET</b> &mdash; late is unreadable, no exceptions</span><span class="ready-meta todo">Action</span></div>
+                  <div class="ready-row"><span class="ready-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span><span class="ready-txt">Two separately-bound volumes &mdash; <b>Technical</b> and <b>Price</b></span><span class="ready-meta ok">Clear</span></div>
+                  <div class="ready-row"><span class="ready-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span><span class="ready-txt">Format &mdash; 12-pt minimum font, 1-inch margins, single column</span><span class="ready-meta ok">Clear</span></div>
+                  <div class="ready-row"><span class="ready-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span><span class="ready-txt">Reps &amp; certs complete in SAM.gov <span class="mono" style="color:var(--mute-2)">FAR 52.204-8</span></span><span class="ready-meta ok">Clear</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- 04 · COMPLIANCE FLAGS -->
           <section class="sec" id="sec-compliance">
             <div class="sec-head">
@@ -1158,6 +1245,7 @@ button{font-family:inherit}
               <a href="#sec-classify"><span class="jn">01</span>Classification</a>
               <a href="#sec-incumbent"><span class="jn">02</span>Incumbent</a>
               <a href="#sec-scope"><span class="jn">03</span>Scope &amp; CLINs</a>
+              <a href="#sec-eval"><span class="jn">M</span>Evaluation &middot; L</a>
               <a href="#sec-compliance"><span class="jn">04</span>Compliance<span class="jb bad">4</span></a>
               <a href="#sec-risks"><span class="jn">05</span>Risk register<span class="jb warn">4</span></a>
               <a href="#sec-reco"><span class="jn">06</span>Recommendation</a>
@@ -1182,7 +1270,7 @@ button{font-family:inherit}
     <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="dr-meta">
-    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="80ebe1f2e5eeaee1ecf6e1f2e5fac0e4ece1aeede9ec">[email&#160;protected]</a></span></div>
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="91faf0e3f4ffbff0fde7f0e3f4ebd1f5fdf0bffcf8fd">[email&#160;protected]</a></span></div>
     <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
   </div>
   <div class="dr-body">
@@ -1273,14 +1361,20 @@ Capture Lead, [Company]
    Default true = render. When false, the block hides and layout reflows cleanly.
      score_factors             → Decision Scorecard (§00) + its Jump-to entry
      win_probability_benchmark → both verdict benchmark chips (score + win prob)
-     key_dates                 → key-dates ribbon + sticky deadline clock + countdowns */
+     key_dates                 → key-dates ribbon + sticky deadline clock + countdowns
+     evaluation_factors        → §M Evaluation Factors + §L submission checklist + its Jump-to entry
+                                 (engine must extract Section M factors + Section L mechanics in
+                                  Call 1; until it emits evaluation_factors[], this section HIDES —
+                                  same false-precision gate as score_factors, never an empty shell) */
 (function(){
-  var AVAILABLE = { score_factors:true, win_probability_benchmark:true, key_dates:true };
+  var AVAILABLE = { score_factors:true, win_probability_benchmark:true, key_dates:true, evaluation_factors:true };
   function show(sel,on){ document.querySelectorAll(sel).forEach(function(el){ el.style.display = on?'':'none'; }); }
   window.applyAvailability = function(av){
     av = av || AVAILABLE;
     show('#sec-scorecard', av.score_factors);
     var j=document.querySelector('.jump a[href="#sec-scorecard"]'); if(j) j.style.display = av.score_factors?'':'none';
+    show('#sec-eval', av.evaluation_factors);
+    var je=document.querySelector('.jump a[href="#sec-eval"]'); if(je) je.style.display = av.evaluation_factors?'':'none';
     show('.mhv-bench', av.win_probability_benchmark);
     show('.keydates', av.key_dates); show('.rail-deadline', av.key_dates);
   };
@@ -1400,6 +1494,10 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        data-field="win_probability"              → audit.win_probability  (int %)
        data-field="win_probability_benchmark"    → audit.win_probability_benchmark  (e.g. "+23 vs 18% category avg")
        data-field="score_factors"                → audit.score_factors[]  {name,weight,score,note,tone:good|ok|warn}  (Decision Scorecard §00; weighted sum = score)
+       data-field="evaluation_factors"           → audit.evaluation_factors[] {rank,name,importance,coverage,coverage_pct,tone:good|warn|bad|mute,note}  (§M Section M; THE solicitation's own factors — distinct from score_factors, which is FARaudit's bid/no-bid rubric. Order = Section M order of importance.)
+       data-field="eval_basis" / "eval_basis_label" → audit.eval_basis (best-value tradeoff vs LPTA + the controlling rule) — drives §M award-basis callout + head pill. eval_basis_label is the short pill form.
+       data-field="submission_requirements"      → audit.submission_requirements[] {requirement,status:ok|warn|todo,meta}  (§L Section L compliance checklist — page limit, format, volumes, due date/time, portal, reps&certs)
+       data-field="submission_summary"           → "N to clear" from real warn/todo counts; HIDE when none outstanding
        data-field="qa_deadline"                  → solicitation.qa_deadline  (questions-due date; ribbon + rail clock)
        data-field="qa_days" / "qa_days_num"       → derived countdown to qa_deadline ("in 14 days" / 14)
        data-field="response_deadline"            → solicitation.response_deadline  (quote due)
@@ -1436,7 +1534,8 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        toggle [data-state="full"] vs [data-state="locked"] visibility.
        Affects: the analyst-flag band (#moment), §04 Compliance Flags, §05 Risk Register.
        Locked treatment shows ghosted rows + an "Upload the PDF to unlock" CTA — never a white void.
-       Remove the #demoToggle control in production (reviewer aid only).
+       Remove BOTH the #demoToggle control AND the #prelimModes case-cycler in production
+       (reviewer aids only — they leaked to prod once; strip both server-side).
 
      GRACEFUL DEGRADATION (product decision — no backend changes to ship)
        Four fields are optional. When ABSENT, hide the block — never show empty UI:
