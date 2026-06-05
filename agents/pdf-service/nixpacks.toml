@@ -1,0 +1,18 @@
+# Per-agent Nixpacks override — kicks in because Root Directory in the
+# Railway service is set to agents/pdf-service. Disables the implicit
+# `npm run build` step (we run via tsx directly) and locks the Node
+# version to match the engines field in package.json.
+
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm ci --omit=dev || npm install --omit=dev"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "npx tsx index.ts"

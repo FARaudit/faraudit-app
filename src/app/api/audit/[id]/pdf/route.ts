@@ -1,31 +1,33 @@
 // GET /api/audit/[id]/pdf — exports the audit-report page as a PDF.
 //
-// 1:1 with the web report by design: this route renders the exact same HTML
-// /audit/[id]/route.ts serves (buildViewModel + renderAuditReport), then
-// prints it to PDF via headless Chromium. The @media print stylesheet in
-// _template.html hides chrome (sidebar / topbar / rail / drawer / demo
-// toggle), expands risk bodies, drops shadows, and forces white backgrounds.
-// One source of truth — no parallel PDF layout to maintain.
+// Now a proxy: the Vercel lambda renders the SAME HTML the web page serves
+// (buildViewModel + renderAuditReport), then POSTs that HTML to the Railway
+// pdf-service which does headless-Chromium → PDF and streams bytes back.
+// We stream those bytes to the browser with the user-facing filename headers.
 //
-// Retires the prior @react-pdf/renderer 4-section generator
-// (Classification / Overview / Compliance list / Risks) which omitted the
-// verdict, headline-risk band, recommendation, and KO email.
+// Why split: Vercel's bundler-plus-file-tracer can't reliably ship
+// @sparticuz/chromium's brotli-compressed binary onto the lambda. Both the
+// serverExternalPackages opt-out + --webpack build flag failed at runtime
+// (commit 9985988 / 67b56e7 era). Railway's persistent container filesystem
+// keeps the binary intact, and the proxy is a 200-line round-trip.
+//
+// Env required:
+//   RAILWAY_PDF_URL    — base URL of the pdf-service (e.g. https://pdf-…railway.app)
+//   RAILWAY_PDF_SECRET — Bearer secret shared with the service
 
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
 import { renderAuditReport } from "../../../../audit/[id]/_render";
 import { displaySolicitationId } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// Chromium cold-start + the print-to-PDF pipeline together comfortably fit
-// in 30s on warm functions; 60s gives us headroom on cold starts.
+// Round-trip = Vercel render (~200ms) + Railway chromium PDF (~5-25s warm)
+// + stream-back. 60s keeps the Vercel side aligned with the Railway hard cap.
 export const maxDuration = 60;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -41,6 +43,15 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const pdfUrl = process.env.RAILWAY_PDF_URL;
+  const pdfSecret = process.env.RAILWAY_PDF_SECRET;
+  if (!pdfUrl || !pdfSecret) {
+    return NextResponse.json(
+      { error: "PDF service not configured — RAILWAY_PDF_URL and RAILWAY_PDF_SECRET required" },
+      { status: 503 }
+    );
+  }
 
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -88,40 +99,32 @@ export async function GET(
   const template = await readFile(templatePath, "utf8");
   const html = renderAuditReport(template, vm);
 
-  // Headless Chromium → PDF. printBackground:true preserves the verdict
-  // gradient + the moment-band amber; preferCSSPageSize lets the template's
-  // @page rule (13mm margin) win.
-  // @sparticuz/chromium ships the Linux x86_64/arm64 binary Vercel needs.
-  // On macOS/Windows dev machines `executablePath()` returns an unsupported
-  // path — set CHROME_EXECUTABLE locally (e.g. /Applications/Google Chrome
-  // .app/Contents/MacOS/Google Chrome) to test the route in dev.
-  const localChromeOverride = process.env.CHROME_EXECUTABLE;
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    executablePath: localChromeOverride || (await chromium.executablePath()),
-    headless: true
-  });
-
-  let pdf: Uint8Array;
+  // POST to Railway pdf-service. The service Bearer-checks RAILWAY_PDF_SECRET
+  // and returns PDF bytes with Content-Type: application/pdf.
+  const endpoint = pdfUrl.replace(/\/+$/, "") + "/pdf";
+  let pdfRes: Response;
   try {
-    const page = await browser.newPage();
-    await page.emulateMediaType("print");
-    // "load" suffices for setContent — the template is self-contained
-    // (inline CSS + inline SVG, only Google Fonts as remote). Network-idle
-    // semantics aren't supported by setContent in the new puppeteer-core.
-    await page.setContent(html, { waitUntil: "load" });
-    pdf = await page.pdf({
-      printBackground: true,
-      preferCSSPageSize: true,
-      format: "Letter",
-      // Margins overridden by the template's @page { margin: 13mm } when
-      // preferCSSPageSize honors it, but spell them out as a fallback so
-      // any browser/runtime that ignores @page still produces sane edges.
-      margin: { top: "13mm", right: "13mm", bottom: "13mm", left: "13mm" }
+    pdfRes = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${pdfSecret}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ auditId: audit.id, html })
     });
-  } finally {
-    await browser.close();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `pdf-service unreachable: ${msg.slice(0, 200)}` }, { status: 502 });
   }
+  if (!pdfRes.ok) {
+    const detail = await pdfRes.text().catch(() => "");
+    return NextResponse.json(
+      { error: `pdf-service ${pdfRes.status}`, detail: detail.slice(0, 400) },
+      { status: 502 }
+    );
+  }
+
+  const pdfBytes = await pdfRes.arrayBuffer();
 
   // Filename keeps the prior pattern: FARaudit-<sol#>-<YYYY-MM-DD>.pdf
   const displayId =
@@ -133,13 +136,7 @@ export async function GET(
   const generatedAt = new Date().toISOString().slice(0, 10);
   const filename = `FARaudit-${displayId}-${generatedAt}.pdf`;
 
-  // Hand back a fresh ArrayBuffer so the Response body type stays clean
-  // across Node.js Buffer + Uint8Array<ArrayBufferLike> generic shifts in
-  // newer TS lib (same pattern the prior route used).
-  const ab = new ArrayBuffer(pdf.byteLength);
-  new Uint8Array(ab).set(pdf);
-
-  return new Response(ab, {
+  return new Response(pdfBytes, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

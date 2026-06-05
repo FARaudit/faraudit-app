@@ -1,0 +1,14 @@
+# PDF Service — Railway HTTP worker (not a cron).
+# Service is configured with Root Directory = agents/pdf-service in the
+# Railway dashboard so this directory's package.json + nixpacks.toml are
+# the active build context.
+
+[build]
+buildCommand = ""
+
+[deploy]
+startCommand = "npx tsx index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
