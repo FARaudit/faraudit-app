@@ -523,6 +523,58 @@ function setMetadataOnly(html: string, isMetaOnly: boolean): string {
   );
 }
 
+// ─── strip reviewer-only controls (Preview State toggle + Metadata case cycler) ─
+//
+// The template ships two design-review aids fixed to the bottom of the page:
+//   #demoToggle   — flips IS_METADATA_ONLY at runtime so reviewers can preview
+//                   full-vs-locked rendering without re-running an audit.
+//   #prelimModes  — pill row that cycles data-prelim-mode (fetch/watch/upload)
+//                   so reviewers can sanity-check all three preliminary states.
+// Both are gated by visibility in the design (locked-only) but they're real
+// DOM at production and leaked on the live audit page. Strip both server-side.
+//
+// The same IIFE that owns the click handlers also drives apply() and
+// drawRing() — both of which we still need — so we add null guards to the
+// few lines that reference the now-stripped #demoToggle, and drop the dead
+// click-handler bindings entirely.
+function stripReviewerControls(html: string): string {
+  let out = html;
+  // Strip the demo-toggle wrapper.
+  const demoOpenRe = /<div class="demo-toggle" id="demoToggle">/;
+  out = removeElementByOpenRe(out, demoOpenRe, "div");
+  // Strip the prelim-modes cycler.
+  const modesOpenRe = /<div class="prelim-modes" id="prelimModes"[^>]*>/;
+  out = removeElementByOpenRe(out, modesOpenRe, "div");
+  // Collapse the preceding HTML comments that documented the stripped blocks.
+  out = out.replace(
+    /\s*<!-- metadata-only demo toggle \(reviewer aid[^>]*-->\s*/,
+    "\n"
+  );
+  out = out.replace(
+    /\s*<!-- prelim-mode cycler \(reviewer aid[^>]*-->\s*/,
+    ""
+  );
+  // Null-guard the lines inside apply() that touch the now-absent elements.
+  out = out.replace(
+    /toggle\.classList\.toggle\('on', meta\);/,
+    "if(toggle) toggle.classList.toggle('on', meta);"
+  );
+  out = out.replace(
+    /label\.textContent = meta\?'Metadata only':'Full report';/,
+    "if(label) label.textContent = meta?'Metadata only':'Full report';"
+  );
+  // Drop the reviewer click bindings — they're dead with the controls stripped.
+  out = out.replace(
+    /\n\s*toggle\.addEventListener\('click', function\(\)\{ IS_METADATA_ONLY=!IS_METADATA_ONLY; apply\(IS_METADATA_ONLY\); \}\);/,
+    ""
+  );
+  out = out.replace(
+    /\n\s*if\(modesEl\) modesEl\.querySelectorAll\('\.pm-pill'\)\.forEach\(function\(p\)\{ p\.addEventListener\('click', function\(\)\{ setPrelimMode\(p\.getAttribute\('data-mode'\)\); \}\); \}\);/,
+    ""
+  );
+  return out;
+}
+
 // ─── confidence ring stroke-dashoffset baked-in ─────────────────────────────
 //
 // The page JS auto-computes the ring after load, but for users with JS off OR
@@ -1102,6 +1154,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   // Dev-only HANDOFF block — not for the wire.
   html = stripHandoffComment(html);
+
+  // Reviewer-only controls (Preview State toggle + Metadata case cycler) —
+  // bottom-left of the design template, must not ship to prod.
+  html = stripReviewerControls(html);
 
   // Stamp the initial "✓ Tracking" state on the [data-track] CTA + sub-note
   // when the current user is already watching this notice. The production
