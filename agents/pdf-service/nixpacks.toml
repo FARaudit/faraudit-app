@@ -1,7 +1,13 @@
-# Per-agent Nixpacks override — kicks in because Root Directory in the
-# Railway service is set to agents/pdf-service. Disables the implicit
-# `npm run build` step (we run via tsx directly) and locks the Node
-# version to match the engines field in package.json.
+# PDF Service Nixpacks config.
+#
+# Activated by setting NIXPACKS_TOML_FILE = agents/pdf-service/nixpacks.toml
+# as a Railway service variable so this file is read instead of the
+# repo-root build path.
+#
+# The cd into agents/pdf-service is necessary because `railway up` from
+# inside agents/pdf-service still walks up to the git root and uploads
+# the whole repo — so the build container's cwd is the repo root, not
+# the agent dir.
 
 providers = ["node"]
 
@@ -9,10 +15,10 @@ providers = ["node"]
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm ci --omit=dev || npm install --omit=dev"]
+cmds = ["cd agents/pdf-service && (npm ci --omit=dev || npm install --omit=dev)"]
 
 [phases.build]
 cmds = []
 
 [start]
-cmd = "npx tsx index.ts"
+cmd = "cd agents/pdf-service && npx tsx index.ts"
