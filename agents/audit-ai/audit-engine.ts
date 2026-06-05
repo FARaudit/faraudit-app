@@ -98,6 +98,10 @@ export interface OverviewJSON {
   evaluation_factors?: EvaluationFactor[];
   submission_requirements?: SubmissionRequirement[];
   submission_summary?: string | null;
+  // Canonical solicitation number as it appears on the SF-18/1449 cover page
+  // — hyphens preserved as printed. Engine hoists this onto complianceJson
+  // so downstream surfaces (masthead, reasoning, filenames) read one value.
+  solicitation_number_canonical?: string | null;
 }
 
 // Section M evaluation factor — one entry per stated factor in the
@@ -136,14 +140,27 @@ export interface DFARSFlag {
 
 export interface PrioritizedRisk {
   text: string;
+  // Short risk title — ≤8 words, no "RISK N (X):" prefix. Drives the analyst
+  // flag headline + the .risk-title element. Falls back to first sentence of
+  // text when the model didn't emit a title.
+  title?: string;
   priority: "P0" | "P1" | "P2";
   category: string;
   citation?: string;
-  // Per-risk provenance. "verified" = the risk references a FAR/DFARS clause
-  // present in the source. "inferred" = pattern-derived (model prefixed with
-  // [Inferred from typical patterns] OR no clause anchor). Lets the renderer
-  // badge inferred risks so customers don't read them as audited findings.
+  // Per-risk provenance. "verified" = the risk quotes ANY anchor extracted
+  // from the parsed document (FAR/DFARS clause, NSN, CAGE, NAICS, DoDAAC,
+  // dollar amount, named party, dated reference, block code). "inferred" =
+  // derived from NAICS/agency norms with zero document anchor. The
+  // post-processor enforces this via DOCUMENT_ANCHOR_RE regardless of what
+  // the model returned, so the badge in the renderer reflects evidence
+  // present in the text rather than the model's self-tagging.
   provenance: "verified" | "inferred";
+  // SPECIFIC neutralizing action for this risk. Engine prompt forbids canned
+  // boilerplate ("see KO email draft" etc.) — when the model has no distinct
+  // move it emits empty string, not generic filler. View-model has a stale
+  // canned fallback (Address this risk before submission — see KO email draft)
+  // that should be removed in a follow-up commit; the engine side is right.
+  faraudit_action?: string;
 }
 
 export interface CLIN {
@@ -179,6 +196,17 @@ export interface ComplianceJSON {
   evaluation_factors?: EvaluationFactor[];
   submission_requirements?: SubmissionRequirement[];
   submission_summary?: string | null;
+  // Score-relative benchmark phrase for the masthead .mhv-bench chip. Derived
+  // from compliance_score: ≥80 → "Top quartile of your audits", 70-79 →
+  // "Above average", 60-69 → "Mid-pack", <60 → null. The renderer must hide
+  // the .mhv-bench element when this is null — surfacing "Top quartile" on a
+  // 25/100 audit (the static design demo text) is a false-precision liability.
+  score_benchmark?: string | null;
+  // Canonical solicitation number as it appears on the SF-18/1449 cover page
+  // (e.g. "SPRRA1-26-Q-0034"). Extracted in Call 1 (Overview) — the view-model
+  // should prefer this over the SAM metadata solicitation_number when present,
+  // so masthead + reasoning + filenames all show the same canonical form.
+  solicitation_number_canonical?: string | null;
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -200,6 +228,16 @@ export interface RisksJSON {
   severity_score?: number;
   top_3_risks?: string[];
   prioritized_risks?: PrioritizedRisk[];
+  // Verdict rationale — the WHY sentence the model emits alongside the
+  // verdict word. Engine assembly strips the leading verdict word
+  // ("DECLINE — ..." / "BID_WITH_CAUTION — ...") and uses the trailing
+  // rationale as bid_recommendation so the masthead never echoes the
+  // verdict word twice.
+  bid_no_bid_recommendation?: string;
+  // 3-paragraph CEO briefing. Currently consumed only by reporting/email
+  // surfaces; included in the type so the engine code can reference it
+  // without an `as unknown` cast.
+  executive_risk_summary?: string;
 }
 
 const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" | "P2" }> = [
@@ -233,39 +271,154 @@ function extractCitation(text: string): string | undefined {
 // risk as inferred so the renderer can badge it.
 const INFERRED_PREFIX_RE = /^\[Inferred[^\]]*\]\s*/i;
 
-function deriveRiskFields(raw: string): { text: string; citation: string | undefined; provenance: "verified" | "inferred" } {
-  const isPrefixed = INFERRED_PREFIX_RE.test(raw);
-  const text = raw.replace(INFERRED_PREFIX_RE, "").trim();
-  const citation = extractCitation(text);
-  const provenance: "verified" | "inferred" =
-    isPrefixed ? "inferred" : citation ? "verified" : "inferred";
-  return { text, citation, provenance };
+// Real provenance signal: any of these patterns inside a risk's text means
+// the finding is quoting an extracted document anchor (clause number, CAGE,
+// NSN, NAICS, DoDAAC, named monetary amount, dated reference, block code,
+// trap clause shorthand). When ANY of these match, provenance MUST be
+// "verified" — regardless of whether the model labeled it inferred. Fixes
+// the over-tagging defect where 20+ document-anchored risks were tagged
+// "Pattern" because the model was reflexively using the [Inferred] prefix.
+const DOCUMENT_ANCHOR_RE = /\b(?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?|\bCAGE\s*[A-Z0-9]{3,5}|\bNSN\s*[\d-]+|\bNAICS\s*\d{4,6}|\bDoDAAC\s*[A-Z0-9]{6,}|\$[\d][\d,]{2,}|\b\d{4}-\d{2}-\d{2}\b|\b[A-Z]{2,5}-\d{2}-[A-Z]-\d{4}\b|\b252\.\d{3}-\d{4}\b|\b5352\.\d{3}-\d{4}\b/i;
+
+// Strip raw category prefixes the model sometimes emits at the start of a
+// risk text — "RISK 1 (DISQUALIFICATION):", "P0 — ", "[DEAL-BREAKER]" etc.
+// Title gets the cleaned first phrase capped at 8 words.
+const RAW_RISK_PREFIX_RE = /^(?:RISK\s+\d+\s*(?:\([^)]+\))?\s*[:.\-—]\s*|(?:P[012])\s*[:.\-—]\s*|\[[^\]]+\]\s*[:.\-—]?\s*)/i;
+
+function cleanRiskTitle(text: string): string {
+  // Title = first sentence (or first 8 words) of the cleaned text. Cap at
+  // ~80 chars so the .risk-title element doesn't wrap awkwardly.
+  const stripped = text.replace(RAW_RISK_PREFIX_RE, "").trim();
+  const firstSentence = stripped.split(/[.!?]\s+|\s+—\s+/)[0].trim();
+  const words = firstSentence.split(/\s+/);
+  let title = words.length <= 8 ? firstSentence : words.slice(0, 8).join(" ");
+  if (title.length > 80) title = title.slice(0, 77) + "…";
+  return title;
 }
+
+function deriveRiskFields(raw: string): { text: string; title: string; citation: string | undefined; provenance: "verified" | "inferred" } {
+  const isPrefixed = INFERRED_PREFIX_RE.test(raw);
+  // Strip both the "[Inferred...]" prefix and any "RISK N (X):" prefix so the
+  // body that lands in renderer + analyst-flag-headline is clean.
+  const stripped = raw.replace(INFERRED_PREFIX_RE, "").replace(RAW_RISK_PREFIX_RE, "").trim();
+  const citation = extractCitation(stripped);
+  const hasAnchor = DOCUMENT_ANCHOR_RE.test(stripped);
+  // Anchor presence WINS — if the risk text quotes a document anchor, it's
+  // verified even if the model self-tagged as inferred. Only when there's
+  // NO anchor AND the model explicitly prefixed [Inferred] (or there's no
+  // FAR/DFARS citation at all) does the risk fall to inferred.
+  const provenance: "verified" | "inferred" =
+    hasAnchor ? "verified"
+    : isPrefixed ? "inferred"
+    : citation ? "verified"
+    : "inferred";
+  return { text: stripped, title: cleanRiskTitle(stripped), citation, provenance };
+}
+
+// Max risks rendered in the report. The risks prompt asks the model to
+// consolidate near-duplicates into a single risk and to cap the list at 10;
+// this is the engine's belt-and-suspenders cap, applied after dedup.
+const MAX_RISKS_RENDERED = 10;
+
+// Theme keys for near-duplicate clustering. The risks-prompt asks the model
+// to merge by theme; this is the engine's fallback dedup when the model
+// emits ~21 verbose findings that all collapse to a handful of themes
+// (JCP/TDP × 3, LPTA/no-discussion × 3, captive-source × 3, FOB × 2 in the
+// SPRRA1-26-Q-0034 audit). Maps surface keywords → canonical theme slug.
+function riskThemeKey(text: string, citation: string | undefined): string {
+  const t = text.toLowerCase();
+  if (/\bjcp\b|joint certif|tdp\b|technical data package|itar\b/.test(t)) return "jcp-tdp-itar";
+  if (/\blpta\b|no discussion|no.discussions/.test(t)) return "lpta-no-discussion";
+  if (/captive|sole.source|single.source|qpl\b|approved source/.test(t)) return "captive-source";
+  if (/\bfob\b|f\.o\.b\.|freight|shipping/.test(t)) return "fob";
+  if (/cmmc|252\.204-7021/.test(t)) return "cmmc";
+  if (/hexavalent|hex.chrome|252\.223-7008/.test(t)) return "hex-chrome";
+  if (/wawf|252\.232-7006/.test(t)) return "wawf";
+  if (/base.access|5352\.242-9000/.test(t)) return "base-access";
+  if (/covered telecom|252\.204-7018|huawei|zte/.test(t)) return "covered-telecom";
+  // Fallback: clause-citation key, else first 30 chars
+  return citation ? citation.toLowerCase() : t.slice(0, 30).replace(/\s+/g, " ");
+}
+
+// Severity rank for tier comparison + sort order.
+const PRIORITY_RANK: Record<"P0" | "P1" | "P2", number> = { P0: 0, P1: 1, P2: 2 };
 
 export function assignRiskPriority(risksJson: RisksJSON): PrioritizedRisk[] {
   const items: PrioritizedRisk[] = [];
+  // Pull from model's explicit prioritized_risks first (richer shape — has
+  // title, faraudit_action, severity, etc.). Falls through to per-category
+  // arrays for back-compat with model outputs that didn't emit the new
+  // structured field.
+  const explicit = Array.isArray(risksJson.prioritized_risks) ? risksJson.prioritized_risks : [];
+  for (const r of explicit) {
+    if (!r || typeof r.text !== "string" || !r.text.trim()) continue;
+    const derived = deriveRiskFields(r.text);
+    items.push({
+      text: derived.text,
+      title: typeof r.title === "string" && r.title.trim() ? cleanRiskTitle(r.title) : derived.title,
+      priority: (r.priority === "P0" || r.priority === "P1" || r.priority === "P2") ? r.priority : "P1",
+      category: typeof r.category === "string" ? r.category : "General",
+      citation: typeof r.citation === "string" && r.citation ? r.citation : derived.citation,
+      // Anchor regex wins — never let model's self-tag suppress an actual
+      // document-anchored risk.
+      provenance: derived.provenance,
+      // Per-risk move: respect model output, but reject canned boilerplate.
+      faraudit_action: cleanFarauditAction(r.faraudit_action)
+    });
+  }
+  // Back-compat: also walk the per-category buckets. The model occasionally
+  // emits BOTH prioritized_risks AND the legacy arrays; dedup below collapses
+  // overlap by theme.
   const push = (raw: unknown, priority: "P0" | "P1" | "P2", category: string) => {
     if (typeof raw !== "string" || !raw.trim()) return;
-    const { text, citation, provenance } = deriveRiskFields(raw);
-    items.push({ text, priority, category, citation, provenance });
+    const derived = deriveRiskFields(raw);
+    items.push({ ...derived, priority, category });
   };
-
   for (const r of risksJson.top_3_risks ?? []) push(r, "P0", "Deal-breaker");
   for (const r of risksJson.technical_risks ?? []) push(r, "P1", "Technical");
   for (const r of risksJson.schedule_risks ?? []) push(r, "P1", "Schedule");
   for (const r of risksJson.price_risks ?? []) push(r, "P1", "Price");
   for (const r of risksJson.evaluation_risks ?? []) push(r, "P2", "Evaluation");
 
+  // Two-phase dedup: theme-based first (collapses JCP×3, LPTA×3 etc. into
+  // one entry, keeping the highest-severity copy), then exact-text fallback.
+  const byTheme = new Map<string, PrioritizedRisk>();
+  for (const item of items) {
+    const key = riskThemeKey(item.text, item.citation);
+    const existing = byTheme.get(key);
+    if (!existing || PRIORITY_RANK[item.priority] < PRIORITY_RANK[existing.priority]) {
+      byTheme.set(key, item);
+    } else if (PRIORITY_RANK[item.priority] === PRIORITY_RANK[existing.priority] && item.text.length > existing.text.length) {
+      // Same priority — prefer the more-detailed text.
+      byTheme.set(key, item);
+    }
+  }
+  const unique = Array.from(byTheme.values());
+  // Exact-text safety net for anything theme-keying missed.
   const seen = new Set<string>();
-  const unique = items.filter((item) => {
-    const key = item.text.toLowerCase().trim();
-    if (seen.has(key)) return false;
-    seen.add(key);
+  const fullyUnique = unique.filter((item) => {
+    const k = item.text.toLowerCase().trim();
+    if (seen.has(k)) return false;
+    seen.add(k);
     return true;
   });
+  fullyUnique.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  return fullyUnique.slice(0, MAX_RISKS_RENDERED);
+}
 
-  const order: Record<"P0" | "P1" | "P2", number> = { P0: 0, P1: 1, P2: 2 };
-  return unique.sort((a, b) => order[a.priority] - order[b.priority]);
+// Reject canned boilerplate. The model occasionally regresses to "Address
+// this risk before submission" / "see KO email" filler when it can't think
+// of a specific move; surfacing that as a per-risk action erodes trust
+// (21× identical strings on a real audit). Return empty when the input
+// matches the boilerplate signature so the view-model's no-action path
+// fires instead of repeating filler.
+const BOILERPLATE_ACTION_RE = /^(?:Address this risk[^.]*\.?|See (?:the )?KO email[^.]*\.?|Proceed with the standard[^.]*\.?)\s*$/i;
+function cleanFarauditAction(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (BOILERPLATE_ACTION_RE.test(trimmed)) return undefined;
+  return trimmed;
 }
 
 // Synthesize a fallback risk when the engine returns no risks at all.
@@ -282,6 +435,7 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: b
 
   if (dfarsTriggered.length > 0) {
     return {
+      title: `DFARS trap clause active`,
       text: `Critical DFARS trap clause(s) detected: ${dfarsTriggered.join(", ")}. Confirm representations and flowdown obligations before bidding.`,
       priority: "P0",
       category: "DFARS trap",
@@ -291,6 +445,7 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: b
 
   if (!hasRichSource && farCount === 0 && dfarsCount === 0) {
     return {
+      title: "Thin source — manual review needed",
       text: "Solicitation context was thin (no PDF attached and SAM.gov metadata limited). Manual review of the full document is required before bid/no-bid decision.",
       priority: "P1",
       category: "Insufficient context",
@@ -299,6 +454,7 @@ function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: b
   }
 
   return {
+    title: "Risk extraction empty — review manually",
     text: "AI risk extraction returned empty. Manual review of the full document is required to confirm there are no material risks.",
     priority: "P2",
     category: "Manual review",
@@ -757,7 +913,8 @@ Output ONLY a JSON object with these keys (populate from the actual solicitation
 - period_of_performance (string): duration with start/end dates if known
 - eval_basis (string or null): 1-2 sentence award method anchored to the controlling FAR rule cited in Section M. Use "FAR 15.101-1" for best-value tradeoff, "FAR 15.101-2" for LPTA, "FAR 14.101" for sealed-bid lowest-price. null if Section M is absent or this is metadata-only.
 - eval_basis_label (string or null): MAX 24 chars. One of "Best-value tradeoff" | "LPTA" | "Lowest price". null if Section M absent.
-- evaluation_factors (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance: string ("Most important" | "Equal" | "Less important" | "Price" | exact stated weight), coverage: string, coverage_pct: number 0-100, tone: "good"|"warn"|"bad"|"mute", note: string}. The customer's capability profile is NOT available to this engine call — therefore: for every NON-PRICE factor emit coverage="—", coverage_pct=0, tone="mute", note="Complete your capability statement to see fit score". For any Price/Cost factor emit coverage="Tradeoff", coverage_pct=0, tone="mute", note="". Empty array if Section M is absent or metadata-only.
+- evaluation_factors (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance: string, coverage: string, coverage_pct: number 0-100, tone: "good"|"warn"|"bad"|"mute", note: string}. The customer's capability profile is NOT available to this engine call — for NON-PRICE factors emit coverage="—", coverage_pct=0, tone="mute", note="Complete your capability statement to see fit score". For the Price/Cost factor, the language DEPENDS ON THE AWARD BASIS: under best-value tradeoff (FAR 15.101-1) use importance="Least important · tradeoff lever" (or the stated weight), coverage="Tradeoff", tone="mute", note=""; under LPTA (FAR 15.101-2) use importance="Determines award" (or "Only differentiator"), coverage="Lowest price wins", tone="mute", note="" — NEVER use "Tradeoff" under LPTA, that's best-value language. Importance text MUST NOT duplicate words (no "Price Price"); if the stated weight is the literal word Price, emit "Most important" or the actual rank-language only. Empty array if Section M is absent or metadata-only.
+- solicitation_number_canonical (string or null): the exact solicitation number as it appears on the SF-18/SF-1449 cover page (or Block 2/Block 6), with hyphens and punctuation PRESERVED as printed. Example: "SPRRA1-26-Q-0034" (with hyphens), not "SPRRA126Q0034" (squashed). Null if no SF-18/1449 cover exists or the document is metadata-only.
 - submission_requirements (object[]): one entry per concrete Section L requirement (page limits, submission portal + deadline, required volumes, format/font rules, reps & certs, oral presentation rules, demo requirements, past performance reference count, etc.). Shape: {requirement: short imperative string, status: "ok"|"warn"|"todo", meta: "Clear"|"At risk"|"Action"}. Map status→meta as ok→Clear, warn→At risk, todo→Action. Empty array if Section L absent.
 - submission_summary (string or null): "{N} to clear" where N = count of submission_requirements with status warn OR todo. null when there are no requirements OR all are "ok".
 
@@ -779,14 +936,14 @@ Output ONLY a JSON object with these keys:
 - far_clauses (string[]): EVERY FAR clause cited (format: "52.212-1", "52.212-4", etc.). Scan ALL sections. Empty array ONLY if you have read every page and confirmed none are cited.
 - dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.). Scan ALL sections.
 - required_certifications (string[]): EVERY certification, registration, or compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
-- set_aside_type (string): "Total Small Business", "8(a)", "WOSB", "EDWOSB", "SDVOSB", "HUBZone", "Partial Small Business", or "None"
+- set_aside_type (string): "Total Small Business", "8(a)", "WOSB", "EDWOSB", "SDVOSB", "HUBZone", "Partial Small Business", or "None". CRITICAL: if the solicitation DOCUMENT explicitly states a set-aside (e.g. "100% small business set-aside", FAR 52.219-1 representation required, FAR 52.219-6 notice present, set-aside block checked on SF-18/1449 Block 10, "this acquisition is set aside for small business" language anywhere in Section A or L), use that value VERBATIM. The document overrides SAM.gov metadata — if SAM says "None" but the document says "Total Small Business", emit "Total Small Business". SAM metadata is fallback only.
 - small_business_eligibility (string): "yes" / "no" / explanation including NAICS size standard
 - key_compliance_actions (string[]): action items a small business must complete to bid (e.g. "Submit past performance for similar contract value within last 3 years", "Complete representations 52.204-24 + 52.204-26")
 - deadlines (string[]): every date the bidder must hit, format "label: YYYY-MM-DD" (questions due, proposal due, period start)
 - clins (object[]): array of {clin: "0001", description: "...", quantity: "...", pricing_arrangement: "FFP|CPFF|...", fob: "Origin|Destination"} for EVERY CLIN in Section B
 - section_l_summary (string): 2-3 sentence summary of Section L proposal preparation instructions, OR empty string if no Section L found
 - section_m_summary (string): 2-3 sentence summary of Section M evaluation criteria with weights/factors, OR empty string if no Section M found
-- dfars_traps (object[]): array of {clause, title, risk_level: "P0"|"P1"|"P2", description, required_action} — specifically flag when present: 252.223-7008 hexavalent chromium · 252.204-7018 covered telecom · 252.204-7021 CMMC · 252.225-7060 Xinjiang forced labor · 252.232-7006 WAWF payment routing · 5352.242-9000 base access. Empty array if none cited.
+- dfars_traps (object[]): array of {clause, title, risk_level: "P0"|"P1"|"P2", description, required_action} — for each trap, the description field MUST extract WHAT THE CLAUSE REQUIRES THE OFFEROR TO DO (representations to mark, certifications to attach, documentation to keep, supply-chain steps to take, timelines to clear). Do NOT emit "Clause-level detail not extracted." or any boilerplate of that shape. When the clause is incorporated by reference only and no specific trap-fire evidence is in the source, soften: risk_level="P1" (NOT P0), description="Incorporated by reference — verify compliance before submission. No documented trap evidence in this solicitation." Flag the well-known traps when present: 252.223-7008 hexavalent chromium · 252.204-7018 covered telecom · 252.204-7021 CMMC · 252.225-7060 Xinjiang forced labor · 252.232-7006 WAWF payment routing · 5352.242-9000 base access. Empty array if none cited.
 - fob_conflicts (string[]): any conflicts between FOB designations across CLINs (e.g. one CLIN FOB Origin, another FOB Destination — flag as a freight liability mismatch). Empty array if consistent.
 - wawf_routing (object): {pay_official_dodaac, issue_by_dodaac, admin_dodaac, inspect_by_dodaac, document_type} extracted from 252.232-7006 attachments. Use empty strings for unknown fields; emit empty object {} only if 252.232-7006 not cited.
 - section_l_requirements (string[]): every specific requirement from Section L as individual action items (page limit, font size, volume structure, oral presentation rules, demo requirements, past performance reference count, etc.).
@@ -801,21 +958,34 @@ ${solText}
 
 You are a senior capture manager scoring risks for a small defense subcontractor anywhere in the continental United States. Identify SPECIFIC, ACTIONABLE risks tied to provisions of THIS solicitation.
 
-Output ONLY a JSON object with these keys:
-- technical_risks (string[]): specific technical challenges, ambiguous specifications, conflicting requirements, MILSPEC integration risks. MUST contain at least 2 entries — find them.
-- schedule_risks (string[]): timeline pressures, period of performance start dates, FOB delivery windows, kickoff windows. MUST contain at least 1 entry.
-- price_risks (string[]): margin/pricing risks, cost-reimbursable terms, capped fees, FOB origin liability, fixed-price exposure. MUST contain at least 1 entry.
-- evaluation_risks (string[]): how Section M factors (technical / past performance / price) are weighted, where points are easily lost, oral presentation risks. MUST contain at least 1 entry.
-- severity_score (number 0-10): overall bid risk. Use 4-7 for typical small-business federal opportunities.
-- top_3_risks (string[]): EXACTLY 3 entries, each one sentence, ranked. These are the deal-breakers — if a DFARS trap (252.223-7008 hexavalent chromium / 252.204-7018 covered telecom / 252.204-7021 CMMC) is present, ELEVATE it to top_3_risks. If FOB destination + small business + no past performance, that's a top_3 risk. If proposal due window <14 days, that's a top_3 risk.
-- dfars_trap_risks (object[]): {clause, trap_name, specific_risk, required_verification, consequence_if_missed} — one object per DFARS trap detected (252.223-7008, 252.204-7018, 252.204-7021, 252.225-7060, 252.232-7006, 5352.242-9000, etc.). Empty array if no traps fired.
-- base_access_risk (string | null): if 5352.242-9000 (Air Force base access) is present, describe the access requirement, escort/credential timeline (typically 4–8 weeks), and risk to schedule if cleared personnel are not pre-staged. null if clause not present.
-- hex_chrome_risk (string | null): if 252.223-7008 is present, describe supply-chain verification effort required (vendor cert letters, mill certs, alternate-finish substitution path) and timeline impact. null if clause not present.
-- cmmc_risk (string | null): if 252.204-7021 is present, identify the CMMC level required (Level 1 / Level 2 / Level 3), whether C3PAO assessment is needed, current readiness gap, and time-to-certify (typically 6–12 months for Level 2). null if clause not present.
-- bid_no_bid_recommendation (string): one of "BID" | "BID_WITH_CAUTION" | "NO_BID" followed by " — " and one-sentence rationale. Example: "BID_WITH_CAUTION — DFARS hex chrome trap fires and small business has no documented mill-cert process."
-- executive_risk_summary (string): 3-paragraph CEO briefing. Paragraph 1: what is being bought (1–2 sentences, plain English). Paragraph 2: top 3 risks + the consequence if each is missed (cure notice, termination for default, lost evaluation points). Paragraph 3: recommended actions ranked, each tied to a calendar window. Use "\\n\\n" between paragraphs.
+PRINCIPLES:
+- Consolidate by theme. If multiple findings point to the same underlying risk chain (e.g. JCP + ITAR + TDP access form ONE chain; LPTA + no-discussion-allowed + sealed evaluation form ONE chain; FOB origin + freight-cost exposure form ONE chain), MERGE them into a single risk at the highest severity. The output target is ≤10 distinct risks total, not 20+ near-duplicates.
+- Verified vs Inferred. Mark a risk "verified" when its text quotes ANY anchor extracted from the parsed document: a specific FAR/DFARS clause number, CAGE code, NSN, NAICS, DoDAAC, dated reference, dollar amount, named party, block number, or trap-clause shorthand. Mark "inferred" ONLY when the finding is derived from NAICS/agency norms with zero document anchor.
+- Specific FARaudit move per risk. Each risk must carry a SPECIFIC neutralizing action the customer can take this week (verify JCP at dla.mil/JCP, calendar a 15-day DPAS notify window, price CLIN with breakout, etc.). NEVER use canned filler — no "Address this risk before submission" / "see KO email" boilerplate. If a risk genuinely has no distinct move beyond the KO email, emit faraudit_action="" (empty string) — the renderer will hide the action chip rather than show filler.
+- Short titles. Each risk has an 8-word-or-fewer title that names the risk. NO "RISK N (DISQUALIFICATION):" prefixes, NO "P0 —" prefixes, NO "[DEAL-BREAKER]" labels — severity is already encoded in the priority field. Title examples: "JCP certification gap — TDP access blocked"; "LPTA with no discussions allowed"; "Container price must be broken out from CLIN".
 
-NEVER return fewer than 3 entries in top_3_risks. NEVER return all-empty arrays. If the source is too thin, infer from typical patterns for this NAICS code, contract type, and agency, and prefix the inferred risk with "[Inferred from typical patterns] ...".
+Output ONLY a JSON object with these keys:
+- prioritized_risks (object[]): the PRIMARY output. Up to 10 distinct, deduped-by-theme risks, sorted P0 → P2. Shape per entry:
+    {
+      title: string (≤8 words, no severity prefix),
+      text: string (full one-sentence description with evidence anchors),
+      priority: "P0" | "P1" | "P2",
+      category: string (e.g. "Disqualification", "Technical", "Schedule", "Price", "Evaluation", "DFARS trap"),
+      citation: string (FAR/DFARS clause cited, OR "" if none),
+      provenance: "verified" | "inferred" (per the rule above; the engine will overwrite this if the text clearly contains an anchor),
+      faraudit_action: string (SPECIFIC move, OR "" if no distinct move exists — DO NOT echo canned filler)
+    }
+- severity_score (number 0-10): overall bid risk. Use 4-7 for typical small-business federal opportunities.
+- top_3_risks (string[]): EXACTLY 3 entries — short one-sentence statements of the deal-breakers (the top 3 priorities from prioritized_risks above). If a DFARS trap (hex chrome / covered telecom / CMMC) is present, ELEVATE it.
+- technical_risks / schedule_risks / price_risks / evaluation_risks (string[]): back-compat per-category buckets (legacy renderers still read these). At least 1 entry per bucket if you're reaching for content; emit [] freely if nothing applies — better empty than padded.
+- dfars_trap_risks (object[]): {clause, trap_name, specific_risk, required_verification, consequence_if_missed} — one object per DFARS trap detected. Empty array if no traps fired.
+- base_access_risk (string | null): if 5352.242-9000 (Air Force base access) is present, describe access + escort/credential timeline. null if clause not present.
+- hex_chrome_risk (string | null): if 252.223-7008 present, supply-chain verification effort. null if clause not present.
+- cmmc_risk (string | null): if 252.204-7021 present, CMMC level + assessment path. null if clause not present.
+- bid_no_bid_recommendation (string): one-sentence RATIONALE that explains WHY the verdict, never starting with the verdict word. CORRECT: "JCP certification gap blocks TDP access — small business cannot price responsibly without the technical data package." INCORRECT: "DECLINE. JCP certification gap blocks TDP access." NEVER lead with BID / BID_WITH_CAUTION / NO_BID / DECLINE / PROCEED / GO / CAUTION — those words are already rendered separately as the verdict pill. Just write the WHY sentence.
+- executive_risk_summary (string): 3-paragraph CEO briefing. Paragraph 1: what is being bought (1–2 sentences, plain English). Paragraph 2: top 3 risks + the consequence if each is missed. Paragraph 3: recommended actions ranked, each tied to a calendar window. Use "\\n\\n" between paragraphs.
+
+If the source is too thin to anchor risks to document text, derive from typical patterns for this NAICS / agency / contract-type and set provenance="inferred" for those entries. Do NOT use the legacy "[Inferred from typical patterns]" text prefix — the provenance field is the canonical signal now.
 
 JSON only.`;
 
@@ -983,7 +1153,49 @@ JSON only.`;
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
   const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;
-  const bid_recommendation = `${recommendation}. Score ${scoreLabel}. Top risk: ${topRisk}`;
+
+  // Build a verdict-tagline-safe bid_recommendation. The view-model takes the
+  // first sentence of this as recommendation_tagline and the renderer prints
+  // it directly under the verdict word — so this string MUST NOT lead with
+  // the verdict word ("DECLINE." renders as "DECLINEDECLINE." once the
+  // separate verdict pill is on top of it). Pull the rationale from the
+  // model's bid_no_bid_recommendation (everything after the " — "), strip
+  // any leading verdict-word echo defensively, then fall back to a generic
+  // score/top-risk line if the model didn't emit a rationale.
+  const VERDICT_LEAD_RE = /^(?:BID_WITH_CAUTION|BID|NO_BID|DECLINE|PROCEED_WITH_CAUTION|PROCEED|GO|CAUTION)\b[\s.,;:—-]+/i;
+  const modelBnb = String(risksJson.bid_no_bid_recommendation ?? "").trim();
+  let rationale = modelBnb.includes(" — ")
+    ? modelBnb.split(" — ").slice(1).join(" — ").trim()
+    : modelBnb;
+  // Strip leading verdict word repeatedly (handles "DECLINE. DECLINE — ...")
+  for (let i = 0; i < 3 && VERDICT_LEAD_RE.test(rationale); i++) {
+    rationale = rationale.replace(VERDICT_LEAD_RE, "").trim();
+  }
+  const bid_recommendation = rationale
+    ? rationale
+    : `Score ${scoreLabel}. Top risk: ${topRisk}`;
+
+  // Score benchmark — score-derived, hidden on low scores so the static
+  // design demo text "Top quartile of your audits" doesn't leak onto a
+  // 25/100 DECLINE. Renderer must strip the .mhv-bench element when this
+  // is null. Bands chosen to track typical small-business audit fit.
+  let score_benchmark: string | null = null;
+  if (compliance_score != null) {
+    if (compliance_score >= 80) score_benchmark = "Top quartile of your audits";
+    else if (compliance_score >= 70) score_benchmark = "Above average";
+    else if (compliance_score >= 60) score_benchmark = "Mid-pack";
+    else score_benchmark = null;
+  }
+  complianceJson.score_benchmark = score_benchmark;
+
+  // Canonical solicitation number hoist — engine prompt extracts it from
+  // the SF-18/1449 cover page with hyphens preserved. Hoisted onto
+  // complianceJson so the view-model + renderer + PDF filename surfaces
+  // can all read one canonical value (fixes the SPRRA126Q0034 vs
+  // SPRRA1-26-Q-0034 inconsistency).
+  if (overviewJson.solicitation_number_canonical !== undefined) {
+    complianceJson.solicitation_number_canonical = overviewJson.solicitation_number_canonical;
+  }
 
   return {
     overview: {

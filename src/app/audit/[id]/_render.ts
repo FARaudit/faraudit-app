@@ -228,11 +228,17 @@ function renderProvenanceBadge(provenance: "verified" | "inferred"): string {
 function renderRisk(r: Risk, isFirst: boolean): string {
   const openClass = isFirst ? " open" : "";
   const badge = renderProvenanceBadge(r.provenance);
+  // Render the .risk-action chip ONLY when the engine produced a specific move.
+  // Empty faraudit_action means the engine had no distinct neutralizing step
+  // beyond what's in the KO email — surface nothing rather than canned filler.
+  const actionBlock = r.faraudit_action
+    ? `<div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>${escapeHtml(r.faraudit_action)}</div></div>`
+    : "";
   return `<div class="risk${openClass}">
                   <div class="risk-head"><span class="risk-sev ${r.severity}">${r.severity === "high" ? "High" : r.severity === "med" ? "Medium" : "Low"}</span><span class="risk-title">${badge}${escapeHtml(r.title)}</span><span class="risk-cite mono">${escapeHtml(r.citation)}</span><svg class="risk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div>
                   <div class="risk-body"><div class="risk-body-inner">
                     <p class="rb-desc">${escapeHtml(r.description)}</p>
-                    <div class="risk-action"><div class="ra-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div><div class="ra-txt"><b>FARaudit move</b>${escapeHtml(r.faraudit_action)}</div></div>
+                    ${actionBlock}
                   </div></div>
                 </div>`;
 }
@@ -762,6 +768,24 @@ function removeEvalSection(html: string): string {
   return out;
 }
 
+// Strip the masthead's score-benchmark .mhv-bench element specifically (the
+// template has TWO .mhv-bench divs — one for score_benchmark, one for
+// win_probability_benchmark — so we anchor on the inner data-field rather
+// than the outer class to avoid stripping the win-probability chip too).
+// Used when score_benchmark is null (compliance_score <60) so the design's
+// static "Top quartile of your audits" text can't leak onto a low score.
+function removeMhvBench(html: string): string {
+  // Anchor: a .mhv-bench wrapper whose inner span carries
+  // data-field="score_benchmark". We locate the inner span first, then walk
+  // backward to the wrapper's opening `<div`.
+  const spanIdx = html.indexOf('<span data-field="score_benchmark"');
+  if (spanIdx === -1) return html;
+  const wrapperStart = html.lastIndexOf('<div class="mhv-bench">', spanIdx);
+  if (wrapperStart === -1) return html;
+  const range = findMatchingClose(html, wrapperStart, "div");
+  return range ? html.slice(0, wrapperStart) + html.slice(range.closeEnd) : html;
+}
+
 // Wire #sec-eval — either strip the whole section (false-precision gate on
 // evaluation_factors) or replace the five data-field surfaces with engine
 // output. eval_basis lives on .award-basis (icon + text); eval_basis_label
@@ -1036,6 +1060,15 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     const scoreNum = vm.score ?? 0;
     html = replaceFieldText(html, "score", String(Math.round(scoreNum)));
     html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
+    // Score benchmark — when engine emitted a phrase (score ≥60), replace
+    // the static design demo text. When null (score <60), strip the entire
+    // .mhv-bench element so "Top quartile of your audits" can never leak
+    // onto a 25/100 DECLINE.
+    if (vm.score_benchmark) {
+      html = replaceFieldText(html, "score_benchmark", vm.score_benchmark);
+    } else {
+      html = removeMhvBench(html);
+    }
     if (vm.win_probability == null) {
       html = setWinProbabilityNull(html);
     } else {
@@ -1085,7 +1118,12 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = replaceFieldText(html, "headline_risk.citation", vm.headline_risk.citation);
     html = replaceFieldText(html, "headline_risk.title", vm.headline_risk.title);
     html = replaceFieldText(html, "headline_risk.description", vm.headline_risk.description);
-    html = replaceFieldText(html, "headline_risk.impact", vm.headline_risk.faraudit_action);
+    // Headline-risk impact text — fall through to the risk description when
+    // the engine didn't emit a specific neutralizing action. (Previously this
+    // unconditionally wrote faraudit_action; empty action would leave the
+    // analyst-flag value blank instead of telling the user what's at stake.)
+    html = replaceFieldText(html, "headline_risk.impact",
+      vm.headline_risk.faraudit_action || vm.headline_risk.description);
   } else {
     html = removeMomentBand(html);
   }

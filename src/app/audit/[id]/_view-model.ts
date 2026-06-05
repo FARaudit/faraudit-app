@@ -110,6 +110,12 @@ export interface AuditViewModel {
   is_unscored: boolean;             // true when score is null or score_confidence === "unscored"
   win_probability: number | null;   // null when basis is 0 / unknown
   win_probability_benchmark: string;
+  // Score-relative benchmark phrase ("Top quartile" / "Above average" /
+  // "Mid-pack"). null on scores <60 — renderer strips the entire .mhv-bench
+  // element so the masthead never shows the design's static demo text on a
+  // genuinely-low audit. Sourced from compliance_json.score_benchmark which
+  // the engine computes from the actual score.
+  score_benchmark: string | null;
 
   // True when the audit ran against a non-solicitation (Award Notice /
   // attachment / unknown) OR a real source returned zero FAR/DFARS clauses.
@@ -475,8 +481,10 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
           severity: priorityToSev(r.priority ?? r.severity),
           citation: String(cite),
           description: text,
-          faraudit_action: String(r.faraudit_action ?? r.recommended_action ?? "").trim() ||
-            "Address this risk before submission — see KO email draft for the clarification.",
+          // Engine omits faraudit_action when the action would be canned
+          // boilerplate; passing empty string here lets the renderer drop the
+          // .risk-action chip entirely rather than show filler.
+          faraudit_action: String(r.faraudit_action ?? r.recommended_action ?? "").trim(),
           provenance
         };
       });
@@ -502,9 +510,11 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
         severity: b.sev,
         citation: cite,
         description: text,
-        faraudit_action: "Address this risk before submission.",
-        // Fallback path scrapes the old category-bucket arrays. Without an
-        // explicit engine-provided provenance, infer from clause anchor.
+        // Legacy category-bucket fallback path. Engine doesn't synthesize a
+        // per-risk action in this path; the renderer drops the action chip
+        // entirely rather than show canned filler.
+        faraudit_action: "",
+        // Without an explicit engine-provided provenance, infer from clause anchor.
         provenance: cite ? "verified" : "inferred"
       });
     }
@@ -519,7 +529,9 @@ function pickHeadlineRisk(risks: Risk[]): Risk {
       severity: "low",
       citation: "",
       description: "FARaudit did not flag a critical exposure in this solicitation.",
-      faraudit_action: "Proceed with the standard pre-quote checklist.",
+      // No risks = no specific action; empty string lets the renderer drop
+      // the .risk-action chip rather than show canned advice.
+      faraudit_action: "",
       provenance: "inferred"
     };
   }
@@ -606,9 +618,7 @@ function deriveKoBody(audit: AuditRow, headline: Risk, displayId: string): strin
 Thank you for the opportunity to respond to ${displayId} (${title}). We intend to submit and have one clarification that affects how offerors price and structure their responses:
 
 ${headline.title}${cite ? ` (${cite})` : ""}. ${headline.description}
-
-${headline.faraudit_action}
-
+${headline.faraudit_action ? `\n${headline.faraudit_action}\n` : ""}
 We appreciate your time and look forward to your response ahead of the Q&A deadline.
 
 Respectfully,
@@ -619,8 +629,14 @@ Respectfully,
 // ─── main ───────────────────────────────────────────────────────────────────
 
 export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean }): AuditViewModel {
+  // Pull compJson first so the canonical solicitation number (engine-extracted
+  // from the SF-18/1449 cover page with hyphens preserved) can override the
+  // SAM-metadata solicitation_number when present. This keeps masthead +
+  // reasoning + KO email + PDF filename consistent across the report.
+  const compJsonEarly = (audit.compliance_json as Record<string, unknown> | null) || {};
+  const canonicalSol = (compJsonEarly.solicitation_number_canonical as string | null | undefined) ?? null;
   const displayId = displaySolicitationId({
-    solicitation_number: audit.solicitation_number as string | null | undefined,
+    solicitation_number: canonicalSol ?? (audit.solicitation_number as string | null | undefined),
     notice_id: audit.notice_id as string | null | undefined,
     title: audit.title as string | null | undefined
   });
@@ -845,6 +861,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     is_not_solicitation: isNotSolicitation,
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
+    // Engine-computed (null when score <60) — drives the renderer's
+    // hide-when-null gate on .mhv-bench.
+    score_benchmark: (compJson.score_benchmark as string | null | undefined) ?? null,
 
     qa_deadline: "",
     qa_days: "",
