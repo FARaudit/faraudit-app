@@ -148,6 +148,14 @@ export interface PrioritizedRisk {
   // canned fallback (Address this risk before submission — see KO email draft)
   // that should be removed in a follow-up commit; the engine side is right.
   faraudit_action?: string;
+  // Fork 1 (2026-06-05): risks that require a discrete offeror submission
+  // action (representations, certifications, acknowledgments, form completions)
+  // get this flag set to true. Pricing/schedule/context risks that cite a
+  // clause but require no offeror submission action stay false. Fast-follow
+  // commit (Fix 4) will derive §04 Compliance Flags from risks where this is
+  // true — making §04 a pure projection of §05 instead of an independent
+  // extractor that can disagree.
+  offerorActionRequired?: boolean;
 }
 
 export interface CLIN {
@@ -194,6 +202,17 @@ export interface ComplianceJSON {
   // should prefer this over the SAM metadata solicitation_number when present,
   // so masthead + reasoning + filenames all show the same canonical form.
   solicitation_number_canonical?: string | null;
+  // Fork 1 (2026-06-05): derived from getNaicsSizeStandard() lookup. Replaces
+  // any LLM-inferred size-standard text — model variance on this field has
+  // shipped wrong numbers ("750 employees" for 336413 which is 1,250).
+  naics_size_standard?: string;
+  // Fork 1: deterministic regex extraction. Populated when a sole-source J&A
+  // names a specific vendor — gates the score cap to ≤25 + DECLINE recommendation
+  // (Fix 6). Renderer embeds name + CAGE inline on the "Structural no-bid" risk.
+  sole_source_vendor?: { name: string; cage?: string | null };
+  // Fork 1: PIID decode (Fix 11) — issuing activity + fiscal year + procurement
+  // type derived from the solicitation number prefix + middle digits + type char.
+  piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -632,7 +651,14 @@ async function callClaude(
   modelOverride?: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  // Fix 2 (2026-06-05): explicit determinism. Anthropic defaults to 1.0; the
+  // audit pipeline runs binary/categorical extraction (clauses, classification,
+  // set-aside) where variance is a defect, not a feature. Callers pass 0 for
+  // structured calls; narrative-summary callers may pass undefined to preserve
+  // default sampling. Threaded as an opt-in to avoid silently degrading the
+  // unrelated callers that may exist downstream.
+  temperature?: number
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -687,6 +713,7 @@ async function callClaude(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        ...(typeof temperature === "number" ? { temperature } : {}),
         system: systemPrompt,
         messages: [{ role: "user", content }]
       }),
@@ -732,13 +759,14 @@ async function callWithRetry(
   label: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  temperature?: number
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId, temperature);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId, temperature);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -805,7 +833,8 @@ JSON only, no prose.`;
     undefined,
     imageBase64,
     imageMediaType,
-    pdfFileId
+    pdfFileId,
+    0  // Fix 2: classifier is binary/categorical — temperature 0
   );
 
   const json = extractJSON(text) || {};
@@ -821,6 +850,195 @@ JSON only, no prose.`;
 
   return { document_type: dt, rationale, confidence: conf };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fork 1 deterministic helpers (2026-06-05). Each function is pure, exported
+// for unit-test access, and called from runAudit() after the model returns.
+// LLM variance on these specific fields was producing wrong values (wrong
+// NAICS size standard, "Top quartile" on a 25/100, contradictory set-asides,
+// sole-source J&As scored as PROCEED_WITH_CAUTION). The fix is to override
+// model output with deterministic post-processing on the binary/categorical
+// decisions that should never vary.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Fix 1 — NAICS size standard lookup. SBA's published table. Render call sites
+// must use this helper exclusively; the model must not generate size standards.
+const NAICS_SIZE_STANDARDS: Record<string, { employees?: number; revenue?: string; label: string }> = {
+  "336411": { employees: 1500, label: "Aircraft Manufacturing" },
+  "336412": { employees: 1500, label: "Aircraft Engine & Engine Parts Manufacturing" },
+  "336413": { employees: 1250, label: "Other Aircraft Parts & Auxiliary Equipment Manufacturing" },
+  "336414": { employees: 1250, label: "Guided Missile & Space Vehicle Manufacturing" },
+  "332710": { employees: 500,  label: "Machine Shops" },
+  "332721": { employees: 500,  label: "Precision Turned Product Manufacturing" },
+  "332722": { employees: 500,  label: "Bolt, Nut, Screw, Rivet & Washer Manufacturing" },
+  "541330": { revenue: "$25.5M", label: "Engineering Services" },
+  "541512": { employees: 150,  label: "Computer Systems Design Services" },
+  "541519": { employees: 150,  label: "Other Computer Related Services" },
+  "561210": { revenue: "$47M",  label: "Facilities Support Services" }
+};
+export function getNaicsSizeStandard(naicsCode: string | null | undefined): string {
+  if (!naicsCode) return "See SBA Table of Size Standards";
+  const entry = NAICS_SIZE_STANDARDS[naicsCode];
+  if (!entry) return "See SBA Table of Size Standards";
+  if (entry.employees) return `${entry.employees.toLocaleString()} employees`;
+  if (entry.revenue) return `${entry.revenue} avg annual receipts`;
+  return "See SBA Table of Size Standards";
+}
+
+// Fix 11 — PIID decode. DLA / Army / AF / USCG / WPAFB issuing-activity prefix
+// → human label. Middle-digit pattern → FY. Procurement-type char → instrument.
+const DLA_ACTIVITY_MAP: Record<string, string> = {
+  "SPRRA1": "DLA Aviation Huntsville, AL",
+  "SPRRA2": "DLA Aviation Huntsville, AL",
+  "SPE4":   "DLA Aviation Richmond, VA",
+  "SPRHA":  "DLA Aviation Ogden, UT",
+  "SPRTA":  "DLA Aviation Oklahoma City, OK",
+  "SPRWA":  "DLA Aviation Warner Robins, GA",
+  "SPEFA":  "DLA Aviation Fleet Readiness Center",
+  "W58RGZ": "U.S. Army ACC — Redstone Arsenal, AL",
+  "FA3016": "JBSA Lackland, TX — 502 CONS",
+  "FA3002": "Wright-Patterson AFB — AFLCMC",
+  "70Z038": "USCG Aviation Logistics Center — Elizabeth City, NC"
+};
+const PROCUREMENT_TYPE_MAP: Record<string, string> = {
+  Q: "RFQ — Simplified Acquisition",
+  R: "RFP — Negotiated Acquisition",
+  B: "IFB — Sealed Bid",
+  T: "T&M / IDC",
+  D: "Delivery Order"
+};
+export function decodePIID(solicitationNumber: string | null | undefined): { activity: string | null; fiscalYear: string | null; procurementType: string | null } {
+  if (!solicitationNumber) return { activity: null, fiscalYear: null, procurementType: null };
+  const up = solicitationNumber.toUpperCase();
+  // Sort prefix keys longest-first so SPRRA1 wins over SPE4 when both could prefix-match.
+  const prefix = Object.keys(DLA_ACTIVITY_MAP)
+    .sort((a, b) => b.length - a.length)
+    .find((k) => up.startsWith(k));
+  const activity = prefix ? DLA_ACTIVITY_MAP[prefix] : null;
+  // FY pattern: two digits sandwiched between letters (or hyphens).
+  // Examples: SPRRA1-26-Q-0034 → 26; SPRRA126Q0034 → 26.
+  const fyMatch = up.match(/[A-Z](\d{2})(?=[A-Z-])/);
+  const fiscalYear = fyMatch ? `FY20${fyMatch[1]}` : null;
+  // Procurement type char: the first letter AFTER the FY digits.
+  let procurementType: string | null = null;
+  if (fyMatch) {
+    const fyIndex = up.indexOf(fyMatch[1], fyMatch.index ?? 0);
+    const after = up.slice(fyIndex + 2).replace(/^[-]/, "");
+    const typeChar = after[0];
+    procurementType = typeChar ? PROCUREMENT_TYPE_MAP[typeChar] ?? null : null;
+  }
+  return { activity, fiscalYear, procurementType };
+}
+
+// Fix 5 — set-aside deterministic regex post-processor. Document text overrides
+// SAM metadata + model output. First pattern match in priority order wins.
+const SET_ASIDE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
+  { pattern: /100\s*%\s*small\s*business\s*set[\s-]?aside/i,                value: "Total Small Business Set-Aside" },
+  { pattern: /set[\s-]?aside.{0,40}8\s*\(a\)|8\s*\(a\).{0,40}set[\s-]?aside/i, value: "8(a)" },
+  { pattern: /SDVOSB|service[\s-]disabled\s*veteran/i,                       value: "SDVOSB" },
+  { pattern: /HUBZone/i,                                                      value: "HUBZone" },
+  { pattern: /EDWOSB|economically\s*disadvantaged.*women/i,                  value: "EDWOSB" },
+  { pattern: /WOSB|women[\s-]owned/i,                                         value: "WOSB" },
+  { pattern: /sole\s*source|FAR\s*6\.302|6\.302/i,                            value: "Sole Source" },
+  { pattern: /full\s*and\s*open|unrestricted\s*competition/i,                 value: "Full & Open" }
+];
+export function applySetAsideRegex(docText: string, fallback: string | undefined): string | undefined {
+  if (!docText) return fallback;
+  for (const { pattern, value } of SET_ASIDE_PATTERNS) {
+    if (pattern.test(docText)) return value;
+  }
+  return fallback;
+}
+
+// Fix 6 — sole-source vendor extraction. Deterministic regex on doc text.
+// Returns { name, cage } when a J&A or sole-source-style document names a
+// specific vendor. Gates the score cap + structural-no-bid risk emission.
+export function extractSoleSourceVendor(docText: string): { name: string; cage?: string | null } | null {
+  if (!docText) return null;
+  const cageMatch = docText.match(/CAGE\s+(?:Code\s+)?([A-Z0-9]{5})/i);
+  const cage = cageMatch ? cageMatch[1].toUpperCase() : null;
+  // Try the "only known source" pattern first — most explicit.
+  let nameMatch = docText.match(/only\s+(?:known\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/);
+  // J&A "sole source to NAME" pattern.
+  if (!nameMatch) {
+    nameMatch = docText.match(/sole[\s-]source[^.]*?to\s+([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/i);
+  }
+  if (!nameMatch && !cage) return null;
+  const name = nameMatch ? nameMatch[1].replace(/\s+/g, " ").trim() : "(vendor name not extracted)";
+  return { name, cage };
+}
+
+// Fix 6 — score cap. Sole-source J&A naming a specific vendor = structural
+// no-bid for everyone else. Cap at 25 (DECLINE band).
+const SOLE_SOURCE_CAP_SCORE = 25;
+const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1/i;
+export function applySoleSourceCap(baseScore: number, docText: string, classificationDocType: string, vendor: ReturnType<typeof extractSoleSourceVendor>): number {
+  const isJA = SOLE_SOURCE_DOC_RE.test(docText) || /sole[\s-]source/i.test(docText) || /J&A/i.test(classificationDocType);
+  if (isJA && vendor) return Math.min(baseScore, SOLE_SOURCE_CAP_SCORE);
+  return baseScore;
+}
+
+// Fix 9 — SPRS posting-lag math. DFARS 252.204-7020 requires a current SPRS
+// score. SPRS scores require 30 days to post after self-assessment. With a
+// 5-day buffer, anything ≤ 35 days from deadline is structurally remediable.
+const SPRS_POSTING_LAG_DAYS = 30;
+const SPRS_BUFFER_DAYS = 5;
+export function checkSprsLagRisk(dfarsClauses: string[] | undefined, responseDeadline: Date | null): PrioritizedRisk | null {
+  if (!responseDeadline || !Array.isArray(dfarsClauses)) return null;
+  const has7020 = dfarsClauses.some((c) => /252\.204-7020|252\.204\s*-\s*7020/.test(c));
+  if (!has7020) return null;
+  const daysToDeadline = Math.floor((responseDeadline.getTime() - Date.now()) / 86_400_000);
+  if (daysToDeadline >= SPRS_POSTING_LAG_DAYS + SPRS_BUFFER_DAYS) return null;
+  const deadlineStr = responseDeadline.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return {
+    text: `SPRS posting lag makes remediation impossible before the ${deadlineStr} deadline. DFARS 252.204-7020 requires a current SPRS score; scores require ${SPRS_POSTING_LAG_DAYS} days to post after NIST SP 800-171 self-assessment submission. With ${daysToDeadline} days to deadline, a firm without a current score cannot remedy the gap in time — this is a no-bid condition, not an action item.`,
+    title: "SPRS remediation impossible before deadline",
+    priority: "P0",
+    category: "compliance",
+    citation: "DFARS 252.204-7020",
+    provenance: "verified",
+    faraudit_action: `Verify your SPRS score is current at https://www.sprs.csd.disa.mil/ before the ${deadlineStr} deadline. If not current, this acquisition is structurally out of reach this cycle — track for the next solicitation.`,
+    offerorActionRequired: true
+  };
+}
+
+// Fix 10 — reverse-auction guidance. Detection via 52.217-10, legacy DLA L02,
+// or "reverse auction" in Section L. Replaces wrong "submit best price first"
+// guidance with correct BATNA-floor strategy.
+const REVERSE_AUCTION_RE = /\b52\.217-10\b|\bL02\b|reverse\s*auction/i;
+export function buildReverseAuctionRisk(farClauses: string[] | undefined, sectionLText: string | undefined): PrioritizedRisk | null {
+  const inClauses = Array.isArray(farClauses) && farClauses.some((c) => /52\.217-10/.test(c));
+  const inSectionL = !!sectionLText && REVERSE_AUCTION_RE.test(sectionLText);
+  if (!inClauses && !inSectionL) return null;
+  const clauseRef = inClauses ? "52.217-10" : "L02";
+  return {
+    text: `Reverse auction present (${clauseRef}). Do NOT submit your floor price at initial submission. Correct strategy: (1) determine your internal BATNA floor before the auction — the minimum price at which you can perform and maintain margin; (2) submit a defensible market-rate price at initial submission; (3) register at https://dla.procurexinc.com before the solicitation close date — registration is required to participate in the auction event; (4) reserve price reduction capacity for the live auction window.`,
+    title: "Reverse auction — initial submission is NOT your floor",
+    priority: "P0",
+    category: "pricing",
+    citation: clauseRef,
+    provenance: "verified",
+    faraudit_action: `Register at https://dla.procurexinc.com before close. Compute your BATNA floor offline. Submit a market-rate (not floor) price at initial submission; reserve your reduction capacity for the live auction.`,
+    offerorActionRequired: true
+  };
+}
+
+// Fix 6 (companion) — structural-no-bid risk emitter.
+export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null }): PrioritizedRisk {
+  const cageStr = vendor.cage ? ` (CAGE ${vendor.cage})` : "";
+  return {
+    text: `Structural no-bid — this acquisition names ${vendor.name}${cageStr} as the only known source. Unless you are ${vendor.name}, or hold an existing authorized distributor agreement at fixed transfer pricing with ${vendor.name}, award will go to the named vendor. This is not a compliance gap to close — it is a market-structure reality. Set a recompete alert for this NSN/solicitation pattern instead.`,
+    title: "Structural no-bid — named-vendor sole source",
+    priority: "P0",
+    category: "market-structure",
+    citation: "FAR 6.302",
+    provenance: "verified",
+    faraudit_action: `Skip this cycle. Track for the next recompete window. If you hold or can establish an authorized distributor relationship with ${vendor.name}, that is the only path; otherwise, position for the next non-sole-source acquisition of this part.`,
+    offerorActionRequired: false
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
@@ -985,7 +1203,8 @@ JSON only.`;
       "overview",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: overview extracts structured factors/requirements — determinism over variance
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -995,7 +1214,8 @@ JSON only.`;
       "compliance",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: clauses/set-aside/CLINs are categorical — temperature 0
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -1005,7 +1225,8 @@ JSON only.`;
       "risks",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: severity scoring + prioritized list are categorical decisions
     )
   ]);
 
@@ -1100,6 +1321,69 @@ JSON only.`;
     const hasRichSource = !!pdfBase64 || !!pdfFileId || !!imageBase64 || !!extractedText;
     prioritized = [synthesizeFallbackRisk(complianceJson, hasRichSource)];
   }
+
+  // ━━ Fork 1 post-processors (2026-06-05) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Run AFTER model returns; outputs override model variance on binary/
+  // categorical fields. solText is the sanitized prompt body that the model
+  // also saw, so anything matched here was visible to the model — we're not
+  // synthesizing new claims, we're enforcing deterministic readings of the
+  // same text. Each block is independent and additive.
+
+  // Fix 5 — set-aside regex post-processor. Document text overrides model
+  // output. SAM metadata fallback is preserved by passing model value as
+  // the fallback arg; if no regex hit, model value stands.
+  complianceJson.set_aside_type = applySetAsideRegex(solText, complianceJson.set_aside_type);
+
+  // Fix 6 — sole-source vendor extraction + structural-no-bid risk emission.
+  const soleSourceVendor = extractSoleSourceVendor(solText);
+  if (soleSourceVendor) {
+    complianceJson.sole_source_vendor = soleSourceVendor;
+    // Emit the structural-no-bid risk so it surfaces in §05 above the model's
+    // own risks. The score-cap below ensures recommendation is DECLINE.
+    prioritized = [buildSoleSourceRisk(soleSourceVendor), ...prioritized];
+  }
+
+  // Fix 9 — SPRS posting-lag risk (DFARS 252.204-7020). Synthesize an
+  // additional HIGH-severity risk when the deadline is too close for SPRS
+  // remediation to clear. The model's risk list may already mention SPRS;
+  // this engine-side emitter guarantees the deadline math is right.
+  const responseDeadline = (() => {
+    const raw = (solicitation as Record<string, unknown> | null)?.["responseDeadLine"];
+    if (typeof raw === "string" && raw.length > 0) {
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  })();
+  const sprsRisk = checkSprsLagRisk(complianceJson.dfars_clauses, responseDeadline);
+  if (sprsRisk) prioritized = [sprsRisk, ...prioritized];
+
+  // Fix 10 — reverse-auction guidance risk (52.217-10 / L02 / "reverse
+  // auction" in Section L). Replaces incorrect "submit floor at initial"
+  // language with the BATNA-floor strategy.
+  const reverseAuctionRisk = buildReverseAuctionRisk(complianceJson.far_clauses, complianceJson.section_l_summary);
+  if (reverseAuctionRisk) prioritized = [reverseAuctionRisk, ...prioritized];
+
+  // Fix 1 — NAICS size standard lookup. Pull NAICS from the solicitation
+  // metadata; fall back to overviewJson if the SAM payload didn't carry it.
+  const naicsCode =
+    (typeof (solicitation as Record<string, unknown> | null)?.["naicsCode"] === "string" ? String((solicitation as Record<string, unknown>)["naicsCode"]) : null)
+    ?? null;
+  if (naicsCode) complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+
+  // Fix 11 — PIID decode from the canonical or SAM solicitation number.
+  const piidSource =
+    overviewJson.solicitation_number_canonical
+    ?? (typeof (solicitation as Record<string, unknown> | null)?.["solicitationNumber"] === "string" ? String((solicitation as Record<string, unknown>)["solicitationNumber"]) : null)
+    ?? null;
+  if (piidSource) complianceJson.piid_decoded = decodePIID(piidSource);
+
+  // Re-cap prioritized after synthesized risks were prepended. MAX_RISKS_RENDERED
+  // applies to the final visible list. Synthesized P0s sort to top by priority
+  // rank already; cap just trims overflow from the model side.
+  prioritized = prioritized.slice(0, MAX_RISKS_RENDERED);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   risksJson.prioritized_risks = prioritized;
 
   // Composite scoring
@@ -1110,7 +1394,12 @@ JSON only.`;
 
   const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
   const riskPenalty = severity * 5;
-  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  const baseScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // Fix 6 — sole-source J&A score cap. Applied AFTER base score is computed
+  // so the cap is visible in logs / debugging. When vendor extraction hit AND
+  // the doc-type text looks like a J&A, cap at SOLE_SOURCE_CAP_SCORE (25 →
+  // DECLINE band).
+  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor);
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which
@@ -1124,9 +1413,19 @@ JSON only.`;
   // isDocumentType in classifyDocument), OR the source was retrieved but no
   // FAR / DFARS clauses were extracted (a real solicitation always cites
   // some). Either signal tells the renderer to suppress bid/no-bid rhetoric.
+  //
+  // Fix 3 (2026-06-05): a document with extracted Section L (submission
+  // requirements) or Section M (evaluation factors) is structurally a
+  // solicitation regardless of the classifier landing or low clause counts.
+  // The L/M signal overrides the "Other" + zero-clause bucket to prevent
+  // a real solicitation with thin clause extraction from being suppressed.
+  const hasSectionL = (complianceJson.submission_requirements?.length ?? 0) > 0;
+  const hasSectionM = (complianceJson.evaluation_factors?.length ?? 0) > 0;
   const is_not_solicitation =
-    classification.document_type === "Other" ||
-    (isRetrieved && farCount === 0 && dfarsCount === 0);
+    !hasSectionL && !hasSectionM && (
+      classification.document_type === "Other" ||
+      (isRetrieved && farCount === 0 && dfarsCount === 0)
+    );
 
   let recommendation: AuditResult["recommendation"];
   if (compliance_score == null) {

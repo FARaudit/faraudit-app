@@ -477,14 +477,17 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
             ? r.provenance
             : "inferred";
         return {
-          title: String(r.title ?? text.split(".")[0] ?? text).slice(0, 160),
+          title: sanitizeDisplayText(String(r.title ?? text.split(".")[0] ?? text).slice(0, 160)),
           severity: priorityToSev(r.priority ?? r.severity),
           citation: String(cite),
-          description: text,
+          // Design B (2026-06-05): apply the ISO-date guard to risk prose so
+          // engine-emitted timestamps render as "11 Jun 2026" rather than
+          // "2026-06-11T11:00:00-05:00".
+          description: sanitizeDisplayText(text),
           // Engine omits faraudit_action when the action would be canned
           // boilerplate; passing empty string here lets the renderer drop the
           // .risk-action chip entirely rather than show filler.
-          faraudit_action: String(r.faraudit_action ?? r.recommended_action ?? "").trim(),
+          faraudit_action: sanitizeDisplayText(String(r.faraudit_action ?? r.recommended_action ?? "").trim()),
           provenance
         };
       });
@@ -940,7 +943,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     submission_requirements: submissionRequirements,
     submission_summary: submissionSummary,
 
-    recommendation_rationale: (audit.bid_recommendation as string) || "Recommendation rationale not recorded.",
+    recommendation_rationale: sanitizeDisplayText(audit.bid_recommendation as string) || "Recommendation rationale not recorded.",
     recommendation_win_themes: winThemes,
 
     ko_email_to: koTo,

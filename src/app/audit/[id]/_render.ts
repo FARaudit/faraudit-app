@@ -365,6 +365,30 @@ function removeVerdictBlock(html: string): string {
   return out;
 }
 
+// Design Revision A (2026-06-05): when is_not_solicitation === true, strip
+// §03 Scope, §04 Compliance Flags, §05 Risk Register, §06 Recommendation.
+// Rationale: the model's analysis of these sections is unreliable when the
+// document isn't a solicitation; rendering them invites contradictions like
+// "no FAR/DFARS clauses detected" alongside a 10-clause risk register.
+//
+// Implementation: uses the existing removeElementByOpenRe() balanced-range
+// helper to strip each section by id. No new CSS, no template change —
+// reuses the same surgical-excise pattern as removeVerdictBlock above. The
+// rendered HTML feeds both the web page and the headless-Chromium PDF, so
+// stripping at the renderer guarantees screen + PDF stay 1:1.
+function removeNotSolicitationSections(html: string): string {
+  const sectionIds = ["sec-scope", "sec-compliance", "sec-risks", "sec-reco"];
+  let out = html;
+  for (const id of sectionIds) {
+    out = removeElementByOpenRe(
+      out,
+      new RegExp(`<section\\b[^>]*\\bid="${id}"[^>]*>`),
+      "section"
+    );
+  }
+  return out;
+}
+
 // Inject the production CTA handlers for [data-fetch] / [data-track] /
 // [data-upload]. The template's bundled handler is a placeholder
 // (showToast); these real handlers know the audit id and route accordingly.
@@ -1031,6 +1055,11 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   if (vm.is_not_solicitation) {
     html = removeVerdictBlock(html);
     html = insertNotSolicitationBanner(html);
+    // Design Revision A: strip §03/§04/§05/§06 entirely so the report cannot
+    // contradict the not-a-solicitation banner. Renderer-side strip keeps
+    // web + PDF in lockstep (no need for [data-state="locked"] CSS gymnastics
+    // since the sections are physically gone).
+    html = removeNotSolicitationSections(html);
   } else if (vm.is_unscored) {
     // DESIGN dual-block spec: keep the prelim .v-unscored block, drop the
     // scored block. data-prelim-mode is the classifier output mapped through

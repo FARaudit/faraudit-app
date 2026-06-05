@@ -161,6 +161,13 @@ export interface PrioritizedRisk {
   // canned fallback (Address this risk before submission — see KO email draft)
   // that should be removed in a follow-up commit; the engine side is right.
   faraudit_action?: string;
+  // Fork 1 (2026-06-05): parity mirror of src/lib/audit-engine.ts. Risks that
+  // require a discrete offeror submission action (representations, certs,
+  // acknowledgments, form completions) set this true. Pricing/schedule/context
+  // risks with a clause citation but no offeror submission action stay false.
+  // Fast-follow Fix 4 derives §04 Compliance Flags from risks where this is
+  // true — collapsing the independent §04 extractor into a §05 projection.
+  offerorActionRequired?: boolean;
 }
 
 export interface CLIN {
@@ -207,6 +214,10 @@ export interface ComplianceJSON {
   // should prefer this over the SAM metadata solicitation_number when present,
   // so masthead + reasoning + filenames all show the same canonical form.
   solicitation_number_canonical?: string | null;
+  // Fork 1 (2026-06-05): parity mirror — see src/lib/audit-engine.ts.
+  naics_size_standard?: string;
+  sole_source_vendor?: { name: string; cage?: string | null };
+  piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -645,7 +656,8 @@ async function callClaude(
   modelOverride?: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  temperature?: number  // Fix 2 (2026-06-05): parity mirror — see src/lib/audit-engine.ts
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -700,6 +712,7 @@ async function callClaude(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        ...(typeof temperature === "number" ? { temperature } : {}),
         system: systemPrompt,
         messages: [{ role: "user", content }]
       }),
@@ -745,13 +758,14 @@ async function callWithRetry(
   label: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  temperature?: number
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId, temperature);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId, temperature);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -818,7 +832,8 @@ JSON only, no prose.`;
     undefined,
     imageBase64,
     imageMediaType,
-    pdfFileId
+    pdfFileId,
+    0  // Fix 2: classifier is binary/categorical — temperature 0
   );
 
   const json = extractJSON(text) || {};
@@ -834,6 +849,167 @@ JSON only, no prose.`;
 
   return { document_type: dt, rationale, confidence: conf };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fork 1 deterministic helpers (2026-06-05). Parity mirror of
+// src/lib/audit-engine.ts — see source file for full doctrine. Per Rule 17,
+// any change to one file must land in the other in the same commit.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NAICS_SIZE_STANDARDS: Record<string, { employees?: number; revenue?: string; label: string }> = {
+  "336411": { employees: 1500, label: "Aircraft Manufacturing" },
+  "336412": { employees: 1500, label: "Aircraft Engine & Engine Parts Manufacturing" },
+  "336413": { employees: 1250, label: "Other Aircraft Parts & Auxiliary Equipment Manufacturing" },
+  "336414": { employees: 1250, label: "Guided Missile & Space Vehicle Manufacturing" },
+  "332710": { employees: 500,  label: "Machine Shops" },
+  "332721": { employees: 500,  label: "Precision Turned Product Manufacturing" },
+  "332722": { employees: 500,  label: "Bolt, Nut, Screw, Rivet & Washer Manufacturing" },
+  "541330": { revenue: "$25.5M", label: "Engineering Services" },
+  "541512": { employees: 150,  label: "Computer Systems Design Services" },
+  "541519": { employees: 150,  label: "Other Computer Related Services" },
+  "561210": { revenue: "$47M",  label: "Facilities Support Services" }
+};
+export function getNaicsSizeStandard(naicsCode: string | null | undefined): string {
+  if (!naicsCode) return "See SBA Table of Size Standards";
+  const entry = NAICS_SIZE_STANDARDS[naicsCode];
+  if (!entry) return "See SBA Table of Size Standards";
+  if (entry.employees) return `${entry.employees.toLocaleString()} employees`;
+  if (entry.revenue) return `${entry.revenue} avg annual receipts`;
+  return "See SBA Table of Size Standards";
+}
+
+const DLA_ACTIVITY_MAP: Record<string, string> = {
+  "SPRRA1": "DLA Aviation Huntsville, AL",
+  "SPRRA2": "DLA Aviation Huntsville, AL",
+  "SPE4":   "DLA Aviation Richmond, VA",
+  "SPRHA":  "DLA Aviation Ogden, UT",
+  "SPRTA":  "DLA Aviation Oklahoma City, OK",
+  "SPRWA":  "DLA Aviation Warner Robins, GA",
+  "SPEFA":  "DLA Aviation Fleet Readiness Center",
+  "W58RGZ": "U.S. Army ACC — Redstone Arsenal, AL",
+  "FA3016": "JBSA Lackland, TX — 502 CONS",
+  "FA3002": "Wright-Patterson AFB — AFLCMC",
+  "70Z038": "USCG Aviation Logistics Center — Elizabeth City, NC"
+};
+const PROCUREMENT_TYPE_MAP: Record<string, string> = {
+  Q: "RFQ — Simplified Acquisition",
+  R: "RFP — Negotiated Acquisition",
+  B: "IFB — Sealed Bid",
+  T: "T&M / IDC",
+  D: "Delivery Order"
+};
+export function decodePIID(solicitationNumber: string | null | undefined): { activity: string | null; fiscalYear: string | null; procurementType: string | null } {
+  if (!solicitationNumber) return { activity: null, fiscalYear: null, procurementType: null };
+  const up = solicitationNumber.toUpperCase();
+  const prefix = Object.keys(DLA_ACTIVITY_MAP)
+    .sort((a, b) => b.length - a.length)
+    .find((k) => up.startsWith(k));
+  const activity = prefix ? DLA_ACTIVITY_MAP[prefix] : null;
+  const fyMatch = up.match(/[A-Z](\d{2})(?=[A-Z-])/);
+  const fiscalYear = fyMatch ? `FY20${fyMatch[1]}` : null;
+  let procurementType: string | null = null;
+  if (fyMatch) {
+    const fyIndex = up.indexOf(fyMatch[1], fyMatch.index ?? 0);
+    const after = up.slice(fyIndex + 2).replace(/^[-]/, "");
+    const typeChar = after[0];
+    procurementType = typeChar ? PROCUREMENT_TYPE_MAP[typeChar] ?? null : null;
+  }
+  return { activity, fiscalYear, procurementType };
+}
+
+const SET_ASIDE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
+  { pattern: /100\s*%\s*small\s*business\s*set[\s-]?aside/i,                value: "Total Small Business Set-Aside" },
+  { pattern: /set[\s-]?aside.{0,40}8\s*\(a\)|8\s*\(a\).{0,40}set[\s-]?aside/i, value: "8(a)" },
+  { pattern: /SDVOSB|service[\s-]disabled\s*veteran/i,                       value: "SDVOSB" },
+  { pattern: /HUBZone/i,                                                      value: "HUBZone" },
+  { pattern: /EDWOSB|economically\s*disadvantaged.*women/i,                  value: "EDWOSB" },
+  { pattern: /WOSB|women[\s-]owned/i,                                         value: "WOSB" },
+  { pattern: /sole\s*source|FAR\s*6\.302|6\.302/i,                            value: "Sole Source" },
+  { pattern: /full\s*and\s*open|unrestricted\s*competition/i,                 value: "Full & Open" }
+];
+export function applySetAsideRegex(docText: string, fallback: string | undefined): string | undefined {
+  if (!docText) return fallback;
+  for (const { pattern, value } of SET_ASIDE_PATTERNS) {
+    if (pattern.test(docText)) return value;
+  }
+  return fallback;
+}
+
+export function extractSoleSourceVendor(docText: string): { name: string; cage?: string | null } | null {
+  if (!docText) return null;
+  const cageMatch = docText.match(/CAGE\s+(?:Code\s+)?([A-Z0-9]{5})/i);
+  const cage = cageMatch ? cageMatch[1].toUpperCase() : null;
+  let nameMatch = docText.match(/only\s+(?:known\s+)?source[^.]*?([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/);
+  if (!nameMatch) {
+    nameMatch = docText.match(/sole[\s-]source[^.]*?to\s+([A-Z][A-Za-z0-9 ,.&'\-]+?(?:Inc|LLC|Corp|Corporation|Ltd|Co|Company|Industries|Aerospace|Systems|Aviation))\b/i);
+  }
+  if (!nameMatch && !cage) return null;
+  const name = nameMatch ? nameMatch[1].replace(/\s+/g, " ").trim() : "(vendor name not extracted)";
+  return { name, cage };
+}
+
+const SOLE_SOURCE_CAP_SCORE = 25;
+const SOLE_SOURCE_DOC_RE = /J&A|Justification\s*and\s*Approval|Justification\s*for\s*Sole\s*Source|FAR\s*6\.302|6\.302-1/i;
+export function applySoleSourceCap(baseScore: number, docText: string, classificationDocType: string, vendor: ReturnType<typeof extractSoleSourceVendor>): number {
+  const isJA = SOLE_SOURCE_DOC_RE.test(docText) || /sole[\s-]source/i.test(docText) || /J&A/i.test(classificationDocType);
+  if (isJA && vendor) return Math.min(baseScore, SOLE_SOURCE_CAP_SCORE);
+  return baseScore;
+}
+
+const SPRS_POSTING_LAG_DAYS = 30;
+const SPRS_BUFFER_DAYS = 5;
+export function checkSprsLagRisk(dfarsClauses: string[] | undefined, responseDeadline: Date | null): PrioritizedRisk | null {
+  if (!responseDeadline || !Array.isArray(dfarsClauses)) return null;
+  const has7020 = dfarsClauses.some((c) => /252\.204-7020|252\.204\s*-\s*7020/.test(c));
+  if (!has7020) return null;
+  const daysToDeadline = Math.floor((responseDeadline.getTime() - Date.now()) / 86_400_000);
+  if (daysToDeadline >= SPRS_POSTING_LAG_DAYS + SPRS_BUFFER_DAYS) return null;
+  const deadlineStr = responseDeadline.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return {
+    text: `SPRS posting lag makes remediation impossible before the ${deadlineStr} deadline. DFARS 252.204-7020 requires a current SPRS score; scores require ${SPRS_POSTING_LAG_DAYS} days to post after NIST SP 800-171 self-assessment submission. With ${daysToDeadline} days to deadline, a firm without a current score cannot remedy the gap in time — this is a no-bid condition, not an action item.`,
+    title: "SPRS remediation impossible before deadline",
+    priority: "P0",
+    category: "compliance",
+    citation: "DFARS 252.204-7020",
+    provenance: "verified",
+    faraudit_action: `Verify your SPRS score is current at https://www.sprs.csd.disa.mil/ before the ${deadlineStr} deadline. If not current, this acquisition is structurally out of reach this cycle — track for the next solicitation.`,
+    offerorActionRequired: true
+  };
+}
+
+const REVERSE_AUCTION_RE = /\b52\.217-10\b|\bL02\b|reverse\s*auction/i;
+export function buildReverseAuctionRisk(farClauses: string[] | undefined, sectionLText: string | undefined): PrioritizedRisk | null {
+  const inClauses = Array.isArray(farClauses) && farClauses.some((c) => /52\.217-10/.test(c));
+  const inSectionL = !!sectionLText && REVERSE_AUCTION_RE.test(sectionLText);
+  if (!inClauses && !inSectionL) return null;
+  const clauseRef = inClauses ? "52.217-10" : "L02";
+  return {
+    text: `Reverse auction present (${clauseRef}). Do NOT submit your floor price at initial submission. Correct strategy: (1) determine your internal BATNA floor before the auction — the minimum price at which you can perform and maintain margin; (2) submit a defensible market-rate price at initial submission; (3) register at https://dla.procurexinc.com before the solicitation close date — registration is required to participate in the auction event; (4) reserve price reduction capacity for the live auction window.`,
+    title: "Reverse auction — initial submission is NOT your floor",
+    priority: "P0",
+    category: "pricing",
+    citation: clauseRef,
+    provenance: "verified",
+    faraudit_action: `Register at https://dla.procurexinc.com before close. Compute your BATNA floor offline. Submit a market-rate (not floor) price at initial submission; reserve your reduction capacity for the live auction.`,
+    offerorActionRequired: true
+  };
+}
+
+export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null }): PrioritizedRisk {
+  const cageStr = vendor.cage ? ` (CAGE ${vendor.cage})` : "";
+  return {
+    text: `Structural no-bid — this acquisition names ${vendor.name}${cageStr} as the only known source. Unless you are ${vendor.name}, or hold an existing authorized distributor agreement at fixed transfer pricing with ${vendor.name}, award will go to the named vendor. This is not a compliance gap to close — it is a market-structure reality. Set a recompete alert for this NSN/solicitation pattern instead.`,
+    title: "Structural no-bid — named-vendor sole source",
+    priority: "P0",
+    category: "market-structure",
+    citation: "FAR 6.302",
+    provenance: "verified",
+    faraudit_action: `Skip this cycle. Track for the next recompete window. If you hold or can establish an authorized distributor relationship with ${vendor.name}, that is the only path; otherwise, position for the next non-sole-source acquisition of this part.`,
+    offerorActionRequired: false
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
@@ -998,7 +1174,8 @@ JSON only.`;
       "overview",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: structured factors/requirements — determinism
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -1008,7 +1185,8 @@ JSON only.`;
       "compliance",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: clauses + set-aside + CLINs — categorical
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -1018,7 +1196,8 @@ JSON only.`;
       "risks",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      0  // Fix 2: severity + prioritized list — categorical
     )
   ]);
 
@@ -1113,6 +1292,45 @@ JSON only.`;
     const hasRichSource = !!pdfBase64 || !!pdfFileId || !!imageBase64 || !!extractedText;
     prioritized = [synthesizeFallbackRisk(complianceJson, hasRichSource)];
   }
+
+  // ━━ Fork 1 post-processors (2026-06-05) — parity mirror ━━━━━━━━━━━━━━━━━━
+  // See src/lib/audit-engine.ts for full doctrine. Same code; parity required.
+  complianceJson.set_aside_type = applySetAsideRegex(solText, complianceJson.set_aside_type);
+
+  const soleSourceVendor = extractSoleSourceVendor(solText);
+  if (soleSourceVendor) {
+    complianceJson.sole_source_vendor = soleSourceVendor;
+    prioritized = [buildSoleSourceRisk(soleSourceVendor), ...prioritized];
+  }
+
+  const responseDeadline = (() => {
+    const raw = (solicitation as Record<string, unknown> | null)?.["responseDeadLine"];
+    if (typeof raw === "string" && raw.length > 0) {
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  })();
+  const sprsRisk = checkSprsLagRisk(complianceJson.dfars_clauses, responseDeadline);
+  if (sprsRisk) prioritized = [sprsRisk, ...prioritized];
+
+  const reverseAuctionRisk = buildReverseAuctionRisk(complianceJson.far_clauses, complianceJson.section_l_summary);
+  if (reverseAuctionRisk) prioritized = [reverseAuctionRisk, ...prioritized];
+
+  const naicsCode =
+    (typeof (solicitation as Record<string, unknown> | null)?.["naicsCode"] === "string" ? String((solicitation as Record<string, unknown>)["naicsCode"]) : null)
+    ?? null;
+  if (naicsCode) complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+
+  const piidSource =
+    overviewJson.solicitation_number_canonical
+    ?? (typeof (solicitation as Record<string, unknown> | null)?.["solicitationNumber"] === "string" ? String((solicitation as Record<string, unknown>)["solicitationNumber"]) : null)
+    ?? null;
+  if (piidSource) complianceJson.piid_decoded = decodePIID(piidSource);
+
+  prioritized = prioritized.slice(0, MAX_RISKS_RENDERED);
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   risksJson.prioritized_risks = prioritized;
 
   // Composite scoring
@@ -1123,7 +1341,9 @@ JSON only.`;
 
   const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
   const riskPenalty = severity * 5;
-  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  const baseScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // Fix 6 sole-source J&A score cap — parity mirror.
+  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor);
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which
@@ -1137,9 +1357,17 @@ JSON only.`;
   // isDocumentType in classifyDocument), OR the source was retrieved but no
   // FAR / DFARS clauses were extracted (a real solicitation always cites
   // some). Either signal tells the renderer to suppress bid/no-bid rhetoric.
+  //
+  // Fix 3 (2026-06-05) — parity mirror: Section L / Section M extraction
+  // overrides the bucket so a real solicitation with thin clause extraction
+  // isn't suppressed.
+  const hasSectionL = (complianceJson.submission_requirements?.length ?? 0) > 0;
+  const hasSectionM = (complianceJson.evaluation_factors?.length ?? 0) > 0;
   const is_not_solicitation =
-    classification.document_type === "Other" ||
-    (isRetrieved && farCount === 0 && dfarsCount === 0);
+    !hasSectionL && !hasSectionM && (
+      classification.document_type === "Other" ||
+      (isRetrieved && farCount === 0 && dfarsCount === 0)
+    );
 
   let recommendation: AuditResult["recommendation"];
   if (compliance_score == null) {
