@@ -727,6 +727,12 @@ async function callClaude(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        // Brain QA determinism gate (2026-06-06) — parity mirror.
+        // See src/lib/audit-engine.ts for full doctrine. Sonnet accepts
+        // temperature: 0 (locks structured extraction at deterministic);
+        // Opus retries omit it (API rejects with "deprecated for this
+        // model"). Model-aware gate.
+        ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
         system: systemPrompt,
         messages: [{ role: "user", content }]
       }),

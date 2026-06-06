@@ -760,6 +760,16 @@ async function callClaude(
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        // Brain QA determinism gate (2026-06-06): empirical Anthropic API
+        // probe — claude-sonnet-4-6 accepts `temperature: 0` (200 OK);
+        // claude-opus-4-7 returns 400 "temperature is deprecated for this
+        // model". The earlier blanket removal at 1e68186 was over-broad.
+        // Model-aware gate: lock Sonnet (the default + 4 primary calls)
+        // at temperature 0 for deterministic structured extraction; let
+        // Opus retries omit it (the API rejects them otherwise). Closes
+        // the variance Brain observed across SPRRA runs (0 vs 68
+        // far_clauses, etc.).
+        ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
         system: systemPrompt,
         messages: [{ role: "user", content }]
       }),
