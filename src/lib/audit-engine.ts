@@ -484,10 +484,40 @@ export interface DocClassification {
   confidence: "high" | "medium" | "low";
 }
 
+// ─── Decision Gate model (Ruling 1, 2026-06-05) ─────────────────────────────
+// A "decision gate" is a binary pass/fail credential or sole-source structural
+// barrier whose presence supersedes the numeric fit-score model: a small
+// business missing JCP cannot bid on a JCP-required acquisition no matter how
+// good their proposal is. The verdict output is a discriminated union — SCORED
+// (continuous 0-100 fit score) when no gates fire, DECISION_GATE (gates list,
+// fit_score=null) when any fire. Aggregator: all cure_possible_in_window=false
+// → DECLINE; otherwise CAUTION. AuditResult retains compliance_score +
+// recommendation for backward compat with the view-model/renderer; the new
+// `verdict` field is additive metadata that future renderer work can consume.
+export type DecisionGateStatus = "OPEN" | "CLOSED" | "UNKNOWN";
+export interface DecisionGate {
+  gate_id: string;
+  gate_label: string;
+  status: DecisionGateStatus;
+  cure_possible_in_window: boolean;
+  verification_url?: string;
+  verification_action: string;
+  named_entity?: string;
+}
+export type AuditVerdict =
+  | { type: "SCORED"; fit_score: number; recommendation: "PROCEED" | "PROCEED_WITH_CAUTION" | "DECLINE" }
+  | { type: "DECISION_GATE"; gates: DecisionGate[]; recommendation: "PROCEED_WITH_CAUTION" | "DECLINE" };
+
 export interface AuditResult {
   overview: { summary: string; json: OverviewJSON };
   compliance: { summary: string; json: ComplianceJSON };
   risks: { summary: string; json: RisksJSON };
+  // Ruling 1 (2026-06-05): typed verdict alongside the legacy scalar fields.
+  // SCORED carries the continuous fit_score; DECISION_GATE carries the gate
+  // list and emits fit_score=null. compliance_score + recommendation below
+  // remain populated for view-model compat — DECISION_GATE's recommendation
+  // is copied to the scalar field so the existing pill renders correctly.
+  verdict: AuditVerdict;
   // null when the source wasn't retrieved (sam_unavailable). Replaces the
   // previous "cap at 60" fallback, which displayed a fabricated score on
   // metadata-only audits. Renderer treats null as "—" / unscored.
@@ -1056,6 +1086,153 @@ export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Ruling 1 (2026-06-05): decision-gate detectors. Each returns a DecisionGate
+// when the gate is present, null otherwise. Aggregator at the bottom turns the
+// list of gates into a recommendation tier per the CEO spec.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const JCP_RE = /\bJCP\b|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data/i;
+const FAA145_RE = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
+const TEST_JIG_RE = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
+const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+
+function daysUntil(d: Date | null): number | null {
+  if (!d) return null;
+  return Math.floor((d.getTime() - Date.now()) / 86_400_000);
+}
+
+export function buildSoleSourceGate(vendor: { name: string; cage?: string | null }): DecisionGate {
+  const named = vendor.cage ? `${vendor.name} (CAGE ${vendor.cage})` : vendor.name;
+  return {
+    gate_id: "SOLE_SOURCE_NAMED_VENDOR",
+    gate_label: "Named-vendor sole source",
+    status: "OPEN",
+    // Per CEO Ruling 1 spec: distributor-relationship path keeps cure_possible
+    // true, which routes the recommendation to CAUTION rather than DECLINE.
+    cure_possible_in_window: true,
+    verification_action: `Establish an authorized distributor agreement with ${vendor.name} OR position for the next non-sole-source acquisition of this part.`,
+    named_entity: named
+  };
+}
+
+export function detectSprsGate(dfarsClauses: string[] | undefined, responseDeadline: Date | null): DecisionGate | null {
+  if (!Array.isArray(dfarsClauses) || !dfarsClauses.some((c) => /252\.204-7020/.test(c))) return null;
+  const days = daysUntil(responseDeadline);
+  // 30-day posting lag + 5-day buffer = 35-day threshold.
+  const curable = days == null ? false : days >= 35;
+  return {
+    gate_id: "SPRS_SCORE_REQUIRED",
+    gate_label: "Current SPRS score required",
+    status: "UNKNOWN",
+    cure_possible_in_window: curable,
+    verification_url: "https://www.sprs.csd.disa.mil/",
+    verification_action: "Verify your SPRS Basic Assessment is posted and current (within 3 years) before the response deadline."
+  };
+}
+
+export function detectJcpGate(docText: string, responseDeadline: Date | null): DecisionGate | null {
+  if (!JCP_RE.test(docText)) return null;
+  const days = daysUntil(responseDeadline);
+  // JCP processing is 5-10 business days; require ~15 days runway.
+  const curable = days == null ? false : days >= 15;
+  return {
+    gate_id: "JCP_CERTIFICATION_REQUIRED",
+    gate_label: "Joint Certification Program certification required",
+    status: "UNKNOWN",
+    cure_possible_in_window: curable,
+    verification_url: "https://www.dla.mil/HQ/Acquisition/Offers/JCP/",
+    verification_action: "Submit DD Form 2345 to JCP and post the certification to SAM.gov before the response deadline."
+  };
+}
+
+export function detectFaa145Gate(docText: string): DecisionGate | null {
+  if (!FAA145_RE.test(docText)) return null;
+  // FAA Part 145 rating is months to obtain; structurally not curable in a
+  // typical solicitation window. Conservative false.
+  return {
+    gate_id: "FAA_145_SPECIFIC_PNS",
+    gate_label: "FAA Part 145 repair station rating required",
+    status: "UNKNOWN",
+    cure_possible_in_window: false,
+    verification_action: "Confirm your FAA Part 145 repair station rating covers the specific P/Ns / class ratings in this solicitation."
+  };
+}
+
+export function detectTestJigGate(docText: string): DecisionGate | null {
+  if (!TEST_JIG_RE.test(docText)) return null;
+  return {
+    gate_id: "TEST_JIG_APPROVAL",
+    gate_label: "Specialized test jig / equipment required",
+    status: "UNKNOWN",
+    cure_possible_in_window: false,
+    verification_action: "Confirm access to (or ability to procure/build) the specified test jig before quoting; lead times typically exceed solicitation windows."
+  };
+}
+
+export function detectAftoGate(docText: string): DecisionGate | null {
+  if (!AFTO_RE.test(docText)) return null;
+  return {
+    gate_id: "AFTO_ACCESS",
+    gate_label: "Air Force Technical Order access required",
+    status: "UNKNOWN",
+    cure_possible_in_window: false,
+    verification_action: "Confirm AFTO access via existing TO library agreement OR teaming arrangement with a holding contractor."
+  };
+}
+
+export function aggregateGateRecommendation(gates: DecisionGate[]): "PROCEED_WITH_CAUTION" | "DECLINE" {
+  if (gates.length === 0) return "PROCEED_WITH_CAUTION";
+  // Spec: all cure_possible_in_window=false → DECLINE.
+  //       at least one cure_possible_in_window=true (rest UNKNOWN) → CAUTION.
+  const anyCurable = gates.some((g) => g.cure_possible_in_window === true);
+  return anyCurable ? "PROCEED_WITH_CAUTION" : "DECLINE";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Ruling 3 (2026-06-05): risk dedup + priority-tier fill cap. Replaces the
+// flat slice(0, MAX_RISKS_RENDERED) cap with a structured fill: 4 P0 + 2 P1
+// + 1 P2 = 7 total. When the audit produces 5+ P0 risks after dedup, drop
+// P1/P2 entirely (the high-severity workload alone is already enough).
+// Dedup key: (normalized_theme, primary_clause_or_section). Merge rule: when
+// two cards share the dedup key, keep the one WITH faraudit_action populated.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function normalizeClauseKey(citation: string | undefined): string {
+  if (!citation) return "";
+  return citation.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+export function applyRuling3Cap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
+  // Round 1: dedup by (themeKey, normalized clause). Keep card with action.
+  const byKey = new Map<string, PrioritizedRisk>();
+  for (const r of risks) {
+    const key = `${riskThemeKey(r.text, r.citation)}|${normalizeClauseKey(r.citation)}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, r); continue; }
+    const prevHasAction = (prev.faraudit_action ?? "").trim().length > 0;
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    if (curHasAction && !prevHasAction) { byKey.set(key, r); continue; }
+    if (!curHasAction && prevHasAction) continue;
+    // Both have action OR neither has action — prefer higher severity, then
+    // longer text. Never merge prose.
+    if (PRIORITY_RANK[r.priority] < PRIORITY_RANK[prev.priority]) byKey.set(key, r);
+    else if (PRIORITY_RANK[r.priority] === PRIORITY_RANK[prev.priority] && r.text.length > prev.text.length) byKey.set(key, r);
+  }
+  const deduped = Array.from(byKey.values());
+
+  // Round 2: priority-tier fill.
+  const p0 = deduped.filter((r) => r.priority === "P0");
+  const p1 = deduped.filter((r) => r.priority === "P1");
+  const p2 = deduped.filter((r) => r.priority === "P2");
+
+  // 5+ P0 after dedup → keep all P0, drop P1/P2 entirely.
+  if (p0.length >= 5) return p0;
+
+  // Else: 4 P0 + 2 P1 + 1 P2 = 7 total.
+  return [...p0.slice(0, 4), ...p1.slice(0, 2), ...p2.slice(0, 1)];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
@@ -1392,10 +1569,10 @@ JSON only.`;
     ?? null;
   if (piidSource) complianceJson.piid_decoded = decodePIID(piidSource);
 
-  // Re-cap prioritized after synthesized risks were prepended. MAX_RISKS_RENDERED
-  // applies to the final visible list. Synthesized P0s sort to top by priority
-  // rank already; cap just trims overflow from the model side.
-  prioritized = prioritized.slice(0, MAX_RISKS_RENDERED);
+  // Ruling 3 (2026-06-05): dedup by (themeKey, citationKey), keep-with-action
+  // merge, priority-tier fill (4 P0 + 2 P1 + 1 P2 = 7), drop P1/P2 when 5+ P0
+  // remain after dedup. Replaces the prior flat slice(0, MAX_RISKS_RENDERED).
+  prioritized = applyRuling3Cap(prioritized);
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   risksJson.prioritized_risks = prioritized;
@@ -1408,12 +1585,11 @@ JSON only.`;
 
   const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
   const riskPenalty = severity * 5;
-  const baseScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
-  // Fix 6 — sole-source J&A score cap. Applied AFTER base score is computed
-  // so the cap is visible in logs / debugging. When vendor extraction hit AND
-  // the doc-type text looks like a J&A, cap at SOLE_SOURCE_CAP_SCORE (25 →
-  // DECLINE band).
-  const rawScore = applySoleSourceCap(baseScore, solText, classification.document_type, soleSourceVendor, complianceJson.far_clauses);
+  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
+  // now drive the recommendation tier; the score reflects the underlying fit
+  // without artificial flooring. The cap helper remains exported for callers
+  // that may want it but is no longer invoked here.
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which
@@ -1441,6 +1617,25 @@ JSON only.`;
       (isRetrieved && farCount === 0 && dfarsCount === 0)
     );
 
+  // Ruling 1 (2026-06-05): build the decision-gate list. Each detector emits
+  // a DecisionGate when its underlying signal is present, null otherwise.
+  // Detection runs only on retrieved sources — metadata-only audits can't see
+  // enough doc text to fire gates safely.
+  const gates: DecisionGate[] = [];
+  if (isRetrieved) {
+    if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
+    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline);
+    if (sprsG) gates.push(sprsG);
+    const jcpG = detectJcpGate(solText, responseDeadline);
+    if (jcpG) gates.push(jcpG);
+    const faaG = detectFaa145Gate(solText);
+    if (faaG) gates.push(faaG);
+    const jigG = detectTestJigGate(solText);
+    if (jigG) gates.push(jigG);
+    const aftoG = detectAftoGate(solText);
+    if (aftoG) gates.push(aftoG);
+  }
+
   let recommendation: AuditResult["recommendation"];
   if (compliance_score == null) {
     // Unscored — default to caution; the renderer should treat
@@ -1450,6 +1645,17 @@ JSON only.`;
   } else if (compliance_score >= 70) recommendation = "PROCEED";
   else if (compliance_score >= 40) recommendation = "PROCEED_WITH_CAUTION";
   else recommendation = "DECLINE";
+
+  // Ruling 1 aggregator: when any gate fires, gates supersede the scored tier.
+  // SOLE_SOURCE alone → CAUTION (cure_possible=true); all-uncurable → DECLINE.
+  if (gates.length > 0) recommendation = aggregateGateRecommendation(gates);
+
+  // Build the typed verdict. SCORED carries fit_score; DECISION_GATE carries
+  // gates and emits fit_score=null per spec. Both reuse the resolved
+  // `recommendation` so the legacy scalar matches the typed one.
+  const verdict: AuditVerdict = gates.length > 0
+    ? { type: "DECISION_GATE", gates, recommendation: recommendation === "PROCEED" ? "PROCEED_WITH_CAUTION" : recommendation }
+    : { type: "SCORED", fit_score: compliance_score ?? 0, recommendation };
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
   const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;
@@ -1516,6 +1722,7 @@ JSON only.`;
     bid_recommendation,
     classification,
     is_not_solicitation,
+    verdict,
     model_used: _activeModel || CLAUDE_MODEL,
     retry_escalations: [
       overviewResult.escalated ? "overview" : null,
