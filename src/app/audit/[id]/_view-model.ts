@@ -821,6 +821,147 @@ function deriveExecClass(rec: "GO" | "CAUTION" | "DECLINE"): "es-go" | "es-cauti
   return "es-caution";
 }
 
+// Brain ruling — canonicalization (2026-06-06 + Cycle-1 fact-layer fix).
+// Gate detection lives in the VM (DERIVED layer) and scans the FULL stored
+// extraction corpus, not just dfars_clauses. The engine-side detection used
+// to gate on dfars_clauses[] alone — when the compliance call returned
+// empty arrays (the 0-vs-68 case observed on fixture A), gate detection
+// missed SPRS even though it sat in risks_json.dfars_trap_risks prose.
+// The VM rebuilds the corpus from EVERY stored text field and re-detects;
+// this absorbs the model-layer variance and produces byte-stable gates
+// across runs where the underlying signal is present somewhere in the
+// stored JSON.
+
+// Regex patterns — local copies of the engine's gate detectors. Keep in sync
+// with src/lib/audit-engine.ts. Cycle-2 will deprecate the engine detectors
+// once the VM is the sole source of truth.
+const VM_SPRS_TEXT_RE  = /\bSPRS\b|Supplier\s+Performance\s+Risk\s+System|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i;
+const VM_SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
+const VM_JCP_RE        = /\bJCP\b|JCP[-\s]?(?:certified|cert|certification)|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data|noncommercial\s+technical\s+data|252\.227-7025/i;
+const VM_FAA145_RE     = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
+const VM_TEST_JIG_RE   = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
+const VM_AFTO_RE       = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+
+// Build a text corpus from every stored audit field that could carry a gate
+// signal. Comprehensive coverage — when one field is missing/empty (model
+// variance), the same signal usually surfaces in a sibling field.
+function buildGateCorpus(
+  audit: AuditRow,
+  compJson: Record<string, unknown>,
+  risksJson: Record<string, unknown>,
+  overviewJson: Record<string, unknown>
+): string {
+  const parts: string[] = [];
+  const push = (v: unknown) => { if (typeof v === "string" && v.length > 0) parts.push(v); };
+  // Audit row summary fields
+  push(audit.overview_summary);
+  push(audit.compliance_summary);
+  push(audit.risks_summary);
+  push(audit.title);
+  // Overview JSON
+  push(overviewJson.summary);
+  push(overviewJson.scope);
+  push(overviewJson.primary_objective);
+  push(overviewJson.contract_type_detail);
+  // Compliance JSON — clause arrays + cert/action arrays + Section L/M summaries
+  if (Array.isArray(compJson.far_clauses)) for (const c of compJson.far_clauses) push(c);
+  if (Array.isArray(compJson.dfars_clauses)) for (const c of compJson.dfars_clauses) push(c);
+  if (Array.isArray(compJson.required_certifications)) for (const c of compJson.required_certifications) push(c);
+  if (Array.isArray(compJson.key_compliance_actions)) for (const a of compJson.key_compliance_actions) push(a);
+  push(compJson.section_l_summary);
+  push(compJson.section_m_summary);
+  if (Array.isArray(compJson.submission_requirements)) {
+    for (const r of compJson.submission_requirements as Array<{ requirement?: unknown }>) push(r?.requirement);
+  }
+  // Risks JSON — prioritized + dfars_trap_risks + executive summary + per-category
+  push(risksJson.executive_risk_summary);
+  if (Array.isArray(risksJson.prioritized_risks)) {
+    for (const r of risksJson.prioritized_risks as Array<Record<string, unknown>>) {
+      push(r.text); push(r.title); push(r.citation); push(r.faraudit_action);
+    }
+  }
+  if (Array.isArray(risksJson.dfars_trap_risks)) {
+    for (const t of risksJson.dfars_trap_risks as Array<Record<string, unknown>>) {
+      push(t.trap_name); push(t.specific_risk); push(t.required_verification);
+    }
+  }
+  for (const arrKey of ["top_3_risks", "technical_risks", "schedule_risks", "price_risks", "evaluation_risks"]) {
+    const arr = (risksJson as Record<string, unknown>)[arrKey];
+    if (Array.isArray(arr)) for (const v of arr) push(v);
+  }
+  return parts.join(" \n ");
+}
+
+// VM-side canonical gate detector. Scans the full stored corpus and emits a
+// deterministic gate set. Absorbs extraction-layer variance — fixtures where
+// dfars_clauses came back empty still detect SPRS if SPRS prose lives in
+// any sibling field (risks_json.dfars_trap_risks, executive_risk_summary,
+// section_l_summary, etc).
+//
+// Curability gating uses one canonical daysToDeadline value (passed in).
+// SPRS: 30-day posting lag + 5-day buffer = curable if >= 35 days.
+// JCP: 5-10 BD processing + buffer = curable if >= 15 days.
+// FAA145, test jig, AFTO: not curable in typical solicitation windows.
+function detectGatesCanonical(
+  corpus: string,
+  daysToDeadline: number | null
+): Array<{ gate_id: string; gate_label: string; status: "OPEN" | "CLOSED" | "UNKNOWN"; cure_possible_in_window: boolean; verification_url?: string; verification_action: string; named_entity?: string }> {
+  const gates: Array<{ gate_id: string; gate_label: string; status: "OPEN" | "CLOSED" | "UNKNOWN"; cure_possible_in_window: boolean; verification_url?: string; verification_action: string; named_entity?: string }> = [];
+  // SPRS
+  if (VM_SPRS_TEXT_RE.test(corpus) || VM_SPRS_CLAUSE_RE.test(corpus)) {
+    gates.push({
+      gate_id: "SPRS_SCORE_REQUIRED",
+      gate_label: "Current SPRS score required",
+      status: "UNKNOWN",
+      cure_possible_in_window: daysToDeadline != null && daysToDeadline >= 35,
+      verification_url: "https://www.sprs.csd.disa.mil/",
+      verification_action: "Verify your SPRS Basic Assessment is posted and current (within 3 years) before the response deadline."
+    });
+  }
+  // JCP
+  if (VM_JCP_RE.test(corpus)) {
+    gates.push({
+      gate_id: "JCP_CERTIFICATION_REQUIRED",
+      gate_label: "Joint Certification Program certification required",
+      status: "UNKNOWN",
+      cure_possible_in_window: daysToDeadline != null && daysToDeadline >= 15,
+      verification_url: "https://www.dla.mil/HQ/Acquisition/Offers/JCP/",
+      verification_action: "Submit DD Form 2345 to JCP and post the certification to SAM.gov before the response deadline."
+    });
+  }
+  // FAA Part 145
+  if (VM_FAA145_RE.test(corpus)) {
+    gates.push({
+      gate_id: "FAA_145_SPECIFIC_PNS",
+      gate_label: "FAA Part 145 repair station rating required",
+      status: "UNKNOWN",
+      cure_possible_in_window: false,
+      verification_action: "Confirm your FAA Part 145 repair station rating covers the specific P/Ns / class ratings in this solicitation."
+    });
+  }
+  // Test jig
+  if (VM_TEST_JIG_RE.test(corpus)) {
+    gates.push({
+      gate_id: "TEST_JIG_APPROVAL",
+      gate_label: "Specialized test jig / equipment required",
+      status: "UNKNOWN",
+      cure_possible_in_window: false,
+      verification_action: "Confirm access to (or ability to procure/build) the specified test jig before quoting; lead times typically exceed solicitation windows."
+    });
+  }
+  // AFTO
+  if (VM_AFTO_RE.test(corpus)) {
+    gates.push({
+      gate_id: "AFTO_ACCESS",
+      gate_label: "Air Force Technical Order access required",
+      status: "UNKNOWN",
+      cure_possible_in_window: false,
+      verification_action: "Confirm AFTO access via existing TO library agreement OR teaming arrangement with a holding contractor."
+    });
+  }
+  return gates;
+}
+
 // Brain ruling — canonicalization (2026-06-06). Composes the §06 .gate-card
 // prose deterministically from the actual gate set + curability + days-to-
 // deadline. Replaces the template's hardcoded SPRRA-flavored demo strings
@@ -1272,6 +1413,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   const responseDeadline = parseDate(audit.response_deadline);
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
 
+  // Cycle-1 canonical gate detection (Brain ruling 2026-06-06). Fact-layer
+  // determinism fix: gates are detected by the VM scanning the full stored
+  // corpus, not read from compJson.verdict.gates (which is the non-deterministic
+  // engine output). Same signal across all extraction runs → byte-stable
+  // gate_conditions + gate_card.
+  const canonicalDaysToDeadline = responseDeadline
+    ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
+    : null;
+  const canonicalGateCorpus = buildGateCorpus(audit, compJson, risksJson, overviewJson);
+  const canonicalGates = detectGatesCanonical(canonicalGateCorpus, canonicalDaysToDeadline);
+
   // Incumbent
   const incumbentExpiry = parseDate(audit.incumbent_expiry);
   const incumbentLookup = parseDate(audit.incumbent_lookup_at);
@@ -1423,14 +1575,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
     verdict_mode: verdictMode,
-    gate_conditions: (() => {
-      const v = (compJson.verdict ?? null) as { type?: string; gates?: unknown } | null;
-      if (!v || v.type !== "DECISION_GATE" || !Array.isArray(v.gates)) return [];
-      const daysToDeadline = responseDeadline
-        ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
-        : null;
-      return deriveGateConditions(v.gates as Parameters<typeof deriveGateConditions>[0], daysToDeadline);
-    })(),
+    // Cycle-1 canonical gate conditions — sourced from canonicalGates (VM-side
+    // corpus scan), not compJson.verdict.gates. Same gates fire across all
+    // extraction runs when the underlying signal is in any stored field.
+    gate_conditions: deriveGateConditions(canonicalGates, canonicalDaysToDeadline),
 
     // ─── Fork 3 surfaces (2026-06-05) — derived from existing engine output ──
     // exec_*: engine-emitted (complianceJson.executive_summary) when available.
@@ -1499,19 +1647,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
       if (rec === "DECLINE") return "NO-BID";
       return "CAUTION";
     })(),
-    days_to_deadline: responseDeadline
-      ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
-      : null,
-    gate_card: (() => {
-      const v = (compJson.verdict ?? null) as { type?: string; gates?: unknown } | null;
-      const gatesArr = (v && v.type === "DECISION_GATE" && Array.isArray(v.gates))
-        ? (v.gates as Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean }>)
-        : [];
-      const daysToDeadline = responseDeadline
-        ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
-        : null;
-      return deriveGateCardProse(gatesArr, verdict.word, daysToDeadline);
-    })(),
+    days_to_deadline: canonicalDaysToDeadline,
+    // Cycle-1 canonical gate card — composed from canonicalGates (VM-detected),
+    // not compJson.verdict.gates. Byte-stable across extraction-variant runs.
+    gate_card: deriveGateCardProse(canonicalGates, verdict.word, canonicalDaysToDeadline),
     // ─────────────────────────────────────────────────────────────────────
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
