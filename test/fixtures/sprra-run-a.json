@@ -1,0 +1,481 @@
+{
+  "id": "77b196cd-71b4-4777-add4-96cdfcf8ba74",
+  "notice_id": "3d39bdaaf59d408b9ba28d19b28cb323",
+  "solicitation_number": "SPRRA126Q0034",
+  "status": "complete",
+  "score": null,
+  "recommendation": "PROCEED_WITH_CAUTION",
+  "overview_output": null,
+  "compliance_output": null,
+  "risks_output": null,
+  "findings": null,
+  "raw_pdf_text": null,
+  "created_at": "2026-06-06T04:58:54.852839+00:00",
+  "updated_at": "2026-06-06T04:58:54.852839+00:00",
+  "agency": "DEPT OF DEFENSE · DEFENSE LOGISTICS AGENCY",
+  "title": "HOUSING ASSY,ACTUAT NSN:1680-01-137-3534 P/N:70410-02501-045",
+  "naics_code": "336413",
+  "set_aside_type": null,
+  "small_business_eligibility": null,
+  "contract_ceiling": null,
+  "period_of_performance": null,
+  "key_actions": null,
+  "far_clauses": null,
+  "dfars_clauses": null,
+  "certifications": null,
+  "deadlines": null,
+  "posted_date": "2026-06-04",
+  "response_deadline": "2026-06-25T16:00:00-05:00",
+  "place_of_performance": null,
+  "contract_type": null,
+  "solicitation_type": null,
+  "set_aside": null,
+  "active": true,
+  "description": null,
+  "point_of_contact": null,
+  "links": null,
+  "user_id": "135cb5c6-f391-4c8b-a5f2-0088004ac797",
+  "compliance_score": 60.0,
+  "technical_risks": null,
+  "schedule_risks": null,
+  "price_risks": null,
+  "evaluation_risks": null,
+  "top_risks": null,
+  "bid_recommendation": "without the TDP, responsible pricing of a UH-60 actuator housing assembly on an LPTA/initial-offer basis is impossible, and the June 25 deadline leaves fewer than 21 calendar days to resolve certification gaps, obtain and analyze the technical data package, build a compliant cost breakdown, and confirm approved-source traceability.",
+  "bid_score": null,
+  "confidence_pct": null,
+  "summary": null,
+  "completed_at": "2026-06-06T05:03:44.266+00:00",
+  "processing_time_ms": null,
+  "error_message": null,
+  "pdf_filename": null,
+  "pdf_size_bytes": null,
+  "overview_summary": "DLA Aviation Huntsville is soliciting quotations for 8 each Housing Assembly Actuator (NSN: 1680-01-137-3534, P/N: 70410-02501-045) in support of the UH-60 Blackhawk weapon system. This is a 100% small business set-aside, one-time buy, firm fixed price acquisition. Deliveries are required to commence 135 days after contract award to the Corpus Christi Army Depot.",
+  "overview_json": {
+    "scope": "Manufacture and deliver 8 each Housing Assembly, Actuator (Noun: HOUSING ASSY,ACTUAT; NSN: 1680-01-137-3534; P/N: 70410-02501-045; Mfr CAGE: 81996) in support of the UH-60 (BE) Blackhawk weapon system. Packaging IAW MIL-STD-2073-1 with military-level preservation, Level B packing, and contractor-furnished reusable container. Inspection and acceptance at origin. Arms Export Control Act applies; JCP certification required to access TDP.",
+    "summary": "DLA Aviation Huntsville is soliciting quotations for 8 each Housing Assembly Actuator (NSN: 1680-01-137-3534, P/N: 70410-02501-045) in support of the UH-60 Blackhawk weapon system. This is a 100% small business set-aside, one-time buy, firm fixed price acquisition. Deliveries are required to commence 135 days after contract award to the Corpus Christi Army Depot.",
+    "customer": "Defense Logistics Agency (DLA) Aviation Huntsville, DLA/AHAA, Redstone Arsenal AL 35898-7340",
+    "eval_basis": "Award will be made using Lowest Priced Technically Acceptable (LPTA) procedures per FAR 15.101-2. The Government will award to the offeror submitting a technically acceptable proposal with the lowest overall price.",
+    "contract_type": "FFP",
+    "bottom_line_item": "8 UH-60 Blackhawk actuator housing assemblies",
+    "eval_basis_label": "LPTA",
+    "primary_objective": "Delivery of 8 each UH-60 actuator housing assemblies to SR W0MU USA DEP Corpus Christi, 540 First St SE Bldg 1846, Corpus Christi TX 78419-5255, commencing 135 days after contract award.",
+    "evaluation_factors": [
+      {
+        "name": "Technical Acceptability",
+        "note": "Complete your capability statement to see fit score",
+        "rank": 1,
+        "tone": "mute",
+        "coverage": "—",
+        "importance": "Pass/Fail gate — must meet all solicitation requirements",
+        "coverage_pct": 0
+      },
+      {
+        "name": "Price",
+        "note": "",
+        "rank": 2,
+        "tone": "mute",
+        "coverage": "Lowest price wins",
+        "importance": "Determines award — only differentiator among technically acceptable offerors",
+        "coverage_pct": 0
+      }
+    ],
+    "submission_summary": "7 to clear",
+    "period_of_performance": "Deliveries commence 135 days after contract award; award expected after 2026-06-25 close date.",
+    "ceiling_value_estimate": null,
+    "submission_requirements": [
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Submit proposal via email only — fax not accepted"
+      },
+      {
+        "meta": "At risk",
+        "status": "warn",
+        "requirement": "Submit proposal on or before 2026-06-25 close of business (16:00 CT per SAM.gov)"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Include manufacturer CAGE code in all proposals"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Provide unit price and container price as separate line items within the CLIN section"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Provide cost/pricing data breakdown (all cost elements including profit/fee) or sales history if requested per FAR 15.403-3"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Confirm active US/Canada Joint Certification Program (JCP) certification for offeror and any manufacturer to access export-controlled TDP"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Request TDP via email to Josh.Long@dla.mil with PRON number in subject line; retrieve within 7 calendar days from DoD SAFE site"
+      },
+      {
+        "meta": "At risk",
+        "status": "warn",
+        "requirement": "Complete and submit all representations and certifications (SAM.gov annual reps current within 12 months)"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Acknowledge small business status — 100% small business set-aside; only small business concerns eligible"
+      },
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Acknowledge DPAS DO-rated order requirement and obligation to notify DLA within 15 days if order cannot be fulfilled"
+      },
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Label any source selection information submitted with legend 'SOURCE SELECTION INFORMATION SEE FAR 2.101 AND FAR 3.104'"
+      }
+    ],
+    "solicitation_number_canonical": "SPRRA1-26-Q-0034"
+  },
+  "compliance_summary": "0 FAR · 0 DFARS · 0 certifications · 0 CLIN · no set-aside",
+  "compliance_json": {
+    "verdict": {
+      "type": "DECISION_GATE",
+      "gates": [
+        {
+          "status": "UNKNOWN",
+          "gate_id": "JCP_CERTIFICATION_REQUIRED",
+          "gate_label": "Joint Certification Program certification required",
+          "verification_url": "https://www.dla.mil/HQ/Acquisition/Offers/JCP/",
+          "verification_action": "Submit DD Form 2345 to JCP and post the certification to SAM.gov before the response deadline.",
+          "cure_possible_in_window": true
+        }
+      ],
+      "recommendation": "PROCEED_WITH_CAUTION"
+    },
+    "eval_basis": "Award will be made using Lowest Priced Technically Acceptable (LPTA) procedures per FAR 15.101-2. The Government will award to the offeror submitting a technically acceptable proposal with the lowest overall price.",
+    "pdf_source": "sam_fetched",
+    "dfars_flags": [
+      {
+        "title": "Hexavalent Chromium",
+        "clause": "252.223-7008",
+        "detected": false,
+        "severity": "P0"
+      },
+      {
+        "title": "Covered Telecom",
+        "clause": "252.204-7018",
+        "detected": false,
+        "severity": "P0"
+      },
+      {
+        "title": "CMMC",
+        "clause": "252.204-7021",
+        "detected": false,
+        "severity": "P1"
+      },
+      {
+        "title": "Xinjiang Forced Labor",
+        "clause": "252.225-7060",
+        "detected": false,
+        "severity": "P0"
+      },
+      {
+        "title": "WAWF Payment Routing",
+        "clause": "252.232-7006",
+        "detected": false,
+        "severity": "P1"
+      },
+      {
+        "title": "Air Force Base Access",
+        "clause": "5352.242-9000",
+        "detected": false,
+        "severity": "P1"
+      },
+      {
+        "title": "Buy American / Balance of Payments",
+        "clause": "252.225-7001",
+        "detected": false,
+        "severity": "P1"
+      },
+      {
+        "title": "Certified Cost or Pricing Data",
+        "clause": "252.215-7010",
+        "detected": false,
+        "severity": "P1"
+      },
+      {
+        "title": "Transportation by Sea",
+        "clause": "252.247-7023",
+        "detected": false,
+        "severity": "P2"
+      }
+    ],
+    "notice_type": "Solicitation",
+    "piid_decoded": {
+      "activity": "DLA Aviation Huntsville, AL",
+      "fiscalYear": null,
+      "procurementType": null
+    },
+    "score_benchmark": "Mid-pack",
+    "eval_basis_label": "LPTA",
+    "score_confidence": "verified",
+    "executive_summary": {
+      "what": "DLA Aviation Huntsville is buying 8 UH-60 Blackhawk actuator housing assemblies — bid with caution — clear JCP before quoting.",
+      "actions": [
+        {
+          "text": "Verify active JCP status for your firm AND your manufacturer this week at https://www.dla.mil/HQ/Logistics/LogisticsPlans/JCP/; email josh.long@dla.mil with your PRON (DOA1) to r…",
+          "when": "By 7 Jun"
+        },
+        {
+          "text": "Email josh.long@dla.mil TODAY with subject line 'DOA1 — TDP Request SPRRA1-26-Q-0034' and download the package within 7 calendar days of receipt; calendar a hard reminder or the…",
+          "when": "By 8 Jun"
+        },
+        {
+          "text": "Confirm your supplier is CAGE 81996 or a government-approved alternate source before submitting; include the manufacturer's CAGE code in the proposal per A-21, and verify your em…",
+          "when": "By 9 Jun"
+        }
+      ],
+      "factors": [
+        "Joint Certification Program certification required (curable in the response window)"
+      ],
+      "verdict": "CAUTION"
+    },
+    "evaluation_factors": [
+      {
+        "name": "Technical Acceptability",
+        "note": "Complete your capability statement to see fit score",
+        "rank": 1,
+        "tone": "mute",
+        "coverage": "—",
+        "importance": "Pass/Fail gate — must meet all solicitation requirements",
+        "coverage_pct": 0
+      },
+      {
+        "name": "Price",
+        "note": "",
+        "rank": 2,
+        "tone": "mute",
+        "coverage": "Tradeoff",
+        "importance": "Determines award — only differentiator among technically acceptable offerors",
+        "coverage_pct": 0
+      }
+    ],
+    "submission_summary": "8 to clear",
+    "is_not_solicitation": false,
+    "naics_size_standard": "1,250 employees",
+    "pdf_unavailable_reason": null,
+    "submission_requirements": [
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Submit proposal via email only — fax not accepted"
+      },
+      {
+        "meta": "At risk",
+        "status": "warn",
+        "requirement": "Submit proposal on or before 2026-06-25 close of business (16:00 CT per SAM.gov)"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Include manufacturer CAGE code in all proposals"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Provide unit price and container price as separate line items within the CLIN section"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Provide cost/pricing data breakdown (all cost elements including profit/fee) or sales history if requested per FAR 15.403-3"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Confirm active US/Canada Joint Certification Program (JCP) certification for offeror and any manufacturer to access export-controlled TDP"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Request TDP via email to Josh.Long@dla.mil with PRON number in subject line; retrieve within 7 calendar days from DoD SAFE site"
+      },
+      {
+        "meta": "At risk",
+        "status": "warn",
+        "requirement": "Complete and submit all representations and certifications (SAM.gov annual reps current within 12 months)"
+      },
+      {
+        "meta": "Action",
+        "status": "todo",
+        "requirement": "Acknowledge small business status — 100% small business set-aside; only small business concerns eligible"
+      },
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Acknowledge DPAS DO-rated order requirement and obligation to notify DLA within 15 days if order cannot be fulfilled"
+      },
+      {
+        "meta": "Clear",
+        "status": "ok",
+        "requirement": "Label any source selection information submitted with legend 'SOURCE SELECTION INFORMATION SEE FAR 2.101 AND FAR 3.104'"
+      }
+    ],
+    "solicitation_number_canonical": "SPRRA1-26-Q-0034"
+  },
+  "risks_summary": "Severity 8/10 · 7 prioritized · top: Per A-11, both the offeror AND any source of supply must hold an active United S",
+  "risks_json": {
+    "cmmc_risk": null,
+    "price_risks": [
+      "Container price must appear as a discrete line item within the CLIN 0001AA pricing section per A-9 — missing this breakout is a technical unacceptability ground under LPTA.",
+      "LPTA with possible award on initial offers means no reverse auction repricing safety net — first price submitted may be final.",
+      "Cost-element breakdown including profit/fee must be producible on demand under A-23/FAR 15.403-3 or the proposal is declared non-responsive."
+    ],
+    "top_3_risks": [
+      "JCP certification must be active for both offeror and manufacturer before TDP access is granted — DLA will not delay award for an ineligible offeror, making this an instant disqualifier if not verified immediately.",
+      "TDP is not attached to the SAM notice and must be requested by email with PRON 'DOA1'; the DoD SAFE link expires in 7 calendar days, so a delayed request against a June 25 deadline means you cannot price the CLIN at all.",
+      "CAGE 81996 manufacturer approval is embedded in CLIN 0001AA and QAR will reject items not produced by the approved manufacturer — if your firm is a non-manufacturer, source confirmation and the 500-employee nonmanufacturer rule compliance must be documented before submission."
+    ],
+    "schedule_risks": [
+      "135-day delivery commencement is fixed from contract award date with FOB Origin terms; DPAS DO-rated order requires 15-day written notification if schedule cannot be met, and silence constitutes acceptance.",
+      "7-calendar-day DoD SAFE expiration window for TDP download creates a hard upstream scheduling constraint — late TDP receipt compresses your should-cost and pricing development timeline."
+    ],
+    "severity_score": 8,
+    "hex_chrome_risk": null,
+    "technical_risks": [
+      "CAGE 81996 approved-manufacturer traceability required at origin inspection — non-manufacturer must furnish objective evidence per Inspection & Acceptance narrative.",
+      "ANSI/ISO/ASQ 9001:2015 or AS9100 QMS compliance (with 7.3 tailoring) required under FAR 52.246-11; absent certification is a DCMA audit trigger.",
+      "MIL-STD-2073-1 Level B preservation and MIL-STD-129 bar code markings required per packaging narrative — contractor must have or source compliant packaging capability before delivery commences."
+    ],
+    "base_access_risk": null,
+    "dfars_trap_risks": [
+      {
+        "clause": "DFARS 252.204-7020",
+        "trap_name": "NIST SP 800-171 DoD Assessment — SPRS score required",
+        "specific_risk": "Award is blocked if your basic assessment score is absent or stale in SPRS; DLA's automated pre-award check will flag a missing score before the KO can make award.",
+        "consequence_if_missed": "Proposal is technically unacceptable and ineligible for award regardless of price.",
+        "required_verification": "Log into SPRS (https://www.sprs.csd.disa.mil/) and confirm a current 252.204-7020 Basic self-assessment is posted with a date within 3 years."
+      },
+      {
+        "clause": "DFARS 252.204-7012",
+        "trap_name": "Safeguarding Covered Defense Information — cyber incident reporting",
+        "specific_risk": "Clause 45 (DFARS 252.204-7012 Deviation 2024-O0013 Rev 1) requires adequate security per NIST SP 800-171 and mandatory 72-hour cyber incident reporting; a small business without a System Security Plan and documented implementation may be found non-compliant during DCMA review.",
+        "consequence_if_missed": "Potential cure notice, contract termination for default, and debarment risk for repeated non-compliance.",
+        "required_verification": "Confirm your firm has a documented SSP covering NIST SP 800-171 controls and a written cyber incident response procedure before award."
+      },
+      {
+        "clause": "DFARS 252.225-7048",
+        "trap_name": "Export-Controlled Items — Arms Export Control Act applies",
+        "specific_risk": "A-11 invokes the Arms Export Control Act (22 U.S.C. 2751 et seq.) and Executive Order 12470; sharing TDP with any non-JCP-certified party including foreign-national employees without a TAA or export license is a federal criminal violation.",
+        "consequence_if_missed": "Severe criminal penalties under ITAR; contract termination; debarment.",
+        "required_verification": "Confirm all personnel who will access the TDP are U.S. citizens or hold valid export authorization; do not share TDP with uncertified subcontractors."
+      }
+    ],
+    "evaluation_risks": [
+      "LPTA basis of award with stated intent to award on initial proposals eliminates any expectation of discussions or price correction after submission.",
+      "Technically Unacceptable rating — triggered by missing CAGE code, incomplete reps/certs, absent container price breakout, or non-compliant QMS — results in immediate ineligibility with no cure."
+    ],
+    "prioritized_risks": [
+      {
+        "text": "Per A-11, both the offeror AND any source of supply must hold an active United States/Canada Joint Certification Program (JCP) certification to access the Arms Export Control Act-restricted TDP via DoD SAFE; DLA explicitly states it will NOT delay award for ineligible offerors to obtain JCP, meaning a missing or lapsed JCP results in permanent disqualification before pricing begins.",
+        "title": "JCP cert gap blocks export-controlled TDP access",
+        "category": "Disqualification",
+        "citation": "A-11 / DFARS 252.225-7048",
+        "priority": "P0",
+        "provenance": "inferred",
+        "faraudit_action": "Verify active JCP status for your firm AND your manufacturer this week at https://www.dla.mil/HQ/Logistics/LogisticsPlans/JCP/; email josh.long@dla.mil with your PRON (DOA1) to request TDP within the 7-calendar-day DoD SAFE window before the June 25 deadline."
+      },
+      {
+        "text": "Per A-11, DLA cannot attach the TDP to the SAM notice due to software constraints, and offerors must affirmatively request the package by email using PRON 'DOA1' in the subject line; the DoD SAFE link expires after 7 calendar days, so a late request against a June 25 response deadline risks receiving zero technical data before bid close.",
+        "title": "TDP required to price",
+        "category": "Disqualification",
+        "citation": "A-11",
+        "priority": "P0",
+        "provenance": "inferred",
+        "faraudit_action": "Email josh.long@dla.mil TODAY with subject line 'DOA1 — TDP Request SPRRA1-26-Q-0034' and download the package within 7 calendar days of receipt; calendar a hard reminder or the SAFE link will expire and you cannot price the CLIN."
+      },
+      {
+        "text": "CLIN 0001AA specifies Mfr CAGE 81996 (PN 70410-02501-045) for the UH-60 Blackhawk Housing Assembly; if your firm is not CAGE 81996, you are a non-manufacturer and must demonstrate the item was 'produced by the approved manufacturer' per the QAR Inspection and Acceptance clause (page 6), while also satisfying the FAR 52.219-1 non-manufacturer rule 500-employee size cap under NAICS 336413 — failure to confirm approved-source status triggers rejection at origin inspection.",
+        "title": "CAGE 81996 manufacturer approval",
+        "category": "Technical",
+        "citation": "CLIN 0001AA / FAR 52.219-1 / Inspection & Acceptance narrative (p.6)",
+        "priority": "P0",
+        "provenance": "verified",
+        "faraudit_action": "Confirm your supplier is CAGE 81996 or a government-approved alternate source before submitting; include the manufacturer's CAGE code in the proposal per A-21, and verify your employee count is under 500 to satisfy the nonmanufacturer rule for this 100% SB set-aside."
+      },
+      {
+        "text": "CAGE 81996 manufacturer approval is embedded in CLIN 0001AA and QAR will reject items not produced by the approved manufacturer — if your firm is a non-manufacturer, source confirmation and the 500-employee nonmanufacturer rule compliance must be documented before submission.",
+        "title": "CAGE 81996 manufacturer approval is embedded in CLIN",
+        "category": "Deal-breaker",
+        "priority": "P0",
+        "provenance": "verified"
+      },
+      {
+        "text": "Section M states award will be Lowest Priced Technically Acceptable (LPTA) and 'the Government intends to make an award based on the initial proposals,' meaning DLA may award without discussions; the reverse auction clause L02 provides only a contingent alternative, so an uncompetitive first price or a technically unacceptable initial submission results in immediate elimination with no cure opportunity.",
+        "title": "LPTA on initial offers",
+        "category": "Evaluation",
+        "citation": "Section M (LPTA narrative) / L02 Reverse Auction (Oct 2016)",
+        "priority": "P1",
+        "provenance": "inferred",
+        "faraudit_action": "Obtain TDP immediately and build a fully-burdened should-cost before submitting; do not plan on a reverse auction round — treat your first submission as your last and verify all T&Cs, reps/certs, and CAGE code are complete to avoid a technical 'Unacceptable' rating."
+      },
+      {
+        "text": "Per CLIN 0001AA narrative (D001) and A-9, the reusable container (contractor-furnished) price MUST be incorporated into the unit price AND separately broken out within the CLIN section; failure to provide both the unit price line and a discrete container price line renders the CLIN pricing non-compliant and the proposal technically unacceptable under the LPTA evaluation framework.",
+        "title": "Container price breakout mandatory or CLIN is non-responsive",
+        "category": "Price",
+        "citation": "A-9 / CLIN 0001AA D001 narrative",
+        "priority": "P1",
+        "provenance": "inferred",
+        "faraudit_action": "Structure your CLIN 0001AA pricing with three explicit line items: (1) unit price inclusive of container, (2) unit price ex-container, (3) container price — confirm formatting matches the CLIN section fields on page 5 before submitting via email per A-18."
+      },
+      {
+        "text": "FAR 52.204-7 (clause 92) and FAR 52.204-13 (clause 12) require active SAM registration at time of offer and maintenance through contract performance; DFARS 252.204-7007 (clause 88) requires annual reps/certs updated within the last 12 months, including the NAICS 336413 size standard — an expired or administratively locked SAM record results in disqualification under the LPTA framework.",
+        "title": "SAM.gov registration and reps/certs must be current at",
+        "category": "Disqualification",
+        "citation": "FAR 52.204-7 (clause 92) / FAR 52.204-13 (clause 12) / DFARS 252.204-7007 (clause 88)",
+        "priority": "P2",
+        "provenance": "verified",
+        "faraudit_action": "Log into SAM.gov today and verify: (1) entity registration is active with no pending renewal, (2) reps/certs updated within 12 months, (3) NAICS 336413 size standard correctly reflected, and (4) electronic business POC is designated for WAWF per 252.232-7006."
+      }
+    ],
+    "executive_risk_summary": "DLA Aviation Huntsville is buying 8 units of a UH-60 Blackhawk actuator housing assembly (NSN 1680-01-137-3534, PN 70410-02501-045, Mfr CAGE 81996) under a one-time-buy, firm-fixed-price, 100% small business set-aside with a June 25, 2026 response deadline and a 135-day delivery requirement to Corpus Christi, TX. The contract is LPTA with stated intent to award on initial proposals.\n\nThree risks could end the bid before a single dollar is quoted. First, the JCP/ITAR barrier: both your firm and your manufacturer must hold an active JCP certification to receive the TDP — DLA will not delay award, so a lapsed cert means permanent disqualification. Second, the TDP is not attached to the SAM notice and must be actively requested by email; the DoD SAFE download link expires in 7 calendar days, so a delayed request against a 21-day window leaves insufficient time to build a defensible price. Third, the approved-manufacturer rule embedded in CLIN 0001AA means QAR will reject delivery of any item not traceable to CAGE 81996 at origin inspection — non-manufacturers must document source approval or face rejection with no recourse under FOB Origin terms.\n\nImmediate actions ranked by urgency: (1) This week — verify JCP status at dla.mil/JCP for your firm and CAGE 81996 supplier; email josh.long@dla.mil with 'DOA1' in the subject line to request the TDP and download within 7 days. (2) By June 16 — confirm CAGE 81996 supplier approval, validate SPRS score is posted under DFARS 252.204-7020, and verify SAM.gov registration is active with current reps/certs under NAICS 336413. (3) By June 22 — complete should-cost build from TDP with full cost-element breakdown (direct materials, labor, overhead, G&A, profit) and structure CLIN 0001AA pricing with mandatory separate container price line per A-9. (4) By June 25 — submit via email only per A-18 with manufacturer CAGE code, all reps/certs, and 'SOURCE SELECTION INFORMATION SEE FAR 2.101 AND FAR 3.104' legend on all documents.",
+    "bid_no_bid_recommendation": "JCP certification status for both your firm and CAGE 81996 manufacturer must be confirmed active before you can even access the TDP — without the TDP, responsible pricing of a UH-60 actuator housing assembly on an LPTA/initial-offer basis is impossible, and the June 25 deadline leaves fewer than 21 calendar days to resolve certification gaps, obtain and analyze the technical data package, build a compliant cost breakdown, and confirm approved-source traceability."
+  },
+  "ko_email_sent": false,
+  "ko_email_sent_at": null,
+  "ko_email_recipient": null,
+  "ko_email_message_id": null,
+  "audit_source": "user",
+  "document_type": "RFQ",
+  "document_type_rationale": "The document header explicitly states 'REQUEST FOR QUOTATION' on Standard Form 18, and the SAM.gov metadata shows solicitationNumber 'SPRRA126Q0034' with a 'Q' designator indicating quotation. The document uses simplified acquisition procedures under FAR 13 with quotations noted as 'not offers.'",
+  "document_type_confidence": "high",
+  "notes": null,
+  "ko_contacted": false,
+  "ko_contact_date": null,
+  "bid_submitted": false,
+  "bid_submit_date": null,
+  "outcome": null,
+  "outcome_date": null,
+  "team_assignee": null,
+  "notes_updated_at": null,
+  "incumbent_name": null,
+  "incumbent_award_value": null,
+  "incumbent_expiry": null,
+  "incumbent_uei": null,
+  "incumbent_lookup_at": null,
+  "incumbent_source": null,
+  "win_probability": null,
+  "win_probability_basis": null,
+  "model_used": "claude-sonnet-4-6",
+  "model_version": null,
+  "quality_score": null,
+  "quality_flag": null,
+  "in_pipeline": false,
+  "prime_sub": null
+}
