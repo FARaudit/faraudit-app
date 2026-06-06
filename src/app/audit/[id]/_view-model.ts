@@ -921,33 +921,89 @@ function deriveKoEmailCard(
   return { to, subject, preview };
 }
 
+// Brain ruling Item 3 (2026-06-05): severity recalibration. The prior mapping
+// derived severity from r.status (todo→dq, warn→req, ok→adv), which inverted
+// real-world semantics — JCP gaps came in as REQ when they're disqualifying,
+// while a CAGE code requirement came in as DQ when it's just required.
+//
+// New mapping is CONTENT-DRIVEN, not status-driven:
+//
+//   DQ ONLY:
+//     - JCP gap                         → can't bid without it
+//     - SPRS absent                     → can't bid without it
+//     - email-only submission violated  → quote thrown out at intake
+//     - proposal not in English/USD     → quote thrown out at intake
+//   Hard rule: never more than 3 DQ tags on a single audit. If detection
+//   overshoots, downgrade the lowest-priority surplus DQs to REQ.
+//
+//   REQ:
+//     - CAGE code on proposals
+//     - Container price breakout
+//     - MFG name + P/N
+//     - SAM registration
+//     - Reps & certs
+//     - Product literature
+//
+//   ADV:
+//     - Source selection legend
+//     - DPAS acknowledgment
+//     - HUBZone preference waiver
+//
+//   DEFAULT: anything not matched above → REQ (conservative middle).
+
+const DQ_PATTERNS: RegExp[] = [
+  /\bJCP\b|Joint\s+Certification\s+Program/i,
+  /\bSPRS\b|Supplier\s+Performance\s+Risk|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i,
+  /email[-\s]?only|by\s+e[-\s]?mail\s+only/i,
+  /\b(?:English\s+(?:language|only)|U\.S\.\s+dollars?|USD\s+only)\b/i
+];
+const ADV_PATTERNS: RegExp[] = [
+  /source\s+selection\s+(?:legend|sensitive)/i,
+  /\bDPAS\b/i,
+  /HUBZone\s+(?:preference\s+)?waiver/i
+];
+
+function classifyChecklistSeverity(text: string): "dq" | "req" | "adv" {
+  if (DQ_PATTERNS.some((p) => p.test(text))) return "dq";
+  if (ADV_PATTERNS.some((p) => p.test(text))) return "adv";
+  return "req";
+}
+
 function deriveSubmissionChecklist(
   compJson: Record<string, unknown>
 ): Array<{ group: "before" | "with" | "after"; text: string; source: string; severity: "dq" | "req" | "adv" }> {
   const reqs = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : [];
-  return reqs.map((r) => {
+  const items = reqs.map((r) => {
     const t = (r.requirement || "").toLowerCase();
-    // Group heuristic. "before" = pre-submission cert/registration/setup;
-    // "after" = post-award obligations; default "with" = the quote package
-    // itself. The renderer collapses each group to its own list section so
-    // the customer reads a sequential prep list.
+    // Group heuristic unchanged from prior commit. "before" = pre-submission
+    // cert/registration/setup; "after" = post-award obligations; default
+    // "with" = the quote package itself.
     const group: "before" | "with" | "after" =
       /\b(?:after\s+award|post[\s-]?award|kick[\s-]?off|deliver(?:able|y)?\s+\d+|on\s+award)\b/.test(t) ? "after" :
       /\b(?:register|registration|certif(?:y|ication)|cage\s+code|uei|sam\.gov|pre[\s-]?qualif|prior\s+to\s+submission)\b/.test(t) ? "before" :
       "with";
-    // Severity derives from the engine-normalized status: todo (offeror has
-    // not done it) → dq disqualifier; warn (at risk) → req; ok (clear) → adv.
-    const severity: "dq" | "req" | "adv" =
-      r.status === "todo" ? "dq" :
-      r.status === "warn" ? "req" :
-      "adv";
     return {
       group,
       text: r.requirement,
       source: "Section L",
-      severity
+      severity: classifyChecklistSeverity(r.requirement || "")
     };
   });
+  // Hard rule: cap DQ at 3 per audit. If detection caught more, downgrade
+  // the EXTRAS (preserving the first 3 in source order) to REQ. This
+  // protects against an audit where every single Section L item ends up
+  // matching a DQ pattern.
+  const dqCount = items.filter((i) => i.severity === "dq").length;
+  if (dqCount > 3) {
+    let seen = 0;
+    for (const it of items) {
+      if (it.severity === "dq") {
+        seen++;
+        if (seen > 3) it.severity = "req";
+      }
+    }
+  }
+  return items;
 }
 
 // ─── main ───────────────────────────────────────────────────────────────────

@@ -1107,10 +1107,24 @@ export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null
 // list of gates into a recommendation tier per the CEO spec.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const JCP_RE = /\bJCP\b|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data/i;
+// Brain ruling Item 1 (2026-06-05): broadened to catch SPRRA's JCP signals.
+// Previously /JCP\b|Joint Certification Program|DD Form 2345|militarily
+// critical technical data/ missed real-data variants. Added:
+//   - "JCP-certified", "JCP cert" (hyphenated + abbreviated forms)
+//   - DFARS 252.227-7025 (limited rights data restrictions — JCP gates this)
+//   - "noncommercial technical data" (DFARS-y phrasing for the same gate)
+const JCP_RE = /\bJCP\b|JCP[-\s]?(?:certified|cert|certification)|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data|noncommercial\s+technical\s+data|252\.227-7025/i;
 const FAA145_RE = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
 const TEST_JIG_RE = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
 const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+// Brain ruling Item 1: SPRS detection broadened to include 252.204-7019 (the
+// Notice of NIST SP 800-171 DoD Assessment Requirements clause — where SPRS
+// is most often cited in DLA solicitations) and the literal "SPRS" mention
+// in prose. The original detectSprsGate only checked 252.204-7020 in the
+// DFARS array; SPRRA cites 252.204-7019 + uses "SPRS" verbatim in §L, so
+// it missed.
+const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
+const SPRS_TEXT_RE = /\bSPRS\b|Supplier\s+Performance\s+Risk\s+System|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i;
 
 function daysUntil(d: Date | null): number | null {
   if (!d) return null;
@@ -1131,8 +1145,23 @@ export function buildSoleSourceGate(vendor: { name: string; cage?: string | null
   };
 }
 
-export function detectSprsGate(dfarsClauses: string[] | undefined, responseDeadline: Date | null): DecisionGate | null {
-  if (!Array.isArray(dfarsClauses) || !dfarsClauses.some((c) => /252\.204-7020/.test(c))) return null;
+// Brain ruling Item 1 (2026-06-05): SPRS detection now checks three signals
+// (a hit on ANY fires the gate): broadened clause set (7019/7020/7012),
+// prose mention in solText (literal "SPRS" / "Supplier Performance Risk
+// System" / "NIST SP 800-171 Assessment"), or the engine's own risk register
+// mentioning SPRS by clause or word. The risk-register pass is the SPRRA
+// fix: even if the clause-array misses 7019, an engine-emitted SPRS risk
+// confirms presence. Take a risks param so the detector can self-check.
+export function detectSprsGate(
+  dfarsClauses: string[] | undefined,
+  responseDeadline: Date | null,
+  docText: string = "",
+  risks: PrioritizedRisk[] = []
+): DecisionGate | null {
+  const inClauses = Array.isArray(dfarsClauses) && dfarsClauses.some((c) => SPRS_CLAUSE_RE.test(c));
+  const inDocText = SPRS_TEXT_RE.test(docText);
+  const inRisks = risks.some((r) => SPRS_TEXT_RE.test(r.text) || SPRS_TEXT_RE.test(r.title || "") || (r.citation && SPRS_CLAUSE_RE.test(r.citation)));
+  if (!inClauses && !inDocText && !inRisks) return null;
   const days = daysUntil(responseDeadline);
   // 30-day posting lag + 5-day buffer = 35-day threshold.
   const curable = days == null ? false : days >= 35;
@@ -1146,8 +1175,20 @@ export function detectSprsGate(dfarsClauses: string[] | undefined, responseDeadl
   };
 }
 
-export function detectJcpGate(docText: string, responseDeadline: Date | null): DecisionGate | null {
-  if (!JCP_RE.test(docText)) return null;
+// Brain ruling Item 1 (2026-06-05): JCP gate now also scans the engine's risk
+// register for JCP/TDP mentions. The model frequently emits a JCP/TDP risk
+// even when the doc-text scanner misses the keyword (e.g. when the JCP gap
+// is described in compliance-prose terms — "controlled technical data
+// requires Joint Certification"). The risk-register check rides on the same
+// JCP_RE so the patterns stay in sync.
+export function detectJcpGate(
+  docText: string,
+  responseDeadline: Date | null,
+  risks: PrioritizedRisk[] = []
+): DecisionGate | null {
+  const inDocText = JCP_RE.test(docText);
+  const inRisks = risks.some((r) => JCP_RE.test(r.text) || JCP_RE.test(r.title || ""));
+  if (!inDocText && !inRisks) return null;
   const days = daysUntil(responseDeadline);
   // JCP processing is 5-10 business days; require ~15 days runway.
   const curable = days == null ? false : days >= 15;
@@ -1234,7 +1275,49 @@ export function applyRuling3Cap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
     if (PRIORITY_RANK[r.priority] < PRIORITY_RANK[prev.priority]) byKey.set(key, r);
     else if (PRIORITY_RANK[r.priority] === PRIORITY_RANK[prev.priority] && r.text.length > prev.text.length) byKey.set(key, r);
   }
-  const deduped = Array.from(byKey.values());
+  const round1 = Array.from(byKey.values());
+
+  // Brain ruling Item 4 (2026-06-05): Round 1.5 — collapse "echo" cards into
+  // their detailed siblings under the same theme. Round 1's compound key
+  // (themeKey + citation) lets echo cards survive when the echo lacks a
+  // citation: detailed risk → key "jcp-tdp-itar|252.227-7014"; echo risk
+  // (move-less, no citation) → key "jcp-tdp-itar|" — different keys, both
+  // survive. Round 1.5 collapses by theme alone but ONLY when the merge
+  // candidates differ by action-presence (one has faraudit_action, one
+  // doesn't) — that's the signature of the echo pattern Brain observed (3
+  // of 9 SPRRA risks were move-less echoes). Two action-bearing cards on
+  // the same theme stay distinct (potentially two real clause-level
+  // concerns under one theme).
+  const byTheme = new Map<string, PrioritizedRisk>();
+  const themeWithActionKeys = new Set<string>();
+  for (const r of round1) {
+    const tKey = riskThemeKey(r.text, r.citation);
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    if (curHasAction) themeWithActionKeys.add(tKey);
+    const prev = byTheme.get(tKey);
+    if (!prev) { byTheme.set(tKey, r); continue; }
+    const prevHasAction = (prev.faraudit_action ?? "").trim().length > 0;
+    if (curHasAction && !prevHasAction) { byTheme.set(tKey, r); continue; }
+  }
+  // If a theme has any action-bearing card, drop ALL move-less cards under
+  // that theme (they're echoes). If a theme has no action-bearing cards,
+  // keep just the byTheme winner (round-1 dedup already removed pure
+  // duplicates within the same key). For themes with multiple action-bearing
+  // cards (legitimate distinct clause-level concerns), preserve every action-
+  // bearing card from round1.
+  const deduped: PrioritizedRisk[] = [];
+  const includedTexts = new Set<string>();
+  for (const r of round1) {
+    const tKey = riskThemeKey(r.text, r.citation);
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    const themeHasAction = themeWithActionKeys.has(tKey);
+    if (themeHasAction && !curHasAction) continue; // drop echo
+    // Action-bearing card under an action-having theme, OR sole card under
+    // a no-action theme — include if not already in (dedup by exact text).
+    if (includedTexts.has(r.text)) continue;
+    includedTexts.add(r.text);
+    deduped.push(r);
+  }
 
   // Round 2: priority-tier fill.
   const p0 = deduped.filter((r) => r.priority === "P0");
@@ -1640,9 +1723,9 @@ JSON only.`;
   const gates: DecisionGate[] = [];
   if (isRetrieved) {
     if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
-    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline);
+    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText, prioritized);
     if (sprsG) gates.push(sprsG);
-    const jcpG = detectJcpGate(solText, responseDeadline);
+    const jcpG = detectJcpGate(solText, responseDeadline, prioritized);
     if (jcpG) gates.push(jcpG);
     const faaG = detectFaa145Gate(solText);
     if (faaG) gates.push(faaG);
@@ -1678,39 +1761,107 @@ JSON only.`;
   // JSONB column — no schema migration needed.
   complianceJson.verdict = verdict;
 
-  // Fork 3 (2026-06-05): derive the executive summary feeding the .exec-sum
-  // surface. Pure derivation from existing extraction — no additional LLM
-  // call. Verdict word maps the recommendation tier; "what" is the first
-  // sentence of overview.summary; factors are the top 3 prioritized risk
-  // titles (each suffixed with their clause citation for credibility); actions
-  // are the top 3 risks' faraudit_action with sequential "By DD Mon" dates
-  // covering the next 3 days (the "48-hour" framing — first action by
-  // tomorrow, last by +3 days).
+  // Brain ruling Item 2 (2026-06-05): differentiated exec_factors vs
+  // exec_actions; one-line synthesis for exec_what.
+  //
+  // exec_factors (the CONDITIONS that determine outcome):
+  //   - Gate audits: each gate's gate_label + curability state
+  //   - Scored audits: top 3 prioritized risk titles + clause cite
+  //
+  // exec_actions (the BD director's next 48-hour move per risk):
+  //   - Top 3 risks' faraudit_action, sequenced over next 3 days
+  //   - Format {when: "By DD Mon", text: action verb + specifics}
+  //
+  // exec_what (the synthesis line):
+  //   "{Agency} is buying {primary_objective}. {bid_condition}."
+  //   bid_condition = "No-bid unless {gates}." (gate audits) OR
+  //                   "Bid with caution — close {top risk theme} first." (scored)
+  //                   OR "Strong fit — file the clarifications below before quoting." (GO)
   const execMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const execVerdictWord =
     recommendation === "PROCEED" ? "GO" :
     recommendation === "DECLINE" ? "NO-BID" :
     "CAUTION";
-  const execSummaryText = String(overviewJson.summary ?? "").trim();
-  const execFirstSentence = execSummaryText.split(/[.!?](?:\s|$)/)[0] || execSummaryText;
-  const execWhat = execFirstSentence.length > 160
-    ? `${execFirstSentence.slice(0, 158).trimEnd()}…`
-    : execFirstSentence;
-  const execFactors = prioritized.slice(0, 3).map((r) => {
-    const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
-    const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
-    return r.citation ? `${capped} (${r.citation})` : capped;
-  });
-  const execActions: Array<{ when: string; text: string }> = prioritized.slice(0, 3).map((r, i) => {
-    const d = new Date(Date.now() + (i + 1) * 86_400_000);
-    const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
-    const actionText = (r.faraudit_action && r.faraudit_action.trim().length > 0
-      ? r.faraudit_action
-      : (r.title ?? r.text)
-    ).trim();
-    const text = actionText.length > 180 ? `${actionText.slice(0, 178).trimEnd()}…` : actionText;
-    return { when, text };
-  });
+
+  // exec_what synthesis. Agency comes from solicitation or compliance JSON
+  // (resolveAgency-style first hop is "DEPT OF DEFENSE.DEFENSE LOGISTICS
+  // AGENCY..." — take the LAST dotted segment as the customer-facing label).
+  const agencyRaw = String(
+    (solicitation as Record<string, unknown> | null)?.["fullParentPathName"]
+      ?? (solicitation as Record<string, unknown> | null)?.["department"]
+      ?? ""
+  );
+  const agencyShort = agencyRaw
+    ? agencyRaw.split(".").pop()!.replace(/\(.*?\)/g, "").trim().split(",")[0].trim() || agencyRaw
+    : "Buying activity";
+  const objective = (overviewJson.primary_objective ?? overviewJson.scope ?? "")
+    .toString()
+    .split(/[.!?](?:\s|$)/)[0]
+    .replace(/\.$/, "")
+    .trim();
+  const objectiveShort = objective.length > 90 ? `${objective.slice(0, 88).trimEnd()}…` : objective;
+  // Bid condition line varies by verdict mode.
+  let bidCondition: string;
+  if (gates.length > 0) {
+    const gateLabels = gates.slice(0, 2).map((g) => {
+      // Compact gate labels: "JCP", "SPRS", "FAA Part 145", "Test Jig", "AFTO",
+      // "Sole Source — <vendor>".
+      if (g.gate_id === "JCP_CERTIFICATION_REQUIRED") return "JCP";
+      if (g.gate_id === "SPRS_SCORE_REQUIRED") return "SPRS";
+      if (g.gate_id === "FAA_145_SPECIFIC_PNS") return "FAA Part 145";
+      if (g.gate_id === "TEST_JIG_APPROVAL") return "test jig";
+      if (g.gate_id === "AFTO_ACCESS") return "AFTO access";
+      if (g.gate_id === "SOLE_SOURCE_NAMED_VENDOR") return g.named_entity ? `distributor agreement with ${g.named_entity.split(" (")[0]}` : "sole-source distributor agreement";
+      return g.gate_label;
+    });
+    const join = gateLabels.length === 1 ? gateLabels[0] : gateLabels.slice(0, -1).join(", ") + " and " + gateLabels[gateLabels.length - 1];
+    bidCondition = recommendation === "DECLINE"
+      ? `no-bid unless ${join} are current today.`
+      : `bid with caution — clear ${join} before quoting.`;
+  } else if (recommendation === "PROCEED") {
+    bidCondition = "strong fit — file the clarifications below before quoting.";
+  } else if (recommendation === "DECLINE") {
+    bidCondition = "no-bid — compliance gaps and risk profile don't support a bid.";
+  } else {
+    const topRisk = prioritized[0];
+    const topTheme = topRisk ? (topRisk.category || "the top risk") : "the top compliance risk";
+    bidCondition = `bid with caution — close ${topTheme} first.`;
+  }
+  const execWhat = objectiveShort
+    ? `${agencyShort} is buying ${objectiveShort} — ${bidCondition}`
+    : `${agencyShort} — ${bidCondition}`;
+
+  // exec_factors: gate conditions for gate audits, top risk titles for scored.
+  const execFactors: string[] = gates.length > 0
+    ? gates.map((g) => {
+        const curability = g.cure_possible_in_window
+          ? "(curable in the response window)"
+          : "(NOT curable in the response window)";
+        return g.named_entity
+          ? `${g.gate_label} — ${g.named_entity} ${curability}`
+          : `${g.gate_label} ${curability}`;
+      })
+    : prioritized.slice(0, 3).map((r) => {
+        const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
+        const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
+        return r.citation ? `${capped} (${r.citation})` : capped;
+      });
+
+  // exec_actions: top 3 risks' faraudit_action, sequenced over next 3 days.
+  // Strict: each entry MUST have a faraudit_action — risks without one are
+  // skipped (this is the Item-4 echo-removal beneficiary; only action-bearing
+  // cards reach this point after applyRuling3Cap).
+  const execActions: Array<{ when: string; text: string }> = prioritized
+    .filter((r) => (r.faraudit_action ?? "").trim().length > 0)
+    .slice(0, 3)
+    .map((r, i) => {
+      const d = new Date(Date.now() + (i + 1) * 86_400_000);
+      const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
+      const action = r.faraudit_action!.trim();
+      const text = action.length > 180 ? `${action.slice(0, 178).trimEnd()}…` : action;
+      return { when, text };
+    });
+
   complianceJson.executive_summary = {
     verdict: execVerdictWord,
     what: execWhat,

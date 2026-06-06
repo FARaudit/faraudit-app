@@ -1043,10 +1043,13 @@ export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null
 // Ruling 1+3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const JCP_RE = /\bJCP\b|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data/i;
+// Brain ruling Item 1 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+const JCP_RE = /\bJCP\b|JCP[-\s]?(?:certified|cert|certification)|Joint\s+Certification\s+Program|DD\s*Form\s*2345|militarily\s+critical\s+technical\s+data|noncommercial\s+technical\s+data|252\.227-7025/i;
 const FAA145_RE = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+repair\s+station|repair\s+station\s+rating/i;
 const TEST_JIG_RE = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
 const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
+const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
+const SPRS_TEXT_RE = /\bSPRS\b|Supplier\s+Performance\s+Risk\s+System|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i;
 
 function daysUntil(d: Date | null): number | null {
   if (!d) return null;
@@ -1065,8 +1068,17 @@ export function buildSoleSourceGate(vendor: { name: string; cage?: string | null
   };
 }
 
-export function detectSprsGate(dfarsClauses: string[] | undefined, responseDeadline: Date | null): DecisionGate | null {
-  if (!Array.isArray(dfarsClauses) || !dfarsClauses.some((c) => /252\.204-7020/.test(c))) return null;
+// Brain ruling Item 1 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+export function detectSprsGate(
+  dfarsClauses: string[] | undefined,
+  responseDeadline: Date | null,
+  docText: string = "",
+  risks: PrioritizedRisk[] = []
+): DecisionGate | null {
+  const inClauses = Array.isArray(dfarsClauses) && dfarsClauses.some((c) => SPRS_CLAUSE_RE.test(c));
+  const inDocText = SPRS_TEXT_RE.test(docText);
+  const inRisks = risks.some((r) => SPRS_TEXT_RE.test(r.text) || SPRS_TEXT_RE.test(r.title || "") || (r.citation && SPRS_CLAUSE_RE.test(r.citation)));
+  if (!inClauses && !inDocText && !inRisks) return null;
   const days = daysUntil(responseDeadline);
   const curable = days == null ? false : days >= 35;
   return {
@@ -1079,8 +1091,14 @@ export function detectSprsGate(dfarsClauses: string[] | undefined, responseDeadl
   };
 }
 
-export function detectJcpGate(docText: string, responseDeadline: Date | null): DecisionGate | null {
-  if (!JCP_RE.test(docText)) return null;
+export function detectJcpGate(
+  docText: string,
+  responseDeadline: Date | null,
+  risks: PrioritizedRisk[] = []
+): DecisionGate | null {
+  const inDocText = JCP_RE.test(docText);
+  const inRisks = risks.some((r) => JCP_RE.test(r.text) || JCP_RE.test(r.title || ""));
+  if (!inDocText && !inRisks) return null;
   const days = daysUntil(responseDeadline);
   const curable = days == null ? false : days >= 15;
   return {
@@ -1150,7 +1168,26 @@ export function applyRuling3Cap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
     if (PRIORITY_RANK[r.priority] < PRIORITY_RANK[prev.priority]) byKey.set(key, r);
     else if (PRIORITY_RANK[r.priority] === PRIORITY_RANK[prev.priority] && r.text.length > prev.text.length) byKey.set(key, r);
   }
-  const deduped = Array.from(byKey.values());
+  const round1 = Array.from(byKey.values());
+
+  // Brain ruling Item 4 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+  const themeWithActionKeys = new Set<string>();
+  for (const r of round1) {
+    if ((r.faraudit_action ?? "").trim().length > 0) {
+      themeWithActionKeys.add(riskThemeKey(r.text, r.citation));
+    }
+  }
+  const deduped: PrioritizedRisk[] = [];
+  const includedTexts = new Set<string>();
+  for (const r of round1) {
+    const tKey = riskThemeKey(r.text, r.citation);
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    if (themeWithActionKeys.has(tKey) && !curHasAction) continue;
+    if (includedTexts.has(r.text)) continue;
+    includedTexts.add(r.text);
+    deduped.push(r);
+  }
+
   const p0 = deduped.filter((r) => r.priority === "P0");
   const p1 = deduped.filter((r) => r.priority === "P1");
   const p2 = deduped.filter((r) => r.priority === "P2");
@@ -1519,9 +1556,9 @@ JSON only.`;
   const gates: DecisionGate[] = [];
   if (isRetrieved) {
     if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
-    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline);
+    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText, prioritized);
     if (sprsG) gates.push(sprsG);
-    const jcpG = detectJcpGate(solText, responseDeadline);
+    const jcpG = detectJcpGate(solText, responseDeadline, prioritized);
     if (jcpG) gates.push(jcpG);
     const faaG = detectFaa145Gate(solText);
     if (faaG) gates.push(faaG);
@@ -1546,30 +1583,77 @@ JSON only.`;
   // Fix 2 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   complianceJson.verdict = verdict;
 
-  // Fork 3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+  // Brain ruling Item 2 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   const execMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const execVerdictWord =
     recommendation === "PROCEED" ? "GO" :
     recommendation === "DECLINE" ? "NO-BID" :
     "CAUTION";
-  const execSummaryText = String(overviewJson.summary ?? "").trim();
-  const execFirstSentence = execSummaryText.split(/[.!?](?:\s|$)/)[0] || execSummaryText;
-  const execWhat = execFirstSentence.length > 160
-    ? `${execFirstSentence.slice(0, 158).trimEnd()}…`
-    : execFirstSentence;
-  const execFactors = prioritized.slice(0, 3).map((r) => {
-    const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
-    const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
-    return r.citation ? `${capped} (${r.citation})` : capped;
-  });
-  const execActions: Array<{ when: string; text: string }> = prioritized.slice(0, 3).map((r, i) => {
-    const d = new Date(Date.now() + (i + 1) * 86_400_000);
-    const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
-    const actionText = (r.faraudit_action && r.faraudit_action.trim().length > 0
-      ? r.faraudit_action
-      : (r.title ?? r.text)
-    ).trim();
-    const text = actionText.length > 180 ? `${actionText.slice(0, 178).trimEnd()}…` : actionText;
+  const agencyRaw = String(
+    (solicitation as Record<string, unknown> | null)?.["fullParentPathName"]
+      ?? (solicitation as Record<string, unknown> | null)?.["department"]
+      ?? ""
+  );
+  const agencyShort = agencyRaw
+    ? agencyRaw.split(".").pop()!.replace(/\(.*?\)/g, "").trim().split(",")[0].trim() || agencyRaw
+    : "Buying activity";
+  const objective = (overviewJson.primary_objective ?? overviewJson.scope ?? "")
+    .toString()
+    .split(/[.!?](?:\s|$)/)[0]
+    .replace(/\.$/, "")
+    .trim();
+  const objectiveShort = objective.length > 90 ? `${objective.slice(0, 88).trimEnd()}…` : objective;
+  let bidCondition: string;
+  if (gates.length > 0) {
+    const gateLabels = gates.slice(0, 2).map((g) => {
+      if (g.gate_id === "JCP_CERTIFICATION_REQUIRED") return "JCP";
+      if (g.gate_id === "SPRS_SCORE_REQUIRED") return "SPRS";
+      if (g.gate_id === "FAA_145_SPECIFIC_PNS") return "FAA Part 145";
+      if (g.gate_id === "TEST_JIG_APPROVAL") return "test jig";
+      if (g.gate_id === "AFTO_ACCESS") return "AFTO access";
+      if (g.gate_id === "SOLE_SOURCE_NAMED_VENDOR") return g.named_entity ? `distributor agreement with ${g.named_entity.split(" (")[0]}` : "sole-source distributor agreement";
+      return g.gate_label;
+    });
+    const join = gateLabels.length === 1 ? gateLabels[0] : gateLabels.slice(0, -1).join(", ") + " and " + gateLabels[gateLabels.length - 1];
+    bidCondition = recommendation === "DECLINE"
+      ? `no-bid unless ${join} are current today.`
+      : `bid with caution — clear ${join} before quoting.`;
+  } else if (recommendation === "PROCEED") {
+    bidCondition = "strong fit — file the clarifications below before quoting.";
+  } else if (recommendation === "DECLINE") {
+    bidCondition = "no-bid — compliance gaps and risk profile don't support a bid.";
+  } else {
+    const topRisk = prioritized[0];
+    const topTheme = topRisk ? (topRisk.category || "the top risk") : "the top compliance risk";
+    bidCondition = `bid with caution — close ${topTheme} first.`;
+  }
+  const execWhat = objectiveShort
+    ? `${agencyShort} is buying ${objectiveShort} — ${bidCondition}`
+    : `${agencyShort} — ${bidCondition}`;
+
+  const execFactors: string[] = gates.length > 0
+    ? gates.map((g) => {
+        const curability = g.cure_possible_in_window
+          ? "(curable in the response window)"
+          : "(NOT curable in the response window)";
+        return g.named_entity
+          ? `${g.gate_label} — ${g.named_entity} ${curability}`
+          : `${g.gate_label} ${curability}`;
+      })
+    : prioritized.slice(0, 3).map((r) => {
+        const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
+        const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
+        return r.citation ? `${capped} (${r.citation})` : capped;
+      });
+
+  const execActions: Array<{ when: string; text: string }> = prioritized
+    .filter((r) => (r.faraudit_action ?? "").trim().length > 0)
+    .slice(0, 3)
+    .map((r, i) => {
+      const d = new Date(Date.now() + (i + 1) * 86_400_000);
+      const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
+      const action = r.faraudit_action!.trim();
+      const text = action.length > 180 ? `${action.slice(0, 178).trimEnd()}…` : action;
     return { when, text };
   });
   complianceJson.executive_summary = {
