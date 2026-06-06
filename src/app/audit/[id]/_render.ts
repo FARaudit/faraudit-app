@@ -1078,6 +1078,173 @@ function setWinProbabilityNull(html: string): string {
 
 // ─── main entry ─────────────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Fork 3 wiring (2026-06-05). Six new surfaces from Design's capture package.
+// Each repeater follows the same pattern: locate the container by its
+// data-field attribute, replace the entire inner HTML with one rendered node
+// per VM data item. This strips Design's static demo children automatically
+// (the CEO-flagged binding gotcha #1) — no leftover demo siblings remain.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Replace the inner HTML of an element identified by a data-field attribute.
+// Tag-name discriminated because the same data-field can land on a <div>, <ol>,
+// <tbody>, or <section>; we walk the matching close to know where the slice
+// ends. Returns the original html unchanged when the field isn't present
+// (defense-in-depth — older templates without the marker won't crash).
+function setFieldInner(html: string, field: string, tagName: string, innerHtml: string): string {
+  const re = new RegExp(`<${tagName}\\b[^>]*\\bdata-field="${field}"[^>]*>`);
+  const m = re.exec(html);
+  if (!m) return html;
+  const range = findMatchingClose(html, m.index, tagName);
+  if (!range) return html;
+  return html.slice(0, range.contentStart) + innerHtml + html.slice(range.contentEnd);
+}
+
+// Gotcha #2 — the .exec-sum section ships hardcoded with `es-caution`. Swap to
+// vm.exec_class (es-go / es-caution / es-nobid) before any inner-field work
+// runs. Single replacement; the class is unique on the element.
+function setExecClass(html: string, execClass: "es-go" | "es-caution" | "es-nobid"): string {
+  return html.replace(
+    /(<section class="exec-sum )es-(?:go|caution|nobid)(" id="sec-exec")/,
+    `$1${execClass}$2`
+  );
+}
+
+function renderExecFactors(html: string, factors: string[]): string {
+  if (factors.length === 0) {
+    // No factors to render — collapse the whole .es-factors block to keep the
+    // grid layout intact (the renderer never invents content when data is empty).
+    return setFieldInner(html, "exec_factors", "ol", "");
+  }
+  const inner = factors.map((f) => `<li>${escapeHtml(f)}</li>`).join("");
+  return setFieldInner(html, "exec_factors", "ol", inner);
+}
+
+function renderExecActions(html: string, actions: Array<{ when: string; text: string }>): string {
+  if (actions.length === 0) return setFieldInner(html, "exec_actions", "div", "");
+  const inner = actions
+    .map((a) => `<div class="es-act"><span class="es-when">${escapeHtml(a.when)}</span><span>${escapeHtml(a.text)}</span></div>`)
+    .join("");
+  return setFieldInner(html, "exec_actions", "div", inner);
+}
+
+// Gotcha #3 — the final gate must carry class "end" (the submission-deadline
+// accent treatment in Design's CSS). All non-final gates take their status
+// class (ok / warn / bad). One node per VM data item; demo siblings stripped.
+function renderTimelineGates(
+  html: string,
+  gates: Array<{ date: string; label: string; status: "ok" | "warn" | "bad" }>
+): string {
+  if (gates.length === 0) return setFieldInner(html, "timeline_gates", "div", "");
+  const inner = gates
+    .map((g, i) => {
+      const cls = i === gates.length - 1 ? "end" : g.status;
+      return `<div class="tl-node ${cls}"><span class="tl-dot"></span><span class="tl-date">${escapeHtml(g.date)}</span><span class="tl-lbl">${escapeHtml(g.label)}</span></div>`;
+    })
+    .join("");
+  return setFieldInner(html, "timeline_gates", "div", inner);
+}
+
+function renderComplianceMatrix(
+  html: string,
+  rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }>
+): string {
+  if (rows.length === 0) return setFieldInner(html, "compliance_matrix", "div", "");
+  // The .cmatrix data-field is on the outer <div class="cmatrix">; preserve
+  // the <table> + <thead> structure and only swap the <tbody> rows. We rebuild
+  // the whole inner so the template's thead chrome stays intact regardless of
+  // future markup changes Design might make to it.
+  const STATUS_LABEL: Record<"action" | "risk" | "clear", string> = {
+    action: "Action",
+    risk: "At Risk",
+    clear: "Clear"
+  };
+  const tbody = rows
+    .map((r) => `<tr><td class="cm-req">${escapeHtml(r.requirement)}</td><td><span class="cm-src">${escapeHtml(r.source)}</span></td><td><span class="cm-status ${r.status}"><span class="d"></span>${STATUS_LABEL[r.status]}</span></td></tr>`)
+    .join("");
+  const inner = `<table><thead><tr><th class="cm-req">Requirement</th><th>Source</th><th>Status</th></tr></thead><tbody>${tbody}</tbody></table>`;
+  return setFieldInner(html, "compliance_matrix", "div", inner);
+}
+
+// Gotcha #4 — the .checklist denominator ("N/10") is computed CLIENT-SIDE by
+// the resolver JS (totalEl.textContent = items.length). We do NOT pre-compute
+// the count or stamp it in the server-rendered markup; the JS auto-corrects
+// off the rendered <label> count. Just render the groups + items verbatim.
+function renderSubmissionChecklist(
+  html: string,
+  items: Array<{ group: "before" | "with" | "after"; text: string; source: string; severity: "dq" | "req" | "adv" }>
+): string {
+  if (items.length === 0) return setFieldInner(html, "submission_checklist", "div", "");
+  const GROUP_LABEL: Record<"before" | "with" | "after", string> = {
+    before: "Before you submit",
+    with: "With your submission",
+    after: "After you submit"
+  };
+  const SEV_LABEL: Record<"dq" | "req" | "adv", string> = {
+    dq: "Disqualifying",
+    req: "Required",
+    adv: "Advisory"
+  };
+  const groups: Array<"before" | "with" | "after"> = ["before", "with", "after"];
+  const renderItem = (it: typeof items[number]) =>
+    `<label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(it.text)}<span class="ck-csrc">${escapeHtml(it.source)}</span></span><span class="ck-sev ${it.severity}">${SEV_LABEL[it.severity]}</span></label>`;
+  const inner = groups
+    .map((g) => {
+      const groupItems = items.filter((it) => it.group === g);
+      if (groupItems.length === 0) return "";
+      return `<div class="ck-group"><div class="ck-gh">${GROUP_LABEL[g]}</div>${groupItems.map(renderItem).join("")}</div>`;
+    })
+    .filter(Boolean)
+    .join("");
+  return setFieldInner(html, "submission_checklist", "div", inner);
+}
+
+// §02 incumbent branch. The template ships both .incumbent (visible) and
+// .inc-none (hidden via inline display:none + data-state="none"). When
+// vm.has_incumbent is true, strip the .inc-none block entirely (keeps the
+// default-rendered .incumbent unchanged). When false, swap: strip .incumbent
+// and reveal .inc-none by removing the inline style + data-state attrs.
+function renderIncumbentBranch(html: string, hasIncumbent: boolean): string {
+  if (hasIncumbent) {
+    // Remove the .inc-none block — it would otherwise stay hidden via CSS but
+    // the markup adds noise to the PDF (Chromium can still pick up
+    // display:none elements in some path-traversals; physically remove for
+    // a clean print artifact).
+    return removeElementByOpenRe(
+      html,
+      /<div class="inc-none"\s+data-state="none"\s+style="display:none">/,
+      "div"
+    );
+  }
+  // No incumbent: strip the .incumbent block + reveal the .inc-none block.
+  let out = removeElementByOpenRe(
+    html,
+    /<div class="incumbent">/,
+    "div"
+  );
+  out = out.replace(
+    /(<div class="inc-none")\s+data-state="none"\s+style="display:none"/,
+    `$1`
+  );
+  return out;
+}
+
+// KO email card — to/subject/preview. The .to anchor wraps a Cloudflare
+// email-decode artifact (data-cfemail obfuscation auto-pasted by Design's
+// static-host export); replacing the data-field inner with the real address
+// strips the obfuscation wrapper cleanly.
+function renderKoEmailCard(
+  html: string,
+  ko: { to: string; subject: string; preview: string }
+): string {
+  let out = setFieldInner(html, "ko_email.to", "b", escapeHtml(ko.to));
+  out = setFieldInner(out, "ko_email.subject", "span", escapeHtml(ko.subject));
+  out = setFieldInner(out, "ko_email.preview", "p", escapeHtml(ko.preview).replace(/\n/g, "<br>"));
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+
 export function renderAuditReport(template: string, vm: AuditViewModel): string {
   let html = template;
 
@@ -1403,6 +1570,36 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     (vm.solicitation_number ?? "") // notice_id-or-slug; the run-audit page
                                     // smart-input accepts either form.
   );
+
+  // ─── Fork 3 wiring (2026-06-05) ──────────────────────────────────────────
+  // Six new surfaces from Design's capture package. Each repeater swaps the
+  // demo children for one rendered node per VM data item (no leftover demo
+  // siblings); class toggles + branches handled by dedicated helpers above.
+  html = setExecClass(html, vm.exec_class);
+  html = replaceFieldText(html, "exec_verdict", vm.exec_verdict);
+  html = replaceFieldText(html, "exec_what", vm.exec_what);
+  html = renderExecFactors(html, vm.exec_factors);
+  html = renderExecActions(html, vm.exec_actions);
+
+  html = renderTimelineGates(html, vm.timeline_gates);
+
+  html = renderComplianceMatrix(html, vm.compliance_matrix);
+  // matrix_export_url: href attribute on the .cm-export anchor. The link sits
+  // on an <a> with data-field="matrix_export_url"; href is the attribute we
+  // need to swap, not the inner text.
+  html = html.replace(
+    /(<a class="cm-export" )href="[^"]*"(\s+data-field="matrix_export_url")/,
+    `$1href="${escapeAttr(vm.matrix_export_url)}"$2`
+  );
+
+  html = renderKoEmailCard(html, vm.ko_email);
+
+  html = renderSubmissionChecklist(html, vm.submission_checklist);
+
+  html = renderIncumbentBranch(html, vm.has_incumbent);
+  html = replaceFieldText(html, "incumbent_none_head", vm.incumbent_none_head);
+  html = replaceFieldText(html, "incumbent_none_note", vm.incumbent_none_note);
+  // ─────────────────────────────────────────────────────────────────────────
 
   return html;
 }
