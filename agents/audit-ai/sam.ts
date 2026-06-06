@@ -107,13 +107,18 @@ function mapOpportunity(o: Record<string, unknown>): Solicitation {
 // any sol# input. This now tries `noticeid` first, then `solnum` on empty
 // result — covers both input styles without requiring the user to know
 // the distinction.
+//
+// DLA hyphenation fallback (2026-06-05) — parity mirror. See src/lib/sam.ts.
+// SF-1449 prints SPRRA1-26-Q-0034 with hyphens; SAM.gov indexes the same
+// record as SPRRA126Q0034. Direct attempts miss; hyphen-stripped third try
+// resolves.
 export async function fetchSolicitationByNoticeId(
   noticeId: string
 ): Promise<Solicitation | null> {
   if (!SAM_API_KEY) return null;
 
-  const tryQuery = async (paramName: "noticeid" | "solnum"): Promise<Solicitation | null> => {
-    const url = `${SAM_SEARCH}?api_key=${SAM_API_KEY}&${paramName}=${encodeURIComponent(noticeId)}&limit=1`;
+  const tryQuery = async (paramName: "noticeid" | "solnum", value: string): Promise<Solicitation | null> => {
+    const url = `${SAM_SEARCH}?api_key=${SAM_API_KEY}&${paramName}=${encodeURIComponent(value)}&limit=1`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) return null;
@@ -125,5 +130,14 @@ export async function fetchSolicitationByNoticeId(
     }
   };
 
-  return (await tryQuery("noticeid")) ?? (await tryQuery("solnum"));
+  const direct = (await tryQuery("noticeid", noticeId)) ?? (await tryQuery("solnum", noticeId));
+  if (direct) return direct;
+  const stripped = noticeId.replace(/-/g, "");
+  if (stripped !== noticeId) {
+    const viaSolnum = await tryQuery("solnum", stripped);
+    if (viaSolnum) return viaSolnum;
+    const viaNoticeId = await tryQuery("noticeid", stripped);
+    if (viaNoticeId) return viaNoticeId;
+  }
+  return null;
 }

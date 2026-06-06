@@ -98,13 +98,23 @@ function mapOpportunity(o: Record<string, unknown>): Solicitation {
 // any sol# input. This now tries `noticeid` first, then `solnum` on empty
 // result — covers both input styles without requiring the user to know
 // the distinction.
+//
+// DLA hyphenation fallback (2026-06-05): DLA Aviation solicitations are
+// canonically printed on the SF-1449 with hyphens (SPRRA1-26-Q-0034), but
+// SAM.gov indexes the same record without hyphens (SPRRA126Q0034). Both
+// noticeid and solnum return zero results on the hyphenated form. Empirical
+// probe: SPRRA1-26-Q-0034 → 0 hits both params; SPRRA126Q0034 + solnum → 1
+// hit (HOUSING ASSY,ACTUAT NSN:1680-01-137-3534, deadline 2026-06-25). When
+// the first two attempts miss AND the input contains hyphens, try a third
+// query with hyphens stripped. Output value is unchanged — SAM returns the
+// canonical record with whichever format it stores.
 export async function fetchSolicitationByNoticeId(
   noticeId: string
 ): Promise<Solicitation | null> {
   if (!SAM_API_KEY) return null;
 
-  const tryQuery = async (paramName: "noticeid" | "solnum"): Promise<Solicitation | null> => {
-    const url = `${SAM_SEARCH}?api_key=${SAM_API_KEY}&${paramName}=${encodeURIComponent(noticeId)}&limit=1`;
+  const tryQuery = async (paramName: "noticeid" | "solnum", value: string): Promise<Solicitation | null> => {
+    const url = `${SAM_SEARCH}?api_key=${SAM_API_KEY}&${paramName}=${encodeURIComponent(value)}&limit=1`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) return null;
@@ -116,5 +126,15 @@ export async function fetchSolicitationByNoticeId(
     }
   };
 
-  return (await tryQuery("noticeid")) ?? (await tryQuery("solnum"));
+  const direct = (await tryQuery("noticeid", noticeId)) ?? (await tryQuery("solnum", noticeId));
+  if (direct) return direct;
+  // Hyphen-stripped fallback for DLA-style sol#s.
+  const stripped = noticeId.replace(/-/g, "");
+  if (stripped !== noticeId) {
+    const viaSolnum = await tryQuery("solnum", stripped);
+    if (viaSolnum) return viaSolnum;
+    const viaNoticeId = await tryQuery("noticeid", stripped);
+    if (viaNoticeId) return viaNoticeId;
+  }
+  return null;
 }
