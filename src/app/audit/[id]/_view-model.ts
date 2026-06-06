@@ -130,6 +130,16 @@ export interface AuditViewModel {
   // on a numeric score.
   verdict_mode: "gate" | "scored";
 
+  // Brain QA Item 1 (2026-06-05): the masthead .mhv-gates + the §06
+  // .gate-card both read from this array when verdict_mode === 'gate'. Each
+  // entry maps an engine DecisionGate to a renderable condition row.
+  gate_conditions: Array<{
+    title: string;       // Short condition headline (gate_label core)
+    context: string;     // Inline context (e.g. CAGE / vendor / brief verification)
+    citation: string;    // Clause cite or "—" when none (e.g. "DFARS 252.204-7020")
+    blocker_note: string; // "UNFIXABLE IN N DAYS IF MISSING" when not curable, else ""
+  }>;
+
   // ─── Fork 3 surfaces (2026-06-05) ────────────────────────────────────────
   // Six new template surfaces from Design's Fork 3 capture package; markup
   // pinned at ceo/redesign-final/platform/audit-report.html. Data layer
@@ -778,6 +788,45 @@ function deriveExecClass(rec: "GO" | "CAUTION" | "DECLINE"): "es-go" | "es-cauti
   return "es-caution";
 }
 
+// Brain QA Item 1 (2026-06-05): VM-side projection of the engine's gates[]
+// list onto the shape the masthead .mhv-gates + §06 .gate-card render.
+// citation is the canonical clause reference for each gate (engine doesn't
+// store one explicitly, so map by gate_id). blocker_note is shown only when
+// the gate is structurally uncurable in the response window.
+function deriveGateConditions(
+  gates: Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean; verification_action?: string; verification_url?: string; named_entity?: string }>,
+  daysToDeadline: number | null
+): AuditViewModel["gate_conditions"] {
+  const CITATIONS: Record<string, string> = {
+    SPRS_SCORE_REQUIRED: "DFARS 252.204-7020",
+    JCP_CERTIFICATION_REQUIRED: "DD Form 2345 / 252.227-7025",
+    FAA_145_SPECIFIC_PNS: "14 CFR Part 145",
+    TEST_JIG_APPROVAL: "Section L / specialized test",
+    AFTO_ACCESS: "AFTO / TO library",
+    SOLE_SOURCE_NAMED_VENDOR: "FAR 6.302"
+  };
+  return gates.map((g) => {
+    const id = String(g.gate_id ?? "");
+    const title = sanitizeDisplayText(g.gate_label || id || "Gate condition");
+    // Context: named_entity if present (sole-source), else a short verification cue
+    // pulled from the start of verification_action up to the first period.
+    let context = "";
+    if (g.named_entity) {
+      context = sanitizeDisplayText(g.named_entity);
+    } else if (g.verification_action) {
+      const firstSentence = String(g.verification_action).split(/[.!?](?:\s|$)/)[0];
+      context = sanitizeDisplayText(firstSentence.length > 110 ? firstSentence.slice(0, 108) + "…" : firstSentence);
+    }
+    const citation = CITATIONS[id] || "—";
+    const blockerNote = g.cure_possible_in_window === false
+      ? (daysToDeadline != null && daysToDeadline > 0
+          ? `UNFIXABLE IN ${daysToDeadline} DAYS IF MISSING`
+          : "UNFIXABLE BEFORE DEADLINE IF MISSING")
+      : "";
+    return { title, context, citation, blocker_note: blockerNote };
+  });
+}
+
 function deriveTimelineGates(
   audit: AuditRow,
   compJson: Record<string, unknown>,
@@ -1272,6 +1321,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
     verdict_mode: verdictMode,
+    gate_conditions: (() => {
+      const v = (compJson.verdict ?? null) as { type?: string; gates?: unknown } | null;
+      if (!v || v.type !== "DECISION_GATE" || !Array.isArray(v.gates)) return [];
+      const daysToDeadline = responseDeadline
+        ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
+        : null;
+      return deriveGateConditions(v.gates as Parameters<typeof deriveGateConditions>[0], daysToDeadline);
+    })(),
 
     // ─── Fork 3 surfaces (2026-06-05) — derived from existing engine output ──
     // exec_*: engine-emitted (complianceJson.executive_summary) when available.

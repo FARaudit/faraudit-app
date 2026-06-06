@@ -1204,29 +1204,106 @@ function renderSubmissionChecklist(
 // vm.has_incumbent is true, strip the .inc-none block entirely (keeps the
 // default-rendered .incumbent unchanged). When false, swap: strip .incumbent
 // and reveal .inc-none by removing the inline style + data-state attrs.
+//
+// Brain QA Item 2 (2026-06-05): SPRRA had no incumbent and §02 came out
+// empty (jump-nav + body both jumped 01→03). The prior reveal regex demanded
+// data-state + style attrs in a strict order with single whitespace between;
+// it didn't match Design's emitted markup in all variants. Switched to two
+// independent attribute strips so order/spacing variations don't matter.
 function renderIncumbentBranch(html: string, hasIncumbent: boolean): string {
   if (hasIncumbent) {
-    // Remove the .inc-none block — it would otherwise stay hidden via CSS but
-    // the markup adds noise to the PDF (Chromium can still pick up
-    // display:none elements in some path-traversals; physically remove for
-    // a clean print artifact).
+    // Remove the .inc-none block. The opener-regex tolerates any combination
+    // of data-state + style attribute order/spacing.
     return removeElementByOpenRe(
       html,
-      /<div class="inc-none"\s+data-state="none"\s+style="display:none">/,
+      /<div class="inc-none"[^>]*data-state="none"[^>]*>/,
       "div"
     );
   }
   // No incumbent: strip the .incumbent block + reveal the .inc-none block.
+  // Two independent attribute strips — order-agnostic — so both
+  //   class="inc-none" data-state="none" style="display:none"
+  // and the rearranged
+  //   class="inc-none" style="display:none" data-state="none"
+  // get unhidden.
   let out = removeElementByOpenRe(
     html,
     /<div class="incumbent">/,
     "div"
   );
   out = out.replace(
-    /(<div class="inc-none")\s+data-state="none"\s+style="display:none"/,
+    /(<div class="inc-none"[^>]*?)\s+data-state="none"/,
+    `$1`
+  );
+  out = out.replace(
+    /(<div class="inc-none"[^>]*?)\s+style="display:none"/,
     `$1`
   );
   return out;
+}
+
+// Brain QA Item 1 (2026-06-05): gate-mode wiring. Populates the two gate
+// surfaces from vm.gate_conditions[]:
+//   1. .mhv-gates (data-field="gate_conditions") in the masthead — compact
+//      one-line gate rows
+//   2. .g-rows (data-field="gate_conditions") in §06 — interactive gate
+//      rows with verification detail + blocker note
+// Both share the same vm.gate_conditions[] data. When the array is empty
+// (scored audit), the markup keeps its demo content but the surfaces stay
+// hidden by the CSS rules (.mh-verdict .mhv-gates display:none until
+// .is-gate added; #reco-gate has inline style="display:none" until the
+// applyVerdictMode call un-hides it). Net: only gate audits render gates.
+function renderGateConditions(
+  html: string,
+  conditions: Array<{ title: string; context: string; citation: string; blocker_note: string }>,
+  verdictMode: "gate" | "scored"
+): string {
+  if (verdictMode !== "gate" || conditions.length === 0) return html;
+  // Masthead .mhv-gates rows. The template's first child is the
+  //   <p class="mhv-gates-cap">Bid only if — all true today</p>
+  // We preserve that cap, then replace the .mhv-gate demo children with one
+  // node per VM condition.
+  const mhvCap = `<p class="mhv-gates-cap">Bid only if — all true today</p>`;
+  const mhvRows = conditions
+    .map((c) => {
+      const detail = c.context
+        ? `${escapeHtml(c.context)}${c.citation && c.citation !== "—" ? ` &middot; ${escapeHtml(c.citation)}` : ""}`
+        : (c.citation && c.citation !== "—" ? escapeHtml(c.citation) : "");
+      return `<div class="mhv-gate"><span class="gk"></span><span class="gx"><b>${escapeHtml(c.title)}</b>${detail ? ` — ${detail}` : ""}</span></div>`;
+    })
+    .join("");
+  let out = setFieldInner(html, "gate_conditions", "div", mhvCap + mhvRows);
+  // §06 .g-rows — second occurrence of data-field="gate_conditions" (this
+  // time on the .g-rows interactive container). Find AFTER the masthead
+  // version so setFieldInner's first-match-only behavior targets the right
+  // container — we already replaced the masthead one above, so the next
+  // match is the §06 one.
+  const gRows = conditions
+    .map((c) => {
+      const detail = `<code>${escapeHtml(c.citation)}</code>${c.context ? ` — ${escapeHtml(c.context)}` : ""}`;
+      const blocker = c.blocker_note ? `<span class="g-blocker">${escapeHtml(c.blocker_note)}</span>` : "";
+      return `<div class="g-row"><span class="gbx"></span><div><div class="gt">${escapeHtml(c.title)}</div><div class="gd">${detail}${blocker}</div></div></div>`;
+    })
+    .join("");
+  out = setFieldInner(out, "gate_conditions", "div", gRows);
+  // Update the .gs-cnt initial count denominator to match the rendered row count
+  // so the resolver's "0 / N cleared" badge starts with the correct N before any
+  // user interaction. The resolver JS recomputes on click.
+  out = out.replace(
+    /<span class="gs-cnt">0 \/ \d+<\/span>/,
+    `<span class="gs-cnt">0 / ${conditions.length}</span>`
+  );
+  return out;
+}
+
+// Inject the applyVerdictMode('gate') call after DOM load. The template
+// already defines window.applyVerdictMode; we just need to invoke it once.
+// Stamped just before </body> so the template's own setup IIFEs (which
+// register applyVerdictMode + the interactive resolver) have already
+// executed by the time this fires.
+function injectVerdictModeCall(html: string): string {
+  const script = `<script data-verdict-mode-gate>document.addEventListener('DOMContentLoaded',function(){if(typeof window.applyVerdictMode==='function')window.applyVerdictMode('gate');});</script>`;
+  return html.replace(/<\/body>/, `${script}\n</body>`);
 }
 
 // KO email card — to/subject/preview. The .to anchor wraps a Cloudflare
@@ -1587,6 +1664,17 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   html = replaceFieldText(html, "exec_what", vm.exec_what);
   html = renderExecFactors(html, vm.exec_factors);
   html = renderExecActions(html, vm.exec_actions);
+
+  // Brain QA Item 1 (2026-06-05): gate-mode wiring. When the engine emitted
+  // a DECISION_GATE verdict, populate the masthead .mhv-gates + the §06
+  // .g-rows from vm.gate_conditions[], then inject a script that calls the
+  // template's own window.applyVerdictMode('gate') after DOM load — that
+  // single call adds .is-gate to .mh-verdict (hides numeric tiles + reveals
+  // gates), un-hides #reco-gate, hides .win-themes + .win-h + .st-amend.
+  html = renderGateConditions(html, vm.gate_conditions, vm.verdict_mode);
+  if (vm.verdict_mode === "gate") {
+    html = injectVerdictModeCall(html);
+  }
 
   html = renderTimelineGates(html, vm.timeline_gates);
 
