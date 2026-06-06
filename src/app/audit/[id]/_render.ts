@@ -1233,13 +1233,20 @@ function renderIncumbentBranch(html: string, hasIncumbent: boolean): string {
 // email-decode artifact (data-cfemail obfuscation auto-pasted by Design's
 // static-host export); replacing the data-field inner with the real address
 // strips the obfuscation wrapper cleanly.
+//
+// Switched 2026-06-05 from setFieldInner (single-match, tag-discriminated)
+// to replaceFieldInner (global walker, tag-agnostic) per the Design QA
+// dedup gotcha. If the template ever ships with the same data-field on
+// multiple elements (e.g. a future drawer mirror of the card preview), the
+// global walker keeps both in sync rather than letting one drift to the
+// static demo value.
 function renderKoEmailCard(
   html: string,
   ko: { to: string; subject: string; preview: string }
 ): string {
-  let out = setFieldInner(html, "ko_email.to", "b", escapeHtml(ko.to));
-  out = setFieldInner(out, "ko_email.subject", "span", escapeHtml(ko.subject));
-  out = setFieldInner(out, "ko_email.preview", "p", escapeHtml(ko.preview).replace(/\n/g, "<br>"));
+  let out = replaceFieldInner(html, "ko_email.to", escapeHtml(ko.to));
+  out = replaceFieldInner(out, "ko_email.subject", escapeHtml(ko.subject));
+  out = replaceFieldInner(out, "ko_email.preview", escapeHtml(ko.preview).replace(/\n/g, "<br>"));
   return out;
 }
 

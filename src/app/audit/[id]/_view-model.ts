@@ -857,8 +857,59 @@ function deriveComplianceMatrix(
   return rows;
 }
 
-function deriveKoEmailCard(audit: AuditRow, displayId: string, risks: Risk[]): { to: string; subject: string; preview: string } {
-  const to = (audit.ko_email_recipient as string) || "contracting-officer@agency.mil";
+// Extract Contracting Officer email + name from Section L extraction text.
+// Pattern matches the canonical "Submit to <Name>, <EMAIL>" / "<Name> at
+// <EMAIL>" / "<EMAIL>" forms DLA Aviation L sections use. Returns null when
+// no email is found; the caller falls back to audit.ko_email_recipient and
+// then to the generic stub.
+//
+// Real-data example from SPRRA126Q0034 Section L:
+//   "Submit to Josh E. Long, JOSH.LONG@DLA.MIL"
+//   → { name: "Josh E. Long", email: "josh.long@dla.mil" }
+function extractCoFromSectionL(compJson: Record<string, unknown>): { email: string; name: string | null } | null {
+  // Section L surfaces the engine touches:
+  //   compJson.section_l_summary (string)  — 2-3 sentence summary text
+  //   compJson.submission_requirements[]   — structured requirement strings
+  // Concatenate both into a single search corpus.
+  const parts: string[] = [];
+  if (typeof compJson.section_l_summary === "string") parts.push(compJson.section_l_summary);
+  if (Array.isArray(compJson.submission_requirements)) {
+    for (const r of compJson.submission_requirements as SubmissionRequirementVM[]) {
+      if (r && typeof r.requirement === "string") parts.push(r.requirement);
+    }
+  }
+  const corpus = parts.join(" \n ");
+  if (!corpus) return null;
+  // Email regex — DLA/DoD addresses are uppercase by convention but the
+  // RFC pattern is case-insensitive. Capture group 0 = whole match.
+  const emailRe = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+  const emailMatch = corpus.match(emailRe);
+  if (!emailMatch) return null;
+  const email = emailMatch[0].toLowerCase();
+  // Try to find a comma-separated name immediately before the email:
+  //   "Josh E. Long, JOSH.LONG@DLA.MIL"
+  //   "Submit to Mary L. Smith, MARY.SMITH@USCG.MIL"
+  // Capture group 1 = the name (2-4 word title-case form).
+  const namePattern = new RegExp(`([A-Z][A-Za-z]+(?:\\s+[A-Z]\\.?)?(?:\\s+[A-Z][A-Za-z]+){1,2}),\\s*${emailMatch[0].replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`, "i");
+  const nameMatch = corpus.match(namePattern);
+  return { email, name: nameMatch ? nameMatch[1].trim() : null };
+}
+
+function deriveKoEmailCard(
+  audit: AuditRow,
+  displayId: string,
+  risks: Risk[],
+  compJson: Record<string, unknown>
+): { to: string; subject: string; preview: string } {
+  // Priority order for the To field:
+  //   1. CO extracted from Section L text (the canonical, doc-derived source —
+  //      e.g. "Josh E. Long, JOSH.LONG@DLA.MIL" on SPRRA126Q0034)
+  //   2. audit.ko_email_recipient column (set by an earlier extraction pass)
+  //   3. Generic stub "contracting-officer@agency.mil" (last-resort placeholder)
+  const lExtracted = extractCoFromSectionL(compJson);
+  const to = lExtracted?.email
+    || (audit.ko_email_recipient as string)
+    || "contracting-officer@agency.mil";
   const subject = `${displayId} — Pre-quote clarifications`;
   const top = risks.slice(0, 2);
   const preview = top.length === 0
@@ -1212,7 +1263,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     compliance_matrix: deriveComplianceMatrix(compJson, risks),
     matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
 
-    ko_email: deriveKoEmailCard(audit, displayId, risks),
+    ko_email: deriveKoEmailCard(audit, displayId, risks, compJson),
 
     submission_checklist: deriveSubmissionChecklist(compJson),
 

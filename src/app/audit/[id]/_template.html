@@ -1496,7 +1496,7 @@ button{font-family:inherit}
             <div class="sec-body">
               <div class="ko-card">
                 <div class="ko-meta">
-                  <div class="kr"><span class="kml">To</span><b data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ec8783c2869e859a899e8dac88808dc2818580">[email&#160;protected]</a></b></div>
+                  <div class="kr"><span class="kml">To</span><b data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="80ebefaeeaf2e9f6e5f2e1c0e4ece1aeede9ec">[email&#160;protected]</a></b></div>
                   <div class="kr"><span class="kml">Subject</span><span data-field="ko_email.subject">SP4701-26-Q-0942 — Questions re: data rights &amp; wage determination</span></div>
                 </div>
                 <p class="ko-preview" data-field="ko_email.preview">Ms. Rivera,
@@ -1627,7 +1627,7 @@ Thank you for the opportunity to quote on SP4701-26-Q-0942. Before submission we
     <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="dr-meta">
-    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="254e4457404b0b4449534457405f654149440b484c49">[email&#160;protected]</a></span></div>
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3e555f4c5b50105f52485f4c5b447e5a525f10535752">[email&#160;protected]</a></span></div>
     <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
   </div>
   <div class="dr-body">
@@ -1868,6 +1868,59 @@ Capture Lead, [Company]
     });
   },{rootMargin:'-18% 0px -72% 0px'});
   links.forEach(function(a){ var s=document.querySelector(a.getAttribute('href')); if(s) io.observe(s); });
+})();
+
+/* ───── verdict-word consistency — one bid-decision vocabulary across masthead + exec summary.
+   Masthead .mhv-word is data-field="recommendation" (engine may send "DECLINE"); the exec card +
+   §06 use BID/CAUTION/NO-BID. Normalize the masthead word off the reliable verdict TONE class so all
+   three surfaces can never disagree. Display-layer only — does not touch the prelim/unscored block. ───── */
+(function(){
+  var TONE={'v-go':'BID','v-caution':'CAUTION','v-decline':'NO-BID'};
+  var vb=[].slice.call(document.querySelectorAll('.mh-verdict')).find(function(v){
+    return (v.classList.contains('v-go')||v.classList.contains('v-caution')||v.classList.contains('v-decline'))
+      && getComputedStyle(v).display!=='none';
+  });
+  if(!vb) return;
+  var tone=['v-go','v-caution','v-decline'].filter(function(c){return vb.classList.contains(c);})[0];
+  var word=TONE[tone];
+  var mw=vb.querySelector('.mhv-word');
+  if(mw && /^(DECLINE|CAUTION|PROCEED|GO|NO[\s-]?BID|BID)\.?$/i.test((mw.textContent||'').trim())) mw.textContent=word;
+  var ev=document.querySelector('.es-vw'); if(ev) ev.textContent=word;
+  var es=document.querySelector('.exec-sum');
+  if(es){ es.classList.remove('es-go','es-caution','es-nobid');
+    es.classList.add(tone==='v-go'?'es-go':tone==='v-caution'?'es-caution':'es-nobid'); }
+})();
+
+/* ───── §07 compliance matrix — collapse boilerplate. A real compliance matrix maps the Section L/M
+   "shalls" to a response obligation; it should NOT print pages of FAR/DFARS clauses incorporated by
+   reference (all auto-"clear"). Roll every bare-clause-number row that is CLEAR into one summary line,
+   so the matrix LEADS with what needs action (Section L/M + any at-risk clause). At-risk/action clause
+   rows (e.g. 52.246-11 AT RISK) are KEPT. Prose requirements (Section L/M) are never bare clause #s → kept. ───── */
+(function(){
+  var tbodies=document.querySelectorAll('.cmatrix tbody'); if(!tbodies.length) return;
+  var sources={}, cleared=0, lastTb=tbodies[tbodies.length-1];
+  [].slice.call(tbodies).forEach(function(tb){
+    [].slice.call(tb.querySelectorAll('tr')).forEach(function(tr){
+      var st=tr.querySelector('.cm-status');
+      var reqEl=tr.querySelector('.cm-req')||tr.cells[0];
+      var req=(reqEl&&reqEl.textContent||'').trim();
+      var isClear=st&&st.classList.contains('clear');
+      var bareClause=/^\d{2,3}\.\d/.test(req);          // "52.203-19" / "252.204-7012", not prose
+      if(isClear && bareClause){
+        var fam=/^252\./.test(req)?'DFARS':'FAR';
+        sources[fam]=(sources[fam]||0)+1; cleared++; tr.remove();
+      }
+    });
+  });
+  if(cleared){
+    var parts=Object.keys(sources).map(function(f){return sources[f]+' '+f;}).join(' + ');
+    var tr=document.createElement('tr'); tr.className='cm-rollup';
+    tr.innerHTML='<td class="cm-req" style="color:var(--mute);font-weight:500">'+parts+
+      ' standard clauses incorporated by reference \u2014 present and verified, no offeror action required.</td>'+
+      '<td><span class="cm-src">Incorporated by ref.</span></td>'+
+      '<td><span class="cm-status clear"><span class="d"></span>Clear</span></td>';
+    lastTb.appendChild(tr);
+  }
 })();
 
 /* ───── §09 submission checklist — live progress + per-audit session persistence ───── */
