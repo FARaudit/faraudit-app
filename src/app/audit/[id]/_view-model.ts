@@ -130,6 +130,58 @@ export interface AuditViewModel {
   // on a numeric score.
   verdict_mode: "gate" | "scored";
 
+  // ─── Fork 3 surfaces (2026-06-05) ────────────────────────────────────────
+  // Six new template surfaces from Design's Fork 3 capture package; markup
+  // pinned at ceo/redesign-final/platform/audit-report.html. Data layer
+  // ships here; renderer wires on the next template re-pull.
+
+  // Executive Summary (.exec-sum) — engine-emitted text, view-model just
+  // splits the verdict word into the CSS class. es-go / es-caution / es-nobid.
+  exec_verdict: string;
+  exec_what: string;
+  exec_factors: string[];
+  exec_actions: Array<{ when: string; text: string }>;
+  exec_class: "es-go" | "es-caution" | "es-nobid";
+
+  // Timeline (.timeline) — derived from posted date + Q&A deadline +
+  // response deadline + award estimate. Status drives color: ok (green-ish),
+  // warn (amber, within 14 days), bad (past or missed).
+  timeline_gates: Array<{ date: string; label: string; status: "ok" | "warn" | "bad" }>;
+
+  // §07 Compliance Matrix (.cmatrix) — derived from far/dfars clauses +
+  // Section L requirements + Section M factors. Status: action (offeror
+  // submission required), risk (cited in the risk register), clear (cited
+  // but no extracted gap).
+  compliance_matrix: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }>;
+  // Standalone matrix CSV/PDF export. The renderer wires this to the
+  // .cmatrix download button. Endpoint follows existing /api/audit/<id>/pdf
+  // shape — a fast-follow lambda will serve the matrix as a separate doc.
+  matrix_export_url: string;
+
+  // §08 KO Email card (.ko-card) — to/subject from the solicitation cover,
+  // preview is the first ~2 risk titles. The full draft remains in #koDrawer
+  // (reused — no change to ko_email_body).
+  ko_email: { to: string; subject: string; preview: string };
+
+  // §09 Submission Checklist (.checklist) — grouped from Section L
+  // requirements. group: before (pre-submission registration/certs),
+  // with (the quote package itself), after (post-award obligations).
+  // severity: dq (disqualifier — todo status), req (required — warn status),
+  // adv (advisory — ok status).
+  submission_checklist: Array<{
+    group: "before" | "with" | "after";
+    text: string;
+    source: string;
+    severity: "dq" | "req" | "adv";
+  }>;
+
+  // §02 no-incumbent variant (.inc-none) — renderer branches on
+  // has_incumbent: true → render .incumbent block; false → render .inc-none
+  // with the head + note copy.
+  has_incumbent: boolean;
+  incumbent_none_head: string;
+  incumbent_none_note: string;
+
   // key dates (qa_deadline + award_date are intentionally not derived; the
   // renderer drops the ribbon item + rail clock when has_* is false)
   qa_deadline: string;
@@ -714,6 +766,139 @@ Respectfully,
 [Company]`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Fork 3 derivation helpers (2026-06-05). Six new surfaces from Design's
+// capture package — markup pinned at ceo/redesign-final/platform/audit-report.html.
+// Every field is derived from existing engine output; no new LLM call.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function deriveExecClass(rec: "GO" | "CAUTION" | "DECLINE"): "es-go" | "es-caution" | "es-nobid" {
+  if (rec === "GO") return "es-go";
+  if (rec === "DECLINE") return "es-nobid";
+  return "es-caution";
+}
+
+function deriveTimelineGates(
+  audit: AuditRow,
+  compJson: Record<string, unknown>,
+  responseDeadline: Date | null
+): Array<{ date: string; label: string; status: "ok" | "warn" | "bad" }> {
+  const gates: Array<{ date: string; label: string; status: "ok" | "warn" | "bad" }> = [];
+  const now = Date.now();
+  const parseToDate = (raw: unknown): Date | null => {
+    if (typeof raw !== "string" || raw.length === 0) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  // Posted date — from the audit row column (set by route handler from SAM
+  // payload) or the compliance JSON for older rows.
+  const posted = parseToDate(audit.posted_date) ?? parseToDate(compJson.posted_date);
+  if (posted) {
+    gates.push({ date: fmtDayMonYear(posted), label: "Posted", status: "ok" });
+  }
+  // Q&A deadline (when extracted by the engine).
+  const qaDeadline = parseToDate(audit.qa_deadline) ?? parseToDate(compJson.qa_deadline);
+  if (qaDeadline) {
+    gates.push({
+      date: fmtDayMonYear(qaDeadline),
+      label: "Q&A deadline",
+      status: qaDeadline.getTime() < now ? "bad" : "warn"
+    });
+  }
+  // Response deadline — always present when the solicitation is active.
+  if (responseDeadline) {
+    const days = Math.floor((responseDeadline.getTime() - now) / 86_400_000);
+    const status: "ok" | "warn" | "bad" = days < 0 ? "bad" : days < 14 ? "warn" : "ok";
+    gates.push({ date: fmtDayMonYear(responseDeadline), label: "Quote due", status });
+  }
+  // Award estimate (when extracted) — last gate in the row.
+  const awardDate = parseToDate(audit.award_date) ?? parseToDate(compJson.award_date);
+  if (awardDate) {
+    gates.push({ date: fmtDayMonYear(awardDate), label: "Award (est.)", status: "ok" });
+  }
+  return gates;
+}
+
+function deriveComplianceMatrix(
+  compJson: Record<string, unknown>,
+  risks: Risk[]
+): Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> {
+  const rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> = [];
+  // Build a lowercase set of citations from the risk register so clauses cited
+  // there get status='risk' instead of 'clear'.
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "").trim();
+  const riskCites = new Set(risks.map((r) => norm(r.citation || "")).filter(Boolean));
+  const farClauses = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as string[]) : [];
+  for (const c of farClauses) {
+    if (!c) continue;
+    rows.push({ requirement: c, source: "FAR clause", status: riskCites.has(norm(c)) ? "risk" : "clear" });
+  }
+  const dfarsClauses = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as string[]) : [];
+  for (const c of dfarsClauses) {
+    if (!c) continue;
+    rows.push({ requirement: c, source: "DFARS clause", status: riskCites.has(norm(c)) ? "risk" : "clear" });
+  }
+  // Section L submission requirements — todo/warn become 'action', ok becomes 'clear'.
+  const reqs = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : [];
+  for (const r of reqs) {
+    if (!r.requirement) continue;
+    rows.push({
+      requirement: r.requirement,
+      source: "Section L",
+      status: r.status === "ok" ? "clear" : "action"
+    });
+  }
+  // Section M evaluation factors — informational, always 'clear'.
+  const factors = Array.isArray(compJson.evaluation_factors) ? (compJson.evaluation_factors as EvaluationFactorVM[]) : [];
+  for (const f of factors) {
+    if (!f.name) continue;
+    rows.push({ requirement: f.name, source: "Section M", status: "clear" });
+  }
+  return rows;
+}
+
+function deriveKoEmailCard(audit: AuditRow, displayId: string, risks: Risk[]): { to: string; subject: string; preview: string } {
+  const to = (audit.ko_email_recipient as string) || "contracting-officer@agency.mil";
+  const subject = `${displayId} — Pre-quote clarifications`;
+  const top = risks.slice(0, 2);
+  const preview = top.length === 0
+    ? "Pre-quote clarifications on the solicitation."
+    : top.map((r, i) => {
+        const headline = (r.title || r.description).slice(0, 100);
+        return `${i + 1}. ${headline}`;
+      }).join(" · ");
+  return { to, subject, preview };
+}
+
+function deriveSubmissionChecklist(
+  compJson: Record<string, unknown>
+): Array<{ group: "before" | "with" | "after"; text: string; source: string; severity: "dq" | "req" | "adv" }> {
+  const reqs = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : [];
+  return reqs.map((r) => {
+    const t = (r.requirement || "").toLowerCase();
+    // Group heuristic. "before" = pre-submission cert/registration/setup;
+    // "after" = post-award obligations; default "with" = the quote package
+    // itself. The renderer collapses each group to its own list section so
+    // the customer reads a sequential prep list.
+    const group: "before" | "with" | "after" =
+      /\b(?:after\s+award|post[\s-]?award|kick[\s-]?off|deliver(?:able|y)?\s+\d+|on\s+award)\b/.test(t) ? "after" :
+      /\b(?:register|registration|certif(?:y|ication)|cage\s+code|uei|sam\.gov|pre[\s-]?qualif|prior\s+to\s+submission)\b/.test(t) ? "before" :
+      "with";
+    // Severity derives from the engine-normalized status: todo (offeror has
+    // not done it) → dq disqualifier; warn (at risk) → req; ok (clear) → adv.
+    const severity: "dq" | "req" | "adv" =
+      r.status === "todo" ? "dq" :
+      r.status === "warn" ? "req" :
+      "adv";
+    return {
+      group,
+      text: r.requirement,
+      source: "Section L",
+      severity
+    };
+  });
+}
+
 // ─── main ───────────────────────────────────────────────────────────────────
 
 export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean }): AuditViewModel {
@@ -980,6 +1165,61 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
     verdict_mode: verdictMode,
+
+    // ─── Fork 3 surfaces (2026-06-05) — derived from existing engine output ──
+    // exec_*: engine-emitted (complianceJson.executive_summary) when available.
+    // The fallback path runs when the row was written by pre-Fork-3 engine
+    // code — we derive the same shape from existing fields so legacy rows
+    // still render the Exec Summary surface cleanly.
+    exec_verdict: (() => {
+      const eng = compJson.executive_summary as { verdict?: string } | undefined;
+      return eng?.verdict ?? (verdict.word === "GO" ? "GO" : verdict.word === "DECLINE" ? "NO-BID" : "CAUTION");
+    })(),
+    exec_what: (() => {
+      const eng = compJson.executive_summary as { what?: string } | undefined;
+      if (eng?.what) return sanitizeDisplayText(eng.what);
+      const overviewJson = (compJson.overview ?? {}) as { summary?: string };
+      const summary = String(overviewJson.summary ?? audit.overview_summary ?? "").trim();
+      const firstSentence = summary.split(/[.!?](?:\s|$)/)[0] || summary;
+      return sanitizeDisplayText(firstSentence.length > 160 ? `${firstSentence.slice(0, 158).trimEnd()}…` : firstSentence);
+    })(),
+    exec_factors: (() => {
+      const eng = compJson.executive_summary as { factors?: unknown } | undefined;
+      if (Array.isArray(eng?.factors)) return (eng.factors as unknown[]).map((f) => sanitizeDisplayText(String(f)));
+      return risks.slice(0, 3).map((r) => sanitizeDisplayText(r.title || r.description.slice(0, 100)));
+    })(),
+    exec_actions: (() => {
+      const eng = compJson.executive_summary as { actions?: unknown } | undefined;
+      if (Array.isArray(eng?.actions)) {
+        return (eng.actions as Array<{ when?: unknown; text?: unknown }>).map((a) => ({
+          when: sanitizeDisplayText(String(a.when ?? "")),
+          text: sanitizeDisplayText(String(a.text ?? ""))
+        }));
+      }
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return risks.slice(0, 3).map((r, i) => {
+        const d = new Date(Date.now() + (i + 1) * 86_400_000);
+        return {
+          when: `By ${d.getUTCDate()} ${months[d.getUTCMonth()]}`,
+          text: sanitizeDisplayText(r.faraudit_action || r.title || r.description.slice(0, 160))
+        };
+      });
+    })(),
+    exec_class: deriveExecClass(verdict.word),
+
+    timeline_gates: deriveTimelineGates(audit, compJson, responseDeadline),
+
+    compliance_matrix: deriveComplianceMatrix(compJson, risks),
+    matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
+
+    ko_email: deriveKoEmailCard(audit, displayId, risks),
+
+    submission_checklist: deriveSubmissionChecklist(compJson),
+
+    has_incumbent: incumbentHasData,
+    incumbent_none_head: "No incumbent identified",
+    incumbent_none_note: "No prior award was found for this NSN / solicitation pattern. Either this is a first-time procurement, or the historical record isn't in our corpus yet. Confirm the recompete cycle directly with the contracting officer.",
+    // ─────────────────────────────────────────────────────────────────────
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
     // Engine-computed (null when score <60) — drives the renderer's

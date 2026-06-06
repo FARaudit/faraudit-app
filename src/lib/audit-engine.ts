@@ -218,6 +218,18 @@ export interface ComplianceJSON {
   // DECISION_GATE audits. Mirror of AuditResult.verdict; redundant by design
   // so the route handler doesn't need a separate column to persist it.
   verdict?: AuditVerdict;
+  // Fork 3 (2026-06-05): engine-emitted executive summary feeding the
+  // .exec-sum surface in the redesigned template. Composed deterministically
+  // from existing extraction (overview summary + top 3 prioritized risks +
+  // recommendation tier) so no additional LLM call is required. Design has
+  // specced the format: verdict word + one-line "what" + 3 win/lose factors +
+  // 3 dated 48-hour actions. View-model passes through unchanged.
+  executive_summary?: {
+    verdict: string;
+    what: string;
+    factors: string[];
+    actions: Array<{ when: string; text: string }>;
+  };
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -1665,6 +1677,46 @@ JSON only.`;
   // writes the whole compliance.json blob to the audits.compliance_json
   // JSONB column — no schema migration needed.
   complianceJson.verdict = verdict;
+
+  // Fork 3 (2026-06-05): derive the executive summary feeding the .exec-sum
+  // surface. Pure derivation from existing extraction — no additional LLM
+  // call. Verdict word maps the recommendation tier; "what" is the first
+  // sentence of overview.summary; factors are the top 3 prioritized risk
+  // titles (each suffixed with their clause citation for credibility); actions
+  // are the top 3 risks' faraudit_action with sequential "By DD Mon" dates
+  // covering the next 3 days (the "48-hour" framing — first action by
+  // tomorrow, last by +3 days).
+  const execMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const execVerdictWord =
+    recommendation === "PROCEED" ? "GO" :
+    recommendation === "DECLINE" ? "NO-BID" :
+    "CAUTION";
+  const execSummaryText = String(overviewJson.summary ?? "").trim();
+  const execFirstSentence = execSummaryText.split(/[.!?](?:\s|$)/)[0] || execSummaryText;
+  const execWhat = execFirstSentence.length > 160
+    ? `${execFirstSentence.slice(0, 158).trimEnd()}…`
+    : execFirstSentence;
+  const execFactors = prioritized.slice(0, 3).map((r) => {
+    const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
+    const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
+    return r.citation ? `${capped} (${r.citation})` : capped;
+  });
+  const execActions: Array<{ when: string; text: string }> = prioritized.slice(0, 3).map((r, i) => {
+    const d = new Date(Date.now() + (i + 1) * 86_400_000);
+    const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
+    const actionText = (r.faraudit_action && r.faraudit_action.trim().length > 0
+      ? r.faraudit_action
+      : (r.title ?? r.text)
+    ).trim();
+    const text = actionText.length > 180 ? `${actionText.slice(0, 178).trimEnd()}…` : actionText;
+    return { when, text };
+  });
+  complianceJson.executive_summary = {
+    verdict: execVerdictWord,
+    what: execWhat,
+    factors: execFactors,
+    actions: execActions
+  };
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
   const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;

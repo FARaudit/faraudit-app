@@ -220,6 +220,13 @@ export interface ComplianceJSON {
   piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
   // Fix 2 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   verdict?: AuditVerdict;
+  // Fork 3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+  executive_summary?: {
+    verdict: string;
+    what: string;
+    factors: string[];
+    actions: Array<{ when: string; text: string }>;
+  };
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -1538,6 +1545,39 @@ JSON only.`;
     : { type: "SCORED", fit_score: compliance_score ?? 0, recommendation };
   // Fix 2 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   complianceJson.verdict = verdict;
+
+  // Fork 3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
+  const execMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const execVerdictWord =
+    recommendation === "PROCEED" ? "GO" :
+    recommendation === "DECLINE" ? "NO-BID" :
+    "CAUTION";
+  const execSummaryText = String(overviewJson.summary ?? "").trim();
+  const execFirstSentence = execSummaryText.split(/[.!?](?:\s|$)/)[0] || execSummaryText;
+  const execWhat = execFirstSentence.length > 160
+    ? `${execFirstSentence.slice(0, 158).trimEnd()}…`
+    : execFirstSentence;
+  const execFactors = prioritized.slice(0, 3).map((r) => {
+    const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
+    const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
+    return r.citation ? `${capped} (${r.citation})` : capped;
+  });
+  const execActions: Array<{ when: string; text: string }> = prioritized.slice(0, 3).map((r, i) => {
+    const d = new Date(Date.now() + (i + 1) * 86_400_000);
+    const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
+    const actionText = (r.faraudit_action && r.faraudit_action.trim().length > 0
+      ? r.faraudit_action
+      : (r.title ?? r.text)
+    ).trim();
+    const text = actionText.length > 180 ? `${actionText.slice(0, 178).trimEnd()}…` : actionText;
+    return { when, text };
+  });
+  complianceJson.executive_summary = {
+    verdict: execVerdictWord,
+    what: execWhat,
+    factors: execFactors,
+    actions: execActions
+  };
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
   const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;
