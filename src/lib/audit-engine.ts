@@ -89,6 +89,14 @@ export interface OverviewJSON {
   // — hyphens preserved as printed. Engine hoists this onto complianceJson
   // so downstream surfaces (masthead, reasoning, filenames) read one value.
   solicitation_number_canonical?: string | null;
+  // Brain QA (2026-06-05): one-line plain-English noun phrase describing
+  // what the customer is buying. Used in the .exec-sum synthesis as the
+  // "{Agency} is buying ___" filler. Strictly NO procurement verbs (deliver,
+  // provide, supply, etc.) — those collide with "is buying" and produce
+  // "is buying Deliver 8 …". NO clause numbers, NO NSN/CAGE/P/N codes.
+  // ≤ 60 chars. Empty string when no clean phrase can be extracted —
+  // synthesizer drops the "is buying" clause entirely in that case.
+  bottom_line_item?: string | null;
 }
 
 // Section M evaluation factor — one entry per stated factor in the
@@ -1101,6 +1109,98 @@ export function buildSoleSourceRisk(vendor: { name: string; cage?: string | null
   };
 }
 
+// Brain QA exec_what helpers (2026-06-05): produce a clean one-sentence
+// synthesis for the .exec-sum surface. Two failure modes the prior
+// implementation produced:
+//   (a) verb stacking — "is buying Deliver 8 each Housing Assembly..." when
+//       overview.primary_objective starts with a procurement verb.
+//   (b) truncation — "...for UH-60 Blackhawk sus…" when the cleaned
+//       objective exceeded 88 chars and got sliced + ellipsis-appended.
+// Both fixed below: cleanAgencyName + cleanObjectivePhrase + NO truncation.
+
+const _AGENCY_ACRONYMS = new Set([
+  "DLA", "DOD", "USAF", "USN", "USMC", "USA", "GSA", "VA", "HHS", "DOJ",
+  "DOT", "NASA", "NAVSEA", "NAVFAC", "AFLCMC", "AFMC", "AFRL", "ACC",
+  "USCG", "DHS", "FBI", "ATF", "DEA", "EPA", "FDA", "DOE", "DOI", "FAA",
+  "FCC", "FTC", "GAO", "IRS", "NIH", "NIST", "NSA", "NSF", "OPM", "SBA",
+  "SEC", "SSA", "TSA", "USDA", "USCIS", "USPS", "ICE", "BIS", "CBP",
+  "DCMA", "DCAA", "DFAS", "DISA", "DMA", "DTRA", "DSCA", "NGA", "NRO",
+  "JBSA", "JBLE", "JBPHH", "USSOCOM", "USEUCOM", "USINDOPACOM", "USNORTHCOM",
+  "USSOUTHCOM", "USCENTCOM", "USTRANSCOM", "USSPACECOM", "USCYBERCOM",
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID",
+  "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS",
+  "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK",
+  "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV",
+  "WI", "WY"
+]);
+
+const _AGENCY_PREPS = new Set(["at", "in", "for", "of", "the", "and", "to"]);
+
+export function cleanAgencyName(raw: string): string {
+  if (!raw || !raw.trim()) return "Buying activity";
+  // Take last segment of dotted SAM path (e.g. "DEPT OF DEFENSE.DEFENSE
+  // LOGISTICS AGENCY.DLA AVIATION.DLA AVIATION AT HUNTSVILLE, AL" → final
+  // segment "DLA AVIATION AT HUNTSVILLE, AL").
+  const segments = raw.includes(".") ? raw.split(".") : [raw];
+  let s = segments[segments.length - 1] || raw;
+  // Strip parens (org codes) + drop trailing state code after comma.
+  s = s.replace(/\s*\([^)]*\)\s*/g, "").trim();
+  s = s.split(",")[0].trim();
+  if (!s) return raw;
+  // Title-case with acronym preservation + preposition strip.
+  const words = s.split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const upper = w.toUpperCase();
+    if (_AGENCY_ACRONYMS.has(upper)) {
+      out.push(upper);
+      continue;
+    }
+    // Drop prepositions in the middle (keep first/last word always).
+    if (_AGENCY_PREPS.has(w.toLowerCase()) && i > 0 && i < words.length - 1) {
+      continue;
+    }
+    out.push(w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  }
+  return out.join(" ");
+}
+
+// Deterministic fallback when the model didn't emit bottom_line_item — strip
+// codes + leading procurement verbs + filler words from primary_objective.
+// Returns empty string when the cleaned result still exceeds 80 chars or
+// looks suspect — the synthesizer drops the "is buying" clause in that case.
+export function cleanObjectivePhrase(rawObjective: string): string {
+  let s = String(rawObjective || "").trim();
+  if (!s) return "";
+  // First sentence only.
+  s = s.split(/[.!?](?:\s|$)/)[0].replace(/\.$/, "").trim();
+  // Strip NSN / P/N / FAR-DFARS-CFR clause numbers / CAGE / DoDAAC / ISO
+  // datetime stubs. These corrupt the plain-English read.
+  s = s
+    .replace(/\bNSN\s*[:#]?\s*[\d-]+/gi, "")
+    .replace(/\bP\s*\/\s*N\s*[:#]?\s*[A-Z0-9.\-]+/gi, "")
+    .replace(/\b(?:FAR|DFARS)\s*\d+\.[\d-]+/gi, "")
+    .replace(/\b\d{2,3}\s*CFR\s*\d+(?:\.\d+)?/gi, "")
+    .replace(/\bCAGE\s*[A-Z0-9]{5}/gi, "")
+    .replace(/\bDoDAAC\s*[A-Z0-9]{6,}/gi, "")
+    .replace(/\b\d{4}-\d{2}-\d{2}T[\d:]+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*,/g, ",")
+    .replace(/,\s*$/, "")
+    .trim();
+  // Strip leading procurement verbs to avoid "is buying Deliver 8 …".
+  s = s.replace(/^(?:Deliver(?:y|ables?)?|Provide|Supply|Procure|Furnish|Manufacture|Produce|Fabricate|Acquire|Buy|Purchase)\s+/i, "");
+  // Strip filler "each" / "ea."
+  s = s.replace(/\b(?:each|ea\.?)\b/gi, "").replace(/\s+/g, " ").trim();
+  // Strip leading articles ("a ", "an ", "the ").
+  s = s.replace(/^(?:a|an|the)\s+/i, "");
+  // Hard length cap: do NOT truncate with ellipsis — return empty so the
+  // synthesizer falls back to the verbless sentence shape.
+  if (s.length > 80) return "";
+  return s;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Ruling 1 (2026-06-05): decision-gate detectors. Each returns a DecisionGate
 // when the gate is present, null otherwise. Aggregator at the bottom turns the
@@ -1413,6 +1513,14 @@ Output ONLY a JSON object with these keys (populate from the actual solicitation
 - eval_basis_label (string or null): MAX 24 chars. One of "Best-value tradeoff" | "LPTA" | "Lowest price". null if Section M absent.
 - evaluation_factors (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance: string, coverage: string, coverage_pct: number 0-100, tone: "good"|"warn"|"bad"|"mute", note: string}. The customer's capability profile is NOT available to this engine call — for NON-PRICE factors emit coverage="—", coverage_pct=0, tone="mute", note="Complete your capability statement to see fit score". For the Price/Cost factor, the language DEPENDS ON THE AWARD BASIS: under best-value tradeoff (FAR 15.101-1) use importance="Least important · tradeoff lever" (or the stated weight), coverage="Tradeoff", tone="mute", note=""; under LPTA (FAR 15.101-2) use importance="Determines award" (or "Only differentiator"), coverage="Lowest price wins", tone="mute", note="" — NEVER use "Tradeoff" under LPTA, that's best-value language. Importance text MUST NOT duplicate words (no "Price Price"); if the stated weight is the literal word Price, emit "Most important" or the actual rank-language only. Empty array if Section M is absent or metadata-only.
 - solicitation_number_canonical (string or null): the exact solicitation number as it appears on the SF-18/SF-1449 cover page (or Block 2/Block 6), with hyphens and punctuation PRESERVED as printed. Example: "SPRRA1-26-Q-0034" (with hyphens), not "SPRRA126Q0034" (squashed). Null if no SF-18/1449 cover exists or the document is metadata-only.
+- bottom_line_item (string or null): ≤ 60 chars. ONE plain-English noun phrase describing what is being acquired, INCLUDING quantity if specified. STRICT RULES (this field feeds an exec summary that prefixes it with "is buying ___" — wrong shape breaks the sentence):
+  • NO procurement verbs at the start ("deliver", "provide", "supply", "procure", "furnish", "manufacture", "buy"). The sentence frame already has the verb.
+  • NO clause numbers (FAR / DFARS), NO NSN, NO CAGE, NO P/N codes in this field.
+  • NO sentence fragments from §03 / scope. This is a SUMMARY, not an excerpt.
+  • Plain lowercase noun phrase (except proper nouns + acronyms like UH-60, IDIQ). Read it back: "[Agency] is buying ___." should sound natural.
+  Examples (good): "8 UH-60 actuator housings", "5-year IDIQ for predictive-maintenance analytics", "$2M ceiling for software development services", "1,500 lb-class flight-critical machined parts".
+  Examples (bad): "Deliver 8 each Housing Assembly Actuator NSN:1680-01-137-3534 P/N:70410-02501-045" (verb + codes), "Predictive maintenance" (too vague — no quantity / no qualifier), "platform stand-up" (no item).
+  Null when no clean phrase is extractable (no quantity AND no clear item type) — synthesizer falls back to a verbless sentence shape.
 - submission_requirements (object[]): one entry per concrete Section L requirement (page limits, submission portal + deadline, required volumes, format/font rules, reps & certs, oral presentation rules, demo requirements, past performance reference count, etc.). Shape: {requirement: short imperative string, status: "ok"|"warn"|"todo", meta: "Clear"|"At risk"|"Action"}. Map status→meta as ok→Clear, warn→At risk, todo→Action. Empty array if Section L absent.
 - submission_summary (string or null): "{N} to clear" where N = count of submission_requirements with status warn OR todo. null when there are no requirements OR all are "ok".
 
@@ -1783,23 +1891,31 @@ JSON only.`;
     recommendation === "DECLINE" ? "NO-BID" :
     "CAUTION";
 
-  // exec_what synthesis. Agency comes from solicitation or compliance JSON
-  // (resolveAgency-style first hop is "DEPT OF DEFENSE.DEFENSE LOGISTICS
-  // AGENCY..." — take the LAST dotted segment as the customer-facing label).
+  // Brain QA exec_what synthesis (2026-06-05): produces a single clean
+  // sentence "[Agency] is buying [phrase] — [bid condition]." with NO
+  // truncation, NO verb stacking, NO clause/NSN/P-N clutter, and proper
+  // agency capitalization.
+  //
+  // Agency: cleanAgencyName() title-cases the SAM full-parent-path tail
+  // while preserving known acronyms (DLA / USAF / state codes) and
+  // stripping prepositions ("AT", "OF", "IN") so "DLA AVIATION AT
+  // HUNTSVILLE, AL" → "DLA Aviation Huntsville".
+  //
+  // Item: prefer overviewJson.bottom_line_item (engine-emitted plain
+  // English with quantity, no verbs, no codes). Fall back to
+  // cleanObjectivePhrase(primary_objective || scope) for legacy audit
+  // rows. If the fallback still exceeds 80 chars after cleanup, the
+  // helper returns empty and the synthesizer drops the "is buying" clause.
   const agencyRaw = String(
     (solicitation as Record<string, unknown> | null)?.["fullParentPathName"]
       ?? (solicitation as Record<string, unknown> | null)?.["department"]
       ?? ""
   );
-  const agencyShort = agencyRaw
-    ? agencyRaw.split(".").pop()!.replace(/\(.*?\)/g, "").trim().split(",")[0].trim() || agencyRaw
-    : "Buying activity";
-  const objective = (overviewJson.primary_objective ?? overviewJson.scope ?? "")
-    .toString()
-    .split(/[.!?](?:\s|$)/)[0]
-    .replace(/\.$/, "")
-    .trim();
-  const objectiveShort = objective.length > 90 ? `${objective.slice(0, 88).trimEnd()}…` : objective;
+  const agencyShort = cleanAgencyName(agencyRaw);
+  const bottomLineItem = (overviewJson.bottom_line_item ?? "").toString().trim();
+  const objectiveShort = bottomLineItem
+    ? bottomLineItem
+    : cleanObjectivePhrase((overviewJson.primary_objective ?? overviewJson.scope ?? "").toString());
   // Bid condition line varies by verdict mode.
   let bidCondition: string;
   if (gates.length > 0) {
