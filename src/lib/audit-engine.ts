@@ -213,6 +213,11 @@ export interface ComplianceJSON {
   // Fork 1: PIID decode (Fix 11) — issuing activity + fiscal year + procurement
   // type derived from the solicitation number prefix + middle digits + type char.
   piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
+  // Fix 2 (2026-06-05 — Ruling 1 wiring): persist the typed verdict so the
+  // view-model can read verdict.type and switch to verdict_mode='gate' for
+  // DECISION_GATE audits. Mirror of AuditResult.verdict; redundant by design
+  // so the route handler doesn't need a separate column to persist it.
+  verdict?: AuditVerdict;
 }
 
 // PdfSource indicates where the audit's PDF context came from. The report
@@ -386,30 +391,29 @@ export function assignRiskPriority(risksJson: RisksJSON): PrioritizedRisk[] {
   for (const r of risksJson.price_risks ?? []) push(r, "P1", "Price");
   for (const r of risksJson.evaluation_risks ?? []) push(r, "P2", "Evaluation");
 
-  // Two-phase dedup: theme-based first (collapses JCP×3, LPTA×3 etc. into
-  // one entry, keeping the highest-severity copy), then exact-text fallback.
-  const byTheme = new Map<string, PrioritizedRisk>();
-  for (const item of items) {
-    const key = riskThemeKey(item.text, item.citation);
-    const existing = byTheme.get(key);
-    if (!existing || PRIORITY_RANK[item.priority] < PRIORITY_RANK[existing.priority]) {
-      byTheme.set(key, item);
-    } else if (PRIORITY_RANK[item.priority] === PRIORITY_RANK[existing.priority] && item.text.length > existing.text.length) {
-      // Same priority — prefer the more-detailed text.
-      byTheme.set(key, item);
-    }
-  }
-  const unique = Array.from(byTheme.values());
-  // Exact-text safety net for anything theme-keying missed.
+  // Fix 1 (2026-06-05 — Ruling 3 sequence correction): the prior themeKey-only
+  // dedup ran BEFORE applyRuling3Cap and was over-aggressive — distinct risks
+  // citing the same clause but different content (e.g. AS9100/QMS vs MIL-STD
+  // packaging, both citing DFARS 252.215-7008) collapsed under the citation-
+  // fallback key, dropping cards that should survive under the compound
+  // (themeKey, citation) key. The slice(0, MAX_RISKS_RENDERED=10) also fired
+  // before applyRuling3Cap's proper priority-tier fill, trimming distinct
+  // MEDIUMs that should fit in the 7-card final.
+  //
+  // Corrected sequence: assignRiskPriority is now a COMBINE-AND-NORMALIZE
+  // function only. Exact-text dedup remains (catches identical prose emitted
+  // twice — once in prioritized_risks, once in a per-category array). All
+  // semantic dedup + tier-cap is owned by applyRuling3Cap downstream, using
+  // the (themeKey, normalized_clause) compound key + keep-with-action merge.
   const seen = new Set<string>();
-  const fullyUnique = unique.filter((item) => {
+  const fullyUnique = items.filter((item) => {
     const k = item.text.toLowerCase().trim();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
   fullyUnique.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
-  return fullyUnique.slice(0, MAX_RISKS_RENDERED);
+  return fullyUnique;
 }
 
 // Reject canned boilerplate. The model occasionally regresses to "Address
@@ -1656,6 +1660,11 @@ JSON only.`;
   const verdict: AuditVerdict = gates.length > 0
     ? { type: "DECISION_GATE", gates, recommendation: recommendation === "PROCEED" ? "PROCEED_WITH_CAUTION" : recommendation }
     : { type: "SCORED", fit_score: compliance_score ?? 0, recommendation };
+  // Fix 2 (2026-06-05 — Ruling 1 wiring): persist verdict in complianceJson
+  // so the view-model can read it after the row is written. The route handler
+  // writes the whole compliance.json blob to the audits.compliance_json
+  // JSONB column — no schema migration needed.
+  complianceJson.verdict = verdict;
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";
   const scoreLabel = compliance_score == null ? "unscored (metadata-only)" : `${compliance_score}/100`;

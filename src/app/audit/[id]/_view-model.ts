@@ -122,6 +122,14 @@ export interface AuditViewModel {
   // Renderer suppresses the verdict block + shows a warning banner instead.
   is_not_solicitation: boolean;
 
+  // Fix 2 (2026-06-05 — Ruling 1 wiring). 'gate' when the engine emitted a
+  // DECISION_GATE verdict (one or more credential/sole-source gates fired);
+  // 'scored' otherwise. Renderer reads this to switch to the interactive
+  // gate template. When 'gate', fit_score is suppressed (set to null) and
+  // is_unscored is NOT triggered — gate audits made a decision, just not
+  // on a numeric score.
+  verdict_mode: "gate" | "scored";
+
   // key dates (qa_deadline + award_date are intentionally not derived; the
   // renderer drops the ribbon item + rail clock when has_* is false)
   qa_deadline: string;
@@ -275,6 +283,14 @@ const ISO_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{
 // bare-date regex runs AFTER the ISO sweep so an ISO that already reformatted
 // to "11 Jun 2026" doesn't get touched. Same MONTHS_SHORT formatter.
 const DATE_ONLY_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+// Fix 2 (2026-06-05 — Ruling 2 follow-up): hybrid YYYY-MMM-DD form (e.g.
+// "2026-JUN-25") slipped through the numeric ISO regex on SPRRA. Three-letter
+// month abbreviation — case-insensitive match. Resolved to "DD Mon YYYY".
+const HYBRID_DATE_RE = /\b(\d{4})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{1,2})\b/gi;
+const MONTH_ABBR_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+};
 
 function sanitizeDisplayText(s: unknown): string {
   if (s == null) return "";
@@ -302,6 +318,14 @@ function sanitizeDisplayText(s: unknown): string {
     if (!Number.isFinite(yi) || !Number.isFinite(mi) || !Number.isFinite(di)) return m;
     if (mi < 1 || mi > 12 || di < 1 || di > 31) return m;
     return `${di} ${MONTHS_SHORT[mi - 1]} ${yi}`;
+  });
+  // Fix 2 (Ruling 2 follow-up): YYYY-MMM-DD hybrid → "D Mon YYYY".
+  out = out.replace(HYBRID_DATE_RE, (m, y, mo, day) => {
+    const idx = MONTH_ABBR_INDEX[String(mo).toLowerCase()];
+    const yi = Number(y), di = Number(day);
+    if (idx == null || !Number.isFinite(yi) || !Number.isFinite(di)) return m;
+    if (di < 1 || di > 31) return m;
+    return `${di} ${MONTHS_SHORT[idx]} ${yi}`;
   });
   // Clean up doubled spaces / dangling punctuation left by the strip.
   out = out.replace(/\s+/g, " ").replace(/\s+([.,;])/g, "$1").trim();
@@ -716,16 +740,30 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   const overviewJson = (audit.overview_json as Record<string, unknown>) || {};
 
   const verdict = mapVerdict(audit.recommendation);
+  // Fix 2 (2026-06-05 — Ruling 1 wiring): read the typed verdict the engine
+  // persisted to complianceJson.verdict. When DECISION_GATE, suppress the
+  // numeric fit_score (set to null per spec) and tag verdict_mode='gate' so
+  // the renderer can switch to the interactive gate template. Gate audits
+  // are NOT unscored (they made a decision) — keep isUnscored false here.
+  const persistedVerdict = (compJson.verdict as { type?: string } | undefined);
+  const verdictMode: "gate" | "scored" = persistedVerdict?.type === "DECISION_GATE" ? "gate" : "scored";
+
   // Honesty flags from audit-engine 13f4743+. compliance_score is now
   // number | null; score_confidence + is_not_solicitation are written into
   // compliance_json by the engine. Pre-13f4743 rows won't have them: derive
   // is_not_solicitation from doc-type + clause counts, and treat compliance_
   // score === null as the source of truth for "unscored".
-  const score: number | null = typeof audit.compliance_score === "number"
+  const rawScore: number | null = typeof audit.compliance_score === "number"
     ? (audit.compliance_score as number)
     : null;
+  // Gate verdicts emit fit_score=null per Ruling 1 spec — renderer shows "—"
+  // instead of the underlying numeric. Non-gate verdicts pass through.
+  const score: number | null = verdictMode === "gate" ? null : rawScore;
   const scoreConfidenceRaw = (compJson.score_confidence ?? audit.score_confidence) as string | undefined;
-  const isUnscored = score === null || scoreConfidenceRaw === "unscored";
+  // Gate audits ran on a real source and produced a decision — not unscored.
+  // The unscored branch only fires when the engine literally couldn't score
+  // (metadata-only, no PDF).
+  const isUnscored = verdictMode !== "gate" && (rawScore === null || scoreConfidenceRaw === "unscored");
   const isMetadataOnly = compJson.pdf_source === "sam_unavailable";
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
@@ -941,6 +979,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     score_display: score == null ? "—" : String(Math.round(score)),
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
+    verdict_mode: verdictMode,
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
     // Engine-computed (null when score <60) — drives the renderer's

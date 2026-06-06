@@ -1148,8 +1148,12 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = setMomentDecline(html, vm.recommendation_class === "v-decline");
     html = replaceFieldText(html, "recommendation", vm.recommendation);
     html = replaceFieldText(html, "recommendation_tagline", vm.recommendation_tagline);
+    // Fix 2 (2026-06-05 — Ruling 1 wiring): gate audits arrive here with
+    // vm.score=null (suppressed in the view-model). Show the score_display
+    // string ("—") rather than the scoreNum fallback which would render "0".
     const scoreNum = vm.score ?? 0;
-    html = replaceFieldText(html, "score", String(Math.round(scoreNum)));
+    const scoreText = vm.score === null ? vm.score_display : String(Math.round(scoreNum));
+    html = replaceFieldText(html, "score", scoreText);
     html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
     // Score benchmark — when engine emitted a phrase (score ≥60), replace
     // the static design demo text. When null (score <60), strip the entire
