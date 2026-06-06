@@ -192,6 +192,39 @@ export interface AuditViewModel {
   incumbent_none_head: string;
   incumbent_none_note: string;
 
+  // ─── Canonicalization layer (2026-06-06, Brain ruling) ────────────────────
+  // Single source of truth for verdict + gate prose. Hosted-inference variance
+  // (batch-invariance failure on the Anthropic API) means raw audit_json isn't
+  // byte-stable even at temperature 0 — so the rendered REPORT must be made
+  // byte-stable via deterministic TS canonicalization on top of variable
+  // model output. These fields kill three observed intra-render
+  // contradictions from SPRRA run 3:
+  //   1. masthead/exec said CAUTION while §06 .gate-verdict said NO-BID
+  //   2. §06 .gc-lead said "all three gates" while gate_conditions.length === 2
+  //   3. §06 .gc-lead said "20-day window" while engine said "19 days"
+
+  // The ONE verdict word — BID | CAUTION | NO-BID. Masthead .mhv-word, exec
+  // .es-vw, §06 .gs-pill, §06 .gate-verdict all read this value. Computed
+  // from gate aggregator when gates exist, else from compliance_score band.
+  verdict_word: "BID" | "CAUTION" | "NO-BID";
+
+  // One canonical days-to-deadline value, computed from one fixed `now` per
+  // VM build. All "N days" references read this (no more "19 days" vs
+  // "20-day" mismatch within a single render). Null when no deadline known.
+  days_to_deadline: number | null;
+
+  // Canonical §06 .gate-card prose, composed from gate count + per-gate
+  // curability + days_to_deadline. Replaces the hardcoded Design demo text
+  // ("NO-BID — unless all three are true today" / "20-day window") with
+  // template-data driven prose tied to the actual gate set.
+  gate_card: {
+    verdict_text: string;       // .gate-verdict text inside .gc-h
+    lead_text: string;          // .gc-lead text
+    count_text: string;         // .gs-cnt initial "0 / N cleared"
+    pill_text: "BID" | "NO-BID"; // .gs-pill initial — NO-BID by default,
+                                 // user resolver flips to BID on full check
+  };
+
   // key dates (qa_deadline + award_date are intentionally not derived; the
   // renderer drops the ribbon item + rail clock when has_* is false)
   qa_deadline: string;
@@ -786,6 +819,75 @@ function deriveExecClass(rec: "GO" | "CAUTION" | "DECLINE"): "es-go" | "es-cauti
   if (rec === "GO") return "es-go";
   if (rec === "DECLINE") return "es-nobid";
   return "es-caution";
+}
+
+// Brain ruling — canonicalization (2026-06-06). Composes the §06 .gate-card
+// prose deterministically from the actual gate set + curability + days-to-
+// deadline. Replaces the template's hardcoded SPRRA-flavored demo strings
+// ("all three are true today" / "20-day window") with prose that tracks the
+// real audit. Per-gate logic, never blanket: "all uncurable" → NO-BID;
+// "any curable" → CAUTION with the specific cure list. Cap at the actual
+// gate count (no "all three" when length=2).
+function deriveGateCardProse(
+  gates: Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean }>,
+  recommendation: "GO" | "CAUTION" | "DECLINE",
+  daysToDeadline: number | null
+): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID" } {
+  const n = gates.length;
+  if (n === 0) {
+    return {
+      verdict_text: recommendation === "GO" ? "Bid with confidence" : recommendation === "DECLINE" ? "No-bid — bid not recommended" : "Caution — close gaps before bid",
+      lead_text: "No structural gates fired on this audit. Standard scored audit applies.",
+      count_text: "0 / 0 cleared",
+      pill_text: recommendation === "GO" ? "BID" : "NO-BID"
+    };
+  }
+  // Gate-mode prose. Pre-curability split:
+  const curable = gates.filter((g) => g.cure_possible_in_window === true);
+  const uncurable = gates.filter((g) => g.cure_possible_in_window !== true);
+  const allUncurable = curable.length === 0;
+  const allCurable = uncurable.length === 0;
+
+  // Verdict text inside .gate-verdict (top of .gc-h). Per-gate phrasing.
+  let verdictText: string;
+  if (allUncurable) {
+    verdictText = n === 1
+      ? "NO-BID — the single gate is structurally unfixable in this window"
+      : `NO-BID — all ${n} gates are structurally unfixable in this window`;
+  } else if (allCurable) {
+    verdictText = n === 1
+      ? "CAUTION — close the single gate before submission"
+      : `CAUTION — close all ${n} gates before submission`;
+  } else {
+    verdictText = `CAUTION — ${curable.length} of ${n} curable in the response window; the rest are not`;
+  }
+
+  // Lead text (.gc-lead) — composed prose tying to the days-to-deadline math.
+  const days = daysToDeadline;
+  const windowPhrase = days == null
+    ? "this response window"
+    : days > 0
+      ? `the ${days}-day window`
+      : "an already-closed window";
+  let leadText: string;
+  if (allUncurable) {
+    leadText = n === 1
+      ? `The gate cannot be remedied inside ${windowPhrase} if missing today. Track the next acquisition.`
+      : `All ${n} gates close the door if any is open at submission, and none can be remedied inside ${windowPhrase}.`;
+  } else if (allCurable) {
+    leadText = `The gate${n === 1 ? "" : "s"} can be cleared inside ${windowPhrase} — file the cure action${n === 1 ? "" : "s"} listed below before submission.`;
+  } else {
+    leadText = `${curable.length} of ${n} gates ${curable.length === 1 ? "is" : "are"} curable inside ${windowPhrase}; the rest are structural. Cure what you can and verify the others before quoting.`;
+  }
+
+  // Count + pill — initial render state. User resolver flips pill→BID when
+  // all rows are ticked.
+  return {
+    verdict_text: verdictText,
+    lead_text: leadText,
+    count_text: `0 / ${n} cleared`,
+    pill_text: "NO-BID"
+  };
 }
 
 // Brain QA Item 1 (2026-06-05): VM-side projection of the engine's gates[]
@@ -1383,6 +1485,33 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     has_incumbent: incumbentHasData,
     incumbent_none_head: "No incumbent identified",
     incumbent_none_note: "No prior award was found for this NSN / solicitation pattern. Either this is a first-time procurement, or the historical record isn't in our corpus yet. Confirm the recompete cycle directly with the contracting officer.",
+
+    // Canonicalization layer (Brain ruling 2026-06-06) — single-source verdict
+    // + canonical gate prose tied to actual gate count + days-to-deadline.
+    verdict_word: (() => {
+      // Read engine-emitted verdict (compJson.verdict.recommendation), map
+      // to the BID/CAUTION/NO-BID surface vocabulary. Same source as the
+      // template's verdict-word IIFE (which reads tone class) — so the IIFE
+      // can run idempotently over our values.
+      const v = (compJson.verdict ?? null) as { recommendation?: string } | null;
+      const rec = v?.recommendation ?? (audit.recommendation as string | undefined) ?? "";
+      if (rec === "PROCEED") return "BID";
+      if (rec === "DECLINE") return "NO-BID";
+      return "CAUTION";
+    })(),
+    days_to_deadline: responseDeadline
+      ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
+      : null,
+    gate_card: (() => {
+      const v = (compJson.verdict ?? null) as { type?: string; gates?: unknown } | null;
+      const gatesArr = (v && v.type === "DECISION_GATE" && Array.isArray(v.gates))
+        ? (v.gates as Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean }>)
+        : [];
+      const daysToDeadline = responseDeadline
+        ? Math.floor((responseDeadline.getTime() - now.getTime()) / 86_400_000)
+        : null;
+      return deriveGateCardProse(gatesArr, verdict.word, daysToDeadline);
+    })(),
     // ─────────────────────────────────────────────────────────────────────
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,

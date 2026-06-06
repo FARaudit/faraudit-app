@@ -1296,6 +1296,49 @@ function renderGateConditions(
   return out;
 }
 
+// Canonicalization layer wiring (Brain ruling 2026-06-06). Applies the
+// canonical verdict word + canonical §06 gate-card prose server-side, so
+// every surface (masthead, exec, §06 verdict + lead + count + pill) reads
+// the SAME computed values. The template's display-layer IIFEs (verdict
+// normalizer, gate resolver) run idempotently over canonical values —
+// they'd compute the same thing.
+//
+// Specifically replaces these hardcoded Design demo strings:
+//   "NO-BID — unless all three are true today"  → vm.gate_card.verdict_text
+//   "This is a small-business LPTA …"           → vm.gate_card.lead_text
+//   "0 / 3"                                      → vm.gate_card.count_text
+function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
+  let out = html;
+  // 1. Masthead .mhv-word — set to canonical word (already set by
+  //    pickVerdictBlock/normalizer chain; this is belt-and-suspenders).
+  //    The verdict-word IIFE in the template will re-set this to the same
+  //    value off the TONE class — idempotent.
+  out = replaceFieldInner(out, "recommendation", escapeHtml(vm.verdict_word));
+  // 2. Exec card .es-vw verdict word.
+  out = replaceFieldInner(out, "exec_verdict", escapeHtml(vm.verdict_word));
+  // 3. §06 gate-card surfaces:
+  //    .gate-verdict (inside .gc-h)         ← gate_card.verdict_text
+  //    .gc-lead                              ← gate_card.lead_text
+  //    .gs-cnt                               ← gate_card.count_text
+  //    .gs-pill                              ← gate_card.pill_text
+  out = replaceFieldInner(out, "gate_verdict", escapeHtml(vm.gate_card.verdict_text));
+  out = replaceFieldInner(out, "gate_lead", escapeHtml(vm.gate_card.lead_text));
+  // .gs-cnt is the small <span class="gs-cnt"> inside the .g-status row.
+  // No data-field marker — match by class.
+  out = out.replace(
+    /(<span class="gs-cnt">)[^<]*(<\/span>)/g,
+    `$1${escapeHtml(vm.gate_card.count_text)}$2`
+  );
+  // .gs-pill — set initial text to the canonical pill_text. Initial render
+  // state only; the §06 resolver IIFE flips this to BID when all rows are
+  // ticked client-side.
+  out = out.replace(
+    /(<span class="gs-pill )(?:go|no)("[^>]*>)[^<]*(<\/span>)/g,
+    `$1${vm.gate_card.pill_text === "BID" ? "go" : "no"}$2${escapeHtml(vm.gate_card.pill_text)}$3`
+  );
+  return out;
+}
+
 // Inject the applyVerdictMode('gate') call after DOM load. The template
 // already defines window.applyVerdictMode; we just need to invoke it once.
 // Stamped just before </body> so the template's own setup IIFEs (which
@@ -1690,6 +1733,16 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   if (vm.verdict_mode === "gate") {
     html = injectVerdictModeCall(html);
   }
+
+  // Canonicalization wiring (Brain ruling 2026-06-06) — single-source
+  // verdict + canonical §06 prose. Replaces hardcoded template demo strings
+  // ("NO-BID — unless all three are true today", "20-day window") with VM-
+  // derived prose tied to the actual gate set and days-to-deadline. Kills
+  // the three run-3 intra-render contradictions:
+  //   1. masthead/exec said CAUTION while §06 .gate-verdict said NO-BID
+  //   2. "all three gates" while gate_conditions.length === 2
+  //   3. "19 days" vs "20-day window" within a single render
+  html = applyCanonicalVerdict(html, vm);
 
   html = renderTimelineGates(html, vm.timeline_gates);
 
