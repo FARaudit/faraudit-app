@@ -270,6 +270,11 @@ function fmtDueShort(d: Date | null): string {
 // inside ISO-shaped runs before the bare-token sweep.
 const ISO_LINESPLIT_RE = /\b(\d{4}-\d{2}-)\s+(\d{2}T\d{2})/g;
 const ISO_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b/g;
+// Defect 4 polish (2026-06-05 P2 follow-up): bare YYYY-MM-DD forms (no
+// timestamp suffix) leaked through the ISO regex on QB risk prose. The
+// bare-date regex runs AFTER the ISO sweep so an ISO that already reformatted
+// to "11 Jun 2026" doesn't get touched. Same MONTHS_SHORT formatter.
+const DATE_ONLY_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
 
 function sanitizeDisplayText(s: unknown): string {
   if (s == null) return "";
@@ -289,9 +294,48 @@ function sanitizeDisplayText(s: unknown): string {
     if (Number.isNaN(d.getTime())) return m;
     return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   });
+  // Defect 4 polish: bare YYYY-MM-DD with no T-suffix → "D Mon YYYY".
+  // Construct the Date with explicit UTC components so timezone math can't
+  // drift the day across midnight.
+  out = out.replace(DATE_ONLY_RE, (m, y, mo, day) => {
+    const yi = Number(y), mi = Number(mo), di = Number(day);
+    if (!Number.isFinite(yi) || !Number.isFinite(mi) || !Number.isFinite(di)) return m;
+    if (mi < 1 || mi > 12 || di < 1 || di > 31) return m;
+    return `${di} ${MONTHS_SHORT[mi - 1]} ${yi}`;
+  });
   // Clean up doubled spaces / dangling punctuation left by the strip.
   out = out.replace(/\s+/g, " ").replace(/\s+([.,;])/g, "$1").trim();
   return out;
+}
+
+// Defect 1 (2026-06-05 P0): provenance upgrade. The engine's DOCUMENT_ANCHOR_RE
+// missed Section #s, CFR cites, TO #s, dated references, and part-number-ish
+// strings on QH — 10/10 risks tagged "≈ Pattern" despite quoting "Section 1.2",
+// "14 CFR 145.215", "TO 9H2-4-96-13 (1 Apr 2025)". This view-model post-pass
+// upgrades a risk to provenance="verified" when its concatenated text/citation/
+// description contains any document-anchored pattern. Runs on every render so
+// existing audit_json rows without re-audit also benefit.
+const DOCUMENT_ANCHOR_PATTERNS: RegExp[] = [
+  /\b(?:FAR|DFARS)\s*\d+\.\d+(?:-\d+)?/i,           // FAR/DFARS clause #s
+  /\b\d{1,3}\s*CFR\s*\d+(?:\.\d+)?/i,                // CFR cites (e.g. "14 CFR 145.215")
+  /\bSection\s+\d+(?:\.\d+){0,3}/i,                  // "Section 1.2", "Section 5.3.2"
+  /\b§\s*\d+(?:\.\d+){0,3}/,                         // "§L.4", "§M"
+  /\bCAGE\s*(?:Code\s*)?[A-Z0-9]{3,5}\b/i,           // CAGE
+  /\bNSN\s*[\d-]+/i,                                  // NSN
+  /\bNAICS\s*\d{4,6}\b/i,                            // NAICS
+  /\bDoDAAC\s*[A-Z0-9]{6,}/i,                        // DoDAAC
+  /\bTO\s+\d+[A-Z]?\d*-[\d-]+/i,                     // TO (Technical Order) #
+  /\bP\/N\s*[\dA-Z][\dA-Z\-]*/i,                     // Part number
+  /\b252\.\d{3}-\d{4}/,                              // bare DFARS
+  /\b5352\.\d{3}-\d{4}/,                             // bare AFFARS
+  /\b\d{4}-\d{2}-\d{2}\b/,                           // ISO date
+  /\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\b/i,  // "1 Apr 2025"
+  /\$\s*[\d][\d,]{2,}/                               // Dollar amount
+];
+function hasDocumentAnchor(...fields: Array<string | undefined | null>): boolean {
+  const joined = fields.filter((f) => typeof f === "string" && f.length > 0).join(" · ");
+  if (!joined) return false;
+  return DOCUMENT_ANCHOR_PATTERNS.some((re) => re.test(joined));
 }
 
 // Set-aside normalization. SAM frequently emits "NONE" (or null) for full &
@@ -482,9 +526,16 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
         // Provenance from the engine (audit-engine 13f4743+). Old rows pre-
         // date the field — default to "inferred" so the renderer badges them
         // as pattern-derived rather than dropping the badge entirely.
-        const provenance: "verified" | "inferred" =
+        const engineProvenance: "verified" | "inferred" =
           r.provenance === "verified" || r.provenance === "inferred"
             ? r.provenance
+            : "inferred";
+        // Defect 1 (2026-06-05 P0): upgrade engine's "inferred" to "verified"
+        // when the risk's prose carries any document-anchored pattern. Engine
+        // ANCHOR_RE missed Section #s / CFR / TO / dated references on QH.
+        const provenance: "verified" | "inferred" =
+          engineProvenance === "verified" || hasDocumentAnchor(text, String(cite), String(r.title ?? ""))
+            ? "verified"
             : "inferred";
         return {
           title: sanitizeDisplayText(String(r.title ?? text.split(".")[0] ?? text).slice(0, 160)),
@@ -853,7 +904,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     : verdict.word === "GO"
       ? "Bid with confidence"
       : verdict.word === "DECLINE"
-        ? "Pass — bid not recommended"
+        ? "No-bid — bid not recommended"
         : "Caution → close gaps before bid";
   const taglineForUnscored = "Upload the PDF to get a full audit score.";
 

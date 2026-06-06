@@ -376,6 +376,52 @@ function removeVerdictBlock(html: string): string {
 // reuses the same surgical-excise pattern as removeVerdictBlock above. The
 // rendered HTML feeds both the web page and the headless-Chromium PDF, so
 // stripping at the renderer guarantees screen + PDF stay 1:1.
+// Defect 3 (2026-06-05): when is_unscored && !is_not_solicitation (the
+// metadata-only "NOT YET SCORED" state), §04 Compliance and §05 Risk Register
+// render as bare section headers with no body — the data-state="full" content
+// blocks have nothing to populate. The template already ships locked-card
+// stand-ins (<div class="locked" data-state="locked" style="display:none">)
+// for both sections, but the global CSS rule
+//   [data-state="locked"]:not(.mh-verdict){display:none!important}
+// keeps them hidden by default. Reveal works the same way pickVerdictBlock
+// reveals the prelim verdict: drop the full-state content + strip both
+// data-state="locked" AND inline display:none from the locked-card wrapper
+// so the CSS hide-rule no longer matches.
+function revealLockedSectionsForUnscored(html: string): string {
+  let out = html;
+  // Drop the full-state content blocks — they'd render empty arrays as a
+  // bare header otherwise. The locked card below will take their place.
+  const fullStateContent: Array<{ tag: string; field: string }> = [
+    { tag: "div",  field: "compliance_flags" },
+    { tag: "div",  field: "risks" }
+  ];
+  for (const { tag, field } of fullStateContent) {
+    out = removeElementByOpenRe(
+      out,
+      new RegExp(`<${tag}\\b[^>]*\\bdata-field="${field}"[^>]*>`),
+      tag
+    );
+  }
+  // Also drop the right-side summary pills in §04/§05 (e.g. "1 P0 · 2 P1 · 1 P2",
+  // "4 open") — they read with stale demo content when the locked card sits
+  // below. Match by the data-field markers on the <span class="sh-pill ...">.
+  for (const field of ["compliance_summary", "risks_summary"]) {
+    out = removeElementByOpenRe(
+      out,
+      new RegExp(`<span\\b[^>]*\\bdata-field="${field}"[^>]*>`),
+      "span"
+    );
+  }
+  // Reveal the locked cards: strip the data-state="locked" attribute (so the
+  // CSS hide-rule no longer matches) + the inline display:none. The class
+  // "locked" remains so the ghost/veil treatment still applies.
+  out = out.replace(
+    /(<div class="locked")\s+data-state="locked"\s+style="display:none"/g,
+    `$1`
+  );
+  return out;
+}
+
 function removeNotSolicitationSections(html: string): string {
   const sectionIds = ["sec-scope", "sec-compliance", "sec-risks", "sec-reco"];
   let out = html;
@@ -1092,6 +1138,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     } else {
       html = removePrelimSetasideNote(html);
     }
+    // Defect 3 (2026-06-05): reveal the locked-card stand-ins for §04 / §05
+    // so the metadata-only audit never renders bare section headers. SPE
+    // (SPE4A526T213S) was the canonical repro.
+    html = revealLockedSectionsForUnscored(html);
   } else {
     html = pickVerdictBlock(html, "scored");
     html = setVerdictClass(html, vm.recommendation_class);
