@@ -1212,57 +1212,62 @@ function renderSubmissionChecklist(
 // independent attribute strips so order/spacing variations don't matter.
 function renderIncumbentBranch(html: string, hasIncumbent: boolean): string {
   if (hasIncumbent) {
-    // Remove the .inc-none block. The opener-regex tolerates any combination
-    // of data-state + style attribute order/spacing.
+    // Strip the .inc-none block — broader opener-regex so attribute order
+    // doesn't matter. The element wrapper is removed; §02 still renders
+    // the live .incumbent block below.
     return removeElementByOpenRe(
       html,
-      /<div class="inc-none"[^>]*data-state="none"[^>]*>/,
+      /<div\b[^>]*\bclass="inc-none"[^>]*>/,
       "div"
     );
   }
-  // No incumbent: strip the .incumbent block + reveal the .inc-none block.
-  // Two independent attribute strips — order-agnostic — so both
-  //   class="inc-none" data-state="none" style="display:none"
-  // and the rearranged
-  //   class="inc-none" style="display:none" data-state="none"
-  // get unhidden.
+  // No incumbent. Strip the .incumbent block (broader regex tolerates
+  // additional classes / attributes / whitespace) and REWRITE the
+  // .inc-none opener wholesale to a clean `<div class="inc-none">` —
+  // strips every "hidden by default" attribute in one shot. The prior
+  // per-attribute regex was order-sensitive and missed Design's emitted
+  // variants on real audits. §02 sec-incumbent wrapper stays intact;
+  // the .inc-none copy renders inside it.
   let out = removeElementByOpenRe(
     html,
-    /<div class="incumbent">/,
+    /<div\b[^>]*\bclass="incumbent"[^>]*>/,
     "div"
   );
   out = out.replace(
-    /(<div class="inc-none"[^>]*?)\s+data-state="none"/,
-    `$1`
-  );
-  out = out.replace(
-    /(<div class="inc-none"[^>]*?)\s+style="display:none"/,
-    `$1`
+    /<div\b[^>]*\bclass="inc-none"[^>]*>/,
+    '<div class="inc-none">'
   );
   return out;
 }
 
-// Brain QA Item 1 (2026-06-05): gate-mode wiring. Populates the two gate
-// surfaces from vm.gate_conditions[]:
-//   1. .mhv-gates (data-field="gate_conditions") in the masthead — compact
-//      one-line gate rows
-//   2. .g-rows (data-field="gate_conditions") in §06 — interactive gate
-//      rows with verification detail + blocker note
-// Both share the same vm.gate_conditions[] data. When the array is empty
-// (scored audit), the markup keeps its demo content but the surfaces stay
-// hidden by the CSS rules (.mh-verdict .mhv-gates display:none until
-// .is-gate added; #reco-gate has inline style="display:none" until the
-// applyVerdictMode call un-hides it). Net: only gate audits render gates.
+// Replace inner HTML by class name (rather than data-field). Used when two
+// elements share the same data-field key but live in different containers
+// (gate_conditions appears on .mhv-gates masthead and .g-rows in §06 — both
+// need DIFFERENT inner content per surface).
+function setInnerByClass(html: string, className: string, tagName: string, innerHtml: string): string {
+  const re = new RegExp(`<${tagName}\\b[^>]*\\bclass="${className}\\b[^"]*"[^>]*>`);
+  const m = re.exec(html);
+  if (!m) return html;
+  const range = findMatchingClose(html, m.index, tagName);
+  if (!range) return html;
+  return html.slice(0, range.contentStart) + innerHtml + html.slice(range.contentEnd);
+}
+
+// Brain QA Item 1 (2026-06-05 follow-up): gate-mode wiring. Two surfaces
+// carry the same data-field="gate_conditions" but live in distinct class
+// containers — .mhv-gates (masthead) needs compact one-line rows; .g-rows
+// (§06 interactive card) needs verbose detail rows + blocker notes. The
+// prior implementation used setFieldInner twice with the same data-field
+// key, but setFieldInner is single-match and both calls hit the masthead,
+// leaving §06 at its static demo. Switched to setInnerByClass for both —
+// each surface targeted by its unique class name.
 function renderGateConditions(
   html: string,
   conditions: Array<{ title: string; context: string; citation: string; blocker_note: string }>,
   verdictMode: "gate" | "scored"
 ): string {
   if (verdictMode !== "gate" || conditions.length === 0) return html;
-  // Masthead .mhv-gates rows. The template's first child is the
-  //   <p class="mhv-gates-cap">Bid only if — all true today</p>
-  // We preserve that cap, then replace the .mhv-gate demo children with one
-  // node per VM condition.
+  // Masthead .mhv-gates — preserves the cap "<p class='mhv-gates-cap'>" prelude.
   const mhvCap = `<p class="mhv-gates-cap">Bid only if — all true today</p>`;
   const mhvRows = conditions
     .map((c) => {
@@ -1272,12 +1277,8 @@ function renderGateConditions(
       return `<div class="mhv-gate"><span class="gk"></span><span class="gx"><b>${escapeHtml(c.title)}</b>${detail ? ` — ${detail}` : ""}</span></div>`;
     })
     .join("");
-  let out = setFieldInner(html, "gate_conditions", "div", mhvCap + mhvRows);
-  // §06 .g-rows — second occurrence of data-field="gate_conditions" (this
-  // time on the .g-rows interactive container). Find AFTER the masthead
-  // version so setFieldInner's first-match-only behavior targets the right
-  // container — we already replaced the masthead one above, so the next
-  // match is the §06 one.
+  let out = setInnerByClass(html, "mhv-gates", "div", mhvCap + mhvRows);
+  // §06 .g-rows — verbose detail rows.
   const gRows = conditions
     .map((c) => {
       const detail = `<code>${escapeHtml(c.citation)}</code>${c.context ? ` — ${escapeHtml(c.context)}` : ""}`;
@@ -1285,10 +1286,9 @@ function renderGateConditions(
       return `<div class="g-row"><span class="gbx"></span><div><div class="gt">${escapeHtml(c.title)}</div><div class="gd">${detail}${blocker}</div></div></div>`;
     })
     .join("");
-  out = setFieldInner(out, "gate_conditions", "div", gRows);
-  // Update the .gs-cnt initial count denominator to match the rendered row count
-  // so the resolver's "0 / N cleared" badge starts with the correct N before any
-  // user interaction. The resolver JS recomputes on click.
+  out = setInnerByClass(out, "g-rows", "div", gRows);
+  // .gs-cnt initial denominator — resolver IIFE recomputes on click but
+  // the static initial render needs the correct N.
   out = out.replace(
     /<span class="gs-cnt">0 \/ \d+<\/span>/,
     `<span class="gs-cnt">0 / ${conditions.length}</span>`
@@ -1324,7 +1324,22 @@ function renderKoEmailCard(
   let out = replaceFieldInner(html, "ko_email.to", escapeHtml(ko.to));
   out = replaceFieldInner(out, "ko_email.subject", escapeHtml(ko.subject));
   out = replaceFieldInner(out, "ko_email.preview", escapeHtml(ko.preview).replace(/\n/g, "<br>"));
+  // Brain QA Item 3 (2026-06-05): preview-duplicate defense. If any
+  // additional <p class="ko-preview">…</p> elements exist in the rendered
+  // HTML beyond the canonical one (cloned by some downstream pass, or a
+  // hidden Design variant the re-pull pasted), keep the first and remove
+  // the rest. Single-source-of-truth guarantee for the preview surface.
+  out = dedupeKoPreview(out);
   return out;
+}
+
+function dedupeKoPreview(html: string): string {
+  const re = /<p class="ko-preview"\b[^>]*>[\s\S]*?<\/p>/g;
+  let count = 0;
+  return html.replace(re, (match) => {
+    count++;
+    return count === 1 ? match : "";
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
