@@ -90,6 +90,8 @@ button{font-family:inherit}
 .mh-id{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent-deep);letter-spacing:.01em;margin:0 0 6px}
 [data-theme="dark"] .mh-id{color:var(--accent-light)}
 .mh-title{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:33px;line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:0 0 18px;text-wrap:balance;max-width:24ch}
+.mh-ids{display:flex;flex-wrap:wrap;gap:5px 16px;margin:0 0 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500;color:var(--ink-2)}
+.mh-ids i{font-style:normal;font-weight:700;color:var(--mute-2);letter-spacing:.05em;margin-right:6px}
 .mh-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--card-soft)}
 .mh-fact{flex:1;min-width:150px;padding:11px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
 .mh-fact:last-child{border-right:0}
@@ -136,6 +138,21 @@ button{font-family:inherit}
 .mhv-metric .k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:6px}
 .mhv-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.22);overflow:hidden;margin-top:8px}
 .mhv-bar i{display:block;height:100%;border-radius:3px;background:rgba(255,255,255,.92)}
+/* ── decision-gate variant — replaces the numeric tiles when the verdict is a DECISION, not a score.
+   Sole-source to a named vendor, or pass/fail eligibility gates that can't be cured in the response
+   window, are switches, not gradients — a 0–100 score on them is false precision. ── */
+.mh-verdict .mhv-gates{display:none}
+.mh-verdict.is-gate .mhv-metrics{display:none}
+.mh-verdict.is-gate .mhv-gates{display:flex;flex-direction:column;gap:7px;margin-top:auto}
+.mhv-gates-cap{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.66);margin:0 0 1px;padding-left:2px}
+.mhv-gate{display:grid;grid-template-columns:16px 1fr;gap:9px;align-items:start;background:rgba(0,0,0,.16);border-radius:9px;padding:9px 11px}
+.mhv-gate .gk{width:15px;height:15px;border-radius:4px;border:2px solid rgba(255,255,255,.55);margin-top:1px}
+.mhv-gate .gx{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.9);line-height:1.32}
+.mhv-gate .gx b{font-weight:800;color:#fff}
+/* customer-facing legend — defuses the "low score vs high confidence" confusion at the source */
+.mhv-foot{margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:500;letter-spacing:.01em;line-height:1.55;color:rgba(255,255,255,.6)}
+.mhv-foot b{font-weight:700;color:rgba(255,255,255,.84)}
+.mh-verdict.is-gate .mhv-foot,.v-unscored .mhv-foot{display:none}
 
 /* ═══════════ ANALYST FLAG — the moment ═══════════ */
 .moment{position:relative;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);padding:22px 26px 22px 28px;display:grid;grid-template-columns:1fr auto;gap:26px;align-items:center}
@@ -160,6 +177,108 @@ button{font-family:inherit}
 .moment-aside .ma-btn{margin-top:2px;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;border-radius:9px;border:1px solid var(--amber-600);background:var(--amber-600);color:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .14s,box-shadow .14s;box-shadow:0 8px 18px -8px rgba(217,119,6,.6)}
 .moment-aside .ma-btn:hover{transform:translateY(-1px)}
 .moment-aside .ma-btn svg{width:13px;height:13px}
+
+/* ═══════════ EXECUTIVE SUMMARY — page 1, the decision in 30 seconds ═══════════ */
+.exec-sum{background:linear-gradient(150deg,var(--navy-800),var(--navy-900));border-radius:16px;padding:24px 26px;margin-bottom:18px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.exec-sum::after{content:"";position:absolute;inset:0;z-index:0;opacity:.6;background:radial-gradient(880px 300px at 88% -20%,rgba(55,138,221,.24),transparent 60%)}
+.exec-sum>*{position:relative;z-index:1}
+.es-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:13px;flex-wrap:wrap}
+.es-kicker{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.es-kicker .es-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.es-verdict{display:flex;align-items:baseline;gap:11px}
+.es-verdict .es-vk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.es-vw{font-family:"Manrope",sans-serif;font-size:29px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.es-nobid .es-vw{color:#fca5a5}
+.es-caution .es-vw{color:#fcd34d}
+.es-go .es-vw{color:#6ee7b7}
+.es-what{font-size:16px;line-height:1.5;font-weight:600;color:#fff;margin:0 0 20px;max-width:90ch;letter-spacing:-.01em}
+.es-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
+.es-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 11px}
+.es-factors{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;counter-reset:esf}
+.es-factors li{position:relative;padding-left:30px;font-size:13px;line-height:1.5;color:rgba(255,255,255,.88)}
+.es-factors li::before{counter-increment:esf;content:counter(esf);position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;display:grid;place-items:center}
+.es-factors li b{color:#fff;font-weight:700}
+.es-actions{display:flex;flex-direction:column;gap:8px}
+.es-act{display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:9px 12px;font-size:12.5px;line-height:1.42;color:rgba(255,255,255,.92)}
+.es-act .es-when{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--accent-light);white-space:nowrap;padding-top:2px;flex-shrink:0;min-width:50px}
+@media (max-width:760px){.es-grid{grid-template-columns:1fr;gap:18px}}
+
+/* ═══ TIMELINE — critical path strip ═══ */
+.timeline{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px 20px;margin-bottom:18px;box-shadow:var(--shadow)}
+.tl-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.tl-k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.tl-sub{font-size:12.5px;color:var(--ink-2);font-weight:600}
+.tl-sub b{color:var(--ink);font-weight:800}
+.tl-track{position:relative;display:flex;justify-content:space-between;gap:8px}
+.tl-track::before{content:"";position:absolute;left:8px;right:8px;top:6px;height:2px;background:var(--line);z-index:0}
+.tl-node{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;text-align:center;min-width:0}
+.tl-dot{width:13px;height:13px;border-radius:50%;background:currentColor;border:2px solid var(--card);box-shadow:0 0 0 2px currentColor}
+.tl-node.ok{color:var(--green-600)}
+.tl-node.warn{color:var(--amber-600)}
+.tl-node.bad{color:var(--red-600)}
+.tl-node.end{color:var(--accent)}
+.tl-date{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;color:var(--ink);letter-spacing:.02em}
+.tl-lbl{font-size:10.5px;line-height:1.3;color:var(--ink-2);max-width:13ch}
+.tl-node.end .tl-lbl,.tl-node.end .tl-date{color:var(--accent-deep);font-weight:700}
+@media (max-width:760px){.tl-track{overflow-x:auto;gap:18px}.tl-node{min-width:80px}}
+
+/* ═══ §07 COMPLIANCE MATRIX ═══ */
+.cm-export{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--accent-deep);text-decoration:none;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.cm-export:hover{background:var(--card-soft)}
+.cm-export svg{width:13px;height:13px}
+.cmatrix{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cmatrix table{width:100%;border-collapse:collapse;font-size:12.5px}
+.cmatrix thead th{background:var(--card-soft);text-align:left;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);padding:9px 14px;border-bottom:1px solid var(--line)}
+.cmatrix td{padding:11px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;line-height:1.45;color:var(--ink-2)}
+.cmatrix tbody tr:last-child td{border-bottom:0}
+.cmatrix .cm-req{color:var(--ink);font-weight:600}
+.cmatrix th.cm-req{width:54%}
+.cm-src{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);white-space:nowrap}
+.cm-status{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.cm-status .d{width:5px;height:5px;border-radius:50%;background:currentColor}
+.cm-status.action{background:var(--blue-50);color:var(--blue-700)}
+.cm-status.risk{background:var(--amber-50);color:var(--amber-700)}
+.cm-status.clear{background:var(--green-50);color:var(--green-700)}
+[data-theme="dark"] .cm-status.action{background:rgba(59,130,246,.16);color:#93c5fd}
+[data-theme="dark"] .cm-status.risk{background:rgba(217,119,6,.16);color:#fcd34d}
+[data-theme="dark"] .cm-status.clear{background:rgba(16,185,129,.16);color:#6ee7b7}
+
+/* ═══ §08 KO EMAIL CARD ═══ */
+.ko-card{border:1px solid var(--line);border-radius:12px;background:var(--card-soft);overflow:hidden}
+.ko-meta{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+.ko-meta .kr{display:flex;gap:10px;font-size:12.5px;color:var(--ink-2);align-items:baseline}
+.ko-meta .kml{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);min-width:48px;flex-shrink:0}
+.ko-meta .kr b{color:var(--ink);font-weight:700}
+.ko-preview{padding:14px 16px;font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:0;white-space:pre-line;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 68%,transparent);mask-image:linear-gradient(180deg,#000 68%,transparent)}
+.ko-actions{display:flex;gap:9px;padding:2px 16px 15px}
+.ko-actions button{display:inline-flex;align-items:center;gap:7px;font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:700;border-radius:9px;padding:9px 14px;cursor:pointer;border:1px solid var(--line)}
+.ko-actions svg{width:14px;height:14px}
+.ko-open{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ko-open:hover{background:var(--accent-deep)}
+.ko-copy2{background:var(--card);color:var(--ink-2)}
+.ko-copy2:hover{background:var(--card-soft)}
+
+/* ═══ §09 SUBMISSION CHECKLIST ═══ */
+.ck-prog{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--mute)}
+.ck-prog b{color:var(--ink);font-weight:800;font-size:13px}
+.checklist{display:flex;flex-direction:column;gap:16px}
+.ck-group{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ck-gh{background:var(--card-soft);padding:10px 15px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--line)}
+.ck-item{display:flex;align-items:flex-start;gap:12px;padding:12px 15px;border-bottom:1px solid var(--line-2);cursor:pointer}
+.ck-group .ck-item:last-child{border-bottom:0}
+.ck-item input{position:absolute;opacity:0;width:0;height:0}
+.ck-box{width:19px;height:19px;border-radius:6px;border:2px solid var(--mute-2);flex-shrink:0;margin-top:1px;position:relative;transition:background .15s,border-color .15s}
+.ck-item input:checked + .ck-box{background:var(--green-600);border-color:var(--green-600)}
+.ck-item input:checked + .ck-box::after{content:"";position:absolute;left:5px;top:1.5px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(45deg)}
+.ck-txt{flex:1;font-size:12.5px;line-height:1.45;color:var(--ink)}
+.ck-item input:checked ~ .ck-txt{color:var(--mute);text-decoration:line-through}
+.ck-csrc{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--mute);margin-top:3px;text-decoration:none}
+.ck-sev{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:5px;flex-shrink:0;white-space:nowrap;margin-top:1px}
+.ck-sev.dq{background:var(--red-50);color:var(--red-700)}
+.ck-sev.req{background:var(--amber-50);color:var(--amber-700)}
+.ck-sev.adv{background:var(--line-3);color:var(--mute)}
+[data-theme="dark"] .ck-sev.dq{background:rgba(220,38,38,.16);color:#fca5a5}
+[data-theme="dark"] .ck-sev.req{background:rgba(217,119,6,.16);color:#fcd34d}
 
 /* ═══════════ LAYOUT: main + rail ═══════════ */
 .rpt-grid{display:grid;grid-template-columns:1fr 312px;gap:18px;align-items:start}
@@ -230,6 +349,11 @@ button{font-family:inherit}
 .inc-expiry .ecap{font-size:12px;line-height:1.5;color:var(--ink-2);margin:0}
 .inc-expiry .ecap b{color:var(--ink);font-weight:700}
 
+.inc-none{display:flex;align-items:flex-start;gap:14px;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:780px}
+.inc-none-ico{width:40px;height:40px;border-radius:10px;background:var(--line-3);color:var(--mute);display:grid;place-items:center;flex-shrink:0}
+.inc-none-ico svg{width:20px;height:20px}
+.inc-none-h{font-size:15px;font-weight:800;color:var(--ink);margin:0 0 5px;letter-spacing:-.01em}
+.inc-none-s{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:0;max-width:66ch}
 /* ── Section 03 — Scope / CLIN ── */
 .scope-lead{font-size:14px;line-height:1.66;color:var(--ink-2);margin:0 0 20px;max-width:88ch}
 .scope-lead b{color:var(--ink);font-weight:700}
@@ -277,6 +401,16 @@ button{font-family:inherit}
 .flag-action b{color:var(--ink);font-weight:700}
 [data-theme="dark"] .flag-action svg{color:var(--accent-light)}
 
+.sev-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 15px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.01em}
+.sev-legend span{display:inline-flex;align-items:center;gap:6px}
+.sev-legend i{font-style:normal;font-weight:800;padding:2px 6px;border-radius:5px;letter-spacing:.05em}
+.sev-legend .l0{background:var(--red-50);color:var(--red-700)}
+.sev-legend .l1{background:var(--amber-50);color:var(--amber-700)}
+.sev-legend .l2{background:var(--line-3);color:var(--mute)}
+.sev-legend b{font-weight:600;color:var(--ink-2)}
+[data-theme="dark"] .sev-legend .l0{background:rgba(220,38,38,.16);color:#fca5a5}
+[data-theme="dark"] .sev-legend .l1{background:rgba(217,119,6,.16);color:#fcd34d}
+[data-theme="dark"] .sev-legend .l2{background:rgba(255,255,255,.05);color:var(--mute)}
 /* ── Section 05 — Risk register ── */
 .risks{display:flex;flex-direction:column;gap:12px}
 .risk{border:1px solid var(--line);border-radius:13px;overflow:hidden}
@@ -308,15 +442,54 @@ button{font-family:inherit}
 .risk.open .risk-body{max-height:420px}
 .risk-body-inner{padding:2px 16px 16px;border-top:1px solid var(--line-2)}
 .risk-body-inner .rb-desc{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:13px 0 13px}
-.risk-action{display:flex;align-items:flex-start;gap:10px;background:rgba(55,138,221,.05);border:1px solid var(--accent-light);border-radius:10px;padding:11px 13px}
-[data-theme="dark"] .risk-action{background:rgba(55,138,221,.1);border-color:rgba(181,212,244,.25)}
-.risk-action .ra-ico{width:24px;height:24px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.risk-action{display:flex;align-items:flex-start;gap:11px;background:linear-gradient(180deg,rgba(55,138,221,.11),rgba(55,138,221,.045));border:1px solid var(--accent-light);border-left:3px solid var(--accent);border-radius:10px;padding:14px 15px;box-shadow:0 1px 2px rgba(55,138,221,.08)}
+[data-theme="dark"] .risk-action{background:linear-gradient(180deg,rgba(55,138,221,.16),rgba(55,138,221,.07));border-color:rgba(181,212,244,.25);border-left-color:var(--accent)}
+.risk-action .ra-ico{width:27px;height:27px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
 .risk-action .ra-ico svg{width:14px;height:14px}
-.risk-action .ra-txt{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
-.risk-action .ra-txt b{color:var(--ink);font-weight:700;display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:3px}
+.risk-action .ra-txt{font-size:13px;line-height:1.55;color:var(--ink);font-weight:500}
+.risk-action .ra-txt b{color:var(--ink);font-weight:700;display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:4px}
 [data-theme="dark"] .risk-action .ra-txt b{color:var(--accent-light)}
 
 /* ── Section 06 — Recommendation ── */
+/* decision-gate card — when verdict_mode = gate, the recommendation IS the gate (not win themes) */
+.gate-card{border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;background:var(--card-soft);margin:2px 0 22px}
+.gate-card .gc-h{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:2px}
+.gate-verdict{font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.gate-verdict.nobid{color:var(--red-700)}
+.gate-verdict.cond{color:var(--amber-700)}
+.gc-lead{font-size:13px;color:var(--ink-2);margin:9px 0 13px;line-height:1.52;max-width:78ch}
+.g-rows{display:flex;flex-direction:column;gap:8px}
+.g-row{display:grid;grid-template-columns:20px 1fr;gap:11px;align-items:start;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.g-row .gbx{width:18px;height:18px;border-radius:5px;border:2px solid var(--mute-2);margin-top:1px}
+.g-row .gt{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35}
+.g-row .gd{font-size:12px;color:var(--ink-2);line-height:1.46;margin-top:3px}
+.g-row .gd code{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);background:var(--blue-50);padding:1px 5px;border-radius:4px}
+.g-blocker{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;color:var(--red-700);letter-spacing:.04em;margin-top:5px;display:inline-block}
+.g-outcome{margin-top:13px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.g-oc{padding:10px 13px;border-radius:9px;font-size:12.5px;line-height:1.45}
+.g-oc.win{background:var(--green-50);color:var(--green-700)}
+.g-oc.no{background:var(--card);border:1px solid var(--line);color:var(--ink-2)}
+.g-oc b{font-weight:800}
+.g-pearl{margin-top:13px;padding:11px 13px;border-left:3px solid var(--ink);background:var(--card);border-radius:0 9px 9px 0;font-size:12.5px;color:var(--ink-2);line-height:1.52}
+.g-pearl b{color:var(--ink);font-weight:700}
+@media (max-width:560px){.g-outcome{grid-template-columns:1fr}}
+/* interactive gate — the report becomes a live decision: tick what you hold, the verdict resolves */
+.g-row{cursor:pointer;transition:border-color .15s,background .15s}
+.g-row:hover{border-color:var(--mute-2)}
+.g-row.checked{border-color:var(--green-600)}
+.g-row .gbx{position:relative;flex:0 0 auto;transition:background .15s,border-color .15s}
+.g-row.checked .gbx{background:var(--green-600);border-color:var(--green-600)}
+.g-row.checked .gbx::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(45deg)}
+.g-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 11px}
+.g-status .gs-k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}
+.g-status .gs-k b{color:var(--ink)}
+.gs-pill{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:800;letter-spacing:.05em;padding:4px 11px;border-radius:7px;transition:background .15s,color .15s}
+.gs-pill.no{background:var(--red-50);color:var(--red-700)}
+.gs-pill.go{background:var(--green-50);color:var(--green-700)}
+.g-oc{transition:opacity .15s,box-shadow .15s}
+.g-oc:not(.active){opacity:.42}
+.g-oc.win.active{box-shadow:0 0 0 1.5px var(--green-600) inset}
+.g-oc.no.active{box-shadow:0 0 0 1.5px var(--mute-2) inset}
 .reco-rationale{font-size:14.5px;line-height:1.65;color:var(--ink-2);margin:0 0 20px;max-width:86ch}
 .reco-rationale b{color:var(--ink);font-weight:700}
 .win-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
@@ -402,7 +575,11 @@ button{font-family:inherit}
   .body{max-width:none!important;padding:0!important;gap:12px!important}
   .rpt-grid{display:block!important;grid-template-columns:none!important}
   .rpt-main>.sec{margin-top:12px}
-  .sec,.masthead,.moment,.keydates,.scorecard{break-inside:avoid;box-shadow:none!important}
+  .sec,.masthead,.moment,.keydates,.scorecard,.exec-sum,.timeline{break-inside:avoid;box-shadow:none!important}
+  .ck-item input:checked + .ck-box{background:transparent!important;border-color:#94a3b8!important}
+  .ck-item input:checked + .ck-box::after{display:none!important}
+  .ck-item input:checked ~ .ck-txt{color:#0a1628!important;text-decoration:none!important}
+  .ck-group,.cmatrix,.ko-card{break-inside:avoid}
   .risk,.flag-row,.eval .sfactor,.award-basis{break-inside:avoid}
   .risk-group-label,.subsec-h{break-after:avoid}
   .risk-body{max-height:none!important}
@@ -493,6 +670,9 @@ button{font-family:inherit}
 .jump{padding:8px 10px 12px}
 .jump a{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:9px;text-decoration:none;color:var(--ink-2);font-size:12.5px;font-weight:600;transition:background .14s,color .14s}
 .jump a:hover{background:var(--card-soft);color:var(--ink)}
+.jump a.active{background:var(--card-soft);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+.jump a.active .jn{color:var(--accent-deep)}
+[data-theme="dark"] .jump a.active .jn{color:var(--accent-light)}
 .jump a .jn{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute-2)}
 .jump a .jb{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px}
 .jump a .jb.bad{background:var(--red-50);color:var(--red-700)}
@@ -645,11 +825,11 @@ button{font-family:inherit}
   <div class="sb-divider"></div>
   <div class="sb-group-label">INTELLIGENCE</div>
   <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
-  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
   <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"/></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
   <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="13" width="3" height="4"/></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
   <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
   <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><path d="M3 20c1-3 3-5 6-5s5 2 6 5"/><circle cx="17" cy="8" r="2.5"/><path d="M21 17c-.5-2-2-3.5-4-3.5"/></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
   <div class="sb-divider"></div>
   <div class="sb-group-label">COMPLIANCE &amp; BD</div>
   <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h8M9 12h8M9 16h5"/><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"/></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
@@ -741,6 +921,16 @@ button{font-family:inherit}
               <div class="mhv-bar"><i style="width:41%"></i></div>
               <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="win_probability_benchmark">+23 vs 18% category avg</span></div>
             </div>
+          </div>
+          <p class="mhv-foot" data-field="metrics_legend"><b>Fit Score</b> rates how winnable this is for a small business — a go/no-go signal, not a grade on the audit. The <b>Doc-type</b> figure in &sect;01 is a separate measure: how sure we are what the document is.</p>
+          <!-- DECISION-GATE variant of the masthead — Code adds class "is-gate" to this .mh-verdict when
+               audit.verdict_mode === 'gate', and populates .mhv-gates from audit.gate_conditions[].
+               In gate mode the numeric tiles hide and these conditions take their place. -->
+          <div class="mhv-gates" data-field="gate_conditions">
+            <p class="mhv-gates-cap">Bid only if — all true today</p>
+            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Current SPRS score on file</b> &middot; DFARS 252.204-7020</span></div>
+            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Active JCP</b> — you + mfr CAGE 81996 &middot; A-11</span></div>
+            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Written supplier lead-time &le; 135 days</b></span></div>
           </div>
         </div>
 
@@ -846,6 +1036,51 @@ button{font-family:inherit}
         </div>
       </section>
 
+      <!-- ═══════════ EXECUTIVE SUMMARY — page 1: the bid decision in 30 seconds. Code: populate exec_* fields;
+           set .es-verdict class to es-go / es-caution / es-nobid to match the recommendation. ═══════════ -->
+      <section class="exec-sum es-caution" id="sec-exec" data-field="executive_summary">
+        <div class="es-top">
+          <div class="es-kicker"><span class="es-dot"></span>Executive Summary</div>
+          <div class="es-verdict"><span class="es-vk">Bottom line</span><span class="es-vw" data-field="exec_verdict">BID</span></div>
+        </div>
+        <p class="es-what" data-field="exec_what">A best-value RFQ to sustain H-60 fleet predictive-maintenance analytics — a strong technical fit against an incumbent contract expiring in 118 days, gated by two unpriced compliance items you can close before the Q&amp;A deadline.</p>
+        <div class="es-grid">
+          <div class="es-col">
+            <p class="es-h">What wins or loses it</p>
+            <ol class="es-factors" data-field="exec_factors">
+              <li><b>Timing.</b> The incumbent’s 5-year award expires in 118 days with no recompete posted — a rare clean window.</li>
+              <li><b>Discriminator.</b> A posted SPRS score + CMMC L2 readiness is something most small-business competitors can’t show on day one.</li>
+              <li><b>Gate.</b> Two unpriced items — a current SPRS score and the CLIN 0002 data-rights exposure — must close before you bid with confidence.</li>
+            </ol>
+          </div>
+          <div class="es-col">
+            <p class="es-h">Next 48 hours</p>
+            <div class="es-actions" data-field="exec_actions">
+              <div class="es-act"><span class="es-when">By Jun 6</span><span>File the data-rights clarification with the KO — draft ready in §08.</span></div>
+              <div class="es-act"><span class="es-when">By Jun 9</span><span>Confirm your SPRS score is posted and current.</span></div>
+              <div class="es-act"><span class="es-when">By Jun 18</span><span>Lock the wage determination before the Q&amp;A deadline.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ TIMELINE — critical path (masthead→§01). Code: populate timeline_gates[] = [{date,label,status}],
+           status ∈ ok|warn|bad; last gate = the submission deadline (class "end"). ═══════════ -->
+      <section class="timeline" id="sec-timeline" data-field="timeline">
+        <div class="tl-head">
+          <div class="tl-k">Critical path to submission</div>
+          <div class="tl-sub">Submit by <b>2 Jul 2026</b> &mdash; six gates between you and a compliant quote</div>
+        </div>
+        <div class="tl-track" data-field="timeline_gates">
+          <div class="tl-node ok"><span class="tl-dot"></span><span class="tl-date">Jun 6</span><span class="tl-lbl">Data-rights Q to KO</span></div>
+          <div class="tl-node warn"><span class="tl-dot"></span><span class="tl-date">Jun 9</span><span class="tl-lbl">SPRS score posted</span></div>
+          <div class="tl-node ok"><span class="tl-dot"></span><span class="tl-date">Jun 13</span><span class="tl-lbl">Price-to-win built</span></div>
+          <div class="tl-node warn"><span class="tl-dot"></span><span class="tl-date">Jun 18</span><span class="tl-lbl">Q&amp;A deadline</span></div>
+          <div class="tl-node ok"><span class="tl-dot"></span><span class="tl-date">Jun 25</span><span class="tl-lbl">Final price &amp; review</span></div>
+          <div class="tl-node end"><span class="tl-dot"></span><span class="tl-date">Jul 2</span><span class="tl-lbl">Submit</span></div>
+        </div>
+      </section>
+
       <!-- ═══════════ GRID: main + rail ═══════════ -->
       <div class="rpt-grid">
 
@@ -897,14 +1132,14 @@ button{font-family:inherit}
             <div class="sec-head">
               <span class="sec-num">01</span>
               <div class="sec-title">Document Classification<span class="st-sub">How FARaudit read this notice</span></div>
-              <div class="sh-right"><span class="sh-pill ok" data-field="document_type_confidence_label">High confidence</span></div>
+              <div class="sh-right"><span class="sh-pill ok" data-field="document_type_confidence_label">High — doc type</span></div>
             </div>
             <div class="sec-body">
               <div class="classify">
                 <div class="cls-conf">
                   <div class="cls-ring">
                     <svg viewBox="0 0 104 104"><circle class="rbg" cx="52" cy="52" r="46"/><circle class="rfg" id="confRing" cx="52" cy="52" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
-                    <div class="rt"><div class="pc"><span data-field="document_type_confidence">94</span>%</div><div class="lb">Confidence</div></div>
+                    <div class="rt"><div class="pc"><span data-field="document_type_confidence">94</span>%</div><div class="lb">Doc-type</div></div>
                   </div>
                   <div class="doc-big" data-field="document_type_full">Request for Quote</div>
                   <div class="doc-cap" data-field="far_basis">FAR Part 13 · Simplified Acquisition</div>
@@ -948,6 +1183,16 @@ button{font-family:inherit}
                   <div class="days"><span data-field="incumbent.days_to_expiry">118</span><span class="u">days left</span></div>
                   <div class="inc-track"><i style="width:68%"></i><span class="now" style="left:68%"></span></div>
                   <p class="ecap" data-field="incumbent.expiry_note">No follow-on has been posted. A <b>5-year award expiring in &lt;4 months</b> with no recompete on the street is the strongest timing signal a challenger can get.</p>
+                </div>
+              </div>
+              <!-- NO-INCUMBENT graceful state — keeps §02 in sequence (no 01→03 numbering gap) AND adds intel.
+                   Code: render this (data-state="none") INSTEAD of .incumbent when no incumbent is identified
+                   (recurring supply spot-buys / new requirements); drop the .incumbent block in that case. -->
+              <div class="inc-none" data-state="none" style="display:none">
+                <div class="inc-none-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+                <div>
+                  <p class="inc-none-h" data-field="incumbent_none_head">No single incumbent on record</p>
+                  <p class="inc-none-s" data-field="incumbent_none_note">FPDS shows no held follow-on contract for this requirement — consistent with a recurring supply buy or a new requirement. There is no entrenched prime to displace; competition is on price, delivery, and source approval, not incumbent capture.</p>
                 </div>
               </div>
             </div>
@@ -1063,6 +1308,7 @@ button{font-family:inherit}
             </div>
             <div class="sec-body">
               <!-- full data -->
+              <div class="sev-legend" data-state="full"><span><i class="l0">P0</i><b>Blocker — no path to award without it</b></span><span><i class="l1">P1</i><b>Critical — clear before you submit</b></span><span><i class="l2">P2</i><b>Advisory — confirm, lower risk</b></span></div>
               <div class="flags" data-state="full" data-field="compliance_flags">
                 <div class="flag-row">
                   <div class="sev p0"><span class="lvl">P0</span><span class="wd">Blocker</span></div>
@@ -1190,11 +1436,112 @@ button{font-family:inherit}
             </div>
             <div class="sec-body">
               <p class="reco-rationale" data-field="recommendation_rationale">A <b>strong technical fit</b> — exact NAICS match, demonstrated H-60 analytics past performance — collides with an aging incumbent contract to create a real opening. But two unpriced compliance gaps (a current SPRS score and the CLIN 0002 data-rights exposure) keep this at <b>CAUTION, not GO</b>. Close both before the Q&amp;A deadline and this converts to a confident bid with the timing in your favor.</p>
+              <!-- DECISION GATE — shown instead of win-themes when verdict_mode = gate. Hidden by default;
+                   applyVerdictMode('gate') reveals it and hides .win-h + .win-themes. Code populates from
+                   gate_verdict / gate_lead / gate_conditions[] / gate_outcomes / gate_pearl. -->
+              <div class="gate-card" id="reco-gate" style="display:none" data-field="gate_block">
+                <div class="gc-h"><span class="gate-verdict cond" data-field="gate_verdict">NO-BID — unless all three are true today</span></div>
+                <p class="gc-lead" data-field="gate_lead">This is a small-business LPTA you can win on price — but three gates close the door if any is open at submission. None can be remedied inside the 20-day window.</p>
+                <div class="g-status"><span class="gs-k">Bid gate — <b><span class="gs-cnt">0 / 3</span></b> cleared</span><span class="gs-pill no">NO-BID</span></div>
+                <div class="g-rows" data-field="gate_conditions">
+                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Current SPRS score on file</div><div class="gd"><code>DFARS 252.204-7020</code> — scores take ~30 days to post after self-assessment.<span class="g-blocker">UNFIXABLE IN 20 DAYS IF MISSING</span></div></div></div>
+                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Active JCP — you and mfr CAGE 81996</div><div class="gd"><code>A-11 / 252.225-7048</code> — a lapse on either party blocks the export-controlled TDP; no TDP = no responsible price.</div></div></div>
+                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Written supplier lead-time &le; 135 days</div><div class="gd">P/N 70410-02501-045 from a sole manufacturer — unconfirmed lead time = default-termination exposure.</div></div></div>
+                </div>
+                <div class="g-outcome" data-field="gate_outcomes">
+                  <div class="g-oc win"><b>All three &check;</b> → straightforward LPTA win on price + packaging. Low competition.</div>
+                  <div class="g-oc no active"><b>Any &cross;</b> → no-bid this cycle. Track for the next solicitation.</div>
+                </div>
+                <div class="g-pearl" data-field="gate_pearl"><b>The catch worth the subscription:</b> reverse auction (L02) — don&rsquo;t submit your floor first. Register at dla.procurexinc.com, submit a market-rate price, hold reduction capacity for the live event.</div>
+              </div>
               <p class="win-h">Win themes — why you, why now</p>
               <div class="win-themes" data-field="recommendation_win_themes">
                 <div class="win-theme"><div class="wt-n">1</div><p><b>Timing.</b> The incumbent's 5-year award expires in 118 days with no recompete posted — challengers rarely get a cleaner window.</p></div>
                 <div class="win-theme"><div class="wt-n">2</div><p><b>Discriminator.</b> A posted SPRS score and CMMC L2 readiness is something most small-business competitors can't show on day one.</p></div>
                 <div class="win-theme"><div class="wt-n">3</div><p><b>Past performance.</b> Your fielded H-60 predictive-maintenance work maps directly to the primary objective — not adjacent, identical.</p></div>
+              </div>
+            </div>
+          </section>
+          <!-- 07 · COMPLIANCE MATRIX -->
+          <section class="sec" id="sec-matrix">
+            <div class="sec-head">
+              <span class="sec-num">07</span>
+              <div class="sec-title">Compliance Matrix<span class="st-sub">Every &ldquo;shall&rdquo; mapped to a response obligation</span></div>
+              <div class="sh-right"><a class="cm-export" href="#" data-field="matrix_export_url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>Export</a></div>
+            </div>
+            <div class="sec-body">
+              <div class="cmatrix" data-field="compliance_matrix">
+                <table>
+                  <thead><tr><th class="cm-req">Requirement</th><th>Source</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr><td class="cm-req">Submit technical &amp; price volumes by e-mail only — no facsimile accepted.</td><td><span class="cm-src">Section L(b)</span></td><td><span class="cm-status action"><span class="d"></span>Action</span></td></tr>
+                    <tr><td class="cm-req">Quote limited to 15 pages including price; resumes are <b>not</b> exempt from the count.</td><td><span class="cm-src">Section L(d)</span></td><td><span class="cm-status risk"><span class="d"></span>At Risk</span></td></tr>
+                    <tr><td class="cm-req">Assert data rights for all delivered algorithms &amp; models on a rights-assertion table.</td><td><span class="cm-src">DFARS 252.227-7017</span></td><td><span class="cm-status action"><span class="d"></span>Action</span></td></tr>
+                    <tr><td class="cm-req">Current SPRS Basic Assessment on file (within 3 years).</td><td><span class="cm-src">DFARS 252.204-7019</span></td><td><span class="cm-status risk"><span class="d"></span>At Risk</span></td></tr>
+                    <tr><td class="cm-req">NAICS 541512 size-standard self-certification current in SAM.gov.</td><td><span class="cm-src">FAR 52.219-1</span></td><td><span class="cm-status clear"><span class="d"></span>Clear</span></td></tr>
+                    <tr><td class="cm-req">Price option CLIN 0002 separately at a fixed unit rate.</td><td><span class="cm-src">Section M · CLIN 0002</span></td><td><span class="cm-status action"><span class="d"></span>Action</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- 08 · KO CLARIFICATION EMAIL (full draft lives in #koDrawer) -->
+          <section class="sec" id="sec-ko">
+            <div class="sec-head">
+              <span class="sec-num">08</span>
+              <div class="sec-title">KO Clarification Email<span class="st-sub">Pre-drafted from your audit &mdash; ready to send</span></div>
+              <div class="sh-right"><span class="sh-pill ok">Draft ready</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="ko-card">
+                <div class="ko-meta">
+                  <div class="kr"><span class="kml">To</span><b data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ec8783c2869e859a899e8dac88808dc2818580">[email&#160;protected]</a></b></div>
+                  <div class="kr"><span class="kml">Subject</span><span data-field="ko_email.subject">SP4701-26-Q-0942 — Questions re: data rights &amp; wage determination</span></div>
+                </div>
+                <p class="ko-preview" data-field="ko_email.preview">Ms. Rivera,
+
+Thank you for the opportunity to quote on SP4701-26-Q-0942. Before submission we request clarification on three items:
+
+1. CLIN 0002 (option) — the SOW requires delivery of &ldquo;all developed algorithms and models,&rdquo; but the CLIN provides no data-rights assertion table. Will the Government accept limited/restricted rights asserted under DFARS 252.227-7017?
+
+2. The referenced SCA wage determination (rev 24) predates a May 2026 revision. Please confirm which revision governs pricing for this effort.</p>
+                <div class="ko-actions">
+                  <button class="ko-open" data-open-ko><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Open full draft</button>
+                  <button class="ko-copy2" data-open-ko><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Copy email</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 09 · SUBMISSION CHECKLIST -->
+          <section class="sec" id="sec-checklist">
+            <div class="sec-head">
+              <span class="sec-num">09</span>
+              <div class="sec-title">Submission Checklist<span class="st-sub">Pre-flight &mdash; everything that must be true to submit</span></div>
+              <div class="sh-right"><span class="ck-prog"><b id="ckDone">0</b> / <span id="ckTotal">10</span> complete</span></div>
+            </div>
+            <div class="sec-body">
+              <div class="checklist" data-field="submission_checklist">
+                <div class="ck-group">
+                  <div class="ck-gh">Before you submit</div>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">SAM.gov registration active &amp; not expiring within 30 days<span class="ck-csrc">FAR 52.204-7</span></span><span class="ck-sev req">Required</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Annual representations &amp; certifications current in SAM<span class="ck-csrc">FAR 52.204-8</span></span><span class="ck-sev req">Required</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Current SPRS Basic Assessment posted (within 3 years)<span class="ck-csrc">DFARS 252.204-7019</span></span><span class="ck-sev dq">Disqualifying</span></label>
+                </div>
+                <div class="ck-group">
+                  <div class="ck-gh">With your submission</div>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Technical &amp; price volumes submitted by e-mail only<span class="ck-csrc">Section L(b)</span></span><span class="ck-sev req">Required</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Quote &le; 15 pages including price (resumes counted)<span class="ck-csrc">Section L(d)</span></span><span class="ck-sev req">Required</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Data-rights assertion table included for CLIN 0002<span class="ck-csrc">DFARS 252.227-7017</span></span><span class="ck-sev dq">Disqualifying</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Option CLIN 0002 priced separately at a fixed unit rate<span class="ck-csrc">Section M</span></span><span class="ck-sev req">Required</span></label>
+                </div>
+                <div class="ck-group">
+                  <div class="ck-gh">After you submit</div>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Register in WAWF for invoicing &amp; payment<span class="ck-csrc">DFARS 252.232-7006</span></span><span class="ck-sev adv">Advisory</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Confirm CAGE code appears on every volume<span class="ck-csrc">Section L</span></span><span class="ck-sev req">Required</span></label>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Calendar the Q&amp;A deadline (18 Jun 2026)<span class="ck-csrc">Section L</span></span><span class="ck-sev adv">Advisory</span></label>
+                </div>
               </div>
             </div>
           </section>
@@ -1247,6 +1594,7 @@ button{font-family:inherit}
           <div class="rail-card">
             <div class="rc-h">Jump to</div>
             <nav class="jump">
+              <a href="#sec-exec"><span class="jn">★</span>Summary</a>
               <a href="#sec-scorecard"><span class="jn">◆</span>Scorecard</a>
               <a href="#sec-classify"><span class="jn">01</span>Classification</a>
               <a href="#sec-incumbent"><span class="jn">02</span>Incumbent</a>
@@ -1255,6 +1603,9 @@ button{font-family:inherit}
               <a href="#sec-compliance"><span class="jn">04</span>Compliance<span class="jb bad">4</span></a>
               <a href="#sec-risks"><span class="jn">05</span>Risk register<span class="jb warn">4</span></a>
               <a href="#sec-reco"><span class="jn">06</span>Recommendation</a>
+              <a href="#sec-matrix"><span class="jn">07</span>Compliance matrix</a>
+              <a href="#sec-ko"><span class="jn">08</span>KO email</a>
+              <a href="#sec-checklist"><span class="jn">09</span>Submission checklist</a>
             </nav>
           </div>
         </aside>
@@ -1276,7 +1627,7 @@ button{font-family:inherit}
     <button class="dr-close" id="koClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="dr-meta">
-    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b4dfd5c6d1da9ad5d8c2d5c6d1cef4d0d8d59ad9ddd8">[email&#160;protected]</a></span></div>
+    <div class="dr-mrow"><span class="mk">To</span><span class="mv mono" data-field="ko_email.to"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="254e4457404b0b4449534457405f654149440b484c49">[email&#160;protected]</a></span></div>
     <div class="dr-mrow"><span class="mk">Re</span><span class="mv">SP4701-26-Q-0942 — Pre-quote clarifications (data rights, WD, page limit)</span></div>
   </div>
   <div class="dr-body">
@@ -1311,6 +1662,12 @@ Capture Lead, [Company]
   <span class="dt-k">Preview state</span>
   <span class="dt-sw" id="demoSw"></span>
   <span class="dt-state" id="demoState">Full report</span>
+</div>
+<!-- verdict-mode toggle (reviewer aid — Code: drive from audit.verdict_mode, remove this control) -->
+<div class="demo-toggle" id="vmToggle" style="bottom:106px">
+  <span class="dt-k">Verdict</span>
+  <span class="dt-sw" id="vmSw"></span>
+  <span class="dt-state" id="vmState">Score</span>
 </div>
 <!-- prelim-mode cycler (reviewer aid — shows only in metadata-only; Code drives data-prelim-mode from the case classifier) -->
 <div class="prelim-modes" id="prelimModes" style="display:none">
@@ -1385,6 +1742,149 @@ Capture Lead, [Company]
     show('.keydates', av.key_dates); show('.rail-deadline', av.key_dates);
   };
   window.applyAvailability();
+})();
+
+/* ───── not-a-solicitation gating (Design A + jump-nav strip — single source) ─────
+   When the engine flags is_not_solicitation, the report must NOT contradict its own
+   masthead. Suppress every analysis section AND its Jump-to entry + count badge,
+   leaving only §01 Classification beneath the NOT-A-SOLICITATION notice. This fixes
+   two observed states with one code path: (a) content stripped but jump-nav still
+   listing a phantom "05 Risk register 10" (W58 GFP); (b) banner shown but full
+   §03/§M/§04/§05/§06 still rendered under it (SPRRA not-a-sol run). Both must key off
+   the SAME is_not_solicitation flag that drives the masthead banner.
+   Code: call window.applyNotSolicitation(audit.is_not_solicitation === true). */
+(function(){
+  var SUPPRESS = ['#sec-scorecard','#sec-incumbent','#sec-scope','#sec-eval','#sec-compliance','#sec-risks','#sec-reco'];
+  window.applyNotSolicitation = function(isNotSol){
+    if(!isNotSol) return;
+    SUPPRESS.forEach(function(sel){
+      document.querySelectorAll(sel).forEach(function(el){ el.style.display='none'; });
+      var j=document.querySelector('.jump a[href="'+sel+'"]'); if(j) j.style.display='none';
+    });
+  };
+})();
+
+/* ───── verdict mode: score tiles vs decision gate ─────
+   Some verdicts are decisions, not scores — sole-source to a named vendor, or pass/fail eligibility
+   gates that cannot be cured inside the response window (SPRS, JCP, Part 145, jig approval). For those
+   the masthead numeric tiles are false precision. applyVerdictMode('gate') swaps the masthead tiles for
+   the gate conditions AND swaps §06 win-themes for the decision-gate card. Score tiles stay for genuinely
+   graded opportunities (a real best-value tradeoff with a populated win-probability).
+   Code: call window.applyVerdictMode(audit.verdict_mode === 'gate' ? 'gate' : 'score'),
+   set the masthead .mhv-word/.mhv-tag from data (e.g. "NO-BID"), and populate the gate_* data-fields. */
+(function(){
+  window.applyVerdictMode = function(mode){
+    var gate = mode === 'gate';
+    document.querySelectorAll('.mh-verdict[data-field="recommendation_block"]').forEach(function(v){ v.classList.toggle('is-gate', gate); });
+    var gc = document.getElementById('reco-gate'); if(gc) gc.style.display = gate ? '' : 'none';
+    document.querySelectorAll('#sec-reco .win-themes, #sec-reco .win-h').forEach(function(el){ el.style.display = gate ? 'none' : ''; });
+    var suf = document.querySelector('#sec-reco .st-amend'); if(suf) suf.style.display = gate ? 'none' : '';
+  };
+})();
+
+/* reviewer aid — verdict-mode toggle (Code: drive from audit.verdict_mode, remove this control) */
+(function(){
+  var t=document.getElementById('vmToggle'); if(!t) return;
+  var st=document.getElementById('vmState');
+  var word=document.querySelector('.mh-verdict[data-field="recommendation_block"] .mhv-word');
+  var tag=document.querySelector('.mh-verdict[data-field="recommendation_block"] .mhv-tag');
+  var orig={w:word?word.textContent:'', t:tag?tag.textContent:''};
+  var on=false;
+  function set(g){
+    on=g; window.applyVerdictMode(g?'gate':'score');
+    t.classList.toggle('on',g); if(st) st.textContent=g?'Decision gate':'Score';
+    if(word) word.textContent = g?'NO-BID':orig.w;
+    if(tag) tag.textContent = g?'Sole-source / eligibility gate — this is a decision, not a score.':orig.t;
+  }
+  t.addEventListener('click',function(){ set(!on); });
+})();
+
+/* ───── interactive decision gate — tick what you hold, the verdict resolves live ─────
+   Turns §06's gate from a static list into a decision instrument. All conditions checked → BID (green);
+   any unchecked → NO-BID (red, the conservative default that also prints correctly). */
+(function(){
+  var card=document.getElementById('reco-gate'); if(!card) return;
+  var rows=[].slice.call(card.querySelectorAll('.g-row'));
+  var pill=card.querySelector('.gs-pill'), cnt=card.querySelector('.gs-cnt');
+  var win=card.querySelector('.g-oc.win'), no=card.querySelector('.g-oc.no');
+  function resolve(){
+    var done=rows.filter(function(r){return r.classList.contains('checked');}).length;
+    var all=rows.length>0 && done===rows.length;
+    if(cnt) cnt.textContent=done+' / '+rows.length;
+    if(pill){ pill.textContent=all?'BID':'NO-BID'; pill.className='gs-pill '+(all?'go':'no'); }
+    if(win) win.classList.toggle('active', all);
+    if(no) no.classList.toggle('active', !all);
+  }
+  rows.forEach(function(r){
+    r.setAttribute('role','checkbox'); r.setAttribute('tabindex','0'); r.setAttribute('aria-checked','false');
+    function toggle(){ var c=r.classList.toggle('checked'); r.setAttribute('aria-checked', c?'true':'false'); resolve(); }
+    r.addEventListener('click', toggle);
+    r.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+  });
+  resolve();
+})();
+
+/* ───── masthead title normalizer ─────
+   Raw SAM item descriptions are ALL-CAPS and jam NSN/PN inline ("HOUSING ASSY,ACTUAT NSN:… P/N:…"),
+   which renders as an unreadable hero title. Pull the part numbers into a clean mono sub-line and
+   de-shout the description. No-op on already-clean titles. (Engine should also emit a clean title;
+   this protects the display either way.) */
+(function(){
+  var el=document.querySelector('.mh-title'); if(!el) return;
+  var raw=(el.textContent||'').trim(); if(!raw) return;
+  var NSN=/NSN[:\s#]*([0-9]{4}-?[0-9]{2}-?[0-9]{3}-?[0-9]{4}|[0-9][0-9-]{8,})/i;
+  var PN=/P\/?N[:\s#]*([A-Za-z0-9][A-Za-z0-9\-\/.]{3,})/i;
+  var ids=[], m;
+  if((m=raw.match(NSN))){ ids.push(['NSN', m[1]]); }
+  if((m=raw.match(PN))){ ids.push(['P/N', m[1]]); }
+  var body=raw.replace(new RegExp(NSN.source,'ig'),'').replace(new RegExp(PN.source,'ig'),'')
+    .replace(/^\d{2}--\s*/,'')
+    .replace(/,(\S)/g,', $1').replace(/\s{2,}/g,' ').replace(/[\s,;:·\-]+$/,'').trim();
+  var letters=body.replace(/[^A-Za-z]/g,'').length, upper=body.replace(/[^A-Z]/g,'').length;
+  if(letters>3 && upper/letters>0.7){
+    body=body.toLowerCase().replace(/[a-z0-9][a-z0-9'\/.-]*/g,function(w){
+      return /\d/.test(w) ? w.toUpperCase() : w.replace(/(^|[-.\/])([a-z])/g,function(_,s,c){return s+c.toUpperCase();});
+    });
+  }
+  if(body){ el.textContent=body; }
+  if(ids.length){
+    el.style.marginBottom='7px';
+    var sub=document.createElement('div'); sub.className='mh-ids';
+    sub.innerHTML=ids.map(function(p){return '<span><i>'+p[0]+'</i>'+p[1]+'</span>';}).join('');
+    el.insertAdjacentElement('afterend', sub);
+  }
+})();
+
+/* ───── jump-nav scroll-spy — highlights the section you're reading (premium navigator feel) ───── */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.jump a[href^="#"]'));
+  if(!links.length || !('IntersectionObserver' in window)) return;
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var id='#'+e.target.id;
+        links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href')===id); });
+      }
+    });
+  },{rootMargin:'-18% 0px -72% 0px'});
+  links.forEach(function(a){ var s=document.querySelector(a.getAttribute('href')); if(s) io.observe(s); });
+})();
+
+/* ───── §09 submission checklist — live progress + per-audit session persistence ───── */
+(function(){
+  var cl=document.querySelector('.checklist'); if(!cl) return;
+  var items=[].slice.call(cl.querySelectorAll('.ck-item input'));
+  var doneEl=document.getElementById('ckDone'), totalEl=document.getElementById('ckTotal');
+  if(totalEl) totalEl.textContent=items.length;
+  var solEl=document.querySelector('[data-field="solicitation_number"]');
+  var key='faraudit:ck:'+((solEl&&solEl.textContent.trim())||'audit');
+  var saved={}; try{ saved=JSON.parse(sessionStorage.getItem(key))||{}; }catch(e){}
+  function upd(){ if(doneEl) doneEl.textContent=items.filter(function(i){return i.checked;}).length; }
+  items.forEach(function(i,idx){
+    if(saved[idx]) i.checked=true;
+    i.addEventListener('change',function(){ saved[idx]=i.checked; try{ sessionStorage.setItem(key,JSON.stringify(saved)); }catch(e){} upd(); });
+  });
+  upd();
 })();
 
 /* ───── risk accordions ───── */
@@ -1656,12 +2156,48 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        Keep the :root token block in a GLOBAL stylesheet (borders/cards/shadows depend on it).
        No external JS libs required — all interactions are vanilla.
 
+     DECISION GATE — verdict_mode wiring (the interactive bid/no-bid instrument)
+       Some verdicts are decisions, not scores (sole-source to a named vendor; pass/fail
+       eligibility gates that can't be cleared in the response window). The engine now persists
+       verdict_mode + a gates[] array. Render contract:
+
+       window.applyVerdictMode(vm.verdict_mode === 'gate' ? 'gate' : 'score')   // call once on load
+         gate  → masthead numeric tiles (.mhv-metrics) hide, .mhv-gates shows; §06 win-themes hide,
+                 #reco-gate (.gate-card) shows. Score is null/suppressed (no false precision).
+         score → unchanged scored layout (keep for genuine tradeoffs w/ a populated win-probability).
+
+       DATA  (compJson.verdict.* — author the markup, then loop gates[]):
+         verdict.label          → masthead .mhv-word           (e.g. "NO-BID")
+         verdict.tagline        → masthead .mhv-tag
+         verdict.gate_verdict   → .gate-verdict   (+ class .nobid red | .cond amber)
+         verdict.gate_lead      → .gc-lead
+         verdict.gates[]        → REPEAT one .g-row per item AND one masthead .mhv-gate per item.
+                                  item = { title, detail, clause, blocker }
+                                    title   → .gt                     (the condition, ≤8 words)
+                                    detail  → .gd                     (why it gates)
+                                    clause  → <code> inside .gd       (e.g. "DFARS 252.204-7020"; omit if none)
+                                    blocker → .g-blocker              (e.g. "UNFIXABLE IN 20 DAYS"; omit if none)
+         verdict.outcome_win    → .g-oc.win text
+         verdict.outcome_no     → .g-oc.no text
+         verdict.pearl          → .g-pearl text  ("the catch worth the subscription")
+
+       The .g-status "N / M cleared" denominator + the live resolve (all checked → BID green,
+       any unchecked → NO-BID red) are handled by the resolver IIFE off rows.length — Code does NOT
+       compute it; just render the rows. NO-BID is pre-set active so print/PDF default is correct.
+       Reference impl + sample (SPRRA 3-gate case) is live in this file's #reco-gate + .mhv-gates.
+
+     SCORE vs CONFIDENCE — they measure different things; label so a glance can't conflate them.
+       §01 ring = how sure we are of the DOCUMENT TYPE (94% = "almost certainly an RFQ").
+       Masthead Fit Score = opportunity viability for a generic small biz (low = hard to win).
+       Ring label is "Doc-type" (not bare "Confidence"); confidence_label should read like
+       "High — doc type". For hard/conditional opps the gate (above) suppresses the score entirely,
+       which is the real fix for "20/100 next to 94%" reading as a contradiction.
+
      OLD FILES TO DELETE
        public/audit-report.html
        public/audit-report-design.html
        public/audit-report-checkpoint*.html
        public/*.bak
      ═══════════════════════════════════════════════════════════════════════════ -->
-<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script>
-</body>
+<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script></body>
 </html>
