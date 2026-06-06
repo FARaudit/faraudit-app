@@ -1306,6 +1306,168 @@ export function applyRuling3Cap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CYCLE 2 (2026-06-06) — FACTS-ONLY DERIVATION HELPERS (parity mirror)
+// See src/lib/audit-engine.ts for full doctrine.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const P0_TRAP_CLAUSES = new Set(["252.223-7008", "252.204-7018", "252.225-7060"]);
+export function derivePriorityFromFinding(category: RiskFinding["category"], citation: string): "P0" | "P1" | "P2" {
+  if (category === "Disqualification") return "P0";
+  if (category === "DFARS_Trap") {
+    const cleaned = citation.replace(/^\s+|\s+$/g, "");
+    return P0_TRAP_CLAUSES.has(cleaned) ? "P0" : "P1";
+  }
+  if (category === "Compliance") return citation ? "P1" : "P2";
+  if (category === "Schedule") return citation ? "P1" : "P2";
+  return citation ? "P1" : "P2";
+}
+
+export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
+  const hasAnchor = DOCUMENT_ANCHOR_RE.test(f.text);
+  return {
+    text: f.text,
+    title: f.title,
+    priority: derivePriorityFromFinding(f.category, f.citation),
+    category: f.category === "DFARS_Trap" ? "DFARS trap" : f.category,
+    citation: f.citation || undefined,
+    provenance: hasAnchor ? "verified" : "inferred",
+    faraudit_action: f.faraudit_action || undefined,
+    offerorActionRequired: f.offerorActionRequired
+  };
+}
+
+function mapPrioritizedToFinding(r: PrioritizedRisk): RiskFinding {
+  const cat = r.category || "";
+  let category: RiskFinding["category"];
+  if (/disqualif|market[-\s]?structure|no[-\s]?bid|sole[-\s]?source/i.test(cat)) category = "Disqualification";
+  else if (/dfars|\btrap\b|hex[-\s]?chrome|cmmc|telecom/i.test(cat)) category = "DFARS_Trap";
+  else if (/schedule|deliver|lead[-\s]?time|sprs[-\s]?lag/i.test(cat)) category = "Schedule";
+  else if (/\bprice|pricing|reverse[-\s]?auction|fob|freight/i.test(cat)) category = "Price";
+  else if (/evaluation|lpta|\bsection\s*m/i.test(cat)) category = "Evaluation";
+  else if (/technical|spec/i.test(cat)) category = "Technical";
+  else category = "Compliance";
+  return {
+    title: r.title ?? cleanRiskTitle(r.text),
+    text: r.text,
+    category,
+    citation: r.citation ?? "",
+    faraudit_action: r.faraudit_action ?? "",
+    offerorActionRequired: r.offerorActionRequired ?? false
+  };
+}
+
+export function deriveEvalBasis(text: string | null | undefined): { eval_basis: string | null; eval_basis_label: string | null } {
+  if (!text || typeof text !== "string" || text.trim().length === 0) {
+    return { eval_basis: null, eval_basis_label: null };
+  }
+  const t = text.toLowerCase();
+  if (/\bfar\s*15\.101-1\b/.test(t) || /best[-\s]?value\s+tradeoff/.test(t)) {
+    return { eval_basis: text.trim(), eval_basis_label: "Best-value tradeoff" };
+  }
+  if (/\bfar\s*15\.101-2\b/.test(t) || /\blpta\b/.test(t) || /lowest[-\s]?price[-\s]?technically/.test(t)) {
+    return { eval_basis: text.trim(), eval_basis_label: "LPTA" };
+  }
+  if (/\bfar\s*14\.101\b/.test(t) || /sealed[-\s]?bid/.test(t) || /lowest\s+price/.test(t)) {
+    return { eval_basis: text.trim(), eval_basis_label: "Lowest price" };
+  }
+  return { eval_basis: text.trim(), eval_basis_label: null };
+}
+
+export function deriveSubmissionStatusMeta(req: string): { status: SubmissionRequirement["status"]; meta: SubmissionRequirement["meta"] } {
+  const t = (req || "").toLowerCase();
+  if (/\bregist|\bsam\.gov|\buei\b|\bduns\b/.test(t)) return { status: "todo", meta: "Action" };
+  if (/\bpage\s*limit|\bfont|\bformat|\bvolume\b|\bmargin/.test(t)) return { status: "ok", meta: "Clear" };
+  if (/\bpast\s*performance|\breferenc/.test(t)) return { status: "todo", meta: "Action" };
+  if (/\bdemo|\boral|\bpresentation|\bsite\s*visit/.test(t)) return { status: "warn", meta: "At risk" };
+  if (/\brepresent|\bcertif|\backnowledg/.test(t)) return { status: "todo", meta: "Action" };
+  if (/\bclearanc|\bts\/sci|\bsecret|\bclassified/.test(t)) return { status: "warn", meta: "At risk" };
+  return { status: "todo", meta: "Action" };
+}
+
+export function deriveEvaluationFactorsFromRaw(
+  raw: EvaluationFactorRaw[] | undefined,
+  evalBasisText: string | null | undefined
+): EvaluationFactor[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const label = deriveEvalBasis(evalBasisText).eval_basis_label;
+  const isLpta = label === "LPTA";
+  const isBestValue = label === "Best-value tradeoff";
+  return raw.map((f, i) => {
+    const name = String(f?.name ?? "");
+    const importanceRaw = String(f?.importance_text ?? "");
+    const isPrice = /^(price|cost)\b/i.test(name);
+    if (isPrice) {
+      const importance = isLpta ? "Determines award"
+        : isBestValue ? (importanceRaw || "Least important · tradeoff lever")
+        : (importanceRaw || "Price factor");
+      const coverage = isLpta ? "Lowest price wins" : "Tradeoff";
+      return { rank: i + 1, name, importance, coverage, coverage_pct: 0, tone: "mute" as const, note: "" };
+    }
+    const importance = /^price\s*$/i.test(importanceRaw) ? "Most important" : importanceRaw;
+    return {
+      rank: i + 1,
+      name,
+      importance,
+      coverage: "—",
+      coverage_pct: 0,
+      tone: "mute" as const,
+      note: "Complete your capability statement to see fit score"
+    };
+  });
+}
+
+export function deriveSubmissionRequirementsFromRaw(raw: string[] | undefined): SubmissionRequirement[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const seen = new Set<string>();
+  const out: SubmissionRequirement[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const fp = trimmed.toLowerCase().replace(/[^\w\s]+/g, " ").replace(/\s+/g, " ").trim();
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    const { status, meta } = deriveSubmissionStatusMeta(trimmed);
+    out.push({ requirement: trimmed, status, meta });
+  }
+  return out;
+}
+
+export function dedupePrioritizedNoCap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
+  const byKey = new Map<string, PrioritizedRisk>();
+  for (const r of risks) {
+    const key = `${riskThemeKey(r.text, r.citation)}|${normalizeClauseKey(r.citation)}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, r); continue; }
+    const prevHasAction = (prev.faraudit_action ?? "").trim().length > 0;
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    if (curHasAction && !prevHasAction) { byKey.set(key, r); continue; }
+    if (!curHasAction && prevHasAction) continue;
+    if (PRIORITY_RANK[r.priority] < PRIORITY_RANK[prev.priority]) byKey.set(key, r);
+    else if (PRIORITY_RANK[r.priority] === PRIORITY_RANK[prev.priority] && r.text.length > prev.text.length) byKey.set(key, r);
+  }
+  const round1 = Array.from(byKey.values());
+  const themeWithActionKeys = new Set<string>();
+  for (const r of round1) {
+    if ((r.faraudit_action ?? "").trim().length > 0) {
+      themeWithActionKeys.add(riskThemeKey(r.text, r.citation));
+    }
+  }
+  const deduped: PrioritizedRisk[] = [];
+  const includedTexts = new Set<string>();
+  for (const r of round1) {
+    const tKey = riskThemeKey(r.text, r.citation);
+    const curHasAction = (r.faraudit_action ?? "").trim().length > 0;
+    if (themeWithActionKeys.has(tKey) && !curHasAction) continue;
+    if (includedTexts.has(r.text)) continue;
+    includedTexts.add(r.text);
+    deduped.push(r);
+  }
+  deduped.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  return deduped;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 
 export async function runAudit(input: AuditInput): Promise<AuditResult> {
   const { solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat } = input;
@@ -1526,71 +1688,32 @@ JSON only — one key: risk_findings.`;
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
-  // Section M/L hoist — Call 1 (Overview) emits these structured fields per
-  // CEO spec (Jun 4 2026); fold them onto complianceJson so the renderer
-  // reads a single canonical surface for the §M/§L block. Defensively
-  // normalize the shape: rank gets re-numbered 1-indexed in stated order;
-  // Price/Cost factor always reads as Tradeoff/mute; any other factor with
-  // missing coverage data falls back to the no-profile shape; the summary
-  // is recomputed from current warn+todo counts so the pill always reflects
-  // the data the rows render.
-  if (overviewJson.eval_basis !== undefined) complianceJson.eval_basis = overviewJson.eval_basis;
-  if (overviewJson.eval_basis_label !== undefined) {
-    // Pill is capped at 24 chars by design (.sh-pill width); truncate
-    // defensively if the model emitted something longer.
-    const lbl = overviewJson.eval_basis_label;
-    complianceJson.eval_basis_label = lbl == null ? null : String(lbl).slice(0, 24);
+  // ━━ Cycle 2 (2026-06-06) — facts-only assembly (parity mirror) ━━━━━━━━━━━
+  const evalBasisDerived = deriveEvalBasis(overviewJson.eval_basis_text ?? null);
+  complianceJson.eval_basis = evalBasisDerived.eval_basis;
+  complianceJson.eval_basis_label = evalBasisDerived.eval_basis_label == null
+    ? null
+    : evalBasisDerived.eval_basis_label.slice(0, 24);
+  complianceJson.evaluation_factors = deriveEvaluationFactorsFromRaw(
+    overviewJson.evaluation_factors_raw,
+    overviewJson.eval_basis_text ?? null
+  );
+  complianceJson.submission_requirements = deriveSubmissionRequirementsFromRaw(
+    overviewJson.submission_requirements_raw
+  );
+  {
+    const reqs = complianceJson.submission_requirements;
+    if (Array.isArray(reqs) && reqs.length > 0) {
+      const toClear = reqs.filter((r) => r.status === "warn" || r.status === "todo").length;
+      complianceJson.submission_summary = toClear > 0 ? `${toClear} to clear` : null;
+    } else {
+      complianceJson.submission_summary = null;
+    }
   }
-  if (Array.isArray(overviewJson.evaluation_factors)) {
-    complianceJson.evaluation_factors = overviewJson.evaluation_factors.map((f, i) => {
-      const name = String(f?.name ?? "");
-      const isPrice = /^(price|cost)\b/i.test(name);
-      const tone: EvaluationFactor["tone"] = isPrice ? "mute"
-        : (f?.tone === "good" || f?.tone === "warn" || f?.tone === "bad" || f?.tone === "mute") ? f.tone
-        : "mute";
-      // No capability profile available to the engine — non-price factors
-      // get the "no profile" shape regardless of what the model returned.
-      const coverage = isPrice ? "Tradeoff" : (f?.coverage && f.coverage !== "—" ? "—" : (f?.coverage ?? "—"));
-      const note = isPrice ? (f?.note ?? "")
-        : (coverage === "—" ? "Complete your capability statement to see fit score" : String(f?.note ?? ""));
-      const coverage_pct = isPrice ? 0
-        : (typeof f?.coverage_pct === "number" && coverage !== "—" ? Math.max(0, Math.min(100, Math.round(f.coverage_pct))) : 0);
-      return {
-        rank: i + 1,
-        name,
-        importance: String(f?.importance ?? ""),
-        coverage,
-        coverage_pct,
-        tone,
-        note
-      };
-    });
-  } else {
-    complianceJson.evaluation_factors = [];
-  }
-  if (Array.isArray(overviewJson.submission_requirements)) {
-    complianceJson.submission_requirements = overviewJson.submission_requirements.map((r) => {
-      const status: SubmissionRequirement["status"] =
-        r?.status === "ok" || r?.status === "warn" || r?.status === "todo" ? r.status : "todo";
-      const meta: SubmissionRequirement["meta"] =
-        status === "ok" ? "Clear" : status === "warn" ? "At risk" : "Action";
-      return { requirement: String(r?.requirement ?? ""), status, meta };
-    });
-  } else {
-    complianceJson.submission_requirements = [];
-  }
-  // Recompute submission_summary from the post-normalization shape so the
-  // "N to clear" pill always matches the rows being rendered, and so the
-  // renderer's hide-when-empty gate (false-precision) flips on the right
-  // signal. null when no requirements OR all are "ok".
-  const reqs = complianceJson.submission_requirements;
-  if (Array.isArray(reqs) && reqs.length > 0) {
-    const toClear = reqs.filter((r) => r.status === "warn" || r.status === "todo").length;
-    complianceJson.submission_summary = toClear > 0 ? `${toClear} to clear` : null;
-  } else {
-    complianceJson.submission_summary = null;
-  }
-  let prioritized = assignRiskPriority(risksJson);
+
+  let prioritized: PrioritizedRisk[] = Array.isArray(risksJson.risk_findings)
+    ? risksJson.risk_findings.map(mapFindingToPrioritized)
+    : [];
 
   // Fallback — never let prioritized_risks be empty. Synthesize one entry that
   // surfaces context (DFARS trap, thin source, manual review needed).
@@ -1635,11 +1758,14 @@ JSON only — one key: risk_findings.`;
     ?? null;
   if (piidSource) complianceJson.piid_decoded = decodePIID(piidSource);
 
-  // Ruling 3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
-  prioritized = applyRuling3Cap(prioritized);
+  // Cycle 2 Brain Q5 (2026-06-06) — parity mirror. Dedup-no-cap. See
+  // src/lib/audit-engine.ts. Progressive disclosure at render handles density.
+  prioritized = dedupePrioritizedNoCap(prioritized);
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   risksJson.prioritized_risks = prioritized;
+  // Cycle 2: canonical risk_findings[] surface (parity mirror).
+  risksJson.risk_findings = prioritized.map(mapPrioritizedToFinding);
 
   // Composite scoring
   const farCount = complianceJson.far_clauses?.length || 0;
