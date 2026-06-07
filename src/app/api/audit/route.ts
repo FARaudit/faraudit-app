@@ -337,15 +337,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ━━ V2 shadow wire-up (AUDIT_ENGINE_V2=true, pdfBuffer-only inputs) ━━
+    // ━━ V2 shadow wire-up (AUDIT_ENGINE_V2=true, inline-bytes arms) ━━
     // Runs runAuditV2 after V1 success and persists structured V2 output
     // into compliance_json.v2_shadow. ZERO impact on V1 user response —
     // every error is swallowed; the client has already received V1's JSON
-    // shape downstream. Visible in DB for inspection (Fix 7 verification).
-    if (AUDIT_V2_ENABLED && pdfBuffer) {
+    // shape downstream. Visible in DB for inspection.
+    //
+    // Hotfix Jun 7 2026 — extended gate to include sam_fetched (the bulk of
+    // prod traffic). Original gate only matched user uploads via pdfBuffer;
+    // SAM-fetched PDFs land in pdfBase64 and skipped V2 entirely. Now we
+    // derive a V2-eligible Buffer from whichever inline arm has bytes
+    // locally. Out-of-scope: Files API (no local bytes), image, text arms.
+    const v2Buffer: Buffer | null = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
+    if (AUDIT_V2_ENABLED && v2Buffer) {
       const v2Start = Date.now();
       try {
-        const v2Result = await runAuditV2(pdfBuffer);
+        const v2Result = await runAuditV2(v2Buffer);
         const v2Shadow = {
           path: "pdf",
           judgment: v2Result.judgment,
