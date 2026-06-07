@@ -2351,3 +2351,68 @@ JSON only — one key: risk_findings.`;
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CYCLE 2 — DOCUMENT-EXTRACTION PIPELINE (v2)
+//
+// Brain ruling 2026-06-07: facts come from the document, not from the model.
+// Activated when AUDIT_ENGINE_V2=true (cycle-2 branch + preview only — prod
+// main untouched). Architecture: deterministic extract → single judgment LLM
+// call (structured outputs). The 3-call legacy runAudit() above is unchanged
+// and remains the default path until V2 sign-off + paired Design ship.
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { extractText as _v2ExtractText } from "./pdf-text-extractor";
+import { detectSections as _v2DetectSections } from "./section-boundary-detector";
+import { extractAllFacts as _v2ExtractAllFacts } from "./section-extractors";
+import { runJudgment as _v2RunJudgment, type AuditJudgment as _v2AuditJudgment } from "./audit-judgment";
+import {
+  matrixRollup as _v2MatrixRollup,
+  dedupRisks as _v2DedupRisks,
+  submissionChecklistFiltered as _v2SubmissionChecklistFiltered,
+} from "../app/audit/[id]/_normalizers";
+
+export interface AuditV2Result {
+  sectionBag: ReturnType<typeof _v2DetectSections>;
+  facts: ReturnType<typeof _v2ExtractAllFacts>;
+  judgment: _v2AuditJudgment;
+  normalizedClauses: ReturnType<typeof _v2MatrixRollup>;
+  normalizedRisks: ReturnType<typeof _v2DedupRisks>;
+  submissionChecklist: ReturnType<typeof _v2SubmissionChecklistFiltered>;
+  warnings: string[];
+}
+
+export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
+  const doc = await _v2ExtractText(pdfBuffer);
+  const sectionBag = _v2DetectSections(doc);
+
+  // Condition 1 — fail loud on critical-section gaps. Partial audit emits
+  // with a warning rather than throwing; renderer surfaces "extraction
+  // incomplete — verify" on the affected section.
+  const criticalMissing = sectionBag.missingSections.filter((k) =>
+    ["B", "C", "L", "M"].includes(k)
+  );
+  const warnings: string[] = [...sectionBag.warnings];
+  if (criticalMissing.length > 0) {
+    warnings.push(
+      `[audit-v2] Critical sections not detected: ${criticalMissing.join(", ")} — audit may have gaps`
+    );
+  }
+
+  const facts = _v2ExtractAllFacts(sectionBag.sections);
+  for (const w of facts.extractionWarnings) warnings.push(`[facts] ${w}`);
+
+  const judgment = await _v2RunJudgment(facts);
+
+  return {
+    sectionBag,
+    facts,
+    judgment,
+    normalizedClauses: _v2MatrixRollup(facts.clauses),
+    normalizedRisks: _v2DedupRisks(judgment.risks),
+    submissionChecklist: _v2SubmissionChecklistFiltered(facts),
+    warnings,
+  };
+}
+
+export const AUDIT_V2_ENABLED = process.env.AUDIT_ENGINE_V2 === "true";

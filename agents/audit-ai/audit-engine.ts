@@ -1994,3 +1994,27 @@ JSON only — one key: risk_findings.`;
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CYCLE 2 — DOCUMENT-EXTRACTION PIPELINE (v2) — PARITY DEFERRED
+//
+// Brain ruling 2026-06-07 ships the document-extraction rebuild in
+// src/lib/audit-engine.ts (runAuditV2 + AUDIT_V2_ENABLED). Per the
+// PARITY NOTE at the top of src/lib/sam.ts, this file's runtime (Railway
+// Root Directory = agents/audit-ai/) cannot import from ../../src/lib at
+// container build time — src/ is not packaged.
+//
+// PARITY WIRING DEFERRED until P0-3 (Audit-AI Railway worker stabilization,
+// down since May 21 2026). When the worker is restored, the v2 pipeline
+// will be vendored into this directory as:
+//   agents/audit-ai/pdf-text-extractor.ts        (byte-equivalent copy)
+//   agents/audit-ai/section-boundary-detector.ts (byte-equivalent copy)
+//   agents/audit-ai/section-extractors.ts        (byte-equivalent copy)
+//   agents/audit-ai/audit-judgment.ts            (byte-equivalent copy)
+//   agents/audit-ai/_normalizers.ts              (byte-equivalent copy)
+// matching the existing sam.ts vendoring pattern.
+//
+// Vercel /api/audit path (the primary surface for Cycle 2) uses
+// src/lib/audit-engine.ts and IS unblocked. The Railway audit-AI cron will
+// pick up the v2 pipeline once vendored.
+// ═══════════════════════════════════════════════════════════════════════════

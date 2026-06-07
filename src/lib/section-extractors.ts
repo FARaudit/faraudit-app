@@ -83,22 +83,46 @@ export function extractClins(section: DetectedSection | null): ClinItem[] {
   const clins: ClinItem[] = [];
   const lines = section.text.split("\n");
 
-  const clinPattern = /^(\d{4}[A-Z]?)\s+(.+)/;
+  // CLIN pattern handles three real-world layouts observed in fixtures:
+  //  SF-18 inline:    "0001  DESCRIPTION  QTY UNIT"     → match[2] populated
+  //  SF-1449 stacked: "0001"                            → match[2] undefined
+  //                   "INTAKE PLUGS, MIL-DTL-..."
+  //  Indented:        "  0001 ..." (leading whitespace from PDF table extraction)
+  // The (?:\s+(.+))? group is OPTIONAL so standalone CLIN numbers also match.
+  const clinPattern = /^\s*(\d{4}[A-Z]?)(?:\s+(.+))?$/;
   const contractTypePattern = /Firm\s+Fixed\s+Price|Time\s+and\s+Materials?|Cost\s+Plus|FFP\b/i;
   const quantityAmbPattern = /\(SET\s+OF\s+(\d+)\)\s*[—\-–]?\s*(\d+)\s*(Each|EA|LOT)/i;
 
+  const seenLineItems = new Set<string>();
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = lines[i];
     const match = clinPattern.exec(line);
     if (!match) continue;
     const lineItem = match[1];
-    const descriptionLines = [match[2]];
+    // Dedup: §B / §E / §F all reference the same CLINs — keep the first
+    // (typically richest from §B) occurrence.
+    if (seenLineItems.has(lineItem)) continue;
+    seenLineItems.add(lineItem);
+
+    const inlineDesc = (match[2] ?? "").trim();
+    const descriptionLines: string[] = inlineDesc.length > 0 ? [inlineDesc] : [];
+
+    // If description is on the next line(s), collect until the next CLIN or
+    // a blank line.
     let j = i + 1;
-    while (j < lines.length && !/^\d{4}/.test(lines[j].trim()) && lines[j].trim().length > 0) {
-      descriptionLines.push(lines[j].trim());
+    while (j < lines.length) {
+      const nextRaw = lines[j];
+      const nextTrim = nextRaw.trim();
+      if (nextTrim.length === 0) break;
+      // Stop at the next CLIN-shaped line
+      if (/^\s*\d{4}[A-Z]?(\s|$)/.test(nextRaw)) break;
+      // Stop on cover-form labels (SF-1449 / SF-18 noise)
+      if (/^\s*(QUANTITY|UNIT|PRICE|AMOUNT|See Schedule|See Section|\(Use Reverse)/i.test(nextTrim)) break;
+      descriptionLines.push(nextTrim);
       j++;
+      if (descriptionLines.length >= 4) break; // cap continuation
     }
-    const fullDescription = descriptionLines.join(" ");
+    const fullDescription = descriptionLines.join(" ").trim();
 
     const qtyMatch = /(\d+)\s*(Each|EA|LOT|Set|Unit)/i.exec(fullDescription);
     const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : null;
@@ -274,12 +298,24 @@ export function extractEvaluationFactors(section: DetectedSection | null): Evalu
     }
   }
 
-  if (factors.length === 0 && method !== "other") {
-    factors.push({
-      factor: method === "LPTA" ? "Lowest Price Technically Acceptable" : "Best Value",
-      weight: null,
-      method,
-    });
+  // Attachment-reference catch — §M sometimes says "see attachment X" with
+  // the actual factor list living outside §M proper. Still emit a row so
+  // downstream renders convey the method + a verify-attachment cue.
+  if (factors.length === 0) {
+    const attachRef = /see\s+(?:attachment|exhibit|section)\s+([A-Z0-9-]+)/i.exec(text);
+    if (attachRef) {
+      factors.push({
+        factor: `Evaluation criteria in ${attachRef[0]} — review attachment before bid`,
+        weight: null,
+        method,
+      });
+    } else if (method !== "other") {
+      factors.push({
+        factor: method === "LPTA" ? "Lowest Price Technically Acceptable" : "Best Value",
+        weight: null,
+        method,
+      });
+    }
   }
   return factors;
 }
