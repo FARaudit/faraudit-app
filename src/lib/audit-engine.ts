@@ -2408,6 +2408,41 @@ export interface AuditV2Result {
   normalizedRisks: ReturnType<typeof _v2DedupRisks>;
   submissionChecklist: ReturnType<typeof _v2SubmissionChecklistFiltered>;
   warnings: string[];
+  // Fix 8 — populated only on the runAuditV2Metadata path (no PDF source).
+  // null/absent for the standard PDF-driven pipeline.
+  metadata_brief?: MetadataBrief | null;
+}
+
+// Fix 8 — metadata-only V2 path. Output of runAuditV2Metadata when SAM.gov
+// returned a notice but no PDF is retrievable (pdf_source="sam_unavailable").
+// Pure deterministic — zero LLM cost. The brief gives the bidder enough
+// signal to decide whether to chase the CO for the full solicitation.
+export interface MetadataBrief {
+  eligibility: {
+    set_aside_type: string | null;
+    naics: string | null;
+    notes: string;
+  };
+  synopsis_summary: string;
+  missing_intel: string[];
+  co_contact: { name: string | null; email: string | null };
+  deadline: {
+    iso: string | null;
+    formatted: string;
+    days_remaining: number | null;
+  };
+}
+
+export interface MetadataOnlyInput {
+  noticeId: string;
+  title: string;
+  description: string;
+  naicsCode: string | null;
+  typeOfSetAside: string | null;
+  postedDate: string | null;
+  responseDeadLine: string | null;
+  noticeType: string | null;
+  agency: string | null;
 }
 
 // ─── Fix 7 — WRONG_DOC pre-extraction detector ─────────────────────────────
@@ -2523,6 +2558,199 @@ function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
     warnings: [
       `[audit-v2] WRONG_DOC short-circuit: ${detected}${piid ? ` (PIID ${piid})` : ""} — extraction + judgment skipped.`,
     ],
+  };
+}
+
+// ─── Fix 8 — metadata-only V2 path (pdf_source = sam_unavailable) ──────────
+// Synthesizes an AuditV2Result from SAM.gov synopsis + metadata only. All
+// derivations deterministic; zero LLM cost. The judgment field carries
+// type="metadata_only" + verdict="conditional" so the renderer can switch
+// to a stripped-down "brief" view that surfaces eligibility, deadline math,
+// CO contact, and what's still missing.
+
+function _v2ParseDeadline(iso: string | null): { iso: string | null; formatted: string; days_remaining: number | null } {
+  if (!iso) return { iso: null, formatted: "Not specified", days_remaining: null };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { iso, formatted: iso, days_remaining: null };
+  const now = new Date();
+  const days = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const formatted = d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return { iso, formatted, days_remaining: days };
+}
+
+function _v2ComputeUrgency(days: number | null): number {
+  if (days === null) return 0;
+  if (days < 0) return 0;       // expired — no urgency
+  if (days < 3) return 100;
+  if (days < 7) return 75;
+  if (days < 14) return 50;
+  if (days < 30) return 25;
+  return 10;
+}
+
+function _v2AnalyzeEligibility(naics: string | null, setAside: string | null): MetadataBrief["eligibility"] {
+  const sa = (setAside || "").trim();
+  let notes: string;
+  if (!sa) {
+    notes = "Full and open competition (no set-aside indicated). Eligibility depends on NAICS size standard and contractor capability — verify NAICS size against your company's averages.";
+  } else if (/^8\(?a\)?$/i.test(sa) || /^8A$/i.test(sa)) {
+    notes = "8(a) sole-source or competitive set-aside. Eligibility limited to certified 8(a) firms only.";
+  } else if (/HUBZ/i.test(sa)) {
+    notes = "HUBZone set-aside. Eligibility limited to SBA-certified HUBZone firms with current eligibility status.";
+  } else if (/SDVOSB|SDB-VO|VOSB[-\s]?SDVOSB/i.test(sa)) {
+    notes = "Service-Disabled Veteran-Owned Small Business set-aside. Eligibility limited to SDVOSB-certified firms.";
+  } else if (/EDWOSB/i.test(sa)) {
+    notes = "Economically Disadvantaged Women-Owned Small Business set-aside. Eligibility limited to EDWOSB-certified firms.";
+  } else if (/WOSB/i.test(sa)) {
+    notes = "Women-Owned Small Business set-aside. Eligibility limited to WOSB-certified firms.";
+  } else if (/SB|small[-\s]?business/i.test(sa)) {
+    notes = `Small Business set-aside${naics ? ` (NAICS ${naics})` : ""}. Eligibility limited to firms under the SBA size standard for this NAICS — verify size status before pursuing.`;
+  } else {
+    notes = `Set-aside: ${sa}. Verify eligibility before pursuing — consult SAM.gov set-aside reference.`;
+  }
+  return { set_aside_type: sa || null, naics: naics || null, notes };
+}
+
+function _v2ExtractSynopsisSummary(description: string): string {
+  const cleaned = description.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "No synopsis text provided by SAM.gov.";
+  // Pull up to first 3 sentences ending in . ! or ?, cap at 400 chars.
+  const sentenceRe = /[^.!?]+[.!?]+/g;
+  const sentences: string[] = [];
+  let m: RegExpExecArray | null;
+  let total = 0;
+  while ((m = sentenceRe.exec(cleaned)) !== null && sentences.length < 3) {
+    const s = m[0].trim();
+    if (s.length === 0) continue;
+    if (total + s.length > 400) break;
+    sentences.push(s);
+    total += s.length;
+  }
+  if (sentences.length === 0) return cleaned.slice(0, 400) + (cleaned.length > 400 ? "…" : "");
+  return sentences.join(" ");
+}
+
+function _v2ExtractCoContact(description: string): { name: string | null; email: string | null } {
+  // Email regex — generic, captures the first plausible email in the synopsis.
+  const emailMatch = description.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/);
+  const email = emailMatch ? emailMatch[0] : null;
+  // Name detection: look for a capitalized two-token name immediately before
+  // the email or after "Contracting Officer:" / "POC:" / "Contact:" markers.
+  let name: string | null = null;
+  const labelMatch = description.match(/(?:Contracting Officer|Contract Specialist|POC|Contact|Point of Contact)\s*[:\-]?\s*([A-Z][a-z]+ [A-Z][a-z]+(?: [A-Z][a-z]+)?)/);
+  if (labelMatch) name = labelMatch[1];
+  if (!name && email) {
+    // Look backward up to 80 chars before the email for a capitalized name pattern.
+    const idx = description.indexOf(email);
+    if (idx > 0) {
+      const before = description.slice(Math.max(0, idx - 80), idx);
+      const tail = before.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s*[^A-Za-z]*$/);
+      if (tail) name = tail[1];
+    }
+  }
+  return { name, email };
+}
+
+function _v2BuildMissingIntel(input: MetadataOnlyInput): string[] {
+  const out: string[] = [
+    "Full clause list (FAR + DFARS — including any traps)",
+    "CLIN structure and pricing schema",
+    "Section L instructions to offerors (page limits, formats, evaluation factors)",
+    "Section M evaluation criteria and weighting",
+    "Statement of Work / PWS / SOO (work statement type)",
+    "Delivery / performance schedule",
+  ];
+  if (!input.naicsCode) out.push("NAICS code (not supplied in metadata)");
+  if (!input.typeOfSetAside) out.push("Set-aside type (not supplied in metadata)");
+  if (!input.responseDeadLine) out.push("Response deadline (not supplied in metadata)");
+  return out;
+}
+
+export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<AuditV2Result> {
+  const deadline = _v2ParseDeadline(input.responseDeadLine);
+  const urgencyScore = _v2ComputeUrgency(deadline.days_remaining);
+  const eligibility = _v2AnalyzeEligibility(input.naicsCode, input.typeOfSetAside);
+  const synopsisSummary = _v2ExtractSynopsisSummary(input.description);
+  const coContact = _v2ExtractCoContact(input.description);
+  const missingIntel = _v2BuildMissingIntel(input);
+
+  const metadataBrief: MetadataBrief = {
+    eligibility,
+    synopsis_summary: synopsisSummary,
+    missing_intel: missingIntel,
+    co_contact: coContact,
+    deadline,
+  };
+
+  const bidStrategy =
+    deadline.days_remaining !== null && deadline.days_remaining >= 0 && deadline.days_remaining < 7
+      ? "Critical timeline — request the solicitation document from the CO immediately before committing resources."
+      : deadline.days_remaining !== null && deadline.days_remaining < 0
+      ? "Response deadline has passed. Confirm whether the opportunity is still active before pursuing."
+      : "Wait for the full solicitation. Use the synopsis to assess eligibility and gauge interest only.";
+
+  const judgment: _v2AuditJudgment = {
+    documentClassification: {
+      type: "metadata_only",
+      confidence: "low",
+      evidence: `No full solicitation PDF retrieved. Analysis derived from SAM.gov synopsis (${input.description.length} chars) and notice metadata.`,
+      bidStrategy,
+    },
+    risks: [],
+    verdict: {
+      bottomLine: "Solicitation document not yet available. Analysis based on synopsis and SAM.gov metadata.",
+      goNoGoRecommendation: "conditional",
+      keyRisks: [],
+      complianceStatus: "compliant",
+      urgencyScore,
+    },
+    l02Catches: [],
+    confidenceNotes: [],
+  };
+
+  const emptyFacts: ReturnType<typeof _v2ExtractAllFacts> = {
+    clins: [],
+    delivery: [],
+    clauses: [],
+    submissionRequirements: [],
+    evaluationFactors: [],
+    contractType: null,
+    setAside: input.typeOfSetAside,
+    naicsCode: input.naicsCode,
+    solicitorNumber: null,
+    offerDueDate: input.responseDeadLine,
+    issuingOffice: input.agency,
+    extractionWarnings: [],
+  };
+
+  return {
+    sectionBag: {
+      sections: {},
+      formatDetected: "unknown",
+      formatConfidence: "low",
+      overallConfidence: 0,
+      sectionCount: 0,
+      missingSections: [],
+      warnings: ["METADATA_ONLY_PATH: no PDF source — analysis derived from SAM.gov metadata + synopsis"],
+    },
+    facts: emptyFacts,
+    judgment,
+    work_statement: null,
+    work_statement_unknown: null,
+    matrix_rollup: { required: [], reference: [], reference_count: 0 },
+    submission_checklist_filtered: [],
+    l02_catches: [],
+    confidence_notes: [],
+    has_incumbent: false,
+    normalizedClauses: _v2MatrixRollup([]),
+    normalizedRisks: _v2DedupRisks([]),
+    submissionChecklist: [],
+    warnings: [
+      `[audit-v2] metadata-only path: synopsis ${input.description.length} chars · deadline=${deadline.formatted}${
+        deadline.days_remaining !== null ? ` (${deadline.days_remaining}d)` : ""
+      } · urgency=${urgencyScore}`,
+    ],
+    metadata_brief: metadataBrief,
   };
 }
 

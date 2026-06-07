@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { runAudit, runAuditV2, AUDIT_V2_ENABLED, type PdfSource } from "@/lib/audit-engine";
+import { runAudit, runAuditV2, runAuditV2Metadata, AUDIT_V2_ENABLED, type PdfSource } from "@/lib/audit-engine";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import {
   noticeIdSchema,
@@ -347,6 +347,7 @@ export async function POST(req: NextRequest) {
       try {
         const v2Result = await runAuditV2(pdfBuffer);
         const v2Shadow = {
+          path: "pdf",
           judgment: v2Result.judgment,
           surfaces: {
             work_statement: v2Result.work_statement,
@@ -356,6 +357,7 @@ export async function POST(req: NextRequest) {
             l02_catches: v2Result.l02_catches,
             confidence_notes: v2Result.confidence_notes,
             has_incumbent: v2Result.has_incumbent,
+            metadata_brief: v2Result.metadata_brief ?? null,
           },
           extraction: {
             sections_detected: Object.keys(v2Result.sectionBag.sections),
@@ -377,6 +379,59 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error("[V2-SHADOW] runAuditV2 failed (non-fatal):", err instanceof Error ? err.message : err);
+      }
+    } else if (AUDIT_V2_ENABLED && pdfSource === "sam_unavailable" && solicitation.description && solicitation.description.length > 50) {
+      // ━━ Fix 8 — V2 metadata-only shadow path ━━
+      // Fires when SAM returned a notice but no PDF was retrievable. Pure
+      // deterministic synthesis: eligibility + deadline math + synopsis +
+      // CO contact + missing-intel list. Zero LLM cost. Same v2_shadow
+      // envelope as the PDF path so downstream consumers see one shape.
+      const v2Start = Date.now();
+      try {
+        const v2Result = await runAuditV2Metadata({
+          noticeId: solicitation.noticeId,
+          title: solicitation.title,
+          description: solicitation.description,
+          naicsCode: solicitation.naicsCode,
+          typeOfSetAside: solicitation.typeOfSetAside,
+          postedDate: solicitation.postedDate,
+          responseDeadLine: solicitation.responseDeadLine,
+          noticeType: solicitation.type,
+          agency,
+        });
+        const v2Shadow = {
+          path: "metadata_only",
+          judgment: v2Result.judgment,
+          surfaces: {
+            work_statement: null,
+            work_statement_unknown: null,
+            matrix_rollup: v2Result.matrix_rollup,
+            submission_checklist_filtered: v2Result.submission_checklist_filtered,
+            l02_catches: v2Result.l02_catches,
+            confidence_notes: v2Result.confidence_notes,
+            has_incumbent: false,
+            metadata_brief: v2Result.metadata_brief ?? null,
+          },
+          extraction: {
+            sections_detected: [] as string[],
+            missing_sections: [] as string[],
+            warnings: v2Result.warnings,
+            extraction_warnings: v2Result.facts.extractionWarnings,
+          },
+          rendered_at: new Date().toISOString(),
+          engine_ms: Date.now() - v2Start,
+        };
+        const { error: shadowError } = await supabase
+          .from("audits")
+          .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
+          .eq("id", audit.id);
+        if (shadowError) {
+          console.error("[V2-SHADOW-META] db update failed (non-fatal):", shadowError.message);
+        } else {
+          console.log("[V2-SHADOW-META] stored for audit", audit.id, "engine_ms=", v2Shadow.engine_ms);
+        }
+      } catch (err) {
+        console.error("[V2-SHADOW-META] runAuditV2Metadata failed (non-fatal):", err instanceof Error ? err.message : err);
       }
     }
 

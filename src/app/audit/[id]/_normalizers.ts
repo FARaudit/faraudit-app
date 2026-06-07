@@ -79,10 +79,10 @@ export function workStatement(dc: AuditJudgment["documentClassification"]): Work
       },
     };
   }
-  if (dc.type === "wrong_doc") {
-    // Unreachable in practice — runAuditV2's pre-extraction detector short-
-    // circuits and synthesizes work_statement/work_statement_unknown=null
-    // directly without calling this function. Branch kept for type-safety.
+  if (dc.type === "wrong_doc" || dc.type === "metadata_only") {
+    // Unreachable in practice — runAuditV2's pre-extraction detector and
+    // runAuditV2Metadata both synthesize work_statement/work_statement_unknown
+    // = null directly without calling this function. Branch kept for type-safety.
     return { work_statement: null, work_statement_unknown: null };
   }
   return {

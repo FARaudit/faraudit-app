@@ -54,7 +54,7 @@ export interface AuditConfidenceNote {
 
 export interface AuditJudgment {
   documentClassification: {
-    type: "SOW" | "PWS" | "SOO" | "combined" | "unknown" | "wrong_doc";
+    type: "SOW" | "PWS" | "SOO" | "combined" | "unknown" | "wrong_doc" | "metadata_only";
     confidence: "high" | "medium" | "low";
     evidence: string;
     bidStrategy: string;
