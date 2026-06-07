@@ -2411,6 +2411,20 @@ export interface AuditV2Result {
   // Fix 8 — populated only on the runAuditV2Metadata path (no PDF source).
   // null/absent for the standard PDF-driven pipeline.
   metadata_brief?: MetadataBrief | null;
+  // Fix 12 — §06 deterministic submission preflight (8 fixed items, status
+  // resolved by clause presence + extracted deadline). Distinct from §09's
+  // submission_checklist_filtered (which groups §L requirements into 6
+  // buckets). null on wrong-doc / metadata-only paths.
+  submission_preflight?: SubmissionChecklistItem[] | null;
+}
+
+// Fix 12 — §06 submission preflight surface.
+// Pure-function output over ExtractedFacts. Zero LLM cost.
+export interface SubmissionChecklistItem {
+  item: string;
+  status: "required" | "conditional" | "not_required";
+  source: string;
+  detail?: string;
 }
 
 // Fix 8 — metadata-only V2 path. Output of runAuditV2Metadata when SAM.gov
@@ -2558,6 +2572,7 @@ function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
     warnings: [
       `[audit-v2] WRONG_DOC short-circuit: ${detected}${piid ? ` (PIID ${piid})` : ""} — extraction + judgment skipped.`,
     ],
+    submission_preflight: null,
   };
 }
 
@@ -2751,7 +2766,104 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
       } · urgency=${urgencyScore}`,
     ],
     metadata_brief: metadataBrief,
+    submission_preflight: null,
   };
+}
+
+// ─── Fix 12 — §06 submission preflight builder ─────────────────────────────
+// Eight deterministic items resolved against the extracted clause list +
+// offer-due-date + §L submission requirements. Zero LLM cost. Items that
+// can't be resolved from extracted facts surface as required-with-detail
+// rather than dropped — the CEO/bidder sees what's needed even when the
+// extractor missed the source.
+function _v2BuildSubmissionPreflight(
+  facts: ReturnType<typeof _v2ExtractAllFacts>
+): SubmissionChecklistItem[] {
+  const hasClause = (number: string): boolean =>
+    facts.clauses.some((c) => c.number === number);
+
+  const items: SubmissionChecklistItem[] = [];
+
+  // 1. Submit by deadline
+  if (facts.offerDueDate) {
+    items.push({
+      item: "Submit by deadline",
+      status: "required",
+      source: "§B / Block 8 / extracted offer-due date",
+      detail: facts.offerDueDate,
+    });
+  } else {
+    items.push({
+      item: "Submit by deadline (deadline not extracted — verify in solicitation before quoting)",
+      status: "required",
+      source: "§B / Block 8",
+    });
+  }
+
+  // 2. CO email — facts don't carry contact emails yet (no CO extractor).
+  // Mark required with a verify-source detail so users still see the item.
+  items.push({
+    item: "Submit to all CO email addresses listed in the solicitation",
+    status: "required",
+    source: "§G / §K — Contracting Officer block",
+    detail: "Verify primary + secondary email addresses in the solicitation before sending. CO contact extraction is pending.",
+  });
+
+  // 3. English language only — FAR 52.214-34
+  items.push(
+    hasClause("52.214-34")
+      ? { item: "Quotation in English only", status: "required", source: "FAR 52.214-34" }
+      : { item: "Quotation in English only", status: "not_required", source: "FAR 52.214-34 not cited" }
+  );
+
+  // 4. US dollars only — FAR 52.214-35
+  items.push(
+    hasClause("52.214-35")
+      ? { item: "Quote in US dollars (USD) only", status: "required", source: "FAR 52.214-35" }
+      : { item: "Quote in US dollars (USD)", status: "not_required", source: "FAR 52.214-35 not cited" }
+  );
+
+  // 5. SAM.gov registration current — FAR 52.204-7
+  if (hasClause("52.204-7")) {
+    items.push({
+      item: "SAM.gov registration must be current at submission",
+      status: "required",
+      source: "FAR 52.204-7",
+    });
+  }
+
+  // 6. Buy American certificate — FAR 52.225-4 / 52.225-2
+  if (hasClause("52.225-4") || hasClause("52.225-2")) {
+    items.push({
+      item: "Submit Buy American certificate",
+      status: "required",
+      source: hasClause("52.225-4") ? "FAR 52.225-4" : "FAR 52.225-2",
+    });
+  }
+
+  // 7. Covered defense telecom representation — DFARS 252.204-7017 / 7018
+  if (hasClause("252.204-7017") || hasClause("252.204-7018")) {
+    items.push({
+      item: "Submit covered defense telecommunications representation",
+      status: "required",
+      source: hasClause("252.204-7017") ? "DFARS 252.204-7017" : "DFARS 252.204-7018",
+    });
+  }
+
+  // 8. Product information — conditional. Detect from §L submission
+  // requirements text when extractor flagged a product-info ask.
+  const productInfoRe = /product information|\bmfg(?:r)?\.?\s+name|part number|illustrations?|literature|technical data sheet|\btds\b/i;
+  const productInfoHit = facts.submissionRequirements.find((r) => productInfoRe.test(r.text));
+  if (productInfoHit) {
+    items.push({
+      item: "Submit product information (MFG name, part number, illustrations / literature)",
+      status: "conditional",
+      source: "§L submission requirements",
+      detail: productInfoHit.text.slice(0, 160),
+    });
+  }
+
+  return items;
 }
 
 export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
@@ -2803,6 +2915,10 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   // signal once incumbent extraction is wired.
   const has_incumbent = false;
 
+  // Fix 12 — §06 deterministic submission preflight (8 fixed items resolved
+  // against clauses + offer-due-date + §L requirements).
+  const submission_preflight = _v2BuildSubmissionPreflight(facts);
+
   return {
     sectionBag,
     facts,
@@ -2818,6 +2934,7 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
     normalizedRisks: _v2DedupRisks(judgment.risks),
     submissionChecklist: checklist,
     warnings,
+    submission_preflight,
   };
 }
 
