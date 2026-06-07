@@ -353,8 +353,92 @@ function renderConfidenceNotes(html: string, v: V2RenderInput): string {
   return out;
 }
 
+// ─── Surface 6 — Metadata brief (Fix 8) ───────────────────────────────────
+
+function renderMetadataBrief(html: string, v: V2RenderInput): string {
+  const mb = v.metadata_brief;
+  if (!mb) return stripIfEmpty(html, "metadata_brief", true);
+  let out = html;
+  out = out.replace(
+    /(<p class="v2-mb-summary" data-field="metadata_brief\.synopsis_summary">)[\s\S]*?(<\/p>)/,
+    `$1${esc(mb.synopsis_summary)}$2`
+  );
+  out = setSpanByDataField(out, "metadata_brief.deadline.formatted", mb.deadline.formatted);
+  out = setSpanByDataField(out, "metadata_brief.deadline.days_remaining", mb.deadline.days_remaining == null ? "—" : String(mb.deadline.days_remaining));
+  out = setSpanByDataField(out, "metadata_brief.eligibility.notes", mb.eligibility.notes);
+  out = setSpanByDataField(out, "metadata_brief.co_contact.name", mb.co_contact.name ?? "—");
+  out = setSpanByDataField(out, "metadata_brief.co_contact.email", mb.co_contact.email ?? "—");
+  const missingItems = mb.missing_intel.map((m) => `<li>${esc(m)}</li>`).join("");
+  out = out.replace(
+    /(<ul data-field="metadata_brief\.missing_intel">)[\s\S]*?(<\/ul>)/,
+    `$1${missingItems}$2`
+  );
+  return out;
+}
+
+// ─── Surface 7 — Submission preflight (Fix 12) ────────────────────────────
+
+function renderSubmissionPreflight(html: string, v: V2RenderInput): string {
+  const items = v.submission_preflight;
+  if (!items || items.length === 0) return stripIfEmpty(html, "submission_preflight", true);
+  const statusBadge = (s: string) =>
+    s === "required"
+      ? `<span class="v2-sp-b req" style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">required</span>`
+      : s === "conditional"
+      ? `<span class="v2-sp-b cond" style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">conditional</span>`
+      : `<span class="v2-sp-b nr" style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">not required</span>`;
+  const rows = items
+    .map(
+      (it) =>
+        `<li class="v2-sp-item">${statusBadge(it.status)} <span class="v2-sp-text">${esc(it.item)}</span><span class="v2-sp-src" style="color:#6b7280;font-size:12px"> · ${esc(it.source)}</span>${it.detail ? `<div class="v2-sp-detail" style="color:#374151;font-size:12px;margin-left:8px">${esc(it.detail)}</div>` : ""}</li>`
+    )
+    .join("");
+  // Direct regex — replaceInnerByDataField only walks <div>; preflight anchor is <ul>.
+  return html.replace(
+    /(<ul class="v2-sp-list" data-field="submission_preflight">)[\s\S]*?(<\/ul>)/,
+    `$1${rows}$2`
+  );
+}
+
+// ─── Surface 8 — Recompete signal (Fix 13) ────────────────────────────────
+
+function renderRecompeteSignal(html: string, v: V2RenderInput): string {
+  const rs = v.recompete_signal;
+  if (!rs) return stripIfEmpty(html, "recompete_signal", true);
+  let out = html;
+  out = setSpanByDataField(out, "recompete_signal.contract_number", rs.contract_number ?? "—");
+  out = setSpanByDataField(out, "recompete_signal.naics", rs.naics ?? "—");
+  out = setSpanByDataField(out, "recompete_signal.agency", rs.agency ?? "—");
+  out = setSpanByDataField(out, "recompete_signal.estimated_end_date", rs.estimated_end_date ?? "Not extracted");
+  out = setSpanByDataField(out, "recompete_signal.recompete_window", rs.recompete_window ?? "Pending end-date extraction");
+  out = out.replace(
+    /(<p class="v2-rs-note" data-field="recompete_signal\.monitoring_note">)[\s\S]*?(<\/p>)/,
+    `$1${esc(rs.monitoring_note)}$2`
+  );
+  return out;
+}
+
+// ─── Surface 9 — Price anchor (Fix 14) ────────────────────────────────────
+
+function renderPriceAnchor(html: string, v: V2RenderInput): string {
+  const pa = v.price_anchor;
+  if (!pa) return stripIfEmpty(html, "price_anchor", true);
+  let out = html;
+  out = setSpanByDataField(out, "price_anchor.evaluation_type", pa.evaluation_type);
+  out = setSpanByDataField(out, "price_anchor.clin_count", pa.clin_count == null ? "—" : String(pa.clin_count));
+  out = out.replace(
+    /(<p class="v2-pa-guidance" data-field="price_anchor\.lpta_guidance">)[\s\S]*?(<\/p>)/,
+    `$1${pa.lpta_guidance ? esc(pa.lpta_guidance) : ""}$2`
+  );
+  out = out.replace(
+    /(<p class="v2-pa-ige" data-field="price_anchor\.ige_note">)[\s\S]*?(<\/p>)/,
+    `$1${pa.ige_note ? esc(pa.ige_note) : ""}$2`
+  );
+  return out;
+}
+
 // ─── Main entrypoint ──────────────────────────────────────────────────────
-// Applies all 5 surface renders. Pure function. Determinism contract:
+// Applies all 9 surface renders. Pure function. Determinism contract:
 // renderV2Surfaces(template, vm) === renderV2Surfaces(template, vm) byte-by-byte.
 
 export function renderV2Surfaces(template: string, v: V2RenderInput): string {
@@ -364,5 +448,10 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   out = renderChecklist(out, v);
   out = renderL02Band(out, v);
   out = renderConfidenceNotes(out, v);
+  // Extended surfaces (Phase 2 cutover — Fix 8 / 12 / 13 / 14)
+  out = renderMetadataBrief(out, v);
+  out = renderSubmissionPreflight(out, v);
+  out = renderRecompeteSignal(out, v);
+  out = renderPriceAnchor(out, v);
   return out;
 }

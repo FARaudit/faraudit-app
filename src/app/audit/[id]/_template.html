@@ -1639,6 +1639,52 @@ Thank you for the opportunity to quote on SP4701-26-Q-0942. Before submission we
             </div>
           </section>
 
+          <!-- ═══════════════════════════════════════════════════════════════
+               V2 OVERLAY SURFACES (Fix 8 / 12 / 13 / 14 — Phase 2 cutover)
+               Each section uses data-hide-when-empty so the renderer strips
+               the entire block when its surface is null/absent. V1-only
+               audits never see these. Anchored after Verification Notes so
+               they tail the main report column ahead of the sticky rail.
+               ═══════════════════════════════════════════════════════════ -->
+
+          <section class="sec v2-overlay v2-metadata-brief" data-hide-when-empty="metadata_brief">
+            <h2 class="sec-h">Synopsis brief (metadata-only audit)</h2>
+            <div class="v2-mb-body">
+              <p class="v2-mb-summary" data-field="metadata_brief.synopsis_summary"></p>
+              <div class="v2-mb-row"><b>Deadline:</b> <span data-field="metadata_brief.deadline.formatted"></span> · <span data-field="metadata_brief.deadline.days_remaining"></span>d remaining</div>
+              <div class="v2-mb-row"><b>Eligibility:</b> <span data-field="metadata_brief.eligibility.notes"></span></div>
+              <div class="v2-mb-row"><b>CO contact:</b> <span data-field="metadata_brief.co_contact.name"></span> &lt;<span data-field="metadata_brief.co_contact.email"></span>&gt;</div>
+              <div class="v2-mb-missing">
+                <b>Missing intel until the full solicitation is retrieved:</b>
+                <ul data-field="metadata_brief.missing_intel"></ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="sec v2-overlay v2-submission-preflight" data-hide-when-empty="submission_preflight">
+            <h2 class="sec-h">Submission preflight (§06 deterministic)</h2>
+            <ul class="v2-sp-list" data-field="submission_preflight"></ul>
+          </section>
+
+          <section class="sec v2-overlay v2-recompete-signal" data-hide-when-empty="recompete_signal">
+            <h2 class="sec-h">Recompete signal</h2>
+            <div class="v2-rs-body">
+              <div class="v2-rs-row"><b>Contract:</b> <span data-field="recompete_signal.contract_number"></span> · NAICS <span data-field="recompete_signal.naics"></span> · <span data-field="recompete_signal.agency"></span></div>
+              <div class="v2-rs-row"><b>Estimated end:</b> <span data-field="recompete_signal.estimated_end_date"></span></div>
+              <div class="v2-rs-row"><b>Recompete window:</b> <span data-field="recompete_signal.recompete_window"></span></div>
+              <p class="v2-rs-note" data-field="recompete_signal.monitoring_note"></p>
+            </div>
+          </section>
+
+          <section class="sec v2-overlay v2-price-anchor" data-hide-when-empty="price_anchor">
+            <h2 class="sec-h">Price anchor</h2>
+            <div class="v2-pa-body">
+              <div class="v2-pa-row"><b>Evaluation type:</b> <span data-field="price_anchor.evaluation_type"></span> · CLINs: <span data-field="price_anchor.clin_count"></span></div>
+              <p class="v2-pa-guidance" data-field="price_anchor.lpta_guidance"></p>
+              <p class="v2-pa-ige" data-field="price_anchor.ige_note"></p>
+            </div>
+          </section>
+
         </div><!-- /rpt-main -->
 
         <!-- ───── STICKY RAIL ───── -->
