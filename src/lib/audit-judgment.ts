@@ -54,15 +54,20 @@ export interface AuditConfidenceNote {
 
 export interface AuditJudgment {
   documentClassification: {
-    type: "SOW" | "PWS" | "SOO" | "combined" | "unknown";
+    type: "SOW" | "PWS" | "SOO" | "combined" | "unknown" | "wrong_doc";
     confidence: "high" | "medium" | "low";
     evidence: string;
     bidStrategy: string;
+    // Fix 7 — populated only on the runAuditV2 wrong-doc short-circuit
+    // path. Schema (LLM responses) never emits these; they're synthesized
+    // by the engine for the pre-extraction detector exit.
+    detected_form?: string;
+    extracted_piid?: string | null;
   };
   risks: AuditRisk[];
   verdict: {
     bottomLine: string;
-    goNoGoRecommendation: "go" | "no_go" | "conditional";
+    goNoGoRecommendation: "go" | "no_go" | "conditional" | "wrong_doc";
     keyRisks: string[];
     complianceStatus: "compliant" | "risks_identified" | "critical_gaps";
     urgencyScore: number;

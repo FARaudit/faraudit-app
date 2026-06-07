@@ -14,6 +14,7 @@ const SOLICITATIONS = [
   "N6833525R0392",     // Navy
   "SPRHA4-26-R-0454",  // DLA
   "SPE4A526T109C",     // DLA
+  "W58RGZ-25-B-0034",  // Army — Fix 7 wrong-doc burn-in target
 ];
 
 const OUT_DIR = path.join(process.cwd(), "test/pdfs/burn-in");

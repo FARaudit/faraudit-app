@@ -2410,8 +2410,134 @@ export interface AuditV2Result {
   warnings: string[];
 }
 
+// ─── Fix 7 — WRONG_DOC pre-extraction detector ─────────────────────────────
+// Regex-only, ~5K-char cover-page scan. Zero LLM cost. Catches the four
+// common "uploaded the wrong PDF" cases (SF-30 mods, DD-1155 orders, award
+// notices, standalone delivery/task orders). Returns isWrongDoc=false when
+// the doc looks like a real solicitation so the normal pipeline runs.
+interface _v2WrongDocSignal {
+  isWrongDoc: boolean;
+  detected_form?: string;
+  extracted_piid?: string | null;
+}
+
+function _v2ExtractPiid(text: string): string | null {
+  // DoD/civilian PIID: 6-char agency code + 2-digit year + letter + 4-5 digits.
+  // Accepts both joined (W912DY25P1234) and dashed (W58RGZ-25-B-0034) forms.
+  const m = text.match(/\b([A-Z][A-Z0-9]{5})[-\s]?(\d{2})[-\s]?([A-Z])[-\s]?(\d{4,5})\b/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}-${m[4]}` : null;
+}
+
+function _v2DetectWrongDocument(rawText: string): _v2WrongDocSignal {
+  // Scan only the cover page — solicitation type markers live in the header.
+  // Going deeper risks false positives (e.g. "MODIFICATION OF CONTRACT" text
+  // inside §I clauses on a real solicitation).
+  const head = rawText.slice(0, 5000).toUpperCase();
+
+  if (/AMENDMENT OF SOLICITATION\/MODIFICATION OF CONTRACT|MODIFICATION OF CONTRACT|\bSTANDARD FORM 30\b|\bSF[-\s]?30\b/.test(head)) {
+    return { isWrongDoc: true, detected_form: "Contract Modification (SF-30)", extracted_piid: _v2ExtractPiid(rawText) };
+  }
+  if (/ORDER FOR SUPPLIES OR SERVICES|\bDD FORM 1155\b|\bDD[-\s]?1155\b/.test(head)) {
+    return { isWrongDoc: true, detected_form: "Purchase Order (DD-1155)", extracted_piid: _v2ExtractPiid(rawText) };
+  }
+  if (/NOTICE OF AWARD|AWARD\/EFFECTIVE DATE/.test(head)) {
+    return { isWrongDoc: true, detected_form: "Award Notice", extracted_piid: _v2ExtractPiid(rawText) };
+  }
+  // Delivery/Task order — only flag if no solicitation marker is also present.
+  if (/\bDELIVERY ORDER\b|\bTASK ORDER\b/.test(head) && !/REQUEST FOR (QUOTE|QUOTATION|PROPOSAL)|SOLICITATION|\bRFQ\b|\bRFP\b|\bIFB\b|COMBINED SYNOPSIS|SF[-\s]?1449|SF[-\s]?18\b|SF[-\s]?33\b|SF[-\s]?1442/.test(head)) {
+    return { isWrongDoc: true, detected_form: "Task/Delivery Order", extracted_piid: _v2ExtractPiid(rawText) };
+  }
+  // CDRL / Data Item Description list (DD-1423). Standalone supporting doc
+  // users often upload instead of the parent solicitation. Two signals must
+  // align: explicit list header AND ≥3 DI- form references in the first 5K.
+  const cdrlHeader = /DOCUMENT SUMMARY LIST|\bDD[-\s]?(?:FORM\s)?1423\b|\bCDRL\b|CONTRACT DATA REQUIREMENTS LIST/.test(head);
+  const diRefCount = (head.match(/\bDI-(?:MGMT|MISC|SESS|CMAN|IPSC|PSSS|TMSS|SAFT|FNCL|ATTS|MNTY|MRSP|MMSS|NDTI|GDRQ|ADMN|HFAC)-\d+/g) ?? []).length;
+  if (cdrlHeader && diRefCount >= 3) {
+    return { isWrongDoc: true, detected_form: "CDRL List (DD-1423 / Data Item Descriptions)", extracted_piid: _v2ExtractPiid(rawText) };
+  }
+  return { isWrongDoc: false };
+}
+
+function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
+  const detected = signal.detected_form ?? "non-solicitation document";
+  const piid = signal.extracted_piid ?? null;
+  const judgment: _v2AuditJudgment = {
+    documentClassification: {
+      type: "wrong_doc",
+      confidence: "high",
+      evidence: `Document header matched ${detected} pattern within first 5K chars of extracted text.`,
+      bidStrategy: "N/A — document is not auditable as a solicitation.",
+      detected_form: detected,
+      extracted_piid: piid,
+    },
+    risks: [],
+    verdict: {
+      bottomLine:
+        `This document is a ${detected}, not a solicitation. ` +
+        `FARaudit audits active solicitations (RFQ, RFP, IFB, Combined Synopsis).` +
+        (piid ? ` To find the original solicitation, search ${piid} on SAM.gov.` : ""),
+      goNoGoRecommendation: "wrong_doc",
+      keyRisks: [],
+      complianceStatus: "compliant",
+      urgencyScore: 0,
+    },
+    l02Catches: [],
+    confidenceNotes: [],
+  };
+  const emptyFacts: ReturnType<typeof _v2ExtractAllFacts> = {
+    clins: [],
+    delivery: [],
+    clauses: [],
+    submissionRequirements: [],
+    evaluationFactors: [],
+    contractType: null,
+    setAside: null,
+    naicsCode: null,
+    solicitorNumber: null,
+    offerDueDate: null,
+    issuingOffice: null,
+    extractionWarnings: [],
+  };
+  return {
+    sectionBag: {
+      sections: {},
+      formatDetected: "unknown",
+      formatConfidence: "low",
+      overallConfidence: 0,
+      sectionCount: 0,
+      missingSections: [],
+      warnings: [`WRONG_DOC_DETECTED: ${detected}`],
+    },
+    facts: emptyFacts,
+    judgment,
+    work_statement: null,
+    work_statement_unknown: null,
+    matrix_rollup: { required: [], reference: [], reference_count: 0 },
+    submission_checklist_filtered: [],
+    l02_catches: [],
+    confidence_notes: [],
+    has_incumbent: false,
+    normalizedClauses: _v2MatrixRollup([]),
+    normalizedRisks: _v2DedupRisks([]),
+    submissionChecklist: [],
+    warnings: [
+      `[audit-v2] WRONG_DOC short-circuit: ${detected}${piid ? ` (PIID ${piid})` : ""} — extraction + judgment skipped.`,
+    ],
+  };
+}
+
 export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
+
+  // Fix 7 — pre-extraction wrong-doc detection. Returns synthesized
+  // AuditV2Result with judgment.documentClassification.type="wrong_doc" and
+  // verdict.goNoGoRecommendation="wrong_doc". Zero LLM cost. Skips section
+  // boundary detection, fact extraction, and judgment entirely.
+  const wrongDoc = _v2DetectWrongDocument(doc.rawText);
+  if (wrongDoc.isWrongDoc) {
+    return _v2BuildWrongDocResult(wrongDoc);
+  }
+
   const sectionBag = _v2DetectSections(doc);
 
   // Condition 1 — fail loud on critical-section gaps. Partial audit emits

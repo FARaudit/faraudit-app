@@ -21,6 +21,7 @@ const SOLS = [
   "N6833525R0392",
   "SPRHA4-26-R-0454",
   "SPE4A526T109C",
+  "W58RGZ-25-B-0034",
 ];
 
 interface Row {
