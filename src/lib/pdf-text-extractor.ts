@@ -33,35 +33,48 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
     let pageCount = 1;
 
     if (typeof PdfParseCtor === "function") {
-      // Try v2-style class constructor with getText()
+      // pdf-parse v2 returns { pages: Array<{ text, num }>, text, total }
+      // pdf-parse v1 returns { text, numpages, ... } from a callable
+      let pagesArr: Array<{ text?: string; num?: number }> | null = null;
       try {
         const inst = new PdfParseCtor({ data: pdfBuffer });
         if (typeof inst.getText === "function") {
           const out = await inst.getText();
           rawText = String(out?.text ?? "");
-          pageCount = Number(out?.pages ?? out?.numpages ?? 1);
+          if (Array.isArray(out?.pages)) pagesArr = out.pages;
+          pageCount = Array.isArray(out?.pages) ? out.pages.length : Number(out?.numpages ?? 1);
         } else {
-          // Fallback: try calling as function (v1 style)
           const out = await PdfParseCtor(pdfBuffer);
           rawText = String(out?.text ?? "");
-          pageCount = Number(out?.numpages ?? out?.pages ?? 1);
+          pageCount = Number(out?.numpages ?? 1);
         }
       } catch {
-        // Last resort: try callable form
         const out = await PdfParseCtor(pdfBuffer);
         rawText = String(out?.text ?? "");
-        pageCount = Number(out?.numpages ?? out?.pages ?? 1);
+        pageCount = Number(out?.numpages ?? 1);
       }
-    } else {
-      throw new Error("pdf-parse module did not export a usable parser");
-    }
 
-    if (!rawText || rawText.length < 50) {
-      warnings.push(`LOW_TEXT_YIELD: extracted only ${rawText.length} chars — possible scanned/image PDF`);
-    }
+      if (!Number.isFinite(pageCount) || pageCount < 1) pageCount = 1;
+      if (!rawText || rawText.length < 50) {
+        warnings.push(`LOW_TEXT_YIELD: extracted only ${rawText.length} chars — possible scanned/image PDF`);
+      }
 
-    const pages = buildPageStructure(rawText, pageCount);
-    return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings };
+      // Prefer v2 per-page structure when available; fall back to form-feed
+      // split or single-block reconstruction.
+      const pages = pagesArr
+        ? pagesArr.map((p, i) => {
+            const text = String(p?.text ?? "").trim();
+            return {
+              pageNum: Number(p?.num ?? i + 1),
+              text,
+              lines: text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0),
+            };
+          })
+        : buildPageStructure(rawText, pageCount);
+
+      return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings };
+    }
+    throw new Error("pdf-parse module did not export a usable parser");
   } catch (err) {
     warnings.push(`pdf-parse failed: ${(err as Error).message}`);
   }

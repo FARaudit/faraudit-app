@@ -76,7 +76,7 @@ const UCF_HEADER_PATTERNS: RegExp[] = [
 // Title-only patterns (medium confidence) for sections without explicit headers.
 const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
   B: /^(Supplies\s+or\s+Services|Schedule\s+of\s+Supplies)/im,
-  C: /^(Description\/Specifications|Statement\s+of\s+Work|Statement\s+of\s+Need)/im,
+  C: /^(Description\/Specifications|Statement\s+of\s+Work|Statement\s+of\s+Need|Requirements|ITEM\s+DESCRIPTION|Scope\s+of\s+Work|Item\s+Description)/im,
   D: /^(Packaging\s+and\s+Marking)/im,
   E: /^(Inspection\s+and\s+Acceptance)/im,
   F: /^(Deliveries\s+or\s+Performance|Period\s+of\s+Performance)/im,
@@ -154,6 +154,23 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
       if (pattern.test(allLines[i].text.trim())) {
         boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: pattern.source });
         foundKeys.add(key);
+        break;
+      }
+    }
+  }
+
+  // Pass 2.5: §C fallback for DLA SF-18 combined format — scope lives inline as
+  // NSN-anchored item description block, not under a labeled §C header.
+  // Anchor on NSN pattern (4-2-3-4 digits) OR "Item Description" / "MFG name"
+  // markers. Confidence: low — schedule-embedded inference.
+  if (!foundKeys.has("C")) {
+    const NSN_RE = /\b\d{4}-\d{2}-\d{3}-\d{4}\b/;
+    const ITEM_DESC_RE = /\b(ITEM\s+DESCRIPTION|MFG\s+name|Schedule\s+of\s+Supplies)/i;
+    for (let i = 0; i < allLines.length; i++) {
+      const t = allLines[i].text.trim();
+      if (NSN_RE.test(t) || ITEM_DESC_RE.test(t)) {
+        boundaries.push({ key: "C", lineIdx: i, confidence: "low", matchedPattern: "DLA_SF18_NSN_INLINE" });
+        foundKeys.add("C");
         break;
       }
     }
