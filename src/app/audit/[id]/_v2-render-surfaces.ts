@@ -18,6 +18,12 @@ import type {
   ChecklistBucketGroup,
 } from "./_normalizers";
 import type { AuditL02Catch, AuditConfidenceNote } from "../../../lib/audit-judgment";
+import type {
+  MetadataBrief,
+  SubmissionChecklistItem,
+  RecompeteSignal,
+  PriceAnchor,
+} from "../../../lib/audit-engine";
 
 export interface V2RenderInput {
   work_statement: WorkStatementKnown | null;
@@ -27,6 +33,62 @@ export interface V2RenderInput {
   l02_catches: AuditL02Catch[];
   confidence_notes: AuditConfidenceNote[];
   has_incumbent: boolean;
+  // Extended surfaces (Fix 8 / 12 / 13 / 14) — optional, absent on legacy
+  // pre-Fork-2 v2_shadow rows or non-PDF paths. Renderers using these MUST
+  // null-check before reading.
+  metadata_brief?: MetadataBrief | null;
+  submission_preflight?: SubmissionChecklistItem[] | null;
+  recompete_signal?: RecompeteSignal | null;
+  price_anchor?: PriceAnchor | null;
+}
+
+// ─── V2 cutover adapter ────────────────────────────────────────────────────
+// Reads compliance_json.v2_shadow.surfaces from an audit row and shapes it
+// into V2RenderInput. Returns null when v2_shadow is absent (V1-only audit;
+// caller should skip the V2 overlay and render V1 only).
+//
+// Null-safe per field: malformed/missing surfaces collapse to safe defaults
+// rather than throwing inside the render path. The renderer's existing
+// stripIfEmpty + null-checks handle the resulting empty objects gracefully.
+//
+// Pure function · deterministic · zero side effects.
+export function buildV2ViewModelFromShadow(
+  audit: Record<string, unknown> | null | undefined
+): V2RenderInput | null {
+  if (!audit || typeof audit !== "object") return null;
+  const comp = audit.compliance_json as Record<string, unknown> | undefined;
+  if (!comp || typeof comp !== "object") return null;
+  const shadow = comp.v2_shadow as Record<string, unknown> | undefined;
+  if (!shadow || typeof shadow !== "object") return null;
+  const surfaces = shadow.surfaces as Record<string, unknown> | undefined;
+  if (!surfaces || typeof surfaces !== "object") return null;
+
+  return {
+    work_statement: (surfaces.work_statement as WorkStatementKnown | null) ?? null,
+    work_statement_unknown: (surfaces.work_statement_unknown as WorkStatementUnknown | null) ?? null,
+    matrix_rollup:
+      (surfaces.matrix_rollup as MatrixRollupReshaped | undefined) ?? {
+        required: [],
+        reference: [],
+        reference_count: 0,
+      },
+    submission_checklist_filtered: Array.isArray(surfaces.submission_checklist_filtered)
+      ? (surfaces.submission_checklist_filtered as ChecklistBucketGroup[])
+      : [],
+    l02_catches: Array.isArray(surfaces.l02_catches)
+      ? (surfaces.l02_catches as AuditL02Catch[])
+      : [],
+    confidence_notes: Array.isArray(surfaces.confidence_notes)
+      ? (surfaces.confidence_notes as AuditConfidenceNote[])
+      : [],
+    has_incumbent: typeof surfaces.has_incumbent === "boolean" ? surfaces.has_incumbent : false,
+    metadata_brief: (surfaces.metadata_brief as MetadataBrief | null) ?? null,
+    submission_preflight: Array.isArray(surfaces.submission_preflight)
+      ? (surfaces.submission_preflight as SubmissionChecklistItem[])
+      : null,
+    recompete_signal: (surfaces.recompete_signal as RecompeteSignal | null) ?? null,
+    price_anchor: (surfaces.price_anchor as PriceAnchor | null) ?? null,
+  };
 }
 
 // HTML escape — minimal, sufficient for solicitation text content.
