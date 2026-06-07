@@ -237,6 +237,17 @@ export function extractDelivery(section: DetectedSection | null): DeliveryItem[]
 
 // ── §I — Clause extractor ────────────────────────────────────────────────
 
+// Cycle 2 v2 — §I incorporation type is HEADER-driven, not proximity-driven.
+// Federal solicitations organize §I into two banners:
+//   "CLAUSES INCORPORATED BY FULL TEXT"  → every clause below it = full_text
+//   "CLAUSES INCORPORATED BY REFERENCE"  → every clause below it = by_reference
+// The prior proximity heuristic (/full\s+text/ in a 500-char window of the
+// clause) misclassified by-reference clauses whose title happened to mention
+// "full text" downstream, and missed full-text clauses too far from any
+// "Full Text" string. Header-walk is deterministic and matches real §I layout.
+const FULL_TEXT_HEADER_RE = /CLAUSES?\s+INCORPORATED\s+BY\s+FULL\s+TEXT/i;
+const BY_REF_HEADER_RE = /CLAUSES?\s+INCORPORATED\s+BY\s+REFERENCE/i;
+
 export function extractClauses(section: DetectedSection | null): ClauseItem[] {
   if (!section) return [];
   const clauses: ClauseItem[] = [];
@@ -244,6 +255,34 @@ export function extractClauses(section: DetectedSection | null): ClauseItem[] {
 
   // FAR: 52.x-x · DFARS: 252.x-x · AFFARS / DAF: 5352.x-x
   const clausePattern = /\b(?:5352|252|52)\.\d{3}-\d{1,4}(?:[A-Z](?![A-Z]))?\b/g;
+
+  // Pre-scan: index every header occurrence to build a header-position table.
+  // For each clause hit, lookup the most-recent header BEFORE the clause's
+  // index — that header dictates the clause's incorporation type.
+  interface HeaderHit { index: number; mode: ClauseItem["incorporated"]; }
+  const headers: HeaderHit[] = [];
+  for (const re of [FULL_TEXT_HEADER_RE, BY_REF_HEADER_RE]) {
+    const globalRe = new RegExp(re.source, "gi");
+    let h: RegExpExecArray | null;
+    while ((h = globalRe.exec(text)) !== null) {
+      headers.push({
+        index: h.index,
+        mode: re === FULL_TEXT_HEADER_RE ? "full_text" : "by_reference",
+      });
+    }
+  }
+  headers.sort((a, b) => a.index - b.index);
+
+  // Default mode when no header has been seen yet: by_reference (the safer
+  // assumption for the standard incorporation pattern).
+  const headerModeAt = (idx: number): ClauseItem["incorporated"] => {
+    let mode: ClauseItem["incorporated"] = "by_reference";
+    for (const h of headers) {
+      if (h.index <= idx) mode = h.mode;
+      else break;
+    }
+    return mode;
+  };
 
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
@@ -258,9 +297,7 @@ export function extractClauses(section: DetectedSection | null): ClauseItem[] {
     const title = titleMatch ? titleMatch[1].trim().replace(/\.$/, "") : "";
 
     const isTrap = DFARS_TRAPS.has(number);
-    const window500 = text.slice(m.index, m.index + 500);
-    const incorporated: ClauseItem["incorporated"] =
-      /full\s+text/i.test(window500) ? "full_text" : "by_reference";
+    const incorporated = headerModeAt(m.index);
 
     clauses.push({
       number,
