@@ -2421,6 +2421,10 @@ export interface AuditV2Result {
   // for the next acquisition cycle of this contract. null on go / wrong_doc /
   // metadata-only paths.
   recompete_signal?: RecompeteSignal | null;
+  // Fix 14 — price anchor + IGE proxy on LPTA detection. Always populated
+  // on normal runAuditV2 (every audit gets an evaluation_type read). null
+  // on wrong-doc / metadata-only paths.
+  price_anchor?: PriceAnchor | null;
 }
 
 // Fix 12 — §06 submission preflight surface.
@@ -2442,6 +2446,18 @@ export interface RecompeteSignal {
   estimated_end_date: string | null;
   recompete_window: string | null;
   monitoring_note: string;
+}
+
+// Fix 14 — price anchor + IGE proxy. evaluation_type always set; LPTA-only
+// guidance fields (lpta_guidance + ige_note) populate only when LPTA is
+// detected in Section M evaluation factors.
+export interface PriceAnchor {
+  evaluation_type: "LPTA" | "BEST_VALUE" | "UNKNOWN";
+  is_lpta: boolean;
+  estimated_value: string | null;
+  clin_count: number | null;
+  lpta_guidance: string | null;
+  ige_note: string | null;
 }
 
 // Fix 8 — metadata-only V2 path. Output of runAuditV2Metadata when SAM.gov
@@ -2591,6 +2607,7 @@ function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
     ],
     submission_preflight: null,
     recompete_signal: null,
+    price_anchor: null,
   };
 }
 
@@ -2786,6 +2803,7 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     metadata_brief: metadataBrief,
     submission_preflight: null,
     recompete_signal: null,
+    price_anchor: null,
   };
 }
 
@@ -2940,6 +2958,52 @@ function _v2BuildRecompeteSignal(
   };
 }
 
+// ─── Fix 14 — price anchor + IGE proxy builder ─────────────────────────────
+// LPTA detection reads facts.evaluationFactors (already parsed by §M
+// extractor with /lowest\s+price\s+technically\s+acceptable|\bLPTA\b/i).
+// When LPTA found, surfaces guidance + an IGE proxy lookup note. When
+// best-value found, surfaces evaluation_type only. UNKNOWN when §M had no
+// recognizable basis-of-award language.
+function _v2BuildPriceAnchor(
+  facts: ReturnType<typeof _v2ExtractAllFacts>
+): PriceAnchor {
+  const hasLpta = facts.evaluationFactors.some((f) => f.method === "LPTA");
+  const hasBestValue = facts.evaluationFactors.some((f) => f.method === "best_value");
+
+  const evaluation_type: PriceAnchor["evaluation_type"] = hasLpta
+    ? "LPTA"
+    : hasBestValue
+    ? "BEST_VALUE"
+    : "UNKNOWN";
+
+  const clin_count = facts.clins.length > 0 ? facts.clins.length : null;
+
+  let lpta_guidance: string | null = null;
+  let ige_note: string | null = null;
+
+  if (hasLpta) {
+    lpta_guidance =
+      "LPTA awards to the lowest-priced technically acceptable offer. " +
+      "Price above the IGE typically fails evaluation. Ensure all Section L " +
+      "technical requirements are fully addressed before pricing.";
+    const agencyStr = facts.issuingOffice || "the issuing agency";
+    const naicsStr = facts.naicsCode ? `NAICS ${facts.naicsCode}` : "matching NAICS";
+    ige_note =
+      `IGE (Independent Government Estimate) not published in solicitation. ` +
+      `Proxy: search ${agencyStr} prior awards in ${naicsStr} on USASpending.gov ` +
+      `and SAM.gov award notices for comparable work.`;
+  }
+
+  return {
+    evaluation_type,
+    is_lpta: hasLpta,
+    estimated_value: null, // V2 extractor does not currently surface estimated value
+    clin_count,
+    lpta_guidance,
+    ige_note,
+  };
+}
+
 export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
 
@@ -2997,6 +3061,10 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   // (no_go / conditional). null on go.
   const recompete_signal = _v2BuildRecompeteSignal(facts, judgment);
 
+  // Fix 14 — price anchor + IGE proxy. Always populated; LPTA-only fields
+  // (lpta_guidance + ige_note) populate when §M evaluation factors flag LPTA.
+  const price_anchor = _v2BuildPriceAnchor(facts);
+
   return {
     sectionBag,
     facts,
@@ -3014,6 +3082,7 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
     warnings,
     submission_preflight,
     recompete_signal,
+    price_anchor,
   };
 }
 
