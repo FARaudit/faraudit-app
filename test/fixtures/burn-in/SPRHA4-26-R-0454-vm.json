@@ -1,0 +1,1072 @@
+{
+  "label": "SPRHA4-26-R-0454 burn-in",
+  "work_statement": null,
+  "work_statement_unknown": {
+    "head": "Couldn't confirm from the extracted text",
+    "reason": "The extracted text contains CLINs for a WF Fixture Assembly (F-16 test equipment, NSN 4920-01-537-5649) and a Counterfeit Prevention Plan CLIN, but no Statement of Work, PWS, or SOO text was extracted. The governing work statement is almost certainly in an un-parsed attachment or separate document not captured in the extraction.",
+    "action": "<b>Upload the attachment to resolve this.</b> It's the single highest-leverage line in the audit — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO)."
+  },
+  "matrix_rollup": {
+    "required": [
+      {
+        "number": "252.204-7018",
+        "title": "PROHIBITION ON THE ACQUISITION OF COVERED DEFENSE",
+        "badge": "trap",
+        "trapReason": "Covered telecommunications equipment ban (DFARS trap)"
+      },
+      {
+        "number": "252.223-7008",
+        "title": "PROHIBITION OF HEXAVALENT CHROMIUM (JAN 2023)",
+        "badge": "trap",
+        "trapReason": "Hexavalent chromium prohibition (DFARS trap)"
+      },
+      {
+        "number": "252.247-7023",
+        "title": "TRANSPORTATION OF SUPPLIES BY SEA--BASIC (OCT 2024)",
+        "badge": "trap",
+        "trapReason": "Transportation by sea — flag carrier requirement (DFARS trap)"
+      }
+    ],
+    "reference": [
+      {
+        "number": "5352.201-9101",
+        "title": "OMBUDSMAN (JUN 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.202-1",
+        "title": "DEFINITIONS (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-3",
+        "title": "GRATUITIES (APR 1984)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-5",
+        "title": "COVENANT AGAINST CONTINGENT FEES (MAY 2014)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-6",
+        "title": "RESTRICTIONS ON SUBCONTRACTOR SALES TO THE GOVERNMENT (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-7",
+        "title": "ANTI-KICKBACK PROCEDURES (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-8",
+        "title": "CANCELLATION, RESCISSION, AND RECOVERY OF FUNDS FOR ILLEGAL OR",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-10",
+        "title": "PRICE OR FEE ADJUSTMENT FOR ILLEGAL OR IMPROPER ACTIVITY (MAY 2014)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-12",
+        "title": "LIMITATION ON PAYMENTS TO INFLUENCE CERTAIN FEDERAL TRANSACTIONS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.203-19",
+        "title": "PROHIBITION ON REQUIRING CERTAIN INTERNAL CONFIDENTIALITY",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.203-7000",
+        "title": "REQUIREMENTS RELATING TO COMPENSATION OF FORMER DOD OFFICIALS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.203-7001",
+        "title": "PROHIBITION ON PERSONS CONVICTED OF FRAUD OR OTHER DEFENSE-",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.203-7002",
+        "title": "REQUIREMENT TO INFORM EMPLOYEES OF WHISTLEBLOWER RIGHTS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-10",
+        "title": "REPORTING EXECUTIVE COMPENSATION AND FIRST-TIER SUBCONTRACT",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-13",
+        "title": "SYSTEM FOR AWARD MANAGEMENT MAINTENANCE (OCT 2018)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-18",
+        "title": "COMMERCIAL AND GOVERNMENT ENTITY CODE MAINTENANCE (AUG 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-19",
+        "title": "INCORPORATION BY REFERENCE OF REPRESENTATIONS AND CERTIFICATIONS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-21",
+        "title": "BASIC SAFEGUARDING OF COVERED CONTRACTOR INFORMATION SYSTEMS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-23",
+        "title": "PROHIBITION ON CONTRACTING FOR HARDWARE, SOFTWARE, AND SERVICES",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-25",
+        "title": "PROHIBITION ON CONTRACTING FOR CERTAIN TELECOMMUNICATIONS AND",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-27",
+        "title": "PROHIBITION ON A BYTEDANCE COVERED APPLICATION (JUN 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.204-30",
+        "title": "FEDERAL ACQUISITION SUPPLY CHAIN SECURITY ACT ORDERS- PROHIBITION",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7002",
+        "title": "PAYMENT FOR SUBLINE ITEMS NOT SEPARATELY PRICED (APR 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7003",
+        "title": "CONTROL OF GOVERNMENT PERSONNEL WORK PRODUCT (APR 1992)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7012",
+        "title": "SAFEGUARDING COVERED DEFENSE INFORMATION AND CYBER INCIDENT",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7015",
+        "title": "NOTICE OF AUTHORIZED DISCLOSURE OF INFORMATION FOR LITIGATION",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7020",
+        "title": "NIST SP 800-171 DOD ASSESSMENT REQUIREMENTS (NOV 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.204-7022",
+        "title": "EXPEDITING CONTRACT CLOSEOUT (MAY 2021)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.209-6",
+        "title": "PROTECTING THE GOVERNMENT'S INTEREST WHEN SUBCONTRACTING WITH",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.209-9",
+        "title": "UPDATES OF PUBLICLY AVAILABLE INFORMATION REGARDING",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.209-10",
+        "title": "PROHIBITION ON CONTRACTING WITH INVERTED DOMESTIC CORPORATIONS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.209-7004",
+        "title": "SUBCONTRACTING WITH FIRMS THAT ARE OWNED OR CONTROLLED BY THE",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.211-5",
+        "title": "MATERIAL REQUIREMENTS (AUG 2000)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.211-15",
+        "title": "DEFENSE PRIORITY AND ALLOCATION REQUIREMENTS (APR 2008)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.211-7003",
+        "title": "ITEM UNIQUE IDENTIFICATION AND VALUATION (JAN 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.232-7003",
+        "title": "If WAWF is not required by this contract, and the contractor is not using WAWF,",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.215-2",
+        "title": "AUDIT AND RECORDS--NEGOTIATION (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.215-8",
+        "title": "ORDER OF PRECEDENCE--UNIFORM CONTRACT FORMAT (OCT 1997)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.215-14",
+        "title": "INTEGRITY OF UNIT PRICES (NOV 2021)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.219-8",
+        "title": "UTILIZATION OF SMALL BUSINESS CONCERNS (JAN 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.219-9",
+        "title": "SMALL BUSINESS SUBCONTRACTING PLAN (JAN 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.219-16",
+        "title": "LIQUIDATED DAMAGES--SUBCONTRACTING PLAN (SEP 2021)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.219-28",
+        "title": "POSTAWARD SMALL BUSINESS PROGRAM REREPRESENTATION (JAN 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.219-7004",
+        "title": "SMALL BUSINESS SUBCONTRACTING PLAN (TEST PROGRAM) (DEC 2022)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-3",
+        "title": "CONVICT LABOR (JUN 2003)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-4",
+        "title": "CONTRACT WORK HOURS AND SAFETY STANDARDS--OVERTIME",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-19",
+        "title": "CHILD LABOR--COOPERATION WITH AUTHORITIES AND REMEDIES (JAN 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-20",
+        "title": "CONTRACTS FOR MATERIALS, ARTICLES, AND EQUIPMENT (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-35",
+        "title": "EQUAL OPPORTUNITY FOR VETERANS (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-36",
+        "title": "EQUAL OPPORTUNITY FOR WORKERS WITH DISABILITIES (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-37",
+        "title": "EMPLOYMENT REPORTS ON VETERANS (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-40",
+        "title": "NOTIFICATION OF EMPLOYEE RIGHTS UNDER THE NATIONAL LABOR",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-50",
+        "title": "COMBATING TRAFFICKING IN PERSONS (NOV 2021)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.222-54",
+        "title": "EMPLOYMENT ELIGIBILITY VERIFICATION (JAN 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.223-11",
+        "title": "OZONE-DEPLETING SUBSTANCES AND HIGH GLOBAL WARMING POTENTIAL",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.223-20",
+        "title": "AEROSOLS (MAY 2024)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.223-21",
+        "title": "FOAMS (MAY 2024)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.223-23",
+        "title": "SUSTAINABLE PRODUCTS AND SERVICES (DEVIATION 2025-O0004) (MAR 2025)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.223-7009",
+        "title": "PROHIBITION OF PROCUREMENT OF FLUORINATED AQUEOUS FILM-FORMING",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "5352.223-9000",
+        "title": "ELIMINATION OF USE OF CLASS I OZONE DEPLETING SUBSTANCES (ODS)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.224-3",
+        "title": "PRIVACY TRAINING (JAN 2017)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.225-13",
+        "title": "RESTRICTIONS ON CERTAIN FOREIGN PURCHASES (FEB 2021)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7012",
+        "title": "PREFERENCE FOR CERTAIN DOMESTIC COMMODITIES (APR 2022)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7013",
+        "title": "DUTY-FREE ENTRY (NOV 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7048",
+        "title": "EXPORT-CONTROLLED ITEMS (JUN 2013)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7052",
+        "title": "RESTRICTION ON THE ACQUISITION OF CERTAIN MAGNETS, TANTALUM, AND",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7061",
+        "title": "RESTRICTION ON THE ACQUISITION OF PERSONAL PROTECTIVE EQUIPMENT",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7967",
+        "title": "PROHIBITION REGARDING RUSSIAN FOSSIL FUEL BUSINESS OPERATIONS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.225-7972",
+        "title": "PROHIBITION ON THE PROCUREMENT OF FOREIGN-MADE UNMANNED AIRCRAFT",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.226-7",
+        "title": "DRUG-FREE WORKPLACE (MAY 2024)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.226-8",
+        "title": "ENCOURAGING CONTRACTOR POLICIES TO BAN TEXT MESSAGING WHILE",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.226-7001",
+        "title": "UTILIZATION OF INDIAN ORGANIZATIONS, INDIAN-OWNED ECONOMIC",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.227-1",
+        "title": "AUTHORIZATION AND CONSENT (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.227-2",
+        "title": "NOTICE AND ASSISTANCE REGARDING PATENT AND COPYRIGHT",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.229-3",
+        "title": "FEDERAL, STATE, AND LOCAL TAXES (FEB 2013)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.229-4",
+        "title": "FEDERAL, STATE, AND LOCAL TAXES (STATE AND LOCAL ADJUSTMENTS)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.229-7014",
+        "title": "FULL EXEMPTION FROM TWO-PERCENT EXCISE TAX ON CERTAIN FOREIGN",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.231-7000",
+        "title": "SUPPLEMENTAL COST PRINCIPLES (DEC 1991)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-1",
+        "title": "PAYMENTS (APR 1984)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-8",
+        "title": "DISCOUNTS FOR PROMPT PAYMENT (FEB 2002)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-11",
+        "title": "EXTRAS (APR 1984)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-17",
+        "title": "INTEREST (MAY 2014)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-23",
+        "title": "ASSIGNMENT OF CLAIMS (MAY 2014)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-25",
+        "title": "PROMPT PAYMENT (JAN 2017)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-33",
+        "title": "PAYMENT BY ELECTRONIC FUNDS TRANSFER--SYSTEM FOR AWARD",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-39",
+        "title": "UNENFORCEABILITY OF UNAUTHORIZED OBLIGATIONS (JUN 2013)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-40",
+        "title": "PROVIDING ACCELERATED PAYMENTS TO SMALL BUSINESS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-16",
+        "title": "Progress",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-5",
+        "title": "Payments Under Fixed-Price Construction Contracts, or the clause at FAR 52",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.232-10",
+        "title": "Payments Under Fixed-Price Architect-Engineer Contracts; and",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.232-7010",
+        "title": "LEVIES ON CONTRACT PAYMENTS (DEC 2006)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.233-1",
+        "title": "DISPUTES (MAY 2014)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.233-3",
+        "title": "PROTEST AFTER AWARD (AUG 1996)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.233-4",
+        "title": "APPLICABLE LAW FOR BREACH OF CONTRACT CLAIM (OCT 2004)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.240-1",
+        "title": "PROHIBITION ON UNMANNED AIRCRAFT SYSTEMS MANUFACTURED OR",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.242-5",
+        "title": "PAYMENTS TO SMALL BUSINESS SUBCONTRACTORS (JAN 2017)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.242-13",
+        "title": "BANKRUPTCY (JUL 1995)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.243-1",
+        "title": "CHANGES--FIXED-PRICE (AUG 1987)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.243-7001",
+        "title": "PRICING OF CONTRACT MODIFICATIONS (DEC 1991)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.243-7002",
+        "title": "REQUESTS FOR EQUITABLE ADJUSTMENT (DEC 2022)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.244-5",
+        "title": "COMPETITION IN SUBCONTRACTING (AUG 2024)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.244-6",
+        "title": "SUBCONTRACTS FOR COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.244-7000",
+        "title": "SUBCONTRACTS FOR COMMERCIAL ITEMS AND COMMERCIAL COMPONENTS",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.246-23",
+        "title": "LIMITATION OF LIABILITY (FEB 1997)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.246-7007",
+        "title": "CONTRACTOR COUNTERFEIT ELECTRONIC PART DETECTION AND AVOIDANCE",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "252.246-7008",
+        "title": "SOURCES OF ELECTRONIC PARTS (JAN 2023)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.247-1",
+        "title": "COMMERCIAL BILL OF LADING NOTATIONS (FEB 2006)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.248-1",
+        "title": "VALUE ENGINEERING (JUN 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.249-2",
+        "title": "TERMINATION FOR CONVENIENCE OF THE GOVERNMENT (FIXED-PRICE)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.249-8",
+        "title": "DEFAULT (FIXED-PRICE SUPPLY AND SERVICE) (APR 1984)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.252-2",
+        "title": "CLAUSES INCORPORATED BY REFERENCE (FEB 1998)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.252-6",
+        "title": "AUTHORIZED DEVIATIONS IN CLAUSES (NOV 2020)",
+        "badge": "reference",
+        "trapReason": null
+      },
+      {
+        "number": "52.253-1",
+        "title": "COMPUTER GENERATED FORMS (JAN 1991)",
+        "badge": "reference",
+        "trapReason": null
+      }
+    ],
+    "reference_count": 113
+  },
+  "submission_checklist_filtered": [
+    {
+      "bucket": "registration",
+      "label": "System registrations",
+      "critical": true,
+      "items": [
+        {
+          "bucket": "registration",
+          "text": "52.204-7 \tSYSTEM FOR AWARD MANAGEMENT (NOV 2024)",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "registration",
+          "text": "(c) Procedures. The Offeror shall review the list of excluded parties in the System for Award Management (SAM)",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "registration",
+          "text": "(https://www.sam.gov) for entities excluded from receiving federal awards for “covered telecommunications equipment or",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "registration",
+          "text": "(b) Procedures. The Offeror shall review the list of excluded parties in the System for Award Management (SAM)",
+          "isCritical": true,
+          "complete": false
+        }
+      ]
+    },
+    {
+      "bucket": "mandatory_doc",
+      "label": "Required documents & product info",
+      "critical": true,
+      "items": [
+        {
+          "bucket": "mandatory_doc",
+          "text": "CAGE code, and whether the entity was the original equipment manufacturer (OEM) or a distributor, if known);",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "mandatory_doc",
+          "text": "number, manufacturer part number, or wholesaler number; and item description, as applicable); and",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "mandatory_doc",
+          "text": "(include on the item being maintained: Brand; model number, such as OEM number, manufacturer part number, or wholesaler",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "mandatory_doc",
+          "text": "CAGE code, and whether the entity was the OEM or a distributor, if known);",
+          "isCritical": true,
+          "complete": false
+        },
+        {
+          "bucket": "mandatory_doc",
+          "text": "(5) For items of supply, list each source's part number for the item.",
+          "isCritical": true,
+          "complete": false
+        }
+      ]
+    },
+    {
+      "bucket": "representation",
+      "label": "Representations & certifications",
+      "critical": false,
+      "items": [
+        {
+          "bucket": "representation",
+          "text": "52.204-24 \tREPRESENTATION REGARDING CERTAIN TELECOMMUNICATIONS AND VIDEO",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "The Offeror shall not complete the representation at paragraph (d)(1) of this provision if the Offeror has represented that",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "provision at 52.204–26, Covered Telecommunications Equipment or Services—Representation, or in paragraph (v)(2)(i) of the",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "provision at 52.212–3, Offeror Representations and Certifications–Commercial Products and Commercial Services. The Offeror",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "shall not complete the representation in paragraph (d)(2) of this provision if the Offeror has represented that it ‘‘does not use",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(d) Representations. The Offeror represents that—",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(2) After conducting a reasonable inquiry, for purposes of this representation, the Offeror represents that—",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(e) Disclosures. (1) Disclosure for the representation in paragraph (d)(1) of this provision. If the Offeror has responded",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "“will” in the representation in paragraph (d)(1) of this provision, the Offeror shall provide the following information as part of",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(2) Disclosure for the representation in paragraph (d)(2) of this provision. If the Offeror has responded “does” in the",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "representation in paragraph (d)(2) of this provision, the Offeror shall provide the following information as part of the offer:",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "REPRESENTATION (OCT 2020)",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(c) Representations.",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "(2) After conducting a reasonable inquiry for purposes of this representation, the offeror represents that it",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "SYSTEMS-REPRESENTATION (AUG 2024) (DEVIATION 2024-O0014) (AUG 2024)",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "representation",
+          "text": "PART IV - REPRESENTATIONS AND INSTRUCTIONS",
+          "isCritical": false,
+          "complete": false
+        }
+      ]
+    },
+    {
+      "bucket": "format",
+      "label": "Format requirements",
+      "critical": false,
+      "items": [
+        {
+          "bucket": "format",
+          "text": "CUI: Source Selection Information - See Far 2.101 and 3.104",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "format",
+          "text": "provide the additional disclosure information required at paragraph (e)(1) of this section if the Offeror responds “will” in",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "format",
+          "text": "information required at paragraph (e)(2) of this section if the Offeror responds “does” in paragraph (d)(2) of this section.",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "format",
+          "text": "or Offeror’s performance. SPRS retrieves item, price, quality, delivery, and contractor information on contracts from",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "format",
+          "text": "(e) The Contracting Officer may consider any other available and relevant information when evaluating a quotation or an offer.",
+          "isCritical": false,
+          "complete": false
+        }
+      ]
+    },
+    {
+      "bucket": "other",
+      "label": "Additional requirements",
+      "critical": false,
+      "items": [
+        {
+          "bucket": "other",
+          "text": "part of any system. Nothing in the prohibition shall be construed to—",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "work under a Federal contract. Nothing in the prohibition shall be construed to—",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "performance of any contract, subcontract or other contractual instrument resulting from this solicitation. The Offeror shall",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "service that uses covered telecommunications equipment or services. The Offeror shall provide the additional disclosure",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "(1) The Offeror represents that it [ ] does, [ ] does not provide covered telecommunications equipment or services as",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "(b) The apparently successful Offeror agrees to complete and submit the following table before award:",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "(3) Use \"Y\" if the item is a commercial item; otherwise, use \"N\". If \"Y\" is listed, the Offeror need not complete the",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "(1) By submission of its offer, the Offeror represents that—",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "of any protests that are filed with the Government Accountability Office (GAO), shall be served on the Contracting Officer",
+          "isCritical": false,
+          "complete": false
+        },
+        {
+          "bucket": "other",
+          "text": "(b) The copy of any protest shall be received in the office designated above within one day of filing a protest with the GAO.",
+          "isCritical": false,
+          "complete": false
+        }
+      ]
+    }
+  ],
+  "l02_catches": [
+    {
+      "category": "WAWF · document type",
+      "title": "Wrong WAWF Invoice Type for NSN Supply Items Will Cause Payment Rejection",
+      "why_invisible": "For NSN-based supply contracts, WAWF requires a specific combination of invoice and receiving report document types (typically 2-in-1 or combo). Contractors frequently submit a standalone invoice without the required receiving report, which passes WAWF system validation but is rejected by the paying office, delaying payment by 30-60 days on an FFP contract.",
+      "move": "Confirm with the contracting officer and DFAS the required WAWF document type combination for CLIN 0001 before first delivery. Set up the WAWF routing codes (DoDAAC for acceptor, paying office, and contract administrator) in advance of first shipment."
+    },
+    {
+      "category": "Lead-time · TDP access",
+      "title": "JCP Certification Lead Time for Export-Controlled F-16 Technical Data Can Exceed 60 Days",
+      "why_invisible": "The NSN 4920-01-537-5649 is for F-16 test equipment, which almost certainly involves export-controlled technical data requiring Joint Certification Program (JCP) access through DTIC. This requirement is not stated in the extracted clauses but is enforced at the data repository level — the contractor discovers it only when attempting to download drawings, after proposal submission.",
+      "move": "Before proposal submission, contact the contracting officer to confirm TDP availability and whether JCP certification is required. If JCP is needed, initiate the certification application immediately — do not wait for award."
+    },
+    {
+      "category": "Counterfeit prevention · traceability",
+      "title": "Counterfeit Prevention Plan Must Be Submitted as a Deliverable, Not Just Maintained Internally",
+      "why_invisible": "CLIN 0002 is NSP (Not Separately Priced) and associated with document FD20202600454, which likely specifies a Contract Data Requirements List (CDRL) submission. Contractors often treat the Counterfeit Prevention Plan as an internal document and miss the formal CDRL submission deadline, triggering a contract deficiency and potentially delaying acceptance of CLIN 0001 deliverables.",
+      "move": "Obtain document FD20202600454 and identify the CDRL submission date for the Counterfeit Prevention Plan. Schedule the plan development and government review cycle to ensure submission occurs before or concurrent with first article/first delivery."
+    },
+    {
+      "category": "FOB · cost inclusion",
+      "title": "FOB Point Unknown — Packaging, Crating, and Transportation Costs May Be Unpriced in FFP",
+      "why_invisible": "No delivery schedule or FOB terms were extracted. For F-16 test equipment (potentially large, heavy, or fragile fixtures), packaging to MIL-STD-2073 and transportation costs can be substantial. If FOB is Origin, the government arranges transportation but the contractor bears packaging costs. If FOB is Destination, the contractor bears all transportation costs. Misidentifying the FOB point in an FFP leads to unrecoverable cost overruns.",
+      "move": "Obtain the complete solicitation and identify the FOB point and packaging requirements (MIL-STD-2073 applicability). Price packaging and transportation costs explicitly in the FFP build-up, and confirm with the contracting officer before submission."
+    },
+    {
+      "category": "Lead-time · base access",
+      "title": "F-16 End-Item Delivery or Testing at a Military Installation Requires Base Access Credentials with 30-90 Day Lead Time",
+      "why_invisible": "The end item is F-16 (likely Lockheed Martin or Air Force depot), and delivery or acceptance testing may occur at a military installation. Base access for contractor personnel (Common Access Card or visitor credentials) requires background checks and sponsorship that can take 30-90 days. This is not mentioned in any extracted clause but is enforced at the installation level and can delay acceptance.",
+      "move": "Identify the delivery/acceptance location from the work statement and contact the installation security office immediately after award to initiate base access requests. Factor this lead time into the delivery schedule risk assessment during proposal preparation."
+    },
+    {
+      "category": "Submission · representation accuracy",
+      "title": "52.204-24 Telecommunications Representation Must Match BOM — Inconsistency Creates False Certification Risk",
+      "why_invisible": "The 52.204-24 representation is a mandatory submission requirement, but it is often completed based on general company knowledge rather than a contract-specific BOM review. If the BOM later reveals a covered telecommunications component, the representation becomes a false certification — a potential False Claims Act violation — even if the error was unintentional.",
+      "move": "Complete the 52.204-24 representation only after conducting a contract-specific BOM review for NSN 4920-01-537-5649. Document the BOM review as the basis for the representation and retain it in the proposal file."
+    },
+    {
+      "category": "Cr6+ · manufacturing process",
+      "title": "Hexavalent Chromium Waiver Process Must Begin Before Proposal Submission If Any Cr6+ Process Is Identified",
+      "why_invisible": "DFARS 252.223-7008 prohibits Cr6+ but allows waivers for specific applications. The waiver process (DD Form 1694 or equivalent) requires engineering justification, government review, and approval — typically 60-90+ days. Contractors often discover the Cr6+ issue during manufacturing, after award, when it is too late to obtain a waiver without a schedule impact, creating an FFP cost and schedule crisis.",
+      "move": "Conduct a manufacturing process audit for Cr6+ content before proposal submission. If any Cr6+ process is identified as potentially necessary, initiate the waiver request process immediately and disclose the status to the contracting officer in the proposal."
+    }
+  ],
+  "confidence_notes": [
+    {
+      "field": "Issuing office / contracting agency",
+      "uncertain": "The issuing office is described as 'other than DoD, NASA, and the Coast Guard,' yet the contract contains multiple DFARS clauses and an AFFARS clause (5352.201-9101), which is contradictory and could not be resolved from the extracted data.",
+      "assumption": "It was assumed this may be a DLA or civilian agency action administered on behalf of the Air Force, with DFARS clauses included by reference due to DoD funding.",
+      "resolve": "Obtain the solicitation cover page (SF-1449 or DD-1707) and confirm the contracting office DoDAAC, funding agency, and applicable regulatory supplement (FAR only vs. FAR+DFARS+AFFARS)."
+    },
+    {
+      "field": "Offer due date",
+      "uncertain": "The offer due date was not extracted and is listed as 'unknown,' making it impossible to confirm whether the proposal deadline is imminent.",
+      "assumption": "It was assumed the solicitation is still open and the deadline has not passed, but this cannot be confirmed.",
+      "resolve": "Access the original solicitation on SAM.gov using the solicitation number (once obtained) to confirm the exact offer due date, time, and timezone."
+    },
+    {
+      "field": "Solicitation number",
+      "uncertain": "The solicitation number was not extracted and is listed as 'unknown,' preventing verification of document completeness, amendment tracking, or contracting officer contact.",
+      "assumption": "It was assumed the extracted data represents the current version of the solicitation without amendments, but this cannot be confirmed.",
+      "resolve": "Locate the solicitation number on the original document header or SAM.gov posting and verify the current amendment number."
+    },
+    {
+      "field": "Work statement type and content",
+      "uncertain": "No SOW, PWS, or SOO text was extracted, making it impossible to confirm the scope of work, performance requirements, or technical specifications for the WF Fixture Assembly.",
+      "assumption": "It was assumed the work statement exists as an un-parsed attachment and that the contract is for manufacture/delivery of the NSN item per a TDP, based on the CLIN description.",
+      "resolve": "Obtain and review the complete solicitation package including all attachments, CDRLs, and referenced documents (especially FD20202600454) from the issuing office or SAM.gov."
+    },
+    {
+      "field": "Delivery schedule and FOB terms",
+      "uncertain": "Zero delivery line items were extracted, so required delivery dates, FOB point, and shipping instructions are unknown.",
+      "assumption": "It was assumed delivery terms exist in an un-parsed section of the solicitation and that standard MIL-STD packaging requirements apply given the NSN and F-16 end item designation.",
+      "resolve": "Obtain the complete solicitation Schedule section (Section F) to confirm delivery dates, FOB point, and packaging/marking requirements."
+    },
+    {
+      "field": "NAICS code",
+      "uncertain": "The NAICS code was not extracted and is listed as 'unknown,' preventing verification of small business size standard applicability and competitive landscape assessment.",
+      "assumption": "It was assumed the NAICS code is consistent with manufacturing of aircraft test equipment (likely 334511 — Search, Detection, Navigation, Guidance, Aeronautical Systems and Instruments Manufacturing, or 332999 — All Other Miscellaneous Fabricated Metal Product Manufacturing).",
+      "resolve": "Obtain the solicitation cover page or SAM.gov posting to confirm the NAICS code and verify the applicable small business size standard."
+    }
+  ],
+  "has_incumbent": false
+}

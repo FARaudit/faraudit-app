@@ -1,0 +1,86 @@
+{
+  "label": "378229-RK burn-in",
+  "work_statement": null,
+  "work_statement_unknown": {
+    "head": "Couldn't confirm from the extracted text",
+    "reason": "Zero CLINs, zero clauses, zero delivery items, zero submission requirements, and no evaluation factors were extracted from the document. The governing work statement (SOW/PWS/SOO) was not present in the parsed text — almost certainly contained in an un-parsed attachment or the extraction pipeline failed entirely.",
+    "action": "<b>Upload the attachment to resolve this.</b> It's the single highest-leverage line in the audit — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO)."
+  },
+  "matrix_rollup": {
+    "required": [],
+    "reference": [],
+    "reference_count": 0
+  },
+  "submission_checklist_filtered": [],
+  "l02_catches": [
+    {
+      "category": "Lead-time · representations and certifications",
+      "title": "SAM.gov registration and annual reps & certs may lapse before award",
+      "why_invisible": "No clause was extracted flagging FAR 52.204-7 or 52.204-13, so the compliance checker shows no flag — but if SAM.gov registration expires between proposal submission and award, the offer becomes ineligible and the award can be rescinded.",
+      "move": "Verify SAM.gov registration expiration date today and renew if it will expire within 12 months. Confirm all representations and certifications (including SPRS score for DFARS 252.204-7019) are current."
+    },
+    {
+      "category": "Lead-time · SPRS posting",
+      "title": "SPRS cybersecurity score may not be posted, blocking award even if technically selected",
+      "why_invisible": "Without DFARS 252.204-7019/7020 being extracted, the checker shows no cybersecurity flag — but DoD contracting officers are required to verify SPRS scores before award; a missing or zero score will stop award regardless of technical merit.",
+      "move": "Log into SPRS (https://www.sprs.csd.disa.mil) and confirm a current self-assessment score is posted. If not, complete the NIST SP 800-171 self-assessment and post the score before the offer due date."
+    },
+    {
+      "category": "Teaming · flow-down obligations",
+      "title": "Subcontractor flow-down clauses cannot be identified, creating teaming agreement gaps",
+      "why_invisible": "Zero clauses were extracted, so no flow-down analysis was performed — but if the solicitation contains DFARS 252.204-7012 (CUI/cyber), 252.227-7013 (technical data), or ITAR-related clauses, subcontractors must be bound to the same obligations or the prime is in breach.",
+      "move": "Once clauses are extracted, immediately identify all mandatory flow-downs per DFARS PGI 204.7403 and FAR 52.244-6. Revise all teaming agreements and NDAs to incorporate required flow-downs before proposal submission."
+    },
+    {
+      "category": "Lead-time · facility clearance",
+      "title": "If classified work is involved, facility clearance and personnel clearance lead times may exceed period of performance start",
+      "why_invisible": "No security clauses were extracted, so no clearance flag was raised — but DoD contracts involving classified information require verified facility clearances (FCL) that can take 6-18 months to obtain, and starting work without them is a contract violation.",
+      "move": "Contact the contracting officer to determine if a DD Form 254 (Contract Security Classification Specification) is attached. If classified work is required, verify current FCL status with your Facility Security Officer (FSO) immediately."
+    }
+  ],
+  "confidence_notes": [
+    {
+      "field": "Document type (SOW/PWS/SOO)",
+      "uncertain": "The governing work statement type could not be determined because no work statement text was extracted from the document.",
+      "assumption": "Classified as 'unknown' — no bid strategy assumptions were made about whether the work is prescriptive or outcomes-based.",
+      "resolve": "Retrieve and parse Section C (Description/Specifications/Work Statement) of the solicitation to identify the document type."
+    },
+    {
+      "field": "NAICS code",
+      "uncertain": "The NAICS code was not present in the extracted data, so size standard and set-aside eligibility cannot be confirmed.",
+      "assumption": "No size standard assumption was made; all size-related compliance checks are deferred.",
+      "resolve": "Verify NAICS code against SF-1449 Block 10 or the SAM.gov synopsis for this solicitation number."
+    },
+    {
+      "field": "Offer due date and timezone",
+      "uncertain": "No offer due date or time was extracted, making it impossible to confirm the proposal deadline or establish a submission schedule.",
+      "assumption": "No deadline assumption was made; all scheduling is on hold.",
+      "resolve": "Check SF-1449 Block 8 or the SAM.gov notice for the exact date, time, and timezone of the offer due date."
+    },
+    {
+      "field": "Contract type",
+      "uncertain": "The contract type (FFP, CPFF, T&M, IDIQ, etc.) was not extracted, so cost risk, accounting system requirements, and fee structure cannot be assessed.",
+      "assumption": "No contract type assumption was made; all cost-risk and accounting system checks are deferred.",
+      "resolve": "Identify contract type from Section B of the solicitation or the SF-1449 contract type block."
+    },
+    {
+      "field": "CLIN list",
+      "uncertain": "Zero CLINs were extracted, so it is unknown whether this is a single-CLIN, multi-CLIN, or IDIQ task order structure.",
+      "assumption": "No pricing structure assumption was made; the CLIN list is treated as entirely unknown.",
+      "resolve": "Obtain Section B of the solicitation and extract all CLINs, SLINs, ELINs, and associated quantities and units of issue."
+    },
+    {
+      "field": "Clause list and DFARS traps",
+      "uncertain": "Zero FAR/DFARS clauses were extracted, so no trap clause analysis could be performed and all compliance obligations are unknown.",
+      "assumption": "No clause compliance assumptions were made; the contract is treated as having unknown obligations.",
+      "resolve": "Extract Section I and Section H from the full solicitation document and re-run the DFARS trap analysis."
+    },
+    {
+      "field": "Set-aside type",
+      "uncertain": "The set-aside designation was not extracted, so eligibility to compete cannot be confirmed for any business category.",
+      "assumption": "No set-aside assumption was made; the solicitation is treated as open competition pending confirmation.",
+      "resolve": "Check SAM.gov notice or SF-1449 Block 10 for set-aside designation and verify applicable SBA certifications."
+    }
+  ],
+  "has_incumbent": false
+}

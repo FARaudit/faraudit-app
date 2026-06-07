@@ -8,6 +8,7 @@
 // Exit: 0 = all fixtures byte-stable · 1 = any variance detected
 
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { extractText } from "../src/lib/pdf-text-extractor";
 import { detectSections, type SectionBag } from "../src/lib/section-boundary-detector";
 import { extractAllFacts, type ExtractedFacts } from "../src/lib/section-extractors";
@@ -110,7 +111,7 @@ async function testFixture(label: string, pdfPath: string): Promise<TestResult> 
 
 async function main() {
   console.log("═════════════════════════════════════════════════════════════════════════════");
-  console.log("  CYCLE 2 EXTRACTION DETERMINISM HARNESS — 3-replay test, all 4 fixtures");
+  console.log("  CYCLE 2 EXTRACTION DETERMINISM HARNESS — 3-replay test, baseline + burn-in");
   console.log("═════════════════════════════════════════════════════════════════════════════");
   console.log("");
 
@@ -120,6 +121,22 @@ async function main() {
     { label: "F3 · N0017426Q1021 (Navy SF-18)",   path: "Solicitation+-+N0017426Q1021.pdf" },
     { label: "F4 · SPRRA126Q0034 (DLA SF-18)",    path: "test/pdfs/SPRRA126Q0034.pdf" },
   ];
+
+  // Cycle 2 v2 burn-in: glob test/pdfs/burn-in/*.pdf and add them as
+  // additional fixtures. Text-only burn-in docs (.txt) are skipped — the
+  // extractor's fail-loud path emits the same placeholder every replay, so
+  // they're trivially deterministic but uninformative for this harness.
+  const burnInDir = path.join(process.cwd(), "test/pdfs/burn-in");
+  if (fs.existsSync(burnInDir)) {
+    for (const entry of fs.readdirSync(burnInDir).sort()) {
+      if (!entry.endsWith(".pdf")) continue;
+      const sol = entry.replace(/\.pdf$/, "");
+      fixtures.push({
+        label: `BI · ${sol} (burn-in)`,
+        path: path.join(burnInDir, entry),
+      });
+    }
+  }
 
   const results: TestResult[] = [];
   for (const f of fixtures) {

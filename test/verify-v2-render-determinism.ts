@@ -95,6 +95,16 @@ async function main() {
     { path: path.join(process.cwd(), "test/fixtures/v2-vm-f4.json"), key: "F4" },
   ];
 
+  // Cycle 2 v2 burn-in: glob test/fixtures/burn-in/*-vm.json and add them.
+  const burnInDir = path.join(process.cwd(), "test/fixtures/burn-in");
+  if (fs.existsSync(burnInDir)) {
+    for (const entry of fs.readdirSync(burnInDir).sort()) {
+      if (!entry.endsWith("-vm.json")) continue;
+      const sol = entry.replace(/-vm\.json$/, "");
+      fixtures.push({ path: path.join(burnInDir, entry), key: `BI ${sol}` });
+    }
+  }
+
   let allPass = true;
   for (const f of fixtures) {
     if (!fs.existsSync(f.path)) {
