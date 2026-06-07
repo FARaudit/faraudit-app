@@ -78,57 +78,96 @@ const DFARS_TRAPS = new Set(Object.keys(DFARS_TRAPS_MAP));
 
 // ── §B — CLIN extractor ──────────────────────────────────────────────────
 
-export function extractClins(section: DetectedSection | null): ClinItem[] {
-  if (!section) return [];
+// extractClins now accepts the section bag. CLIN tokens legitimately live in
+// §B (priced schedule), §C (some SF-1449 embed schedule under SOW area), §F
+// (per-CLIN delivery), and §E (per-CLIN inspection). We scan all four with
+// §B prioritized FIRST so its richer descriptions win the dedup. SF-1449
+// flattened tables sometimes split the schedule across the §B→§C page
+// boundary, leaving 0001 in §B and 0002/0003 in §C — this was the F1 defect.
+export function extractClins(sections: Record<string, DetectedSection>): ClinItem[] {
+  const sourceText = ["B", "C", "F", "E"]
+    .map((k) => sections[k]?.text ?? "")
+    .filter((t) => t.length > 0)
+    .join("\n\n");
+  if (sourceText.length === 0) return [];
+
+  // Normalize CRLF. Token scan finds every plausible CLIN reference at line-
+  // start or after whitespace — handles flattened PDF tables where CLINs are
+  // not necessarily anchored at column 0.
+  const text = sourceText.replace(/\r/g, "");
+
+  // CLIN token = 4-digit (+ optional uppercase letter) followed by whitespace
+  // and a description token starting with a capital letter or paren. Rejects
+  // bare years (19xx/20xx). Lookahead is non-consuming so subsequent matches
+  // start cleanly after the lineItem.
+  const tokenRe = /(?:^|\n|\s)(\d{4}[A-Z]?)(?=\s+[A-Z(])/g;
+
+  interface Hit { lineItem: string; index: number; }
+  const hits: Hit[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(text)) !== null) {
+    const li = m[1];
+    // Reject obvious year tokens.
+    if (/^(19|20)\d{2}$/.test(li)) continue;
+    // m.index is start of the entire match (which may begin with \n or \s).
+    // The lineItem sits at m.index + (length of the leading whitespace char).
+    const liIdx = text.indexOf(li, m.index);
+    if (liIdx < 0) continue;
+    hits.push({ lineItem: li, index: liIdx });
+  }
+
+  // Dedup by lineItem (first occurrence wins — §B priority via concat order).
+  const seen = new Set<string>();
+  const ordered: Hit[] = [];
+  for (const h of hits) {
+    if (seen.has(h.lineItem)) continue;
+    seen.add(h.lineItem);
+    ordered.push(h);
+  }
+
+  // Sort hits by index (preserve document order after dedup).
+  ordered.sort((a, b) => a.index - b.index);
+
+  const contractTypeRe = /Firm\s+Fixed\s+Price|Time\s+and\s+Materials?|Cost\s+Plus|FFP\b/i;
+  const quantityAmbRe = /\(SET\s+OF\s+(\d+)\)\s*[—\-–]?\s*(\d+)\s*(Each|EA|LOT)/i;
+  const qtyUnitRe = /(\d+)\s*(Each|EA|LOT|Set|Unit)\b/i;
+  // Strong CLIN content signals — descriptions on real CLIN line items contain
+  // at least one of these markers in every fixture observed (SF-1449 + SF-18 +
+  // DLA + Navy). Used to admit non-0-prefix CLINs (option-year 1xxx/2xxx,
+  // optional 9xxx) without admitting form numbers / ISO standard refs / zip
+  // codes that happen to be 4-digit tokens followed by capital text.
+  const CLIN_CONTENT_RE = /Pricing\s+Arrangement:|Product\s+Service\s+Code:|Mfr\s+(CAGE|Part\s+Number):|\(SET\s+OF\b|\bCDRL\s+A\d{3}|\bFAT\)|Pricing\s+Type:/i;
+
   const clins: ClinItem[] = [];
-  const lines = section.text.split("\n");
+  for (let k = 0; k < ordered.length; k++) {
+    const cur = ordered[k];
+    const next = ordered[k + 1];
+    const descStart = cur.index + cur.lineItem.length;
+    // Description bounded to text BEFORE the next CLIN token, or 600 chars
+    // past the current item (whichever is shorter). This prevents one CLIN's
+    // description from absorbing the next CLIN's content.
+    const descEnd = next ? next.index : Math.min(text.length, descStart + 600);
+    const rawDesc = text.slice(descStart, descEnd);
+    const fullDescription = rawDesc.replace(/\s+/g, " ").trim();
 
-  // CLIN pattern handles three real-world layouts observed in fixtures:
-  //  SF-18 inline:    "0001  DESCRIPTION  QTY UNIT"     → match[2] populated
-  //  SF-1449 stacked: "0001"                            → match[2] undefined
-  //                   "INTAKE PLUGS, MIL-DTL-..."
-  //  Indented:        "  0001 ..." (leading whitespace from PDF table extraction)
-  // The (?:\s+(.+))? group is OPTIONAL so standalone CLIN numbers also match.
-  const clinPattern = /^\s*(\d{4}[A-Z]?)(?:\s+(.+))?$/;
-  const contractTypePattern = /Firm\s+Fixed\s+Price|Time\s+and\s+Materials?|Cost\s+Plus|FFP\b/i;
-  const quantityAmbPattern = /\(SET\s+OF\s+(\d+)\)\s*[—\-–]?\s*(\d+)\s*(Each|EA|LOT)/i;
+    // Dual-criterion admission filter:
+    //   (a) lineItem starts with "0" — federal base-CLIN convention (0001-0999)
+    //   (b) OR the FIRST 150 chars of the description contain a strong CLIN
+    //       content marker — admits non-0-prefix CLINs (option-year 1xxx,
+    //       optional 9xxx) only when their own description (not a downstream
+    //       CLIN's header that bled into the window) confirms it's a real
+    //       procurement line item.
+    // Rejects: form numbers (1449 SF form), PSC codes (1680), zip codes (1324),
+    // ISO standards (9001), building numbers (4522), tailoring fragments.
+    const startsWithZero = cur.lineItem.startsWith("0");
+    const hasContentMarker = CLIN_CONTENT_RE.test(fullDescription.slice(0, 150));
+    if (!startsWithZero && !hasContentMarker) continue;
 
-  const seenLineItems = new Set<string>();
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = clinPattern.exec(line);
-    if (!match) continue;
-    const lineItem = match[1];
-    // Dedup: §B / §E / §F all reference the same CLINs — keep the first
-    // (typically richest from §B) occurrence.
-    if (seenLineItems.has(lineItem)) continue;
-    seenLineItems.add(lineItem);
-
-    const inlineDesc = (match[2] ?? "").trim();
-    const descriptionLines: string[] = inlineDesc.length > 0 ? [inlineDesc] : [];
-
-    // If description is on the next line(s), collect until the next CLIN or
-    // a blank line.
-    let j = i + 1;
-    while (j < lines.length) {
-      const nextRaw = lines[j];
-      const nextTrim = nextRaw.trim();
-      if (nextTrim.length === 0) break;
-      // Stop at the next CLIN-shaped line
-      if (/^\s*\d{4}[A-Z]?(\s|$)/.test(nextRaw)) break;
-      // Stop on cover-form labels (SF-1449 / SF-18 noise)
-      if (/^\s*(QUANTITY|UNIT|PRICE|AMOUNT|See Schedule|See Section|\(Use Reverse)/i.test(nextTrim)) break;
-      descriptionLines.push(nextTrim);
-      j++;
-      if (descriptionLines.length >= 4) break; // cap continuation
-    }
-    const fullDescription = descriptionLines.join(" ").trim();
-
-    const qtyMatch = /(\d+)\s*(Each|EA|LOT|Set|Unit)/i.exec(fullDescription);
+    const qtyMatch = qtyUnitRe.exec(fullDescription);
     const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : null;
     const unit = qtyMatch ? qtyMatch[2] : null;
 
-    const ctMatch = contractTypePattern.exec(fullDescription);
+    const ctMatch = contractTypeRe.exec(fullDescription);
     let contractType: ClinItem["contractType"] = null;
     if (ctMatch) {
       const ct = ctMatch[0].toLowerCase();
@@ -137,13 +176,13 @@ export function extractClins(section: DetectedSection | null): ClinItem[] {
       else if (ct.includes("cost")) contractType = "CPFF";
     }
 
-    const ambMatch = quantityAmbPattern.exec(fullDescription);
+    const ambMatch = quantityAmbRe.exec(fullDescription);
     const ambiguityFlag = ambMatch
-      ? `quantity_ambiguous: "SET OF ${ambMatch[1]} — ${ambMatch[2]} ${ambMatch[3]}" — verify total units vs sets`
+      ? `quantity_ambiguous: "SET OF ${ambMatch[1]} — ${ambMatch[2]} ${ambMatch[3]}" — verify ${ambMatch[2]} sets vs ${ambMatch[2]} units`
       : null;
 
     clins.push({
-      lineItem,
+      lineItem: cur.lineItem,
       description: fullDescription.slice(0, 300),
       quantity: qty,
       unit,
@@ -347,7 +386,7 @@ export function extractAllFacts(sections: Record<string, DetectedSection>): Extr
   const warnings: string[] = [];
   const s = sections;
 
-  const clins = extractClins(s["B"] ?? null);
+  const clins = extractClins(s);
   const delivery = extractDelivery(s["F"] ?? null);
   const clauses = extractClauses(s["I"] ?? null);
   const submission = extractSubmissionRequirements(s["L"] ?? null);
