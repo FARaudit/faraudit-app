@@ -2416,6 +2416,11 @@ export interface AuditV2Result {
   // submission_checklist_filtered (which groups §L requirements into 6
   // buckets). null on wrong-doc / metadata-only paths.
   submission_preflight?: SubmissionChecklistItem[] | null;
+  // Fix 13 — recompete signal. Populated only when judgment verdict is
+  // non-pursuit (no_go / conditional). Tells the bidder where to watch
+  // for the next acquisition cycle of this contract. null on go / wrong_doc /
+  // metadata-only paths.
+  recompete_signal?: RecompeteSignal | null;
 }
 
 // Fix 12 — §06 submission preflight surface.
@@ -2425,6 +2430,18 @@ export interface SubmissionChecklistItem {
   status: "required" | "conditional" | "not_required";
   source: string;
   detail?: string;
+}
+
+// Fix 13 — recompete signal surface. Pure-function output over ExtractedFacts +
+// judgment. Zero LLM cost. Surfaces only on DECLINE/CONDITIONAL paths so the
+// contractor who isn't pursuing this cycle has actionable monitoring guidance.
+export interface RecompeteSignal {
+  contract_number: string | null;
+  naics: string | null;
+  agency: string | null;
+  estimated_end_date: string | null;
+  recompete_window: string | null;
+  monitoring_note: string;
 }
 
 // Fix 8 — metadata-only V2 path. Output of runAuditV2Metadata when SAM.gov
@@ -2573,6 +2590,7 @@ function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
       `[audit-v2] WRONG_DOC short-circuit: ${detected}${piid ? ` (PIID ${piid})` : ""} — extraction + judgment skipped.`,
     ],
     submission_preflight: null,
+    recompete_signal: null,
   };
 }
 
@@ -2767,6 +2785,7 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     ],
     metadata_brief: metadataBrief,
     submission_preflight: null,
+    recompete_signal: null,
   };
 }
 
@@ -2866,6 +2885,61 @@ function _v2BuildSubmissionPreflight(
   return items;
 }
 
+// ─── Fix 13 — recompete signal builder ─────────────────────────────────────
+// Fires only on non-pursuit verdicts. Estimated end-date proxied from the
+// latest deliveryDate in extracted delivery items. Recompete window is the
+// standard 90-120 days before end-of-contract.
+function _v2BuildRecompeteSignal(
+  facts: ReturnType<typeof _v2ExtractAllFacts>,
+  judgment: _v2AuditJudgment
+): RecompeteSignal | null {
+  const verdict = judgment.verdict.goNoGoRecommendation;
+  // Only surface on non-pursuit verdicts. wrong_doc + go skip this surface.
+  if (verdict !== "no_go" && verdict !== "conditional") return null;
+
+  // Pick the LATEST extracted deliveryDate as the estimated contract end.
+  // Single-delivery solicitations: that one date IS the end. Multi-CLIN:
+  // last delivery is the natural floor for the recompete window.
+  let estimated_end_date: string | null = null;
+  let parsedEndDate: Date | null = null;
+  for (const d of facts.delivery) {
+    if (!d.deliveryDate) continue;
+    const parsed = new Date(d.deliveryDate);
+    if (Number.isNaN(parsed.getTime())) continue;
+    if (!parsedEndDate || parsed.getTime() > parsedEndDate.getTime()) {
+      parsedEndDate = parsed;
+      estimated_end_date = d.deliveryDate;
+    }
+  }
+
+  let recompete_window: string | null = null;
+  if (parsedEndDate) {
+    const windowStart = new Date(parsedEndDate.getTime() - 120 * 24 * 60 * 60 * 1000);
+    const windowEnd = new Date(parsedEndDate.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    recompete_window = `${fmt(windowStart)} – ${fmt(windowEnd)} (~90–120 days before contract end)`;
+  }
+
+  const agencyStr = facts.issuingOffice || "the issuing agency";
+  const naicsStr = facts.naicsCode ? `NAICS ${facts.naicsCode}` : "the same NAICS";
+  const windowPrefix = recompete_window
+    ? ` starting ${recompete_window.split(" (")[0]}`
+    : "";
+  const monitoring_note =
+    `Monitor SAM.gov Pre-Solicitation Synopsis and Sources Sought notices for ` +
+    `${agencyStr} in ${naicsStr}${windowPrefix}. ` +
+    `Set a recompete alert on this contract number and NAICS combination.`;
+
+  return {
+    contract_number: facts.solicitorNumber,
+    naics: facts.naicsCode,
+    agency: facts.issuingOffice,
+    estimated_end_date,
+    recompete_window,
+    monitoring_note,
+  };
+}
+
 export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
 
@@ -2919,6 +2993,10 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   // against clauses + offer-due-date + §L requirements).
   const submission_preflight = _v2BuildSubmissionPreflight(facts);
 
+  // Fix 13 — recompete signal. Populated only on non-pursuit verdicts
+  // (no_go / conditional). null on go.
+  const recompete_signal = _v2BuildRecompeteSignal(facts, judgment);
+
   return {
     sectionBag,
     facts,
@@ -2935,6 +3013,7 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
     submissionChecklist: checklist,
     warnings,
     submission_preflight,
+    recompete_signal,
   };
 }
 

@@ -359,6 +359,7 @@ export async function POST(req: NextRequest) {
             has_incumbent: v2Result.has_incumbent,
             metadata_brief: v2Result.metadata_brief ?? null,
             submission_preflight: v2Result.submission_preflight ?? null,
+            recompete_signal: v2Result.recompete_signal ?? null,
           },
           extraction: {
             sections_detected: Object.keys(v2Result.sectionBag.sections),
@@ -413,6 +414,7 @@ export async function POST(req: NextRequest) {
             has_incumbent: false,
             metadata_brief: v2Result.metadata_brief ?? null,
             submission_preflight: v2Result.submission_preflight ?? null,
+            recompete_signal: v2Result.recompete_signal ?? null,
           },
           extraction: {
             sections_detected: [] as string[],
