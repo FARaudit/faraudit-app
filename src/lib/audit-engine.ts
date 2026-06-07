@@ -2365,17 +2365,45 @@ JSON only — one key: risk_findings.`;
 import { extractText as _v2ExtractText } from "./pdf-text-extractor";
 import { detectSections as _v2DetectSections } from "./section-boundary-detector";
 import { extractAllFacts as _v2ExtractAllFacts } from "./section-extractors";
-import { runJudgment as _v2RunJudgment, type AuditJudgment as _v2AuditJudgment } from "./audit-judgment";
+import {
+  runJudgment as _v2RunJudgment,
+  type AuditJudgment as _v2AuditJudgment,
+  type AuditL02Catch as _v2AuditL02Catch,
+  type AuditConfidenceNote as _v2AuditConfidenceNote,
+} from "./audit-judgment";
 import {
   matrixRollup as _v2MatrixRollup,
+  matrixRollupReshape as _v2MatrixRollupReshape,
   dedupRisks as _v2DedupRisks,
   submissionChecklistFiltered as _v2SubmissionChecklistFiltered,
+  workStatement as _v2WorkStatement,
+  type WorkStatementKnown as _v2WorkStatementKnown,
+  type WorkStatementUnknown as _v2WorkStatementUnknown,
 } from "../app/audit/[id]/_normalizers";
 
 export interface AuditV2Result {
   sectionBag: ReturnType<typeof _v2DetectSections>;
   facts: ReturnType<typeof _v2ExtractAllFacts>;
   judgment: _v2AuditJudgment;
+  // ─── Cycle 2 v2 view-model surfaces (Part C emit) ──────────────────────
+  // EXACTLY ONE of work_statement / work_statement_unknown is non-null,
+  // matching the two §03-HEAD render variants (Part D).
+  work_statement: _v2WorkStatementKnown | null;
+  work_statement_unknown: _v2WorkStatementUnknown | null;
+  // matrix_rollup: { required[], reference[], reference_count } feeds the
+  // §04 tally strip + .cmx-row required cards + .cmx-rollup reference tail.
+  matrix_rollup: ReturnType<typeof _v2MatrixRollupReshape>;
+  // submission_checklist_filtered: 6 buckets carrying `critical` flag +
+  // per-item severity. Renderer drives .ck-group.is-critical from data.
+  submission_checklist_filtered: ReturnType<typeof _v2SubmissionChecklistFiltered>;
+  // l02_catches: distinct L02 band in decision layer. POST hero-dedup count.
+  l02_catches: _v2AuditL02Catch[];
+  // confidence_notes: footnote panel at report end. data-hide-when-empty.
+  confidence_notes: _v2AuditConfidenceNote[];
+  // has_incumbent: §02 inc-none render gate. Renderer shows empty-state
+  // when false (does NOT strip §02 — see Part E fix).
+  has_incumbent: boolean;
+  // Legacy flat shape kept for the existing render path during transition.
   normalizedClauses: ReturnType<typeof _v2MatrixRollup>;
   normalizedRisks: ReturnType<typeof _v2DedupRisks>;
   submissionChecklist: ReturnType<typeof _v2SubmissionChecklistFiltered>;
@@ -2404,13 +2432,37 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
 
   const judgment = await _v2RunJudgment(facts);
 
+  // ─── Cycle 2 v2 view-model surface derivations ─────────────────────────
+  const ws = _v2WorkStatement(judgment.documentClassification);
+  const matrix = _v2MatrixRollupReshape(facts.clauses);
+  const checklist = _v2SubmissionChecklistFiltered(facts);
+
+  // L02 hero-dedup (Brain Part C): the top (highest-impact) catch is
+  // promoted to the hero "catch you'd have missed" band at the top of the
+  // report; remove it from the L02 band so it doesn't appear twice.
+  // l02_catches.length downstream (Part D bindings: .et-count + jump-nav
+  // badge) MUST be the post-dedup band count.
+  const l02_catches = judgment.l02Catches.length > 0 ? judgment.l02Catches.slice(1) : [];
+
+  // has_incumbent: until an incumbent extractor lands, default false so the
+  // §02 .inc-none empty-state renders (Part E fix). Engine writes a real
+  // signal once incumbent extraction is wired.
+  const has_incumbent = false;
+
   return {
     sectionBag,
     facts,
     judgment,
+    work_statement: ws.work_statement,
+    work_statement_unknown: ws.work_statement_unknown,
+    matrix_rollup: matrix,
+    submission_checklist_filtered: checklist,
+    l02_catches,
+    confidence_notes: judgment.confidenceNotes,
+    has_incumbent,
     normalizedClauses: _v2MatrixRollup(facts.clauses),
     normalizedRisks: _v2DedupRisks(judgment.risks),
-    submissionChecklist: _v2SubmissionChecklistFiltered(facts),
+    submissionChecklist: checklist,
     warnings,
   };
 }

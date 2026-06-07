@@ -33,6 +33,25 @@ export interface AuditRisk {
   trapClause: string | null;
 }
 
+// Cycle 2 v2 — L02 catches and confidence notes upgraded from string[] to
+// structured object[] per Design spec. Render surfaces need category/title/
+// why_invisible/move + field/uncertain/assumption/resolve to populate the new
+// templates without VM having to parse free-text. snake_case key convention
+// matches Design HTML data-field attributes for 1:1 wire-up.
+export interface AuditL02Catch {
+  category: string;
+  title: string;
+  why_invisible: string;
+  move: string;
+}
+
+export interface AuditConfidenceNote {
+  field: string;
+  uncertain: string;
+  assumption: string;
+  resolve: string;
+}
+
 export interface AuditJudgment {
   documentClassification: {
     type: "SOW" | "PWS" | "SOO" | "combined" | "unknown";
@@ -48,8 +67,8 @@ export interface AuditJudgment {
     complianceStatus: "compliant" | "risks_identified" | "critical_gaps";
     urgencyScore: number;
   };
-  l02Catches: string[];
-  confidenceNotes: string[];
+  l02Catches: AuditL02Catch[];
+  confidenceNotes: AuditConfidenceNote[];
 }
 
 // ── Strict JSON schema for Structured Outputs ─────────────────────────────
@@ -102,8 +121,34 @@ const JUDGMENT_SCHEMA = {
         urgencyScore: { type: "integer" },
       },
     },
-    l02Catches: { type: "array", items: { type: "string" } },
-    confidenceNotes: { type: "array", items: { type: "string" } },
+    l02Catches: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["category", "title", "why_invisible", "move"],
+        properties: {
+          category: { type: "string" },
+          title: { type: "string" },
+          why_invisible: { type: "string" },
+          move: { type: "string" },
+        },
+      },
+    },
+    confidenceNotes: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["field", "uncertain", "assumption", "resolve"],
+        properties: {
+          field: { type: "string" },
+          uncertain: { type: "string" },
+          assumption: { type: "string" },
+          resolve: { type: "string" },
+        },
+      },
+    },
   },
 } as const;
 
@@ -146,11 +191,25 @@ ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- $
 
 ## Your task
 
-1. Classify the document type (SOW / PWS / SOO / combined) — this changes the bid strategy.
+1. Classify the document type (SOW / PWS / SOO / combined / unknown) — this changes the bid strategy.
+   • SOW = Statement of Work (prescriptive — how to do the work)
+   • PWS = Performance Work Statement (outcomes-based)
+   • SOO = Statement of Objectives (offeror proposes approach)
+   • combined = explicit hybrid
+   • unknown = governing work statement was NOT in the extracted text (likely in an un-parsed attachment).
 2. Identify all risks. Do NOT cap the list — surface every real risk, including P2s. Use 'id' = 'R01', 'R02', etc.
 3. For DFARS traps already flagged above, confirm severity and add mitigation specifics.
-4. Identify L02-class catches: items that pass clause checking but fail in contract execution (wrong WAWF document type, base access escort/credential lead time, timezone deadline traps, FOB conflicts, SPRS posting lag, JCP-required TDP access, etc.).
-5. Produce a plain-language verdict with urgency score 0-100.
+4. Identify L02-class catches: items that pass clause checking but fail in contract execution (wrong WAWF document type, base access escort/credential lead time, timezone deadline traps, FOB conflicts, SPRS posting lag, JCP-required TDP access, etc.). EACH catch is a STRUCTURED OBJECT:
+     category      — short tag, e.g. "Lead-time · base access", "FOB · cost inclusion", "Submission · single point of failure"
+     title         — one-sentence trap title
+     why_invisible — why it passes clause-check but fails at execution (the "looks fine on paper" gap)
+     move          — the SPECIFIC neutralizing action (verb-led, ≤2 sentences)
+5. Each confidence note (CONDITION 1 fail-loud) is also a STRUCTURED OBJECT:
+     field      — the specific field that's uncertain (e.g. "NAICS code", "Contract type", "CLIN list")
+     uncertain  — one sentence stating WHAT couldn't be confirmed from the document
+     assumption — one sentence stating WHAT was assumed in its place
+     resolve    — one sentence stating HOW to confirm (e.g. "Verify against SF-1449 block 10")
+6. Produce a plain-language verdict with urgency score 0-100.
 
 Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.`;
 }
@@ -165,8 +224,13 @@ export async function runJudgment(facts: ExtractedFacts): Promise<AuditJudgment>
   const timeoutMs = Number(process.env.CLAUDE_TIMEOUT_MS) || 240000;
 
   const body = {
+    // Cycle 2 v2: max_tokens raised 6000 → 10000. The schema upgrade
+    // (l02Catches + confidenceNotes string[] → object[] with 4 keys each)
+    // plus the unbounded risk list pushed real-world outputs past 6000-token
+    // ceiling — F1 truncation observed at ~25K chars. 10000 leaves headroom
+    // for 20+ risks · 10+ L02 catches · 8 confidence notes without truncation.
     model,
-    max_tokens: 6000,
+    max_tokens: 10000,
     temperature: 0,
     system:
       "You are a defense contract compliance expert. Respond only with the structured JSON requested. Be thorough on risks — do not cap the list.",

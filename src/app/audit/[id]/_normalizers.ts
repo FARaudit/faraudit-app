@@ -10,7 +10,87 @@
 // to offerorActionRequired; empty → hide, all-inferred → render-with-marker.
 
 import type { ExtractedFacts, ClauseItem } from "../../../lib/section-extractors";
-import type { AuditRisk } from "../../../lib/audit-judgment";
+import type { AuditRisk, AuditJudgment } from "../../../lib/audit-judgment";
+
+// ───────────────────────────────────────────────────────────────────────────
+// workStatement — §03-HEAD reveal (Cycle 2 v2)
+// Returns EXACTLY ONE of:
+//   { work_statement }          when documentClassification.type ∈ {SOW,PWS,SOO,combined}
+//   { work_statement_unknown }  when documentClassification.type === 'unknown'
+// Renderer uses the presence of each key to pick the data-state="known" vs
+// data-state="unknown" block. Never hide — the unknown variant reads as
+// rigor (Condition 1 fail-loud).
+// Per Brain REV2: unknown variant fires ONLY on type === 'unknown'. A
+// low-confidence-but-KNOWN type renders the known block with a "Tentative"
+// confidence chip.
+// ───────────────────────────────────────────────────────────────────────────
+
+const TYPE_FULL: Record<string, string> = {
+  SOW: "Statement of Work",
+  PWS: "Performance Work Statement",
+  SOO: "Statement of Objectives",
+  combined: "Combined (SOW + PWS)",
+};
+
+const TYPE_MEANING: Record<string, string> = {
+  SOW: "The Government prescribes <b>how</b> the work is done — tasks, methods, and deliverables are spelled out. You are scored on <b>compliance with the stated method</b>, not on a process you invent. This is the most prescriptive and leaves the least room to differentiate on approach.",
+  PWS: "The Government specifies <b>outcomes and performance standards</b>, leaving methodology to the contractor. You are scored on the strength of your approach and your track record. This rewards demonstrated capability and clean past performance.",
+  SOO: "The Government states <b>objectives only</b> and asks the offeror to propose the full approach. The technical volume IS the proposal — methodology is your primary differentiator.",
+  combined: "Hybrid — parts of the work are SOW (prescribed methods), other parts PWS (outcomes-based). Read each section carefully; the bid strategy varies CLIN by CLIN.",
+};
+
+export type WorkStatementKnown = {
+  abbr: "SOW" | "PWS" | "SOO" | "combined";
+  full: string;
+  meaning: string;
+  evidence: string;
+  confidence: "High confidence" | "Medium confidence" | "Tentative";
+  bid_strategy: string;
+};
+
+export type WorkStatementUnknown = {
+  head: string;
+  reason: string;
+  action: string;
+};
+
+export interface WorkStatementResult {
+  work_statement: WorkStatementKnown | null;
+  work_statement_unknown: WorkStatementUnknown | null;
+}
+
+function confidenceLabel(conf: AuditJudgment["documentClassification"]["confidence"]): WorkStatementKnown["confidence"] {
+  if (conf === "high") return "High confidence";
+  if (conf === "medium") return "Medium confidence";
+  return "Tentative";
+}
+
+export function workStatement(dc: AuditJudgment["documentClassification"]): WorkStatementResult {
+  if (dc.type === "unknown") {
+    return {
+      work_statement: null,
+      work_statement_unknown: {
+        head: "Couldn't confirm from the extracted text",
+        reason:
+          dc.evidence ||
+          "The governing work statement appears to live in an <b>attachment</b> (a Statement of Need / SOW PDF) that wasn't in the parsed solicitation body. SOW vs PWS changes the entire bid approach, so FARaudit reports this as tentative rather than guessing.",
+        action:
+          "<b>Upload the attachment to resolve this.</b> It's the single highest-leverage line in the audit — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
+      },
+    };
+  }
+  return {
+    work_statement: {
+      abbr: dc.type,
+      full: TYPE_FULL[dc.type] ?? dc.type,
+      meaning: TYPE_MEANING[dc.type] ?? "",
+      evidence: dc.evidence || "(evidence not captured)",
+      confidence: confidenceLabel(dc.confidence),
+      bid_strategy: dc.bidStrategy || "(bid strategy not captured)",
+    },
+    work_statement_unknown: null,
+  };
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // matrix_rollup — collapse standard clauses into a rollup row, preserve traps
@@ -27,42 +107,77 @@ export interface ClauseMatrixRow {
 }
 
 export function matrixRollup(clauses: ClauseItem[]): ClauseMatrixRow[] {
-  if (clauses.length === 0) return [];
-
-  // Traps first, then full-text incorporations, then everything else.
-  const traps = clauses.filter((c) => c.isTrap);
-  const fullText = clauses.filter((c) => !c.isTrap && c.incorporated === "full_text");
-  const byRef = clauses.filter((c) => !c.isTrap && c.incorporated === "by_reference");
-
-  const out: ClauseMatrixRow[] = [];
-  for (const c of traps) {
-    out.push({ number: c.number, title: c.title || "(title not extracted — verify in solicitation)", badge: "trap", trapReason: c.trapReason });
-  }
-  for (const c of fullText) {
-    out.push({ number: c.number, title: c.title || "(title not extracted)", badge: "required", trapReason: null });
-  }
-  // Collapse by-reference clauses into a rollup IF there are many; otherwise
-  // surface each one individually.
-  if (byRef.length > 6) {
-    const farCount = byRef.filter((c) => c.number.startsWith("52.")).length;
-    const dfarsCount = byRef.filter((c) => c.number.startsWith("252.")).length;
-    const otherCount = byRef.length - farCount - dfarsCount;
+  // Legacy flat-row return — preserved for callers that still consume the
+  // single-array shape. NEW callers should prefer matrixRollupReshape (below)
+  // which returns { required, reference, reference_count } per Cycle 2 v2.
+  const reshaped = matrixRollupReshape(clauses);
+  const out: ClauseMatrixRow[] = [...reshaped.required];
+  if (reshaped.reference_count > 6) {
+    const farCount = reshaped.reference.filter((c) => c.number.startsWith("52.")).length;
+    const dfarsCount = reshaped.reference.filter((c) => c.number.startsWith("252.")).length;
+    const otherCount = reshaped.reference_count - farCount - dfarsCount;
     const parts: string[] = [];
     if (farCount > 0) parts.push(`${farCount} FAR`);
     if (dfarsCount > 0) parts.push(`${dfarsCount} DFARS`);
     if (otherCount > 0) parts.push(`${otherCount} other`);
     out.push({
-      number: `(${byRef.length} total)`,
+      number: `(${reshaped.reference_count} total)`,
       title: `${parts.join(" + ")} standard clauses incorporated by reference`,
       badge: "rollup",
       trapReason: null,
     });
   } else {
-    for (const c of byRef) {
-      out.push({ number: c.number, title: c.title || "(title not extracted)", badge: "reference", trapReason: null });
-    }
+    for (const c of reshaped.reference) out.push(c);
   }
   return out;
+}
+
+// matrixRollupReshape — Cycle 2 v2 §04 reshape per Design spec.
+// Returns: { required, reference, reference_count }
+//   required  = traps + full-text (the rich .cmx-row cards above the rollup)
+//   reference = by-reference tail (rendered as .cmx-ref chips inside the
+//               .cmx-rollup collapsible)
+//   reference_count = number rendered as <b> in the rollup toggle label
+// Renderer-side derived counts (NOT hardcoded literals — Part D anti-literal
+// binding):
+//   trap_count     = required.filter(r => r.badge === "trap").length
+//   fulltext_count = required.filter(r => r.badge === "required").length
+export interface MatrixRollupReshaped {
+  required: ClauseMatrixRow[];
+  reference: ClauseMatrixRow[];
+  reference_count: number;
+}
+
+export function matrixRollupReshape(clauses: ClauseItem[]): MatrixRollupReshaped {
+  if (clauses.length === 0) {
+    return { required: [], reference: [], reference_count: 0 };
+  }
+  const traps = clauses.filter((c) => c.isTrap);
+  const fullText = clauses.filter((c) => !c.isTrap && c.incorporated === "full_text");
+  const byRef = clauses.filter((c) => !c.isTrap && c.incorporated === "by_reference");
+
+  const required: ClauseMatrixRow[] = [
+    ...traps.map((c) => ({
+      number: c.number,
+      title: c.title || "(title not extracted — verify in solicitation)",
+      badge: "trap" as const,
+      trapReason: c.trapReason,
+    })),
+    ...fullText.map((c) => ({
+      number: c.number,
+      title: c.title || "(title not extracted)",
+      badge: "required" as const,
+      trapReason: null,
+    })),
+  ];
+  const reference: ClauseMatrixRow[] = byRef.map((c) => ({
+    number: c.number,
+    title: c.title || "(title not extracted)",
+    badge: "reference" as const,
+    trapReason: null,
+  }));
+
+  return { required, reference, reference_count: reference.length };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -173,9 +288,21 @@ function bucketize(text: string, declaredBucket: string | null): ChecklistBucket
   return "other";
 }
 
-export function submissionChecklistFiltered(
-  facts: ExtractedFacts
-): Array<{ bucket: ChecklistBucket; label: string; items: ChecklistItem[] }> {
+// Per Brain REV2: bucket-level `critical` flag derives from the bucket TYPE
+// (deadline / registration / mandatory_doc = critical) so the renderer can
+// drive .ck-group.is-critical styling from DATA, not group position. Per-
+// item `severity` ('critical' | 'normal') comes from the underlying
+// requirement's isCritical flag.
+const CRITICAL_BUCKETS = new Set<ChecklistBucket>(["deadline", "registration", "mandatory_doc"]);
+
+export interface ChecklistBucketGroup {
+  bucket: ChecklistBucket;
+  label: string;
+  critical: boolean;
+  items: ChecklistItem[];
+}
+
+export function submissionChecklistFiltered(facts: ExtractedFacts): ChecklistBucketGroup[] {
   const buckets = new Map<ChecklistBucket, ChecklistItem[]>();
   for (const b of BUCKET_ORDER) buckets.set(b, []);
 
@@ -203,6 +330,9 @@ export function submissionChecklistFiltered(
   return BUCKET_ORDER.filter((b) => (buckets.get(b)?.length ?? 0) > 0).map((b) => ({
     bucket: b,
     label: BUCKET_LABELS[b],
+    // critical flag is DATA, not position — REV2 anti-positional ruling.
+    // Renderer reads .critical to apply .ck-group.is-critical styling.
+    critical: CRITICAL_BUCKETS.has(b),
     items: buckets.get(b)!.sort((a, x) => Number(x.isCritical) - Number(a.isCritical)),
   }));
 }

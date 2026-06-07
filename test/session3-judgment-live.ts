@@ -75,18 +75,33 @@ async function main() {
     console.log(`    [${r.severity}] ${r.title}${trap}`);
   }
   console.log("");
-  console.log("─── L02 catches ─────────────────────────────────────────────────────────────");
+  console.log("─── L02 catches (Cycle 2 v2 object schema) ──────────────────────────────────");
   if (judgment.l02Catches.length === 0) {
     console.log("  (none)");
   } else {
-    for (const c of judgment.l02Catches) console.log(`  - ${c}`);
+    for (const c of judgment.l02Catches) {
+      console.log(`  [${c.category}] ${c.title}`);
+      console.log(`    why_invisible: ${c.why_invisible.slice(0, 140)}`);
+      console.log(`    move: ${c.move.slice(0, 140)}`);
+    }
   }
   console.log("");
   if (judgment.confidenceNotes.length > 0) {
-    console.log("─── Confidence notes ────────────────────────────────────────────────────────");
-    for (const n of judgment.confidenceNotes) console.log(`  - ${n}`);
+    console.log("─── Confidence notes (Cycle 2 v2 object schema) ─────────────────────────────");
+    for (const n of judgment.confidenceNotes) {
+      console.log(`  [${n.field}]`);
+      console.log(`    uncertain: ${n.uncertain.slice(0, 140)}`);
+      console.log(`    assumption: ${n.assumption.slice(0, 140)}`);
+      console.log(`    resolve: ${n.resolve.slice(0, 140)}`);
+    }
     console.log("");
   }
+
+  // Brain Part D verification — schema field types
+  const l02OK = judgment.l02Catches.every((c) => typeof c === "object" && "category" in c && "title" in c && "why_invisible" in c && "move" in c);
+  const cnOK = judgment.confidenceNotes.every((n) => typeof n === "object" && "field" in n && "uncertain" in n && "assumption" in n && "resolve" in n);
+  console.log(`Schema verification: l02_catches objects ${l02OK ? "✓" : "✗"} · confidence_notes objects ${cnOK ? "✓" : "✗"}`);
+  console.log(`work_statement variant fired: ${judgment.documentClassification.type === "unknown" ? "UNKNOWN (rigor)" : "KNOWN (" + judgment.documentClassification.type + ")"}`);
 
   console.log("═════════════════════════════════════════════════════════════════════════════");
   console.log("  ✓ CONDITION 2 VERIFIED: structured output parsed, no silent {} failure");
