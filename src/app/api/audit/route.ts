@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { runAudit, type PdfSource } from "@/lib/audit-engine";
+import { runAudit, runAuditV2, AUDIT_V2_ENABLED, type PdfSource } from "@/lib/audit-engine";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import {
   noticeIdSchema,
@@ -335,6 +335,49 @@ export async function POST(req: NextRequest) {
         { error: updateError.message, auditId: audit.id },
         { status: 500 }
       );
+    }
+
+    // ━━ V2 shadow wire-up (AUDIT_ENGINE_V2=true, pdfBuffer-only inputs) ━━
+    // Runs runAuditV2 after V1 success and persists structured V2 output
+    // into compliance_json.v2_shadow. ZERO impact on V1 user response —
+    // every error is swallowed; the client has already received V1's JSON
+    // shape downstream. Visible in DB for inspection (Fix 7 verification).
+    if (AUDIT_V2_ENABLED && pdfBuffer) {
+      const v2Start = Date.now();
+      try {
+        const v2Result = await runAuditV2(pdfBuffer);
+        const v2Shadow = {
+          judgment: v2Result.judgment,
+          surfaces: {
+            work_statement: v2Result.work_statement,
+            work_statement_unknown: v2Result.work_statement_unknown,
+            matrix_rollup: v2Result.matrix_rollup,
+            submission_checklist_filtered: v2Result.submission_checklist_filtered,
+            l02_catches: v2Result.l02_catches,
+            confidence_notes: v2Result.confidence_notes,
+            has_incumbent: v2Result.has_incumbent,
+          },
+          extraction: {
+            sections_detected: Object.keys(v2Result.sectionBag.sections),
+            missing_sections: v2Result.sectionBag.missingSections,
+            warnings: v2Result.warnings,
+            extraction_warnings: v2Result.facts.extractionWarnings,
+          },
+          rendered_at: new Date().toISOString(),
+          engine_ms: Date.now() - v2Start,
+        };
+        const { error: shadowError } = await supabase
+          .from("audits")
+          .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
+          .eq("id", audit.id);
+        if (shadowError) {
+          console.error("[V2-SHADOW] db update failed (non-fatal):", shadowError.message);
+        } else {
+          console.log("[V2-SHADOW] stored for audit", audit.id, "engine_ms=", v2Shadow.engine_ms);
+        }
+      } catch (err) {
+        console.error("[V2-SHADOW] runAuditV2 failed (non-fatal):", err instanceof Error ? err.message : err);
+      }
     }
 
     // Best-effort intelligence-corpus write — every audit teaches the engine
