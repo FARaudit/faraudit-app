@@ -1895,9 +1895,17 @@ JSON only — one key: risk_findings.`;
 
   const [overviewResult, complianceResult, risksResult] = await Promise.all([
     callWithRetry(
+      // Cycle 2 (2026-06-07): overview maxTokens raised 1500 → 4000. Pre-
+      // Cycle-2 overview prompt fit 1500 comfortably; Cycle-2 prompt adds
+      // exhaustive submission_requirements_raw[] (15-25 verbatim §L imperatives
+      // × 80-200 chars each) + evaluation_factors_raw + eval_basis_text +
+      // section summaries. At 1500 tokens, Sonnet truncated mid-JSON →
+      // parse failed → Opus retry truncated same → engine wrote {} for
+      // overview, losing the §09 Q1 measurement field entirely. 4000 tokens
+      // (≈16K char capacity) is comfortable headroom even for long §L.
       `${SECURITY_DIRECTIVE}\n\nYou are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`,
       overviewPrompt,
-      1500,
+      4000,
       pdfBase64,
       "overview",
       imageBase64,

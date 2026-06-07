@@ -1639,9 +1639,12 @@ JSON only — one key: risk_findings.`;
 
   const [overviewResult, complianceResult, risksResult] = await Promise.all([
     callWithRetry(
+      // Cycle 2 (2026-06-07) — parity mirror. overview maxTokens 1500 → 4000
+      // to fit the exhaustive submission_requirements_raw[] enumeration. See
+      // src/lib/audit-engine.ts for full rationale.
       `${SECURITY_DIRECTIVE}\n\nYou are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`,
       overviewPrompt,
-      1500,
+      4000,
       pdfBase64,
       "overview",
       imageBase64,
