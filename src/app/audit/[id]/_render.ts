@@ -1764,5 +1764,64 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   html = replaceFieldText(html, "incumbent_none_note", vm.incumbent_none_note);
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Paged-PDF spec Item 3 — honor data-hide-when-empty server-side. Without
+  // this pass, V1 renders empty l02_catches / confidence_notes / compliance_
+  // flags sections (F2 / F3 / F4 in V2-BURNIN-FLAW-LOG.md). When V2 overlay
+  // lands, it owns the empty-state for these three; V1 just defaults to
+  // empty since the source fields don't exist on the V1 viewmodel.
+  html = stripHideWhenEmptyBlocks(html, vm);
+
+  return html;
+}
+
+// ─── Paged-PDF Item 3 — empty-block strip pass ─────────────────────────────
+// Tag-balanced walk pulled from _v2-render-surfaces.ts:stripIfEmpty.
+function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
+  let out = html;
+  // compliance_flags lives in a <div class="flags" data-hide-when-empty="..."> wrapper (§04).
+  // The other two are <section> wrappers.
+  const passes: Array<{ field: string; isEmpty: boolean }> = [
+    { field: "compliance_flags", isEmpty: !vm.compliance_flags || vm.compliance_flags.length === 0 },
+    // V2-shadow-only surfaces — V1 has no source, treat as always empty so
+    // the empty blocks don't print. The V2 overlay path renders + retains.
+    { field: "l02_catches", isEmpty: true },
+    { field: "confidence_notes", isEmpty: true },
+  ];
+  for (const p of passes) {
+    if (!p.isEmpty) continue;
+    out = stripBlockByHideField(out, p.field);
+  }
+  return out;
+}
+
+function stripBlockByHideField(html: string, dataField: string): string {
+  const openRe = new RegExp(
+    `<(section|div)\\b[^>]*\\bdata-hide-when-empty="${dataField.replace(/[.]/g, "\\.")}"[^>]*>`,
+    "i"
+  );
+  const m = openRe.exec(html);
+  if (!m) return html;
+  const tag = m[1];
+  const openTagRe = new RegExp(`<${tag}\\b[^>]*>`, "gi");
+  const closeTagRe = new RegExp(`</${tag}\\s*>`, "gi");
+  let depth = 1;
+  const openEnd = m.index + m[0].length;
+  openTagRe.lastIndex = openEnd;
+  closeTagRe.lastIndex = openEnd;
+  while (depth > 0) {
+    const o = openTagRe.exec(html);
+    const c = closeTagRe.exec(html);
+    if (!c) return html;
+    if (o && o.index < c.index) {
+      depth++;
+      closeTagRe.lastIndex = o.index + 1;
+    } else {
+      depth--;
+      if (depth === 0) {
+        return html.slice(0, m.index) + html.slice(c.index + c[0].length);
+      }
+      openTagRe.lastIndex = c.index + 1;
+    }
+  }
   return html;
 }

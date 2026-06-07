@@ -110,7 +110,17 @@ export async function GET(
         "Authorization": `Bearer ${pdfSecret}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ auditId: audit.id, html })
+      body: JSON.stringify({
+        auditId: audit.id,
+        html,
+        // Paged-PDF spec (Jun 7 2026) — Chromium can't read the masthead
+        // sol# from the DOM for displayHeaderFooter, so the service needs
+        // it explicitly to interpolate into headerTemplate.
+        solicitationNumber:
+          (audit.solicitation_number as string | null) ??
+          (audit.notice_id as string | null) ??
+          ""
+      })
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -423,8 +423,8 @@ button{font-family:inherit}
 [data-theme="dark"] .risk-sev.high{background:rgba(220,38,38,.16);color:#fca5a5;border-color:transparent}
 [data-theme="dark"] .risk-sev.med{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
 [data-theme="dark"] .risk-sev.low{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:transparent}
-.risk-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0}
-.risk-cite{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:auto;white-space:nowrap}
+.risk-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0;flex:1 1 auto}
+.risk-cite{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:auto;text-align:right;white-space:normal;overflow-wrap:anywhere;max-width:38%;flex:0 1 auto;line-height:1.4}
 /* risk provenance — verified-from-document vs inferred-pattern (trust tier) */
 .risk-prov{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:5px;flex-shrink:0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .risk-prov.doc{background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)}
@@ -567,30 +567,55 @@ button{font-family:inherit}
 .rd-note b{color:var(--ink);font-weight:700}
 
 /* ═══════════ PRINT — board-ready report ═══════════ */
+/* ═══════════ PAGED PDF (Letter) — institutional research ═══════════
+   Inverts the old broken model: sections FLOW (no whole-.sec break-inside:
+   avoid → kills mid-document whitespace gaps), section headers glue to
+   their first content (no orphaned headers), every card/row is atomic
+   (no card split across a page), tables repeat header row, rail/jump-nav
+   /sidebar/toggles hidden. Header/footer come from printToPDF (Part B —
+   Chromium ignores CSS @page margin-box content).
+   Spec: ceo/redesign-final/Review/AUDIT-REPORT-PAGED-LAYOUT-SPEC.md */
 @media print{
-  @page{margin:13mm}
+  @page{size:Letter;margin:16mm 13mm 14mm}   /* see Part B: printToPDF margins override this in prod */
   html,body,.frame,.bg{background:#fff!important}
-  .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.prelim-modes,.toast,.rpt-return{display:none!important}
+
+  /* hide every screen affordance — only the report prints */
+  .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.prelim-modes,.toast,
+  .rpt-return,.risk-chev,.kd-note{display:none!important}
+
+  /* collapse the app shell to one full-width document column */
   .frame{display:block!important;min-width:0!important;max-width:none!important;grid-template-columns:none!important}
-  .body{max-width:none!important;padding:0!important;gap:12px!important}
+  .body{display:block!important;max-width:none!important;padding:0!important;margin:0!important}
   .rpt-grid{display:block!important;grid-template-columns:none!important}
-  .rpt-main>.sec{margin-top:12px}
-  .sec,.masthead,.moment,.keydates,.scorecard,.exec-sum,.timeline{break-inside:avoid;box-shadow:none!important}
+  .rpt-main{display:block!important}
+
+  /* one even vertical rhythm between blocks */
+  .masthead,.keydates,.moment,.exec-sum,.timeline,.etraps,.scorecard,.sec{
+    margin:0 0 5.5mm 0!important;box-shadow:none!important}
+  .sec+.sec,.rpt-main>.sec{margin-top:0!important}
+
+  /* PAGINATION */
+  .sec,.etraps{break-inside:auto}                                   /* 1 sections flow → fill pages, no gaps */
+  .sec-head,.et-head{break-after:avoid}                             /* 2 header pulls to its content */
+  .sec-head + *,.sec-body > :first-child{break-before:avoid}
+  .masthead,.keydates,.moment,.exec-sum,.timeline,.scorecard,       /* 3 hero/lead blocks stay whole */
+  #sec-classify,#sec-incumbent,#sec-ko,.matrix-artifact,.ws-reveal,.award-basis,.gate-card{break-inside:avoid}
+  .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,  /* 4 every card/row atomic */
+  .es-act,.tl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin-tbl tr,.cmatrix tr,.ko-card,.cmatrix{break-inside:avoid}
+  .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick{break-after:avoid}  /* 5 labels glue down */
+  .clin-tbl thead,.cmatrix thead{display:table-header-group}        /* 6 tables repeat header per page */
+  p,li,.ws-meaning,.risk-detail{orphans:3;widows:3}                 /* 7 widow/orphan control */
+
+  .risk-body{max-height:none!important;overflow:visible!important}  /* collapsibles open on paper */
+
+  /* checklist prints as blank boxes regardless of on-screen checked state */
   .ck-item input:checked + .ck-box{background:transparent!important;border-color:#94a3b8!important}
   .ck-item input:checked + .ck-box::after{display:none!important}
   .ck-item input:checked ~ .ck-txt{color:#0a1628!important;text-decoration:none!important}
-  .ck-group,.cmatrix,.ko-card{break-inside:avoid}
-  .risk,.flag-row,.eval .sfactor,.award-basis{break-inside:avoid}
-  .risk-group-label,.subsec-h{break-after:avoid}
-  .risk-body{max-height:none!important}
-  .risk-chev,.kd-note{display:none!important}
-  /* provenance + severity badges legible at print scale */
+
   .risk-prov{font-size:9px!important;padding:3px 8px!important}
   .risk-prov.pattern{background:#eef2f6!important;color:#475569!important;border-color:#cbd5e1!important}
   .risk-prov.doc{background:#ecfdf5!important;color:#047857!important;border-color:#a7f3d0!important}
-  /* hide locked-state teasers in print — but NEVER the masthead verdict block: the .v-unscored
-     "Preliminary read" block IS the real verdict in metadata-only state and must print (1:1 web↔PDF).
-     Production strips the unused block server-side; this :not() keeps the design-file demo PDF correct. */
   [data-state="locked"]:not(.mh-verdict){display:none!important}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }

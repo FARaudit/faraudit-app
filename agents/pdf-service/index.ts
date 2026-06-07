@@ -111,13 +111,28 @@ app.post("/pdf", async (req, res) => {
     });
   }
 
-  const { auditId, html } = (req.body ?? {}) as { auditId?: string; html?: string };
+  const { auditId, html, solicitationNumber } = (req.body ?? {}) as {
+    auditId?: string;
+    html?: string;
+    solicitationNumber?: string;
+  };
   if (typeof html !== "string" || html.length === 0) {
     return res.status(400).json({ error: "html (string) required in body" });
   }
   if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
     return res.status(413).json({ error: `html exceeds ${MAX_HTML_BYTES} bytes` });
   }
+
+  // Escape for safe inline injection into Chromium headerTemplate. The
+  // template ignores inherited styles and has no client-side sanitizer.
+  const escHtml = (s: string): string =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const solHeader = escHtml((solicitationNumber || "").trim());
 
   const t0 = Date.now();
   let browser: Browser;
@@ -136,11 +151,34 @@ app.post("/pdf", async (req, res) => {
     // The render must finish inside RENDER_TIMEOUT_MS — race the work.
     const renderWork = (async () => {
       await page.setContent(html, { waitUntil: "load" });
+      // Paged PDF spec (Jun 7 2026 · AUDIT-REPORT-PAGED-LAYOUT-SPEC.md Part B).
+      // top/bottom margins reserve room for Chromium's displayHeaderFooter
+      // bands (20mm header / 16mm footer). preferCSSPageSize:false lets these
+      // margins govern in prod; the template's @page rule only governs the
+      // design-file's Cmd+P test. headerTemplate / footerTemplate styles MUST
+      // be inline — templates inherit nothing and default font is ~6px.
+      const headerTemplate = `
+        <div style="width:100%; font-family:'IBM Plex Mono',monospace; font-size:8px;
+                    letter-spacing:.04em; color:#64748b; padding:0 13mm;
+                    display:flex; justify-content:space-between; align-items:center;">
+          <span>${solHeader}</span>
+          <span style="text-transform:uppercase; letter-spacing:.12em;">FARaudit Audit Report</span>
+        </div>`;
+      const footerTemplate = `
+        <div style="width:100%; font-family:'IBM Plex Mono',monospace; font-size:8px;
+                    color:#94a3b8; padding:0 13mm;
+                    display:flex; justify-content:space-between; align-items:center;">
+          <span><b style="color:#0a1628; font-weight:700;">FAR</b>audit</span>
+          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+        </div>`;
       const out = await page.pdf({
-        printBackground: true,
-        preferCSSPageSize: true,
         format: "Letter",
-        margin: { top: "13mm", right: "13mm", bottom: "13mm", left: "13mm" }
+        printBackground: true,
+        preferCSSPageSize: false,
+        margin: { top: "20mm", bottom: "16mm", left: "13mm", right: "13mm" },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate
       });
       return out as Buffer;
     })();
