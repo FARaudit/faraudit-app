@@ -1,0 +1,56 @@
+{
+  "label": "F4 SPRRA126Q0034 (DLA SF-18) — KNOWN ws variant (SOW)",
+  "work_statement": {
+    "abbr": "SOW",
+    "full": "Statement of Work",
+    "meaning": "The Government prescribes <b>how</b> the work is done — tasks, methods, and deliverables are spelled out. You are scored on <b>compliance with the stated method</b>, not on a process you invent.",
+    "evidence": "Attachment 0001 · §1.2 contractor shall perform",
+    "confidence": "High confidence",
+    "bid_strategy": "Win on <b>flawless compliance and price realism</b>, not a clever methodology the SOW doesn't ask for."
+  },
+  "work_statement_unknown": null,
+  "matrix_rollup": {
+    "required": [
+      { "number": "252.204-7018", "title": "Covered Telecommunications", "badge": "trap", "trapReason": "Covered telecom (DFARS trap)" },
+      { "number": "252.225-7060", "title": "Xinjiang Forced Labor", "badge": "trap", "trapReason": "Xinjiang (DFARS trap)" },
+      { "number": "252.204-7012", "title": "Safeguarding Covered Defense Information", "badge": "trap", "trapReason": "CDI safeguarding" }
+    ],
+    "reference": [
+      { "number": "52.203-3", "title": "Gratuities", "badge": "reference", "trapReason": null },
+      { "number": "52.204-7", "title": "SAM", "badge": "reference", "trapReason": null }
+    ],
+    "reference_count": 71
+  },
+  "submission_checklist_filtered": [
+    {
+      "bucket": "deadline",
+      "label": "Submission deadline",
+      "critical": true,
+      "items": [
+        { "bucket": "deadline", "text": "Quote due 25 Jun 2026", "isCritical": true, "complete": false }
+      ]
+    },
+    {
+      "bucket": "mandatory_doc",
+      "label": "Required documents & product info",
+      "critical": true,
+      "items": [
+        { "bucket": "mandatory_doc", "text": "CAGE code included in proposal", "isCritical": true, "complete": false },
+        { "bucket": "mandatory_doc", "text": "Unit price with container price breakdown", "isCritical": true, "complete": false }
+      ]
+    },
+    {
+      "bucket": "representation",
+      "label": "Representations & certifications",
+      "critical": false,
+      "items": [
+        { "bucket": "representation", "text": "JCP certification required for TDP access", "isCritical": true, "complete": false }
+      ]
+    }
+  ],
+  "l02_catches": [
+    { "category": "Lead-time · SPRS posting lag", "title": "SPRS Basic Assessment posting lag", "why_invisible": "Posting updates can take 7-14 days to propagate.", "move": "Verify SPRS score is current within 30 days BEFORE quote submission." }
+  ],
+  "confidence_notes": [],
+  "has_incumbent": false
+}

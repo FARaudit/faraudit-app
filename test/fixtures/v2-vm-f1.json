@@ -1,0 +1,83 @@
+{
+  "label": "F1 FA301626Q0068 (USAF SF-1449) — UNKNOWN ws variant",
+  "work_statement": null,
+  "work_statement_unknown": {
+    "head": "Couldn't confirm from the extracted text",
+    "reason": "The governing work statement appears to live in an <b>attachment</b> (a Statement of Need / SOW PDF) that wasn't in the parsed solicitation body. SOW vs PWS changes the entire bid approach, so FARaudit reports this as tentative rather than guessing.",
+    "action": "<b>Upload the attachment to resolve this.</b> It's the single highest-leverage line in the audit — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO)."
+  },
+  "matrix_rollup": {
+    "required": [
+      { "number": "252.204-7018", "title": "Covered Telecommunications Equipment Ban", "badge": "trap", "trapReason": "Covered telecom (DFARS trap)" },
+      { "number": "252.223-7008", "title": "Hexavalent Chromium Prohibition", "badge": "trap", "trapReason": "Hex chrome (DFARS trap)" },
+      { "number": "252.225-7060", "title": "Xinjiang Forced-Labor Prohibition", "badge": "trap", "trapReason": "Xinjiang (DFARS trap)" },
+      { "number": "52.219-14", "title": "Limitations on Subcontracting", "badge": "required", "trapReason": null },
+      { "number": "5352.201-9101", "title": "Ombudsman", "badge": "required", "trapReason": null },
+      { "number": "5352.223-9001", "title": "Health and Safety on Government Installations", "badge": "required", "trapReason": null }
+    ],
+    "reference": [
+      { "number": "52.203-3", "title": "Gratuities", "badge": "reference", "trapReason": null },
+      { "number": "52.203-6", "title": "Restrictions on Subcontractor Sales to the Government", "badge": "reference", "trapReason": null },
+      { "number": "52.204-7", "title": "System for Award Management", "badge": "reference", "trapReason": null },
+      { "number": "52.204-13", "title": "System for Award Management Maintenance", "badge": "reference", "trapReason": null },
+      { "number": "52.209-6", "title": "Protecting the Government's Interest When Subcontracting", "badge": "reference", "trapReason": null }
+    ],
+    "reference_count": 23
+  },
+  "submission_checklist_filtered": [
+    {
+      "bucket": "deadline",
+      "label": "Submission deadline",
+      "critical": true,
+      "items": [
+        { "bucket": "deadline", "text": "Offer due: 03 Aug 2026 12:00 PM CDT", "isCritical": true, "complete": false }
+      ]
+    },
+    {
+      "bucket": "registration",
+      "label": "System registrations",
+      "critical": true,
+      "items": [
+        { "bucket": "registration", "text": "SAM.gov registration current and not expiring within 30 days", "isCritical": true, "complete": false },
+        { "bucket": "registration", "text": "WAWF registration for invoicing", "isCritical": false, "complete": false }
+      ]
+    },
+    {
+      "bucket": "mandatory_doc",
+      "label": "Required documents & product info",
+      "critical": true,
+      "items": [
+        { "bucket": "mandatory_doc", "text": "Manufacturer name", "isCritical": true, "complete": false },
+        { "bucket": "mandatory_doc", "text": "Part number", "isCritical": true, "complete": false },
+        { "bucket": "mandatory_doc", "text": "Product illustration", "isCritical": true, "complete": false },
+        { "bucket": "mandatory_doc", "text": "Product literature", "isCritical": true, "complete": false }
+      ]
+    },
+    {
+      "bucket": "representation",
+      "label": "Representations & certifications",
+      "critical": false,
+      "items": [
+        { "bucket": "representation", "text": "Annual reps & certs current in SAM", "isCritical": false, "complete": false }
+      ]
+    },
+    {
+      "bucket": "format",
+      "label": "Format requirements",
+      "critical": false,
+      "items": [
+        { "bucket": "format", "text": "Quotes submitted via email only", "isCritical": false, "complete": false }
+      ]
+    }
+  ],
+  "l02_catches": [
+    { "category": "Lead-time · base access", "title": "Base-access credentialing runs longer than the phase-in window", "why_invisible": "Every clause is satisfiable on paper, but CAC / installation access takes 6–10 weeks.", "move": "Submit visit-request package day of award; price remote phase-in for first 30 days." },
+    { "category": "Submission · single point of failure", "title": "Email-only submission with no portal backup", "why_invisible": "Two .mil addresses look standard but email delivery failures are undetectable.", "move": "Send 90+ min early, keep under 10MB, request read receipt, CC second address." },
+    { "category": "FOB · cost inclusion", "title": "FOB Origin quietly pushes freight into your unit price", "why_invisible": "CLIN 0004 is FOB Origin — bidders who assume Destination under-price by freight delta.", "move": "Build destination freight into CLIN 0004 unit price; file Q&A to confirm FOB." }
+  ],
+  "confidence_notes": [
+    { "field": "NAICS code", "uncertain": "NAICS code not extracted from solicitation; assumed from PSC.", "assumption": "541512 (size standard $34.0M).", "resolve": "Confirm against SF-1449 Block 10 before relying on size-eligibility." },
+    { "field": "Contract type", "uncertain": "No explicit contract-type clause extracted; FFP assumed from CLIN structure.", "assumption": "Firm-fixed-price for CLINs 0001-0002.", "resolve": "Verify FOB and pricing arrangement in Section B before quoting." }
+  ],
+  "has_incumbent": false
+}

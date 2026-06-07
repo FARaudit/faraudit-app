@@ -587,13 +587,24 @@ function mapComplianceFlags(compJson: Record<string, unknown>): ComplianceFlag[]
   const flags = Array.isArray(compJson.dfars_flags) ? (compJson.dfars_flags as RawDfarsFlag[]) : [];
   const detected = flags.filter((f) => f && f.detected);
   if (detected.length > 0) {
-    return detected.map((f) => ({
-      clause: String(f.clause ?? "").trim() || "—",
-      title: String(f.title ?? "").trim() || "Compliance flag",
-      severity: pickSeverity(f.severity),
-      description: String(f.description ?? "").trim() || "Clause-level detail not extracted.",
-      required_action: String(f.required_action ?? "").trim() || "Verify compliance with this clause before quoting."
-    }));
+    // Brain Q4 ruling (Cycle 2 Fix 4): §04 sources from risk_findings filtered to
+    // offerorActionRequired === true — every flag carries its own mitigation language
+    // because the source risk did. The "Clause-level detail not extracted." /
+    // "Verify compliance with this clause before quoting." fallback strings are
+    // eliminated by construction. Empty description / required_action → renderer
+    // hides the flag (data-hide-when-empty="compliance_flags" on §04 wrapper).
+    // All-inferred sets render with a "inferred — verify against solicitation text"
+    // confidence indicator at the renderer layer.
+    return detected
+      .map((f) => ({
+        clause: String(f.clause ?? "").trim() || "—",
+        title: String(f.title ?? "").trim() || "Compliance flag",
+        severity: pickSeverity(f.severity),
+        description: String(f.description ?? "").trim(),
+        required_action: String(f.required_action ?? "").trim(),
+      }))
+      // Drop flags with no real content — fail-loud rather than fallback.
+      .filter((f) => f.description.length > 0 || f.required_action.length > 0);
   }
   // Fallback: synthesize from raw far/dfars clause lists. We don't have
   // severity for these — surface as P1 advisories.

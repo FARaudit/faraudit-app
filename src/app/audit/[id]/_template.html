@@ -1127,6 +1127,24 @@ button{font-family:inherit}
             </div>
           </section>
 
+          <!-- ═══ EXECUTION TRAPS (L02) ═══ Cycle 2 v2 — distinct band in the
+               decision layer (after scorecard, before §01). NOT numbered.
+               .et-count + jump-nav badge bind to l02_catches.length (POST hero-dedup
+               per Part C). data-hide-when-empty="l02_catches" auto-hides band when
+               nothing to surface. -->
+          <section class="etraps" id="sec-etraps" data-field="l02_catches" data-hide-when-empty="l02_catches">
+            <div class="et-head">
+              <p class="et-kick">Execution traps &middot; L02<span class="et-count"><span data-field="l02_count">0</span> found</span></p>
+              <h2 class="et-title">What passes clause-check &mdash; and still loses you the award</h2>
+              <p class="et-sub">These aren&rsquo;t in the clause list or the risk register. They&rsquo;re operational traps buried in Section L, the attachments, and the delivery terms &mdash; the ones that surface only after you&rsquo;ve won.</p>
+            </div>
+            <div class="et-grid" data-field="l02_catches.list">
+              <!-- Repeater: one .et-card per L02 catch (post hero-dedup).
+                   Fields per item: category, title, why_invisible, move.
+                   Renderer rebuilds inner from l02_catches[]. -->
+            </div>
+          </section>
+
           <!-- 01 · CLASSIFICATION -->
           <section class="sec" id="sec-classify">
             <div class="sec-head">
@@ -1165,7 +1183,16 @@ button{font-family:inherit}
               <div class="sh-right"><span class="sh-pill warn" data-field="incumbent_status">Recompete window open</span></div>
             </div>
             <div class="sec-body">
-              <div class="incumbent">
+              <!-- §02 incumbent branch — Cycle 2 v2 Part E contract:
+                   On vm.has_incumbent === true: renderer strips the .inc-none
+                   wrapper below, leaves .incumbent (data-state="known") in place.
+                   On vm.has_incumbent === false: renderer strips the .incumbent
+                   wrapper here, and clears the inline style + data-state="none"
+                   on .inc-none to REVEAL the empty-state block.
+                   NEVER strip the <section> wrapper — that creates a 01→03
+                   numbering gap. renderIncumbentBranch() in _render.ts handles
+                   both branches safely. -->
+              <div class="incumbent" data-state="known">
                 <div class="inc-card">
                   <div class="inc-name">
                     <div class="inc-logo">M</div>
@@ -1205,6 +1232,32 @@ button{font-family:inherit}
               <div class="sec-title">Scope &amp; CLIN Structure<span class="st-sub">What they're actually buying</span></div>
             </div>
             <div class="sec-body">
+              <!-- §03-HEAD · WORK-STATEMENT REVEAL (Cycle 2 v2 — Rule 54)
+                   Code renders EXACTLY ONE of the two .ws-reveal blocks below:
+                     data-state="known"   when vm.work_statement is non-null (type ∈ {SOW,PWS,SOO,combined})
+                     data-state="unknown" when vm.work_statement_unknown is non-null (type === 'unknown')
+                   Confidence chip text comes from vm.work_statement.confidence — renders "Tentative"
+                   when the model emitted low confidence on a KNOWN type (still the known block, not unknown). -->
+              <div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">
+                <div class="ws-main">
+                  <p class="ws-kick">Work-statement type<span class="ws-conf" data-field="work_statement.confidence"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg><span data-field="work_statement.confidence_label">High confidence</span></span></p>
+                  <div class="ws-type"><span class="ws-abbr" data-field="work_statement.abbr">SOW</span><span class="ws-full" data-field="work_statement.full">Statement of Work</span></div>
+                  <p class="ws-mean" data-field="work_statement.meaning"></p>
+                  <div class="ws-ev"><span class="ev-tag">Found in</span><span class="ev-cite" data-field="work_statement.evidence"></span></div>
+                </div>
+                <div class="ws-strat">
+                  <span class="wst-k">Bid strategy</span>
+                  <p class="wst-t" data-field="work_statement.bid_strategy"></p>
+                </div>
+              </div>
+              <div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">
+                <div class="ws-main">
+                  <p class="ws-kick">Work-statement type<span class="ws-conf"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg>Tentative</span></p>
+                  <div class="ws-type"><span class="ws-abbr">UNKNOWN</span><span class="ws-full" data-field="work_statement_unknown.head"></span></div>
+                  <p class="ws-mean" data-field="work_statement_unknown.reason"></p>
+                  <div class="ws-strat-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg><span class="wsi-t" data-field="work_statement_unknown.action"></span></div>
+                </div>
+              </div>
               <p class="scope-lead" data-field="clin_summary">DLA Aviation seeks a <b>predictive-maintenance analytics platform</b> for the H-60 Black Hawk fleet — ingesting flight, fault, and supply data to forecast component failures and drive demand planning. The award is a single-award IDIQ: a firm-fixed-price platform stand-up (CLIN 0001), licensed analytics + model delivery (CLIN 0002), and surge analyst support priced as labor-hour task orders (CLIN 0003–0004).</p>
 
               <div class="scope-grid">
@@ -1309,7 +1362,7 @@ button{font-family:inherit}
             <div class="sec-body">
               <!-- full data -->
               <div class="sev-legend" data-state="full"><span><i class="l0">P0</i><b>Blocker — no path to award without it</b></span><span><i class="l1">P1</i><b>Critical — clear before you submit</b></span><span><i class="l2">P2</i><b>Advisory — confirm, lower risk</b></span></div>
-              <div class="flags" data-state="full" data-field="compliance_flags">
+              <div class="flags" data-state="full" data-field="compliance_flags" data-hide-when-empty="compliance_flags">
                 <div class="flag-row">
                   <div class="sev p0"><span class="lvl">P0</span><span class="wd">Blocker</span></div>
                   <div class="flag-main">
@@ -1340,6 +1393,33 @@ button{font-family:inherit}
                     <div class="flag-top"><span class="flag-clause mono">DFARS 252.239-7010</span><span class="flag-title">Cloud Computing Services</span></div>
                     <p class="flag-desc">Any cloud solution must use a DoD-authorized (IL4/IL5) offering with a provisional authorization on file.</p>
                     <div class="flag-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg><span><b>Action:</b> Cite your hosting environment's DoD PA / IL level in the technical volume; confirm data stays within the authorized boundary.</span></div>
+                  </div>
+                </div>
+              </div>
+              <!-- §04 CLAUSE-MATRIX ROLLUP (Cycle 2 v2 — Part D port).
+                   Tally strip counts are DATA, NOT literals:
+                     "N traps"      ← matrix_rollup.required[badge==='trap'].length
+                     "N full-text"  ← matrix_rollup.required[badge==='required'].length
+                     "N by reference" ← matrix_rollup.reference_count
+                   Expander "<b>N</b> more clauses" ← matrix_rollup.reference_count.
+                   .cmx-row repeater renders one row per matrix_rollup.required entry.
+                   .cmx-refs repeater renders one chip per matrix_rollup.reference entry. -->
+              <div class="clause-matrix" data-field="matrix_rollup">
+                <div class="cmx-h">Full clause matrix<span class="cmx-counts"><span class="cmx-tally trap"><span class="d"></span><span data-field="matrix_rollup.trap_count">0</span> traps</span><span class="cmx-tally required"><span class="d"></span><span data-field="matrix_rollup.fulltext_count">0</span> full-text</span><span class="cmx-tally reference"><span class="d"></span><span data-field="matrix_rollup.reference_count">0</span> by reference</span></span></div>
+                <div class="cmx-rows" data-field="matrix_rollup.required">
+                  <!-- Repeater: one .cmx-row per required clause. Renderer rebuilds inner. -->
+                </div>
+                <div class="cmx-rollup">
+                  <button class="cmx-toggle" type="button" aria-expanded="false" data-cmx-toggle>
+                    <svg class="cmx-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+                    <span class="cmx-lbl"><b data-field="matrix_rollup.reference_count">0</b> more clauses incorporated by reference</span>
+                    <span class="cmx-sub">standard · no offeror action</span>
+                  </button>
+                  <div class="cmx-tail">
+                    <div class="cmx-refs" data-field="matrix_rollup.reference">
+                      <!-- Repeater: one .cmx-ref chip per reference clause. -->
+                    </div>
+                    <p class="cmx-note">These are standard provisions incorporated by reference under FAR 52.252-2. They impose no offeror-specific action beyond accurate SAM representations — the full text with status ships in the exportable matrix (&sect;07).</p>
                   </div>
                 </div>
               </div>
@@ -1522,27 +1602,40 @@ Thank you for the opportunity to quote on SP4701-26-Q-0942. Before submission we
               <div class="sh-right"><span class="ck-prog"><b id="ckDone">0</b> / <span id="ckTotal">10</span> complete</span></div>
             </div>
             <div class="sec-body">
-              <div class="checklist" data-field="submission_checklist">
-                <div class="ck-group">
-                  <div class="ck-gh">Before you submit</div>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">SAM.gov registration active &amp; not expiring within 30 days<span class="ck-csrc">FAR 52.204-7</span></span><span class="ck-sev req">Required</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Annual representations &amp; certifications current in SAM<span class="ck-csrc">FAR 52.204-8</span></span><span class="ck-sev req">Required</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Current SPRS Basic Assessment posted (within 3 years)<span class="ck-csrc">DFARS 252.204-7019</span></span><span class="ck-sev dq">Disqualifying</span></label>
-                </div>
-                <div class="ck-group">
-                  <div class="ck-gh">With your submission</div>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Technical &amp; price volumes submitted by e-mail only<span class="ck-csrc">Section L(b)</span></span><span class="ck-sev req">Required</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Quote &le; 15 pages including price (resumes counted)<span class="ck-csrc">Section L(d)</span></span><span class="ck-sev req">Required</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Data-rights assertion table included for CLIN 0002<span class="ck-csrc">DFARS 252.227-7017</span></span><span class="ck-sev dq">Disqualifying</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Option CLIN 0002 priced separately at a fixed unit rate<span class="ck-csrc">Section M</span></span><span class="ck-sev req">Required</span></label>
-                </div>
-                <div class="ck-group">
-                  <div class="ck-gh">After you submit</div>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Register in WAWF for invoicing &amp; payment<span class="ck-csrc">DFARS 252.232-7006</span></span><span class="ck-sev adv">Advisory</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Confirm CAGE code appears on every volume<span class="ck-csrc">Section L</span></span><span class="ck-sev req">Required</span></label>
-                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">Calendar the Q&amp;A deadline (18 Jun 2026)<span class="ck-csrc">Section L</span></span><span class="ck-sev adv">Advisory</span></label>
+              <!-- §09 SIX-BUCKET PRE-FLIGHT (Cycle 2 v2 — Part D port).
+                   Buckets render in ORDER from submission_checklist_filtered[].
+                   .ck-group.is-critical styling is DRIVEN BY DATA — the renderer
+                   adds .is-critical when the bucket's `critical` flag is true
+                   (deadline / registration / mandatory_doc per VM derivation),
+                   NOT by group position. Per-item .is-critical from item.isCritical.
+                   Each bucket carries data-bucket=<bucket-key> for harness probing. -->
+              <div class="checklist" data-field="submission_checklist_filtered">
+                <!-- Repeater: one .ck-group per bucket; one .ck-item per requirement.
+                     Renderer rebuilds inner from submission_checklist_filtered[].
+                     Template carries one bucket as a structural shape reference;
+                     real render replaces this. -->
+                <div class="ck-group" data-bucket="deadline" style="display:none">
+                  <div class="ck-gh">Submission deadline</div>
+                  <label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt"><span class="ck-text">(placeholder — renderer fills from data)</span></span></label>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- ═══ VERIFICATION NOTES ═══ Cycle 2 v2 — fail-loud (Condition 1).
+               Footnote position at the bottom of rpt-main. .vn-count binds to
+               confidence_notes.length. data-hide-when-empty auto-hides the
+               whole panel when nothing to verify. -->
+          <section class="vnotes" id="sec-vnotes" data-field="confidence_notes" data-hide-when-empty="confidence_notes">
+            <div class="vn-head">
+              <div class="vn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
+              <div class="vn-h">What we couldn&rsquo;t fully verify</div>
+              <span class="vn-count"><span data-field="confidence_count">0</span> notes</span>
+            </div>
+            <p class="vn-frame">FARaudit fails loud. Every fact it couldn&rsquo;t confirm directly from your document is listed here &mdash; with the assumption it made and how to resolve it &mdash; rather than guessed and buried. <b>This is the rigor that makes the rest of the report trustworthy.</b></p>
+            <div class="vn-list" data-field="confidence_notes.list">
+              <!-- Repeater: one .vn-row per confidence note.
+                   Fields per item: field, uncertain, assumption, resolve. -->
             </div>
           </section>
 
