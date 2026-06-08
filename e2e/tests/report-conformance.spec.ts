@@ -39,7 +39,8 @@ const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
 // suite still RUNS the assertion (reports the result), but fails are warn-only.
 const BLOCKING_IDS = new Set<string>([
   'D6',  // .rpt-main{min-width:0} — Phase 1.5 scroll fix
-  'E1',  // §09 six-bucket — Phase 2 #1 (CATASTROPHIC, just landed)
+  'E1',  // §09 six-bucket — Phase 2 #1 (CATASTROPHIC)
+  'E12', // §08 drafted email body — Phase 2 #2
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -148,6 +149,30 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     return { ok: artifacts === 1 && tables === 0, detail: `.matrix-artifact=${artifacts} .cmatrix=${tables}` };
   });
   results.push({ id: 'E11', pass: e11.ok, detail: e11.detail });
+
+  // E12 — §08 ko-preview: non-empty AND contains greeting + ≥2 numbered items
+  // + sign-off. Stronger than just "non-empty" — enforces the canonical's
+  // structure (greeting → lead → numbered clarification asks → sign-off).
+  // BLOCKING — Phase 2 #2 just landed.
+  const e12 = await page.evaluate(() => {
+    const p = document.querySelector('.ko-preview');
+    if (!p) return { ok: false, detail: '.ko-preview NOT FOUND' };
+    const text = (p.textContent || '').trim();
+    if (text.length === 0) return { ok: false, detail: 'ko-preview empty' };
+    // Greeting check — "Dear [name]," or "Dear Contracting Officer,"
+    const hasGreeting = /^\s*Dear\s+[A-Z][^,]*,/.test(text);
+    // Numbered items — at least 2 lines starting with "1." and "2."
+    const items = (text.match(/(?:^|\n)\s*\d+\.\s+/g) || []).length;
+    // Sign-off — "Respectfully" or "Thank you" or "Sincerely" near the end
+    const tail = text.slice(-200);
+    const hasSignoff = /Respectfully|Sincerely|Thank you for your time/i.test(tail);
+    const ok = hasGreeting && items >= 2 && hasSignoff;
+    return {
+      ok,
+      detail: `greeting=${hasGreeting} numbered_items=${items} signoff=${hasSignoff} (len=${text.length})`,
+    };
+  });
+  results.push({ id: 'E12', pass: e12.ok, detail: e12.detail });
 
   return results;
 }

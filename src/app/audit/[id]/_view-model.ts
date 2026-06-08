@@ -1207,6 +1207,12 @@ function extractCoFromSectionL(compJson: Record<string, unknown>): { email: stri
   return { email, name: nameMatch ? nameMatch[1].trim() : null };
 }
 
+// §08 — Phase 2 #2 (Option B drafted email body, Jun 8 2026).
+// Replaces the legacy "1. <risk> · 2. <risk>" run-on with a structured
+// pre-quote clarification email matching the canonical §08 voice:
+// greeting → lead with sol# → numbered clarification asks (questions, not
+// risk dumps) → professional sign-off. Zero LLM cost. Option A (engine-side
+// LLM draft) is the V2 ceiling — separate ticket.
 function deriveKoEmailCard(
   audit: AuditRow,
   displayId: string,
@@ -1223,14 +1229,55 @@ function deriveKoEmailCard(
     || (audit.ko_email_recipient as string)
     || "contracting-officer@agency.mil";
   const subject = `${displayId} — Pre-quote clarifications`;
-  const top = risks.slice(0, 2);
-  const preview = top.length === 0
-    ? "Pre-quote clarifications on the solicitation."
-    : top.map((r, i) => {
-        const headline = (r.title || r.description).slice(0, 100);
-        return `${i + 1}. ${headline}`;
-      }).join(" · ");
+
+  // Greeting — "Dear [Last name]," when CO extracted; fallback to generic.
+  // Use last name only (more professional than full name in a cold email).
+  const coName = lExtracted?.name?.trim();
+  const lastName = coName ? coName.split(/\s+/).filter((s) => /^[A-Z]/.test(s)).pop() || coName : null;
+  const greeting = lastName ? `Dear ${lastName},` : "Dear Contracting Officer,";
+
+  // Lead — anchors the email to the solicitation under review.
+  const lead = `We are reviewing ${displayId} and request clarification on the following items before submission:`;
+
+  // Numbered clarification asks — phrased as questions, not risk excerpts.
+  // The canonical voice: short statement of the gap + "will the Government /
+  // could the Government confirm / can the Government clarify ..."
+  const top = risks.slice(0, 3);
+  const body = top.length === 0
+    ? "We are at this time conducting our initial review and have no outstanding clarifications."
+    : top.map((r, i) => `${i + 1}. ${riskToClarificationAsk(r)}`).join("\n\n");
+
+  // Sign-off — placeholders the user fills in. Matches canonical structure.
+  const signoff = "Thank you for your time.\n\nRespectfully,\n[Your name]\n[Your company]";
+
+  const preview = [greeting, "", lead, "", body, "", signoff].join("\n");
   return { to, subject, preview };
+}
+
+// Phrase a Risk as a professional clarification ask. Canonical voice:
+//   "<short statement of the gap> — could the Government confirm <X>?"
+// Falls back to a generic "please confirm" question when the risk doesn't
+// supply a specific action to invert into a question.
+function riskToClarificationAsk(r: Risk): string {
+  // Title is the gap statement (truncated for one-line clarity).
+  const title = (r.title || "").trim();
+  const headline = title.length > 140 ? title.slice(0, 137) + "..." : (title || "A risk was identified");
+  // faraudit_action is typically imperative ("Verify SPRS score is current...").
+  // Invert: strip the leading verb, lowercase the rest, wrap in "could the
+  // Government confirm ...?" Falls through to generic if action absent.
+  const action = (r.faraudit_action || "").trim();
+  if (action.length > 20) {
+    const stripped = action
+      .replace(/^(?:please\s+)?(?:verify|submit|provide|confirm|ensure|check|file|request|complete|review|include)\s+/i, "")
+      .replace(/\.$/, "")
+      .trim();
+    if (stripped.length > 10) {
+      const lowered = stripped.charAt(0).toLowerCase() + stripped.slice(1);
+      return `${headline} — could the Government confirm ${lowered}?`;
+    }
+  }
+  // Generic fallback when we can't extract a question.
+  return `${headline} — please clarify the Government's position before submission.`;
 }
 
 // Brain ruling Item 3 (2026-06-05): severity recalibration. The prior mapping
