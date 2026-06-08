@@ -1689,6 +1689,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     }
   } else {
     html = removeKdItem(html, "response_deadline");
+    // tl-sub empty-state guard (Option B) — when response_deadline unknown,
+    // strip "Submit by <b>[date]</b> &mdash; " prefix so the timeline header
+    // reads "N steps between you and a compliant quote" not the demo date.
+    html = html.replace(/Submit by <b data-field="response_deadline">[\s\S]*?<\/b> &mdash; /, "");
   }
   if (!vm.has_qa_deadline) {
     html = removeKdItem(html, "qa_deadline");
