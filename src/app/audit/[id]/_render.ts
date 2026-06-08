@@ -1368,6 +1368,20 @@ function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
     /(<span class="gs-pill )(?:go|no)("[^>]*>)[^<]*(<\/span>)/g,
     `$1${vm.gate_card.pill_text === "BID" ? "go" : "no"}$2${escapeHtml(vm.gate_card.pill_text)}$3`
   );
+  // Phase 3 E7 (F7) — .g-oc.win and .g-oc.no <b>...</b> outcome lead words.
+  // Template ships hardcoded 'All three ✓' / 'Any ✗' which contradicts a
+  // 2-gate audit's actual gate count. Renderer regex-replaces only the <b>
+  // content with vm.gate_card.outcome_win_lead / outcome_no_lead, which are
+  // derived from gate count in deriveGateCardProse (Both for n=2, All three
+  // for n=3, All N for n≥4, conditional for n=1).
+  out = out.replace(
+    /(<div class="g-oc win"><b>)[\s\S]*?(<\/b>)/,
+    `$1${escapeHtml(vm.gate_card.outcome_win_lead)}$2`
+  );
+  out = out.replace(
+    /(<div class="g-oc no(?:\s+active)?"><b>)[\s\S]*?(<\/b>)/,
+    `$1${escapeHtml(vm.gate_card.outcome_no_lead)}$2`
+  );
   return out;
 }
 

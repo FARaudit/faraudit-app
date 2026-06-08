@@ -44,6 +44,7 @@ const BLOCKING_IDS = new Set<string>([
   'E13', // §03 ws-reveal present + exactly one state — Phase 2 #3 (floor)
   'E9',  // key-dates populate-or-collapse — Phase 2 #4 (F5)
   'E2',  // set-aside single-source: masthead token === §03 token — Phase 3 (F8)
+  'E7',  // §06 gate outcome prose matches gate count — Phase 3 (F7)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -279,6 +280,35 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E2', pass: e2.ok, detail: e2.detail });
+
+  // E7 — §06 gate outcome prose matches gate count (F7). Template ships
+  // hardcoded 'All three ✓' / 'Any ✗' in .g-oc.win/.g-oc.no <b> prefixes;
+  // renderer derives the lead word from gate_conditions.length so a 2-gate
+  // audit shows 'Both' not 'All three'. Detector: count .g-row, assert the
+  // outcome .g-oc text contains the matching count word AND never contains
+  // 'All three' when n !== 3. BLOCKING — Phase 3 (F7).
+  // Gate mode is not active on every audit; when no .g-row exists, pass
+  // (the gate-card is hidden via display:none).
+  const e7 = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll('.g-row'));
+    const n = rows.length;
+    if (n === 0) return { ok: true, detail: 'no .g-row (gate mode not active — OK)' };
+    const winOc = document.querySelector('.g-oc.win');
+    const winText = (winOc?.textContent || '').trim();
+    // Allowed lead words by count
+    let allowed: string[];
+    if (n === 1) allowed = ['gate clears', 'gate clear', 'If', 'single'];
+    else if (n === 2) allowed = ['Both'];
+    else if (n === 3) allowed = ['All three'];
+    else allowed = ['All ' + n];
+    const match = allowed.some((a) => winText.includes(a));
+    const wrongAllThree = n !== 3 && winText.includes('All three');
+    return {
+      ok: match && !wrongAllThree,
+      detail: `n=${n} expected=${allowed.join('/')} got="${winText.slice(0, 50)}"${wrongAllThree ? ' WRONG-ALL-THREE' : ''}`,
+    };
+  });
+  results.push({ id: 'E7', pass: e7.ok, detail: e7.detail });
 
   return results;
 }

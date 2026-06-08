@@ -254,6 +254,11 @@ export interface AuditViewModel {
     count_text: string;         // .gs-cnt initial "0 / N cleared"
     pill_text: "BID" | "NO-BID"; // .gs-pill initial — NO-BID by default,
                                  // user resolver flips to BID on full check
+    // Phase 3 E7 (F7) — outcome lead words inside .g-oc.win/.g-oc.no <b>
+    // prefix. Derived from gate count so "All three ✓" never leaks on a
+    // 2-gate audit. Renderer regex-replaces only the <b>...</b> content.
+    outcome_win_lead: string;   // "All three" / "Both" / "All 5" / "If the gate clears"
+    outcome_no_lead: string;    // "Any" / "If it fails"
   };
 
   // key dates (qa_deadline + award_date are intentionally not derived; the
@@ -1021,14 +1026,18 @@ function deriveGateCardProse(
   gates: Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean }>,
   recommendation: "GO" | "CAUTION" | "DECLINE",
   daysToDeadline: number | null
-): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID" } {
+): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID"; outcome_win_lead: string; outcome_no_lead: string } {
   const n = gates.length;
   if (n === 0) {
     return {
       verdict_text: recommendation === "GO" ? "Bid with confidence" : recommendation === "DECLINE" ? "No-bid — bid not recommended" : "Caution — close gaps before bid",
       lead_text: "No structural gates fired on this audit. Standard scored audit applies.",
       count_text: "0 / 0 cleared",
-      pill_text: recommendation === "GO" ? "BID" : "NO-BID"
+      pill_text: recommendation === "GO" ? "BID" : "NO-BID",
+      // No gates → outcome words are placeholders; .gate-card is hidden
+      // when verdict_mode !== "gate", so these never render in practice.
+      outcome_win_lead: "If clear ✓",
+      outcome_no_lead: "If any fail ✗"
     };
   }
   // Gate-mode prose. Pre-curability split:
@@ -1069,13 +1078,33 @@ function deriveGateCardProse(
     leadText = `${curable.length} of ${n} gates ${curable.length === 1 ? "is" : "are"} curable inside ${windowPhrase}; the rest are structural. Cure what you can and verify the others before quoting.`;
   }
 
+  // Outcome lead words (E7 / F7) — drives .g-oc.win and .g-oc.no <b>...</b>
+  // prefix. Renderer regex-replaces both. Never "All three" on n !== 3.
+  let outcomeWin: string;
+  let outcomeNo: string;
+  if (n === 1) {
+    outcomeWin = "If the gate clears ✓";
+    outcomeNo = "If it fails ✗";
+  } else if (n === 2) {
+    outcomeWin = "Both ✓";
+    outcomeNo = "Any ✗";
+  } else if (n === 3) {
+    outcomeWin = "All three ✓";
+    outcomeNo = "Any ✗";
+  } else {
+    outcomeWin = `All ${n} ✓`;
+    outcomeNo = "Any ✗";
+  }
+
   // Count + pill — initial render state. User resolver flips pill→BID when
   // all rows are ticked.
   return {
     verdict_text: verdictText,
     lead_text: leadText,
     count_text: `0 / ${n} cleared`,
-    pill_text: "NO-BID"
+    pill_text: "NO-BID",
+    outcome_win_lead: outcomeWin,
+    outcome_no_lead: outcomeNo
   };
 }
 
