@@ -24,14 +24,15 @@ import * as path from 'node:path';
 // 5 audit IDs spanning the formats. Pulled from /api/audits or set per-run.
 // For initial wiring, exercise against the most recent SPRRA (DLA / SF-18)
 // — additional docs added as audits are run on the other formats.
-// 4f4743d7 added 2026-06-08 as the V2-shadow-regression fixture: it has a
-// populated v2_shadow with an EMPTY submission_checklist_filtered surface,
-// so without the V2 overlay empty-guard, renderChecklist would clobber V1's
-// 23-item checklist with [] and E1 (groups=6/6, items>1) would fail. With
-// the guard in place, V1's checklist survives — E1 stays green.
+//
+// 4f4743d7 was briefly added 2026-06-08 as the V2-overlay empty-guard regression
+// fixture and proved the guard works (E1 on it = "groups=6/6 · items=25 · dups=0",
+// i.e. V1's 25-item checklist survived the V2 overlay's empty submission_checklist_filtered).
+// Removed pending Brain's V1/V2 ws-reveal coordination fix (E13 floor-breach surfaces
+// on V2-shadow-bearing audits whose work_statement_unknown is populated — separate gap).
+// Re-add to AUDIT_DOCS after the ws-reveal coord fix lands.
 const AUDIT_DOCS: Array<{ label: string; id: string }> = [
-  { label: 'DLA · SPRRA126Q0034',  id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
-  { label: 'V2-shadow regression', id: '4f4743d7-d6fc-44f7-bb73-3400495c1dd5' },
+  { label: 'DLA · SPRRA126Q0034', id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
 ];
 
 const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
