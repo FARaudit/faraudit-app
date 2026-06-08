@@ -229,35 +229,86 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   });
   results.push({ id: 'E13', pass: e13.ok, detail: e13.detail });
 
-  // E9 — key-dates F5: every rendered .kd-item has a non-empty value, OR the
-  // empty cell is collapsed (no blank gaps). The renderer already drops
-  // .kd-item by has_<field> flag + drops the whole .keydates ribbon when all
-  // three flags are false (_render.ts:1598-1623). E9 verifies that contract.
+  // E9 — key-dates F5 (Phase 2 #4, Jun 8 2026 re-sync). Strengthened from the
+  // "no empty cells" floor to the full strip contract:
+  //   1. legacy .kd-sep divs are GONE (divider is a CSS pseudo on .kd-item);
+  //   2. every rendered .kd-item's primary [data-field] span is non-empty;
+  //   3. every rendered .cnt sub-span is non-empty (uncomputable countdowns
+  //      are stripped, never left as an empty pill);
+  //   4. when ≥1 upcoming date exists, exactly ONE .kd-item.urgent is present;
+  //      when all dates are past, ZERO .kd-item.urgent;
+  //   5. when has_<any-date>=false everywhere the whole .keydates strip AND
+  //      the .rail-deadline clock are display:none (zero-metadata path).
   // BLOCKING — Phase 2 #4.
   const e9 = await page.evaluate(() => {
-    const items = Array.from(document.querySelectorAll('.kd-item'));
-    if (items.length === 0) {
-      return { ok: true, detail: 'no .kd-item rendered (ribbon collapsed — OK per E9)' };
+    // (1) No .kd-sep elements anywhere on the page.
+    const seps = document.querySelectorAll('.kd-sep').length;
+    if (seps > 0) return { ok: false, detail: `${seps} legacy .kd-sep element(s) still in DOM` };
+
+    const strip = document.querySelector('.keydates') as HTMLElement | null;
+    const stripVisible = !!strip && getComputedStyle(strip).display !== 'none';
+    const rail = document.querySelector('.rail-deadline') as HTMLElement | null;
+    const railVisible = !!rail && getComputedStyle(rail).display !== 'none';
+
+    // (5) Zero-metadata path — strip + rail clock both hidden together.
+    if (!stripVisible) {
+      if (railVisible) {
+        return { ok: false, detail: '.keydates hidden but .rail-deadline still visible (zero-metadata contract broken)' };
+      }
+      return { ok: true, detail: 'zero-metadata: .keydates + .rail-deadline both hidden ✓' };
     }
+
+    const items = strip ? Array.from(strip.querySelectorAll('.kd-item')) : [];
+    if (items.length === 0) {
+      return { ok: false, detail: '.keydates visible but contains 0 .kd-item (should have hidden the strip)' };
+    }
+
+    // (2) + (3) — primary [data-field] non-empty + every .cnt non-empty.
     const empties: string[] = [];
     for (const it of items) {
-      // The primary value is in the first [data-field] span inside .kd-v
-      // (e.g., qa_deadline → "18 Jun 2026"). Check that span has non-empty
-      // text; the .cnt secondary span ("in 14 days") is decorative.
       const primary = it.querySelector('.kd-v [data-field]') as HTMLElement | null;
-      if (!primary) {
-        empties.push('no [data-field] span');
-        continue;
-      }
+      if (!primary) { empties.push('no [data-field] span'); continue; }
       const text = (primary.textContent || '').trim();
       if (text.length === 0) {
         empties.push((primary.getAttribute('data-field') || 'unknown') + '=empty');
+        continue;
+      }
+      const cnts = Array.from(it.querySelectorAll('.cnt')) as HTMLElement[];
+      for (const c of cnts) {
+        const ct = (c.textContent || '').trim();
+        if (ct.length === 0) {
+          empties.push((primary.getAttribute('data-field') || 'unknown') + '.cnt=empty');
+        }
       }
     }
-    if (empties.length === 0) {
-      return { ok: true, detail: `${items.length} .kd-item rendered, all populated` };
+    if (empties.length > 0) {
+      return { ok: false, detail: `${empties.length} empty cell(s): ${empties.join(', ')}` };
     }
-    return { ok: false, detail: `${empties.length} empty cell(s): ${empties.join(', ')}` };
+
+    // (4) Urgent contract — exactly one when ≥1 upcoming, zero when all past.
+    // "Upcoming" detected by .cnt text NOT matching the past marker ("closed" /
+    // "N days ago"). The renderer formats past dates as "closed"; we accept both
+    // for back-compat with any non-keydates code paths.
+    const pastRe = /\bclosed\b|\bdays?\s+ago\b/i;
+    const upcomingItems = items.filter((it) => {
+      const cnts = Array.from(it.querySelectorAll('.cnt')) as HTMLElement[];
+      // No .cnt → can't tell; treat as upcoming (the date is still rendered).
+      if (cnts.length === 0) return true;
+      return !cnts.some((c) => pastRe.test((c.textContent || '').trim()));
+    });
+    const urgentCount = items.filter((it) => it.classList.contains('urgent')).length;
+    const expectedUrgent = upcomingItems.length > 0 ? 1 : 0;
+    if (urgentCount !== expectedUrgent) {
+      return {
+        ok: false,
+        detail: `expected ${expectedUrgent} .kd-item.urgent (upcoming=${upcomingItems.length}), got ${urgentCount}`,
+      };
+    }
+
+    return {
+      ok: true,
+      detail: `${items.length} .kd-item · ${upcomingItems.length} upcoming · ${urgentCount} .urgent · 0 .kd-sep ✓`,
+    };
   });
   results.push({ id: 'E9', pass: e9.ok, detail: e9.detail });
 

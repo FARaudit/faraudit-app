@@ -263,8 +263,9 @@ export interface AuditViewModel {
     outcome_no_lead: string;    // "Any" / "If it fails"
   };
 
-  // key dates (qa_deadline + award_date are intentionally not derived; the
-  // renderer drops the ribbon item + rail clock when has_* is false)
+  // key dates — Phase 2 #4 (Jun 8 2026): qa_deadline + award_date now parsed
+  // from audit row (with compJson fallback). Renderer drops the ribbon item
+  // when has_* is false; .kd-item + .kd-item::before pseudo-divider auto-reflows.
   qa_deadline: string;
   qa_days: string;
   qa_days_num: string;
@@ -277,6 +278,13 @@ export interface AuditViewModel {
   // tile's .mhv-note line. Empty when response_deadline is null.
   response_deadline_short: string;
   award_date: string;
+  // Derived fiscal-quarter for the .cnt span next to award_date (e.g. "Q4 FY26").
+  // Empty when award_date is null OR uncomputable → renderer drops the .cnt span.
+  award_quarter: string;
+  // Field key of the single soonest UPCOMING date (qa_deadline / response_deadline
+  // / award_date). Empty when no upcoming date remains → renderer adds no .urgent
+  // class. Computed from one fixed `now` per run for determinism.
+  urgent_field: "" | "qa_deadline" | "response_deadline" | "award_date";
   // Phase A.0 defect fix (Jun 8 2026): .kd-note text was hardcoded demo
   // string in template. Now data-driven — renderer strips .kd-note unless
   // (has_qa_deadline AND key_dates_note non-empty). Default "" so the demo
@@ -286,6 +294,7 @@ export interface AuditViewModel {
   has_response_deadline: boolean;
   has_qa_deadline: boolean;
   has_award_date: boolean;
+  has_award_quarter: boolean;
 
   // Preliminary-read verdict block (metadata-only state) — Design ruling
   // 2026-06-04: when no document was retrieved, surface SAM-metadata tiles
@@ -542,6 +551,36 @@ function fmtCountdown(days: number | null): string {
   if (days === 0) return "today";
   if (days === 1) return "in 1 day";
   return `in ${days} days`;
+}
+
+// Key-dates ribbon variant — collapses past dates to "closed" instead of the
+// "N days ago" form. Brief: countdown reads "in N days" / "today" / "closed"
+// (Phase 2 #4 / Jun 8 2026). Returns "" when uncomputable → renderer drops
+// the .cnt span entirely (never an empty pill).
+function fmtKdCountdown(days: number | null): string {
+  if (days == null) return "";
+  if (days < 0) return "closed";
+  if (days === 0) return "today";
+  if (days === 1) return "in 1 day";
+  return `in ${days} days`;
+}
+
+// US federal fiscal year — runs Oct 1 → Sep 30, named after the calendar year
+// it ends in (FY26 = Oct 1 2025 – Sep 30 2026). Returns "" when input is null
+// so the renderer drops the .cnt span when uncomputable.
+function fiscalQuarter(d: Date | null): string {
+  if (!d) return "";
+  const m = d.getUTCMonth(); // 0=Jan … 11=Dec
+  const y = d.getUTCFullYear();
+  // Q1 Oct-Dec → FY = calendar year + 1; Q2 Jan-Mar; Q3 Apr-Jun; Q4 Jul-Sep.
+  let q: 1 | 2 | 3 | 4;
+  let fy: number;
+  if (m >= 9)         { q = 1; fy = y + 1; }
+  else if (m <= 2)    { q = 2; fy = y;     }
+  else if (m <= 5)    { q = 3; fy = y;     }
+  else                { q = 4; fy = y;     }
+  const fyShort = String(fy).slice(-2);
+  return `Q${q} FY${fyShort}`;
 }
 
 // ─── verdict mapping ────────────────────────────────────────────────────────
@@ -1654,11 +1693,30 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   // Dates — only show what we actually have. DESIGN ruling 2026-06-04: a Q&A
   // deadline or anticipated-award date presented as fact when we derived it
   // from response_deadline ± offset is a customer liability. Hide > fabricate.
-  // qa_deadline + award_date are not in the current schema → never rendered;
-  // the renderer drops the corresponding ribbon items + rail clock.
+  // Phase 2 #4 (Jun 8 2026): qa_deadline + award_date now parsed from the
+  // audit row (with compJson fallback — same path the timeline gates use at
+  // lines 1194/1209). Renderer drops each .kd-item when its has_* is false;
+  // .urgent + award_quarter computed off one fixed `now` for determinism.
   const now = new Date();
   const responseDeadline = parseDate(audit.response_deadline);
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
+  const qaDeadlineDate = parseDate(audit.qa_deadline) ?? parseDate(compJson.qa_deadline);
+  const qaDays = qaDeadlineDate ? daysBetween(now, qaDeadlineDate) : null;
+  const awardDateDate = parseDate(audit.award_date) ?? parseDate(compJson.award_date);
+  const awardQuarterStr = fiscalQuarter(awardDateDate);
+  // Compute `.urgent` — the single soonest UPCOMING date wins (min positive
+  // countdown). If Questions-due has passed, urgent moves to Quote-due, etc.
+  // Empty string when no upcoming date exists → renderer adds no .urgent class.
+  const upcoming: Array<{ field: "qa_deadline" | "response_deadline" | "award_date"; days: number }> = [];
+  if (qaDays != null && qaDays >= 0) upcoming.push({ field: "qa_deadline", days: qaDays });
+  if (responseDays != null && responseDays >= 0) upcoming.push({ field: "response_deadline", days: responseDays });
+  // award_date counts even though it's typically months out — if it's the only
+  // future date, it still gets the amber accent.
+  const awardDays = awardDateDate ? daysBetween(now, awardDateDate) : null;
+  if (awardDays != null && awardDays >= 0) upcoming.push({ field: "award_date", days: awardDays });
+  upcoming.sort((a, b) => a.days - b.days);
+  const urgentField: "" | "qa_deadline" | "response_deadline" | "award_date" =
+    upcoming.length > 0 ? upcoming[0].field : "";
 
   // Cycle-1 canonical gate detection (Brain ruling 2026-06-06). Fact-layer
   // determinism fix: gates are detected by the VM scanning the full stored
@@ -1906,18 +1964,21 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     // hide-when-null gate on .mhv-bench.
     score_benchmark: (compJson.score_benchmark as string | null | undefined) ?? null,
 
-    qa_deadline: "",
-    qa_days: "",
-    qa_days_num: "",
+    qa_deadline: qaDeadlineDate ? fmtDayMonYear(qaDeadlineDate) : "",
+    qa_days: fmtKdCountdown(qaDays),
+    qa_days_num: qaDays != null ? String(Math.max(0, qaDays)) : "",
     response_deadline: fmtDayMonYear(responseDeadline),
-    response_days: fmtCountdown(responseDays),
+    response_days: fmtKdCountdown(responseDays),
     response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
     response_deadline_short: fmtDueShort(responseDeadline),
-    award_date: "",
+    award_date: awardDateDate ? fmtDayMonYear(awardDateDate) : "",
+    award_quarter: awardQuarterStr,
+    urgent_field: urgentField,
     key_dates_note: "",
     has_response_deadline: !!responseDeadline,
-    has_qa_deadline: false,
-    has_award_date: false,
+    has_qa_deadline: !!qaDeadlineDate,
+    has_award_date: !!awardDateDate,
+    has_award_quarter: awardQuarterStr.length > 0,
 
     // Preliminary-read tiles (metadata-only state). Eligibility intentionally
     // empty until a real per-user determination is wired (capability_statements

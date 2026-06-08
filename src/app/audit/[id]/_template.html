@@ -562,7 +562,9 @@ button{font-family:inherit}
 .kd-item.urgent::before{content:"";position:absolute;left:6px;top:13px;bottom:13px;width:3px;border-radius:3px;background:var(--amber-600)}
 .kd-item.urgent .kd-v .cnt{color:var(--amber-700)}
 [data-theme="dark"] .kd-item.urgent .kd-v .cnt{color:#fcd34d}
-.kd-sep{width:1px;align-self:stretch;background:var(--line);margin:11px 0}
+/* divider drawn as a left-border pseudo on each item after the first VISIBLE one — collapse-safe:
+   when Code omits a null cell server-side, dividers reflow automatically (no orphaned separator). */
+.kd-item + .kd-item::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:1px;background:var(--line)}
 .kd-note{margin-left:auto;display:flex;align-items:center;gap:9px;padding:11px 20px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--amber-700);font-weight:600;line-height:1.45;max-width:330px}
 .kd-note svg{width:14px;height:14px;flex-shrink:0}
 .kd-note b{color:var(--ink);font-weight:700}
@@ -1227,17 +1229,15 @@ button{font-family:inherit}
           <span class="kd-k">Questions due</span>
           <span class="kd-v"><span data-field="qa_deadline">18 Jun 2026</span><span class="cnt" data-field="qa_days">in 14 days</span></span>
         </div>
-        <div class="kd-sep"></div>
         <div class="kd-item">
           <span class="kd-k">Quote due</span>
           <span class="kd-v"><span data-field="response_deadline">2 Jul 2026</span><span class="cnt" data-field="response_days">in 28 days</span></span>
         </div>
-        <div class="kd-sep"></div>
         <div class="kd-item">
           <span class="kd-k">Anticipated award</span>
-          <span class="kd-v"><span data-field="award_date">Sep 2026</span></span>
+          <span class="kd-v"><span data-field="award_date">Sep 2026</span><span class="cnt" data-field="award_quarter">~Q4 FY26</span></span>
         </div>
-        <div class="kd-note" data-field="key_dates_note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span data-field="key_dates_note.text">The data-rights clarification must clear <b>before questions close</b> — 14 days.</span></div>
+        <div class="kd-note" data-field="key_dates_note" data-hide-when-empty="key_dates_note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>The data-rights clarification must clear <b>before questions close</b> — 14 days.</span></div>
       </div>
 
       <!-- ═══════════ ANALYST FLAG · THE MOMENT (full data) ═══════════ -->

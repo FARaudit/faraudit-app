@@ -790,8 +790,9 @@ function setPageTitle(html: string, title: string): string {
 
 // Drop a .kd-item ribbon entry by the data-field it carries (qa_deadline,
 // response_deadline, award_date). Uses the balanced-tag finder so nested
-// markup can't bleed the match.  Also drops a trailing .kd-sep so we don't
-// leave a hanging divider.
+// markup can't bleed the match. Phase 2 #4 (Jun 8 2026) re-sync: .kd-sep
+// divs are gone — the divider is a `.kd-item + .kd-item::before` pseudo
+// that auto-reflows when a sibling is omitted, so no trailing-sep eat needed.
 function removeKdItem(html: string, fieldKey: string): string {
   // Find the data-field index, walk backward to its enclosing <div class="kd-item …">,
   // then use the balanced finder for the matching </div>.
@@ -803,11 +804,44 @@ function removeKdItem(html: string, fieldKey: string): string {
   if (openIdx === -1) return html;
   const range = findMatchingClose(html, openIdx, "div");
   if (!range) return html;
-  let cutEnd = range.closeEnd;
-  // Eat optional whitespace + trailing <div class="kd-sep"></div>.
-  const sep = html.slice(cutEnd).match(/^\s*<div class="kd-sep"><\/div>/);
-  if (sep) cutEnd += sep[0].length;
-  return html.slice(0, openIdx) + html.slice(cutEnd);
+  return html.slice(0, openIdx) + html.slice(range.closeEnd);
+}
+
+// Strip the inner .cnt span (the countdown / quarter pill) from a single
+// .kd-item, identified by its primary data-field (qa_deadline, response_deadline,
+// award_date). Used when the secondary value is uncomputable — the date itself
+// still renders, just without its sub-pill. Brief: "hide the .cnt if uncomputable".
+function removeKdCnt(html: string, primaryField: string): string {
+  const marker = `data-field="${primaryField}"`;
+  const markerIdx = html.indexOf(marker);
+  if (markerIdx === -1) return html;
+  const before = html.slice(0, markerIdx);
+  const itemOpen = before.lastIndexOf('<div class="kd-item');
+  if (itemOpen === -1) return html;
+  const itemRange = findMatchingClose(html, itemOpen, "div");
+  if (!itemRange) return html;
+  const itemHtml = html.slice(itemOpen, itemRange.closeEnd);
+  const stripped = itemHtml.replace(/<span class="cnt"[^>]*>[\s\S]*?<\/span>/, "");
+  if (stripped === itemHtml) return html;
+  return html.slice(0, itemOpen) + stripped + html.slice(itemRange.closeEnd);
+}
+
+// Move the `urgent` class to whichever .kd-item carries the field with the
+// smallest positive countdown. Template hardcodes urgent on the Questions-due
+// item; we strip it everywhere then re-apply to the computed winner (or strip
+// it entirely when no upcoming date exists). Idempotent — running twice is safe.
+function applyUrgentKdItem(html: string, urgentField: "" | "qa_deadline" | "response_deadline" | "award_date"): string {
+  // 1. Strip any existing `urgent` class anywhere on a .kd-item open tag.
+  let out = html.replace(/<div class="kd-item urgent"/g, '<div class="kd-item"');
+  if (!urgentField) return out;
+  // 2. Find the .kd-item containing the target field and re-add urgent.
+  const marker = `data-field="${urgentField}"`;
+  const markerIdx = out.indexOf(marker);
+  if (markerIdx === -1) return out;
+  const before = out.slice(0, markerIdx);
+  const itemOpen = before.lastIndexOf('<div class="kd-item"');
+  if (itemOpen === -1) return out;
+  return out.slice(0, itemOpen) + '<div class="kd-item urgent"' + out.slice(itemOpen + '<div class="kd-item"'.length);
 }
 
 // Drop the entire .keydates ribbon when none of the three dates is real.
@@ -1641,11 +1675,17 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     }
   }
 
-  // Key dates ribbon — only render items we actually have, per the
-  // hide-not-fabricate rule. Drop items whose source date is missing.
+  // Key dates ribbon — Phase 2 #4 (Jun 8 2026). Hide-not-fabricate: render
+  // only the items whose source date is non-null. .kd-sep divs are gone;
+  // .kd-item + .kd-item::before pseudo-divider auto-reflows when a sibling
+  // is omitted, so no orphan separators are possible.
   if (vm.has_response_deadline) {
     html = replaceFieldText(html, "response_deadline", vm.response_deadline);
-    html = replaceFieldText(html, "response_days", vm.response_days);
+    if (vm.response_days) {
+      html = replaceFieldText(html, "response_days", vm.response_days);
+    } else {
+      html = removeKdCnt(html, "response_deadline");
+    }
   } else {
     html = removeKdItem(html, "response_deadline");
   }
@@ -1655,15 +1695,21 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeRailDeadline(html);
   } else {
     html = replaceFieldText(html, "qa_deadline", vm.qa_deadline);
-    html = replaceFieldText(html, "qa_days", vm.qa_days);
-    html = replaceFieldText(html, "qa_days_num", vm.qa_days_num);
-    // Phase A.0 defect fix — .kd-note default was hardcoded demo text.
+    if (vm.qa_days) {
+      html = replaceFieldText(html, "qa_days", vm.qa_days);
+      html = replaceFieldText(html, "qa_days_num", vm.qa_days_num);
+    } else {
+      html = removeKdCnt(html, "qa_deadline");
+    }
+    // Phase A.0 + Phase 2 #4 — .kd-note honors data-hide-when-empty="key_dates_note".
     // Render real note only when vm.key_dates_note is non-empty; otherwise
-    // strip the .kd-note element (kills the latent demo-leak path when
-    // has_qa_deadline=true but no real note is available).
+    // strip the .kd-note entirely (no demo-text default leaks). The canonical
+    // re-sync collapsed the inner text span's data-field — text lives on a
+    // child <span>, so we replace its content via positional regex on the
+    // .kd-note's last <span>...</span>.
     if (vm.key_dates_note && vm.key_dates_note.trim().length > 0) {
       html = html.replace(
-        /(<span data-field="key_dates_note\.text">)[\s\S]*?(<\/span>)/,
+        /(<div class="kd-note"[^>]*>[\s\S]*?<span>)[\s\S]*?(<\/span>\s*<\/div>)/,
         `$1${vm.key_dates_note}$2`
       );
     } else {
@@ -1674,7 +1720,16 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeKdItem(html, "award_date");
   } else {
     html = replaceFieldText(html, "award_date", vm.award_date);
+    if (vm.has_award_quarter) {
+      html = replaceFieldText(html, "award_quarter", vm.award_quarter);
+    } else {
+      html = removeKdCnt(html, "award_date");
+    }
   }
+  // Compute .urgent off the VM's chosen field (or strip everywhere when no
+  // upcoming date remains). Runs after item-drops so the target item still
+  // exists when we re-apply the class.
+  html = applyUrgentKdItem(html, vm.urgent_field);
   // If none of the three dates was real, drop the entire ribbon.
   if (!vm.has_response_deadline && !vm.has_qa_deadline && !vm.has_award_date) {
     html = removeKeyDates(html);
