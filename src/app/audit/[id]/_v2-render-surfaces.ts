@@ -198,25 +198,24 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
   // `style="display:none"` from the one that DOES apply and removing the
   // other block entirely.
   if (v.work_statement) {
-    // Show known block (drop display:none on data-state="known"), strip unknown.
+    // V1 (renderWorkStatementReveal in _render.ts) has already un-hidden the
+    // correct .ws-reveal block per its own work_statement derivation. V2 just
+    // re-applies the un-hide for its chosen block (idempotent — no-op if V1
+    // already did it) then overrides the content with shadow values.
+    //
+    // E13 floor-breach root cause (fixed Jun 8 2026): the previous V2 strip
+    // regex /<div class="ws-reveal"...style="display:none">[\s\S]*?<\/div>\s*
+    // <\/div>\s*<\/div>/ non-greedy-matched THROUGH both ws-reveal blocks (the
+    // known block ends in 2 trailing </div>; the first 3-in-a-row is at the
+    // end of unknown) and wiped BOTH elements. V1's renderWorkStatementReveal
+    // header comment (L1480-1487) calls out this exact anti-pattern. Strip
+    // removed; the other block stays hidden via the template's default
+    // display:none. Same pattern applied in the unknown branch below.
     let out = html.replace(
       /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">/,
       `<div class="ws-reveal" data-state="known" data-field="work_statement">`
     );
-    // Strip the entire unknown ws-reveal block
-    out = stripIfEmpty(
-      // We use stripIfEmpty pattern but need a non-data-hide-when-empty path.
-      // Simpler: regex-strip the unknown block as a whole.
-      out,
-      "__UNUSED__",
-      true
-    );
-    // Manually strip the unknown ws-reveal:
-    out = out.replace(
-      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">[\s\S]*?<\/div>\s*<\/div>/,
-      ""
-    );
-    // Now fill the known block's data-field spans/paragraphs.
+    // Fill the known block's data-field spans/paragraphs (V2 overrides V1's content).
     out = setSpanByDataField(out, "work_statement.confidence_label", v.work_statement.confidence);
     out = out.replace(
       /(<span class="ws-abbr" data-field="work_statement\.abbr">)[\s\S]*?(<\/span>)/,
@@ -241,14 +240,13 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     return out;
   }
   if (v.work_statement_unknown) {
-    // Show unknown block (drop display:none), strip known.
+    // V1 un-hide stands; V2 re-applies un-hide (idempotent) then overrides
+    // content. Known-block strip removed — see the known branch above for the
+    // E13 floor-breach root cause and the V1 comment that originally documented
+    // this exact regex pitfall.
     let out = html.replace(
       /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">/,
       `<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown">`
-    );
-    out = out.replace(
-      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/,
-      ""
     );
     out = out.replace(
       /(<span class="ws-full" data-field="work_statement_unknown\.head">)[\s\S]*?(<\/span>)/,
