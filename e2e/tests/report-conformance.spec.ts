@@ -42,6 +42,7 @@ const BLOCKING_IDS = new Set<string>([
   'E1',  // §09 six-bucket — Phase 2 #1 (CATASTROPHIC)
   'E12', // §08 drafted email body — Phase 2 #2
   'E13', // §03 ws-reveal present + exactly one state — Phase 2 #3 (floor)
+  'E9',  // key-dates populate-or-collapse — Phase 2 #4 (F5)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -222,6 +223,38 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     return { ok: false, detail: `unexpected state="${state}" classes="${v.className}"` };
   });
   results.push({ id: 'E13', pass: e13.ok, detail: e13.detail });
+
+  // E9 — key-dates F5: every rendered .kd-item has a non-empty value, OR the
+  // empty cell is collapsed (no blank gaps). The renderer already drops
+  // .kd-item by has_<field> flag + drops the whole .keydates ribbon when all
+  // three flags are false (_render.ts:1598-1623). E9 verifies that contract.
+  // BLOCKING — Phase 2 #4.
+  const e9 = await page.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('.kd-item'));
+    if (items.length === 0) {
+      return { ok: true, detail: 'no .kd-item rendered (ribbon collapsed — OK per E9)' };
+    }
+    const empties: string[] = [];
+    for (const it of items) {
+      // The primary value is in the first [data-field] span inside .kd-v
+      // (e.g., qa_deadline → "18 Jun 2026"). Check that span has non-empty
+      // text; the .cnt secondary span ("in 14 days") is decorative.
+      const primary = it.querySelector('.kd-v [data-field]') as HTMLElement | null;
+      if (!primary) {
+        empties.push('no [data-field] span');
+        continue;
+      }
+      const text = (primary.textContent || '').trim();
+      if (text.length === 0) {
+        empties.push((primary.getAttribute('data-field') || 'unknown') + '=empty');
+      }
+    }
+    if (empties.length === 0) {
+      return { ok: true, detail: `${items.length} .kd-item rendered, all populated` };
+    }
+    return { ok: false, detail: `${empties.length} empty cell(s): ${empties.join(', ')}` };
+  });
+  results.push({ id: 'E9', pass: e9.ok, detail: e9.detail });
 
   return results;
 }
