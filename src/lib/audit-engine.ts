@@ -104,7 +104,7 @@ export interface OverviewJSON {
   // "{Agency} is buying ___" filler. Strictly NO procurement verbs (deliver,
   // provide, supply, etc.) — those collide with "is buying" and produce
   // "is buying Deliver 8 …". NO clause numbers, NO NSN/CAGE/P/N codes.
-  // ≤ 60 chars. Empty string when no clean phrase can be extracted —
+  // target ~50 chars, hard max 80 chars. NEVER emit ellipsis — return null if phrase cannot fit cleanly.
   // synthesizer drops the "is buying" clause entirely in that case.
   bottom_line_item?: string | null;
 }
@@ -378,7 +378,7 @@ function cleanRiskTitle(text: string): string {
   const firstSentence = stripped.split(/[.!?]\s+|\s+—\s+/)[0].trim();
   const words = firstSentence.split(/\s+/);
   let title = words.length <= 8 ? firstSentence : words.slice(0, 8).join(" ");
-  if (title.length > 80) title = title.slice(0, 77) + "…";
+  // No char-slice fallback — 8-word cap sufficient; CSS wraps long tokens.
   return title;
 }
 
@@ -1810,7 +1810,7 @@ You are extracting FACTS from a federal solicitation. Output ONLY a JSON object 
 - ceiling_value_estimate (string or null): "$X-Y million" if stated; null if not.
 - period_of_performance (string): verbatim duration / start-end date range.
 - solicitation_number_canonical (string or null): the exact solicitation number as it appears on the SF-18/SF-1449 cover page, hyphens and punctuation PRESERVED. Example: "SPRRA1-26-Q-0034" (with hyphens), not "SPRRA126Q0034" (squashed). null for metadata-only.
-- bottom_line_item (string or null): ≤ 60 chars. ONE plain-English noun phrase describing what is being acquired, including quantity if specified. STRICT RULES (feeds the exec summary "is buying ___" frame — wrong shape breaks the sentence):
+- bottom_line_item (string or null): target ~50 chars, hard max 80 chars. ONE plain-English noun phrase describing what is being acquired, including quantity if specified. NEVER emit "…" or "..." — return null instead if the phrase cannot fit in 80 chars cleanly. STRICT RULES (any ellipsis breaks the "is buying ___" frame downstream):
   • NO procurement verbs at start ("deliver", "provide", "supply", "procure", "furnish", "manufacture", "buy"). The sentence frame already has the verb.
   • NO clause numbers (FAR/DFARS), NO NSN, NO CAGE, NO P/N codes.
   • Plain lowercase noun phrase (except proper nouns + acronyms like UH-60, IDIQ).
@@ -2199,9 +2199,11 @@ JSON only — one key: risk_findings.`;
       ?? ""
   );
   const agencyShort = cleanAgencyName(agencyRaw);
-  const bottomLineItem = (overviewJson.bottom_line_item ?? "").toString().trim();
-  const objectiveShort = bottomLineItem
-    ? bottomLineItem
+  const bliRaw = (overviewJson.bottom_line_item ?? "").toString().trim();
+  // Reject model-side ellipsis-truncation — fall through to deterministic fallback (F6/F10 root cause).
+  const bliClean = /[…]|\.\.\./.test(bliRaw) ? "" : bliRaw;
+  const objectiveShort = bliClean
+    ? bliClean
     : cleanObjectivePhrase((overviewJson.primary_objective ?? overviewJson.scope ?? "").toString());
   // Bid condition line varies by verdict mode.
   let bidCondition: string;
@@ -2246,7 +2248,8 @@ JSON only — one key: risk_findings.`;
       })
     : prioritized.slice(0, 3).map((r) => {
         const headline = (r.title ?? r.text).split(/[.!?](?:\s|$)/)[0].trim();
-        const capped = headline.length > 110 ? `${headline.slice(0, 108).trimEnd()}…` : headline;
+        const clauseFirst = headline.split(/[.!?;:]\s+|\s+—\s+/)[0].trim();
+        const capped = clauseFirst || headline;
         return r.citation ? `${capped} (${r.citation})` : capped;
       });
 
@@ -2261,7 +2264,7 @@ JSON only — one key: risk_findings.`;
       const d = new Date(Date.now() + (i + 1) * 86_400_000);
       const when = `By ${d.getUTCDate()} ${execMonths[d.getUTCMonth()]}`;
       const action = r.faraudit_action!.trim();
-      const text = action.length > 180 ? `${action.slice(0, 178).trimEnd()}…` : action;
+      const text = action;
       return { when, text };
     });
 
