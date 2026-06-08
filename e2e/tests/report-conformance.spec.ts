@@ -43,6 +43,7 @@ const BLOCKING_IDS = new Set<string>([
   'E12', // §08 drafted email body — Phase 2 #2
   'E13', // §03 ws-reveal present + exactly one state — Phase 2 #3 (floor)
   'E9',  // key-dates populate-or-collapse — Phase 2 #4 (F5)
+  'E2',  // set-aside single-source: masthead token === §03 token — Phase 3 (F8)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -255,6 +256,29 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     return { ok: false, detail: `${empties.length} empty cell(s): ${empties.join(', ')}` };
   });
   results.push({ id: 'E9', pass: e9.ok, detail: e9.detail });
+
+  // E2 — set-aside single-source (F8): masthead set-aside token === §03
+  // set-aside token. Single-source via vm.set_aside + global replaceFieldInner
+  // walk. Asserts text-equality of all [data-field="set_aside"] anchors
+  // (normalized: lowercased, whitespace-collapsed, punctuation stripped) so
+  // 'Total Small Business' on masthead doesn't drift from '100% small biz'
+  // in §03 — the F8 contradiction pattern. BLOCKING — Phase 3 first commit.
+  const e2 = await page.evaluate(() => {
+    const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const anchors = Array.from(document.querySelectorAll('[data-field="set_aside"]')) as HTMLElement[];
+    if (anchors.length === 0) return { ok: false, detail: 'no [data-field="set_aside"] anchors found' };
+    if (anchors.length === 1) return { ok: true, detail: `1 anchor only · token="${anchors[0].textContent?.trim().slice(0, 40)}"` };
+    const tokens = anchors.map((el) => norm(el.textContent || ''));
+    const uniq = Array.from(new Set(tokens));
+    if (uniq.length === 1) {
+      return { ok: true, detail: `${anchors.length} anchors / 1 token · "${tokens[0].slice(0, 40)}"` };
+    }
+    return {
+      ok: false,
+      detail: `${anchors.length} anchors / ${uniq.length} tokens: ${uniq.map((t) => `"${t.slice(0, 30)}"`).join(' vs ')}`,
+    };
+  });
+  results.push({ id: 'E2', pass: e2.ok, detail: e2.detail });
 
   return results;
 }
