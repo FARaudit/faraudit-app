@@ -45,6 +45,7 @@ const BLOCKING_IDS = new Set<string>([
   'E9',  // key-dates populate-or-collapse — Phase 2 #4 (F5)
   'E2',  // set-aside single-source: masthead token === §03 token — Phase 3 (F8)
   'E7',  // §06 gate outcome prose matches gate count — Phase 3 (F7)
+  'E10', // rail jump-nav inside aside.rail — Phase 3 (removeReadinessCard walker fix)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';

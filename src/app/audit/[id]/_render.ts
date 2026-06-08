@@ -939,8 +939,15 @@ function removeIncExpiry(html: string): string {
 // derived scorecard — false precision until backed by a real checklist model.
 function removeReadinessCard(html: string): string {
   // The card is a .rail-card whose first child .rc-h reads "Pre-quote readiness".
-  const re = /<div class="rail-card">\s*<div class="rc-h">Pre-quote readiness<\/div>[\s\S]*?<\/div>\s*<\/div>/;
-  return html.replace(re, "");
+  // Use balanced walker — the lazy regex variant stops at the inner .ready
+  // close and leaves the outer rail-card </div> as an orphan, which then
+  // consumes the rail aside's </aside> during HTML parsing.
+  const headerRe = /<div class="rail-card">\s*<div class="rc-h">Pre-quote readiness<\/div>/;
+  const m = headerRe.exec(html);
+  if (!m) return html;
+  const range = findMatchingClose(html, m.index, "div");
+  if (!range) return html;
+  return html.slice(0, m.index) + html.slice(range.closeEnd);
 }
 
 // Hide the Moment band entirely when there are no real risks (DESIGN Q2).
