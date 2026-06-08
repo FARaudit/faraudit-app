@@ -27,12 +27,14 @@ import * as path from 'node:path';
 //
 // 4f4743d7 was briefly added 2026-06-08 as the V2-overlay empty-guard regression
 // fixture and proved the guard works (E1 on it = "groups=6/6 · items=25 · dups=0",
-// i.e. V1's 25-item checklist survived the V2 overlay's empty submission_checklist_filtered).
-// Removed pending Brain's V1/V2 ws-reveal coordination fix (E13 floor-breach surfaces
-// on V2-shadow-bearing audits whose work_statement_unknown is populated — separate gap).
-// Re-add to AUDIT_DOCS after the ws-reveal coord fix lands.
+// i.e. V1's 25-item checklist survived V2's empty submission_checklist_filtered).
+// Re-added 2026-06-08 after the V1/V2 ws-reveal coord fix (d7fa5d3) eliminated the
+// broken non-greedy strip regex that wiped both .ws-reveal blocks → E13 floor breach.
+// This fixture is the standing regression test for BOTH the V2 empty-guard AND the
+// ws-reveal coord fix on V2-shadow-bearing audits.
 const AUDIT_DOCS: Array<{ label: string; id: string }> = [
-  { label: 'DLA · SPRRA126Q0034', id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
+  { label: 'DLA · SPRRA126Q0034',  id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
+  { label: 'V2-shadow regression', id: '4f4743d7-d6fc-44f7-bb73-3400495c1dd5' },
 ];
 
 const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
