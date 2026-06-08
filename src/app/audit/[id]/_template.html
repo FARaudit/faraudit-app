@@ -1305,7 +1305,7 @@ button{font-family:inherit}
       <section class="timeline" id="sec-timeline" data-field="timeline">
         <div class="tl-head">
           <div class="tl-k">Critical path to submission</div>
-          <div class="tl-sub">Submit by <b>2 Jul 2026</b> &mdash; six gates between you and a compliant quote</div>
+          <div class="tl-sub">Submit by <b>2 Jul 2026</b> &mdash; <span class="tl-count">six gates</span> between you and a compliant quote</div>
         </div>
         <div class="tl-track" data-field="timeline_gates">
           <div class="tl-node ok"><span class="tl-dot"></span><span class="tl-date">Jun 6</span><span class="tl-lbl">Data-rights Q to KO</span></div>
@@ -2286,6 +2286,23 @@ Capture Lead, [Company]
     i.addEventListener('change',function(){ saved[idx]=i.checked; try{ sessionStorage.setItem(key,JSON.stringify(saved)); }catch(e){} upd(); });
   });
   upd();
+})();
+
+/* ───── timeline gate-count single-source ─────
+   The header's "N gates" phrase is derived from the actual .tl-track .tl-node
+   count so the header can never disagree with the rendered nodes — Code just
+   renders timeline_gates[] and this IIFE writes the count word back into
+   .tl-count. (Demo: 6 nodes → "six gates". Real 2-gate audit → "two gates".) */
+(function(){
+  var WORDS=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
+  document.querySelectorAll('.timeline').forEach(function(tl){
+    var track=tl.querySelector('.tl-track');
+    var out=tl.querySelector('.tl-count');
+    if(!track||!out) return;
+    var n=track.querySelectorAll('.tl-node').length;
+    var word=n>=0&&n<=10?WORDS[n]:String(n);
+    out.textContent=word+' gate'+(n===1?'':'s');
+  });
 })();
 
 /* ───── risk accordions ───── */
