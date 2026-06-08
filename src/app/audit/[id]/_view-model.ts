@@ -1369,7 +1369,15 @@ function deriveKoEmailCard(
   // Numbered clarification asks — phrased as questions, not risk excerpts.
   // The canonical voice: short statement of the gap + "will the Government /
   // could the Government confirm / can the Government clarify ..."
-  const top = risks.slice(0, 3);
+  // W3 — only feed action-bearing, non-generic risks into the KO clarification
+  // email. Pre-b1: risks.slice(0, 3) was unfiltered so a generic "initial review"
+  // risk could become a clarification ask. Filter twice: (i) drop risks with no
+  // real faraudit_action prose (the "stub" risks the engine emits), (ii) drop
+  // risks whose title reads as a non-actionable placeholder.
+  const top = risks
+    .filter((r) => (r.faraudit_action || "").trim().length > 20)
+    .filter((r) => !/initial review|no outstanding/i.test(r.title || ""))
+    .slice(0, 3);
   const body = top.length === 0
     ? "We are at this time conducting our initial review and have no outstanding clarifications."
     : top.map((r, i) => `${i + 1}. ${riskToClarificationAsk(r)}`).join("\n\n");
@@ -1388,7 +1396,12 @@ function deriveKoEmailCard(
 function riskToClarificationAsk(r: Risk): string {
   // Title is the gap statement (truncated for one-line clarity).
   const title = (r.title || "").trim();
-  const headline = title.length > 140 ? title.slice(0, 137) + "..." : (title || "A risk was identified");
+  // W3 — boundary-cap on clause boundary (.!?;:—) instead of mid-word slice
+  // (mirror b55099c F6/F10 fix). The previous slice(0, 137) + "..." inserted a
+  // mid-word ellipsis into the KO email — exactly the F6/F10 anti-pattern.
+  const headline = title
+    ? (title.split(/[.!?;:]\s+|\s+—\s+/)[0].trim() || title)
+    : "A risk was identified";
   // faraudit_action is typically imperative ("Verify SPRS score is current...").
   // Invert: strip the leading verb, lowercase the rest, wrap in "could the
   // Government confirm ...?" Falls through to generic if action absent.
