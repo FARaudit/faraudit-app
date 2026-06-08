@@ -1207,33 +1207,28 @@ function renderMatrixArtifact(
 // the resolver JS (totalEl.textContent = items.length). We do NOT pre-compute
 // the count or stamp it in the server-rendered markup; the JS auto-corrects
 // off the rendered <label> count. Just render the groups + items verbatim.
+// §09 — Phase 2 #1 (F1 catastrophic fix, Jun 8 2026). Emits up to 6 .ck-group
+// blocks (deadline → registration → mandatory_doc → representation → format
+// → other) inside the canonical's data-field="submission_checklist_filtered"
+// wrapper. Critical buckets get .ck-group.is-critical styling. Items are
+// already deduped + bucketed in the viewmodel.
 function renderSubmissionChecklist(
   html: string,
-  items: Array<{ group: "before" | "with" | "after"; text: string; source: string; severity: "dq" | "req" | "adv" }>
+  groups: AuditViewModel["submission_checklist_filtered"]
 ): string {
-  if (items.length === 0) return setFieldInner(html, "submission_checklist", "div", "");
-  const GROUP_LABEL: Record<"before" | "with" | "after", string> = {
-    before: "Before you submit",
-    with: "With your submission",
-    after: "After you submit"
-  };
-  const SEV_LABEL: Record<"dq" | "req" | "adv", string> = {
-    dq: "Disqualifying",
-    req: "Required",
-    adv: "Advisory"
-  };
-  const groups: Array<"before" | "with" | "after"> = ["before", "with", "after"];
-  const renderItem = (it: typeof items[number]) =>
-    `<label class="ck-item"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(it.text)}<span class="ck-csrc">${escapeHtml(it.source)}</span></span><span class="ck-sev ${it.severity}">${SEV_LABEL[it.severity]}</span></label>`;
+  if (groups.length === 0) return setFieldInner(html, "submission_checklist_filtered", "div", "");
   const inner = groups
     .map((g) => {
-      const groupItems = items.filter((it) => it.group === g);
-      if (groupItems.length === 0) return "";
-      return `<div class="ck-group"><div class="ck-gh">${GROUP_LABEL[g]}</div>${groupItems.map(renderItem).join("")}</div>`;
+      const items = g.items
+        .map(
+          (it) =>
+            `<label class="ck-item${it.isCritical ? " is-critical" : ""}"><input type="checkbox"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(it.text)}<span class="ck-csrc">${escapeHtml(it.source)}</span></span></label>`
+        )
+        .join("");
+      return `<div class="ck-group${g.critical ? " is-critical" : ""}" data-bucket="${g.bucket}"><div class="ck-gh">${escapeHtml(g.label)}</div>${items}</div>`;
     })
-    .filter(Boolean)
     .join("");
-  return setFieldInner(html, "submission_checklist", "div", inner);
+  return setFieldInner(html, "submission_checklist_filtered", "div", inner);
 }
 
 // §02 incumbent branch. The template ships both .incumbent (visible) and
@@ -1799,7 +1794,7 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   html = renderKoEmailCard(html, vm.ko_email);
 
-  html = renderSubmissionChecklist(html, vm.submission_checklist);
+  html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
 
   html = renderIncumbentBranch(html, vm.has_incumbent);
   html = replaceFieldText(html, "incumbent_none_head", vm.incumbent_none_head);

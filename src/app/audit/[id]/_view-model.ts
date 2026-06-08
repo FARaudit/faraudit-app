@@ -175,14 +175,23 @@ export interface AuditViewModel {
 
   // §09 Submission Checklist (.checklist) — grouped from Section L
   // requirements. group: before (pre-submission registration/certs),
-  // with (the quote package itself), after (post-award obligations).
-  // severity: dq (disqualifier — todo status), req (required — warn status),
-  // adv (advisory — ok status).
-  submission_checklist: Array<{
-    group: "before" | "with" | "after";
-    text: string;
-    source: string;
-    severity: "dq" | "req" | "adv";
+  // §09 Pre-flight Checklist — Phase 2 #1 (F1 catastrophic fix, Jun 8 2026).
+  // Six canonical buckets in render order: deadline → registration →
+  // mandatory_doc → representation → format → other. Critical buckets
+  // (deadline / registration / mandatory_doc) get .is-critical styling.
+  // Renderer drives data-field="submission_checklist_filtered" on the §09
+  // wrapper. Replaces the legacy 3-bucket (before/with/after) shape.
+  submission_checklist_filtered: Array<{
+    bucket: "deadline" | "registration" | "mandatory_doc" | "representation" | "format" | "other";
+    label: string;
+    critical: boolean;
+    items: Array<{
+      bucket: "deadline" | "registration" | "mandatory_doc" | "representation" | "format" | "other";
+      text: string;
+      source: string;
+      isCritical: boolean;
+      complete: boolean;
+    }>;
   }>;
 
   // §02 no-incumbent variant (.inc-none) — renderer branches on
@@ -1272,41 +1281,70 @@ function classifyChecklistSeverity(text: string): "dq" | "req" | "adv" {
   return "req";
 }
 
-function deriveSubmissionChecklist(
+// §09 — Phase 2 #1 (F1) — six-bucket deterministic categorization, Jun 8 2026.
+// Replaces the legacy 3-bucket (before/with/after) derivation. Buckets +
+// regex patterns mirror src/lib/section-extractors.ts:316 so V1 derives the
+// same shape V2 emits. Critical buckets get .is-critical styling client-side.
+type ChecklistBucket = "deadline" | "registration" | "mandatory_doc" | "representation" | "format" | "other";
+const CHECKLIST_BUCKET_ORDER: ChecklistBucket[] = ["deadline", "registration", "mandatory_doc", "representation", "format", "other"];
+const CHECKLIST_BUCKET_LABEL: Record<ChecklistBucket, string> = {
+  deadline: "Submission deadline",
+  registration: "Registrations & status",
+  mandatory_doc: "Mandatory documents",
+  representation: "Representations & certifications",
+  format: "Format & content",
+  other: "Other",
+};
+const CHECKLIST_CRITICAL_BUCKETS = new Set<ChecklistBucket>(["deadline", "registration", "mandatory_doc"]);
+
+function categorizeChecklistBucket(text: string): ChecklistBucket {
+  if (/due\s+(date|time)|no\s+later\s+than|submit\s+by|close\s+of\s+business|deadline/i.test(text)) return "deadline";
+  if (/\bSAM\.gov|System\s+for\s+Award\s+Management|\bWAWF\b|\bregister/i.test(text)) return "registration";
+  if (/must\s+include|shall\s+include|required\s+to\s+(submit|provide)|MFG\s+name|Part\s+Number|breakdown|CAGE\s+code/i.test(text)) return "mandatory_doc";
+  if (/\brepresentation|certification|\bcertif/i.test(text)) return "representation";
+  if (/english\s+language|U\.?S\.?\s+Currency|\bUSD\b|via\s+email|page\s+limit|font|format/i.test(text)) return "format";
+  return "other";
+}
+
+function deriveSubmissionChecklistFiltered(
   compJson: Record<string, unknown>
-): Array<{ group: "before" | "with" | "after"; text: string; source: string; severity: "dq" | "req" | "adv" }> {
-  const reqs = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : [];
-  const items = reqs.map((r) => {
-    const t = (r.requirement || "").toLowerCase();
-    // Group heuristic unchanged from prior commit. "before" = pre-submission
-    // cert/registration/setup; "after" = post-award obligations; default
-    // "with" = the quote package itself.
-    const group: "before" | "with" | "after" =
-      /\b(?:after\s+award|post[\s-]?award|kick[\s-]?off|deliver(?:able|y)?\s+\d+|on\s+award)\b/.test(t) ? "after" :
-      /\b(?:register|registration|certif(?:y|ication)|cage\s+code|uei|sam\.gov|pre[\s-]?qualif|prior\s+to\s+submission)\b/.test(t) ? "before" :
-      "with";
-    return {
-      group,
-      text: r.requirement,
+): AuditViewModel["submission_checklist_filtered"] {
+  // Source: prefer raw[] (engine emits this), fall back to objects[].
+  const reqsRaw = Array.isArray(compJson.submission_requirements_raw) ? (compJson.submission_requirements_raw as unknown[]) : null;
+  const reqsObj = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : null;
+  const lines: string[] = reqsRaw
+    ? reqsRaw.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    : reqsObj
+    ? reqsObj.map((r) => (r.requirement || "").trim()).filter((s) => s.length > 0)
+    : [];
+
+  // Dedup by punctuation-stripped fingerprint — kills the "duplicated run-on"
+  // F1 symptom where the same risk title appears twice.
+  const seen = new Set<string>();
+  type Item = AuditViewModel["submission_checklist_filtered"][number]["items"][number];
+  const items: Item[] = [];
+  for (const line of lines) {
+    const fp = line.toLowerCase().replace(/[^\w\s]+/g, " ").replace(/\s+/g, " ").trim();
+    if (!fp || seen.has(fp)) continue;
+    seen.add(fp);
+    const bucket = categorizeChecklistBucket(line);
+    items.push({
+      bucket,
+      text: line,
       source: "Section L",
-      severity: classifyChecklistSeverity(r.requirement || "")
-    };
-  });
-  // Hard rule: cap DQ at 3 per audit. If detection caught more, downgrade
-  // the EXTRAS (preserving the first 3 in source order) to REQ. This
-  // protects against an audit where every single Section L item ends up
-  // matching a DQ pattern.
-  const dqCount = items.filter((i) => i.severity === "dq").length;
-  if (dqCount > 3) {
-    let seen = 0;
-    for (const it of items) {
-      if (it.severity === "dq") {
-        seen++;
-        if (seen > 3) it.severity = "req";
-      }
-    }
+      isCritical: CHECKLIST_CRITICAL_BUCKETS.has(bucket),
+      complete: false,
+    });
   }
-  return items;
+
+  // Group in canonical order, drop empty buckets so the §09 counter math
+  // (rendered .ck-item count) stays honest. Critical flag is DATA-driven.
+  return CHECKLIST_BUCKET_ORDER.map((b) => ({
+    bucket: b,
+    label: CHECKLIST_BUCKET_LABEL[b],
+    critical: CHECKLIST_CRITICAL_BUCKETS.has(b),
+    items: items.filter((it) => it.bucket === b),
+  })).filter((g) => g.items.length > 0);
 }
 
 // ─── main ───────────────────────────────────────────────────────────────────
@@ -1639,7 +1677,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
 
     ko_email: deriveKoEmailCard(audit, displayId, risks, compJson),
 
-    submission_checklist: deriveSubmissionChecklist(compJson),
+    submission_checklist_filtered: deriveSubmissionChecklistFiltered(compJson),
 
     has_incumbent: incumbentHasData,
     incumbent_none_head: "No incumbent identified",
