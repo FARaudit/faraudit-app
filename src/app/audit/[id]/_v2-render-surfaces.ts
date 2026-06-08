@@ -269,6 +269,9 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
 
 function renderMatrixRollup(html: string, v: V2RenderInput): string {
   const m = v.matrix_rollup;
+  // Empty-guard (W2, Jun 8 2026) — leave V1's matrix in place when V2 has no
+  // data in any dimension. Architectural twin of aafa802's checklist guard.
+  if (m.required.length === 0 && m.reference.length === 0 && m.reference_count === 0) return html;
   const trapCount = m.required.filter((r) => r.badge === "trap").length;
   const fulltextCount = m.required.filter((r) => r.badge === "required").length;
 
