@@ -41,6 +41,7 @@ const BLOCKING_IDS = new Set<string>([
   'D6',  // .rpt-main{min-width:0} — Phase 1.5 scroll fix
   'E1',  // §09 six-bucket — Phase 2 #1 (CATASTROPHIC)
   'E12', // §08 drafted email body — Phase 2 #2
+  'E13', // §03 ws-reveal present + exactly one state — Phase 2 #3 (floor)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -176,6 +177,51 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E12', pass: e12.ok, detail: e12.detail });
+
+  // E13 — §03 ws-reveal floor: present AND in exactly one state (known |
+  // tentative | unknown). Never empty-known. Per CEO directive Jun 8 2026:
+  // presence = blocking floor; correct SOW/PWS/SOO classification =
+  // V2 ceiling. BLOCKING — Phase 2 #3.
+  const e13 = await page.evaluate(() => {
+    const reveals = Array.from(document.querySelectorAll('.ws-reveal'));
+    // Strip hidden defaults — only count blocks that don't have display:none
+    // inline (those are the un-revealed twin still in the markup).
+    const visible = reveals.filter((el) => {
+      const style = (el as HTMLElement).style.display;
+      const inlineHidden = style === 'none';
+      return !inlineHidden;
+    });
+    if (visible.length === 0) return { ok: false, detail: 'no .ws-reveal visible (floor breach)' };
+    if (visible.length > 1) return { ok: false, detail: `${visible.length} .ws-reveal visible (must be 1)` };
+    const v = visible[0] as HTMLElement;
+    const state = v.getAttribute('data-state');
+    const isUnknown = v.classList.contains('is-unknown');
+
+    if (state === 'unknown' && isUnknown) {
+      // Amber unknown variant — must have head, reason, action populated
+      const head = (v.querySelector('[data-field="work_statement_unknown.head"]')?.textContent || '').trim();
+      const reason = (v.querySelector('[data-field="work_statement_unknown.reason"]')?.textContent || '').trim();
+      const action = (v.querySelector('[data-field="work_statement_unknown.action"]')?.textContent || '').trim();
+      const ok = head.length > 5 && reason.length > 20 && action.length > 10;
+      return { ok, detail: `state=unknown head=${head.length}ch reason=${reason.length}ch action=${action.length}ch` };
+    }
+    if (state === 'known') {
+      // Known block — abbr in {SOW,PWS,SOO,combined}, meaning + bid_strategy
+      // non-empty. confidence_label may be Tentative (low-conf known).
+      const abbr = (v.querySelector('[data-field="work_statement.abbr"]')?.textContent || '').trim();
+      const meaning = (v.querySelector('[data-field="work_statement.meaning"]')?.textContent || '').trim();
+      const bidStrategy = (v.querySelector('[data-field="work_statement.bid_strategy"]')?.textContent || '').trim();
+      const confLabel = (v.querySelector('[data-field="work_statement.confidence_label"]')?.textContent || '').trim();
+      const validAbbr = /^(SOW|PWS|SOO|combined)$/i.test(abbr);
+      const isEmptyKnown = !validAbbr || meaning.length === 0 || bidStrategy.length === 0;
+      if (isEmptyKnown) {
+        return { ok: false, detail: `state=known abbr="${abbr}" meaning=${meaning.length}ch bid=${bidStrategy.length}ch — EMPTY-KNOWN (breach)` };
+      }
+      return { ok: true, detail: `state=known abbr=${abbr} conf="${confLabel}" meaning=${meaning.length}ch bid=${bidStrategy.length}ch` };
+    }
+    return { ok: false, detail: `unexpected state="${state}" classes="${v.className}"` };
+  });
+  results.push({ id: 'E13', pass: e13.ok, detail: e13.detail });
 
   return results;
 }

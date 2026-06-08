@@ -194,6 +194,28 @@ export interface AuditViewModel {
     }>;
   }>;
 
+  // §03 work-statement reveal — Phase 2 #3 (floor, Jun 8 2026).
+  // EXACTLY ONE of work_statement / work_statement_unknown is non-null. The
+  // renderer never leaves §03 without a reveal block — silent vanishing is
+  // a regression. Trigger: known on document_type ∈ {SOW,PWS,SOO,combined};
+  // unknown on every other type incl. RFP/RFQ/IFB/Other/null. Confidence ===
+  // "low" stays in the known block as a "Tentative" chip — do NOT fall to
+  // amber unknown on low-confidence-known. Future ceiling (V2): real
+  // SOW/PWS/SOO classification from attachment parsing.
+  work_statement: {
+    abbr: "SOW" | "PWS" | "SOO" | "combined";
+    full: string;
+    meaning: string;
+    evidence: string;
+    confidence: "High confidence" | "Medium confidence" | "Tentative";
+    bid_strategy: string;
+  } | null;
+  work_statement_unknown: {
+    head: string;
+    reason: string;
+    action: string;
+  } | null;
+
   // §02 no-incumbent variant (.inc-none) — renderer branches on
   // has_incumbent: true → render .incumbent block; false → render .inc-none
   // with the head + note copy.
@@ -1353,6 +1375,75 @@ function categorizeChecklistBucket(text: string): ChecklistBucket {
   return "other";
 }
 
+// §03 — Phase 2 #3 (Jun 8 2026). Floor: always emit one of work_statement /
+// work_statement_unknown so §03 never silently loses the reveal block.
+//
+// Trigger:
+//   - document_type ∈ {SOW, PWS, SOO, combined} → known block. Low confidence
+//     stays in known with a "Tentative" chip (do NOT fall to unknown).
+//   - everything else (RFP / RFQ / IFB / Sources Sought / Other / null /
+//     empty) → amber honest-unknown variant. Reads as rigor, not a bug.
+//
+// Ceiling (V2 — future ticket): real SOW/PWS/SOO classification from
+// attachment parsing. The V1 engine classifies the WHOLE document, not the
+// work-statement type embedded within it, so most real audits today go to
+// the unknown variant.
+const WS_KNOWN_TYPES = new Set(["SOW", "PWS", "SOO", "combined"]);
+const WS_FULL: Record<string, string> = {
+  SOW: "Statement of Work",
+  PWS: "Performance Work Statement",
+  SOO: "Statement of Objectives",
+  combined: "Combined work statement",
+};
+const WS_MEANING: Record<string, string> = {
+  SOW: "Government prescribes the work — propose a <b>method</b> for executing each listed deliverable. Pricing follows the scope's structure.",
+  PWS: "Government states <b>performance standards</b>, not methods — propose your approach to meeting them. Method is your trade space; outcomes are graded against the standards.",
+  SOO: "Government states <b>objectives</b> — you define how to achieve them. Highest creative latitude; bid clarity wins.",
+  combined: "Mixed posture — different sections governed by SOW / PWS / SOO. Handle each under its native rule.",
+};
+const WS_BID_STRATEGY: Record<string, string> = {
+  SOW: "Lead with <b>method depth</b> per deliverable. Tie each priced CLIN to a discrete SOW item so the Government can map your approach 1:1 to the scope.",
+  PWS: "Lead with <b>outcome confidence</b> — show evidence you've hit comparable performance standards before. Method is supporting, not central.",
+  SOO: "Lead with <b>creative differentiation</b> — your proposed means are the differentiator. Anchor every choice to a stated objective.",
+  combined: "Map each section's posture in your response outline so the Government sees you've matched their rule per section.",
+};
+
+function deriveWorkStatementReveal(audit: AuditRow): {
+  work_statement: AuditViewModel["work_statement"];
+  work_statement_unknown: AuditViewModel["work_statement_unknown"];
+} {
+  const docType = String(audit.document_type ?? "").trim();
+  const confRaw = String(audit.document_type_confidence ?? "low").toLowerCase();
+  const rationale = String(audit.document_type_rationale ?? "").trim();
+
+  if (WS_KNOWN_TYPES.has(docType)) {
+    const confLabel: "High confidence" | "Medium confidence" | "Tentative" =
+      confRaw === "high" ? "High confidence" : confRaw === "medium" ? "Medium confidence" : "Tentative";
+    return {
+      work_statement: {
+        abbr: docType as "SOW" | "PWS" | "SOO" | "combined",
+        full: WS_FULL[docType],
+        meaning: WS_MEANING[docType],
+        evidence: rationale || "Classification derived from the document header + structural analysis (Section labels, deliverable vs performance-standard language).",
+        confidence: confLabel,
+        bid_strategy: WS_BID_STRATEGY[docType],
+      },
+      work_statement_unknown: null,
+    };
+  }
+
+  // Unknown amber variant — fires on RFP/RFQ/IFB/Other/null. Reads as rigor.
+  return {
+    work_statement: null,
+    work_statement_unknown: {
+      head: "Work-statement type not classified from the parsed body",
+      reason:
+        "The governing work statement (SOW / PWS / SOO) wasn't located in the body FARaudit parsed for this notice. It likely lives in an <b>attachment</b> — a separate SOW PDF, a §C narrative document, or a CDRL/DID supplement that isn't part of the main solicitation file. SOW vs PWS changes your entire bid posture (method-led vs outcome-led), so FARaudit reports this as <b>tentative</b> rather than guessing.",
+      action: "<b>Upload the SOW/PWS attachment to classify it.</b> The work-statement type is the single highest-leverage call in your bid strategy — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
+    },
+  };
+}
+
 function deriveSubmissionChecklistFiltered(
   compJson: Record<string, unknown>
 ): AuditViewModel["submission_checklist_filtered"] {
@@ -1725,6 +1816,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     ko_email: deriveKoEmailCard(audit, displayId, risks, compJson),
 
     submission_checklist_filtered: deriveSubmissionChecklistFiltered(compJson),
+    ...deriveWorkStatementReveal(audit),
 
     has_incumbent: incumbentHasData,
     incumbent_none_head: "No incumbent identified",

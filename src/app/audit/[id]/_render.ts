@@ -1392,6 +1392,103 @@ function injectVerdictModeCall(html: string): string {
 // multiple elements (e.g. a future drawer mirror of the card preview), the
 // global walker keeps both in sync rather than letting one drift to the
 // static demo value.
+// §03 — Phase 2 #3 (Jun 8 2026). Renders EXACTLY ONE of the two .ws-reveal
+// blocks. Floor invariant: §03 never silently loses the reveal — the unknown
+// amber variant is the no-data state, NOT the no-render state.
+//
+// The template ships BOTH blocks with style="display:none". We:
+//   1. Drop display:none on the block that applies (revealing it)
+//   2. Strip the other block entirely (so the DOM has exactly one ws-reveal)
+//   3. Populate the data-field slots inside the visible block
+function renderWorkStatementReveal(
+  html: string,
+  ws: AuditViewModel["work_statement"],
+  wsu: AuditViewModel["work_statement_unknown"]
+): string {
+  if (ws) {
+    // Reveal known, strip unknown
+    let out = html.replace(
+      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">/,
+      `<div class="ws-reveal" data-state="known" data-field="work_statement">`
+    );
+    out = out.replace(
+      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">[\s\S]*?<\/div>\s*<\/div>/,
+      ""
+    );
+    // Populate fields. Confidence: replace BOTH the chip text and the icon
+    // doesn't change (template's check-icon is generic). For "Tentative" we
+    // keep the same chip element — visual differentiation is the label.
+    out = out.replace(
+      /(<span data-field="work_statement\.confidence_label">)[\s\S]*?(<\/span>)/,
+      `$1${escapeHtml(ws.confidence)}$2`
+    );
+    out = out.replace(
+      /(<span class="ws-abbr" data-field="work_statement\.abbr">)[\s\S]*?(<\/span>)/,
+      `$1${escapeHtml(ws.abbr)}$2`
+    );
+    out = out.replace(
+      /(<span class="ws-full" data-field="work_statement\.full">)[\s\S]*?(<\/span>)/,
+      `$1${escapeHtml(ws.full)}$2`
+    );
+    out = out.replace(
+      /(<p class="ws-mean" data-field="work_statement\.meaning">)[\s\S]*?(<\/p>)/,
+      `$1${ws.meaning}$2`
+    );
+    out = out.replace(
+      /(<span class="ev-cite" data-field="work_statement\.evidence">)[\s\S]*?(<\/span>)/,
+      `$1${escapeHtml(ws.evidence)}$2`
+    );
+    out = out.replace(
+      /(<p class="wst-t" data-field="work_statement\.bid_strategy">)[\s\S]*?(<\/p>)/,
+      `$1${ws.bid_strategy}$2`
+    );
+    return out;
+  }
+  if (wsu) {
+    // Reveal unknown, strip known. Known block ends in 3 nested </div></div></div>
+    // (ws-reveal > ws-main + ws-strat both opened inside).
+    let out = html.replace(
+      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">/,
+      ``
+    );
+    out = out.replace(
+      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">/,
+      `<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown">`
+    );
+    // The known-block strip leaves orphaned inner divs since the opener is
+    // removed. Walk balanced — find the first .ws-reveal-is-unknown (which
+    // we just un-hid) and remove everything between the (now-missing)
+    // ws-reveal known opener up to the is-unknown opener. Cleaner: re-strip
+    // the known block as one unit before un-hiding the unknown.
+    // Redo: strip known block as whole unit, THEN un-hide unknown.
+    out = html.replace(
+      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/,
+      ""
+    );
+    out = out.replace(
+      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">/,
+      `<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown">`
+    );
+    out = out.replace(
+      /(<span class="ws-full" data-field="work_statement_unknown\.head">)[\s\S]*?(<\/span>)/,
+      `$1${escapeHtml(wsu.head)}$2`
+    );
+    out = out.replace(
+      /(<p class="ws-mean" data-field="work_statement_unknown\.reason">)[\s\S]*?(<\/p>)/,
+      `$1${wsu.reason}$2`
+    );
+    out = out.replace(
+      /(<span class="wsi-t" data-field="work_statement_unknown\.action">)[\s\S]*?(<\/span>)/,
+      `$1${wsu.action}$2`
+    );
+    return out;
+  }
+  // Floor invariant: should never reach here (derivation always returns one
+  // of the two). If we do, leave the template's hidden defaults — better
+  // than throwing in the render path.
+  return html;
+}
+
 function renderKoEmailCard(
   html: string,
   ko: { to: string; subject: string; preview: string }
@@ -1793,6 +1890,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   );
 
   html = renderKoEmailCard(html, vm.ko_email);
+
+  // §03 work-statement reveal — Phase 2 #3. Floor: never silently vanish.
+  html = renderWorkStatementReveal(html, vm.work_statement, vm.work_statement_unknown);
 
   html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
 
