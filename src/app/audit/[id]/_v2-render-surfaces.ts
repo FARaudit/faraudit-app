@@ -189,6 +189,10 @@ function setSpanByDataField(html: string, dataField: string, value: string): str
 // ─── Surface 1 — §03-HEAD work-statement reveal ────────────────────────────
 
 function renderWorkStatement(html: string, v: V2RenderInput): string {
+  // Empty-guard (Jun 8 2026) — when V2 shadow produced neither known nor unknown
+  // work-statement, leave V1's rendered content in place. Never clobber with
+  // null. The V1 strip pass (renderAuditReportComplete) owns empty-strip duty.
+  if (!v.work_statement && !v.work_statement_unknown) return html;
   // Brain rule (Part D): render EXACTLY ONE of the two .ws-reveal blocks.
   // Implementation: strip whichever block does not apply by removing its
   // `style="display:none"` from the one that DOES apply and removing the
@@ -304,6 +308,10 @@ function renderMatrixRollup(html: string, v: V2RenderInput): string {
 // ─── Surface 3 — §09 6-bucket pre-flight ──────────────────────────────────
 
 function renderChecklist(html: string, v: V2RenderInput): string {
+  // Empty-guard (Jun 8 2026) — when V2 shadow produced no checklist, leave V1's
+  // rendered 6-bucket / N-item checklist in place. Writing "" here would clobber
+  // V1's content to "0 / 0 cleared". Fall-back, never blank.
+  if (!v.submission_checklist_filtered || v.submission_checklist_filtered.length === 0) return html;
   const groups = v.submission_checklist_filtered
     .map((g) => {
       const critClass = g.critical ? " is-critical" : "";
@@ -322,9 +330,11 @@ function renderChecklist(html: string, v: V2RenderInput): string {
 // ─── Surface 4 — L02 band ─────────────────────────────────────────────────
 
 function renderL02Band(html: string, v: V2RenderInput): string {
-  if (v.l02_catches.length === 0) {
-    return stripIfEmpty(html, "l02_catches", true);
-  }
+  // Empty-guard (Jun 8 2026) — return html unchanged when V2 has nothing. V1's
+  // strip pass (renderAuditReportComplete → stripHideWhenEmptyBlocks) owns the
+  // empty-section cleanup as the single authority. Stripping here would create
+  // a redundant code path + risk a regression if V1 ever fills l02_catches.
+  if (v.l02_catches.length === 0) return html;
   let out = setSpanByDataField(html, "l02_count", String(v.l02_catches.length));
   const cards = v.l02_catches
     .map(
@@ -339,9 +349,9 @@ function renderL02Band(html: string, v: V2RenderInput): string {
 // ─── Surface 5 — Verification notes ───────────────────────────────────────
 
 function renderConfidenceNotes(html: string, v: V2RenderInput): string {
-  if (v.confidence_notes.length === 0) {
-    return stripIfEmpty(html, "confidence_notes", true);
-  }
+  // Empty-guard (Jun 8 2026) — same fail-safe pattern as renderL02Band. V1's
+  // strip pass is the empty-section authority; V2 only writes when it has data.
+  if (v.confidence_notes.length === 0) return html;
   let out = setSpanByDataField(html, "confidence_count", String(v.confidence_notes.length));
   const rows = v.confidence_notes
     .map(

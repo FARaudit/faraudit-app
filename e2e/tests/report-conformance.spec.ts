@@ -24,8 +24,14 @@ import * as path from 'node:path';
 // 5 audit IDs spanning the formats. Pulled from /api/audits or set per-run.
 // For initial wiring, exercise against the most recent SPRRA (DLA / SF-18)
 // — additional docs added as audits are run on the other formats.
+// 4f4743d7 added 2026-06-08 as the V2-shadow-regression fixture: it has a
+// populated v2_shadow with an EMPTY submission_checklist_filtered surface,
+// so without the V2 overlay empty-guard, renderChecklist would clobber V1's
+// 23-item checklist with [] and E1 (groups=6/6, items>1) would fail. With
+// the guard in place, V1's checklist survives — E1 stays green.
 const AUDIT_DOCS: Array<{ label: string; id: string }> = [
-  { label: 'DLA · SPRRA126Q0034', id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
+  { label: 'DLA · SPRRA126Q0034',  id: 'd7e8d740-10f3-4dc9-ad65-835d5155a604' },
+  { label: 'V2-shadow regression', id: '4f4743d7-d6fc-44f7-bb73-3400495c1dd5' },
 ];
 
 const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
