@@ -153,15 +153,18 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   // E12 — §08 ko-preview: non-empty AND contains greeting + ≥2 numbered items
   // + sign-off. Stronger than just "non-empty" — enforces the canonical's
   // structure (greeting → lead → numbered clarification asks → sign-off).
-  // BLOCKING — Phase 2 #2 just landed.
+  // BLOCKING — Phase 2 #2 (Option B drafted email).
+  // Uses innerText (not textContent) so <br>-rendered line breaks count as
+  // newlines — the renderer escapes the source then replaces \n with <br>.
   const e12 = await page.evaluate(() => {
-    const p = document.querySelector('.ko-preview');
+    const p = document.querySelector('.ko-preview') as HTMLElement | null;
     if (!p) return { ok: false, detail: '.ko-preview NOT FOUND' };
-    const text = (p.textContent || '').trim();
+    const text = (p.innerText || '').trim();
     if (text.length === 0) return { ok: false, detail: 'ko-preview empty' };
     // Greeting check — "Dear [name]," or "Dear Contracting Officer,"
     const hasGreeting = /^\s*Dear\s+[A-Z][^,]*,/.test(text);
-    // Numbered items — at least 2 lines starting with "1." and "2."
+    // Numbered items — at least 2 lines starting with "N." (\d+\.). Matches
+    // anywhere in the string since innerText preserves \n from <br>.
     const items = (text.match(/(?:^|\n)\s*\d+\.\s+/g) || []).length;
     // Sign-off — "Respectfully" or "Thank you" or "Sincerely" near the end
     const tail = text.slice(-200);
