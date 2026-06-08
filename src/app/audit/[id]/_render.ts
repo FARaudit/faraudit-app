@@ -1166,6 +1166,43 @@ function renderComplianceMatrix(
   return setFieldInner(html, "compliance_matrix", "div", inner);
 }
 
+// §07 matrix-artifact card render — Jun 8 2026 export-parity Phase 1.
+// Drives the compact export card markup (canonical §07) from the same
+// vm.compliance_matrix array the old table render used. Populates the
+// header count pill (matrix_count) + the body summary sentence
+// (matrix_rollup.summary). The export link href is set separately in the
+// main render flow via the data-field="matrix_export_url" regex.
+function renderMatrixArtifact(
+  html: string,
+  rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }>
+): string {
+  const total = rows.length;
+  const actionCount = rows.filter((r) => r.status === "action").length;
+  const refCount = total - actionCount;
+
+  const countPill = total === 1 ? "1 requirement" : `${total} requirements`;
+  // Summary sentence mirrors canonical voice. When zero requirements are
+  // extracted (metadata-only paths or pre-render edge cases), emit a
+  // truthful empty-state instead of a contradictory "All 0 mapped" string.
+  const summary =
+    total === 0
+      ? "Compliance matrix not yet available for this audit."
+      : `All ${total} solicitation requirements mapped to a response obligation &mdash; <b>${actionCount} need offeror action</b>, the remaining ${refCount} are standard clauses incorporated by reference, present and verified.`;
+
+  // <span data-field="matrix_count"> in the sec-head pill
+  let out = html.replace(
+    /(<span[^>]*\bdata-field="matrix_count"[^>]*>)[\s\S]*?(<\/span>)/,
+    `$1${escapeHtml(countPill)}$2`
+  );
+  // <p class="ma-h" data-field="matrix_rollup.summary"> in the card body — keep
+  // bolded action count by injecting raw HTML (escapeHtml the dynamic counts).
+  out = out.replace(
+    /(<p class="ma-h" data-field="matrix_rollup\.summary">)[\s\S]*?(<\/p>)/,
+    `$1${summary}$2`
+  );
+  return out;
+}
+
 // Gotcha #4 — the .checklist denominator ("N/10") is computed CLIENT-SIDE by
 // the resolver JS (totalEl.textContent = items.length). We do NOT pre-compute
 // the count or stamp it in the server-rendered markup; the JS auto-corrects
@@ -1746,12 +1783,17 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   html = renderTimelineGates(html, vm.timeline_gates);
 
-  html = renderComplianceMatrix(html, vm.compliance_matrix);
-  // matrix_export_url: href attribute on the .cm-export anchor. The link sits
-  // on an <a> with data-field="matrix_export_url"; href is the attribute we
-  // need to swap, not the inner text.
+  // §07 — matrix-artifact card (Phase 1 of export-parity re-sync, Jun 8 2026).
+  // Canonical's §07 is the compact export-artifact card, not the full clause
+  // table. Renders count pill + summary sentence + export link. The full
+  // matrix is the downloadable artifact reached via the export link, not a
+  // printed re-list of §L. renderComplianceMatrix() kept in this file for
+  // legacy callers but no longer invoked by the report render.
+  html = renderMatrixArtifact(html, vm.compliance_matrix);
+  // matrix_export_url: href attribute on the .ma-export anchor (was .cm-export
+  // before the Jun 8 canonical re-sync; updated to track the new class).
   html = html.replace(
-    /(<a class="cm-export" )href="[^"]*"(\s+data-field="matrix_export_url")/,
+    /(<a class="ma-export" )href="[^"]*"(\s+data-field="matrix_export_url")/,
     `$1href="${escapeAttr(vm.matrix_export_url)}"$2`
   );
 
