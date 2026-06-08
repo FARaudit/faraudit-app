@@ -1781,7 +1781,16 @@ function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
   // compliance_flags lives in a <div class="flags" data-hide-when-empty="..."> wrapper (§04).
   // The other two are <section> wrappers.
   const passes: Array<{ field: string; isEmpty: boolean }> = [
-    { field: "compliance_flags", isEmpty: !vm.compliance_flags || vm.compliance_flags.length === 0 },
+    // §04 hide pass — Export Parity Item D. Strip the whole §04 (now wraps
+    // header + legend + flags + matrix) when BOTH flags AND matrix are
+    // empty. Prevents the "Full clause matrix · 0 traps · 0 full-text ·
+    // 0 by reference" all-zero render shown on the Jun 7 SPRRA case.
+    {
+      field: "compliance_flags",
+      isEmpty:
+        (!vm.compliance_flags || vm.compliance_flags.length === 0) &&
+        (!vm.compliance_matrix || vm.compliance_matrix.length === 0),
+    },
     // V2-shadow-only surfaces — V1 has no source, treat as always empty so
     // the empty blocks don't print. The V2 overlay path renders + retains.
     { field: "l02_catches", isEmpty: true },

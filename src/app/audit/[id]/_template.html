@@ -226,6 +226,22 @@ button{font-family:inherit}
 .cm-export{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--accent-deep);text-decoration:none;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 .cm-export:hover{background:var(--card-soft)}
 .cm-export svg{width:13px;height:13px}
+/* §07 export artifact — matrix is a downloadable working doc, NOT a printed re-list of §L (kills triple-emission) */
+.matrix-artifact{display:flex;align-items:flex-start;gap:16px;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.matrix-artifact .ma-ico{width:42px;height:42px;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+.matrix-artifact .ma-ico svg{width:21px;height:21px}
+.matrix-artifact .ma-body{flex:1;min-width:0}
+.ma-h{font-size:13.5px;line-height:1.5;color:var(--ink);font-weight:600;margin:0 0 5px}
+.ma-h b{font-weight:800;color:var(--accent-deep)}
+.ma-sub{font-size:12px;line-height:1.55;color:var(--mute);margin:0;max-width:62ch}
+.matrix-artifact .ma-export{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:#fff;background:var(--accent-deep);text-decoration:none;padding:9px 14px;border-radius:9px;align-self:center}
+.matrix-artifact .ma-export svg{width:14px;height:14px}
+.matrix-artifact .ma-export:hover{background:var(--accent)}
+@media(max-width:680px){.matrix-artifact{flex-wrap:wrap}.matrix-artifact .ma-export{align-self:flex-start}}
+/* §04 inferred-marker — flags with no document anchor are MARKED (not hidden) so the reader verifies them */
+.flag-inferred{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-700);background:var(--amber-50);border:1px solid rgba(217,119,6,.28);border-radius:5px;padding:2px 7px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+[data-theme="dark"] .flag-inferred{color:#fcd34d;background:rgba(217,119,6,.14);border-color:rgba(217,119,6,.32)}
+.flag-row.is-inferred .flag-main{border-left:2px dashed rgba(217,119,6,.5);padding-left:13px;margin-left:-2px}
 .cmatrix{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .cmatrix table{width:100%;border-collapse:collapse;font-size:12.5px}
 .cmatrix thead th{background:var(--card-soft);text-align:left;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);padding:9px 14px;border-bottom:1px solid var(--line)}
@@ -424,6 +440,9 @@ button{font-family:inherit}
 [data-theme="dark"] .risk-sev.med{background:rgba(217,119,6,.16);color:#fcd34d;border-color:transparent}
 [data-theme="dark"] .risk-sev.low{background:rgba(55,138,221,.16);color:var(--accent-light);border-color:transparent}
 .risk-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0;flex:1 1 auto}
+/* citation must never crush the title: it wraps, is width-capped, and yields space to the title.
+   (Long multi-clause citations on real data — "A-11 (Arms Export Control Act, 22 U.S.C. …)" —
+   previously hogged the nowrap row and stacked the title letter-by-letter.) */
 .risk-cite{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);margin-left:auto;text-align:right;white-space:normal;overflow-wrap:anywhere;max-width:38%;flex:0 1 auto;line-height:1.4}
 /* risk provenance — verified-from-document vs inferred-pattern (trust tier) */
 .risk-prov{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:5px;flex-shrink:0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -567,55 +586,70 @@ button{font-family:inherit}
 .rd-note b{color:var(--ink);font-weight:700}
 
 /* ═══════════ PRINT — board-ready report ═══════════ */
-/* ═══════════ PAGED PDF (Letter) — institutional research ═══════════
-   Inverts the old broken model: sections FLOW (no whole-.sec break-inside:
-   avoid → kills mid-document whitespace gaps), section headers glue to
-   their first content (no orphaned headers), every card/row is atomic
-   (no card split across a page), tables repeat header row, rail/jump-nav
-   /sidebar/toggles hidden. Header/footer come from printToPDF (Part B —
-   Chromium ignores CSS @page margin-box content).
+/* PAGED PDF (Letter) — institutional research, not a screenshot.
+   Model: sections FLOW (never avoid the whole .sec → kills mid-doc whitespace
+   gaps); the section header is glued to its first content (never orphaned at a
+   page bottom); every card / row is ATOMIC (never splits across a page); the
+   page-1 decision layer (masthead/exec/catch/timeline) stays whole. The running
+   header (solicitation #) + footer (page X of Y · FARaudit) are injected by the
+   Chromium print pipeline — the @page top/bottom margins reserve room for them.
    Spec: ceo/redesign-final/Review/AUDIT-REPORT-PAGED-LAYOUT-SPEC.md */
 @media print{
-  @page{size:Letter;margin:16mm 13mm 14mm}   /* see Part B: printToPDF margins override this in prod */
+  @page{size:Letter;margin:16mm 13mm 14mm}
   html,body,.frame,.bg{background:#fff!important}
 
-  /* hide every screen affordance — only the report prints */
+  /* ── hide every screen affordance — only the report itself prints ── */
   .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.prelim-modes,.toast,
   .rpt-return,.risk-chev,.kd-note{display:none!important}
 
-  /* collapse the app shell to one full-width document column */
+  /* ── collapse the app shell to one full-width document column ── */
   .frame{display:block!important;min-width:0!important;max-width:none!important;grid-template-columns:none!important}
   .body{display:block!important;max-width:none!important;padding:0!important;margin:0!important}
   .rpt-grid{display:block!important;grid-template-columns:none!important}
   .rpt-main{display:block!important}
 
-  /* one even vertical rhythm between blocks */
+  /* ── one even vertical rhythm between blocks (replaces uneven screen
+        margins + grid gaps that left ragged whitespace) ── */
   .masthead,.keydates,.moment,.exec-sum,.timeline,.etraps,.scorecard,.sec{
     margin:0 0 5.5mm 0!important;box-shadow:none!important}
   .sec+.sec,.rpt-main>.sec{margin-top:0!important}
 
-  /* PAGINATION */
-  .sec,.etraps{break-inside:auto}                                   /* 1 sections flow → fill pages, no gaps */
-  .sec-head,.et-head{break-after:avoid}                             /* 2 header pulls to its content */
+  /* ════ PAGINATION ════
+     1 · sections flow so every page fills top-to-bottom (no whole-section
+         "break-inside:avoid" → no tall section bumps to a fresh page) */
+  .sec,.etraps{break-inside:auto}
+  /* 2 · a header never sits alone at a page bottom — it pulls to its content */
+  .sec-head,.et-head{break-after:avoid}
   .sec-head + *,.sec-body > :first-child{break-before:avoid}
-  .masthead,.keydates,.moment,.exec-sum,.timeline,.scorecard,       /* 3 hero/lead blocks stay whole */
+  /* 3 · hero / lead blocks that read as one unit stay whole */
+  .masthead,.keydates,.moment,.exec-sum,.timeline,.scorecard,
   #sec-classify,#sec-incumbent,#sec-ko,.matrix-artifact,.ws-reveal,.award-basis,.gate-card{break-inside:avoid}
-  .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,  /* 4 every card/row atomic */
+  /* 4 · every card / row is atomic — never split down the middle */
+  .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,
   .es-act,.tl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin-tbl tr,.cmatrix tr,.ko-card,.cmatrix{break-inside:avoid}
-  .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick{break-after:avoid}  /* 5 labels glue down */
-  .clin-tbl thead,.cmatrix thead{display:table-header-group}        /* 6 tables repeat header per page */
-  p,li,.ws-meaning,.risk-detail{orphans:3;widows:3}                 /* 7 widow/orphan control */
+  /* 5 · sub-headers / group labels glue to the first row beneath them */
+  .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick{break-after:avoid}
+  /* 6 · long tables repeat their header row on each page they span */
+  .clin-tbl thead,.cmatrix thead{display:table-header-group}
+  /* 7 · typographic widow/orphan control */
+  p,li,.ws-meaning,.risk-detail{orphans:3;widows:3}
 
-  .risk-body{max-height:none!important;overflow:visible!important}  /* collapsibles open on paper */
+  /* collapsibles must be fully expanded on paper */
+  .risk-body{max-height:none!important;overflow:visible!important}
 
   /* checklist prints as blank boxes regardless of on-screen checked state */
   .ck-item input:checked + .ck-box{background:transparent!important;border-color:#94a3b8!important}
   .ck-item input:checked + .ck-box::after{display:none!important}
   .ck-item input:checked ~ .ck-txt{color:#0a1628!important;text-decoration:none!important}
 
+  /* provenance + severity chips legible at print scale */
   .risk-prov{font-size:9px!important;padding:3px 8px!important}
   .risk-prov.pattern{background:#eef2f6!important;color:#475569!important;border-color:#cbd5e1!important}
   .risk-prov.doc{background:#ecfdf5!important;color:#047857!important;border-color:#a7f3d0!important}
+
+  /* hide locked-state teasers in print — but NEVER the masthead verdict block: the .v-unscored
+     "Preliminary read" block IS the real verdict in metadata-only state and must print (1:1 web↔PDF).
+     Production strips the unused block server-side; this :not() keeps the design-file demo PDF correct. */
   [data-state="locked"]:not(.mh-verdict){display:none!important}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
@@ -830,6 +864,149 @@ button{font-family:inherit}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
 /* ── /canonical toggle sidebar ── */
+
+/* ═══════════════════════════════════════════════════════════════
+   CYCLE 2 — render restructure (Design brief, view-model 48baa06 + eaaeb1c)
+   Five surfaces: work-statement reveal · clause-matrix rollup · execution
+   traps (L02) · six-bucket pre-flight · verification notes (confidence).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── WORK-STATEMENT TYPE REVEAL (heads §03 — the single line that sets bid approach, Rule 54) ─── */
+.ws-reveal{display:grid;grid-template-columns:minmax(0,1fr) 286px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);box-shadow:var(--shadow-sm);margin:0 0 22px}
+.ws-main{padding:18px 22px 17px;border-left:4px solid var(--accent-deep);min-width:0}
+.ws-kick{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.ws-conf{display:inline-flex;align-items:center;gap:5px;font-size:9px;color:var(--green-700);background:var(--green-50);border:1px solid var(--green-200);border-radius:5px;padding:2px 7px;letter-spacing:.04em}
+[data-theme="dark"] .ws-conf{background:rgba(16,185,129,.14);color:#6ee7b7;border-color:rgba(16,185,129,.3)}
+.ws-type{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;margin:0 0 9px}
+.ws-abbr{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1;color:var(--accent-deep)}
+[data-theme="dark"] .ws-abbr{color:var(--accent-light)}
+.ws-full{font-family:"Manrope",sans-serif;font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.ws-mean{font-size:13px;line-height:1.55;color:var(--ink-2);margin:0 0 12px;max-width:60ch}
+.ws-mean b{color:var(--ink);font-weight:700}
+.ws-ev{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);flex-wrap:wrap}
+.ws-ev .ev-tag{font-weight:700;color:var(--mute-2);letter-spacing:.05em;text-transform:uppercase;font-size:8.5px}
+.ws-ev .ev-cite{color:var(--accent-deep);background:rgba(55,138,221,.07);border:1px solid var(--accent-light);border-radius:5px;padding:2px 8px}
+[data-theme="dark"] .ws-ev .ev-cite{color:var(--accent-light);border-color:rgba(181,212,244,.26);background:rgba(55,138,221,.14)}
+.ws-strat{background:linear-gradient(150deg,var(--navy-800),var(--navy-900));color:#fff;padding:17px 19px;display:flex;flex-direction:column;gap:7px;position:relative;overflow:hidden}
+.ws-strat::after{content:"";position:absolute;inset:0;opacity:.5;background:radial-gradient(420px 180px at 110% -20%,rgba(55,138,221,.3),transparent 62%)}
+.ws-strat>*{position:relative;z-index:1}
+.ws-strat .wst-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-light)}
+.ws-strat .wst-t{font-size:12.5px;line-height:1.5;color:#e8eef6;font-weight:500}
+.ws-strat .wst-t b{color:#fff;font-weight:800}
+/* honest-unknown variant — visible, calm, framed as rigor (NOT an error) */
+.ws-reveal.is-unknown{grid-template-columns:1fr;background:linear-gradient(98deg,var(--amber-50),var(--card) 60%)}
+[data-theme="dark"] .ws-reveal.is-unknown{background:linear-gradient(98deg,rgba(217,119,6,.1),var(--card) 60%)}
+.ws-reveal.is-unknown .ws-main{border-left-color:var(--amber-600);padding-bottom:18px}
+.ws-reveal.is-unknown .ws-abbr{color:var(--amber-700);font-size:22px}
+[data-theme="dark"] .ws-reveal.is-unknown .ws-abbr{color:#fcd34d}
+.ws-reveal.is-unknown .ws-conf{color:var(--amber-800);background:var(--amber-100);border-color:var(--amber-200)}
+[data-theme="dark"] .ws-reveal.is-unknown .ws-conf{color:#fcd34d;background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.34)}
+.ws-strat-inline{display:flex;align-items:flex-start;gap:10px;margin-top:13px;padding-top:13px;border-top:1px solid var(--amber-200)}
+[data-theme="dark"] .ws-strat-inline{border-color:rgba(217,119,6,.3)}
+.ws-strat-inline svg{width:16px;height:16px;color:var(--amber-700);flex-shrink:0;margin-top:1px}
+[data-theme="dark"] .ws-strat-inline svg{color:#fcd34d}
+.ws-strat-inline .wsi-t{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.ws-strat-inline .wsi-t b{color:var(--ink);font-weight:700}
+@media(max-width:680px){.ws-reveal{grid-template-columns:1fr}}
+
+/* ─── §04 CLAUSE-MATRIX ROLLUP (trap rows live above as rich flags; required + by-ref tail here) ─── */
+.clause-matrix{margin-top:20px;border-top:1px solid var(--line-2);padding-top:18px}
+.cmx-h{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
+.cmx-h .cmx-counts{display:flex;gap:6px;margin-left:auto}
+.cmx-tally{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;letter-spacing:.04em;padding:2px 8px;border-radius:5px;font-weight:700}
+.cmx-tally .d{width:5px;height:5px;border-radius:50%;background:currentColor}
+.cmx-tally.trap{background:var(--amber-50);color:var(--amber-700)}
+.cmx-tally.required{background:var(--blue-50);color:var(--blue-700)}
+.cmx-tally.reference{background:var(--card-soft);color:var(--mute);border:1px solid var(--line)}
+[data-theme="dark"] .cmx-tally.trap{background:rgba(217,119,6,.16);color:#fcd34d}
+[data-theme="dark"] .cmx-tally.required{background:rgba(59,130,246,.16);color:#93c5fd}
+.cmx-row{display:grid;grid-template-columns:78px 150px 1fr auto;gap:12px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--line-3)}
+.cmx-row:last-of-type{border-bottom:0}
+.cmx-badge{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 0;text-align:center;border-radius:5px}
+.cmx-badge.required{background:var(--blue-50);color:var(--blue-700)}
+[data-theme="dark"] .cmx-badge.required{background:rgba(59,130,246,.16);color:#93c5fd}
+.cmx-clause{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[data-theme="dark"] .cmx-clause{color:var(--accent-light)}
+.cmx-title{font-size:12px;line-height:1.4;color:var(--ink-2)}
+.cmx-status{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--green-700);white-space:nowrap}
+[data-theme="dark"] .cmx-status{color:#6ee7b7}
+/* collapsible by-reference tail */
+.cmx-rollup{margin-top:4px}
+.cmx-toggle{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:var(--card-soft);border:1px solid var(--line);border-radius:9px;padding:11px 14px;cursor:pointer;font-family:inherit;transition:border-color .14s,background .14s}
+.cmx-toggle:hover{border-color:var(--accent-light)}
+.cmx-toggle .cmx-chev{width:15px;height:15px;color:var(--mute);transition:transform .18s;flex-shrink:0}
+.cmx-rollup.is-open .cmx-chev{transform:rotate(90deg)}
+.cmx-toggle .cmx-lbl{font-size:12px;font-weight:600;color:var(--ink)}
+.cmx-toggle .cmx-lbl b{color:var(--accent-deep);font-weight:800}
+[data-theme="dark"] .cmx-toggle .cmx-lbl b{color:var(--accent-light)}
+.cmx-toggle .cmx-sub{font-size:11px;color:var(--mute);margin-left:auto;font-family:"IBM Plex Mono",monospace}
+.cmx-tail{display:none;padding:10px 4px 2px}
+.cmx-rollup.is-open .cmx-tail{display:block}
+.cmx-refs{display:flex;flex-wrap:wrap;gap:6px}
+.cmx-ref{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+.cmx-tail .cmx-note{font-size:11px;color:var(--mute);margin:10px 0 0;line-height:1.5}
+@media(max-width:680px){.cmx-row{grid-template-columns:64px 1fr;row-gap:4px}.cmx-row .cmx-clause,.cmx-row .cmx-status{grid-column:2}}
+
+/* ─── EXECUTION TRAPS (L02) — the architectural payoff; distinct band, not buried in §05 ─── */
+.etraps{border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:18px;box-shadow:var(--shadow);background:var(--card)}
+.et-head{background:linear-gradient(150deg,var(--navy-800),var(--navy-900));color:#fff;padding:18px 24px;position:relative;overflow:hidden}
+.et-head::after{content:"";position:absolute;inset:0;opacity:.55;background:radial-gradient(720px 240px at 90% -30%,rgba(55,138,221,.26),transparent 60%)}
+.et-head>*{position:relative;z-index:1}
+.et-kick{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--accent-light);margin:0 0 8px}
+.et-kick .et-count{margin-left:auto;color:#fff;background:rgba(55,138,221,.22);border:1px solid rgba(181,212,244,.3);border-radius:6px;padding:3px 9px;letter-spacing:.04em}
+.et-title{font-family:"Manrope",sans-serif;font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:#fff;margin:0 0 5px}
+.et-sub{font-size:12.5px;line-height:1.5;color:#aebfd6;margin:0;max-width:72ch}
+.et-grid{padding:16px 18px 18px;display:grid;gap:11px}
+.et-card{display:grid;grid-template-columns:30px 1fr;gap:14px;border:1px solid var(--line);border-left:3px solid var(--amber-600);border-radius:11px;padding:14px 16px;background:var(--card-soft)}
+.et-num{width:30px;height:30px;border-radius:8px;background:rgba(217,119,6,.1);border:1px solid var(--amber-200);color:var(--amber-700);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700}
+[data-theme="dark"] .et-num{background:rgba(217,119,6,.16);color:#fcd34d;border-color:rgba(217,119,6,.34)}
+.et-cat{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 7px;margin:0 0 7px}
+.et-ttl{font-size:14px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.3;margin:0 0 6px}
+.et-why{display:flex;align-items:flex-start;gap:7px;font-size:12px;line-height:1.5;color:var(--ink-2);margin:0 0 9px}
+.et-why svg{width:14px;height:14px;color:var(--amber-700);flex-shrink:0;margin-top:1px}
+[data-theme="dark"] .et-why svg{color:#fcd34d}
+.et-why b{color:var(--ink);font-weight:700}
+.et-move{display:flex;align-items:flex-start;gap:9px;background:linear-gradient(180deg,rgba(55,138,221,.06),rgba(55,138,221,.03));border:1px solid var(--accent-light);border-radius:9px;padding:10px 13px}
+[data-theme="dark"] .et-move{background:rgba(55,138,221,.1);border-color:rgba(181,212,244,.24)}
+.et-move .em-ico{width:22px;height:22px;border-radius:6px;background:var(--accent-deep);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.et-move .em-ico svg{width:13px;height:13px}
+.et-move .em-t{font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.et-move .em-t b{display:block;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px}
+[data-theme="dark"] .et-move .em-t b{color:var(--accent-light)}
+
+/* ─── §09 PRE-FLIGHT — six ordered buckets, critical first ─── */
+.ck-group.is-critical .ck-gh{color:var(--red-700)}
+[data-theme="dark"] .ck-group.is-critical .ck-gh{color:#fca5a5}
+.ck-gh{display:flex;align-items:center;gap:9px}
+.ck-bnum{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;color:var(--mute-2);background:var(--card-soft);border:1px solid var(--line);border-radius:5px;padding:2px 6px;letter-spacing:.02em}
+.ck-group.is-critical .ck-bnum{color:var(--red-700);background:var(--red-50);border-color:var(--red-200)}
+[data-theme="dark"] .ck-group.is-critical .ck-bnum{color:#fca5a5;background:rgba(220,38,38,.14);border-color:rgba(220,38,38,.3)}
+.ck-crit-tag{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red-700)}
+[data-theme="dark"] .ck-crit-tag{color:#fca5a5}
+.ck-item.is-critical{position:relative;border-radius:9px;background:linear-gradient(98deg,var(--red-50),transparent 70%);box-shadow:inset 3px 0 0 var(--red-600);padding-left:14px;margin-left:-2px}
+[data-theme="dark"] .ck-item.is-critical{background:linear-gradient(98deg,rgba(220,38,38,.1),transparent 70%)}
+
+/* ─── VERIFICATION NOTES (confidence) — fail-loud transparency panel, end of report ─── */
+.vnotes{border:1px solid var(--line);border-radius:15px;background:var(--card-soft);padding:18px 22px 20px;box-shadow:var(--shadow-sm)}
+.vn-head{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.vn-ico{width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--line);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
+[data-theme="dark"] .vn-ico{color:var(--accent-light)}
+.vn-ico svg{width:16px;height:16px}
+.vn-h{font-size:14px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.vn-count{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+.vn-frame{font-size:12px;line-height:1.55;color:var(--mute);margin:0 0 15px;max-width:80ch;padding-left:40px}
+.vn-frame b{color:var(--ink-2);font-weight:700}
+.vn-list{display:grid;gap:9px}
+.vn-row{display:grid;grid-template-columns:168px 1fr;gap:14px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line-2)}
+.vn-field{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--ink);text-transform:uppercase}
+.vn-body{min-width:0}
+.vn-unsure{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin:0 0 4px}
+.vn-unsure b{color:var(--ink);font-weight:700}
+.vn-assume{font-size:11.5px;line-height:1.5;color:var(--mute);margin:0}
+.vn-assume .va-k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute-2);margin-right:5px}
+.vn-assume .va-resolve{color:var(--accent-deep);font-weight:600}
+[data-theme="dark"] .vn-assume .va-resolve{color:var(--accent-light)}
+@media(max-width:680px){.vn-row{grid-template-columns:1fr}.vn-frame{padding-left:0}}
 </style>
 </head>
 <body>
@@ -1378,7 +1555,7 @@ button{font-family:inherit}
           </section>
 
           <!-- 04 · COMPLIANCE FLAGS -->
-          <section class="sec" id="sec-compliance">
+          <section class="sec" id="sec-compliance" data-hide-when-empty="compliance_flags">
             <div class="sec-head">
               <span class="sec-num">04</span>
               <div class="sec-title">Compliance Flags<span class="st-sub">Clauses that require an offeror action</span></div>
@@ -1661,52 +1838,6 @@ Thank you for the opportunity to quote on SP4701-26-Q-0942. Before submission we
             <div class="vn-list" data-field="confidence_notes.list">
               <!-- Repeater: one .vn-row per confidence note.
                    Fields per item: field, uncertain, assumption, resolve. -->
-            </div>
-          </section>
-
-          <!-- ═══════════════════════════════════════════════════════════════
-               V2 OVERLAY SURFACES (Fix 8 / 12 / 13 / 14 — Phase 2 cutover)
-               Each section uses data-hide-when-empty so the renderer strips
-               the entire block when its surface is null/absent. V1-only
-               audits never see these. Anchored after Verification Notes so
-               they tail the main report column ahead of the sticky rail.
-               ═══════════════════════════════════════════════════════════ -->
-
-          <section class="sec v2-overlay v2-metadata-brief" data-hide-when-empty="metadata_brief">
-            <h2 class="sec-h">Synopsis brief (metadata-only audit)</h2>
-            <div class="v2-mb-body">
-              <p class="v2-mb-summary" data-field="metadata_brief.synopsis_summary"></p>
-              <div class="v2-mb-row"><b>Deadline:</b> <span data-field="metadata_brief.deadline.formatted"></span> · <span data-field="metadata_brief.deadline.days_remaining"></span>d remaining</div>
-              <div class="v2-mb-row"><b>Eligibility:</b> <span data-field="metadata_brief.eligibility.notes"></span></div>
-              <div class="v2-mb-row"><b>CO contact:</b> <span data-field="metadata_brief.co_contact.name"></span> &lt;<span data-field="metadata_brief.co_contact.email"></span>&gt;</div>
-              <div class="v2-mb-missing">
-                <b>Missing intel until the full solicitation is retrieved:</b>
-                <ul data-field="metadata_brief.missing_intel"></ul>
-              </div>
-            </div>
-          </section>
-
-          <section class="sec v2-overlay v2-submission-preflight" data-hide-when-empty="submission_preflight">
-            <h2 class="sec-h">Submission preflight (§06 deterministic)</h2>
-            <ul class="v2-sp-list" data-field="submission_preflight"></ul>
-          </section>
-
-          <section class="sec v2-overlay v2-recompete-signal" data-hide-when-empty="recompete_signal">
-            <h2 class="sec-h">Recompete signal</h2>
-            <div class="v2-rs-body">
-              <div class="v2-rs-row"><b>Contract:</b> <span data-field="recompete_signal.contract_number"></span> · NAICS <span data-field="recompete_signal.naics"></span> · <span data-field="recompete_signal.agency"></span></div>
-              <div class="v2-rs-row"><b>Estimated end:</b> <span data-field="recompete_signal.estimated_end_date"></span></div>
-              <div class="v2-rs-row"><b>Recompete window:</b> <span data-field="recompete_signal.recompete_window"></span></div>
-              <p class="v2-rs-note" data-field="recompete_signal.monitoring_note"></p>
-            </div>
-          </section>
-
-          <section class="sec v2-overlay v2-price-anchor" data-hide-when-empty="price_anchor">
-            <h2 class="sec-h">Price anchor</h2>
-            <div class="v2-pa-body">
-              <div class="v2-pa-row"><b>Evaluation type:</b> <span data-field="price_anchor.evaluation_type"></span> · CLINs: <span data-field="price_anchor.clin_count"></span></div>
-              <p class="v2-pa-guidance" data-field="price_anchor.lpta_guidance"></p>
-              <p class="v2-pa-ige" data-field="price_anchor.ige_note"></p>
             </div>
           </section>
 
