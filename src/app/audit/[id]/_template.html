@@ -298,6 +298,12 @@ button{font-family:inherit}
 
 /* ═══════════ LAYOUT: main + rail ═══════════ */
 .rpt-grid{display:grid;grid-template-columns:1fr 312px;gap:18px;align-items:start}
+/* Grid-item min-width override — without this, CSS Grid's default min-width:auto
+   lets un-shrinkable descendants (e.g. a CLIN table with long all-caps cell
+   text) inflate the 1fr column to min-content, pushing the rail off-screen
+   and forcing horizontal scroll. Belt-and-suspenders so any future wide
+   content can't break the layout. Jun 8 2026 overflow fix. */
+.rpt-main{min-width:0}
 
 /* sections */
 .sec{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);overflow:hidden;scroll-margin-top:78px}
