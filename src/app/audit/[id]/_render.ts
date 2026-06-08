@@ -1392,32 +1392,29 @@ function injectVerdictModeCall(html: string): string {
 // multiple elements (e.g. a future drawer mirror of the card preview), the
 // global walker keeps both in sync rather than letting one drift to the
 // static demo value.
-// §03 — Phase 2 #3 (Jun 8 2026). Renders EXACTLY ONE of the two .ws-reveal
+// §03 — Phase 2 #3 (Jun 8 2026). Reveals EXACTLY ONE of the two .ws-reveal
 // blocks. Floor invariant: §03 never silently loses the reveal — the unknown
 // amber variant is the no-data state, NOT the no-render state.
 //
-// The template ships BOTH blocks with style="display:none". We:
-//   1. Drop display:none on the block that applies (revealing it)
-//   2. Strip the other block entirely (so the DOM has exactly one ws-reveal)
-//   3. Populate the data-field slots inside the visible block
+// Implementation: do NOT strip the unused block. Both blocks ship with
+// style="display:none" in the template; we remove that inline style from
+// the CHOSEN block (un-hiding it) and leave the OTHER block exactly as-is
+// (still display:none, invisible to users + filtered out by the E13
+// detector). This avoids tag-balanced strip regex pitfalls — earlier attempt
+// used /[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/ which non-greedy-matched
+// THROUGH both blocks (the known block only ends in 2 trailing </div>; the
+// first 3-in-a-row appears at the end of the unknown block).
 function renderWorkStatementReveal(
   html: string,
   ws: AuditViewModel["work_statement"],
   wsu: AuditViewModel["work_statement_unknown"]
 ): string {
   if (ws) {
-    // Reveal known, strip unknown
+    // Un-hide known. Unknown stays display:none.
     let out = html.replace(
       /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">/,
       `<div class="ws-reveal" data-state="known" data-field="work_statement">`
     );
-    out = out.replace(
-      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">[\s\S]*?<\/div>\s*<\/div>/,
-      ""
-    );
-    // Populate fields. Confidence: replace BOTH the chip text and the icon
-    // doesn't change (template's check-icon is generic). For "Tentative" we
-    // keep the same chip element — visual differentiation is the label.
     out = out.replace(
       /(<span data-field="work_statement\.confidence_label">)[\s\S]*?(<\/span>)/,
       `$1${escapeHtml(ws.confidence)}$2`
@@ -1445,27 +1442,8 @@ function renderWorkStatementReveal(
     return out;
   }
   if (wsu) {
-    // Reveal unknown, strip known. Known block ends in 3 nested </div></div></div>
-    // (ws-reveal > ws-main + ws-strat both opened inside).
+    // Un-hide unknown. Known stays display:none.
     let out = html.replace(
-      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">/,
-      ``
-    );
-    out = out.replace(
-      /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">/,
-      `<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown">`
-    );
-    // The known-block strip leaves orphaned inner divs since the opener is
-    // removed. Walk balanced — find the first .ws-reveal-is-unknown (which
-    // we just un-hid) and remove everything between the (now-missing)
-    // ws-reveal known opener up to the is-unknown opener. Cleaner: re-strip
-    // the known block as one unit before un-hiding the unknown.
-    // Redo: strip known block as whole unit, THEN un-hide unknown.
-    out = html.replace(
-      /<div class="ws-reveal" data-state="known" data-field="work_statement" style="display:none">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/,
-      ""
-    );
-    out = out.replace(
       /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown" style="display:none">/,
       `<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown">`
     );
