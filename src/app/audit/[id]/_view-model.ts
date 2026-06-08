@@ -270,6 +270,12 @@ export interface AuditViewModel {
   // tile's .mhv-note line. Empty when response_deadline is null.
   response_deadline_short: string;
   award_date: string;
+  // Phase A.0 defect fix (Jun 8 2026): .kd-note text was hardcoded demo
+  // string in template. Now data-driven — renderer strips .kd-note unless
+  // (has_qa_deadline AND key_dates_note non-empty). Default "" so the demo
+  // never leaks on real audits. Currently never populated by derivation —
+  // future ticket can wire it from engine output if a real note is emitted.
+  key_dates_note: string;
   has_response_deadline: boolean;
   has_qa_deadline: boolean;
   has_award_date: boolean;
@@ -1854,6 +1860,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
     response_deadline_short: fmtDueShort(responseDeadline),
     award_date: "",
+    key_dates_note: "",
     has_response_deadline: !!responseDeadline,
     has_qa_deadline: false,
     has_award_date: false,

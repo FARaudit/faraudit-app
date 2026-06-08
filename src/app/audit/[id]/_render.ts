@@ -1611,6 +1611,18 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = replaceFieldText(html, "qa_deadline", vm.qa_deadline);
     html = replaceFieldText(html, "qa_days", vm.qa_days);
     html = replaceFieldText(html, "qa_days_num", vm.qa_days_num);
+    // Phase A.0 defect fix — .kd-note default was hardcoded demo text.
+    // Render real note only when vm.key_dates_note is non-empty; otherwise
+    // strip the .kd-note element (kills the latent demo-leak path when
+    // has_qa_deadline=true but no real note is available).
+    if (vm.key_dates_note && vm.key_dates_note.trim().length > 0) {
+      html = html.replace(
+        /(<span data-field="key_dates_note\.text">)[\s\S]*?(<\/span>)/,
+        `$1${vm.key_dates_note}$2`
+      );
+    } else {
+      html = removeKdNote(html);
+    }
   }
   if (!vm.has_award_date) {
     html = removeKdItem(html, "award_date");
