@@ -15,6 +15,7 @@ import type {
   EvaluationFactorVM,
   SubmissionRequirementVM
 } from "./_view-model";
+import { buildV2ViewModelFromShadow, renderV2Surfaces } from "./_v2-render-surfaces";
 
 // ─── safe text helpers ──────────────────────────────────────────────────────
 
@@ -1990,19 +1991,18 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   html = replaceFieldText(html, "incumbent_none_note", vm.incumbent_none_note);
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Paged-PDF spec Item 3 — honor data-hide-when-empty server-side. Without
-  // this pass, V1 renders empty l02_catches / confidence_notes / compliance_
-  // flags sections (F2 / F3 / F4 in V2-BURNIN-FLAW-LOG.md). When V2 overlay
-  // lands, it owns the empty-state for these three; V1 just defaults to
-  // empty since the source fields don't exist on the V1 viewmodel.
-  html = stripHideWhenEmptyBlocks(html, vm);
-
+  // V2 cutover B2+B3 (Jun 8 2026): strip pass moved OUT of renderAuditReport.
+  // The route handlers now call renderAuditReportComplete (below) which runs
+  // V1 → V2 overlay → strip, so V2 can populate l02_catches / confidence_notes
+  // BEFORE the strip's length-check decides whether to remove them.
   return html;
 }
 
 // ─── Paged-PDF Item 3 — empty-block strip pass ─────────────────────────────
 // Tag-balanced walk pulled from _v2-render-surfaces.ts:stripIfEmpty.
-function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
+// Exported (Jun 8 2026 / V2 cutover B2) so the route-level wrapper can call it
+// AFTER V2 overlay populates content — length-check then sees the real shape.
+export function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
   let out = html;
   // compliance_flags lives in a <div class="flags" data-hide-when-empty="..."> wrapper (§04).
   // The other two are <section> wrappers.
@@ -2017,10 +2017,12 @@ function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
         (!vm.compliance_flags || vm.compliance_flags.length === 0) &&
         (!vm.compliance_matrix || vm.compliance_matrix.length === 0),
     },
-    // V2-shadow-only surfaces — V1 has no source, treat as always empty so
-    // the empty blocks don't print. The V2 overlay path renders + retains.
-    { field: "l02_catches", isEmpty: true },
-    { field: "confidence_notes", isEmpty: true },
+    // V2-shadow-only surfaces — strip when V2 wrote nothing for this audit.
+    // When V2 overlay populated content (shadow surface length > 0), skip the
+    // strip so the V2 payload survives to the user. (Length sourced from
+    // vm.v2_surface_lengths, computed in _view-model.ts from compliance_json.v2_shadow.)
+    { field: "l02_catches",     isEmpty: (vm.v2_surface_lengths?.l02_catches     ?? 0) === 0 },
+    { field: "confidence_notes", isEmpty: (vm.v2_surface_lengths?.confidence_notes ?? 0) === 0 },
   ];
   for (const p of passes) {
     if (!p.isEmpty) continue;
@@ -2059,4 +2061,25 @@ function stripBlockByHideField(html: string, dataField: string): string {
     }
   }
   return html;
+}
+
+// ─── V2 cutover wrapper (B2 + B3 coupled, Jun 8 2026) ──────────────────────
+// Single source of truth for the V1 → V2 overlay → strip-pass chain. Both the
+// web route (/audit/[id]) and PDF route (/api/audit/[id]/pdf) call this so the
+// HTML they emit is byte-identical.
+//
+// Order matters: V2 overlay must populate BEFORE strip runs, so the strip's
+// length-check (against vm.v2_surface_lengths) sees the populated shape and
+// skips the corresponding sections. If shadow data is absent, v2Input is null,
+// V2 step is a no-op, and the strip removes the empty-state template blocks —
+// preserving the pre-cutover V1 behavior byte-for-byte.
+export function renderAuditReportComplete(
+  template: string,
+  vm: AuditViewModel,
+  audit: Record<string, unknown>
+): string {
+  let html = renderAuditReport(template, vm);
+  const v2Input = buildV2ViewModelFromShadow(audit);
+  if (v2Input) html = renderV2Surfaces(html, v2Input);
+  return stripHideWhenEmptyBlocks(html, vm);
 }

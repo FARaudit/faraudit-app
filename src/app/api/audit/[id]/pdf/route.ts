@@ -21,7 +21,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
-import { renderAuditReport } from "../../../../audit/[id]/_render";
+import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
 import { displaySolicitationId } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
@@ -97,7 +97,7 @@ export async function GET(
     "_template.html"
   );
   const template = await readFile(templatePath, "utf8");
-  const html = renderAuditReport(template, vm);
+  const html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
 
   // POST to Railway pdf-service. The service Bearer-checks RAILWAY_PDF_SECRET
   // and returns PDF bytes with Content-Type: application/pdf.

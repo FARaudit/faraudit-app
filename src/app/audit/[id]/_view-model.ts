@@ -296,6 +296,12 @@ export interface AuditViewModel {
   has_award_date: boolean;
   has_award_quarter: boolean;
 
+  // V2 cutover B2 — count of shadow-populated items for each surface the strip
+  // pass cares about. Default 0 when no v2_shadow present (V1 audits). Drives
+  // stripHideWhenEmptyBlocks: if length > 0, V2 overlay will populate the block
+  // and strip must skip it; if 0, strip removes the empty-state template demo.
+  v2_surface_lengths?: { l02_catches: number; confidence_notes: number };
+
   // Preliminary-read verdict block (metadata-only state) — Design ruling
   // 2026-06-04: when no document was retrieved, surface SAM-metadata tiles
   // instead of a fabricated fit score.
@@ -1592,6 +1598,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   // SAM-metadata solicitation_number when present. This keeps masthead +
   // reasoning + KO email + PDF filename consistent across the report.
   const compJsonEarly = (audit.compliance_json as Record<string, unknown> | null) || {};
+  // V2 cutover B2 — surface lengths fed to stripHideWhenEmptyBlocks so the
+  // strip skips l02_catches / confidence_notes when V2 overlay will populate.
+  const v2Shadow = (compJsonEarly.v2_shadow as Record<string, unknown> | null) ?? null;
+  const v2SurfacesObj = (v2Shadow?.surfaces as Record<string, unknown> | undefined) ?? {};
+  const v2SurfaceLengths = {
+    l02_catches: Array.isArray(v2SurfacesObj.l02_catches) ? (v2SurfacesObj.l02_catches as unknown[]).length : 0,
+    confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes) ? (v2SurfacesObj.confidence_notes as unknown[]).length : 0,
+  };
   const canonicalSol = (compJsonEarly.solicitation_number_canonical as string | null | undefined) ?? null;
   const displayId = displaySolicitationId({
     solicitation_number: canonicalSol ?? (audit.solicitation_number as string | null | undefined),
@@ -1979,6 +1993,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     has_qa_deadline: !!qaDeadlineDate,
     has_award_date: !!awardDateDate,
     has_award_quarter: awardQuarterStr.length > 0,
+    v2_surface_lengths: v2SurfaceLengths,
 
     // Preliminary-read tiles (metadata-only state). Eligibility intentionally
     // empty until a real per-user determination is wired (capability_statements

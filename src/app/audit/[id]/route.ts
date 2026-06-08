@@ -11,7 +11,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
-import { renderAuditReport } from "./_render";
+import { renderAuditReportComplete } from "./_render";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -85,7 +85,7 @@ export async function GET(
 
   const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");
-  const html = renderAuditReport(template, vm);
+  const html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
 
   return new Response(html, {
     status: 200,
