@@ -1062,7 +1062,7 @@ function setRisksEmptyState(html: string): string {
 function setComplianceEmptyState(html: string): string {
   const innerHtml = `
                 <div style="padding:20px 18px;border:1px dashed var(--line);border-radius:13px;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;line-height:1.6">
-                  <b style="color:var(--ink-2);font-weight:700">No offeror-action clauses flagged.</b><br>The audit engine did not surface a FAR/DFARS trap requiring a clarification step before quoting.
+                  <b style="color:var(--ink-2);font-weight:700">Clause-level detail not available for this solicitation.</b><br>The engine extracted clause references but not the required-action prose needed to render §​04. See §​07 below for the full requirement landscape.
                 </div>
               `;
   return replaceFieldInner(html, "compliance_flags", innerHtml);
