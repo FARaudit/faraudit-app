@@ -243,12 +243,33 @@ function renderRisk(r: Risk, isFirst: boolean): string {
                 </div>`;
 }
 
-function renderClinRow(c: ClinLineItem): string {
-  const flagClass = c.has_flag ? " class=\"has-flag\"" : "";
-  const flagBadge = c.has_flag
-    ? `<div class="cflag"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>${escapeHtml(c.flag_label || "Flag")}</div>`
-    : "";
-  return `<tr${flagClass}><td class="cid">${escapeHtml(c.clin)}</td><td>${escapeHtml(c.description)}${flagBadge}</td><td>${escapeHtml(c.type)}</td><td class="right">${escapeHtml(c.qty)}</td></tr>`;
+// Card-shape CLIN renderer. Pills are emitted only when their field has a real
+// value — empty Type ("—") or empty Qty ("—") fall out so no orphan .cpill ever
+// reaches the DOM (conformance gate asserts on this). PSC + NSN appear only
+// when the engine extracted them; never invented.
+function renderClinCard(c: ClinLineItem): string {
+  const cardClass = c.has_flag ? "clin has-flag" : "clin";
+  const nsnLine = c.nsn ? `<div class="nsn">${escapeHtml(c.nsn)}</div>` : "";
+  const pills: string[] = [];
+  if (c.psc && c.psc !== "—") {
+    pills.push(`<span class="cpill psc"><i>PSC</i> <span class="v">${escapeHtml(c.psc)}</span></span>`);
+  }
+  if (c.type && c.type !== "—") {
+    pills.push(`<span class="cpill"><i>Type</i> <span class="v">${escapeHtml(c.type)}</span></span>`);
+  }
+  if (c.qty && c.qty !== "—") {
+    pills.push(`<span class="cpill"><i>Qty</i> <span class="v">${escapeHtml(c.qty)}</span></span>`);
+  }
+  if (c.has_flag) {
+    pills.push(`<span class="cpill flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>${escapeHtml(c.flag_label || "Flag")}</span>`);
+  }
+  return `<div class="${cardClass}">
+                  <div class="clin-num">${escapeHtml(c.clin)}<span class="sub">CLIN</span></div>
+                  <div class="clin-main">
+                    <div class="clin-desc">${escapeHtml(c.description)}${nsnLine}</div>
+                    <div class="clin-pills">${pills.join("")}</div>
+                  </div>
+                </div>`;
 }
 
 function renderWinTheme(t: string, i: number): string {
@@ -1060,11 +1081,15 @@ function setJumpBadge(html: string, sectionHref: string, count: number): string 
   );
 }
 
-// Replace the CLIN <tbody> with an empty-state row when no line items.
+// Replace the CLIN cards container with an empty-state notice when no line
+// items. Card layout shares the same data-field anchor (<div class="clins">)
+// so we reuse replaceFieldInner which walks balanced div boundaries (a flat
+// tbody regex no longer works — children are <div class="clin"> not <tr>).
 function setClinEmptyState(html: string): string {
-  return html.replace(
-    /(<table class="clin-tbl" data-field="clin_table">[\s\S]*?<tbody>)[\s\S]*?(<\/tbody>)/,
-    `$1\n                  <tr><td colspan="4" style="padding:18px 14px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px">CLIN structure not extracted — upload the full PDF to surface the line items.</td></tr>\n                $2`
+  return replaceFieldInner(
+    html,
+    "clin_table",
+    `\n                <div class="clin-empty" style="padding:18px 16px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px;border:1px dashed var(--line);border-radius:13px">CLIN structure not extracted — upload the full PDF to surface the line items.</div>\n              `
   );
 }
 
@@ -1741,15 +1766,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     /<div class="hier">[\s\S]*?<\/div>(?=\s*<\/div>\s*<\/div>\s*<div class="scope-block">\s*<div class="sb-h">Contract Vehicle)/,
     `<div class="hier">${renderHierarchy(vm.customer_hierarchy)}</div>`
   );
-  // CLIN table — render real rows when present, otherwise drop in an empty-
-  // state row (DESIGN #4: leaving the demo "Platform stand-up / Analytics
-  // licenses" rows on an "IT Help Desk" notice is worse than the empty state).
+  // CLIN cards — render real cards when present, otherwise drop in an empty-
+  // state notice (DESIGN #4: leaving the demo "Platform stand-up / Analytics
+  // licenses" cards on an "IT Help Desk" notice is worse than the empty state).
+  // Was a <table class="clin-tbl">; Jun 8 2026 re-sync flipped to .clin cards.
   if (vm.clin_line_items.length > 0) {
-    const tbody = vm.clin_line_items.map(renderClinRow).join("\n                  ");
-    html = html.replace(
-      /(<table class="clin-tbl" data-field="clin_table">[\s\S]*?<tbody>)[\s\S]*?(<\/tbody>)/,
-      `$1\n                  ${tbody}\n                $2`
-    );
+    const cards = vm.clin_line_items.map(renderClinCard).join("\n                ");
+    html = replaceFieldInner(html, "clin_table", `\n                ${cards}\n              `);
   } else {
     html = setClinEmptyState(html);
   }

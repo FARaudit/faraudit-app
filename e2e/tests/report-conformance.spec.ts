@@ -46,6 +46,8 @@ const BLOCKING_IDS = new Set<string>([
   'E2',  // set-aside single-source: masthead token === §03 token — Phase 3 (F8)
   'E7',  // §06 gate outcome prose matches gate count — Phase 3 (F7)
   'E10', // rail jump-nav inside aside.rail — Phase 3 (removeReadinessCard walker fix)
+  'E14', // §03 CLIN cards, flagged item carries .cpill.flag, no empty .cpill — Jun 8 2026 re-sync
+  'E15', // §05 risk-cap UX — visible cap=10, .risk-more.is-shown, click expands, no orphan labels
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -310,6 +312,110 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E7', pass: e7.ok, detail: e7.detail });
+
+  // E14 — §03 CLIN cards re-sync (Jun 8 2026). Asserts:
+  //   1. the legacy <table class="clin-tbl"> is gone (the wide table that
+  //      forced the Jun-8 min-width:0 scroll fix);
+  //   2. §03 renders .clin cards (count ≥ 1) inside <div class="clins">;
+  //   3. any card carrying .has-flag also carries an inner .cpill.flag (the
+  //      amber pill — the linked-risk flag);
+  //   4. no empty .cpill survives (every pill has visible text from its
+  //      <span class="v"> or its .flag label).
+  // BLOCKING — landed in the Jun 8 re-sync from canonical platform/Audit Report Design.html.
+  const e14 = await page.evaluate(() => {
+    const legacyTable = document.querySelector('table.clin-tbl');
+    if (legacyTable) return { ok: false, detail: 'legacy <table.clin-tbl> still in DOM' };
+    const sec = document.querySelector('#sec-scope') || document.querySelector('[data-field="clin_table"]')?.closest('.sec');
+    if (!sec) return { ok: false, detail: '§03 section anchor NOT FOUND' };
+    const cards = Array.from(sec.querySelectorAll('.clins > .clin'));
+    if (cards.length === 0) {
+      // Empty-state notice is acceptable (engine produced no CLINs); skip the
+      // structural checks but still pass.
+      const empty = sec.querySelector('.clin-empty');
+      if (empty) return { ok: true, detail: 'CLIN empty-state notice (no line items extracted)' };
+      return { ok: false, detail: '.clins container has no .clin cards and no .clin-empty notice' };
+    }
+    // Flagged cards must carry a .cpill.flag inside their pill strip.
+    const flagged = cards.filter((c) => c.classList.contains('has-flag'));
+    const flaggedMissingPill = flagged.filter((c) => !c.querySelector('.cpill.flag'));
+    if (flaggedMissingPill.length > 0) {
+      return { ok: false, detail: `${flaggedMissingPill.length}/${flagged.length} .has-flag cards missing .cpill.flag` };
+    }
+    // No empty .cpill — every pill must surface a value (either a .v span or
+    // visible text content for the flag variant).
+    const allPills = Array.from(sec.querySelectorAll('.clin .cpill')) as HTMLElement[];
+    const empties = allPills.filter((p) => {
+      const t = (p.textContent || '').replace(/\s+/g, ' ').trim();
+      return t.length === 0;
+    });
+    if (empties.length > 0) {
+      return { ok: false, detail: `${empties.length}/${allPills.length} empty .cpill found` };
+    }
+    return {
+      ok: true,
+      detail: `${cards.length} card(s) · ${flagged.length} flagged (.cpill.flag ok) · ${allPills.length} pills (no empties)`,
+    };
+  });
+  results.push({ id: 'E14', pass: e14.ok, detail: e14.detail });
+
+  // E15 — §05 risk-register cap (Jun 8 2026 re-sync). Asserts:
+  //   1. when total .risk count > 10, exactly 10 are visible and the rest
+  //      carry .is-hidden;
+  //   2. .risk-more is the immediate next sibling of .risks AND carries
+  //      .is-shown with label text matching /^\d+ more flags?$/;
+  //   3. clicking the toggle reveals every collapsed .risk (visible count =
+  //      total .risk count) AND re-reveals any .risk-group-label.is-hidden;
+  //   4. dormant on ≤10-risk audits — assertion passes without click attempt.
+  // BLOCKING — the cap IIFE itself is canonical-byte-identical; the gate
+  // ensures the IIFE actually wires up on the rendered DOM (catches a missing
+  // button sibling, a stale renderer that strips data-risk-more, etc).
+  const e15 = await page.evaluate(async () => {
+    const list = document.querySelector('.risks');
+    if (!list) return { ok: false, detail: '.risks NOT FOUND' };
+    const all = Array.from(list.querySelectorAll('.risk'));
+    if (all.length <= 10) {
+      // Dormant — confirm the toggle did NOT light up (would mean spurious cap).
+      const btn = list.nextElementSibling as HTMLElement | null;
+      const lit = !!(btn && btn.classList.contains('risk-more') && btn.classList.contains('is-shown'));
+      if (lit) return { ok: false, detail: `${all.length} risks but .risk-more.is-shown is lit (spurious cap)` };
+      return { ok: true, detail: `${all.length} risks (≤10) · cap dormant ✓` };
+    }
+    const visible = all.filter((r) => !r.classList.contains('is-hidden'));
+    if (visible.length !== 10) {
+      return { ok: false, detail: `expected 10 visible .risk, got ${visible.length} (total ${all.length})` };
+    }
+    const btn = list.nextElementSibling as HTMLButtonElement | null;
+    if (!btn || !btn.classList.contains('risk-more')) {
+      return { ok: false, detail: '.risk-more is not the immediate next sibling of .risks' };
+    }
+    if (!btn.classList.contains('is-shown')) {
+      return { ok: false, detail: '.risk-more present but missing .is-shown' };
+    }
+    const lblEl = btn.querySelector('[data-risk-more-label]') as HTMLElement | null;
+    const lbl = (lblEl?.textContent || '').trim();
+    if (!/^\d+ more flags?$/.test(lbl)) {
+      return { ok: false, detail: `.risk-more label "${lbl}" doesn't match /^N more flag(s)?$/` };
+    }
+    // Click → expand
+    btn.click();
+    await new Promise((r) => setTimeout(r, 50));
+    const visibleAfter = all.filter((r) => {
+      const cs = getComputedStyle(r);
+      return cs.display !== 'none';
+    });
+    if (visibleAfter.length !== all.length) {
+      return { ok: false, detail: `after click: ${visibleAfter.length}/${all.length} visible (expected all)` };
+    }
+    const orphanLabels = list.querySelectorAll('.risk-group-label.is-hidden').length;
+    if (orphanLabels > 0) {
+      return { ok: false, detail: `after click: ${orphanLabels} .risk-group-label.is-hidden remain (should re-reveal)` };
+    }
+    return {
+      ok: true,
+      detail: `total=${all.length} · pre-click visible=10 · label="${lbl}" · post-click visible=${visibleAfter.length} · orphan labels=0`,
+    };
+  });
+  results.push({ id: 'E15', pass: e15.ok, detail: e15.detail });
 
   return results;
 }

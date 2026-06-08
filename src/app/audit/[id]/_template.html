@@ -392,16 +392,28 @@ button{font-family:inherit}
 .hier-node.leaf .hdot{background:var(--accent);box-shadow:0 0 0 3px rgba(55,138,221,.16)}
 .hier-node.leaf .htxt{font-weight:700;color:var(--ink)}
 .hier-line{width:2px;background:var(--line);height:8px;margin-left:calc(var(--ind,0) + 3.5px)}
-/* CLIN table */
-.clin-tbl{width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.clin-tbl thead th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);background:var(--card-soft);padding:10px 14px;border-bottom:1px solid var(--line)}
-.clin-tbl thead th.right{text-align:right}
-.clin-tbl td{padding:11px 14px;border-top:1px solid var(--line-2);vertical-align:top;color:var(--ink-2)}
-.clin-tbl td.cid{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);white-space:nowrap}
-.clin-tbl td.right{text-align:right;font-family:"IBM Plex Mono",monospace}
-.clin-tbl tr.has-flag td{background:rgba(217,119,6,.05)}
-.clin-tbl .cflag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--amber-700);background:rgba(217,119,6,.1);border:1px solid var(--amber-200);border-radius:5px;padding:2px 6px;margin-top:5px}
-[data-theme="dark"] .clin-tbl .cflag{color:#fcd34d;background:rgba(217,119,6,.16);border-color:transparent}
+/* CLIN cards — breaks the ALL-CAPS table wall into scannable item / desc / metadata pills.
+   (Replaces the former .clin-tbl; the table inflated the 1fr grid column → the Jun 8 scroll fix.) */
+.clins{display:flex;flex-direction:column;gap:10px}
+.clin{display:grid;grid-template-columns:62px 1fr;gap:16px;padding:14px 16px;border:1px solid var(--line);border-radius:13px;background:var(--card);transition:border-color .14s,box-shadow .14s;min-width:0}
+.clin:hover{border-color:var(--mute-2);box-shadow:var(--shadow-sm)}
+.clin.has-flag{background:rgba(217,119,6,.04)}
+[data-theme="dark"] .clin.has-flag{background:rgba(217,119,6,.07)}
+.clin-num{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--accent-deep);letter-spacing:.02em;padding-top:1px}
+[data-theme="dark"] .clin-num{color:var(--accent-light)}
+.clin-num .sub{display:block;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2);margin-top:3px}
+.clin-main{min-width:0}
+.clin-desc{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
+.clin-desc .nsn{display:block;margin-top:4px;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
+.clin-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.cpill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:6px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.cpill i{font-style:normal;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:8.5px;color:var(--mute-2)}
+.cpill .v{color:var(--ink)}
+.cpill.psc{background:rgba(55,138,221,.08);border-color:var(--accent-light);color:var(--accent-deep)}
+[data-theme="dark"] .cpill.psc{background:rgba(55,138,221,.16);border-color:rgba(181,212,244,.28);color:var(--accent-light)}
+.cpill.flag{background:rgba(217,119,6,.1);border-color:var(--amber-200);color:var(--amber-700)}
+[data-theme="dark"] .cpill.flag{background:rgba(217,119,6,.16);border-color:transparent;color:#fcd34d}
+.cpill.flag svg{width:11px;height:11px}
 
 /* ── Section 04 — Compliance flags ── */
 .flags{display:flex;flex-direction:column;gap:12px}
@@ -474,6 +486,17 @@ button{font-family:inherit}
 .risk-action .ra-txt{font-size:13px;line-height:1.55;color:var(--ink);font-weight:500}
 .risk-action .ra-txt b{color:var(--ink);font-weight:700;display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:4px}
 [data-theme="dark"] .risk-action .ra-txt b{color:var(--accent-light)}
+/* risk-register cap — high-count audits (e.g. 19 risks) show 10, collapse the rest behind a "N more"
+   toggle. Applied at runtime by the risk-cap IIFE (pure UX, not a derivation); demo (6 risks) is unchanged. */
+.risk.is-hidden{display:none}
+.risks.is-expanded .risk.is-hidden{display:block}
+.risk-group-label.is-hidden{display:none}
+.risk-more{margin-top:12px;width:100%;display:none;align-items:center;justify-content:center;gap:8px;padding:11px;border:1px dashed var(--line);border-radius:12px;background:none;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;cursor:pointer;transition:border-color .15s,color .15s}
+.risk-more.is-shown{display:flex}
+.risk-more:hover{border-color:var(--accent-deep);color:var(--accent-deep)}
+[data-theme="dark"] .risk-more:hover{color:var(--accent-light)}
+.risk-more svg{width:13px;height:13px;transition:transform .2s}
+.risks.is-expanded + .risk-more svg{transform:rotate(180deg)}
 
 /* ── Section 06 — Recommendation ── */
 /* decision-gate card — when verdict_mode = gate, the recommendation IS the gate (not win themes) */
@@ -632,16 +655,21 @@ button{font-family:inherit}
   #sec-classify,#sec-incumbent,#sec-ko,.matrix-artifact,.ws-reveal,.award-basis,.gate-card{break-inside:avoid}
   /* 4 · every card / row is atomic — never split down the middle */
   .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,
-  .es-act,.tl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin-tbl tr,.cmatrix tr,.ko-card,.cmatrix{break-inside:avoid}
+  .es-act,.tl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin,.cmatrix tr,.ko-card,.cmatrix{break-inside:avoid}
   /* 5 · sub-headers / group labels glue to the first row beneath them */
   .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick{break-after:avoid}
   /* 6 · long tables repeat their header row on each page they span */
-  .clin-tbl thead,.cmatrix thead{display:table-header-group}
+  .cmatrix thead{display:table-header-group}
   /* 7 · typographic widow/orphan control */
   p,li,.ws-meaning,.risk-detail{orphans:3;widows:3}
 
   /* collapsibles must be fully expanded on paper */
   .risk-body{max-height:none!important;overflow:visible!important}
+  /* risk-register cap is a screen-only UX cap — print/PDF shows every risk,
+     re-reveals any orphaned group label, and hides the "N more flags" toggle. */
+  .risk-more{display:none!important}
+  .risks .risk.is-hidden{display:block!important}
+  .risk-group-label.is-hidden{display:flex!important}
 
   /* checklist prints as blank boxes regardless of on-screen checked state */
   .ck-item input:checked + .ck-box{background:transparent!important;border-color:#94a3b8!important}
@@ -1497,15 +1525,36 @@ button{font-family:inherit}
                 </div>
               </div>
 
-              <table class="clin-tbl" data-field="clin_table">
-                <thead><tr><th>CLIN</th><th>Description</th><th>Type</th><th class="right">Qty / Ceiling</th></tr></thead>
-                <tbody>
-                  <tr><td class="cid">0001</td><td>Platform stand-up &amp; data integration</td><td>FFP</td><td class="right">1 LO</td></tr>
-                  <tr class="has-flag"><td class="cid">0002</td><td>Analytics licenses &amp; model delivery<div class="cflag"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>Data-rights table missing</div></td><td>FFP</td><td class="right">60 mo</td></tr>
-                  <tr><td class="cid">0003</td><td>Surge analyst support</td><td>LH</td><td class="right">12,000 hrs</td></tr>
-                  <tr><td class="cid">0004</td><td>Training &amp; knowledge transfer</td><td>LH</td><td class="right">1,500 hrs</td></tr>
-                </tbody>
-              </table>
+              <div class="clins" data-field="clin_table">
+                <div class="clin">
+                  <div class="clin-num">0001<span class="sub">CLIN</span></div>
+                  <div class="clin-main">
+                    <div class="clin-desc">Platform stand-up &amp; data integration</div>
+                    <div class="clin-pills"><span class="cpill"><i>Type</i> <span class="v">FFP</span></span><span class="cpill"><i>Qty</i> <span class="v">1 LO</span></span></div>
+                  </div>
+                </div>
+                <div class="clin has-flag">
+                  <div class="clin-num">0002<span class="sub">CLIN</span></div>
+                  <div class="clin-main">
+                    <div class="clin-desc">Analytics licenses &amp; model delivery</div>
+                    <div class="clin-pills"><span class="cpill"><i>Type</i> <span class="v">FFP</span></span><span class="cpill"><i>Qty</i> <span class="v">60 mo</span></span><span class="cpill flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>Data-rights table missing</span></div>
+                  </div>
+                </div>
+                <div class="clin">
+                  <div class="clin-num">0003<span class="sub">CLIN</span></div>
+                  <div class="clin-main">
+                    <div class="clin-desc">Surge analyst support</div>
+                    <div class="clin-pills"><span class="cpill"><i>Type</i> <span class="v">LH</span></span><span class="cpill"><i>Qty</i> <span class="v">12,000 hrs</span></span></div>
+                  </div>
+                </div>
+                <div class="clin">
+                  <div class="clin-num">0004<span class="sub">CLIN</span></div>
+                  <div class="clin-main">
+                    <div class="clin-desc">Training &amp; knowledge transfer</div>
+                    <div class="clin-pills"><span class="cpill"><i>Type</i> <span class="v">LH</span></span><span class="cpill"><i>Qty</i> <span class="v">1,500 hrs</span></span></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1701,6 +1750,7 @@ button{font-family:inherit}
                   </div></div>
                 </div>
               </div>
+              <button class="risk-more" data-risk-more type="button" aria-expanded="false"><span data-risk-more-label>more flags</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
               <!-- metadata-only locked -->
               <div class="locked" data-state="locked" style="display:none">
                 <div class="locked-ghost"><div class="lg-row"></div><div class="lg-row"></div><div class="lg-row"></div></div>
@@ -2243,6 +2293,52 @@ document.querySelectorAll('.risk-head').forEach(function(h){
   h.addEventListener('click', function(){ h.parentElement.classList.toggle('open'); });
 });
 
+/* ───── risk-register cap (pure UX, like the checklist resolver) ─────
+   High-count audits (e.g. SPRRA = 19 risks) show the first N, collapse the rest behind a
+   "N more flags" toggle. Computed at runtime off the rendered DOM — Code just renders all the
+   risks. Group labels with no visible risk beneath them are hidden so no orphaned divider shows. */
+(function(){
+  var LIMIT=10;
+  document.querySelectorAll('.risks').forEach(function(list){
+    var risks=[].slice.call(list.querySelectorAll('.risk'));
+    if(risks.length<=LIMIT) return;
+    var hidden=0;
+    risks.forEach(function(r,i){ if(i>=LIMIT){ r.classList.add('is-hidden'); hidden++; } });
+    if(!hidden) return;
+    /* hide any group label that now has no visible .risk before the next label / end */
+    list.querySelectorAll('.risk-group-label').forEach(function(lbl){
+      var n=lbl.nextElementSibling, anyVisible=false;
+      while(n && !n.classList.contains('risk-group-label')){
+        if(n.classList.contains('risk') && !n.classList.contains('is-hidden')){ anyVisible=true; break; }
+        n=n.nextElementSibling;
+      }
+      if(!anyVisible) lbl.classList.add('is-hidden');
+    });
+    var btn=list.nextElementSibling;
+    if(!btn || !btn.classList.contains('risk-more')) return;
+    var lblEl=btn.querySelector('[data-risk-more-label]');
+    function label(){ return hidden+' more flag'+(hidden===1?'':'s'); }
+    lblEl.textContent=label();
+    btn.classList.add('is-shown');
+    btn.addEventListener('click', function(){
+      var open=list.classList.toggle('is-expanded');
+      btn.setAttribute('aria-expanded', open?'true':'false');
+      lblEl.textContent=open?'Show fewer':label();
+      if(open) list.querySelectorAll('.risk-group-label.is-hidden').forEach(function(l){ l.classList.remove('is-hidden'); });
+      else { /* re-hide orphaned labels on collapse */
+        list.querySelectorAll('.risk-group-label').forEach(function(lbl){
+          var n=lbl.nextElementSibling, anyVisible=false;
+          while(n && !n.classList.contains('risk-group-label')){
+            if(n.classList.contains('risk') && !n.classList.contains('is-hidden')){ anyVisible=true; break; }
+            n=n.nextElementSibling;
+          }
+          if(!anyVisible) lbl.classList.add('is-hidden');
+        });
+      }
+    });
+  });
+})();
+
 /* ───── KO drawer ───── */
 (function(){
   var scrim=document.getElementById('scrim'), drawer=document.getElementById('koDrawer');
@@ -2375,7 +2471,7 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
        data-field="primary_objective"            → clin.primary_objective
        data-field="period_of_performance"        → clin.period_of_performance
        data-field="customer_office"              → clin.customer_hierarchy[last]  (leaf node of §03 tree)
-       data-field="clin_table"                   → clin.line_items[]  (repeat <tr>; add .has-flag + .cflag when item has a linked risk)
+       data-field="clin_table"                   → clin.line_items[]  (repeat .clin card; add .has-flag on the card + a .cpill.flag when item has a linked risk; .cpill per metadata field — PSC/Type/Qty)
        data-field="compliance_flags"             → compliance_flags[]  {clause,title,severity:P0|P1|P2,description,required_action}
        data-field="risks"                        → risks[]  {title,severity:high|med|low,citation,description,faraudit_action}
        data-field="headline_risk"                → risks[0] OR highest-severity risk (drives the analyst-flag band)

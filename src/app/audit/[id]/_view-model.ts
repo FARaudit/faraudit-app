@@ -74,6 +74,8 @@ export interface ClinLineItem {
   qty: string;
   has_flag: boolean;
   flag_label?: string;
+  nsn?: string;
+  psc?: string;
 }
 
 export interface HierarchyNode {
@@ -798,6 +800,22 @@ interface RawClin {
   pricing_arrangement?: string;
   fob?: string;
   status?: string;
+  nsn?: string;
+  part_number?: string;
+  psc?: string;
+}
+
+// Format an ISO date (YYYY-MM-DD) into the same "DD MMM YYYY" shape the rest
+// of the report uses (audit-engine.ts:1128/2627/2937). Pass-through anything
+// that isn't a clean ISO date — qty cells often legitimately read "60 mo" or
+// "12,000 hrs" which should not be touched.
+function formatQtyValue(raw: string): string {
+  const trimmed = raw.trim();
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+  if (!iso) return raw;
+  const d = new Date(trimmed + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineItem[] {
@@ -809,15 +827,22 @@ function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineIte
     const status = String(c.status ?? "").toLowerCase();
     const hasFlag = status === "conflict" || status === "ambiguous" || !!linkedRisk;
     const qtyParts: string[] = [];
-    if (c.quantity != null && c.quantity !== "") qtyParts.push(String(c.quantity));
+    if (c.quantity != null && c.quantity !== "") qtyParts.push(formatQtyValue(String(c.quantity)));
     if (c.unit) qtyParts.push(String(c.unit));
+    // NSN preferred; fall back to part_number when only that exists. Brief: emit
+    // only when present, never invent.
+    const nsnRaw = c.nsn ?? c.part_number;
+    const nsn = nsnRaw != null && String(nsnRaw).trim() ? String(nsnRaw).trim() : undefined;
+    const psc = c.psc != null && String(c.psc).trim() ? String(c.psc).trim() : undefined;
     return {
       clin: String(c.clin ?? "—"),
       description: desc,
       type: String(c.pricing_arrangement ?? "—"),
       qty: qtyParts.join(" ") || "—",
       has_flag: hasFlag,
-      flag_label: hasFlag ? (linkedRisk ? linkedRisk.title.slice(0, 64) : status === "conflict" ? "Conflict flagged" : "Ambiguity flagged") : undefined
+      flag_label: hasFlag ? (linkedRisk ? linkedRisk.title.slice(0, 64) : status === "conflict" ? "Conflict flagged" : "Ambiguity flagged") : undefined,
+      nsn,
+      psc
     };
   });
 }
