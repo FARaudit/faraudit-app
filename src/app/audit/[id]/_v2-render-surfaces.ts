@@ -16,6 +16,8 @@ import type {
   WorkStatementUnknown,
   MatrixRollupReshaped,
   ChecklistBucketGroup,
+  ClauseMatrixRow,
+  MatrixBadge,
 } from "./_normalizers";
 import type { AuditL02Catch, AuditConfidenceNote } from "../../../lib/audit-judgment";
 import type {
@@ -66,12 +68,40 @@ export function buildV2ViewModelFromShadow(
   return {
     work_statement: (surfaces.work_statement as WorkStatementKnown | null) ?? null,
     work_statement_unknown: (surfaces.work_statement_unknown as WorkStatementUnknown | null) ?? null,
-    matrix_rollup:
-      (surfaces.matrix_rollup as MatrixRollupReshaped | undefined) ?? {
-        required: [],
-        reference: [],
-        reference_count: 0,
-      },
+    matrix_rollup: ((): MatrixRollupReshaped => {
+      // FA-103 fix: fall back to V1 clause lists when V2 extraction returned empty
+      const v2m = surfaces.matrix_rollup as MatrixRollupReshaped | undefined;
+      if (v2m && (v2m.required.length > 0 || v2m.reference.length > 0)) return v2m;
+      const dfars: string[] = Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as string[]) : [];
+      const far: string[] = Array.isArray(comp.far_clauses) ? (comp.far_clauses as string[]) : [];
+      const flags = Array.isArray(comp.dfars_flags) ? (comp.dfars_flags as Array<{clause_number?:string;title?:string;severity?:string;description?:string}>) : [];
+      if (dfars.length === 0 && far.length === 0 && flags.length === 0) {
+        return { required: [], reference: [], reference_count: 0 };
+      }
+      const required: ClauseMatrixRow[] = flags.map((f) => {
+        const isTrap = f.severity === "HIGH" || f.severity === "CRITICAL";
+        return {
+          number: f.clause_number ?? "",
+          title: f.title ?? "",
+          badge: (isTrap ? "trap" : "required") as MatrixBadge,
+          trapReason: isTrap ? (f.description ?? f.title ?? null) : null,
+        };
+      });
+      const flagNums = new Set(flags.map((f) => f.clause_number ?? ""));
+      dfars.forEach((c) => {
+        const num = typeof c === "string" ? c : ((c as { number?: string }).number ?? "");
+        if (num && !flagNums.has(num)) {
+          required.push({ number: num, title: "", badge: "required" as MatrixBadge, trapReason: null });
+        }
+      });
+      const reference: ClauseMatrixRow[] = far.map((c) => ({
+        number: typeof c === "string" ? c : ((c as { number?: string }).number ?? ""),
+        title: typeof c === "string" ? "" : ((c as { title?: string }).title ?? ""),
+        badge: "reference" as MatrixBadge,
+        trapReason: null,
+      }));
+      return { required, reference, reference_count: reference.length };
+    })(),
     submission_checklist_filtered: Array.isArray(surfaces.submission_checklist_filtered)
       ? (surfaces.submission_checklist_filtered as ChecklistBucketGroup[])
       : [],
