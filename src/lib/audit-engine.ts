@@ -339,10 +339,15 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "5352.242-9000", title: "Air Force Base Access", severity: "P1" },
   { clause: "252.225-7001", title: "Buy American / Balance of Payments", severity: "P1" },
   { clause: "252.215-7010", title: "Certified Cost or Pricing Data", severity: "P1" },
-  { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" }
+  { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" },
+  // FA-104: extended trap recognition — SPRS + JCP gain doc-text fallback detection in parseDFARSTraps
+  { clause: "252.204-7020", title: "SPRS — NIST SP 800-171 Assessment", severity: "P0" },
+  { clause: "252.227-7025", title: "JCP — Limited Rights Data Restrictions", severity: "P0" },
+  { clause: "252.225-7009", title: "Specialty Metals Restrictions", severity: "P1" },
+  { clause: "252.211-7003", title: "IUID — Unique Item Identification", severity: "P1" }
 ];
 
-export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: RisksJSON): DFARSFlag[] {
+export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: RisksJSON, docText?: string): DFARSFlag[] {
   const clauses = complianceJson.dfars_clauses ?? [];
   // W4 — index DFARS_Trap risk_findings by clause number so detected traps
   // inherit description + required_action prose. §04 then renders real flag
@@ -355,7 +360,13 @@ export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: Risk
     if (clauseRef) findingByClause.set(clauseRef, f);
   }
   return DFARS_TRAPS.map((trap) => {
-    const detected = clauses.some((c) => typeof c === "string" && c.includes(trap.clause));
+    let detected = clauses.some((c) => typeof c === "string" && c.includes(trap.clause));
+    // FA-104: doc-text fallback for SPRS / JCP when Claude extraction missed the clause number in dfars_clauses.
+    // Reuses existing SPRS_TEXT_RE + JCP_RE patterns (defined later in this file) — zero new LLM calls.
+    if (!detected && docText) {
+      if (trap.clause === "252.204-7020" && SPRS_TEXT_RE.test(docText)) detected = true;
+      else if (trap.clause === "252.227-7025" && JCP_RE.test(docText)) detected = true;
+    }
     const finding = detected ? findingByClause.get(trap.clause) : undefined;
     return {
       clause: trap.clause,
@@ -1863,7 +1874,7 @@ You are a compliance officer reading every page of this solicitation. Extract FA
 Output ONLY a JSON object with these keys — facts only, no severities or risk levels:
 
 - far_clauses (string[]): EVERY FAR clause cited (format: "52.212-1", "52.212-4", etc.). Scan ALL sections. Empty array ONLY if you have read every page and confirmed none are cited. Do not omit common clauses (52.212-1, 52.212-4, 52.232-33 are essentially universal — list when present).
-- dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.).
+- dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.). Common trap clauses to look for explicitly: 252.204-7020 (SPRS / NIST SP 800-171 Assessment), 252.227-7025 (JCP / limited rights data), 252.225-7009 (specialty metals), 252.211-7003 (IUID), 252.225-7060 (Xinjiang), 252.204-7021 (CMMC) — list ANY that appear in the document.
 - required_certifications (string[]): EVERY certification / registration / compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
 - key_compliance_actions (string[]): verbatim required-action language for items a small business must complete to bid (e.g. "Submit past performance for similar contract value within last 3 years", "Complete representations 52.204-24 + 52.204-26").
 - set_aside_text (string or null): VERBATIM citation if the document explicitly states a set-aside — quote the literal sentence or clause reference (e.g. "100% small business set-aside" / "FAR 52.219-6 notice present" / "Block 10 box X checked"). null if no document text triggers a set-aside. (TS derives the enum value via regex on the full solText; this raw signal preserves the document's literal wording.)
@@ -1968,7 +1979,7 @@ JSON only — one key: risk_findings.`;
   }
 
   // Engine post-processing
-  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson);
+  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson, solText);
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
