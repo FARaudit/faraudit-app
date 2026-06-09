@@ -30,6 +30,12 @@ export interface Risk {
   // customers can tell a clause-grounded finding from a pattern guess.
   // Default for legacy audit rows that pre-date the engine flag: "inferred".
   provenance: "verified" | "inferred";
+  // Engine-emitted category (RiskFinding.category vocabulary: "Disqualification",
+  // "DFARS_Trap", "Technical", "Schedule", "Price", "Evaluation", "Compliance",
+  // plus lowercase variants from custom detectors — "pricing", "market-structure",
+  // "compliance", "Manual review"). Optional because legacy bucket-fallback path
+  // can't always supply one; W3-L02 filter uses it for non-clarifiable exclusion.
+  category?: string;
 }
 
 export interface ScoreFactor {
@@ -768,7 +774,10 @@ function mapRisks(risksJson: Record<string, unknown>): Risk[] {
           // boilerplate; passing empty string here lets the renderer drop the
           // .risk-action chip entirely rather than show filler.
           faraudit_action: sanitizeDisplayText(String(r.faraudit_action ?? r.recommended_action ?? "").trim()),
-          provenance
+          provenance,
+          // W3-L02 — propagate engine-emitted category so the KO email filter
+          // can exclude non-clarifiable risks (pricing, market-structure, etc.).
+          category: typeof r.category === "string" ? r.category : undefined,
         };
       });
   }
