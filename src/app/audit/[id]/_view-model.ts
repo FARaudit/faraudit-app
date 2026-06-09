@@ -1634,6 +1634,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   // strip skips l02_catches / confidence_notes when V2 overlay will populate.
   const v2Shadow = (compJsonEarly.v2_shadow as Record<string, unknown> | null) ?? null;
   const v2SurfacesObj = (v2Shadow?.surfaces as Record<string, unknown> | undefined) ?? {};
+  // FA-110/111: surface V2 metadata_brief for masthead consumption (set_aside/agency/naics)
+  const v2Meta = (v2SurfacesObj.metadata_brief as Record<string, unknown> | null) ?? null;
   const v2SurfaceLengths = {
     l02_catches: Array.isArray(v2SurfacesObj.l02_catches) ? (v2SurfacesObj.l02_catches as unknown[]).length : 0,
     confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes) ? (v2SurfacesObj.confidence_notes as unknown[]).length : 0,
@@ -1902,16 +1904,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     page_title: `FARaudit — Audit Report · ${displayId}`,
 
     title,
-    agency: (audit.agency as string) || "—",
+    agency: (v2Meta?.agency as string | undefined) || (audit.agency as string) || "—",
     agency_sub: "",
-    naics: (audit.naics_code as string) || "—",
+    naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
     // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
     // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
     // column. Doc text overrides metadata — masthead must show what the
     // solicitation actually says.
     set_aside: normalizeSetAside(
-      (compJson.set_aside_type as string | undefined) ?? (audit.set_aside as string | undefined)
+      (v2Meta?.set_aside as string | undefined)
+        ?? (compJson.set_aside_type as string | undefined)
+        ?? (audit.set_aside as string | undefined)
     ),
     set_aside_sub: "",
     contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
