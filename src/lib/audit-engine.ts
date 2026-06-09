@@ -2501,6 +2501,17 @@ export interface MetadataBrief {
     formatted: string;
     days_remaining: number | null;
   };
+  // FA-110/111 additions — flat masthead fields sourced from facts.*
+  set_aside: string | null;
+  agency: string | null;
+  naics_code: string | null;
+  solicitor_number: string | null;
+  timeline_gates: {
+    offer_due: string | null;
+    qa_cutoff: string | null;
+    site_visit: string | null;
+    award_date: string | null;
+  } | null;
 }
 
 export interface MetadataOnlyInput {
@@ -2753,6 +2764,17 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     missing_intel: missingIntel,
     co_contact: coContact,
     deadline,
+    // FA-110/111: flat masthead fields populated from metadata-only inputs
+    set_aside: input.typeOfSetAside ?? null,
+    agency: null,
+    naics_code: input.naicsCode ?? null,
+    solicitor_number: input.noticeId ?? null,
+    timeline_gates: {
+      offer_due: deadline.iso,
+      qa_cutoff: null,
+      site_visit: null,
+      award_date: null,
+    },
   };
 
   const bidStrategy =
@@ -3105,6 +3127,32 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
     warnings,
     submission_preflight,
     recompete_signal,
+    // FA-110/111: emit metadata_brief on full V2 path from facts.* in scope
+    metadata_brief: {
+      eligibility: {
+        set_aside_type: facts.setAside ?? null,
+        naics: facts.naicsCode ?? null,
+        notes: "",
+      },
+      synopsis_summary: "",
+      missing_intel: [],
+      co_contact: { name: null, email: null },
+      deadline: {
+        iso: facts.offerDueDate ?? null,
+        formatted: facts.offerDueDate ?? "",
+        days_remaining: null,
+      },
+      set_aside: facts.setAside ?? null,
+      agency: facts.issuingOffice ?? null,
+      naics_code: facts.naicsCode ?? null,
+      solicitor_number: facts.solicitorNumber ?? null,
+      timeline_gates: {
+        offer_due: facts.offerDueDate ?? null,
+        qa_cutoff: null,
+        site_visit: null,
+        award_date: null,
+      },
+    } satisfies MetadataBrief,
     price_anchor,
   };
 }
