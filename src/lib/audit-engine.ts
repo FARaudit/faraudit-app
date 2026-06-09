@@ -152,6 +152,10 @@ export interface DFARSFlag {
   title: string;
   detected: boolean;
   severity: "P0" | "P1" | "P2";
+  // W4 — prose joined from risk_findings by clause number.
+  // Optional for back-compat with pre-W4 audit rows stored in Supabase.
+  description?: string;
+  required_action?: string;
 }
 
 export interface PrioritizedRisk {
@@ -338,14 +342,30 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" }
 ];
 
-export function parseDFARSTraps(complianceJson: ComplianceJSON): DFARSFlag[] {
+export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: RisksJSON): DFARSFlag[] {
   const clauses = complianceJson.dfars_clauses ?? [];
-  return DFARS_TRAPS.map((trap) => ({
-    clause: trap.clause,
-    title: trap.title,
-    detected: clauses.some((c) => typeof c === "string" && c.includes(trap.clause)),
-    severity: trap.severity
-  }));
+  // W4 — index DFARS_Trap risk_findings by clause number so detected traps
+  // inherit description + required_action prose. §04 then renders real flag
+  // rows instead of firing the W2b soften empty-state. Zero new LLM calls —
+  // reuses existing engine output from the risks pass.
+  const dfarsFindings = (risksJson?.risk_findings ?? []).filter((f) => f?.category === "DFARS_Trap");
+  const findingByClause = new Map<string, RiskFinding>();
+  for (const f of dfarsFindings) {
+    const clauseRef = (f.citation || "").match(/(?:252|5352).d+(?:-d+)?/)?.[0];
+    if (clauseRef) findingByClause.set(clauseRef, f);
+  }
+  return DFARS_TRAPS.map((trap) => {
+    const detected = clauses.some((c) => typeof c === "string" && c.includes(trap.clause));
+    const finding = detected ? findingByClause.get(trap.clause) : undefined;
+    return {
+      clause: trap.clause,
+      title: trap.title,
+      detected,
+      severity: trap.severity,
+      description: finding?.text ?? "",
+      required_action: finding?.faraudit_action ?? "",
+    };
+  });
 }
 
 function extractCitation(text: string): string | undefined {
@@ -1948,7 +1968,7 @@ JSON only — one key: risk_findings.`;
   }
 
   // Engine post-processing
-  complianceJson.dfars_flags = parseDFARSTraps(complianceJson);
+  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson);
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
