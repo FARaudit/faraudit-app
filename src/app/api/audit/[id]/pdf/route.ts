@@ -86,8 +86,19 @@ export async function GET(
   }
   if (!audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
 
+  // FA-108: capability_statement presence — same signal the page route uses
+  // so the PDF Fit Score lock-state matches the on-screen render. Default true
+  // (unlocked); flipped to false only on explicit "no row" result.
+  let hasCapabilityStatement = true;
+  const { data: capRow, error: capErr } = await supabase
+    .from("capability_statements")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!capErr) hasCapabilityStatement = !!capRow;
+
   // Build the same view model + render the same HTML the web route serves.
-  const vm = buildViewModel(audit);
+  const vm = buildViewModel(audit, { hasCapabilityStatement });
   const templatePath = path.join(
     process.cwd(),
     "src",

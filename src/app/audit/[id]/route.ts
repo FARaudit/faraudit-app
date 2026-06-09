@@ -81,7 +81,19 @@ export async function GET(
     isWatching = !!watchRow;
   }
 
-  const vm = buildViewModel(audit, { isWatching });
+  // FA-108: capability_statement presence — soft-locks the Fit Score when
+  // the user has no statement on file. Default true (unlocked) — only flipped
+  // to false on explicit "no row" result so transient query errors leave the
+  // score visible rather than locking everyone out.
+  let hasCapabilityStatement = true;
+  const { data: capRow, error: capErr } = await supabase
+    .from("capability_statements")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!capErr) hasCapabilityStatement = !!capRow;
+
+  const vm = buildViewModel(audit, { isWatching, hasCapabilityStatement });
 
   const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");
