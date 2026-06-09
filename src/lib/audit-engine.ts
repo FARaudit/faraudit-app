@@ -351,7 +351,7 @@ export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: Risk
   const dfarsFindings = (risksJson?.risk_findings ?? []).filter((f) => f?.category === "DFARS_Trap");
   const findingByClause = new Map<string, RiskFinding>();
   for (const f of dfarsFindings) {
-    const clauseRef = (f.citation || "").match(/(?:252|5352).d+(?:-d+)?/)?.[0];
+    const clauseRef = (f.citation || "").match(/\b(?:252|5352)\.\d+(?:-\d+)?\b/)?.[0];
     if (clauseRef) findingByClause.set(clauseRef, f);
   }
   return DFARS_TRAPS.map((trap) => {
