@@ -1826,8 +1826,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     : [];
   const submissionSummary = (compJson.submission_summary ?? null) as string | null;
 
-  // KO email
-  const koTo = (audit.ko_email_recipient as string) || "contracting-officer@agency.mil";
+  // KO email — FA-102: single derivation. Path B retired; deriveKoEmailCard's
+  // §05 (Section L) extraction is canonical for ko_email.to on every surface.
+  const koCard = deriveKoEmailCard(audit, displayId, risks, compJson);
+  const koTo = koCard.to;
   const koBody = deriveKoBody(audit, headlineRisk, displayId);
 
   // Win probability — null when basis is 0 or value is missing.
@@ -1977,7 +1979,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     compliance_matrix: deriveComplianceMatrix(compJson, risks),
     matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
 
-    ko_email: deriveKoEmailCard(audit, displayId, risks, compJson),
+    ko_email: koCard,
 
     submission_checklist_filtered: deriveSubmissionChecklistFiltered(compJson),
     ...deriveWorkStatementReveal(audit),
