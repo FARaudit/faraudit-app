@@ -619,6 +619,31 @@ function insertNotSolicitationBanner(html: string): string {
   );
 }
 
+// FA-107: SOLICITATION CLOSED banner — injected above the recommendation card
+// when vm.is_expired (response_deadline has passed). Red theme mirrors the
+// amber not-solicitation banner pattern. The KO email card is suppressed
+// separately at the renderKoEmailCard call site.
+function insertExpiredBanner(html: string, responseDeadlineShort: string): string {
+  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--red-50),var(--card) 64%);border:1px solid var(--red-200);border-left:4px solid var(--red-700);border-radius:16px;box-shadow:var(--shadow);margin:18px 0";
+  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--red-700);color:#fff;display:grid;place-items:center";
+  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red-700);margin:0 0 6px";
+  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  const deadlinePhrase = responseDeadlineShort ? `Offer deadline ${escapeHtml(responseDeadlineShort)} has passed.` : "Offer deadline has passed.";
+  const banner = `
+      <section style="${bannerStyle}" role="status" aria-label="Solicitation is closed">
+        <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div style="min-width:0"><p style="${eyebrowStyle}">Solicitation closed</p><p style="${bodyStyle}"><b>${deadlinePhrase}</b> This audit is for reference only — no submission action is available.</p></div>
+      </section>
+`;
+  // Insert directly before the rpt-grid so it lands between the masthead/key-
+  // dates region and the §04/§05 sections that follow — same anchor as
+  // insertNotSolicitationBanner for visual consistency.
+  return html.replace(
+    /(<div class="rpt-grid">)/,
+    `${banner}      $1`
+  );
+}
+
 // The KO drawer's "Re" line + the inline mailto subject hard-code the demo
 // solicitation number. Replace both with the live one + a generic subject.
 function setKoSubject(html: string, solicitationNumber: string): string {
@@ -1953,7 +1978,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // single call adds .is-gate to .mh-verdict (hides numeric tiles + reveals
   // gates), un-hides #reco-gate, hides .win-themes + .win-h + .st-amend.
   html = renderGateConditions(html, vm.gate_conditions, vm.verdict_mode);
-  if (vm.verdict_mode === "gate") {
+  // FA-108: also trigger gate-mode suppression when score_locked (no capability
+  // statement on file). The numeric tile gets hidden the same way as DECISION_GATE
+  // verdicts; CTA tile-replacement copy lands in a follow-up commit.
+  if (vm.verdict_mode === "gate" || vm.score_locked) {
     html = injectVerdictModeCall(html);
   }
 
@@ -1983,7 +2011,12 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     `$1href="${escapeAttr(vm.matrix_export_url)}"$2`
   );
 
-  html = renderKoEmailCard(html, vm.ko_email);
+  // FA-107: inject SOLICITATION CLOSED banner + suppress KO email card when expired
+  if (vm.is_expired) {
+    html = insertExpiredBanner(html, vm.response_deadline_short);
+  } else {
+    html = renderKoEmailCard(html, vm.ko_email);
+  }
 
   // §03 work-statement reveal — Phase 2 #3. Floor: never silently vanish.
   html = renderWorkStatementReveal(html, vm.work_statement, vm.work_statement_unknown);

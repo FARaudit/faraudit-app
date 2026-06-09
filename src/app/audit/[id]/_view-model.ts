@@ -301,6 +301,17 @@ export interface AuditViewModel {
   has_qa_deadline: boolean;
   has_award_date: boolean;
   has_award_quarter: boolean;
+  // FA-107: true when response_deadline is in the past. Renderer overlays an
+  // "SOLICITATION CLOSED" banner and suppresses the KO email card.
+  is_expired: boolean;
+  // FA-108: true when the audit's owner has no capability_statements row.
+  // Renderer treats this as a soft lock — score forced to null + gate-mode
+  // suppression triggered via the existing injectVerdictModeCall path.
+  // Defaults to false unless caller passes opts.hasCapabilityStatement=false.
+  // CTA tile-replacement copy ("Complete your Capability Statement to unlock
+  // your Fit Score") lands in a follow-up commit alongside the Supabase
+  // capability_statements presence query in the page/PDF routes.
+  score_locked: boolean;
 
   // V2 cutover B2 — count of shadow-populated items for each surface the strip
   // pass cares about. Default 0 when no v2_shadow present (V1 audits). Drives
@@ -1408,35 +1419,18 @@ function deriveKoEmailCard(
   return { to, subject, preview };
 }
 
-// Phrase a Risk as a professional clarification ask. Canonical voice:
-//   "<short statement of the gap> — could the Government confirm <X>?"
-// Falls back to a generic "please confirm" question when the risk doesn't
-// supply a specific action to invert into a question.
+// FA-106: produce clean CO-facing clarification questions from r.title only.
+// r.faraudit_action is internal bidder-mitigation prose (verbs like "Verify",
+// URLs like https://sprs..., FARaudit-side workflow language) and must NOT
+// be inverted into a CO question — that leaks internal language into the
+// customer-facing email body. Title-only template eliminates the leak.
+// W3 boundary-cap retained — never mid-word slice into the headline.
 function riskToClarificationAsk(r: Risk): string {
-  // Title is the gap statement (truncated for one-line clarity).
   const title = (r.title || "").trim();
-  // W3 — boundary-cap on clause boundary (.!?;:—) instead of mid-word slice
-  // (mirror b55099c F6/F10 fix). The previous slice(0, 137) + "..." inserted a
-  // mid-word ellipsis into the KO email — exactly the F6/F10 anti-pattern.
   const headline = title
     ? (title.split(/[.!?;:]\s+|\s+—\s+/)[0].trim() || title)
     : "A risk was identified";
-  // faraudit_action is typically imperative ("Verify SPRS score is current...").
-  // Invert: strip the leading verb, lowercase the rest, wrap in "could the
-  // Government confirm ...?" Falls through to generic if action absent.
-  const action = (r.faraudit_action || "").trim();
-  if (action.length > 20) {
-    const stripped = action
-      .replace(/^(?:please\s+)?(?:verify|submit|provide|confirm|ensure|check|file|request|complete|review|include)\s+/i, "")
-      .replace(/\.$/, "")
-      .trim();
-    if (stripped.length > 10) {
-      const lowered = stripped.charAt(0).toLowerCase() + stripped.slice(1);
-      return `${headline} — could the Government confirm ${lowered}?`;
-    }
-  }
-  // Generic fallback when we can't extract a question.
-  return `${headline} — please clarify the Government's position before submission.`;
+  return `${headline} — please clarify the Government's intent before submission.`;
 }
 
 // Brain ruling Item 3 (2026-06-05): severity recalibration. The prior mapping
@@ -1624,7 +1618,7 @@ function deriveSubmissionChecklistFiltered(
 
 // ─── main ───────────────────────────────────────────────────────────────────
 
-export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean }): AuditViewModel {
+export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; hasCapabilityStatement?: boolean }): AuditViewModel {
   // Pull compJson first so the canonical solicitation number (engine-extracted
   // from the SF-18/1449 cover page with hyphens preserved) can override the
   // SAM-metadata solicitation_number when present. This keeps masthead +
@@ -1665,6 +1659,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   // are NOT unscored (they made a decision) — keep isUnscored false here.
   const persistedVerdict = (compJson.verdict as { type?: string } | undefined);
   const verdictMode: "gate" | "scored" = persistedVerdict?.type === "DECISION_GATE" ? "gate" : "scored";
+  // FA-108: soft lock when caller signals no capability_statement on file.
+  // undefined → false (no lock). Explicit false → lock. Wired via opts in a
+  // follow-up commit; today no caller passes the flag so behavior is inert.
+  const score_locked: boolean = opts?.hasCapabilityStatement === false;
 
   // Honesty flags from audit-engine 13f4743+. compliance_score is now
   // number | null; score_confidence + is_not_solicitation are written into
@@ -1676,7 +1674,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     : null;
   // Gate verdicts emit fit_score=null per Ruling 1 spec — renderer shows "—"
   // instead of the underlying numeric. Non-gate verdicts pass through.
-  const score: number | null = verdictMode === "gate" ? null : rawScore;
+  // FA-108: score also nulled when score_locked (no capability_statement on file).
+  const score: number | null = (verdictMode === "gate" || score_locked) ? null : rawScore;
   const scoreConfidenceRaw = (compJson.score_confidence ?? audit.score_confidence) as string | undefined;
   // Gate audits ran on a real source and produced a decision — not unscored.
   // The unscored branch only fires when the engine literally couldn't score
@@ -1748,6 +1747,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
   const now = new Date();
   const responseDeadline = parseDate(audit.response_deadline);
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
+  // FA-107: solicitation is closed when offer-due deadline is in the past
+  const is_expired: boolean = responseDays !== null && responseDays < 0;
+  // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
+  // scope by the time `score` is computed.)
   const qaDeadlineDate = parseDate(audit.qa_deadline) ?? parseDate(compJson.qa_deadline);
   const qaDays = qaDeadlineDate ? daysBetween(now, qaDeadlineDate) : null;
   const awardDateDate = parseDate(audit.award_date) ?? parseDate(compJson.award_date);
@@ -2031,6 +2034,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean })
     has_qa_deadline: !!qaDeadlineDate,
     has_award_date: !!awardDateDate,
     has_award_quarter: awardQuarterStr.length > 0,
+    is_expired,
+    score_locked,
     v2_surface_lengths: v2SurfaceLengths,
 
     // Preliminary-read tiles (metadata-only state). Eligibility intentionally
