@@ -239,7 +239,9 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     return out;
   }
-  if (v.work_statement_unknown) {
+  // FA-105 fix: suppress unknown banner when V1 scope-narrative already rendered
+  const wsAlreadyPopulated = /<[^>]*data-field=["']work_statement["'][^>]*>[\s\S]{20,}/m.test(html);
+  if (v.work_statement_unknown && !wsAlreadyPopulated) {
     // V1 un-hide stands; V2 re-applies un-hide (idempotent) then overrides
     // content. Known-block strip removed — see the known branch above for the
     // E13 floor-breach root cause and the V1 comment that originally documented
