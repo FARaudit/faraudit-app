@@ -1374,9 +1374,19 @@ function deriveKoEmailCard(
   // risk could become a clarification ask. Filter twice: (i) drop risks with no
   // real faraudit_action prose (the "stub" risks the engine emits), (ii) drop
   // risks whose title reads as a non-actionable placeholder.
+  // W3-L02: exclude non-clarifiable categories from KO clarification asks.
+  // L02 reverse-auction / market-structure risks are bidder strategy — not CO questions.
+  const NON_CLARIFIABLE_CATEGORIES = new Set([
+    'Disqualification',  // structurally ineligible — no CO ask can fix
+    'pricing',           // L02 reverse-auction detector — bidder strategy
+    'market-structure',  // L02 multi-vendor detector — bidder strategy
+    'Manual review',     // meta-category — low-signal fallback
+  ]);
+
   const top = risks
-    .filter((r) => (r.faraudit_action || "").trim().length > 20)
-    .filter((r) => !/initial review|no outstanding/i.test(r.title || ""))
+    .filter((r) => (r.faraudit_action || '').trim().length > 20)
+    .filter((r) => !/initial review|no outstanding/i.test(r.title || ''))
+    .filter((r) => !NON_CLARIFIABLE_CATEGORIES.has(r.category || ''))
     .slice(0, 3);
   const body = top.length === 0
     ? "We are at this time conducting our initial review and have no outstanding clarifications."
