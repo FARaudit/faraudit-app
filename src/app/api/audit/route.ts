@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { runAudit, runAuditV2, runAuditV2Metadata, AUDIT_V2_ENABLED, type PdfSource } from "@/lib/audit-engine";
+import { type PdfSource } from "@/lib/audit-engine";
+import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
+import { getAdminClient } from "@/lib/supabase-admin";
 import {
   noticeIdSchema,
   pdfFileSchema,
@@ -177,6 +179,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No solicitation source available" }, { status: 400 });
   }
 
+  // ━━ FA-116 — async enqueue branch (flag: AUDIT_ASYNC_ENQUEUE) ━━
+  // Flag absent/false → sync path below, unchanged. Flag true → all
+  // fast-fail validation above has passed; enqueue for the resident
+  // audit-worker and return 202 immediately. SAM PDF download is deferred to
+  // the worker (pdf_url); uploaded PDFs go to the Anthropic Files API NOW at
+  // every size, because the worker never sees the multipart bytes.
+  if (process.env.AUDIT_ASYNC_ENQUEUE === "true") {
+    return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer, safeName, rate });
+  }
+
   // ━━ Content for Claude — pdf / image / text via fetchPdfFromSamUrl ━━
   // Outcomes, in priority order:
   //   1. User upload (pdfBuffer set above):
@@ -259,10 +271,13 @@ export async function POST(req: NextRequest) {
   // Skipped for PDF-only uploads (no real notice_id to match on).
   let agency: string | null = resolveAgency(solicitation);
   if (!agency && solicitation.noticeId && !/^pdf-/i.test(solicitation.noticeId)) {
+    // FA-116: scope to non-user rows — a user-enqueued duplicate of this
+    // notice_id would make .maybeSingle() throw on >1 row.
     const { data: pa } = await supabase
       .from("pending_audits")
       .select("agency")
       .eq("notice_id", solicitation.noticeId)
+      .neq("source", "user")
       .maybeSingle();
     if (pa?.agency) agency = pa.agency as string;
   }
@@ -291,183 +306,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
+  // ━━ Run three-call audit + persist + V2 shadow + corpus ━━
+  // FA-116: pipeline body extracted to src/lib/audit-executor.ts so the
+  // resident audit-worker runs the identical code. Behavior preserved,
+  // including the historical persist-failure contract (500 with auditId,
+  // row left in 'processing' — see AuditPersistError).
   try {
-    const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
-
-    // audit-engine 13f4743 emits score_confidence + is_not_solicitation on
-    // the result root. Fold them into compliance_json so the renderer can
-    // read them directly instead of falling back to its own derivation.
-    // Persisted alongside compliance_score per the engine's honesty flags.
-    //
-    // Also fold notice_type (from the SAM v2 Solicitation interface — e.g.
-    // "Sources Sought", "Presolicitation", "Solicitation") so the view-
-    // model's prelim-mode classifier can read it. No new column needed.
-    const persistedComplianceJson = {
-      ...result.compliance.json,
-      score_confidence: result.score_confidence ?? null,
-      is_not_solicitation: result.is_not_solicitation ?? false,
-      notice_type: solicitation.type ?? null
-    };
-
-    const { error: updateError } = await supabase
-      .from("audits")
-      .update({
-        overview_summary: result.overview.summary,
-        overview_json: result.overview.json,
-        compliance_summary: result.compliance.summary,
-        compliance_json: persistedComplianceJson,
-        risks_summary: result.risks.summary,
-        risks_json: result.risks.json,
-        compliance_score: result.compliance_score,
-        recommendation: result.recommendation,
-        bid_recommendation: result.bid_recommendation,
-        document_type: result.classification.document_type,
-        document_type_rationale: result.classification.rationale,
-        document_type_confidence: result.classification.confidence,
-        status: "complete",
-        completed_at: new Date().toISOString()
-      })
-      .eq("id", audit.id);
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: updateError.message, auditId: audit.id },
-        { status: 500 }
-      );
-    }
-
-    // ━━ V2 shadow wire-up (AUDIT_ENGINE_V2=true, inline-bytes arms) ━━
-    // Runs runAuditV2 after V1 success and persists structured V2 output
-    // into compliance_json.v2_shadow. ZERO impact on V1 user response —
-    // every error is swallowed; the client has already received V1's JSON
-    // shape downstream. Visible in DB for inspection.
-    //
-    // Hotfix Jun 7 2026 — extended gate to include sam_fetched (the bulk of
-    // prod traffic). Original gate only matched user uploads via pdfBuffer;
-    // SAM-fetched PDFs land in pdfBase64 and skipped V2 entirely. Now we
-    // derive a V2-eligible Buffer from whichever inline arm has bytes
-    // locally. Out-of-scope: Files API (no local bytes), image, text arms.
-    const v2Buffer: Buffer | null = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
-    if (AUDIT_V2_ENABLED && v2Buffer) {
-      const v2Start = Date.now();
-      try {
-        const v2Result = await runAuditV2(v2Buffer);
-        const v2Shadow = {
-          path: "pdf",
-          judgment: v2Result.judgment,
-          surfaces: {
-            work_statement: v2Result.work_statement,
-            work_statement_unknown: v2Result.work_statement_unknown,
-            matrix_rollup: v2Result.matrix_rollup,
-            submission_checklist_filtered: v2Result.submission_checklist_filtered,
-            l02_catches: v2Result.l02_catches,
-            confidence_notes: v2Result.confidence_notes,
-            has_incumbent: v2Result.has_incumbent,
-            metadata_brief: v2Result.metadata_brief ?? null,
-            submission_preflight: v2Result.submission_preflight ?? null,
-            recompete_signal: v2Result.recompete_signal ?? null,
-            price_anchor: v2Result.price_anchor ?? null,
-          },
-          extraction: {
-            sections_detected: Object.keys(v2Result.sectionBag.sections),
-            missing_sections: v2Result.sectionBag.missingSections,
-            warnings: v2Result.warnings,
-            extraction_warnings: v2Result.facts.extractionWarnings,
-          },
-          rendered_at: new Date().toISOString(),
-          engine_ms: Date.now() - v2Start,
-        };
-        const { error: shadowError } = await supabase
-          .from("audits")
-          .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
-          .eq("id", audit.id);
-        if (shadowError) {
-          console.error("[V2-SHADOW] db update failed (non-fatal):", shadowError.message);
-        } else {
-          console.log("[V2-SHADOW] stored for audit", audit.id, "engine_ms=", v2Shadow.engine_ms);
-        }
-      } catch (err) {
-        console.error("[V2-SHADOW] runAuditV2 failed (non-fatal):", err instanceof Error ? err.message : err);
-      }
-    } else if (AUDIT_V2_ENABLED && pdfSource === "sam_unavailable" && solicitation.description && solicitation.description.length > 50) {
-      // ━━ Fix 8 — V2 metadata-only shadow path ━━
-      // Fires when SAM returned a notice but no PDF was retrievable. Pure
-      // deterministic synthesis: eligibility + deadline math + synopsis +
-      // CO contact + missing-intel list. Zero LLM cost. Same v2_shadow
-      // envelope as the PDF path so downstream consumers see one shape.
-      const v2Start = Date.now();
-      try {
-        const v2Result = await runAuditV2Metadata({
-          noticeId: solicitation.noticeId,
-          title: solicitation.title,
-          description: solicitation.description,
-          naicsCode: solicitation.naicsCode,
-          typeOfSetAside: solicitation.typeOfSetAside,
-          postedDate: solicitation.postedDate,
-          responseDeadLine: solicitation.responseDeadLine,
-          noticeType: solicitation.type,
-          agency,
-        });
-        const v2Shadow = {
-          path: "metadata_only",
-          judgment: v2Result.judgment,
-          surfaces: {
-            work_statement: null,
-            work_statement_unknown: null,
-            matrix_rollup: v2Result.matrix_rollup,
-            submission_checklist_filtered: v2Result.submission_checklist_filtered,
-            l02_catches: v2Result.l02_catches,
-            confidence_notes: v2Result.confidence_notes,
-            has_incumbent: false,
-            metadata_brief: v2Result.metadata_brief ?? null,
-            submission_preflight: v2Result.submission_preflight ?? null,
-            recompete_signal: v2Result.recompete_signal ?? null,
-            price_anchor: v2Result.price_anchor ?? null,
-          },
-          extraction: {
-            sections_detected: [] as string[],
-            missing_sections: [] as string[],
-            warnings: v2Result.warnings,
-            extraction_warnings: v2Result.facts.extractionWarnings,
-          },
-          rendered_at: new Date().toISOString(),
-          engine_ms: Date.now() - v2Start,
-        };
-        const { error: shadowError } = await supabase
-          .from("audits")
-          .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
-          .eq("id", audit.id);
-        if (shadowError) {
-          console.error("[V2-SHADOW-META] db update failed (non-fatal):", shadowError.message);
-        } else {
-          console.log("[V2-SHADOW-META] stored for audit", audit.id, "engine_ms=", v2Shadow.engine_ms);
-        }
-      } catch (err) {
-        console.error("[V2-SHADOW-META] runAuditV2Metadata failed (non-fatal):", err instanceof Error ? err.message : err);
-      }
-    }
-
-    // Best-effort intelligence-corpus write — every audit teaches the engine
-    // what trap clauses fire on what document types. Failure here doesn't
-    // disrupt the audit response.
-    try {
-      const flags = (result.compliance.json.dfars_flags ?? []).filter((f) => f.detected);
-      if (flags.length > 0) {
-        await supabase.from("fa_intelligence_corpus").insert(
-          flags.map((f) => ({
-            audit_id: audit.id,
-            solicitation_id: solicitation.noticeId,
-            trap_type: f.clause,
-            was_caught: true,
-            outcome: result.recommendation,
-            metadata: { document_type: result.classification.document_type, severity: f.severity }
-          }))
-        );
-      }
-    } catch {
-      /* silent — corpus is best-effort */
-    }
+    const execResult = await executeAudit(supabase, audit.id, {
+      solicitation,
+      agency,
+      pdfBuffer,
+      pdfBase64,
+      pdfFileId,
+      imageBase64,
+      imageMediaType,
+      extractedText,
+      extractedFormat,
+      pdfSource,
+      pdfUnavailableReason
+    });
 
     return NextResponse.json(
       {
@@ -476,8 +333,8 @@ export async function POST(req: NextRequest) {
         // auditId in URL construction so paste-shares don't leak the UUID.
         solicitationNumber: solicitation.solicitationNumber,
         status: "complete",
-        recommendation: result.recommendation,
-        score: result.compliance_score
+        recommendation: execResult.recommendation,
+        score: execResult.compliance_score
       },
       {
         headers: {
@@ -489,6 +346,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    if (err instanceof AuditPersistError) {
+      return NextResponse.json({ error: message, auditId: audit.id }, { status: 500 });
+    }
     console.error("[audit POST] failed", { auditId: audit.id, message });
     await supabase
       .from("audits")
@@ -496,6 +356,132 @@ export async function POST(req: NextRequest) {
       .eq("id", audit.id);
     return NextResponse.json({ error: message, auditId: audit.id }, { status: 500 });
   }
+}
+
+// ━━ FA-116 — async enqueue (flag-gated, see branch in POST above) ━━
+// Inserts the audits row under the caller's RLS session (authoritative owner
+// record, same fields/order as the sync path) plus a pending_audits row with
+// source='user' via the service-role client (pending_audits RLS grants
+// authenticated users READ only — migration 011). The resident audit-worker
+// claims the pending row and runs the same executeAudit() pipeline.
+async function enqueueAsyncAudit(args: {
+  supabase: Awaited<ReturnType<typeof createServerClient>>;
+  userId: string;
+  solicitation: Solicitation;
+  pdfBuffer: Buffer | null;
+  safeName: string | null;
+  rate: { remaining: number; resetAt: number };
+}) {
+  const { supabase, userId, solicitation, pdfBuffer, safeName, rate } = args;
+
+  // Uploaded PDFs go to the Files API before ANY insert — if the upload
+  // fails, no rows exist and nothing was charged.
+  let anthropicFileId: string | null = null;
+  if (pdfBuffer) {
+    try {
+      const uploaded = await uploadPdfToFilesApi(pdfBuffer, safeName);
+      anthropicFileId = uploaded.fileId;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "unknown upload error";
+      return NextResponse.json(
+        { error: `PDF upload failed: ${message}. Nothing was charged — please try again.` },
+        { status: 502 }
+      );
+    }
+  }
+
+  // Agency resolution — mirror of the sync path (resolveAgency + sam-ingest
+  // pending_audits fallback, scoped to non-user rows).
+  let agency: string | null = resolveAgency(solicitation);
+  if (!agency && solicitation.noticeId && !/^pdf-/i.test(solicitation.noticeId)) {
+    const { data: pa } = await supabase
+      .from("pending_audits")
+      .select("agency")
+      .eq("notice_id", solicitation.noticeId)
+      .neq("source", "user")
+      .maybeSingle();
+    if (pa?.agency) agency = pa.agency as string;
+  }
+
+  const { data: audit, error: insertError } = await supabase
+    .from("audits")
+    .insert({
+      notice_id: solicitation.noticeId,
+      solicitation_number: solicitation.solicitationNumber,
+      title: solicitation.title,
+      agency,
+      naics_code: solicitation.naicsCode,
+      set_aside: solicitation.typeOfSetAside,
+      posted_date: solicitation.postedDate,
+      response_deadline: solicitation.responseDeadLine,
+      user_id: userId,
+      status: "processing"
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !audit) {
+    return NextResponse.json(
+      { error: insertError?.message || "Insert failed" },
+      { status: 500 }
+    );
+  }
+
+  const admin = getAdminClient();
+  if (!admin) {
+    await supabase
+      .from("audits")
+      .update({ status: "failed", error_message: "enqueue failed: service-role client unavailable" })
+      .eq("id", audit.id);
+    return NextResponse.json(
+      { error: "Audit queue is unavailable. Nothing was charged — please try again.", auditId: audit.id },
+      { status: 500 }
+    );
+  }
+
+  const { error: enqueueErr } = await admin.from("pending_audits").insert({
+    notice_id: solicitation.noticeId,
+    solicitation_number: solicitation.solicitationNumber,
+    title: solicitation.title,
+    agency,
+    naics_code: solicitation.naicsCode,
+    set_aside: solicitation.typeOfSetAside,
+    response_deadline: solicitation.responseDeadLine,
+    pdf_url: solicitation.resourceLinks[0] ?? null,
+    source: "user",
+    status: "pending",
+    user_id: userId,
+    audit_id: audit.id,
+    anthropic_file_id: anthropicFileId,
+    pdf_filename: pdfBuffer ? safeName : null
+  });
+
+  if (enqueueErr) {
+    await supabase
+      .from("audits")
+      .update({ status: "failed", error_message: `enqueue failed: ${enqueueErr.message}` })
+      .eq("id", audit.id);
+    return NextResponse.json(
+      { error: `Audit could not be queued: ${enqueueErr.message}`, auditId: audit.id },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      auditId: audit.id,
+      solicitationNumber: solicitation.solicitationNumber,
+      status: "queued"
+    },
+    {
+      status: 202,
+      headers: {
+        "X-RateLimit-Limit": "10",
+        "X-RateLimit-Remaining": String(rate.remaining),
+        "X-RateLimit-Reset": String(Math.ceil(rate.resetAt / 1000))
+      }
+    }
+  );
 }
 
 export async function GET() {

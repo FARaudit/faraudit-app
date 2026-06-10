@@ -1374,6 +1374,10 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
+  // FA-116 — progress copy while an async-enqueued audit (202) is polled.
+  const [queuedNote, setQueuedNote] = useState<string | null>(null);
+  const unmountedRef = useRef(false);
+  useEffect(() => () => { unmountedRef.current = true; }, []);
   const noticeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -1414,9 +1418,49 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     setMode(next);
   }
 
+  // FA-116 — poll loop for async-enqueued audits. The server returned 202
+  // before the engine ran; we poll /api/audit/[id]/status every 4s until the
+  // worker lands a terminal status. The long-wait threshold changes COPY
+  // only, never the verdict — transient poll failures are silently retried.
+  async function pollUntilDone(auditId: string, slugFromEnqueue: string | null): Promise<void> {
+    const started = Date.now();
+    setQueuedNote("Audit queued — running now. This usually takes 1–3 minutes.");
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 4000));
+      if (unmountedRef.current) return;
+      let status: { status?: string; error_message?: string | null; solicitationNumber?: string | null };
+      try {
+        const res = await fetch(`/api/audit/${auditId}/status`);
+        if (!res.ok) throw new Error(String(res.status));
+        status = await res.json();
+      } catch {
+        continue;
+      }
+      if (status.status === "complete") {
+        setQueuedNote(null);
+        const slug = (status.solicitationNumber ?? slugFromEnqueue ?? "").trim();
+        router.push(`/audit/${slug ? slug.toLowerCase() : auditId}`);
+        return;
+      }
+      if (status.status === "failed") {
+        setQueuedNote(null);
+        const reason = status.error_message || "unknown error";
+        const fetchClass = /fetch|download|resource|sam|pdf|unavailable|timeout/i.test(reason);
+        throw new Error(
+          `Audit failed: ${reason}.${fetchClass && mode === "notice"
+            ? " Try uploading the solicitation PDF directly — SAM.gov attachments aren't always retrievable."
+            : ""}`
+        );
+      }
+      if (Date.now() - started > 8 * 60 * 1000) {
+        setQueuedNote("Still running — large solicitations can take a while. You can leave this page; the finished report will appear in Past Audits.");
+      }
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null); setResult(null);
+    setError(null); setResult(null); setQueuedNote(null);
     if (mode === "notice" && !noticeId) { setError("Paste a SAM Notice ID."); return; }
     if (mode === "pdf" && !pdf) { setError("Select a PDF to upload."); return; }
     setSubmitting(true);
@@ -1427,6 +1471,11 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       const res = await fetch("/api/audit", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `audit failed (${res.status})`);
+      if (res.status === 202 && json.auditId) {
+        // FA-116 async path — flag-on servers enqueue and 202 immediately.
+        await pollUntilDone(json.auditId as string, (json.solicitationNumber as string | null) ?? null);
+        return;
+      }
       setResult(json);
       if (json.auditId) {
         // Prefer slug (solicitationNumber) over UUID so the URL bar shows the
@@ -1560,6 +1609,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
           <span className="af">Task Order</span><span className="af">Modification</span>
         </div>
         {error && <div className="audit-error">{error}</div>}
+        {queuedNote && !error && <div className="audit-success">⟳ {queuedNote}</div>}
         {result && (
           <div className="audit-success">
             ✓ Audit complete · {result.auditId}

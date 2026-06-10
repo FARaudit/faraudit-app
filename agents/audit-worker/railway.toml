@@ -1,0 +1,24 @@
+# FA-116 — audit-worker: resident Railway service for user-enqueued audits.
+#
+# UNLIKE audit-ai/sam-ingest, this service MUST use Root Directory = / —
+# worker.ts imports src/lib/audit-executor (and through it the full V1+V2
+# engine), so the container needs the whole repo tree. Point the service's
+# "Config as code" path at agents/audit-worker/railway.toml so this file
+# applies; the repo-root nixpacks.toml (install-only, no `next build`)
+# handles the build phase.
+#
+# Required service env (besides the shared Supabase/Anthropic/SAM vars):
+#   NIXPACKS_NODE_VERSION=22   — supabase-js realtime needs native WebSocket
+#                                (ws is not a repo-root dependency)
+#   NPM_CONFIG_PRODUCTION=false — tsx/dotenv/pdf-parse live in root
+#                                 devDependencies and are needed at runtime
+#
+# Resident loop (no cronSchedule) — restart ALWAYS so redeploys/crashes
+# resume claiming; the in-loop stale sweep recovers rows orphaned mid-audit.
+
+[build]
+buildCommand = ""
+
+[deploy]
+startCommand = "npx tsx agents/audit-worker/index.ts"
+restartPolicyType = "ALWAYS"
