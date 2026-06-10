@@ -216,7 +216,10 @@ ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- $
      resolve    — one sentence stating HOW to confirm (e.g. "Verify against SF-1449 block 10")
 6. Produce a plain-language verdict with urgency score 0-100.
 
-Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.`;
+Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.
+
+CONTRADICTION GUARD (FA-113):
+DO NOT emit risks or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", or "Unknown" when that field has a value in the Extracted Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note asserting it is missing. The fields you may legitimately flag as uncertain are limited to those literally shown as "unknown" or "(none extracted)" above.`;
 }
 
 // ── Main judgment function ────────────────────────────────────────────────

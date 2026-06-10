@@ -286,6 +286,168 @@ export interface ComplianceJSON {
 // for PDFs >20MB routed through the Anthropic Files API (avoids the 25MB inline cap).
 export type PdfSource = "uploaded" | "uploaded_pdf_via_files_api" | "sam_fetched" | "sam_pdf_via_files_api" | "sam_image_extracted" | "sam_image_resized" | "sam_unavailable" | "sam_text_extracted";
 
+// ═══ FA-113: contradiction filter + extracted-facts context injection ═════
+// Engine post-processing safety net. Call-3 (risks) and V2 judgment occasionally
+// emit "missing X" boilerplate even when calls 1+2 already extracted X. This
+// filter scans risk_findings, judgment.risks, judgment.confidenceNotes,
+// judgment.l02Catches and drops entries whose text asserts a fact is missing
+// when our presence map confirms it IS present. Conservative by design —
+// only suppresses on a confident fact-presence match; never suppresses
+// genuine unknowns (e.g. work_statement classifier returning null is real).
+
+export interface ExtractedFactsPresence {
+  solicitation_number: boolean;
+  due_date: boolean;
+  naics: boolean;
+  clins: boolean;
+  clauses: boolean;
+  contract_type: boolean;
+  agency: boolean;
+  set_aside: boolean;
+}
+
+const FA113_MISSING_PATTERNS: Record<keyof ExtractedFactsPresence, RegExp[]> = {
+  solicitation_number: [
+    /without a solicitation number/i,
+    /no solicitation number/i,
+    /solicitation number (?:is |was )?(?:not |un)?(?:extracted|extractable|present|found|available|determined)/i,
+    /Solicitation document not yet/i,
+    /Complete Solicitation Data Absent/i,
+  ],
+  due_date: [
+    /no due date (?:extract|present|find|specif|avail)/i,
+    /Offer Due Date Unknown/i,
+    /due date (?:is |was )?(?:not |un)?(?:extracted|extractable|present|specified|determined)/i,
+    /no deadline (?:extract|present|find|specif)/i,
+    /Proposal Deadline (?:is |was )?Unestablished/i,
+  ],
+  naics: [
+    /NAICS code (?:was |is )?(?:not |un)?(?:present|extractable|extracted|found|specified|determined)/i,
+    /NAICS (?:code )?(?:is |was )?(?:not |un)?(?:extracted|extractable|present|found|determined)/i,
+    /NAICS Code Unknown/i,
+    /no NAICS (?:code )?(?:extract|present|find|specif)/i,
+    /NAICS (?:code )?could not be (?:inferred|determined|extracted|verified)/i,
+  ],
+  clins: [
+    /Zero CLINs (?:extract|present|find)/i,
+    /No CLINs (?:extract|present|find)/i,
+    /CLINs (?:are |were |is |was )?(?:not |un)?(?:extracted|extractable)/i,
+    /Pricing Structure (?:and Deliverable )?Scope Unknown/i,
+    /CLIN list (?:is |was )?(?:not |un)?(?:extracted|extractable|determined)/i,
+  ],
+  clauses: [
+    /Zero Clauses Extracted/i,
+    /no clauses (?:were |are )?extract(?:ed|able)/i,
+    /Full FAR\/DFARS Compliance Posture Unknown/i,
+  ],
+  contract_type: [
+    /Contract Type Unknown/i,
+    /contract type (?:was |is )?(?:not |un)?(?:extracted|extractable|present|determined)/i,
+    /Cost Risk and Pricing Strategy Undefined/i,
+  ],
+  agency: [
+    /Issuing (?:Office |Agency )?Unknown/i,
+    /(?:issuing )?agency (?:was |is )?(?:not |un)?(?:present|extractable|extracted)/i,
+  ],
+  set_aside: [
+    /Set-Aside Status Unknown/i,
+    /set.aside (?:status )?(?:is |was )?(?:not |un)?(?:extracted|extractable|determined)/i,
+    /Teaming and Subcontracting Strategy Undefined/i,
+  ],
+};
+
+interface FA113FilterTarget {
+  title?: string;
+  text?: string;
+  field?: string;
+  uncertain?: string;
+  assumption?: string;
+}
+
+export function applyContradictionFilter<T extends FA113FilterTarget>(
+  items: T[],
+  presence: ExtractedFactsPresence,
+  surface: string
+): T[] {
+  return items.filter((item) => {
+    const haystack = [item.title, item.text, item.field, item.uncertain, item.assumption]
+      .filter((s): s is string => typeof s === "string")
+      .join(" ");
+    for (const [factKey, patterns] of Object.entries(FA113_MISSING_PATTERNS) as Array<[
+      keyof ExtractedFactsPresence,
+      RegExp[]
+    ]>) {
+      if (!presence[factKey]) continue; // fact genuinely missing — keep the entry
+      for (const pat of patterns) {
+        if (pat.test(haystack)) {
+          const preview = (item.title || item.text || item.field || "").slice(0, 80);
+          // eslint-disable-next-line no-console
+          console.warn("[CONTRADICTION-FILTER]", surface, factKey, preview);
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+}
+
+// Compact SAM-metadata facts digest, injected into the V1 call-3 risks prompt
+// so the model cannot claim a known-extracted fact is missing. Deterministic
+// ordering for temp-0 reproducibility. Built pre-LLM from the `solicitation`
+// payload (always in scope in runAudit), so context injection is free of any
+// circular dependency on the call results themselves.
+function buildV1FactsDigest(
+  solicitation: Record<string, unknown> | null,
+  responseDeadline: Date | null
+): string {
+  if (!solicitation || typeof solicitation !== "object") return "";
+  const sol = solicitation;
+  const pick = (k: string): string | null => {
+    const v = sol[k];
+    return typeof v === "string" && v.trim().length > 0 ? v : null;
+  };
+  const lines: string[] = [];
+  const solNum = pick("solicitationNumber");
+  const noticeId = pick("noticeId");
+  if (solNum) lines.push(`- solicitation_number: ${solNum}`);
+  if (noticeId && noticeId !== solNum) lines.push(`- notice_id: ${noticeId}`);
+  const naics = pick("naicsCode") || pick("naics_code");
+  if (naics) lines.push(`- NAICS: ${naics}`);
+  const setAside = pick("typeOfSetAside") || pick("set_aside");
+  if (setAside) lines.push(`- set_aside: ${setAside}`);
+  const agency = pick("agency");
+  if (agency) lines.push(`- agency: ${agency}`);
+  const title = pick("title");
+  if (title) lines.push(`- title: ${title.slice(0, 120)}`);
+  if (responseDeadline) lines.push(`- response_deadline: ${responseDeadline.toISOString().slice(0, 10)}`);
+  return lines.join("\n");
+}
+
+export function buildV1PresenceMap(
+  solicitation: Record<string, unknown> | null,
+  complianceJson: ComplianceJSON,
+  responseDeadline: Date | null
+): ExtractedFactsPresence {
+  const sol = solicitation || {};
+  const get = (k: string): unknown => (sol as Record<string, unknown>)[k];
+  const solNumPresent = typeof get("solicitationNumber") === "string" && (get("solicitationNumber") as string).length > 0;
+  const farLen = Array.isArray(complianceJson.far_clauses) ? (complianceJson.far_clauses as unknown[]).length : 0;
+  const dfarsLen = Array.isArray(complianceJson.dfars_clauses) ? (complianceJson.dfars_clauses as unknown[]).length : 0;
+  return {
+    solicitation_number: solNumPresent,
+    due_date: !!responseDeadline,
+    naics: typeof get("naicsCode") === "string" && (get("naicsCode") as string).length > 0,
+    clins: false, // V1 doesn't extract CLINs into a typed array we trust here; leave false → never suppress CLIN-missing claims
+    clauses: farLen + dfarsLen > 0,
+    contract_type: false, // V1 doesn't expose contract_type from compliance reliably
+    agency: typeof get("agency") === "string" && (get("agency") as string).length > 0,
+    set_aside: (typeof get("typeOfSetAside") === "string" && (get("typeOfSetAside") as string).length > 0) ||
+               (typeof get("set_aside") === "string" && (get("set_aside") as string).length > 0),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+
 // Cycle 2 facts-only risk shape. The model emits flat findings; priority,
 // dedup, top-3, per-category buckets, severity_score, exec summary, and
 // verdict rationale are all TS-derived in the VM. RiskFinding.category
@@ -1779,6 +1941,22 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
     console.warn(`[audit-engine] redacted ${redactionCount} injection-pattern hit(s)`);
   }
 
+  // FA-113: parse responseDeadline EARLY so the SAM-metadata facts digest can
+  // include it as a key:value line in the call-3 risks prompt. Pre-LLM
+  // extraction — no circular dependency on the call results.
+  const responseDeadlineEarly: Date | null = (() => {
+    const raw = (solicitation as Record<string, unknown> | null)?.["responseDeadLine"];
+    if (typeof raw === "string" && raw.length > 0) {
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  })();
+  const v1FactsDigest = buildV1FactsDigest(
+    solicitation as Record<string, unknown> | null,
+    responseDeadlineEarly
+  );
+
   // ━━ Pre-step: classify the document ━━
   // This runs BEFORE the 3 main calls so each downstream prompt can be tailored
   // to the document's procurement type (SOW emphasizes deliverables; PWS emphasizes
@@ -1892,6 +2070,9 @@ JSON only.`;
   const risksPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
+EXTRACTED FACTS (from SAM.gov listing — DO NOT generate risks claiming any of these fields are missing, unextractable, or unknown; they have been confirmed extracted):
+${v1FactsDigest || "(no SAM metadata available)"}
+
 You are a senior capture manager identifying SPECIFIC, ACTIONABLE risks tied to provisions of THIS solicitation, for a small defense subcontractor in the continental United States. You emit FACTS — risk findings with document evidence. Priority, severity_score, top-3 selection, per-category buckets, verdict rationale, and exec summaries are all TS-derived downstream from your findings; do NOT emit any of those.
 
 PRINCIPLES:
@@ -1979,6 +2160,22 @@ JSON only — one key: risk_findings.`;
   }
 
   // Engine post-processing
+  // FA-113: contradiction filter — drop call-3 risk_findings that claim a fact
+  // is missing when the V1 presence map confirms it IS extracted. Logs each
+  // suppression to console.warn("[CONTRADICTION-FILTER]", ...).
+  const v1Presence = buildV1PresenceMap(
+    solicitation as Record<string, unknown> | null,
+    complianceJson,
+    responseDeadlineEarly
+  );
+  if (Array.isArray(risksJson.risk_findings)) {
+    risksJson.risk_findings = applyContradictionFilter(
+      risksJson.risk_findings,
+      v1Presence,
+      "v1.risks.risk_findings"
+    );
+  }
+
   complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson, solText);
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
@@ -3091,6 +3288,25 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   for (const w of facts.extractionWarnings) warnings.push(`[facts] ${w}`);
 
   const judgment = await _v2RunJudgment(facts);
+
+  // FA-113: contradiction filter on V2 surfaces — drop judgment.risks,
+  // confidenceNotes, and l02Catches that claim a fact is missing when the V2
+  // facts presence map confirms it IS extracted. Conservative: only suppresses
+  // on confident fact-presence match (e.g. facts.naicsCode populated). Logs
+  // each suppression via console.warn("[CONTRADICTION-FILTER]", ...).
+  const v2Presence: ExtractedFactsPresence = {
+    solicitation_number: !!facts.solicitorNumber,
+    due_date: !!facts.offerDueDate,
+    naics: !!facts.naicsCode,
+    clins: facts.clins.length > 0,
+    clauses: facts.clauses.length > 0,
+    contract_type: !!facts.contractType,
+    agency: !!facts.issuingOffice,
+    set_aside: !!facts.setAside,
+  };
+  judgment.risks = applyContradictionFilter(judgment.risks, v2Presence, "v2.judgment.risks");
+  judgment.confidenceNotes = applyContradictionFilter(judgment.confidenceNotes, v2Presence, "v2.judgment.confidenceNotes");
+  judgment.l02Catches = applyContradictionFilter(judgment.l02Catches, v2Presence, "v2.judgment.l02Catches");
 
   // ─── Cycle 2 v2 view-model surface derivations ─────────────────────────
   const ws = _v2WorkStatement(judgment.documentClassification);
