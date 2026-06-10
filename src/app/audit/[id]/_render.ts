@@ -1264,6 +1264,48 @@ function renderComplianceMatrix(
   return setFieldInner(html, "compliance_matrix", "div", inner);
 }
 
+// §04 matrix-rollup tally render (FA-115 Pass 4 Item 3). The .cmx-counts
+// strip inside §04 ships hardcoded "0 traps · 0 full-text · 0 by reference"
+// because no renderer was filling matrix_rollup.{trap_count,fulltext_count,
+// reference_count}. FA-103's fallback populated the flag rows but not these
+// rollup tallies, leaving the badge contradicting §04's flag header above.
+//
+// Single-source-of-truth fix: derive trap_count from the SAME compliance_flags
+// array the §04 header pill reads. Traps = P0/P1 dfars flags (the items §04
+// renders as P0 hex chrome + P1 amber rows). fulltext_count + reference_count
+// come from compliance_matrix (status === "action" for full-text, the rest
+// reference-only). The badge can never disagree with §04 again because both
+// surfaces read the same VM array.
+// Trap tally chokepoint: the §04 .cmx-tally trap count ALWAYS derives from the
+// same P0/P1 compliance_flags the §04 header pill reads — the V2 overlay's
+// matrix-badge-derived count can contradict it, so this re-pins after overlay.
+function renderTrapTally(html: string, flags: ComplianceFlag[]): string {
+  const trapCount = flags.filter((f) => f.severity === "P0" || f.severity === "P1").length;
+  return html.replace(
+    /(<span[^>]*\bdata-field="matrix_rollup\.trap_count"[^>]*>)[\s\S]*?(<\/span>)/g,
+    `$1${trapCount}$2`
+  );
+}
+
+function renderMatrixRollupCounts(
+  html: string,
+  flags: ComplianceFlag[],
+  matrixRows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }>
+): string {
+  const fulltextCount = matrixRows.filter((r) => r.status === "action").length;
+  const referenceCount = Math.max(0, matrixRows.length - fulltextCount);
+  let out = renderTrapTally(html, flags);
+  out = out.replace(
+    /(<span[^>]*\bdata-field="matrix_rollup\.fulltext_count"[^>]*>)[\s\S]*?(<\/span>)/g,
+    `$1${fulltextCount}$2`
+  );
+  out = out.replace(
+    /(<(?:span|b)[^>]*\bdata-field="matrix_rollup\.reference_count"[^>]*>)[\s\S]*?(<\/(?:span|b)>)/g,
+    `$1${referenceCount}$2`
+  );
+  return out;
+}
+
 // §07 matrix-artifact card render — Jun 8 2026 export-parity Phase 1.
 // Drives the compact export card markup (canonical §07) from the same
 // vm.compliance_matrix array the old table render used. Populates the
@@ -1479,6 +1521,20 @@ function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
   out = out.replace(
     /(<div class="g-oc no(?:\s+active)?"><b>)[\s\S]*?(<\/b>)/,
     `$1${escapeHtml(vm.gate_card.outcome_no_lead)}$2`
+  );
+  // FA-115 Pass 4 Item 5 — outcome TAILS (text after </b>). The template's
+  // demo tail ("→ straightforward LPTA win on price + packaging. Low
+  // competition.") previously leaked on active gate-mode reports and could
+  // contradict §M's award basis. VM-derived tails reference the single
+  // evaluation framing (eval_basis_label). applyClosedBidGate still runs
+  // after this for expired reports and overwrites with past-tense framing.
+  out = out.replace(
+    /(<div class="g-oc win"><b>[\s\S]*?<\/b>)[^<]*(<\/div>)/,
+    `$1${escapeHtml(vm.gate_card.outcome_win_tail)}$2`
+  );
+  out = out.replace(
+    /(<div class="g-oc no(?:\s+active)?"><b>[\s\S]*?<\/b>)[^<]*(<\/div>)/,
+    `$1${escapeHtml(vm.gate_card.outcome_no_tail)}$2`
   );
   return out;
 }
@@ -2208,6 +2264,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // printed re-list of §L. renderComplianceMatrix() kept in this file for
   // legacy callers but no longer invoked by the report render.
   html = renderMatrixArtifact(html, vm.compliance_matrix);
+  // FA-115 Item 3 — §04 clause-matrix rollup tallies (traps / full-text /
+  // by-reference). Single-sourced from the same compliance_flags array the
+  // §04 header pill reads, so the badge can never contradict the flags above.
+  html = renderMatrixRollupCounts(html, vm.compliance_flags, vm.compliance_matrix);
   // matrix_export_url: href attribute on the .ma-export anchor (was .cm-export
   // before the Jun 8 canonical re-sync; updated to track the new class).
   html = html.replace(
@@ -2328,7 +2388,13 @@ export function renderAuditReportComplete(
 ): string {
   let html = renderAuditReport(template, vm);
   const v2Input = buildV2ViewModelFromShadow(audit);
-  if (v2Input) html = renderV2Surfaces(html, v2Input);
+  if (v2Input) {
+    html = renderV2Surfaces(html, v2Input);
+    // FA-115 Item 3: V2's matrix rollup derives the trap tally from matrix
+    // badges, which can contradict the §04 P0/P1 flag count. Re-pin to the
+    // single source of truth.
+    html = renderTrapTally(html, vm.compliance_flags);
+  }
   html = stripHideWhenEmptyBlocks(html, vm);
   // FA-114: report-wide closed-state framing — operates on FINAL HTML so that
   // checkbox-strip / progress-counter-strip survive renderSubmissionChecklist

@@ -274,6 +274,14 @@ export interface AuditViewModel {
     // 2-gate audit. Renderer regex-replaces only the <b>...</b> content.
     outcome_win_lead: string;   // "All three" / "Both" / "All 5" / "If the gate clears"
     outcome_no_lead: string;    // "Any" / "If it fails"
+    // FA-115 Pass 4 Item 5 — outcome TAIL text (after the </b>, before the
+    // </div>). The template ships demo copy ("→ straightforward LPTA win on
+    // price + packaging. Low competition.") that leaked on active gate-mode
+    // reports because applyCanonicalVerdict only replaced the <b> lead. The
+    // tail is now VM-derived and references the SINGLE evaluation framing
+    // (eval_basis_label) so §06 can never contradict §M's award basis.
+    outcome_win_tail: string;
+    outcome_no_tail: string;
   };
 
   // key dates — Phase 2 #4 (Jun 8 2026): qa_deadline + award_date now parsed
@@ -540,15 +548,47 @@ function hasDocumentAnchor(...fields: Array<string | undefined | null>): boolean
   return DOCUMENT_ANCHOR_PATTERNS.some((re) => re.test(joined));
 }
 
-// Set-aside normalization. SAM frequently emits "NONE" (or null) for full &
-// open competitions. "NONE" reads as missing-data; "Full & open" is the
-// correct, customer-facing label. Real set-asides ("Total Small Business",
-// "8(a)", etc.) pass through unchanged.
+// Set-aside normalization (FA-115 Pass 4 Item 2). SAM and engine code paths
+// emit a wide range of raw set-aside tokens — "SBA", "Total Small Business",
+// "WOSB", "EDWOSB", "8(A)", "HUBZONE", "SDVOSB", "NONE". The masthead must
+// show the customer-facing display label, not the raw code. Mapping table
+// covers known codes; unknown values pass through verbatim (never invent).
+const SET_ASIDE_LABEL: Record<string, string> = {
+  // Full & open competition synonyms
+  "":                            "Full & Open",
+  "NONE":                        "Full & Open",
+  "FULL AND OPEN":               "Full & Open",
+  "FULL & OPEN":                 "Full & Open",
+  "UNRESTRICTED":                "Full & Open",
+  // Total small business (any structure)
+  "SBA":                         "Small Business — 100%",
+  "TOTAL SMALL BUSINESS":        "Small Business — 100%",
+  "SMALL BUSINESS":              "Small Business — 100%",
+  "SMALL BUSINESS SET-ASIDE":    "Small Business — 100%",
+  "TOTAL_SMALL_BUSINESS":        "Small Business — 100%",
+  "SBA_TOTAL_SB":                "Small Business — 100%",
+  // Socio-economic categories
+  "WOSB":                        "Women-Owned Small Business (WOSB)",
+  "WOMEN-OWNED SMALL BUSINESS":  "Women-Owned Small Business (WOSB)",
+  "EDWOSB":                      "Economically Disadvantaged WOSB (EDWOSB)",
+  "SDVOSB":                      "Service-Disabled Veteran-Owned Small Business (SDVOSB)",
+  "SDVOSBC":                     "Service-Disabled Veteran-Owned Small Business (SDVOSB)",
+  "VOSB":                        "Veteran-Owned Small Business (VOSB)",
+  "HUBZONE":                     "HUBZone Small Business",
+  "HUB ZONE":                    "HUBZone Small Business",
+  "8(A)":                        "8(a) Sole-Source / Competitive",
+  "8A":                          "8(a) Sole-Source / Competitive",
+  "8A_COMPETED":                 "8(a) Competitive",
+  "8A_SOLE_SOURCE":              "8(a) Sole-Source",
+};
+
 function normalizeSetAside(s: unknown): string {
   const v = typeof s === "string" ? s.trim() : "";
-  if (!v) return "Full & open";
-  const upper = v.toUpperCase();
-  if (upper === "NONE" || upper === "FULL AND OPEN" || upper === "FULL & OPEN") return "Full & open";
+  const key = v.toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(SET_ASIDE_LABEL, key)) {
+    return SET_ASIDE_LABEL[key];
+  }
+  // Unknown value — pass through verbatim. Never invent.
   return v;
 }
 
@@ -1117,13 +1157,57 @@ function detectGatesCanonical(
 // deadline. Replaces the template's hardcoded SPRRA-flavored demo strings
 // ("all three are true today" / "20-day window") with prose that tracks the
 // real audit. Per-gate logic, never blanket: "all uncurable" → NO-BID;
+// FA-115 Pass 4 Item 5 — single-source evaluation framing. compliance_json
+// carries eval_basis (verbatim §M prose) + eval_basis_label (engine short
+// label, often null on older rows). The report had THREE divergent framings
+// (§M best-value tradeoff / §06 "LPTA win" / §05 three-lowest-price) because
+// each surface invented its own. This derivation is the ONE source: prefer
+// the engine label, else detect from the eval_basis prose (same patterns as
+// section-extractors.ts eval-method detection), else null. §M pill + §06
+// gate-outcome copy both reference the result.
+function deriveEvalFraming(
+  evalBasisLabel: string | null,
+  evalBasis: string | null
+): { label: string | null; description: string | null } {
+  const fromLabel = (evalBasisLabel ?? "").trim();
+  const prose = (evalBasis ?? "").trim();
+  const detect = (s: string): "lpta" | "best_value" | null => {
+    if (/lowest\s+price\s+technically\s+acceptable|\bLPTA\b/i.test(s)) return "lpta";
+    if (/best[-\s]?value|trade-?off|most\s+advantageous/i.test(s)) return "best_value";
+    return null;
+  };
+  const kind = detect(fromLabel) ?? detect(prose);
+  if (kind === "lpta") {
+    return {
+      label: fromLabel || "LPTA",
+      description: "Lowest price technically acceptable — award goes to the lowest-priced offer that meets the technical floor.",
+    };
+  }
+  if (kind === "best_value") {
+    return {
+      label: fromLabel || "Best-value tradeoff",
+      description: "Best-value tradeoff — technical merit and past performance are weighed against price, not lowest-price-wins.",
+    };
+  }
+  // Unknown basis — pass the engine label through verbatim if it exists;
+  // never invent a framing.
+  return { label: fromLabel || null, description: null };
+}
+
 // "any curable" → CAUTION with the specific cure list. Cap at the actual
 // gate count (no "all three" when length=2).
 function deriveGateCardProse(
   gates: Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean }>,
   recommendation: "GO" | "CAUTION" | "DECLINE",
-  daysToDeadline: number | null
-): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID"; outcome_win_lead: string; outcome_no_lead: string } {
+  daysToDeadline: number | null,
+  evalFraming?: { label: string | null; description: string | null }
+): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID"; outcome_win_lead: string; outcome_no_lead: string; outcome_win_tail: string; outcome_no_tail: string } {
+  // FA-115 Item 5 — outcome tails reference the single derived evaluation
+  // framing so §06 can never assert "LPTA win" on a best-value solicitation.
+  const winTail = evalFraming?.label
+    ? ` — eligible to compete under the stated basis: ${evalFraming.label}.`
+    : " — eligible to compete under the solicitation's stated evaluation basis.";
+  const noTail = " — no-bid this cycle. Track the next solicitation.";
   const n = gates.length;
   if (n === 0) {
     return {
@@ -1134,7 +1218,9 @@ function deriveGateCardProse(
       // No gates → outcome words are placeholders; .gate-card is hidden
       // when verdict_mode !== "gate", so these never render in practice.
       outcome_win_lead: "If clear ✓",
-      outcome_no_lead: "If any fail ✗"
+      outcome_no_lead: "If any fail ✗",
+      outcome_win_tail: winTail,
+      outcome_no_tail: noTail
     };
   }
   // Gate-mode prose. Pre-curability split:
@@ -1201,7 +1287,9 @@ function deriveGateCardProse(
     count_text: `0 / ${n} cleared`,
     pill_text: "NO-BID",
     outcome_win_lead: outcomeWin,
-    outcome_no_lead: outcomeNo
+    outcome_no_lead: outcomeNo,
+    outcome_win_tail: winTail,
+    outcome_no_tail: noTail
   };
 }
 
@@ -1505,7 +1593,15 @@ const CHECKLIST_BUCKET_LABEL: Record<ChecklistBucket, string> = {
 const CHECKLIST_CRITICAL_BUCKETS = new Set<ChecklistBucket>(["deadline", "registration", "mandatory_doc"]);
 
 function categorizeChecklistBucket(text: string): ChecklistBucket {
-  if (/due\s+(date|time)|no\s+later\s+than|submit\s+by|close\s+of\s+business|deadline/i.test(text)) return "deadline";
+  // FA-115 Pass 4 Item 6 — Q&A items are checked FIRST so "Questions are due
+  // no later than…" never lands in (and mislabels) the SUBMISSION DEADLINE
+  // bucket. Q&A/inquiry deadlines are reference info, not the submit-by gate.
+  if (/\bquestions?\b|\bq\s*&\s*a\b|\binquir/i.test(text)) return "other";
+  // Submission deadline — covers "Submit quote by …", "Quotes due …",
+  // "Offers are due …", "Proposal due date", plus the generic deadline forms.
+  // `submit\s+(?:\w+\s+){0,3}by` tolerates the object between verb and "by"
+  // ("Submit quote by", "Submit your proposal package by").
+  if (/submit\s+(?:\w+\s+){0,3}by\b|(?:quotes?|offers?|proposals?|responses?)\s+(?:are\s+|is\s+)?due|due\s+(date|time)|no\s+later\s+than|close\s+of\s+business|deadline/i.test(text)) return "deadline";
   if (/\bSAM\.gov|System\s+for\s+Award\s+Management|\bWAWF\b|\bregister/i.test(text)) return "registration";
   if (/must\s+include|shall\s+include|required\s+to\s+(submit|provide)|MFG\s+name|Part\s+Number|breakdown|CAGE\s+code/i.test(text)) return "mandatory_doc";
   if (/\brepresentation|certification|\bcertif/i.test(text)) return "representation";
@@ -1626,10 +1722,13 @@ function deriveSubmissionChecklistFiltered(
 // ─── main ───────────────────────────────────────────────────────────────────
 
 export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; hasCapabilityStatement?: boolean }): AuditViewModel {
-  // Pull compJson first so the canonical solicitation number (engine-extracted
-  // from the SF-18/1449 cover page with hyphens preserved) can override the
-  // SAM-metadata solicitation_number when present. This keeps masthead +
-  // reasoning + KO email + PDF filename consistent across the report.
+  // FA-115 (Pass 4 Item 1): prefer audit.solicitation_number (DB column,
+  // deterministic SAM-sourced) over compJson.solicitation_number_canonical
+  // (LLM-extracted from SF-18/1449 cover page). The LLM occasionally
+  // concatenates the SOL number with the first CLIN code ("FA480026Q0061" +
+  // "0001" → "FA480026Q00610001"). The DB column is clean. Canonical remains
+  // fallback when the DB column is null. No regex trimming heuristics — we
+  // trust the cleaner source.
   const compJsonEarly = (audit.compliance_json as Record<string, unknown> | null) || {};
   // V2 cutover B2 — surface lengths fed to stripHideWhenEmptyBlocks so the
   // strip skips l02_catches / confidence_notes when V2 overlay will populate.
@@ -1642,8 +1741,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes) ? (v2SurfacesObj.confidence_notes as unknown[]).length : 0,
   };
   const canonicalSol = (compJsonEarly.solicitation_number_canonical as string | null | undefined) ?? null;
+  const dbSol = audit.solicitation_number as string | null | undefined;
   const displayId = displaySolicitationId({
-    solicitation_number: canonicalSol ?? (audit.solicitation_number as string | null | undefined),
+    solicitation_number: (typeof dbSol === "string" && dbSol.trim().length > 0) ? dbSol : canonicalSol,
     notice_id: audit.notice_id as string | null | undefined,
     title: audit.title as string | null | undefined
   });
@@ -1817,7 +1917,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // (1-indexed rank, Price→Tradeoff/mute, no-profile defaults, recomputed
   // submission_summary) so we trust the values verbatim here.
   const evalBasis = (compJson.eval_basis ?? null) as string | null;
-  const evalBasisLabel = (compJson.eval_basis_label ?? null) as string | null;
+  // FA-115 Item 5 — single-source evaluation framing. The derived label feeds
+  // BOTH the §M head pill (eval_basis_label) and the §06 gate-outcome tails
+  // (via deriveGateCardProse) so the two surfaces can never diverge again.
+  const evalFraming = deriveEvalFraming(
+    (compJson.eval_basis_label ?? null) as string | null,
+    evalBasis
+  );
+  const evalBasisLabel = evalFraming.label;
   // Defect 4 (2026-06-05): sanitize every rendered text field on §M factors
   // and §L requirements. Engine emits these from Call 1 (Overview) where the
   // prompt can land raw ISO timestamps in factor.note / requirement strings.
@@ -2060,7 +2167,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     days_to_deadline: canonicalDaysToDeadline,
     // Cycle-1 canonical gate card — composed from canonicalGates (VM-detected),
     // not compJson.verdict.gates. Byte-stable across extraction-variant runs.
-    gate_card: deriveGateCardProse(canonicalGates, verdict.word, canonicalDaysToDeadline),
+    gate_card: deriveGateCardProse(canonicalGates, verdict.word, canonicalDaysToDeadline, evalFraming),
     // ─────────────────────────────────────────────────────────────────────
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,

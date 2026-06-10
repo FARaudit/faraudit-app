@@ -284,13 +284,20 @@ function bucketize(text: string, declaredBucket: string | null): ChecklistBucket
   if (declaredBucket && (BUCKET_ORDER as string[]).includes(declaredBucket)) {
     return declaredBucket as ChecklistBucket;
   }
+  // FA-115 Pass 4 Item 6 — Q&A items checked FIRST so "Questions are due no
+  // later than…" never claims the SUBMISSION DEADLINE bucket. Mirrors the
+  // same-named fix in _view-model.ts:categorizeChecklistBucket.
+  if (/\bquestions?\b|\bq\s*&\s*a\b|\binquir/.test(t)) return "other";
   if (/\bregist|\bsam\.gov|\buei\b|\bduns\b|\bwawf\b/.test(t)) return "registration";
   if (/\bpage\s*limit|\bfont|\bformat|\bvolume\b|\bmargin/.test(t)) return "format";
   if (/\bpast\s*performance|\breferenc/.test(t)) return "mandatory_doc";
   if (/\bdemo|\boral|\bpresentation|\bsite\s*visit/.test(t)) return "mandatory_doc";
   if (/\brepresent|\bcertif|\backnowledg/.test(t)) return "representation";
   if (/\bclearanc|\bts\/sci|\bsecret|\bclassified/.test(t)) return "clearance";
-  if (/\bdue|\bsubmit\s+by|\bdeadline|\bno\s+later\s+than|\bclose\s+of\s+business/.test(t)) return "deadline";
+  // "submit (quote|offer|proposal…) by" — tolerate the object between the
+  // verb and "by" so "Submit quote by 08 Jun" routes to deadline, plus the
+  // "quotes/offers/proposals due" forms.
+  if (/\bdue|submit\s+(?:\w+\s+){0,3}by\b|\bdeadline|\bno\s+later\s+than|\bclose\s+of\s+business/.test(t)) return "deadline";
   return "other";
 }
 

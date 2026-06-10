@@ -43,6 +43,15 @@ const AUDIT_DOCS: Array<{ label: string; id: string; expectedWsState?: 'known' |
     id: 'cc147fe8-3cf3-4512-9f36-367a3085b4f7',
     expectedWsState: 'known',
     expectedE12Fail: true },
+  // FA-115 Pass 4 Item 9 — stable EXPIRED fixture (FA480026Q0061, closed 08 Jun
+  // 2026). Exercises E17's closed-mode branch in the standing gate, which until
+  // now only ever ran the active-mode branch. E12 demoted to warn here by
+  // design: removeKoEmailCard suppresses the §08 card on closed audits, so
+  // .ko-preview is intentionally absent — not an extraction failure.
+  { label: 'USAF · expired · db89100b',
+    id: 'db89100b-f731-44cb-bd38-12eabfb75b23',
+    expectedWsState: 'unknown',
+    expectedE12Fail: true },
 ];
 
 const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
