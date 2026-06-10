@@ -28,10 +28,13 @@ export async function PATCH(
     return NextResponse.json({ error: "no valid fields (in_pipeline | watched)" }, { status: 400 });
   }
 
+  // FA-116: pipeline/watch flags belong to cron-ingested opportunity rows —
+  // never touch user-enqueued audit rows sharing the same notice_id.
   const { error } = await supabase
     .from("pending_audits")
     .update(updates)
-    .eq("notice_id", notice_id);
+    .eq("notice_id", notice_id)
+    .neq("source", "user");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 503 });
   return NextResponse.json({ ok: true });

@@ -229,7 +229,9 @@ async function triggerAuditReply(noticeId: string): Promise<string> {
   const sb = getAdminClient();
   if (!sb) return "Manual audit · admin client unavailable.";
   // Skip if already queued.
-  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).maybeSingle();
+  // FA-116: notice_id is only unique among non-user rows — maybeSingle() would
+  // throw on a user duplicate, so scope the dedupe check to cron-sourced rows.
+  const { data: existing } = await sb.from("pending_audits").select("id, status").eq("notice_id", noticeId).neq("source", "user").maybeSingle();
   if (existing) {
     return `Manual audit · ${noticeId} already queued (status: ${existing.status}). audit-ai will pick it up next cron tick (06:30 CDT).`;
   }

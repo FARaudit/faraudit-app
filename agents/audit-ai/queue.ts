@@ -46,10 +46,13 @@ export async function fetchPending(limit: number): Promise<PendingAudit[]> {
   // Claude budget on opportunities that still have time to bid. The prior
   // "oldest-created first" order could surface already-expired rows when the
   // queue had backlog.
+  // FA-116: source='user' rows belong to the resident audit-worker loop —
+  // the cron must never claim them (disjoint consumer sets, no claim races).
   const { data, error } = await supabase
     .from("pending_audits")
     .select("*")
     .eq("status", "pending")
+    .neq("source", "user")
     .gt("response_deadline", new Date().toISOString())
     .order("response_deadline", { ascending: true })
     .limit(limit);
@@ -95,12 +98,40 @@ export async function markFailed(id: string, message: string): Promise<void> {
   if (error) throw new Error(`markFailed(${id}): ${error.message}`);
 }
 
+// FA-116: notice_id uniqueness is now a partial index (WHERE source <> 'user'),
+// which PostgREST cannot target as an ON CONFLICT arbiter — upsert(onConflict:
+// "notice_id") throws 42P10 against it. Replaced with select-then-split:
+// existing non-user rows are updated by notice_id, fresh rows inserted.
+// Single-writer (daily cron / manual seed), so the non-atomic window is moot.
 export async function upsertPending(rows: Array<Partial<PendingAudit> & { notice_id: string }>): Promise<number> {
-  const { error, count } = await supabase
+  if (rows.length === 0) return 0;
+  const { data: existing, error: existErr } = await supabase
     .from("pending_audits")
-    .upsert(rows, { onConflict: "notice_id", ignoreDuplicates: false, count: "exact" });
-  if (error) throw new Error(`upsertPending: ${error.message}`);
-  return count || 0;
+    .select("notice_id")
+    .neq("source", "user")
+    .in("notice_id", rows.map((r) => r.notice_id));
+  if (existErr) throw new Error(`upsertPending existence check: ${existErr.message}`);
+  const existingSet = new Set(((existing || []) as Array<{ notice_id: string }>).map((r) => r.notice_id));
+
+  let written = 0;
+  const fresh = rows.filter((r) => !existingSet.has(r.notice_id));
+  if (fresh.length > 0) {
+    const { error, count } = await supabase
+      .from("pending_audits")
+      .insert(fresh, { count: "exact" });
+    if (error) throw new Error(`upsertPending insert: ${error.message}`);
+    written += count ?? fresh.length;
+  }
+  for (const row of rows.filter((r) => existingSet.has(r.notice_id))) {
+    const { error } = await supabase
+      .from("pending_audits")
+      .update(row)
+      .eq("notice_id", row.notice_id)
+      .neq("source", "user");
+    if (error) throw new Error(`upsertPending update(${row.notice_id}): ${error.message}`);
+    written += 1;
+  }
+  return written;
 }
 
 // Corpus ceiling helper — returns total completed audits
@@ -124,6 +155,9 @@ const kExpiredMessage = "response_deadline expired before scoring";
 export async function cleanupExpired(): Promise<{ pending_audits: number; audits: number }> {
   const nowIso = new Date().toISOString();
 
+  // FA-116: never sweep user-enqueued rows — auditing an expired solicitation
+  // is a supported user flow (closed-state report mode); the audit-worker
+  // claims those regardless of deadline.
   const { data: paRows, error: paErr } = await supabase
     .from("pending_audits")
     .update({
@@ -132,6 +166,7 @@ export async function cleanupExpired(): Promise<{ pending_audits: number; audits
       processed_at: nowIso
     })
     .eq("status", "pending")
+    .neq("source", "user")
     .lt("response_deadline", nowIso)
     .select("notice_id");
   if (paErr) throw new Error(`cleanupExpired(pending_audits): ${paErr.message}`);

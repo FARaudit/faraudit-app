@@ -30,10 +30,13 @@ export async function GET(
     if (data) row = data as Record<string, unknown>;
   }
   if (!row) {
+    // FA-116: user-enqueued rows may duplicate a cron-ingested notice_id —
+    // .maybeSingle() would throw on >1 row, so scope to non-user.
     const { data } = await supabase
       .from("pending_audits")
       .select("id, notice_id, naics_code, agency, incumbent_name, incumbent_award_value, incumbent_expiry, incumbent_uei, incumbent_lookup_at")
       .eq("notice_id", notice_id)
+      .neq("source", "user")
       .maybeSingle();
     if (data) {
       row = data as Record<string, unknown>;

@@ -56,9 +56,12 @@ export async function insertNew(rows: PendingAuditInsert[]): Promise<{ inserted:
   const existingSet = new Set<string>();
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
+    // FA-116: ignore user-enqueued rows — a user auditing a notice must not
+    // block the cron from ingesting that same notice into the corpus queue.
     const { data: existing, error: existErr } = await supabase
       .from("pending_audits")
       .select("notice_id")
+      .neq("source", "user")
       .in("notice_id", slice.map((r) => r.notice_id));
     if (existErr) throw new Error(`existence check (batch ${i}-${i + slice.length}): ${existErr.message || JSON.stringify(existErr)}`);
     for (const r of (existing || []) as Array<{ notice_id: string }>) existingSet.add(r.notice_id);

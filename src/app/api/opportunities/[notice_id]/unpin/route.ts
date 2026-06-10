@@ -30,10 +30,13 @@ export async function POST(
 
   // Step 1: PATCH pending_audits.in_pipeline=false. If this fails, nothing was
   // mutated yet — return immediately, no compensation needed.
+  // FA-116: pin/unpin operates on cron-ingested rows only — never flip
+  // in_pipeline on user-enqueued audit rows sharing the same notice_id.
   const { error: paErr } = await supabase
     .from("pending_audits")
     .update({ in_pipeline: false })
-    .eq("notice_id", notice_id);
+    .eq("notice_id", notice_id)
+    .neq("source", "user");
   if (paErr) {
     console.error(`[unpin] pending_audits PATCH failed (${notice_id}): ${paErr.message}`);
     return NextResponse.json(
@@ -58,7 +61,8 @@ export async function POST(
     const { error: rbErr } = await supabase
       .from("pending_audits")
       .update({ in_pipeline: true })
-      .eq("notice_id", notice_id);
+      .eq("notice_id", notice_id)
+      .neq("source", "user");
     if (rbErr) {
       console.error(`[unpin] ROLLBACK FAILED (${notice_id}): pending_audits stuck in_pipeline=false but audits stub stuck in_pipeline=true. Manual reconcile required. rollback_error=${rbErr.message}`);
       return NextResponse.json(

@@ -25,10 +25,13 @@ export async function POST(
   // Step 1: load the pending_audits row so we can copy its display fields into
   // the stub audit. We rely on the pending row existing; if it doesn't, this
   // notice_id was either never ingested or has been purged — return 404.
+  // FA-116: scope to non-user rows — user-enqueued audits may duplicate a
+  // cron-ingested notice_id, which would make .maybeSingle() throw on >1 row.
   const { data: pa, error: paErr } = await supabase
     .from("pending_audits")
     .select("notice_id, solicitation_number, title, agency, naics_code, set_aside, response_deadline")
     .eq("notice_id", notice_id)
+    .neq("source", "user")
     .maybeSingle();
   if (paErr) return NextResponse.json({ error: `pending_audits load failed: ${paErr.message}` }, { status: 503 });
   if (!pa)   return NextResponse.json({ error: "notice_id not found in pending_audits" }, { status: 404 });
@@ -61,7 +64,8 @@ export async function POST(
   const { error: pinPaErr } = await supabase
     .from("pending_audits")
     .update({ in_pipeline: true })
-    .eq("notice_id", notice_id);
+    .eq("notice_id", notice_id)
+    .neq("source", "user");
   if (pinPaErr) return NextResponse.json({ error: `pending_audits pin failed: ${pinPaErr.message}` }, { status: 503 });
 
   // Step 3: is there an audits row already? If so, just ensure in_pipeline=true on it.
