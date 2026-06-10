@@ -1971,18 +1971,59 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       return risks.slice(0, 3).map((r) => sanitizeDisplayText(r.title || r.description.slice(0, 100)));
     })(),
     exec_actions: (() => {
+      // FA-114: clamp generated action dates against responseDeadline. Engine
+      // can emit "By 11 Jun" strings that exceed the deadline; the VM-derived
+      // fallback can also overshoot when risks.length > days_remaining. In
+      // either case the "By <date>" prefix is dropped so the action text
+      // stands alone. Applies in ALL modes — not only is_expired.
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const monIdx: Record<string, number> = {
+        jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+      };
+      // Robust parser — JS's Date(string) is unreliable for short formats like
+      // "11 Jun 2026". Manually parse "By D Mon" / "By Mon D" / ISO formats.
+      const parseWhen = (when: string): Date | null => {
+        if (!when) return null;
+        const stripped = when.replace(/^By\s+/i, "").trim();
+        // ISO-ish: 2026-06-11 or 2026-06-11T...
+        const iso = stripped.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]));
+        // Day Mon  ("11 Jun")  or  Mon Day  ("Jun 11")  — with optional year
+        const parts = stripped.split(/[\s,]+/).filter(Boolean);
+        let day: number | null = null;
+        let mon: number | null = null;
+        let yearTok: number | null = null;
+        for (const p of parts) {
+          const n = parseInt(p, 10);
+          if (!isNaN(n)) {
+            if (n >= 1 && n <= 31 && day === null) day = n;
+            else if (n >= 2020 && n <= 2099) yearTok = n;
+          } else {
+            const m = monIdx[p.slice(0, 3).toLowerCase()];
+            if (m !== undefined && mon === null) mon = m;
+          }
+        }
+        if (day === null || mon === null) return null;
+        const year = yearTok ?? new Date().getUTCFullYear();
+        return new Date(Date.UTC(year, mon, day));
+      };
+      const clampWhen = (when: string): string => {
+        if (!when || !responseDeadline) return when;
+        const d = parseWhen(when);
+        return d && d > responseDeadline ? "" : when;
+      };
       const eng = compJson.executive_summary as { actions?: unknown } | undefined;
       if (Array.isArray(eng?.actions)) {
         return (eng.actions as Array<{ when?: unknown; text?: unknown }>).map((a) => ({
-          when: sanitizeDisplayText(String(a.when ?? "")),
+          when: clampWhen(sanitizeDisplayText(String(a.when ?? ""))),
           text: sanitizeDisplayText(String(a.text ?? ""))
         }));
       }
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       return risks.slice(0, 3).map((r, i) => {
         const d = new Date(Date.now() + (i + 1) * 86_400_000);
+        const past = responseDeadline && d > responseDeadline;
         return {
-          when: `By ${d.getUTCDate()} ${months[d.getUTCMonth()]}`,
+          when: past ? "" : `By ${d.getUTCDate()} ${months[d.getUTCMonth()]}`,
           text: sanitizeDisplayText(r.faraudit_action || r.title || r.description.slice(0, 160))
         };
       });

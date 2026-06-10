@@ -1214,8 +1214,14 @@ function renderExecFactors(html: string, factors: string[]): string {
 
 function renderExecActions(html: string, actions: Array<{ when: string; text: string }>): string {
   if (actions.length === 0) return setFieldInner(html, "exec_actions", "div", "");
+  // FA-114: when the VM clamps a date past response_deadline it emits when=""
+  // — skip the es-when span entirely so the action text doesn't sit next to
+  // an empty CSS-styled pill.
   const inner = actions
-    .map((a) => `<div class="es-act"><span class="es-when">${escapeHtml(a.when)}</span><span>${escapeHtml(a.text)}</span></div>`)
+    .map((a) => {
+      const whenSpan = a.when ? `<span class="es-when">${escapeHtml(a.when)}</span>` : "";
+      return `<div class="es-act">${whenSpan}<span>${escapeHtml(a.text)}</span></div>`;
+    })
     .join("");
   return setFieldInner(html, "exec_actions", "div", inner);
 }
@@ -1607,6 +1613,102 @@ function removeKoEmailCard(html: string): string {
   // non-word chars (`"` and the following space/`>`), so removeElementByOpenRe
   // would silently no-op. [^>]*> handles any following attributes safely.
   return removeElementByOpenRe(html, /<div class="ko-card"[^>]*>/, "div");
+}
+
+// ─── FA-114: closed-state report-wide mode ────────────────────────────────
+// All functions below are no-ops on active audits and only invoked when
+// vm.is_expired === true. They run AFTER the normal renderers populate the
+// dynamic data-field anchors, so they operate on the final rendered HTML
+// (real data already in place). Demo-leak guard runs as the LAST step in
+// renderAuditReportComplete and catches any residue.
+
+// (1) Hero gate — strip "today" voice from the gate_verdict / .gs-k counter.
+// The recommendation word (NO-BID / PROCEED / CAUTION) stays — it's the
+// historical verdict, valid regardless of whether the solicitation is still
+// open. Only the imperative-present-tense framing changes.
+function applyClosedHeroGate(html: string): string {
+  let out = html;
+  // gate_verdict text: drop "today" imperative (template uses unicode "—" not "&mdash;")
+  out = out.replace(/unless all three are true today/gi, "based on conditions as posted");
+  out = out.replace(/are true today/gi, "were true as posted");
+  // .gs-k header structure: <span class="gs-k">Bid gate — <b><span class="gs-cnt">N / M</span></b> cleared</span>
+  // Match through the nested <b><span>...</span></b> and any text after, ending at the OUTER </span>.
+  out = out.replace(
+    /(<span class="gs-k">)Bid gate (?:—|&mdash;)[\s\S]*?<\/b>[^<]*(<\/span>)/,
+    "$1Bid gate &mdash; <b>as posted</b>$2"
+  );
+  return out;
+}
+
+// (2) Critical path — replace the .tl-sub "Submit by ... N steps" with a
+// reference-mode "Closed ... — requirements as posted" line.
+function applyClosedCriticalPath(html: string, responseDeadlineShort: string): string {
+  const dateLabel = responseDeadlineShort && responseDeadlineShort.trim().length > 0
+    ? escapeHtml(responseDeadlineShort)
+    : "the response deadline";
+  return html.replace(
+    /<div class="tl-sub">[\s\S]*?<\/div>/,
+    `<div class="tl-sub">Closed ${dateLabel} &mdash; requirements as posted</div>`
+  );
+}
+
+// (3) Strip the entire "Next 48 hours" .es-col block. There are sibling
+// .es-col elements (e.g. the verdict-factors column) — anchor on the actual
+// "Next 48 hours" header position, then walk BACK to find the enclosing
+// .es-col open tag and forward to its matching close.
+function removeNext48HoursBlock(html: string): string {
+  const headerNeedle = '<p class="es-h">Next 48 hours</p>';
+  const headerIdx = html.indexOf(headerNeedle);
+  if (headerIdx < 0) return html;
+  const before = html.slice(0, headerIdx);
+  const esColOpen = before.lastIndexOf('<div class="es-col">');
+  if (esColOpen < 0) return html;
+  const range = findMatchingClose(html, esColOpen, "div");
+  if (!range) return html;
+  return html.slice(0, esColOpen) + html.slice(range.closeEnd);
+}
+
+// (4) §09 Submission Checklist — swap header subtitle to reference framing,
+// remove the "N / M complete" progress counter, and strip interactive
+// checkbox inputs inside the .checklist (items render as plain reference list).
+function applyClosedChecklistHeader(html: string): string {
+  let out = html;
+  // Target the §09 st-sub specifically (multiple st-sub spans exist in the
+  // template; .replace without /g would otherwise hit the first one). The
+  // <span> directly follows "Submission Checklist" text.
+  out = out.replace(
+    /(>Submission Checklist<span class="st-sub">)[^<]*(<\/span>)/,
+    "$1Reference &mdash; submission requirements as posted$2"
+  );
+  // Strip the progress counter span
+  out = out.replace(/<span class="ck-prog">[\s\S]*?<\/span>/, "");
+  // Strip interactive checkbox inputs within the checklist section. Use a
+  // permissive regex so attribute order / quoting style doesn't matter.
+  const checklistOpen = out.indexOf('<div class="checklist"');
+  const checklistEnd = checklistOpen >= 0 ? out.indexOf("</section>", checklistOpen) : -1;
+  if (checklistOpen >= 0 && checklistEnd > checklistOpen) {
+    const segment = out.slice(checklistOpen, checklistEnd);
+    const stripped = segment.replace(/<input\b[^>]*type=['"]?checkbox['"]?[^>]*>/gi, "");
+    out = out.slice(0, checklistOpen) + stripped + out.slice(checklistEnd);
+  }
+  return out;
+}
+
+// (5) §06 Bid Gate outcomes — past-tense framing. applyCanonicalVerdict
+// already touches the <b>...</b> lead words; we swap the trailing text after
+// each <b>. The "no" outcome's "Track for the next solicitation" becomes the
+// primary forward-looking action. Factual — no invented recompete dates.
+function applyClosedBidGate(html: string): string {
+  let out = html;
+  out = out.replace(
+    /(<div class="g-oc win"><b>[\s\S]*?<\/b>)[^<]*(<\/div>)/,
+    "$1 &mdash; conditions required at submission to win.$2"
+  );
+  out = out.replace(
+    /(<div class="g-oc no(?:\s+active)?"><b>[\s\S]*?<\/b>)[^<]*(<\/div>)/,
+    "$1 &mdash; track the next acquisition for this requirement.$2"
+  );
+  return out;
 }
 
 // FA-112: gate_pearl ("catch worth the subscription") render. When VM supplies
@@ -2121,6 +2223,7 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // VM data; visibility suppression is additive on top.
   html = renderKoEmailCard(html, vm.ko_email);
   if (vm.is_expired) {
+    // FA-107: banner + KO card visibility suppression
     html = insertExpiredBanner(html, vm.response_deadline_short);
     html = removeKoEmailCard(html);
   }
@@ -2227,6 +2330,18 @@ export function renderAuditReportComplete(
   const v2Input = buildV2ViewModelFromShadow(audit);
   if (v2Input) html = renderV2Surfaces(html, v2Input);
   html = stripHideWhenEmptyBlocks(html, vm);
+  // FA-114: report-wide closed-state framing — operates on FINAL HTML so that
+  // checkbox-strip / progress-counter-strip survive renderSubmissionChecklist
+  // (which would otherwise re-emit them). Order: hero gate → critical path →
+  // next-48 strip → checklist header (last so the checkbox strip lands AFTER
+  // renderSubmissionChecklist's injection) → bid gate.
+  if (vm.is_expired) {
+    html = applyClosedHeroGate(html);
+    html = applyClosedCriticalPath(html, vm.response_deadline_short);
+    html = removeNext48HoursBlock(html);
+    html = applyClosedChecklistHeader(html);
+    html = applyClosedBidGate(html);
+  }
   // FA-112: final-stage demo-leak guard. Catches any template demo content
   // (SP4701 / Rivera / H-60 / procurexinc / Predictive Maintenance Analytics)
   // that survived all prior render passes. Warn-only on failure to resolve

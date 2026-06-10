@@ -66,6 +66,7 @@ const BLOCKING_IDS = new Set<string>([
   'E14', // §03 CLIN cards, flagged item carries .cpill.flag, no empty .cpill — Jun 8 2026 re-sync
   'E15', // §05 risk-cap UX — visible cap=10, .risk-more.is-shown, click expands, no orphan labels
   'E16', // FA-112 demo-leak guard — no template demo markers in rendered DOM
+  'E17', // FA-114 closed-state mode — symmetric: closed surfaces on expired, active surfaces on live
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -518,6 +519,64 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E16', pass: e16.ok, detail: e16.detail });
+
+  // E17 — FA-114 closed-state mode symmetric assertion.
+  // Detects mode via SOLICITATION CLOSED banner presence and asserts the
+  // appropriate surface set is in the DOM (closed vs active). On closed
+  // audits: closed banner + no "today" imperative + no NEXT-48-HOURS + no
+  // post-deadline "By <date>" entries + checklist shows reference framing.
+  // On active audits: no banner + Pre-flight subtitle + Submit-by critical
+  // path + KO card visible (no FA-107-style over-suppression).
+  const e17 = await page.evaluate(() => {
+    const text = document.body.innerHTML;
+    const closed = /Solicitation closed/i.test(text);
+    if (closed) {
+      const fails: string[] = [];
+      if (/are true today/i.test(text)) fails.push('"today" imperative still present');
+      if (/<p class="es-h">Next 48 hours<\/p>/i.test(text)) fails.push('NEXT-48-HOURS block not stripped');
+      if (!/Closed[^<]{0,60}requirements as posted/i.test(text)) fails.push('critical path not in reference framing');
+      if (!/Reference[^<]{0,30}submission requirements as posted/i.test(text)) fails.push('checklist subtitle not in reference framing');
+      if (/Pre-flight[^<]{0,30}everything that must be true/i.test(text)) fails.push('Pre-flight subtitle still active');
+      // post-deadline By-dates check — scan rendered .es-when spans
+      const esWhenMatches = Array.from(text.matchAll(/<span class="es-when">By\s+(\S[^<]*?)<\/span>/g));
+      const dlEl = document.querySelector('[data-field="response_deadline"]');
+      const dl = dlEl ? new Date(dlEl.textContent || '') : null;
+      const monIdx: Record<string, number> = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+      for (const m of esWhenMatches) {
+        const parts = m[1].trim().split(/[\s,]+/).filter(Boolean);
+        let day: number | null = null, mon: number | null = null;
+        for (const p of parts) {
+          const n = parseInt(p, 10);
+          if (!isNaN(n) && n >= 1 && n <= 31 && day === null) day = n;
+          const mi = monIdx[p.slice(0,3).toLowerCase()];
+          if (mi !== undefined && mon === null) mon = mi;
+        }
+        if (day !== null && mon !== null && dl) {
+          const y = new Date().getUTCFullYear();
+          const d = new Date(Date.UTC(y, mon, day));
+          if (d > dl) { fails.push(`es-when "${m[1]}" past deadline`); break; }
+        }
+      }
+      return {
+        ok: fails.length === 0,
+        detail: fails.length === 0
+          ? 'closed-mode surfaces ✓ (banner · no-today · no-48h · ref-checklist · clamped dates)'
+          : 'closed-mode fail: ' + fails.join(' | '),
+      };
+    }
+    // Active mode — guard against over-suppression (the FA-107 lesson).
+    const fails: string[] = [];
+    if (!/Pre-flight[^<]{0,30}everything that must be true/i.test(text)) fails.push('active Pre-flight subtitle missing');
+    if (!/<div class="tl-sub">[^<]{0,60}Submit by/i.test(text)) fails.push('active "Submit by" critical path missing');
+    if (!/<div class="ko-card"/i.test(text)) fails.push('KO card missing (over-suppression?)');
+    return {
+      ok: fails.length === 0,
+      detail: fails.length === 0
+        ? 'active-mode surfaces ✓ (Pre-flight · Submit-by · KO card present)'
+        : 'active-mode fail: ' + fails.join(' | '),
+    };
+  });
+  results.push({ id: 'E17', pass: e17.ok, detail: e17.detail });
 
   return results;
 }
