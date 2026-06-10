@@ -65,6 +65,7 @@ const BLOCKING_IDS = new Set<string>([
   'E10', // rail jump-nav inside aside.rail — Phase 3 (removeReadinessCard walker fix)
   'E14', // §03 CLIN cards, flagged item carries .cpill.flag, no empty .cpill — Jun 8 2026 re-sync
   'E15', // §05 risk-cap UX — visible cap=10, .risk-more.is-shown, click expands, no orphan labels
+  'E16', // FA-112 demo-leak guard — no template demo markers in rendered DOM
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -484,6 +485,39 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E15', pass: e15.ok, detail: e15.detail });
+
+  // E16 — FA-112 demo-leak guard. Asserts rendered page contains none of the
+  // template's hardcoded demo markers. Catches both FA-107-style over-suppression
+  // (anchors skipped when expired) and unbound data-field elements (e.g. the
+  // gate_pearl <div class="g-pearl"> that had zero replaceField* call binding
+  // in the codebase). BLOCKING — demo content in a customer report is a
+  // demo-killer.
+  const e16 = await page.evaluate(() => {
+    // Markers MUST be unambiguous template-default phrases (no collisions with
+    // legitimate engine output). Mirrors DEMO_MARKERS in _render.ts demoLeakGuard.
+    const markers = [
+      'SP4701-26-Q-0942',
+      'Ms. Rivera,',
+      'Predictive Maintenance Analytics for the H-60',
+      'The catch worth the subscription',
+    ];
+    const html = document.documentElement.outerHTML;
+    const hits: Array<{ marker: string; idx: number; context: string }> = [];
+    for (const m of markers) {
+      const idx = html.indexOf(m);
+      if (idx >= 0) {
+        const before = html.slice(Math.max(0, idx - 80), idx).replace(/\s+/g, ' ');
+        hits.push({ marker: m, idx, context: '…' + before + '«' + m + '»' });
+      }
+    }
+    return {
+      ok: hits.length === 0,
+      detail: hits.length === 0
+        ? 'no demo markers in DOM ✓'
+        : `demo markers leaked: ${hits.map((h) => `${h.marker}@${h.idx} ctx=${h.context}`).join(' | ')}`,
+    };
+  });
+  results.push({ id: 'E16', pass: e16.ok, detail: e16.detail });
 
   return results;
 }

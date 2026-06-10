@@ -1598,6 +1598,108 @@ function dedupeKoPreview(html: string): string {
   });
 }
 
+// FA-112: visibility suppression for the .ko-card section. Used when
+// vm.is_expired === true. Anchors INSIDE the card are still replaced by
+// renderKoEmailCard before this strip runs — preserves the no-demo-leak
+// invariant even though the card never reaches the viewport.
+function removeKoEmailCard(html: string): string {
+  // Regex note: no `\b` after the quoted class — \b doesn't match between two
+  // non-word chars (`"` and the following space/`>`), so removeElementByOpenRe
+  // would silently no-op. [^>]*> handles any following attributes safely.
+  return removeElementByOpenRe(html, /<div class="ko-card"[^>]*>/, "div");
+}
+
+// FA-112: gate_pearl ("catch worth the subscription") render. When VM supplies
+// pearl content, replace inner; otherwise strip the entire <div class="g-pearl">
+// element from the output so the template's demo procurex/reverse-auction copy
+// never leaks. Default for now is null until an engine surface (likely the
+// hero L02 catch) is wired into vm.gate_pearl.
+function renderGatePearl(html: string, pearl: string | null): string {
+  if (pearl && pearl.trim().length > 0) {
+    return replaceFieldInner(html, "gate_pearl", escapeHtml(pearl));
+  }
+  return removeElementByOpenRe(html, /<div class="g-pearl"[^>]*>/, "div");
+}
+
+// FA-112: demo-leak guard. Last render step. Scans for known template demo
+// markers and blanks the enclosing data-field element (or nearest block element)
+// if any survive. Never throws — failure mode is console.warn only so render
+// output is never broken by the guard itself.
+function demoLeakGuard(html: string): string {
+  // Markers must be UNAMBIGUOUS template-default phrases — substrings that
+  // can only appear via an unreplaced data-field anchor or an unstripped
+  // template element. Pass 1 testing showed that broader substrings
+  // ("procurexinc", "H-60", "Rivera") collide with legitimate engine output:
+  //   - "procurexinc" is emitted by buildReverseAuctionRisk (audit-engine.ts:1182,1188)
+  //     in the L02 reverse-auction risk text
+  //   - "H-60" is a real military helicopter platform; appears in real
+  //     defense solicitations
+  //   - "Rivera" is a common surname; could appear as a real CO name
+  // Using those raw substrings as guard markers would blank legitimate
+  // engine content. The phrases below are unique to the template's demo
+  // defaults at _template.html lines 5, 1111, 1155, 1812, 1854, 1856, 1858,
+  // 1998, 2003, 2441.
+  const DEMO_MARKERS = [
+    "SP4701-26-Q-0942",
+    "Ms. Rivera,",
+    "Predictive Maintenance Analytics for the H-60",
+    "The catch worth the subscription",
+  ];
+  try {
+    let out = html;
+    for (const marker of DEMO_MARKERS) {
+      let safetyCounter = 0;
+      while (safetyCounter < 50) {
+        const idx = out.indexOf(marker);
+        if (idx < 0) break;
+        const before = out.slice(0, idx);
+        const fieldTagRe = /<([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?\bdata-field="([^"]+)"[^>]*>/g;
+        let lastFieldMatch: { tag: string; key: string; idx: number } | null = null;
+        let m: RegExpExecArray | null;
+        while ((m = fieldTagRe.exec(before)) !== null) {
+          lastFieldMatch = { tag: m[1], key: m[2], idx: m.index };
+        }
+        if (lastFieldMatch) {
+          const range = findMatchingClose(out, lastFieldMatch.idx, lastFieldMatch.tag);
+          if (range && idx >= range.contentStart && idx < range.contentEnd) {
+            out = out.slice(0, range.contentStart) + out.slice(range.contentEnd);
+            // eslint-disable-next-line no-console
+            console.warn("[DEMO-LEAK]", marker, "in data-field=" + lastFieldMatch.key);
+            safetyCounter++;
+            continue;
+          }
+        }
+        // Fallback: nearest block element (div / p / span / section / h1-6).
+        const blockTagRe = /<(div|p|span|section|h[1-6])\b[^>]*>/g;
+        let lastBlockMatch: { tag: string; idx: number } | null = null;
+        while ((m = blockTagRe.exec(before)) !== null) {
+          lastBlockMatch = { tag: m[1], idx: m.index };
+        }
+        if (lastBlockMatch) {
+          const range = findMatchingClose(out, lastBlockMatch.idx, lastBlockMatch.tag);
+          if (range && idx >= range.contentStart && idx < range.contentEnd) {
+            out = out.slice(0, range.contentStart) + out.slice(range.contentEnd);
+            // eslint-disable-next-line no-console
+            console.warn("[DEMO-LEAK]", marker, "(no data-field; stripped <" + lastBlockMatch.tag + ">)");
+            safetyCounter++;
+            continue;
+          }
+        }
+        // Couldn't resolve enclosing element — warn-only, halt this marker.
+        // eslint-disable-next-line no-console
+        console.warn("[DEMO-LEAK]", marker, "(could not resolve enclosing element)");
+        break;
+      }
+    }
+    return out;
+  } catch (e) {
+    // Fail-safe: guard must never throw. Surface the error and return original.
+    // eslint-disable-next-line no-console
+    console.warn("[DEMO-LEAK]", "guard internal error:", e instanceof Error ? e.message : String(e));
+    return html;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function renderAuditReport(template: string, vm: AuditViewModel): string {
@@ -2011,12 +2113,18 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     `$1href="${escapeAttr(vm.matrix_export_url)}"$2`
   );
 
-  // FA-107: inject SOLICITATION CLOSED banner + suppress KO email card when expired
+  // FA-112 (FA-107 decouple): anchors are ALWAYS replaced; expiry controls
+  // visibility, not replacement. The previous else-only path skipped
+  // renderKoEmailCard when is_expired=true, leaking template demo defaults
+  // (SP4701 / Ms. Rivera) through unreplaced ko_email.subject and
+  // ko_email.preview anchors. Invariant: anchors always populated with real
+  // VM data; visibility suppression is additive on top.
+  html = renderKoEmailCard(html, vm.ko_email);
   if (vm.is_expired) {
     html = insertExpiredBanner(html, vm.response_deadline_short);
-  } else {
-    html = renderKoEmailCard(html, vm.ko_email);
+    html = removeKoEmailCard(html);
   }
+  html = renderGatePearl(html, vm.gate_pearl);
 
   // §03 work-statement reveal — Phase 2 #3. Floor: never silently vanish.
   html = renderWorkStatementReveal(html, vm.work_statement, vm.work_statement_unknown);
@@ -2118,5 +2226,10 @@ export function renderAuditReportComplete(
   let html = renderAuditReport(template, vm);
   const v2Input = buildV2ViewModelFromShadow(audit);
   if (v2Input) html = renderV2Surfaces(html, v2Input);
-  return stripHideWhenEmptyBlocks(html, vm);
+  html = stripHideWhenEmptyBlocks(html, vm);
+  // FA-112: final-stage demo-leak guard. Catches any template demo content
+  // (SP4701 / Rivera / H-60 / procurexinc / Predictive Maintenance Analytics)
+  // that survived all prior render passes. Warn-only on failure to resolve
+  // — never throws.
+  return demoLeakGuard(html);
 }

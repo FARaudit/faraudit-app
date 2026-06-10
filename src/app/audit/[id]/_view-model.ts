@@ -148,6 +148,13 @@ export interface AuditViewModel {
     blocker_note: string; // "UNFIXABLE IN N DAYS IF MISSING" when not curable, else ""
   }>;
 
+  // FA-112: gate_pearl ("catch worth the subscription" band). No engine surface
+  // exists yet — defaults to null. Renderer replaces inner when populated,
+  // strips the entire <div class="g-pearl"> element when null. Prevents the
+  // template's demo procurex / reverse-auction copy from leaking on audits
+  // that don't have a hero L02 catch.
+  gate_pearl: string | null;
+
   // ─── Fork 3 surfaces (2026-06-05) ────────────────────────────────────────
   // Six new template surfaces from Design's Fork 3 capture package; markup
   // pinned at ceo/redesign-final/platform/audit-report.html. Data layer
@@ -1939,6 +1946,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // corpus scan), not compJson.verdict.gates. Same gates fire across all
     // extraction runs when the underlying signal is in any stored field.
     gate_conditions: deriveGateConditions(canonicalGates, canonicalDaysToDeadline),
+    gate_pearl: null,
 
     // ─── Fork 3 surfaces (2026-06-05) — derived from existing engine output ──
     // exec_*: engine-emitted (complianceJson.executive_summary) when available.
