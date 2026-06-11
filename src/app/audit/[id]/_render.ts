@@ -2277,6 +2277,17 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   if (vm.verdict_mode === "gate" || vm.score_locked) {
     html = injectVerdictModeCall(html);
   }
+  // FA-129 — CEO ruling: a NO-BID verdict is final. The interactive bid-gate
+  // tile ("tick what you hold — resolves to BID when all true") and the
+  // masthead "Bid only if — all true today" rows contradict it, so both are
+  // stripped server-side on NO-BID. CAUTION/GO keep the instrument unchanged.
+  // applyVerdictMode('gate') still runs above — its #reco-gate lookup is
+  // null-guarded, and the masthead numeric-tile suppression + win-themes
+  // hiding (FA-108) must survive.
+  if (vm.verdict_word === "NO-BID") {
+    html = removeElementByOpenRe(html, /<div class="gate-card"[^>]*>/, "div");
+    html = removeElementByOpenRe(html, /<div class="mhv-gates"[^>]*>/, "div");
+  }
 
   // Canonicalization wiring (Brain ruling 2026-06-06) — single-source
   // verdict + canonical §06 prose. Replaces hardcoded template demo strings
