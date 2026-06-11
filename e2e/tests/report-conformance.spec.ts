@@ -568,12 +568,13 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
         const txt = body ? (body.textContent || '').replace(/\s+/g, '') : '';
         if (!txt) fails.push('§08 visible with empty body (ready-to-send shell)');
       }
-      // KO CTA: canonical guard scope is rail/actions only — the masthead
-      // .ma-btn is deliberately exempt. Visibility via closest('.act') wrapper.
-      for (const el of Array.from(document.querySelectorAll<HTMLElement>('.rail [data-open-ko], .actions [data-open-ko]'))) {
+      // KO CTA: zero visible [data-open-ko] anywhere — incl. the masthead
+      // .ma-btn (canonical updated Jun 11; was rail/actions-scoped, which
+      // left a dead "Fix it in the KO email" hero CTA on closed docs).
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-open-ko]'))) {
         const target = (el.closest<HTMLElement>('.act') || el);
         if (getComputedStyle(target).display !== 'none') {
-          fails.push('live [data-open-ko] CTA on closed audit');
+          fails.push(`live [data-open-ko] CTA on closed audit (${el.className || el.tagName})`);
           break;
         }
       }

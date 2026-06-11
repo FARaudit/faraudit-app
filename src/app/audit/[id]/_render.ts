@@ -1730,7 +1730,8 @@ function removeKoEmailCard(html: string): string {
 // §08 KO-email empty-guard (canonical, Jun 11) — server-side mirror of the
 // template's sec-ko IIFE for PDF/no-JS readers. Canonical rule: zero text in
 // the first of .ko-preview/.ko-print-full/.ko-card → hide §08, its jump-nav
-// entry, and the rail [data-open-ko] action. Trigger case: closed-mode
+// entry, and every [data-open-ko] outside #sec-ko (incl. the masthead
+// .ma-btn — a dead "Fix it in the KO email" CTA). Trigger case: closed-mode
 // removeKoEmailCard strips the whole .ko-card, leaving a "ready to send"
 // header over an empty body with a live "Send KO email" CTA on a dead
 // deadline (FA930126Q0017). Open-mode cards always carry To/Subject label
@@ -1756,7 +1757,14 @@ function stripEmptyKoSection(html: string): string {
   if (text) return html;
   let out = removeElementByOpenRe(html, secOpenRe, "section");
   out = out.replace(/<a href="#sec-ko">[\s\S]*?<\/a>\s*/i, "");
-  out = removeElementByOpenRe(out, /<button class="act primary" data-open-ko>/, "button");
+  // Section removal already dropped the in-section KO buttons; every markup
+  // [data-open-ko] left (rail CTA, masthead .ma-btn) is a <button> and dies
+  // here. Script-text mentions of the attribute don't match the open-tag re.
+  for (;;) {
+    const next = removeElementByOpenRe(out, /<button[^>]*\sdata-open-ko[^>]*>/, "button");
+    if (next === out) break;
+    out = next;
+  }
   return out;
 }
 

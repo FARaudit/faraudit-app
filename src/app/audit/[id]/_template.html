@@ -2358,7 +2358,8 @@ Capture Lead, [Company]
    Closed-mode (or any) renders that strip the drafted email body must not leave a visible
    "ready to send" shell (caught Jun 11, FA930126Q0017 closed doc: header + empty box + a live
    "Send KO email" rail CTA on a dead deadline). Zero body text → hide §08, its jump-nav entry,
-   and any rail action that opens the KO drawer. Same doctrine as §09/timeline/§02/§04. */
+   and EVERY [data-open-ko] outside #sec-ko — incl. the masthead .ma-btn, otherwise a dead
+   "Fix it in the KO email" CTA. Same doctrine as §09/timeline/§02/§04. */
 (function(){
   var sec=document.getElementById('sec-ko'); if(!sec) return;
   var body=sec.querySelector('.ko-preview, .ko-print-full, .ko-card');
@@ -2366,7 +2367,8 @@ Capture Lead, [Company]
   if(txt) return;
   sec.style.display='none';
   var jn=document.querySelector('a[href="#sec-ko"]'); if(jn) jn.style.display='none';
-  [].forEach.call(document.querySelectorAll('.rail [data-open-ko], .actions [data-open-ko]'),function(a){
+  [].forEach.call(document.querySelectorAll('[data-open-ko]'),function(a){
+    if(sec.contains(a)) return;
     var act=a.closest('.act')||a; act.style.display='none';
   });
 })();
