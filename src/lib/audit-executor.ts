@@ -22,7 +22,8 @@ import {
   runAuditV2,
   runAuditV2Metadata,
   AUDIT_V2_ENABLED,
-  type PdfSource
+  type PdfSource,
+  type ExternalBoundFacts
 } from "@/lib/audit-engine";
 
 export class AuditPersistError extends Error {
@@ -131,7 +132,32 @@ export async function executeAudit(
   if (AUDIT_V2_ENABLED && v2Buffer) {
     const v2Start = Date.now();
     try {
-      const v2Result = await runAuditV2(v2Buffer);
+      // FA-131 — V1 vision output + SAM notice metadata are both in scope
+      // here; pass them so V2's judgment never sees "unknown" for a fact
+      // either source already bound (image-scan PDFs yield zero local facts).
+      const v2External: ExternalBoundFacts = {
+        v1: {
+          solicitorNumber:
+            result.overview.json.solicitation_number_canonical ??
+            (typeof persistedComplianceJson.solicitation_number_canonical === "string"
+              ? persistedComplianceJson.solicitation_number_canonical
+              : null),
+          contractType: result.overview.json.contract_type ?? null,
+          issuingOffice: result.overview.json.customer ?? null,
+          setAside:
+            (typeof persistedComplianceJson.set_aside_type === "string" && persistedComplianceJson.set_aside_type
+              ? persistedComplianceJson.set_aside_type
+              : null) ?? persistedComplianceJson.set_aside_text ?? null,
+        },
+        sam: {
+          solicitorNumber: solicitation.solicitationNumber,
+          naicsCode: solicitation.naicsCode,
+          setAside: solicitation.typeOfSetAside,
+          offerDueDate: solicitation.responseDeadLine,
+          issuingOffice: agency,
+        },
+      };
+      const v2Result = await runAuditV2(v2Buffer, v2External);
       const v2Shadow = {
         path: "pdf",
         judgment: v2Result.judgment,

@@ -2595,12 +2595,13 @@ JSON only — one key: risk_findings.`;
 
 import { extractText as _v2ExtractText } from "./pdf-text-extractor";
 import { detectSections as _v2DetectSections } from "./section-boundary-detector";
-import { extractAllFacts as _v2ExtractAllFacts } from "./section-extractors";
+import { extractAllFacts as _v2ExtractAllFacts, type ExtractedFacts } from "./section-extractors";
 import {
   runJudgment as _v2RunJudgment,
   type AuditJudgment as _v2AuditJudgment,
   type AuditL02Catch as _v2AuditL02Catch,
   type AuditConfidenceNote as _v2AuditConfidenceNote,
+  type BoundFactSources as _v2BoundFactSources,
 } from "./audit-judgment";
 import {
   matrixRollup as _v2MatrixRollup,
@@ -3257,7 +3258,77 @@ function _v2BuildPriceAnchor(
   };
 }
 
-export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
+// ─── FA-131 — external bound-fact overlay ──────────────────────────────────
+// On image-scan PDFs local text extraction yields zero scalar facts, so the
+// judgment used to see "unknown" for fields V1 vision or SAM metadata had
+// already bound — producing printed confidence notes that contradict the
+// rest of the report. Callers that hold V1 output and/or the SAM notice pass
+// them here; runAuditV2 fills only the gaps (local extraction always wins)
+// and threads per-field provenance into the judgment prompt.
+
+export interface ExternalScalarFacts {
+  solicitorNumber?: string | null;
+  naicsCode?: string | null;
+  setAside?: string | null;
+  offerDueDate?: string | null;
+  contractType?: string | null;
+  issuingOffice?: string | null;
+}
+
+export interface ExternalBoundFacts {
+  v1?: ExternalScalarFacts;
+  sam?: ExternalScalarFacts;
+}
+
+function normalizeContractType(raw: string | null | undefined): ExtractedFacts["contractType"] {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  if (/\bFFP\b|firm[\s-]*fixed/i.test(s)) return "FFP";
+  if (/\bT\s*&\s*M\b|time[\s-]*(?:and|&)[\s-]*materials?/i.test(s)) return "T&M";
+  if (/\bCPFF\b|cost[\s-]*plus/i.test(s)) return "CPFF";
+  if (/\bIDIQ\b|indefinite[\s-]*delivery/i.test(s)) return "IDIQ";
+  return "other";
+}
+
+function bindExternalFacts(
+  facts: ExtractedFacts,
+  external: ExternalBoundFacts | undefined
+): _v2BoundFactSources {
+  const boundSources: _v2BoundFactSources = {};
+  const stringKeys = ["solicitorNumber", "naicsCode", "setAside", "offerDueDate", "issuingOffice"] as const;
+  for (const key of stringKeys) {
+    if (facts[key]) {
+      boundSources[key] = "document";
+      continue;
+    }
+    const fromV1 = external?.v1?.[key]?.trim();
+    const fromSam = external?.sam?.[key]?.trim();
+    if (fromV1) {
+      facts[key] = fromV1;
+      boundSources[key] = "v1_vision";
+    } else if (fromSam) {
+      facts[key] = fromSam;
+      boundSources[key] = "sam_metadata";
+    }
+  }
+  if (facts.contractType) {
+    boundSources.contractType = "document";
+  } else {
+    const v1Ct = normalizeContractType(external?.v1?.contractType);
+    const samCt = normalizeContractType(external?.sam?.contractType);
+    if (v1Ct) {
+      facts.contractType = v1Ct;
+      boundSources.contractType = "v1_vision";
+    } else if (samCt) {
+      facts.contractType = samCt;
+      boundSources.contractType = "sam_metadata";
+    }
+  }
+  return boundSources;
+}
+
+export async function runAuditV2(pdfBuffer: Buffer, external?: ExternalBoundFacts): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
 
   // Fix 7 — pre-extraction wrong-doc detection. Returns synthesized
@@ -3287,7 +3358,12 @@ export async function runAuditV2(pdfBuffer: Buffer): Promise<AuditV2Result> {
   const facts = _v2ExtractAllFacts(sectionBag.sections);
   for (const w of facts.extractionWarnings) warnings.push(`[facts] ${w}`);
 
-  const judgment = await _v2RunJudgment(facts);
+  // FA-131 — fill scalar-fact gaps from V1 vision + SAM metadata before the
+  // judgment call. The presence map below (FA-113 contradiction filter) reads
+  // facts AFTER this fill, so bound facts also suppress contradictory output.
+  const boundSources = bindExternalFacts(facts, external);
+
+  const judgment = await _v2RunJudgment(facts, boundSources);
 
   // FA-113: contradiction filter on V2 surfaces — drop judgment.risks,
   // confidenceNotes, and l02Catches that claim a fact is missing when the V2

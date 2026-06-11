@@ -55,8 +55,17 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       }
 
       if (!Number.isFinite(pageCount) || pageCount < 1) pageCount = 1;
-      if (!rawText || rawText.length < 50) {
-        warnings.push(`LOW_TEXT_YIELD: extracted only ${rawText.length} chars — possible scanned/image PDF`);
+      // FA-131 — page-separator/padding lines ("-- 3 of 50 --") are extractor
+      // artifacts, not document text. A pure image scan can emit hundreds of
+      // chars of them and defeat the <50 threshold, so measure meaningful
+      // chars with separator lines stripped.
+      const meaningfulLength = rawText
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !/^[\s\-–—=_·.*]*(?:page\s*)?\d+\s*(?:of|\/)\s*\d+[\s\-–—=_·.*]*$/i.test(l))
+        .join("\n").length;
+      if (!rawText || meaningfulLength < 50) {
+        warnings.push(`LOW_TEXT_YIELD: extracted only ${meaningfulLength} meaningful chars (${rawText.length} raw) — possible scanned/image PDF`);
       }
 
       // Prefer v2 per-page structure when available; fall back to form-feed

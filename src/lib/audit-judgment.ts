@@ -157,22 +157,52 @@ const JUDGMENT_SCHEMA = {
   },
 } as const;
 
+// ── FA-131 — fact-binding provenance ──────────────────────────────────────
+// Scalar header facts can be bound from three sources: deterministic local
+// text extraction ("document"), the V1 vision pass ("v1_vision"), or SAM.gov
+// notice metadata ("sam_metadata"). The engine fuses them (document wins,
+// external sources fill gaps) and passes per-field provenance here so the
+// prompt can mark each value and confine uncertainty notes to fields that
+// are unbound across ALL sources.
+
+export type ScalarFactKey =
+  | "solicitorNumber"
+  | "naicsCode"
+  | "setAside"
+  | "offerDueDate"
+  | "contractType"
+  | "issuingOffice";
+
+export type FactBindingSource = "document" | "v1_vision" | "sam_metadata";
+
+export type BoundFactSources = Partial<Record<ScalarFactKey, FactBindingSource>>;
+
+function bindingLabel(boundSources: BoundFactSources | undefined, key: ScalarFactKey): string {
+  const s = boundSources?.[key];
+  if (s === "v1_vision") return " [bound: vision extraction]";
+  if (s === "sam_metadata") return " [bound: SAM.gov notice metadata]";
+  return "";
+}
+
 // ── Prompt builder ────────────────────────────────────────────────────────
 
-function buildJudgmentPrompt(facts: ExtractedFacts): string {
+function buildJudgmentPrompt(facts: ExtractedFacts, boundSources?: BoundFactSources): string {
   const trapClauses = facts.clauses.filter((c) => c.isTrap);
   const criticalReqs = facts.submissionRequirements.filter((r) => r.isCritical);
+  const lbl = (key: ScalarFactKey) => bindingLabel(boundSources, key);
 
   return `You are a defense contract compliance expert. Analyze this solicitation and produce a structured audit judgment.
 
-## Extracted Facts (deterministic — verified against source document)
+## Bound Facts (fused: deterministic local extraction · vision extraction · SAM.gov notice metadata)
 
-**Solicitation:** ${facts.solicitorNumber ?? "unknown"}
-**NAICS:** ${facts.naicsCode ?? "unknown"}
-**Set-aside:** ${facts.setAside ?? "unknown"}
-**Offer due:** ${facts.offerDueDate ?? "unknown"}
-**Contract type:** ${facts.contractType ?? "unknown"}
-**Issuing office:** ${facts.issuingOffice ?? "unknown"}
+A value marked [bound: …] was confirmed from that source. Every non-"unknown" value below is a CONFIRMED fact regardless of source.
+
+**Solicitation:** ${facts.solicitorNumber ?? "unknown"}${facts.solicitorNumber ? lbl("solicitorNumber") : ""}
+**NAICS:** ${facts.naicsCode ?? "unknown"}${facts.naicsCode ? lbl("naicsCode") : ""}
+**Set-aside:** ${facts.setAside ?? "unknown"}${facts.setAside ? lbl("setAside") : ""}
+**Offer due:** ${facts.offerDueDate ?? "unknown"}${facts.offerDueDate ? lbl("offerDueDate") : ""}
+**Contract type:** ${facts.contractType ?? "unknown"}${facts.contractType ? lbl("contractType") : ""}
+**Issuing office:** ${facts.issuingOffice ?? "unknown"}${facts.issuingOffice ? lbl("issuingOffice") : ""}
 
 **CLINs (${facts.clins.length} found):**
 ${facts.clins.map((c) => `- ${c.lineItem}: ${c.description.slice(0, 150)}${c.ambiguityFlag ? ` ⚠ ${c.ambiguityFlag}` : ""}`).join("\n") || "(none extracted)"}
@@ -204,11 +234,15 @@ ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- $
    • unknown = governing work statement was NOT in the extracted text (likely in an un-parsed attachment).
 2. Identify all risks. Do NOT cap the list — surface every real risk, including P2s. Use 'id' = 'R01', 'R02', etc.
 3. For DFARS traps already flagged above, confirm severity and add mitigation specifics.
-4. Identify L02-class catches: items that pass clause checking but fail in contract execution (wrong WAWF document type, base access escort/credential lead time, timezone deadline traps, FOB conflicts, SPRS posting lag, JCP-required TDP access, etc.). EACH catch is a STRUCTURED OBJECT:
+4. Identify L02-class catches: items that pass clause checking but fail in contract execution. EACH catch is a STRUCTURED OBJECT:
      category      — short tag, e.g. "Lead-time · base access", "FOB · cost inclusion", "Submission · single point of failure"
      title         — one-sentence trap title
      why_invisible — why it passes clause-check but fails at execution (the "looks fine on paper" gap)
      move          — the SPECIFIC neutralizing action (verb-led, ≤2 sentences)
+   L02 HARD CONSTRAINTS:
+   • Every catch MUST be anchored to a specific item in the Bound Facts above — cite the exact CLIN, clause number, requirement text, or date it derives from inside why_invisible or move.
+   • Execution-failure AREAS worth checking include payment-system document routing, installation/site access lead time, deadline timezone ambiguity, inspection-point/freight cost conflicts, supplier-performance-rating posting lag, and technical-data access gating. These are AREAS TO CHECK, not catches to copy — NEVER emit a catch that merely restates one of these areas without a document-specific anchor. If this document gives no evidence for an area, emit NOTHING for that area.
+   • NEVER emit a catch premised on a fact that contradicts a bound fact above (e.g., no cost-reimbursement or accounting-system catches when Contract type is bound to FFP; no eligibility catches contradicting the bound Set-aside).
 5. Each confidence note (CONDITION 1 fail-loud) is also a STRUCTURED OBJECT:
      field      — the specific field that's uncertain (e.g. "NAICS code", "Contract type", "CLIN list")
      uncertain  — one sentence stating WHAT couldn't be confirmed from the document
@@ -218,13 +252,13 @@ ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- $
 
 Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.
 
-CONTRADICTION GUARD (FA-113):
-DO NOT emit risks or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", or "Unknown" when that field has a value in the Extracted Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note asserting it is missing. The fields you may legitimately flag as uncertain are limited to those literally shown as "unknown" or "(none extracted)" above.`;
+CONTRADICTION GUARD (FA-113 / FA-131):
+Header facts may be bound from local text extraction, vision extraction, or SAM.gov notice metadata — a bound value is CONFIRMED regardless of source. DO NOT emit risks, l02Catches, or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", "could not be confirmed", or "Unknown" when that field shows a non-"unknown" value in the Bound Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note/catch asserting it is missing or unconfirmed. The ONLY fields you may flag as uncertain are those literally shown as "unknown" or "(none extracted)" above — i.e., unbound across ALL sources.`;
 }
 
 // ── Main judgment function ────────────────────────────────────────────────
 
-export async function runJudgment(facts: ExtractedFacts): Promise<AuditJudgment> {
+export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFactSources): Promise<AuditJudgment> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — judgment call cannot proceed");
 
@@ -242,7 +276,7 @@ export async function runJudgment(facts: ExtractedFacts): Promise<AuditJudgment>
     temperature: 0,
     system:
       "You are a defense contract compliance expert. Respond only with the structured JSON requested. Be thorough on risks — do not cap the list.",
-    messages: [{ role: "user", content: buildJudgmentPrompt(facts) }],
+    messages: [{ role: "user", content: buildJudgmentPrompt(facts, boundSources) }],
     output_config: {
       format: {
         type: "json_schema",
