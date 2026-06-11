@@ -260,7 +260,10 @@ Be precise. Cite section/clause references. Do not invent facts not present in t
 
 CONTRADICTION GUARD (FA-113 / FA-131):
 Header facts may be bound from local text extraction, vision extraction, or SAM.gov notice metadata — a bound value is CONFIRMED regardless of source. DO NOT emit risks, l02Catches, or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", "could not be confirmed", or "Unknown" when that field shows a non-"unknown" value in the Bound Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note/catch asserting it is missing or unconfirmed. The ONLY fields you may flag as uncertain are those literally shown as "unknown" or "(none extracted)" above — i.e., unbound across ALL sources.
-The same rule applies to the LISTS above (FA-139): if CLINs, Clauses, Submission requirements, or Evaluation factors show one or more entries — regardless of binding source — do NOT emit a risk/note/catch claiming that list is missing, empty, zero, or unextracted.`;
+The same rule applies to the LISTS above (FA-139): if CLINs, Clauses, Submission requirements, or Evaluation factors show one or more entries — regardless of binding source — do NOT emit a risk/note/catch claiming that list is missing, empty, zero, or unextracted.
+
+PLATFORM-NAME GUARD:
+Never name a specific weapon system, aircraft, ship, or vehicle platform (e.g. "F/A-18", "H-60", "M1 Abrams") in any risk, catch, note, or verdict UNLESS that platform name appears verbatim in the Bound Facts or extracted document text above. Do NOT infer a platform from an NSN, FSC, part number, or agency name — if the document does not name the platform, refer to it generically ("the end item", "the supported platform").`;
 }
 
 // ── Main judgment function ────────────────────────────────────────────────

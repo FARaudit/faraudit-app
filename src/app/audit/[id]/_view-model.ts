@@ -1212,10 +1212,14 @@ function deriveGateCardProse(
   if (allUncurable) {
     verdictText = n === 1
       ? "NO-BID — the single gate is structurally unfixable in this window"
+      : n === 2
+      ? "NO-BID — both gates are structurally unfixable in this window"
       : `NO-BID — all ${n} gates are structurally unfixable in this window`;
   } else if (allCurable) {
     verdictText = n === 1
       ? "CAUTION — close the single gate before submission"
+      : n === 2
+      ? "CAUTION — close both gates before submission"
       : `CAUTION — close all ${n} gates before submission`;
   } else {
     verdictText = `CAUTION — ${curable.length} of ${n} curable in the response window; the rest are not`;
@@ -1232,6 +1236,8 @@ function deriveGateCardProse(
   if (allUncurable) {
     leadText = n === 1
       ? `The gate cannot be remedied inside ${windowPhrase} if missing today. Track the next acquisition.`
+      : n === 2
+      ? `Both gates close the door if either is open at submission, and neither can be remedied inside ${windowPhrase}.`
       : `All ${n} gates close the door if any is open at submission, and none can be remedied inside ${windowPhrase}.`;
   } else if (allCurable) {
     leadText = `The gate${n === 1 ? "" : "s"} can be cleared inside ${windowPhrase} — file the cure action${n === 1 ? "" : "s"} listed below before submission.`;
@@ -2062,7 +2068,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     ),
     set_aside_sub: "",
     contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
-    contract_type_sub: sanitizeDisplayText(overviewJson.period_of_performance),
+    // P2 polish: the masthead cell sub-line is a compact label slot, not a
+    // prose field. period_of_performance often arrives as a full sentence
+    // ("Delivery required on or before 31 OCT 2026; offers must be held
+    // firm…") or a not-stated disclaimer — neither belongs under "FFP".
+    // Show it only when it reads like a compact PoP value.
+    contract_type_sub: ((): string => {
+      const pop = sanitizeDisplayText(overviewJson.period_of_performance);
+      if (!pop || pop.length > 60) return "";
+      if (/not (?:explicitly )?stated|not extracted|no verbatim|not specified/i.test(pop)) return "";
+      return pop;
+    })(),
 
     recommendation: verdict.word,
     recommendation_class: verdict.cls,
