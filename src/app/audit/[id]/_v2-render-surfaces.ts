@@ -107,15 +107,38 @@ export function buildV2ViewModelFromShadow(
       }));
       return { required, reference, reference_count: reference.length };
     })(),
-    submission_checklist_filtered: Array.isArray(surfaces.submission_checklist_filtered)
-      ? (surfaces.submission_checklist_filtered as ChecklistBucketGroup[])
-      : [],
+    submission_checklist_filtered: ((): ChecklistBucketGroup[] => {
+      const v2ck = Array.isArray(surfaces.submission_checklist_filtered)
+        ? (surfaces.submission_checklist_filtered as ChecklistBucketGroup[])
+        : [];
+      // FA-139 richer-source guard: V2's checklist can be the 1-item
+      // due-date fallback while V1's §L extraction holds dozens of lines
+      // (616efb58: §09=1 vs §L=58). Overlaying the poorer list clobbers the
+      // richer VM render — suppress the overlay so the renderer's
+      // empty-guard keeps the V1-derived checklist.
+      const v2Count = v2ck.reduce(
+        (n, g) => n + (Array.isArray(g?.items) ? g.items.length : 0),
+        0
+      );
+      const rawReqs = comp.submission_requirements_raw;
+      const objReqs = comp.submission_requirements;
+      const v1Count = Array.isArray(rawReqs)
+        ? rawReqs.filter((s) => typeof s === "string" && s.trim().length > 0).length
+        : Array.isArray(objReqs)
+        ? objReqs.length
+        : 0;
+      if (v2Count > 0 && v2Count < v1Count) return [];
+      return v2ck;
+    })(),
     l02_catches: Array.isArray(surfaces.l02_catches)
       ? (surfaces.l02_catches as AuditL02Catch[])
       : [],
-    confidence_notes: Array.isArray(surfaces.confidence_notes)
-      ? (surfaces.confidence_notes as AuditConfidenceNote[])
-      : [],
+    confidence_notes: suppressContradictedConfidenceNotes(
+      Array.isArray(surfaces.confidence_notes)
+        ? (surfaces.confidence_notes as AuditConfidenceNote[])
+        : [],
+      audit as Record<string, unknown>
+    ),
     has_incumbent: typeof surfaces.has_incumbent === "boolean" ? surfaces.has_incumbent : false,
     metadata_brief: (surfaces.metadata_brief as MetadataBrief | null) ?? null,
     submission_preflight: Array.isArray(surfaces.submission_preflight)
@@ -124,6 +147,53 @@ export function buildV2ViewModelFromShadow(
     recompete_signal: (surfaces.recompete_signal as RecompeteSignal | null) ?? null,
     price_anchor: (surfaces.price_anchor as PriceAnchor | null) ?? null,
   };
+}
+
+// FA-139 — belt-and-suspenders vnote suppression. A confidence note may
+// never contradict content rendered on the same page: if the note's SUBJECT
+// (CLINs, §L submission requirements, §M evaluation factors, clause matrix,
+// set-aside) is non-empty in the audit row / compliance_json, drop the note.
+// Engine-side FA-113 filtering handles fresh runs; this guards the historical
+// corpus whose persisted v2_shadow predates the engine fix. Shared by
+// buildV2ViewModelFromShadow (rendered notes) and buildViewModel's
+// v2_surface_lengths (confidence_count span + strip gating) so the count and
+// the rendered rows can never disagree.
+export function suppressContradictedConfidenceNotes(
+  notes: AuditConfidenceNote[],
+  audit: Record<string, unknown>
+): AuditConfidenceNote[] {
+  if (notes.length === 0) return notes;
+  const comp = (audit.compliance_json as Record<string, unknown> | null) ?? {};
+  const len = (v: unknown): number => (Array.isArray(v) ? v.length : 0);
+  const clinsPresent = len(comp.clins) > 0;
+  const reqsPresent =
+    len(comp.submission_requirements_raw) > 0 || len(comp.submission_requirements) > 0;
+  const evalPresent =
+    len(comp.evaluation_factors_raw) > 0 || len(comp.evaluation_factors) > 0;
+  const clausesPresent = len(comp.far_clauses) + len(comp.dfars_clauses) > 0;
+  const setAsidePresent =
+    (typeof audit.set_aside === "string" && audit.set_aside.trim().length > 0) ||
+    (typeof comp.set_aside_type === "string" && (comp.set_aside_type as string).trim().length > 0) ||
+    (typeof comp.set_aside_text === "string" && (comp.set_aside_text as string).trim().length > 0);
+  const subjects: Array<[RegExp, boolean]> = [
+    [/\bclin/i, clinsPresent],
+    [/submission|section\s*l\b|checklist|proposal\s+requirements/i, reqsPresent],
+    [/evaluation|section\s*m\b/i, evalPresent],
+    [/\bclauses?\b|\bdfars\b/i, clausesPresent],
+    [/set.aside/i, setAsidePresent],
+  ];
+  return notes.filter((n) => {
+    // field is the schema-designated subject; fall back to the uncertainty
+    // sentence only when field is blank.
+    const subject =
+      typeof n.field === "string" && n.field.trim().length > 0
+        ? n.field
+        : (typeof n.uncertain === "string" ? n.uncertain : "");
+    for (const [re, present] of subjects) {
+      if (present && re.test(subject)) return false;
+    }
+    return true;
+  });
 }
 
 // HTML escape — minimal, sufficient for solicitation text content.

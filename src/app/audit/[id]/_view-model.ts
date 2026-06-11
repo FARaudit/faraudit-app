@@ -7,6 +7,8 @@
 // the 1:1 visual port renders without demo strings or blank sections.
 
 import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
+import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
+import type { AuditConfidenceNote } from "@/lib/audit-judgment";
 
 type AuditRow = Record<string, unknown>;
 
@@ -1751,7 +1753,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const v2Meta = (v2SurfacesObj.metadata_brief as Record<string, unknown> | null) ?? null;
   const v2SurfaceLengths = {
     l02_catches: Array.isArray(v2SurfacesObj.l02_catches) ? (v2SurfacesObj.l02_catches as unknown[]).length : 0,
-    confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes) ? (v2SurfacesObj.confidence_notes as unknown[]).length : 0,
+    // FA-139: count POST-suppression so .confidence_count and the strip
+    // gate agree with the rows buildV2ViewModelFromShadow actually renders.
+    confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes)
+      ? suppressContradictedConfidenceNotes(
+          v2SurfacesObj.confidence_notes as AuditConfidenceNote[],
+          audit as unknown as Record<string, unknown>
+        ).length
+      : 0,
   };
   const canonicalSol = (compJsonEarly.solicitation_number_canonical as string | null | undefined) ?? null;
   const dbSol = audit.solicitation_number as string | null | undefined;

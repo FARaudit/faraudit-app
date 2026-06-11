@@ -304,6 +304,8 @@ export interface ExtractedFactsPresence {
   contract_type: boolean;
   agency: boolean;
   set_aside: boolean;
+  submission_requirements: boolean;
+  evaluation_factors: boolean;
 }
 
 const FA113_MISSING_PATTERNS: Record<keyof ExtractedFactsPresence, RegExp[]> = {
@@ -329,15 +331,18 @@ const FA113_MISSING_PATTERNS: Record<keyof ExtractedFactsPresence, RegExp[]> = {
     /NAICS (?:code )?could not be (?:inferred|determined|extracted|verified)/i,
   ],
   clins: [
-    /Zero CLINs (?:extract|present|find)/i,
-    /No CLINs (?:extract|present|find)/i,
+    // FA-139: optional "were|are|is|was" — "Zero CLINs were extracted"
+    // previously slipped past the pattern family.
+    /Zero CLINs (?:were |are |is |was )?(?:extract|present|find|found)/i,
+    /No CLINs (?:were |are |is |was )?(?:extract|present|find|found|identif)/i,
     /CLINs (?:are |were |is |was )?(?:not |un)?(?:extracted|extractable)/i,
     /Pricing Structure (?:and Deliverable )?Scope Unknown/i,
     /CLIN list (?:is |was )?(?:not |un)?(?:extracted|extractable|determined)/i,
   ],
   clauses: [
-    /Zero Clauses Extracted/i,
-    /no clauses (?:were |are )?extract(?:ed|able)/i,
+    /Zero Clauses (?:were |are |is |was )?Extracted/i,
+    /no clauses (?:were |are )?(?:extract(?:ed|able)|identified|found)/i,
+    /clause list (?:is |was )?(?:not |un)?(?:extracted|extractable|determined)/i,
     /Full FAR\/DFARS Compliance Posture Unknown/i,
   ],
   contract_type: [
@@ -353,6 +358,16 @@ const FA113_MISSING_PATTERNS: Record<keyof ExtractedFactsPresence, RegExp[]> = {
     /Set-Aside Status Unknown/i,
     /set.aside (?:status )?(?:is |was )?(?:not |un)?(?:extracted|extractable|determined)/i,
     /Teaming and Subcontracting Strategy Undefined/i,
+  ],
+  submission_requirements: [
+    /no submission requirements (?:were |are |is |was )?(?:extract|present|find|found|identif)/i,
+    /submission requirements (?:were |are |could )?not (?:be )?(?:extracted|identified|found|determined)/i,
+    /Section L (?:requirements? )?(?:were |are |is |was )?(?:not |un)(?:available|extracted|found|detected)/i,
+  ],
+  evaluation_factors: [
+    /no evaluation factors (?:were |are |is |was )?(?:extract|present|find|found|identif|stated)/i,
+    /evaluation factors (?:were |are |could )?not (?:be )?(?:extracted|identified|found|determined|stated)/i,
+    /evaluation criteria (?:unknown|not (?:extracted|stated|found|available))/i,
   ],
 };
 
@@ -437,12 +452,16 @@ export function buildV1PresenceMap(
     solicitation_number: solNumPresent,
     due_date: !!responseDeadline,
     naics: typeof get("naicsCode") === "string" && (get("naicsCode") as string).length > 0,
-    clins: false, // V1 doesn't extract CLINs into a typed array we trust here; leave false → never suppress CLIN-missing claims
+    // FA-139: complianceJson.clins IS the typed V1 vision array ({clin,
+    // description, …}) — when populated, "Zero CLINs" claims are contradictions.
+    clins: Array.isArray(complianceJson.clins) && complianceJson.clins.length > 0,
     clauses: farLen + dfarsLen > 0,
     contract_type: false, // V1 doesn't expose contract_type from compliance reliably
     agency: typeof get("agency") === "string" && (get("agency") as string).length > 0,
     set_aside: (typeof get("typeOfSetAside") === "string" && (get("typeOfSetAside") as string).length > 0) ||
                (typeof get("set_aside") === "string" && (get("set_aside") as string).length > 0),
+    submission_requirements: Array.isArray(complianceJson.submission_requirements) && complianceJson.submission_requirements.length > 0,
+    evaluation_factors: Array.isArray(complianceJson.evaluation_factors) && complianceJson.evaluation_factors.length > 0,
   };
 }
 
@@ -2610,7 +2629,12 @@ JSON only — one key: risk_findings.`;
 
 import { extractText as _v2ExtractText } from "./pdf-text-extractor";
 import { detectSections as _v2DetectSections } from "./section-boundary-detector";
-import { extractAllFacts as _v2ExtractAllFacts, type ExtractedFacts } from "./section-extractors";
+import {
+  extractAllFacts as _v2ExtractAllFacts,
+  DFARS_TRAPS_MAP as _v2DfarsTrapsMap,
+  bucketizeSubmissionLine as _v2BucketizeSubmissionLine,
+  type ExtractedFacts
+} from "./section-extractors";
 import {
   runJudgment as _v2RunJudgment,
   type AuditJudgment as _v2AuditJudgment,
@@ -3290,9 +3314,21 @@ export interface ExternalScalarFacts {
   issuingOffice?: string | null;
 }
 
+// FA-139 — V1 vision's STRUCTURED lists, shaped loosely so the executor can
+// pass persisted JSONB straight through. bindExternalFacts maps these into
+// typed ExtractedFacts entries ONLY when V2's own extraction came up empty
+// (document wins; external fills gaps — same contract as FA-131 scalars).
+export interface ExternalStructuredFacts {
+  clins?: Array<{ clin?: string | null; description?: string | null; quantity?: string | number | null } | null>;
+  clauses?: Array<string | { number?: string; title?: string } | null>;
+  submissionRequirements?: Array<string | null>;
+  evaluationFactors?: Array<{ name?: string | null; importance_text?: string | null } | null>;
+}
+
 export interface ExternalBoundFacts {
   v1?: ExternalScalarFacts;
   sam?: ExternalScalarFacts;
+  v1Structured?: ExternalStructuredFacts;
 }
 
 function normalizeContractType(raw: string | null | undefined): ExtractedFacts["contractType"] {
@@ -3340,6 +3376,67 @@ function bindExternalFacts(
       boundSources.contractType = "sam_metadata";
     }
   }
+
+  // FA-139 — structured-list gap fill. Scanned/flattened PDFs can defeat the
+  // deterministic extractors while V1 vision read the same lists fine. Fill
+  // ONLY when V2's own list is empty so document-extracted lists always win.
+  const v1s = external?.v1Structured;
+  if (v1s) {
+    if (facts.clins.length === 0 && Array.isArray(v1s.clins) && v1s.clins.length > 0) {
+      facts.clins = v1s.clins
+        .filter((c): c is NonNullable<typeof c> => !!c && !!(c.clin || c.description))
+        .map((c) => {
+          const qty = Number(String(c.quantity ?? "").replace(/[^\d.]/g, ""));
+          return {
+            lineItem: String(c.clin ?? "").trim() || "—",
+            description: String(c.description ?? "").trim(),
+            quantity: Number.isFinite(qty) && qty > 0 ? qty : null,
+            unit: null,
+            contractType: null,
+            ambiguityFlag: null,
+          };
+        });
+      if (facts.clins.length > 0) boundSources.clins = "v1_vision";
+    }
+    if (facts.clauses.length === 0 && Array.isArray(v1s.clauses) && v1s.clauses.length > 0) {
+      facts.clauses = v1s.clauses
+        .map((c) => (typeof c === "string" ? { number: c, title: "" } : { number: c?.number ?? "", title: c?.title ?? "" }))
+        .filter((c) => c.number.trim().length > 0)
+        .map((c) => {
+          const num = c.number.trim();
+          const trap = _v2DfarsTrapsMap[num];
+          return {
+            number: num,
+            title: c.title,
+            incorporated: "by_reference" as const,
+            effectiveDate: null,
+            isTrap: !!trap,
+            trapReason: trap ? `${trap} (DFARS trap)` : null,
+          };
+        });
+      if (facts.clauses.length > 0) boundSources.clauses = "v1_vision";
+    }
+    if (facts.submissionRequirements.length === 0 && Array.isArray(v1s.submissionRequirements) && v1s.submissionRequirements.length > 0) {
+      facts.submissionRequirements = v1s.submissionRequirements
+        .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+        .map((text) => {
+          const { bucket, isCritical } = _v2BucketizeSubmissionLine(text);
+          return { bucket, text: text.trim().slice(0, 300), sourceClause: null, isCritical };
+        });
+      if (facts.submissionRequirements.length > 0) boundSources.submissionRequirements = "v1_vision";
+    }
+    if (facts.evaluationFactors.length === 0 && Array.isArray(v1s.evaluationFactors) && v1s.evaluationFactors.length > 0) {
+      facts.evaluationFactors = v1s.evaluationFactors
+        .filter((f): f is NonNullable<typeof f> => !!f && typeof f.name === "string" && f.name.trim().length > 0)
+        .map((f) => ({
+          factor: String(f.name).trim().slice(0, 200),
+          weight: typeof f.importance_text === "string" && f.importance_text.trim() ? f.importance_text.trim() : null,
+          method: null,
+        }));
+      if (facts.evaluationFactors.length > 0) boundSources.evaluationFactors = "v1_vision";
+    }
+  }
+
   return boundSources;
 }
 
@@ -3394,6 +3491,8 @@ export async function runAuditV2(pdfBuffer: Buffer, external?: ExternalBoundFact
     contract_type: !!facts.contractType,
     agency: !!facts.issuingOffice,
     set_aside: !!facts.setAside,
+    submission_requirements: facts.submissionRequirements.length > 0,
+    evaluation_factors: facts.evaluationFactors.length > 0,
   };
   judgment.risks = applyContradictionFilter(judgment.risks, v2Presence, "v2.judgment.risks");
   judgment.confidenceNotes = applyContradictionFilter(judgment.confidenceNotes, v2Presence, "v2.judgment.confidenceNotes");

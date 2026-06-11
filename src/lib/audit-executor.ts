@@ -156,6 +156,23 @@ export async function executeAudit(
           offerDueDate: solicitation.responseDeadLine,
           issuingOffice: agency,
         },
+        // FA-139 — V1 vision's STRUCTURED lists fill V2 list gaps the same
+        // way the scalars above do. Without this, image-scan PDFs leave V2's
+        // clins/clauses/§L/§M empty → judgment vnotes contradict the rendered
+        // report and §09 collapses to the 1-item due-date fallback.
+        v1Structured: {
+          clins: Array.isArray(persistedComplianceJson.clins) ? persistedComplianceJson.clins : [],
+          clauses: [
+            ...(Array.isArray(persistedComplianceJson.dfars_clauses) ? persistedComplianceJson.dfars_clauses : []),
+            ...(Array.isArray(persistedComplianceJson.far_clauses) ? persistedComplianceJson.far_clauses : []),
+          ],
+          submissionRequirements: Array.isArray(result.overview.json.submission_requirements_raw)
+            ? result.overview.json.submission_requirements_raw
+            : [],
+          evaluationFactors: Array.isArray(result.overview.json.evaluation_factors_raw)
+            ? result.overview.json.evaluation_factors_raw
+            : [],
+        },
       };
       const v2Result = await runAuditV2(v2Buffer, v2External);
       const v2Shadow = {

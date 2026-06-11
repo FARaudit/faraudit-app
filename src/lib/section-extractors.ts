@@ -64,7 +64,7 @@ export interface ExtractedFacts {
 
 // ── DFARS trap clause list (matches engine DFARS_TRAPS) ───────────────────
 
-const DFARS_TRAPS_MAP: Record<string, string> = {
+export const DFARS_TRAPS_MAP: Record<string, string> = {
   "252.223-7008": "Hexavalent chromium prohibition",
   "252.204-7018": "Covered telecommunications equipment ban",
   "252.204-7021": "CMMC compliance level required",
@@ -313,18 +313,29 @@ export function extractClauses(section: DetectedSection | null): ClauseItem[] {
 
 // ── §L — Submission requirements extractor ───────────────────────────────
 
+const SUBMISSION_BUCKETS: Array<{ bucket: SubmissionRequirement["bucket"]; pattern: RegExp; critical: boolean }> = [
+  { bucket: "deadline",        pattern: /due\s+(date|time)|no\s+later\s+than|submit\s+by|close\s+of\s+business|deadline/i, critical: true },
+  { bucket: "registration",    pattern: /\bSAM\.gov|System\s+for\s+Award\s+Management|\bWAWF\b|\bregister/i, critical: true },
+  { bucket: "mandatory_doc",   pattern: /must\s+include|shall\s+include|required\s+to\s+(submit|provide)|MFG\s+name|Part\s+Number|breakdown|CAGE\s+code/i, critical: true },
+  { bucket: "representation",  pattern: /\brepresentation|certification|\bcertif/i, critical: false },
+  { bucket: "format",          pattern: /english\s+language|U\.?S\.?\s+Currency|\bUSD\b|via\s+email|page\s+limit|font|format/i, critical: false },
+];
+
+// FA-139 — shared bucketizer so externally bound §L lines (V1 vision) get
+// the same bucket/criticality treatment as document-extracted ones.
+export function bucketizeSubmissionLine(text: string): { bucket: SubmissionRequirement["bucket"]; isCritical: boolean } {
+  for (const { bucket, pattern, critical } of SUBMISSION_BUCKETS) {
+    if (pattern.test(text)) return { bucket, isCritical: critical };
+  }
+  return { bucket: "other", isCritical: false };
+}
+
 export function extractSubmissionRequirements(section: DetectedSection | null): SubmissionRequirement[] {
   if (!section) return [];
   const reqs: SubmissionRequirement[] = [];
   const lines = section.text.split("\n");
 
-  const buckets: Array<{ bucket: SubmissionRequirement["bucket"]; pattern: RegExp; critical: boolean }> = [
-    { bucket: "deadline",        pattern: /due\s+(date|time)|no\s+later\s+than|submit\s+by|close\s+of\s+business|deadline/i, critical: true },
-    { bucket: "registration",    pattern: /\bSAM\.gov|System\s+for\s+Award\s+Management|\bWAWF\b|\bregister/i, critical: true },
-    { bucket: "mandatory_doc",   pattern: /must\s+include|shall\s+include|required\s+to\s+(submit|provide)|MFG\s+name|Part\s+Number|breakdown|CAGE\s+code/i, critical: true },
-    { bucket: "representation",  pattern: /\brepresentation|certification|\bcertif/i, critical: false },
-    { bucket: "format",          pattern: /english\s+language|U\.?S\.?\s+Currency|\bUSD\b|via\s+email|page\s+limit|font|format/i, critical: false },
-  ];
+  const buckets = SUBMISSION_BUCKETS;
 
   const seen = new Set<string>();
   for (const line of lines) {

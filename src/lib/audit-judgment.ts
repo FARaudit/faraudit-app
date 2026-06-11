@@ -173,11 +173,17 @@ export type ScalarFactKey =
   | "contractType"
   | "issuingOffice";
 
+// FA-139 — structured LISTS can also be externally bound (V1 vision fills
+// V2 list gaps the same way FA-131 fills scalars). Tracking the source lets
+// the prompt mark a vision-bound list as CONFIRMED, keeping the
+// contradiction guard's "non-unknown ⇒ confirmed" rule consistent.
+export type ListFactKey = "clins" | "clauses" | "submissionRequirements" | "evaluationFactors";
+
 export type FactBindingSource = "document" | "v1_vision" | "sam_metadata";
 
-export type BoundFactSources = Partial<Record<ScalarFactKey, FactBindingSource>>;
+export type BoundFactSources = Partial<Record<ScalarFactKey | ListFactKey, FactBindingSource>>;
 
-function bindingLabel(boundSources: BoundFactSources | undefined, key: ScalarFactKey): string {
+function bindingLabel(boundSources: BoundFactSources | undefined, key: ScalarFactKey | ListFactKey): string {
   const s = boundSources?.[key];
   if (s === "v1_vision") return " [bound: vision extraction]";
   if (s === "sam_metadata") return " [bound: SAM.gov notice metadata]";
@@ -189,7 +195,7 @@ function bindingLabel(boundSources: BoundFactSources | undefined, key: ScalarFac
 function buildJudgmentPrompt(facts: ExtractedFacts, boundSources?: BoundFactSources): string {
   const trapClauses = facts.clauses.filter((c) => c.isTrap);
   const criticalReqs = facts.submissionRequirements.filter((r) => r.isCritical);
-  const lbl = (key: ScalarFactKey) => bindingLabel(boundSources, key);
+  const lbl = (key: ScalarFactKey | ListFactKey) => bindingLabel(boundSources, key);
 
   return `You are a defense contract compliance expert. Analyze this solicitation and produce a structured audit judgment.
 
@@ -204,21 +210,21 @@ A value marked [bound: …] was confirmed from that source. Every non-"unknown" 
 **Contract type:** ${facts.contractType ?? "unknown"}${facts.contractType ? lbl("contractType") : ""}
 **Issuing office:** ${facts.issuingOffice ?? "unknown"}${facts.issuingOffice ? lbl("issuingOffice") : ""}
 
-**CLINs (${facts.clins.length} found):**
+**CLINs (${facts.clins.length} found):**${facts.clins.length > 0 ? lbl("clins") : ""}
 ${facts.clins.map((c) => `- ${c.lineItem}: ${c.description.slice(0, 150)}${c.ambiguityFlag ? ` ⚠ ${c.ambiguityFlag}` : ""}`).join("\n") || "(none extracted)"}
 
 **Delivery (${facts.delivery.length} items):**
 ${facts.delivery.map((d) => `- CLIN ${d.lineItem}: ${d.deliveryDate ?? "no date"} · FOB: ${d.fobType ?? "unspecified"} · DoDAAC: ${d.dodaac ?? "none"}`).join("\n") || "(none extracted)"}
 
-**Clauses (${facts.clauses.length} total, ${trapClauses.length} traps):**
+**Clauses (${facts.clauses.length} total, ${trapClauses.length} traps):**${facts.clauses.length > 0 ? lbl("clauses") : ""}
 ${trapClauses.map((c) => `- TRAP: ${c.number} — ${c.title || "(title not extracted)"} — ${c.trapReason}`).join("\n")}
 ${facts.clauses.filter((c) => !c.isTrap).slice(0, 12).map((c) => `- ${c.number}${c.title ? " — " + c.title : ""}`).join("\n")}
 
-**Submission requirements (${facts.submissionRequirements.length} found):**
+**Submission requirements (${facts.submissionRequirements.length} found):**${facts.submissionRequirements.length > 0 ? lbl("submissionRequirements") : ""}
 ${criticalReqs.slice(0, 12).map((r) => `- [CRITICAL/${r.bucket}] ${r.text.slice(0, 140)}`).join("\n")}
 ${facts.submissionRequirements.filter((r) => !r.isCritical).slice(0, 5).map((r) => `- [${r.bucket}] ${r.text.slice(0, 100)}`).join("\n")}
 
-**Evaluation factors:**
+**Evaluation factors:**${facts.evaluationFactors.length > 0 ? lbl("evaluationFactors") : ""}
 ${facts.evaluationFactors.map((e) => `- ${e.factor.slice(0, 100)}${e.weight ? ` (${e.weight})` : ""} [${e.method}]`).join("\n") || "(none extracted)"}
 
 **Extraction warnings (pre-verified issues):**
@@ -253,7 +259,8 @@ ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- $
 Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.
 
 CONTRADICTION GUARD (FA-113 / FA-131):
-Header facts may be bound from local text extraction, vision extraction, or SAM.gov notice metadata — a bound value is CONFIRMED regardless of source. DO NOT emit risks, l02Catches, or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", "could not be confirmed", or "Unknown" when that field shows a non-"unknown" value in the Bound Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note/catch asserting it is missing or unconfirmed. The ONLY fields you may flag as uncertain are those literally shown as "unknown" or "(none extracted)" above — i.e., unbound across ALL sources.`;
+Header facts may be bound from local text extraction, vision extraction, or SAM.gov notice metadata — a bound value is CONFIRMED regardless of source. DO NOT emit risks, l02Catches, or confidenceNotes claiming a field listed above is "missing", "not present", "not extracted", "unextractable", "could not be determined", "could not be confirmed", or "Unknown" when that field shows a non-"unknown" value in the Bound Facts header. Specifically: if Solicitation, NAICS, Set-aside, Offer due, Contract type, or Issuing office shows a non-"unknown" value above, do NOT generate a risk/note/catch asserting it is missing or unconfirmed. The ONLY fields you may flag as uncertain are those literally shown as "unknown" or "(none extracted)" above — i.e., unbound across ALL sources.
+The same rule applies to the LISTS above (FA-139): if CLINs, Clauses, Submission requirements, or Evaluation factors show one or more entries — regardless of binding source — do NOT emit a risk/note/catch claiming that list is missing, empty, zero, or unextracted.`;
 }
 
 // ── Main judgment function ────────────────────────────────────────────────
