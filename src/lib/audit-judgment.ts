@@ -337,3 +337,89 @@ export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFac
     );
   }
 }
+
+// ── FA-141 — judgment self-consistency ─────────────────────────────────────
+// A report may never assert two different values for the same fact. When a
+// vnote hedges ("CMMC level not stated — assuming L2") while the judgment's
+// own risks/L02 catches — or the bound facts / notice title — assert a
+// concrete value (§05 risk: "CMMC Level 1 per PWS 1.6.21.1"), the assertion
+// wins and the hedge dies. KO asks derive from risks (riskToClarificationAsk)
+// so scanning risks covers them. Shared by the engine (fresh runs, post
+// FA-113 filter) and the render-side FA-139 suppressor (historical corpus).
+
+const FA141_MATCHERS: Array<{ id: string; subjectRe: RegExp; assertionRe: RegExp }> = [
+  {
+    id: "cmmc_level",
+    subjectRe: /\bcmmc\b/i,
+    assertionRe: /\bcmmc\b[\s\S]{0,30}?\b(?:level|lvl|l)\s*-?\s*[123]\b/i,
+  },
+  {
+    id: "set_aside",
+    subjectRe: /set.aside/i,
+    assertionRe:
+      /\b(?:total\s+small\s+business|8\s*\(\s*a\s*\)|(?:ed)?wosb|sdvosb|vosb|hubzone|unrestricted|full\s+and\s+open|small\s+business\s+set.aside)\b/i,
+  },
+  {
+    id: "naics",
+    subjectRe: /\bnaics\b/i,
+    assertionRe: /\bnaics\b[\s\S]{0,30}?\b\d{6}\b/i,
+  },
+  {
+    id: "deadline",
+    subjectRe: /due\s*date|deadline|response\s*date|closing\s*date|offer\s*due/i,
+    assertionRe:
+      /(?:due|deadline|close[sd]?|closing|responses?\s+by|submit(?:ted)?\s+by|no\s+later\s+than|\bnlt\b)[\s\S]{0,60}?(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4})/i,
+  },
+  {
+    id: "doc_type",
+    subjectRe: /work\s*statement\s*type|document\s*type|\btype\b[\s\S]{0,20}\b(?:sow|pws|soo)\b|\b(?:sow|pws|soo)\b[\s\S]{0,20}\btype\b/i,
+    assertionRe: /document\s*type\s*[:=]\s*(?:sow|pws|soo|combined)\b/i,
+  },
+];
+
+function titleDefinesAcronym(subject: string, title: string): string | null {
+  const acronyms = subject.match(/\b[A-Z]{3,6}\b/g) ?? [];
+  if (acronyms.length === 0) return null;
+  const upperTitle = title.toUpperCase();
+  const initials = (title.match(/\b[A-Za-z]/g) ?? []).join("").toUpperCase();
+  for (const a of acronyms) {
+    if (upperTitle.includes(`(${a})`)) return a;
+    if (initials.includes(a)) return a;
+  }
+  return null;
+}
+
+export function dropSelfContradictedNotes(
+  notes: AuditConfidenceNote[],
+  assertionTexts: Array<string | null | undefined>,
+  title: string | null | undefined,
+  context: string
+): AuditConfidenceNote[] {
+  if (notes.length === 0) return notes;
+  const corpus = assertionTexts
+    .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    .join("\n");
+  return notes.filter((n) => {
+    const subject =
+      typeof n.field === "string" && n.field.trim().length > 0
+        ? n.field
+        : typeof n.uncertain === "string"
+          ? n.uncertain
+          : "";
+    if (!subject) return true;
+    for (const m of FA141_MATCHERS) {
+      if (m.subjectRe.test(subject) && m.assertionRe.test(corpus)) {
+        console.warn(`[FA-141] ${context} dropped vnote (${m.id} asserted elsewhere): "${subject}"`);
+        return false;
+      }
+    }
+    if (title && title.trim().length > 0) {
+      const acr = titleDefinesAcronym(subject, title);
+      if (acr) {
+        console.warn(`[FA-141] ${context} dropped vnote (acronym ${acr} defined by title): "${subject}"`);
+        return false;
+      }
+    }
+    return true;
+  });
+}

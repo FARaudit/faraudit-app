@@ -2646,6 +2646,7 @@ import {
 } from "./section-extractors";
 import {
   runJudgment as _v2RunJudgment,
+  dropSelfContradictedNotes as _v2DropSelfContradictedNotes,
   type AuditJudgment as _v2AuditJudgment,
   type AuditL02Catch as _v2AuditL02Catch,
   type AuditConfidenceNote as _v2AuditConfidenceNote,
@@ -3315,6 +3316,9 @@ function _v2BuildPriceAnchor(
 // and threads per-field provenance into the judgment prompt.
 
 export interface ExternalScalarFacts {
+  // FA-141 — notice title; not bound into ExtractedFacts (no title field),
+  // read directly by the self-consistency pass for title-acronym checks.
+  title?: string | null;
   solicitorNumber?: string | null;
   naicsCode?: string | null;
   setAside?: string | null;
@@ -3506,6 +3510,30 @@ export async function runAuditV2(pdfBuffer: Buffer, external?: ExternalBoundFact
   judgment.risks = applyContradictionFilter(judgment.risks, v2Presence, "v2.judgment.risks");
   judgment.confidenceNotes = applyContradictionFilter(judgment.confidenceNotes, v2Presence, "v2.judgment.confidenceNotes");
   judgment.l02Catches = applyContradictionFilter(judgment.l02Catches, v2Presence, "v2.judgment.l02Catches");
+
+  // FA-141 — judgment self-consistency. FA-113 above kills notes contradicted
+  // by extraction PRESENCE; this pass kills notes contradicted by ASSERTED
+  // VALUES in the judgment's own output (risks → §05 + §08 KO asks, L02
+  // catches), the bound facts, or the notice title (63022ffb: vnote assumed
+  // CMMC L2 while a §05 risk asserted L1 citing PWS 1.6.21.1; "DFSE acronym
+  // undefined" vnote beside a masthead title spelling it out).
+  const fa141Assertions: Array<string | null | undefined> = [
+    ...judgment.risks.flatMap((r) => [r.title, r.description, r.mitigation, r.trapClause]),
+    ...judgment.l02Catches.flatMap((c) => [c.title, c.why_invisible, c.move]),
+    facts.naicsCode ? `NAICS ${facts.naicsCode}` : null,
+    facts.setAside ? `set-aside: ${facts.setAside}` : null,
+    facts.offerDueDate ? `responses due ${facts.offerDueDate}` : null,
+  ];
+  if (!["unknown", "wrong_doc", "metadata_only"].includes(judgment.documentClassification.type)) {
+    fa141Assertions.push(`document type: ${judgment.documentClassification.type}`);
+  }
+  const fa141Title = external?.sam?.title ?? external?.v1?.title ?? null;
+  judgment.confidenceNotes = _v2DropSelfContradictedNotes(
+    judgment.confidenceNotes,
+    fa141Assertions,
+    fa141Title,
+    "v2.judgment"
+  );
 
   // ─── Cycle 2 v2 view-model surface derivations ─────────────────────────
   const ws = _v2WorkStatement(judgment.documentClassification);

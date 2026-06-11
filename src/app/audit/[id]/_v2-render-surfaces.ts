@@ -19,7 +19,7 @@ import type {
   ClauseMatrixRow,
   MatrixBadge,
 } from "./_normalizers";
-import type { AuditL02Catch, AuditConfidenceNote } from "../../../lib/audit-judgment";
+import { dropSelfContradictedNotes, type AuditL02Catch, type AuditConfidenceNote } from "../../../lib/audit-judgment";
 import type {
   MetadataBrief,
   SubmissionChecklistItem,
@@ -268,7 +268,7 @@ export function suppressContradictedConfidenceNotes(
     [/issuing\s*(office|agency)|\bagency\b/i, agencyPresent],
     [/contract\s*type/i, contractTypePresent],
   ];
-  return notes.filter((n) => {
+  const kept = notes.filter((n) => {
     // field is the schema-designated subject; fall back to the uncertainty
     // sentence only when field is blank.
     const subject =
@@ -280,6 +280,25 @@ export function suppressContradictedConfidenceNotes(
     }
     return true;
   });
+
+  // FA-141 — self-consistency for the historical corpus: persisted v2_shadow
+  // rows predate the engine-side pass, so re-run it here against the shadow
+  // judgment's own risks/L02 text + the notice title. Engine-filtered fresh
+  // runs pass through unchanged (their contradicted notes are already gone).
+  const shadow = (comp.v2_shadow as Record<string, unknown> | null) ?? {};
+  const sj = (shadow.judgment as Record<string, unknown> | null) ?? {};
+  const sjRisks = Array.isArray(sj.risks) ? (sj.risks as Array<Record<string, unknown>>) : [];
+  const sjL02 = Array.isArray(sj.l02Catches) ? (sj.l02Catches as Array<Record<string, unknown>>) : [];
+  const assertions: Array<string | null | undefined> = [
+    ...sjRisks.flatMap((r) => [r.title, r.description, r.mitigation, r.trapClause] as Array<string | null | undefined>),
+    ...sjL02.flatMap((c) => [c.title, c.why_invisible, c.move] as Array<string | null | undefined>),
+  ];
+  const docClass = (sj.documentClassification as Record<string, unknown> | null) ?? {};
+  if (typeof docClass.type === "string" && !["unknown", "wrong_doc", "metadata_only"].includes(docClass.type)) {
+    assertions.push(`document type: ${docClass.type}`);
+  }
+  const title = typeof audit.title === "string" ? audit.title : null;
+  return dropSelfContradictedNotes(kept, assertions, title, "render.v2_shadow");
 }
 
 // HTML escape — minimal, sufficient for solicitation text content.

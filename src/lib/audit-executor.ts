@@ -150,6 +150,7 @@ export async function executeAudit(
               : null) ?? persistedComplianceJson.set_aside_text ?? null,
         },
         sam: {
+          title: solicitation.title,
           solicitorNumber: solicitation.solicitationNumber,
           naicsCode: solicitation.naicsCode,
           setAside: solicitation.typeOfSetAside,
