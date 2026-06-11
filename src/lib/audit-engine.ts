@@ -2333,7 +2333,16 @@ JSON only — one key: risk_findings.`;
   // set, not just what the model emitted on a given run.
   risksJson.risk_findings = prioritized.map(mapPrioritizedToFinding);
 
-  // Composite scoring
+  // Composite scoring (FA-126 — deterministic, documented):
+  //   score = clamp(0..100, 100 − min(40, (FAR + DFARS + certs) × 1.5) − severity × 5)
+  //   rec   = score ≥ 70 → PROCEED · 40-69 → PROCEED_WITH_CAUTION · < 40 → DECLINE
+  //           (null score → PROCEED_WITH_CAUTION; fired gates SUPERSEDE the
+  //           scored tier via aggregateGateRecommendation — this is why a
+  //           35 can carry CAUTION and a 71 can carry DECLINE.)
+  //   Known saturation: clause-heavy DoD solicitations pin the complexity
+  //   penalty at 40 and call-3's modal severity is 5 → score 35 recurs.
+  //   The number is computed, not fabricated; on DECISION_GATE audits every
+  //   surface suppresses it ("—") because gates, not the score, decide.
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
   const certCount = complianceJson.required_certifications?.length || 0;

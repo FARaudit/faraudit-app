@@ -1785,11 +1785,13 @@ function PastAuditsPanel({
                 <span className="sr-badge" style={{ background: a.audit_source === "audit_ai" ? "rgba(96,165,250,.10)" : "rgba(148,163,184,.06)", color: a.audit_source === "audit_ai" ? "var(--blue)" : "var(--t40)", border: "1px solid var(--border)" }}>
                   {a.audit_source === "audit_ai" ? "AI" : "USER"}
                 </span>
-                {a.compliance_score != null
+                {/* FA-126: gate-mode audits render "—" — the report suppresses
+                    the numeric score when gates supersede the scored tier. */}
+                {a.compliance_score != null && a.verdict_type !== "DECISION_GATE"
                   ? <span className="sr-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{a.compliance_score}</span>
                   : <span className="sr-date">—</span>}
                 <span className="sr-badge" style={{ color: recColor, background: "transparent", border: `1px solid ${recColor}40` }}>
-                  {a.recommendation ? a.recommendation.replace("_", " ") : "—"}
+                  {a.recommendation ? a.recommendation.replace(/_/g, " ") : "—"}
                 </span>
                 <button
                   type="button"
@@ -2343,7 +2345,7 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                       <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {displaySolicitationId(a)}
                       </span>
-                      {a.compliance_score != null && (
+                      {a.compliance_score != null && a.verdict_type !== "DECISION_GATE" && (
                         <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, color: rc, border: `1px solid ${rc}40` }}>
                           {a.compliance_score}
                         </span>

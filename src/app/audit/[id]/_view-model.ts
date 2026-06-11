@@ -2180,12 +2180,12 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // Canonicalization layer (Brain ruling 2026-06-06) — single-source verdict
     // + canonical gate prose tied to actual gate count + days-to-deadline.
     verdict_word: (() => {
-      // Read engine-emitted verdict (compJson.verdict.recommendation), map
-      // to the BID/CAUTION/NO-BID surface vocabulary. Same source as the
-      // template's verdict-word IIFE (which reads tone class) — so the IIFE
-      // can run idempotently over our values.
+      // FA-126 — the stored audits.recommendation column is the single
+      // source of truth (same field the ledger, masthead pill, and PDF
+      // read). compJson.verdict.recommendation is fallback only, for legacy
+      // rows written before the column was populated.
       const v = (compJson.verdict ?? null) as { recommendation?: string } | null;
-      const rec = v?.recommendation ?? (audit.recommendation as string | undefined) ?? "";
+      const rec = (audit.recommendation as string | undefined) ?? v?.recommendation ?? "";
       if (rec === "PROCEED") return "BID";
       if (rec === "DECLINE") return "NO-BID";
       return "CAUTION";

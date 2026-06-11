@@ -186,6 +186,11 @@ export interface AuditRow {
   bid_submitted: boolean | null;
   in_pipeline: boolean;
   prime_sub: "prime" | "sub" | null;
+  // FA-126 — "SCORED" | "DECISION_GATE" | null. Gate-mode audits suppress
+  // the numeric score on the report (view-model nulls it); ledger surfaces
+  // must mirror that so the same audit never shows 35 in one place and "—"
+  // in another.
+  verdict_type: string | null;
 }
 
 // ─── Tab 4: Defense Spending Intel (FA-96) ────────────────────────────────
@@ -231,7 +236,7 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub")
+    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);

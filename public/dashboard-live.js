@@ -50,6 +50,17 @@
 
   function recommendationBucket(audit) {
     if ((audit.status || "").toLowerCase() !== "complete") return null;
+    // FA-126 — audits.recommendation is the single source of truth. The
+    // engine persists one of three enums; map them 1:1 so the ledger can
+    // never disagree with the report masthead / §06 / PDF, which read the
+    // same stored field. (Pre-fix, a stored PROCEED_WITH_CAUTION with score
+    // 35 fell through the free-text probes into the score branch and
+    // rendered "Decline".) The heuristics below survive ONLY for legacy
+    // rows that predate the enum.
+    var stored = (audit.recommendation || "").toUpperCase();
+    if (stored === "PROCEED") return "Proceed";
+    if (stored === "PROCEED_WITH_CAUTION") return "Caution";
+    if (stored === "DECLINE") return "Decline";
     var bnb = (audit.bid_no_bid || "").toLowerCase();
     var rec = (audit.recommendation || "").toLowerCase();
     if (bnb === "no-bid" || rec.indexOf("disqualif") !== -1 || rec.indexOf("no bid") !== -1) return "Decline";
@@ -71,13 +82,17 @@
 
   function mapAuditToRow(audit) {
     var ago = relativeAgo(audit.completed_at || audit.created_at);
+    // FA-126 — DECISION_GATE audits suppress the numeric score on the
+    // report (gates supersede the scored tier; view-model renders "—").
+    // Mirror that here so the ledger never shows a number the report hides.
+    var gateMode = audit.verdict_type === "DECISION_GATE";
     return {
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
       title:  (audit.title || "Untitled").trim(),
       date:   ago.label,
       age:    ago.ageHours,
       type:   audit.document_type || "—",
-      score:  typeof audit.compliance_score === "number" ? audit.compliance_score : null,
+      score:  (!gateMode && typeof audit.compliance_score === "number") ? audit.compliance_score : null,
       rec:    recommendationBucket(audit),
       status: statusBucket(audit)
     };
