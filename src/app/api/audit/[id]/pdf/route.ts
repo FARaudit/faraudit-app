@@ -110,6 +110,15 @@ export async function GET(
   const template = await readFile(templatePath, "utf8");
   const html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
 
+  // Trailing-blank-page guard (Jun 11 renders, USAF pg 12): .frame carries
+  // min-height:100vh which survives into print — Chromium pads the document
+  // to viewport height and can emit an empty final page. Patched here, not in
+  // _template.html, so the template stays 1:1 with the canonical design file.
+  const pdfHtml = html.replace(
+    "</head>",
+    '<style>@media print{.frame{min-height:0!important}.rpt-main>:last-child{margin-bottom:0!important}}</style></head>'
+  );
+
   // POST to Railway pdf-service. The service Bearer-checks RAILWAY_PDF_SECRET
   // and returns PDF bytes with Content-Type: application/pdf.
   const endpoint = pdfUrl.replace(/\/+$/, "") + "/pdf";
@@ -123,7 +132,7 @@ export async function GET(
       },
       body: JSON.stringify({
         auditId: audit.id,
-        html,
+        html: pdfHtml,
         // Paged-PDF spec (Jun 7 2026) — Chromium can't read the masthead
         // sol# from the DOM for displayHeaderFooter, so the service needs
         // it explicitly to interpolate into headerTemplate.

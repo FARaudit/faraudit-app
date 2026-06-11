@@ -77,6 +77,7 @@ const BLOCKING_IDS = new Set<string>([
   'E16', // FA-112 demo-leak guard — no template demo markers in rendered DOM
   'E17', // FA-114 closed-state mode — symmetric: closed surfaces on expired, active surfaces on live
   'E18', // canonical backgrounds — §09 critical rows red-50, move callouts blue-50, no gradients (Jun 11 pink defect)
+  'E19', // §09 counter "N / M complete" with real numbers whenever section visible (Jun 11 bare-"complete" defect)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -628,6 +629,32 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
     };
   });
   results.push({ id: 'E18', pass: e18.ok, detail: e18.detail });
+
+  // E19 — §09 progress counter shows real numbers whenever the section is
+  // visible. Jun 11 JLG PDF rendered a bare "complete" (the closed-mode
+  // counter strip ended at the nested ckTotal </span>); active audits relied
+  // on client JS to overwrite the template's demo "0 / 10". Counter is now
+  // server-populated; format must be "N / M complete". Hidden/stripped §09
+  // passes as n/a (the empty-state test covers that path).
+  const e19 = await page.evaluate(() => {
+    const sec = document.getElementById('sec-checklist');
+    if (!sec || getComputedStyle(sec).display === 'none') {
+      return { ok: true, detail: '§09 not visible — counter n/a' };
+    }
+    const prog = sec.querySelector('.ck-prog');
+    if (!prog) return { ok: false, detail: '§09 visible but .ck-prog counter missing' };
+    const text = (prog.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!/^\d+ \/ \d+ complete$/.test(text)) {
+      return { ok: false, detail: `counter text "${text}" — expected "N / M complete"` };
+    }
+    const total = parseInt(text.split('/')[1], 10);
+    const items = sec.querySelectorAll('.ck-item').length;
+    if (total !== items) {
+      return { ok: false, detail: `counter total=${total} but .ck-item count=${items}` };
+    }
+    return { ok: true, detail: `counter "${text}" · matches ${items} .ck-item(s)` };
+  });
+  results.push({ id: 'E19', pass: e19.ok, detail: e19.detail });
 
   return results;
 }

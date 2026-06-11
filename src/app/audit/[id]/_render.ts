@@ -1725,8 +1725,11 @@ function removeNext48HoursBlock(html: string): string {
 }
 
 // (4) §09 Submission Checklist — swap header subtitle to reference framing,
-// remove the "N / M complete" progress counter, and strip interactive
-// checkbox inputs inside the .checklist (items render as plain reference list).
+// and strip interactive checkbox inputs inside the .checklist (items render
+// as plain reference list). The "N / M complete" counter STAYS (Design, Jun
+// 11): server-rendered numbers, format asserted by conformance E19. The old
+// counter strip used a non-greedy regex that ended at the NESTED ckTotal
+// </span>, leaving a dangling bare "complete" in the render (JLG pg-13 bug).
 function applyClosedChecklistHeader(html: string): string {
   let out = html;
   // Target the §09 st-sub specifically (multiple st-sub spans exist in the
@@ -1736,8 +1739,6 @@ function applyClosedChecklistHeader(html: string): string {
     /(>Submission Checklist<span class="st-sub">)[^<]*(<\/span>)/,
     "$1Reference &mdash; submission requirements as posted$2"
   );
-  // Strip the progress counter span
-  out = out.replace(/<span class="ck-prog">[\s\S]*?<\/span>/, "");
   // Strip interactive checkbox inputs within the checklist section. Use a
   // permissive regex so attribute order / quoting style doesn't matter.
   const checklistOpen = out.indexOf('<div class="checklist"');
@@ -1747,6 +1748,11 @@ function applyClosedChecklistHeader(html: string): string {
     const stripped = segment.replace(/<input\b[^>]*type=['"]?checkbox['"]?[^>]*>/gi, "");
     out = out.slice(0, checklistOpen) + stripped + out.slice(checklistEnd);
   }
+  // With the inputs stripped, the canonical §09 IIFE counts zero
+  // `.ck-item input` and hides the section + jump-nav (its empty guard) —
+  // then would overwrite ckTotal with 0. Closed mode is a static reference
+  // list with a server-rendered counter, so remove the IIFE entirely.
+  out = out.replace(/\/\* ───── §09 submission checklist[\s\S]*?\}\)\(\);/, "");
   return out;
 }
 
@@ -2348,6 +2354,15 @@ export function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): stri
   // client IIFE's section lookup is moot, so the anchor is removed here too.
   if (checklistItemCount === 0) {
     out = out.replace(/<a href="#sec-checklist">[\s\S]*?<\/a>\s*/i, "");
+  } else {
+    // Server-populate the counter. The template ships demo defaults (0 / 10)
+    // and the IIFE only corrects them when client JS runs — the PDF pipeline
+    // and no-JS readers otherwise see demo numbers (Design, Jun 11).
+    out = out.replace(/<b id="ckDone">\d*<\/b>/, '<b id="ckDone">0</b>');
+    out = out.replace(
+      /<span id="ckTotal">\d*<\/span>/,
+      `<span id="ckTotal">${checklistItemCount}</span>`
+    );
   }
   return out;
 }
