@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-sb="open">
+<head>
+<meta charset="utf-8" />
+<title>FARaudit — Audit Report</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FARaudit · Audit Report — TRANSITIONAL STATES (production sync)
+   Synced whole-block from ceo/redesign-final/platform/Audit Report States.html
+   (source of truth — do not re-derive; copy markup/CSS FROM that file).
+   Prod deltas vs design source:
+     · reviewer state-toggle pill (CSS+markup) removed
+     · reviewer stage-advancement / fake-poll / state-switch JS removed
+     · Cloudflare email-protection artifact → plain support@faraudit.com
+     · shell JS = report-parity (localStorage theme/sidebar, watcher/bell hydration)
+     · real status poll + retry wiring (body[data-audit-id], data-start epoch)
+   Renderer (_render-states.ts) binds data-field hooks and renders ONE state.
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4;
+  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
+  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
+  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
+  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-500:#f59e0b; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
+}
+:root,[data-theme="light"],[data-theme="auto"]{
+  --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
+  --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+}
+[data-theme="dark"]{
+  --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
+  --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
+button{font-family:inherit}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+.main{display:flex;flex-direction:column;min-width:0}
+
+/* ═══ topbar (canonical) ═══ */
+.topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;position:sticky;top:0;z-index:60;transition:background-color .25s, border-color .25s}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs a{color:var(--mute);text-decoration:none}.crumbs a:hover{color:var(--ink-2)}
+.crumbs b{color:var(--ink);font-weight:700}
+.crumbs .sep{color:var(--mute-2)}
+/* status pill — RUNNING (amber) / FAILED (red) variants of the canonical live-pill */
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;border:1px solid}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%}
+.live-pill.running{background:var(--amber-50);color:var(--amber-800);border-color:var(--amber-200)}
+.live-pill.running::before{background:var(--amber-500);animation:pulse-a 1.6s ease-out infinite}
+[data-theme="dark"] .live-pill.running{background:rgba(217,119,6,0.12);color:#fcd34d;border-color:rgba(252,211,77,0.30)}
+.live-pill.failed{background:var(--red-50);color:var(--red-800);border-color:var(--red-200)}
+.live-pill.failed::before{background:var(--red-500);animation:none}
+[data-theme="dark"] .live-pill.failed{background:rgba(220,38,38,0.12);color:#fca5a5;border-color:rgba(252,165,165,0.30)}
+@keyframes pulse-a{0%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}100%{box-shadow:0 0 0 8px rgba(245,158,11,0)}}
+@media (prefers-reduced-motion: reduce){.live-pill.running::before{animation:none}}
+.search{margin-left:auto;display:flex;align-items:center;gap:10px;height:34px;width:340px;padding:0 12px;border-radius:9px;background:var(--search-bg);border:1px solid var(--line);color:var(--mute);font-size:13px}
+.search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10.5px;color:var(--mute-2);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;position:relative;transition:background .14s, border-color .14s}
+.icon-btn:hover{border-color:var(--mute-2)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn .nbadge{position:absolute;top:-4px;right:-4px;background:var(--red-600);color:#fff;font-size:9.5px;font-weight:800;height:15px;min-width:15px;border-radius:8px;display:grid;place-items:center;padding:0 4px;border:2px solid var(--card)}
+.user-chip{height:34px;padding:0 6px 0 4px;border-radius:9px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px}
+.user-chip .av{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#1e3a8a,#0f172a);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+.user-chip .nm{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.1}
+
+/* ═══ BODY ═══ */
+.body{padding:24px 30px 96px;display:flex;flex-direction:column;gap:18px;max-width:1480px;width:100%;margin:0 auto}
+
+/* ── return rail (canonical) ── */
+.rpt-return{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.back-link{display:inline-flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--mute);text-decoration:none;letter-spacing:.02em}
+.back-link svg{width:13px;height:13px}
+.back-link:hover{color:var(--ink-2)}
+.rpt-stamp{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);display:flex;align-items:center;gap:10px}
+.rpt-stamp b{color:var(--ink-2);font-weight:600}
+.rpt-stamp .dot{width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
+
+/* ═══════════ STATE MASTHEAD (shared shell — canonical masthead grammar) ═══════════ */
+.st-masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+.st-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
+.st-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
+.st-id{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent-deep);letter-spacing:.01em;margin:0 0 6px}
+[data-theme="dark"] .st-id{color:var(--accent-light)}
+.st-title{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:33px;line-height:1.12;letter-spacing:-.02em;color:var(--ink);margin:0 0 14px;text-wrap:balance;max-width:26ch}
+.st-lede{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin:0;max-width:62ch}
+.st-lede b{color:var(--ink);font-weight:700}
+.st-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--card-soft);margin-top:auto}
+.st-left .st-meta{margin-top:22px}
+.st-fact{flex:1;min-width:140px;padding:11px 14px;border-right:1px solid var(--line)}
+.st-fact:last-child{border-right:0}
+.st-fact i{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-style:normal;margin-bottom:4px}
+.st-fact b{display:block;font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.25}
+.st-fact b.mono{font-size:12px}
+
+/* right panel — verdict-slot treatments. Slate = in progress (never reads as a verdict);
+   decline gradient = failed (canonical .v-decline) */
+.st-panel{padding:26px 26px 24px;display:flex;flex-direction:column;color:#fff;position:relative;isolation:isolate}
+.st-panel::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.16;background-image:radial-gradient(rgba(255,255,255,.9) 1px,transparent 1px);background-size:16px 16px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 70%);mask-image:linear-gradient(180deg,#000,transparent 70%)}
+.p-progress{background:linear-gradient(160deg,#3b4759,#28323f 72%,#161d27)}
+.p-failed{background:linear-gradient(160deg,#b91c1c,#991b1b 72%,#6e1414)}
+.sp-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:0 0 10px}
+.sp-word{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;line-height:.98;letter-spacing:-.025em;margin:0 0 11px}
+.sp-tag{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.78);margin:0;max-width:30ch}
+.sp-elapsed{margin:18px 0 0;font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:500;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.sp-elapsed small{display:block;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
+.sp-cta{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;border-radius:11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.30);color:#fff;font-size:13px;font-weight:800;letter-spacing:.01em;cursor:pointer;text-decoration:none;transition:background .15s,transform .14s}
+.sp-cta:hover{background:rgba(255,255,255,.22);transform:translateY(-1px)}
+.sp-cta svg{width:15px;height:15px}
+.sp-cta + .sp-cta{margin-top:8px}
+.sp-cta.ghost{background:transparent;border-color:rgba(255,255,255,.22);font-weight:700}
+.sp-cta.ghost:hover{background:rgba(255,255,255,.10)}
+.st-panel .sp-stack{margin-top:auto;display:flex;flex-direction:column}
+.st-panel .sp-stack .sp-cta{margin-top:0}
+.st-panel .sp-stack .sp-cta + .sp-cta{margin-top:8px}
+
+/* ═══════════ ENGINE STAGES (shared component, both states) ═══════════ */
+.stages{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:20px 24px}
+.stages-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.stages-k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.stages-sub{font-size:12.5px;color:var(--ink-2);font-weight:600}
+.stages-sub b{color:var(--ink);font-weight:800}
+.stage{display:flex;align-items:center;gap:16px;padding:13px 2px;border-top:1px solid var(--line-2)}
+.stage:first-of-type{border-top:0}
+.stage .sg-no{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute-2);width:26px;flex:none;letter-spacing:.04em}
+.stage .sg-dot{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;border:1.5px solid var(--line);color:transparent;background:var(--card-soft)}
+.stage .sg-dot svg{width:11px;height:11px}
+.stage .sg-lbl{font-size:13px;font-weight:700;color:var(--ink);flex:1 1 auto;min-width:0}
+.stage .sg-lbl small{display:block;font-size:11px;font-weight:500;color:var(--mute);margin-top:1px;line-height:1.4}
+.stage .sg-status{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--mute-2);white-space:nowrap;text-align:right}
+/* done */
+.stage.is-done .sg-dot{background:var(--green-50);border-color:var(--green-200);color:var(--green-600)}
+[data-theme="dark"] .stage.is-done .sg-dot{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
+.stage.is-done .sg-status{color:var(--green-700)}
+[data-theme="dark"] .stage.is-done .sg-status{color:#6ee7b7}
+/* active */
+.stage.is-active .sg-dot{border-color:var(--accent);background:rgba(55,138,221,.08)}
+.stage.is-active .sg-dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse-b 1.6s ease-out infinite}
+@keyframes pulse-b{0%{box-shadow:0 0 0 0 rgba(55,138,221,.4)}100%{box-shadow:0 0 0 7px rgba(55,138,221,0)}}
+@media (prefers-reduced-motion: reduce){.stage.is-active .sg-dot::before{animation:none}}
+.stage.is-active .sg-status{color:var(--accent-deep);font-weight:700}
+[data-theme="dark"] .stage.is-active .sg-status{color:var(--accent-light)}
+/* pending */
+.stage.is-pending .sg-lbl{color:var(--mute)}
+.stage.is-pending .sg-lbl small{color:var(--mute-2)}
+/* failed */
+.stage.is-failed .sg-dot{background:var(--red-50);border-color:var(--red-200);color:var(--red-600)}
+[data-theme="dark"] .stage.is-failed .sg-dot{background:rgba(220,38,38,.12);border-color:rgba(220,38,38,.3)}
+.stage.is-failed .sg-lbl{color:var(--red-700)}
+[data-theme="dark"] .stage.is-failed .sg-lbl{color:#fca5a5}
+.stage.is-failed .sg-status{color:var(--red-600);font-weight:700}
+/* skipped (after a failure) */
+.stage.is-skipped{opacity:.45}
+.stage.is-skipped .sg-lbl{color:var(--mute)}
+
+/* ── auto-refresh strip (progress only) ── */
+.refresh-strip{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);padding:0 4px}
+.refresh-strip b{color:var(--ink-2);font-weight:600}
+.refresh-strip .dot{width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
+.refresh-strip a{color:var(--accent-deep);text-decoration:none;font-weight:600}
+.refresh-strip a:hover{text-decoration:underline}
+[data-theme="dark"] .refresh-strip a{color:var(--accent-light)}
+
+/* ── skeleton ghosts: where the report assembles (progress only) ── */
+.ghost{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:22px 24px;position:relative;overflow:hidden}
+.ghost-k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute-2);margin-bottom:14px}
+.gh-row{height:11px;border-radius:6px;background:var(--line-3);margin-bottom:10px}
+.gh-row.w60{width:60%}.gh-row.w80{width:80%}.gh-row.w45{width:45%}.gh-row.w72{width:72%}
+.gh-row:last-child{margin-bottom:0}
+.ghost::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);transform:translateX(-100%);animation:shimmer 2.4s ease-in-out infinite}
+[data-theme="dark"] .ghost::after{background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.05) 50%,transparent 70%)}
+@keyframes shimmer{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion: reduce){.ghost::after{animation:none;display:none}}
+
+/* ═══════════ FAILED — reason card ═══════════ */
+.reason{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden}
+.reason-head{display:flex;align-items:center;gap:10px;padding:14px 24px;border-bottom:1px solid var(--line-2);background:var(--card-soft)}
+.reason-head .rk{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--red-700)}
+[data-theme="dark"] .reason-head .rk{color:#fca5a5}
+.reason-body{padding:18px 24px 20px}
+.reason-title{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin:0 0 7px}
+.reason-prose{font-size:13px;line-height:1.6;color:var(--ink-2);margin:0 0 14px;max-width:78ch}
+.reason-prose b{color:var(--ink);font-weight:700}
+.reason-trace{font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.55;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);border-radius:9px;padding:10px 14px;overflow-wrap:anywhere}
+.reason-trace b{color:var(--ink-2);font-weight:600}
+
+/* failed — recovery actions on the light card */
+.recover{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rec-card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:20px 22px;display:flex;flex-direction:column;gap:8px}
+.rec-card.primary{border-color:var(--accent-light);box-shadow:var(--shadow-sm),inset 0 0 0 1px rgba(55,138,221,.12)}
+[data-theme="dark"] .rec-card.primary{border-color:rgba(181,212,244,.28)}
+.rec-k{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.rec-card.primary .rec-k{color:var(--accent-deep)}
+[data-theme="dark"] .rec-card.primary .rec-k{color:var(--accent-light)}
+.rec-title{font-size:14.5px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.rec-prose{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:0;flex:1 1 auto}
+.rec-btn{margin-top:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;transition:background .15s,transform .14s,border-color .14s;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.rec-btn:hover{transform:translateY(-1px);border-color:var(--mute-2)}
+.rec-btn.solid{background:var(--accent);border-color:var(--accent);color:#fff}
+.rec-btn.solid:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
+.rec-btn svg{width:15px;height:15px}
+@media (max-width:980px){.recover{grid-template-columns:1fr}}
+
+/* failed — support footnote */
+.support-note{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);padding:0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.support-note b{color:var(--ink-2);font-weight:600}
+.support-note a{color:var(--accent-deep);text-decoration:none;font-weight:600}
+.support-note a:hover{text-decoration:underline}
+[data-theme="dark"] .support-note a{color:var(--accent-light)}
+
+/* ═══ state gating — render exactly one ═══ */
+[data-state="progress"] .only-failed{display:none!important}
+[data-state="failed"] .only-progress{display:none!important}
+
+/* ── canonical toggle sidebar ── */
+:root{--sb-width:56px}
+[data-sb="open"]{--sb-width:232px}
+.sidebar{width:var(--sb-width)!important;background:#0A1628!important;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 18px;position:sticky;top:0;height:100vh;border-right:1px solid rgba(255,255,255,.08);flex-shrink:0;align-self:stretch;overflow:visible;transition:width .22s cubic-bezier(0.16,1,0.3,1)}
+.sb-toggle{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:#0A1628;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:background .14s,color .14s;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
+.sb-toggle:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-toggle svg{width:11px;height:11px;transition:transform .22s}
+[data-sb="open"] .sb-toggle svg{transform:rotate(180deg)}
+.sb-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.sb-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 6px 12px -4px rgba(55,138,221,.55)}
+.sb-wordmark{display:none}
+[data-sb="open"] .sb-logo-row{justify-content:flex-start;gap:10px;margin:0 0 8px 4px;align-self:flex-start}
+[data-sb="open"] .sb-wordmark{display:inline-flex;font-family:"Manrope",sans-serif;font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+[data-sb="open"] .sb-wordmark .wm-au{color:#378ADD}
+.sb-group-label{display:none}
+[data-sb="open"] .sb-group-label{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 12px 6px;align-self:stretch}
+.sb-divider{width:24px;height:1px;background:rgba(255,255,255,.06);margin:6px 0}
+[data-sb="open"] .sb-divider{display:none}
+.sb-icon{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:rgba(255,255,255,.6);position:relative;cursor:pointer;transition:all .15s;text-decoration:none;border:0;background:transparent;font:inherit;padding:0}
+.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.sb-icon.active{background:rgba(55,138,221,.15);color:#fff;box-shadow:inset 2px 0 0 #378ADD}
+.sb-icon.active::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;background:#378ADD;border-radius:2px}
+.sb-icon > svg{width:18px;height:18px;flex-shrink:0}
+.sb-icon .sb-label,.sb-icon .sb-badge{display:none}
+.sb-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#050d1a;color:#fff;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .14s,transform .14s;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:300;letter-spacing:.01em}
+.sb-tip::before{content:"";position:absolute;left:-3px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;background:#050d1a}
+.sb-icon:hover .sb-tip{opacity:1;transform:translateY(-50%) translateX(2px)}
+[data-sb="open"] .sb-icon .sb-tip{display:none!important}
+[data-sb="open"] .sidebar{align-items:stretch;padding:14px 10px 14px}
+[data-sb="open"] .sb-icon{display:flex!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;height:36px;gap:11px!important;padding:0 10px!important;border-radius:9px;flex-direction:row!important}
+[data-sb="open"] .sb-icon > svg{flex-shrink:0;width:18px;height:18px}
+[data-sb="open"] .sb-icon .sb-label{display:inline-flex!important;align-items:center;font-size:12.5px;font-weight:500;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1;flex:1 1 auto;min-width:0}
+[data-sb="open"] .sb-icon.active{background:rgba(181,212,244,.08);color:#fff;box-shadow:none}
+[data-sb="open"] .sb-icon.active::before{display:none}
+[data-sb="open"] .sb-icon.active svg{color:#378ADD}
+[data-sb="open"] .sb-icon .sb-badge{display:inline-flex!important;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:5px;flex-shrink:0;line-height:1;white-space:nowrap}
+[data-sb="open"] .sb-icon .sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
+[data-sb="open"] .sb-icon .sb-badge.new{background:#378ADD;color:#fff}
+[data-sb="open"] .sb-icon .sb-badge.live{background:rgba(16,185,129,.18);color:#86efac;gap:4px;padding-left:5px}
+[data-sb="open"] .sb-icon .sb-badge.live::before{content:"";width:5px;height:5px;border-radius:50%;background:#10b981;flex-shrink:0}
+[data-sb="open"] .sb-icon .sb-badge.danger{background:rgba(220,38,38,.18);color:#fca5a5;border:1px solid rgba(220,38,38,.3)}
+.sb-icon.sb-signout:hover{color:#fca5a5}
+[data-sb="open"] .sb-icon.sb-signout:hover{color:#fca5a5;background:rgba(220,38,38,.08)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:center}
+[data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
+/* ── /canonical toggle sidebar ── */
+</style>
+</head>
+<body data-state="progress" data-audit-id="" data-start="">
+
+<div class="frame">
+
+  <!-- ═════════════ SIDEBAR (canonical — identical to report) ═════════════ -->
+  <aside class="sidebar">
+  <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+  <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
+  <div class="sb-group-label">WORKSPACE</div>
+  <a class="sb-icon" href="/command-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg><span class="sb-label">Today</span><span class="sb-tip">Today</span></a>
+  <a class="sb-icon" href="/audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13l2 2 4-4"></path></svg><span class="sb-label">Run Audit</span><span class="sb-badge new">New</span><span class="sb-tip">Run Audit</span></a>
+  <a class="sb-icon" href="/acquisition-stages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span class="sb-label">Acquisition Stages</span><span class="sb-tip">Acquisition Stages</span></a>
+  <a class="sb-icon active" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="sb-label">Past Audits</span><span class="sb-badge count">15</span><span class="sb-tip">Past Audits</span></a>
+  <a class="sb-icon" href="/pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"></path><path d="M14 7h7v7"></path></svg><span class="sb-label">Pipeline</span><span class="sb-badge danger">3</span><span class="sb-tip">Pipeline</span></a>
+  <a class="sb-icon" href="/capability-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg><span class="sb-label">Capability Statement</span><span class="sb-tip">Capability Statement</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">INTELLIGENCE</div>
+  <a class="sb-icon" href="/opportunities"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M9 12l2 2 4-4"></path></svg><span class="sb-label">Opportunities</span><span class="sb-badge live">Live</span><span class="sb-tip">Opportunities</span></a>
+  <a class="sb-icon" href="/defense-news"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L4 8v8l8 5 8-5V8l-8-5z"></path></svg><span class="sb-label">Defense News</span><span class="sb-tip">Defense News</span></a>
+  <a class="sb-icon" href="/defense-spending"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16"></path><rect x="7" y="11" width="3" height="6"></rect><rect x="12" y="8" width="3" height="9"></rect><rect x="17" y="13" width="3" height="4"></rect></svg><span class="sb-label">Defense Spending</span><span class="sb-tip">Defense Spending</span></a>
+  <a class="sb-icon" href="/agencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V8l7-5 7 5v13"></path><path d="M9 21v-6h6v6"></path></svg><span class="sb-label">Defense Agencies</span><span class="sb-badge count">8</span><span class="sb-tip">Defense Agencies</span></a>
+  <a class="sb-icon" href="/contracting-officers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"></circle><path d="M3 20c1-3 3-5 6-5s5 2 6 5"></path><circle cx="17" cy="8" r="2.5"></circle><path d="M21 17c-.5-2-2-3.5-4-3.5"></path></svg><span class="sb-label">Contracting Officers</span><span class="sb-tip">Contracting Officers</span></a>
+  <a class="sb-icon" href="/watching"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></svg><span class="sb-label">Watching</span><span class="sb-badge count" data-sb-watching-count style="display:none"></span><span class="sb-tip">Watching</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">COMPLIANCE &amp; BD</div>
+  <a class="sb-icon" href="/far-dfars-updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M9 8h8M9 12h8M9 16h5"></path><circle cx="18" cy="17" r="2.5" fill="#378ADD" stroke="none"></circle></svg><span class="sb-label">FAR/DFARS Updates</span><span class="sb-tip">FAR/DFARS Updates</span></a>
+  <a class="sb-icon" href="/cmmc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg><span class="sb-label">CMMC Readiness</span><span class="sb-tip">CMMC Readiness</span></a>
+  <a class="sb-icon" href="/wage-benchmarks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"></path><rect x="5" y="11" width="3" height="9"></rect><rect x="10.5" y="6" width="3" height="14"></rect><rect x="16" y="14" width="3" height="6"></rect></svg><span class="sb-label">Wage Benchmarks</span><span class="sb-tip">Wage Benchmarks</span></a>
+  <a class="sb-icon" href="/teaming-partners"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="9" r="3"></circle><circle cx="17" cy="9" r="3"></circle><path d="M2 20c0-3 2.5-5 5-5s5 2 5 5"></path><path d="M12 20c0-3 2.5-5 5-5s5 2 5 5"></path></svg><span class="sb-label">Teaming Partners</span><span class="sb-tip">Teaming Partners</span></a>
+  <a class="sb-icon" href="/gao-protests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20"></path></svg><span class="sb-label">GAO Protests</span><span class="sb-tip">GAO Protests</span></a>
+  <div class="sb-divider"></div>
+  <div class="sb-group-label">ACCOUNT</div>
+  <a class="sb-icon" href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-7 8-7s8 3 8 7"></path></svg><span class="sb-label">Profile &amp; Settings</span><span class="sb-tip">Profile &amp; Settings</span></a>
+  <form action="/api/auth/sign-out" method="post" style="display:contents">
+    <button type="submit" class="sb-icon sb-signout" aria-label="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg><span class="sb-label">Sign out</span><span class="sb-tip">Sign out</span></button>
+  </form>
+  <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
+</aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main class="main">
+
+    <!-- topbar (canonical; status pill swaps per state) -->
+    <div class="topbar">
+      <div class="crumbs"><a href="/dashboard">Past Audits</a><span class="sep">/</span><b data-field="solicitation_number">FA8118-26-R-0035</b></div>
+      <span class="live-pill running only-progress">RUNNING</span>
+      <span class="live-pill failed only-failed">FAILED</span>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        <span>Search audits, notice IDs, NAICS…</span>
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
+          <svg id="themeMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"></path></svg>
+        </button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8z"></path><path d="M10 21a2 2 0 004 0"></path></svg>
+          <span class="nbadge" style="display:none"></span>
+        </button>
+        <div class="user-chip">
+          <div class="av">JR</div>
+          <div><div class="nm">Jose Rodriguez</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ STATE: AUDIT IN PROGRESS ════════════════ -->
+    <div class="body only-progress" data-screen-label="Audit in progress">
+
+      <div class="rpt-return">
+        <a class="back-link" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Back to Past Audits</a>
+        <div class="rpt-stamp">
+          <span>Audit <b data-field="audit_id">8c2f41ab</b></span><span class="dot"></span>
+          <span>Started <b data-field="started_at">Jun 10, 2026 · 11:42 ET</b></span>
+        </div>
+      </div>
+
+      <!-- progress masthead — canonical masthead grammar, slate panel (never reads as a verdict) -->
+      <header class="st-masthead">
+        <div class="st-left">
+          <p class="st-eyebrow">Audit Report · In Preparation</p>
+          <p class="st-id" data-field="solicitation_number">FA8118-26-R-0035</p>
+          <h1 class="st-title">Reading the solicitation the way an auditor would.</h1>
+          <p class="st-lede">Clause-by-clause extraction, risk analysis, and a bid verdict are being prepared. Full audits are typically ready in <b>one to three minutes</b> — this page refreshes itself, so there is nothing you need to do.</p>
+          <div class="st-meta">
+            <div class="st-fact"><i>Document</i><b class="mono" data-field="source_filename">FA8118-26-R-0035.pdf</b></div>
+            <div class="st-fact"><i>Pages</i><b data-field="page_count">52</b></div>
+            <div class="st-fact"><i>Intelligence calls</i><b data-field="intel_calls">3 queued</b></div>
+            <div class="st-fact"><i>Requested by</i><b data-field="requested_by">Jose Rodriguez</b></div>
+          </div>
+        </div>
+        <div class="st-panel p-progress">
+          <p class="sp-k">Engine Status</p>
+          <p class="sp-word">Analyzing</p>
+          <p class="sp-tag">Stage <b id="spStageNo">2</b> of 5 — no action required.</p>
+          <p class="sp-elapsed"><span id="spElapsed">00:00</span><small>Elapsed</small></p>
+        </div>
+      </header>
+
+      <!-- engine stages — mono = fact; states: done / active / pending -->
+      <section class="stages" aria-label="Audit pipeline stages">
+        <div class="stages-head">
+          <span class="stages-k">Audit Pipeline</span>
+          <span class="stages-sub">Sections of the report assemble below as each stage completes.</span>
+        </div>
+        <div class="stage is-done" data-stage="retrieval">
+          <span class="sg-no">01</span>
+          <span class="sg-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"></path></svg></span>
+          <span class="sg-lbl">Document retrieval<small>Solicitation package fetched and parsed</small></span>
+          <span class="sg-status" data-field="stage_retrieval_time">DONE · 6S</span>
+        </div>
+        <div class="stage is-active" data-stage="extraction">
+          <span class="sg-no">02</span>
+          <span class="sg-dot"></span>
+          <span class="sg-lbl">Clause extraction<small>FAR/DFARS clauses, CLINs, key dates, evaluation factors</small></span>
+          <span class="sg-status">IN PROGRESS</span>
+        </div>
+        <div class="stage is-pending" data-stage="risk">
+          <span class="sg-no">03</span>
+          <span class="sg-dot"></span>
+          <span class="sg-lbl">Risk analysis<small>Compliance traps, execution traps, risk register</small></span>
+          <span class="sg-status">PENDING</span>
+        </div>
+        <div class="stage is-pending" data-stage="verdict">
+          <span class="sg-no">04</span>
+          <span class="sg-dot"></span>
+          <span class="sg-lbl">Verdict &amp; scoring<small>Bid gates, fit score, recommendation</small></span>
+          <span class="sg-status">PENDING</span>
+        </div>
+        <div class="stage is-pending" data-stage="assembly">
+          <span class="sg-no">05</span>
+          <span class="sg-dot"></span>
+          <span class="sg-lbl">Report assembly<small>Compliance matrix, pre-flight checklist, KO email</small></span>
+          <span class="sg-status">PENDING</span>
+        </div>
+      </section>
+
+      <div class="refresh-strip">
+        <span>AUTO-REFRESH ON</span><span class="dot"></span>
+        <span>Last checked <b id="lastChecked">just now</b></span><span class="dot"></span>
+        <a href="" id="refreshNow">Refresh now</a>
+      </div>
+
+      <!-- skeleton: where the report lands -->
+      <section class="ghost" aria-hidden="true">
+        <div class="ghost-k">Executive Summary — assembling</div>
+        <div class="gh-row w80"></div>
+        <div class="gh-row w60"></div>
+        <div class="gh-row w72"></div>
+        <div class="gh-row w45"></div>
+      </section>
+      <section class="ghost" aria-hidden="true">
+        <div class="ghost-k">Risk Register — assembling</div>
+        <div class="gh-row w60"></div>
+        <div class="gh-row w80"></div>
+        <div class="gh-row w45"></div>
+      </section>
+
+    </div>
+
+    <!-- ════════════════ STATE: AUDIT FAILED ════════════════ -->
+    <div class="body only-failed" data-screen-label="Audit failed">
+
+      <div class="rpt-return">
+        <a class="back-link" href="/dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Back to Past Audits</a>
+        <div class="rpt-stamp">
+          <span>Audit <b data-field="audit_id">8c2f41ab</b></span><span class="dot"></span>
+          <span>Failed <b data-field="failed_at">Jun 10, 2026 · 11:44 ET</b></span>
+        </div>
+      </div>
+
+      <!-- failed masthead — decline gradient on the verdict slot; headline is judgment (serif), reason is fact (mono) -->
+      <header class="st-masthead">
+        <div class="st-left">
+          <p class="st-eyebrow">Audit Report · Not Completed</p>
+          <p class="st-id" data-field="solicitation_number">FA8118-26-R-0035</p>
+          <h1 class="st-title">This audit could not be completed.</h1>
+          <p class="st-lede">The engine stopped before analysis began — <b>nothing was scored, and no verdict was produced</b>. The most reliable fix is to upload the solicitation PDF directly; audits run from an uploaded document skip retrieval entirely.</p>
+          <div class="st-meta">
+            <div class="st-fact"><i>Failed at stage</i><b data-field="failed_stage">01 — Document retrieval</b></div>
+            <div class="st-fact"><i>Attempts</i><b data-field="attempt_count">2 of 2</b></div>
+            <div class="st-fact"><i>Audit ID</i><b class="mono" data-field="audit_id">8c2f41ab</b></div>
+          </div>
+        </div>
+        <div class="st-panel p-failed">
+          <p class="sp-k">Engine Status</p>
+          <p class="sp-word">Failed</p>
+          <p class="sp-tag" data-field="failed_tag">Stopped at document retrieval.</p>
+          <div class="sp-stack">
+            <a class="sp-cta" href="/audit?mode=upload" data-action="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>Upload the PDF directly</a>
+            <a class="sp-cta ghost" href="" data-action="retry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-2.6-6.4"></path><path d="M21 3v6h-6"></path></svg>Retry this audit</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- failure reason — mono = extracted fact -->
+      <section class="reason">
+        <div class="reason-head"><span class="rk">Failure Reason</span></div>
+        <div class="reason-body">
+          <p class="reason-title" data-field="error_headline">The solicitation package could not be retrieved from SAM.gov.</p>
+          <p class="reason-prose" data-field="error_explainer">SAM.gov refused the download request for this notice's attachment package on both attempts. This usually means the attachments are behind a controlled-access wall (export-controlled or JCP-gated documents), or SAM.gov is rate-limiting automated retrieval. <b>It is not a problem with your account.</b></p>
+          <p class="reason-trace" data-field="error_trace"><b>TRACE</b> — GET sam.gov/api/prod/opps/v3/opportunities/resources · <b data-field="error_code">HTTP 403</b> · 2 attempts · 11:43:07 / 11:44:21 ET · notice ID <span data-field="notice_id">7e4a9c0b21d34f6e</span></p>
+        </div>
+      </section>
+
+      <!-- recovery paths -->
+      <div class="recover">
+        <div class="rec-card primary">
+          <span class="rec-k">Recommended</span>
+          <span class="rec-title">Upload the solicitation PDF directly</span>
+          <p class="rec-prose">Download the package from SAM.gov in your browser — your session can pass the access wall the engine can't — then upload it here. The audit re-runs immediately and skips retrieval.</p>
+          <a class="rec-btn solid" href="/audit?mode=upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>Upload PDF &amp; re-run audit</a>
+        </div>
+        <div class="rec-card" data-block="retry_card">
+          <span class="rec-k">Alternative</span>
+          <span class="rec-title">Retry automatic retrieval</span>
+          <p class="rec-prose">If SAM.gov was rate-limiting, a retry in a few minutes may succeed. Best when the notice has no controlled-access attachments.</p>
+          <a class="rec-btn" href="" data-action="retry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-2.6-6.4"></path><path d="M21 3v6h-6"></path></svg>Retry audit</a>
+        </div>
+      </div>
+
+      <div class="support-note">
+        <span>STILL FAILING?</span>
+        <span>Email <a href="mailto:support@faraudit.com">support@faraudit.com</a> with audit ID <b data-field="audit_id">8c2f41ab</b> — we answer within one business day.</span>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  /* ── theme toggle — report-parity (localStorage 'faraudit-theme') ── */
+  (function(){
+    var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
+    function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
+    try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
+    sync();
+    if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
+  })();
+
+  /* ── sidebar toggle — report-parity (localStorage 'faraudit-sb') ── */
+  (function(){
+    var KEY='faraudit-sb', html=document.documentElement;
+    try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
+    document.addEventListener('click',function(e){
+      var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
+      var next=html.getAttribute('data-sb')==='open'?'closed':'open';
+      html.setAttribute('data-sb',next);
+      try{localStorage.setItem(KEY,next);}catch(e){}
+    });
+  })();
+
+  var auditId = document.body.getAttribute('data-audit-id');
+  var state = document.body.getAttribute('data-state');
+
+  /* ── elapsed timer (progress panel) — seeded from server started_at epoch ── */
+  var elEl = document.getElementById('spElapsed');
+  var startAttr = document.body.getAttribute('data-start');
+  if (elEl && startAttr) {
+    var t0 = parseInt(startAttr, 10);
+    if (!isNaN(t0)) {
+      var tick = function(){
+        var s = Math.max(0, Math.floor((Date.now() - t0)/1000));
+        var m = Math.floor(s/60); s = s % 60;
+        elEl.textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+      };
+      tick(); setInterval(tick, 1000);
+    }
+  }
+
+  /* ── status poll (progress) — real endpoint; terminal status → reload lands
+        on the full report (or the failed state). 5s cadence matches the legacy
+        meta-refresh this page replaces. ── */
+  if (auditId && state === 'progress') {
+    var lastEl = document.getElementById('lastChecked');
+    var lastPoll = Date.now();
+    var poll = function(){
+      fetch('/api/audit/' + encodeURIComponent(auditId) + '/status', { headers: { accept: 'application/json' } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          lastPoll = Date.now();
+          if (d && d.status && d.status !== 'processing') location.reload();
+        })
+        .catch(function(){});
+    };
+    setInterval(poll, 5000);
+    setInterval(function(){
+      if(!lastEl) return;
+      var s = Math.floor((Date.now() - lastPoll)/1000);
+      lastEl.textContent = s < 2 ? 'just now' : s + 's ago';
+    }, 1000);
+    var rn = document.getElementById('refreshNow');
+    if(rn){ rn.addEventListener('click', function(e){ e.preventDefault(); poll(); if(lastEl) lastEl.textContent = 'just now'; }); }
+  }
+
+  /* ── retry (failed) — POST the refetch endpoint, then reload into the
+        progress state. force:true bypasses the 24h idempotency window. ── */
+  if (auditId && state === 'failed') {
+    var busy = false;
+    document.querySelectorAll('[data-action="retry"]').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        if (busy) return;
+        busy = true;
+        a.style.opacity = '0.6';
+        fetch('/api/audit/' + encodeURIComponent(auditId) + '/refetch', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ force: true })
+        })
+          .then(function(){ location.reload(); })
+          .catch(function(){ busy = false; a.style.opacity = ''; });
+      });
+    });
+  }
+})();
+</script>
+<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script></body>
+</html>

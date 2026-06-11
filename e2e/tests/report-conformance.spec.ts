@@ -638,3 +638,245 @@ for (const doc of AUDIT_DOCS) {
     });
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSITIONAL STATES — Audit Report States.html sync (progress / failed).
+// Spec source: ceo/redesign-final/Review/AUDIT-STATES-HANDOFF.md (acceptance
+// criteria 1-5). All states assertions are BLOCKING — the E16 demo-leak class
+// applies to both states per criterion 4.
+//
+// Fixtures:
+//   - failed: defaults to a real prod failed audit. A retry un-fails the row
+//     in place (refetch reuses the same audit id), so when the fixture's state
+//     has moved on the test SKIPS with a clear message — override with
+//     STATES_FAILED_AUDIT_ID.
+//   - progress: transient by nature (1-3 min window). Provide
+//     STATES_PROGRESS_AUDIT_ID while an audit is processing (e.g. during
+//     FA-120 re-runs); the test skips when unset.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATES_DEMO_MARKERS = [
+  'FA8118-26-R-0035',
+  '8c2f41ab',
+  '7e4a9c0b21d34f6e',
+  '11:43:07 / 11:44:21',
+  '3 queued',
+  'DONE · 6S',
+  '2 of 2',
+];
+
+const STATES_FAILED_AUDIT_ID = process.env.STATES_FAILED_AUDIT_ID || '2d62e5c0-f6bd-4838-90ff-ab87e186632e';
+const STATES_PROGRESS_AUDIT_ID = process.env.STATES_PROGRESS_AUDIT_ID || '';
+
+async function runStatesSharedAssertions(
+  page: import('@playwright/test').Page,
+  expectedState: 'progress' | 'failed'
+): Promise<AssertionResult[]> {
+  const results: AssertionResult[] = [];
+
+  // ST1 — canonical shell present; legacy dark/gold interstitial + reviewer
+  // toggle gone (acceptance criteria 1, 2, 5).
+  const st1 = await page.evaluate(() => {
+    const fails: string[] = [];
+    if (!document.querySelector('aside.sidebar')) fails.push('sidebar missing');
+    if (!document.querySelector('.topbar')) fails.push('topbar missing');
+    if (!document.querySelector('.rpt-return .back-link')) fails.push('return rail missing');
+    if (document.querySelector('.demo-toggle')) fails.push('reviewer demo-toggle present');
+    if (/three-call intelligence pipeline/i.test(document.body.innerHTML)) fails.push('legacy holding copy present');
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg === 'rgb(11, 14, 19)') fails.push('legacy dark interstitial background (#0B0E13)');
+    return { ok: fails.length === 0, detail: fails.join(' | ') || 'shell ✓ (sidebar · topbar · return rail · no demo toggle · legacy gone)' };
+  });
+  results.push({ id: 'ST1', pass: st1.ok, detail: st1.detail });
+
+  // ST2 — exactly ONE state rendered server-side; the sibling state's body
+  // block and pill are stripped, not just CSS-hidden.
+  const st2 = await page.evaluate((exp) => {
+    const fails: string[] = [];
+    const ds = document.body.getAttribute('data-state');
+    if (ds !== exp) fails.push(`body data-state=${ds} (expected ${exp})`);
+    const bodies = document.querySelectorAll('.body');
+    if (bodies.length !== 1) fails.push(`${bodies.length} .body blocks (expected 1)`);
+    const other = exp === 'progress' ? 'only-failed' : 'only-progress';
+    const leftovers = document.querySelectorAll('.' + other);
+    if (leftovers.length > 0) fails.push(`${leftovers.length} .${other} elements not stripped`);
+    const pills = document.querySelectorAll('.live-pill');
+    if (pills.length !== 1) fails.push(`${pills.length} live-pills (expected 1)`);
+    return { ok: fails.length === 0, detail: fails.join(' | ') || 'one state server-side ✓' };
+  }, expectedState);
+  results.push({ id: 'ST2', pass: st2.ok, detail: st2.detail });
+
+  // ST3 — E16 demo-leak class for the states template: none of the design
+  // file's demo defaults may reach a prod render (acceptance criterion 4).
+  const st3 = await page.evaluate((markers) => {
+    const html = document.documentElement.outerHTML;
+    const hits: string[] = [];
+    for (const m of markers) {
+      const idx = html.indexOf(m);
+      if (idx >= 0) {
+        const before = html.slice(Math.max(0, idx - 80), idx).replace(/\s+/g, ' ');
+        hits.push(`${m}@${idx} ctx=…${before}«${m}»`);
+      }
+    }
+    return { ok: hits.length === 0, detail: hits.length === 0 ? 'no states demo markers in DOM ✓' : 'demo markers leaked: ' + hits.join(' | ') };
+  }, STATES_DEMO_MARKERS);
+  results.push({ id: 'ST3', pass: st3.ok, detail: st3.detail });
+
+  // ST4 — no horizontal overflow (D1 parity with the report shell) and no
+  // empty fact cells (unknown facts must collapse, not render blank).
+  const st4 = await page.evaluate(() => {
+    const fails: string[] = [];
+    const delta = Math.abs(document.documentElement.scrollWidth - window.innerWidth);
+    if (delta > 1) fails.push(`hscroll delta=${delta}`);
+    const empties = Array.from(document.querySelectorAll('.st-fact b')).filter((b) => !(b.textContent || '').trim());
+    if (empties.length > 0) fails.push(`${empties.length} empty .st-fact values (should collapse)`);
+    return { ok: fails.length === 0, detail: fails.join(' | ') || 'layout ✓ (no hscroll · no empty fact cells)' };
+  });
+  results.push({ id: 'ST4', pass: st4.ok, detail: st4.detail });
+
+  return results;
+}
+
+function reportStatesResults(label: string, vpLabel: string, results: AssertionResult[]): string[] {
+  console.log(`\n══ STATES · ${label} @ ${vpLabel} ══`);
+  const fails: string[] = [];
+  for (const r of results) {
+    console.log(`  ${(r.pass ? '✓' : '✗ BLOCK').padEnd(8)} ${r.id.padEnd(4)} ${r.detail}`);
+    if (!r.pass) fails.push(`${r.id}: ${r.detail}`);
+  }
+  const reportPath = path.join(OUT_DIR, `states-${label.replace(/[^a-z0-9]+/gi, '-')}-${vpLabel}.json`);
+  fs.writeFileSync(reportPath, JSON.stringify({ label, viewport: vpLabel, results, fails }, null, 2));
+  return fails;
+}
+
+for (const vp of VIEWPORTS) {
+  test(`states conformance: failed @ ${vp.label}`, async ({ page }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`/audit/${STATES_FAILED_AUDIT_ID}`);
+    await page.waitForLoadState('networkidle');
+
+    const url = page.url();
+    if (/\/sign-in/.test(url)) {
+      throw new Error(`auth redirect → ${url} (storageState stale; re-run auth.setup.ts)`);
+    }
+
+    // The fixture un-fails in place when retried — skip (don't fail) when the
+    // row's state has moved on, so the gate stays meaningful.
+    const ds = await page.evaluate(() => document.body.getAttribute('data-state'));
+    test.skip(ds !== 'failed', `fixture ${STATES_FAILED_AUDIT_ID} is no longer failed (data-state=${ds}) — set STATES_FAILED_AUDIT_ID to a current failed audit`);
+
+    const results = await runStatesSharedAssertions(page, 'failed');
+
+    // SF1 — red FAILED pill + decline panel (acceptance criterion 4).
+    const sf1 = await page.evaluate(() => {
+      const fails: string[] = [];
+      if (!document.querySelector('.live-pill.failed')) fails.push('.live-pill.failed missing');
+      if (document.querySelector('.live-pill.running')) fails.push('.live-pill.running present on failed state');
+      if (!document.querySelector('.st-panel.p-failed')) fails.push('.st-panel.p-failed missing');
+      if (document.querySelector('.st-panel.p-progress')) fails.push('.st-panel.p-progress present on failed state');
+      return { ok: fails.length === 0, detail: fails.join(' | ') || 'FAILED pill + decline panel ✓' };
+    });
+    results.push({ id: 'SF1', pass: sf1.ok, detail: sf1.detail });
+
+    // SF2 — upload-direct is the visually primary action.
+    const sf2 = await page.evaluate(() => {
+      const fails: string[] = [];
+      const primary = document.querySelector('.rec-card.primary');
+      if (!primary) fails.push('.rec-card.primary missing');
+      else if (!primary.querySelector('a[href="/audit?mode=upload"]')) fails.push('primary rec-card does not route to upload flow');
+      const stack = document.querySelector('.sp-stack');
+      const firstCta = stack && stack.querySelector('.sp-cta');
+      if (!firstCta || firstCta.getAttribute('data-action') !== 'upload') fails.push('panel first CTA is not upload');
+      return { ok: fails.length === 0, detail: fails.join(' | ') || 'upload visually primary ✓' };
+    });
+    results.push({ id: 'SF2', pass: sf2.ok, detail: sf2.detail });
+
+    // SF3 — real reason + trace bound; unverifiable billing claim absent.
+    const sf3 = await page.evaluate(() => {
+      const fails: string[] = [];
+      const title = document.querySelector('.reason-title');
+      if (!title || !(title.textContent || '').trim()) fails.push('reason headline empty');
+      const trace = document.querySelector('.reason-trace');
+      const traceText = trace ? (trace.textContent || '') : '';
+      if (!/TRACE/.test(traceText)) fails.push('trace line missing');
+      if (!/audit [0-9a-f]{8}-[0-9a-f]{4}/i.test(traceText)) fails.push('trace lacks audit uuid');
+      if (/credit was not used/i.test(document.body.innerHTML)) fails.push('unverifiable credit-line present');
+      if (/cdn-cgi|__cf_email__/.test(document.body.innerHTML)) fails.push('cloudflare email-protection artifact present');
+      return { ok: fails.length === 0, detail: fails.join(' | ') || 'reason + trace bound ✓' };
+    });
+    results.push({ id: 'SF3', pass: sf3.ok, detail: sf3.detail });
+
+    const fails = reportStatesResults('failed', vp.label, results);
+    if (fails.length > 0) {
+      await page.screenshot({ path: path.join(OUT_DIR, `FAIL-states-failed-${vp.label}.png`), fullPage: true });
+    }
+    expect(fails, `states(failed) assertion failures:\n${fails.join('\n')}`).toEqual([]);
+  });
+}
+
+test('states conformance: progress @ 1440', async ({ page }) => {
+  test.skip(!STATES_PROGRESS_AUDIT_ID, 'STATES_PROGRESS_AUDIT_ID not set — run while an audit is processing');
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/audit/${STATES_PROGRESS_AUDIT_ID}`);
+  await page.waitForLoadState('networkidle');
+
+  const url = page.url();
+  if (/\/sign-in/.test(url)) {
+    throw new Error(`auth redirect → ${url} (storageState stale; re-run auth.setup.ts)`);
+  }
+
+  const ds = await page.evaluate(() => document.body.getAttribute('data-state'));
+  test.skip(ds !== 'progress', `audit ${STATES_PROGRESS_AUDIT_ID} is not processing (data-state=${ds}) — the window is 1-3 min; re-point at a fresh run`);
+
+  const results = await runStatesSharedAssertions(page, 'progress');
+
+  // SP1 — amber RUNNING pill + slate (non-verdict) panel (criterion 3).
+  const sp1 = await page.evaluate(() => {
+    const fails: string[] = [];
+    if (!document.querySelector('.live-pill.running')) fails.push('.live-pill.running missing');
+    if (document.querySelector('.live-pill.failed')) fails.push('.live-pill.failed present on progress state');
+    if (!document.querySelector('.st-panel.p-progress')) fails.push('.st-panel.p-progress missing');
+    if (document.querySelector('.st-panel.p-failed')) fails.push('.st-panel.p-failed present on progress state');
+    return { ok: fails.length === 0, detail: fails.join(' | ') || 'RUNNING pill + slate panel ✓' };
+  });
+  results.push({ id: 'SP1', pass: sp1.ok, detail: sp1.detail });
+
+  // SP2 — stages reflect a real (non-demo) pipeline readout: 5 rows, exactly
+  // one active, none carrying the template's demo timings.
+  const sp2 = await page.evaluate(() => {
+    const fails: string[] = [];
+    const stages = document.querySelectorAll('.stage');
+    if (stages.length !== 5) fails.push(`${stages.length} stage rows (expected 5)`);
+    const active = document.querySelectorAll('.stage.is-active');
+    if (active.length !== 1) fails.push(`${active.length} active stages (expected 1)`);
+    const no = document.getElementById('spStageNo');
+    if (!no || !/^\d$/.test((no.textContent || '').trim())) fails.push('spStageNo not numeric');
+    return { ok: fails.length === 0, detail: fails.join(' | ') || `stages ✓ (5 rows · 1 active · stageNo=${(document.getElementById('spStageNo')?.textContent || '').trim()})` };
+  });
+  results.push({ id: 'SP2', pass: sp2.ok, detail: sp2.detail });
+
+  // SP3 — elapsed ticks client-side from the server-seeded start epoch.
+  const before = await page.locator('#spElapsed').textContent();
+  await page.waitForTimeout(1600);
+  const after = await page.locator('#spElapsed').textContent();
+  const sp3ok = !!before && !!after && /^\d{2,}:\d{2}$/.test(after.trim()) && after !== before;
+  results.push({ id: 'SP3', pass: sp3ok, detail: sp3ok ? `elapsed ticks ✓ (${before} → ${after})` : `elapsed not ticking (${before} → ${after})` });
+
+  // SP4 — auto-refresh strip + assembling skeletons present.
+  const sp4 = await page.evaluate(() => {
+    const fails: string[] = [];
+    if (!document.querySelector('.refresh-strip')) fails.push('refresh strip missing');
+    if (!document.getElementById('lastChecked')) fails.push('#lastChecked missing');
+    if (document.querySelectorAll('.ghost').length < 2) fails.push('skeleton ghosts missing');
+    return { ok: fails.length === 0, detail: fails.join(' | ') || 'refresh strip + skeletons ✓' };
+  });
+  results.push({ id: 'SP4', pass: sp4.ok, detail: sp4.detail });
+
+  const fails = reportStatesResults('progress', '1440', results);
+  if (fails.length > 0) {
+    await page.screenshot({ path: path.join(OUT_DIR, `FAIL-states-progress-1440.png`), fullPage: true });
+  }
+  expect(fails, `states(progress) assertion failures:\n${fails.join('\n')}`).toEqual([]);
+});
