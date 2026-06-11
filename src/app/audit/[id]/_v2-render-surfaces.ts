@@ -51,7 +51,9 @@ export interface V2RenderInput {
 // required_action) — mirror of mapComplianceFlags/pickSeverity in
 // _view-model.ts. A TRAP badge whose clause is not in this set points at a
 // §04 card that doesn't exist, so such rows render as plain "required".
-function sec04TrapClauses(comp: Record<string, unknown>): Map<string, string | null> {
+function sec04TrapClauses(
+  comp: Record<string, unknown>
+): Map<string, { title: string; reason: string | null }> {
   const flags = Array.isArray(comp.dfars_flags)
     ? (comp.dfars_flags as Array<{
         clause?: string;
@@ -62,7 +64,7 @@ function sec04TrapClauses(comp: Record<string, unknown>): Map<string, string | n
         detected?: boolean;
       } | null>)
     : [];
-  const map = new Map<string, string | null>();
+  const map = new Map<string, { title: string; reason: string | null }>();
   for (const f of flags) {
     if (!f || f.detected !== true) continue;
     const sev = String(f.severity ?? "").toUpperCase();
@@ -71,7 +73,7 @@ function sec04TrapClauses(comp: Record<string, unknown>): Map<string, string | n
     const requiredAction = String(f.required_action ?? "").trim();
     if (description.length === 0 && requiredAction.length === 0) continue;
     const num = String(f.clause ?? "").trim();
-    if (num) map.set(num, description || requiredAction || null);
+    if (num) map.set(num, { title: String(f.title ?? "").trim(), reason: description || requiredAction || null });
   }
   return map;
 }
@@ -106,8 +108,9 @@ export function buildV2ViewModelFromShadow(
       const rebadge = (rows: ClauseMatrixRow[]): ClauseMatrixRow[] =>
         rows.map((r) => {
           const num = String(r.number ?? "").trim();
-          if (trapMap.has(num)) {
-            return { ...r, badge: "trap" as MatrixBadge, trapReason: r.trapReason ?? trapMap.get(num) ?? null };
+          const trap = trapMap.get(num);
+          if (trap) {
+            return { ...r, badge: "trap" as MatrixBadge, trapReason: r.trapReason ?? trap.reason };
           }
           return r.badge === "trap"
             ? { ...r, badge: "required" as MatrixBadge, trapReason: null }
@@ -116,7 +119,21 @@ export function buildV2ViewModelFromShadow(
       // FA-103 fix: fall back to V1 clause lists when V2 extraction returned empty
       const v2m = surfaces.matrix_rollup as MatrixRollupReshaped | undefined;
       if (v2m && (v2m.required.length > 0 || v2m.reference.length > 0)) {
-        return { ...v2m, required: rebadge(v2m.required), reference: rebadge(v2m.reference) };
+        const required = rebadge(v2m.required);
+        const reference = rebadge(v2m.reference);
+        // A §04-rendered trap that V2's extraction omitted from the matrix
+        // would leave the tally chip > TRAP-badged rows. Append it — every
+        // trap card in §04 must have a matrix row (SPRTA1 re-run: 252.211-7003
+        // IUID was a §04 trap but absent from the V2 required list).
+        const present = new Set(
+          [...required, ...reference].map((r) => String(r.number ?? "").trim())
+        );
+        for (const [num, trap] of trapMap) {
+          if (!present.has(num)) {
+            required.push({ number: num, title: trap.title, badge: "trap" as MatrixBadge, trapReason: trap.reason });
+          }
+        }
+        return { ...v2m, required, reference };
       }
       const dfars: string[] = Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as string[]) : [];
       const far: string[] = Array.isArray(comp.far_clauses) ? (comp.far_clauses as string[]) : [];
@@ -134,12 +151,12 @@ export function buildV2ViewModelFromShadow(
         // clause survives the §04 content filter, so every "See §04 trap"
         // pointer resolves to a rendered flag card.
         const num = String(f.clause ?? "").trim();
-        const isTrap = trapMap.has(num);
+        const trap = trapMap.get(num);
         return {
           number: f.clause ?? "",
           title: f.title ?? "",
-          badge: (isTrap ? "trap" : "required") as MatrixBadge,
-          trapReason: isTrap ? (trapMap.get(num) ?? f.title ?? null) : null,
+          badge: (trap ? "trap" : "required") as MatrixBadge,
+          trapReason: trap ? (trap.reason ?? f.title ?? null) : null,
         };
       });
       const flagNums = new Set(flags.map((f) => f.clause ?? ""));
