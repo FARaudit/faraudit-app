@@ -2357,12 +2357,14 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 export function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
   let out = html;
   // §09 empty-state guard — an audit can map requirements yet derive zero
-  // checklist items (USDA Jun 11 case). Count ITEMS, not groups: a groups
-  // array of empty buckets must still strip.
-  const checklistItemCount = (vm.submission_checklist_filtered ?? []).reduce(
-    (n, g) => n + (g.items?.length ?? 0),
-    0
-  );
+  // checklist items (USDA Jun 11 case). Count ITEMS, not groups.
+  // FA-127c: count the RENDERED rows, not vm.submission_checklist_filtered.
+  // This pass runs AFTER the V2 overlay, which replaces the §09 container
+  // with its own row set — counting the V1 VM collection here printed
+  // ckTotal one off the visible rows (USMS 18/17, FDA 21/20). Both emitters
+  // replace the container inner (empty ⇒ ""), so the html count is exact;
+  // CSS/JS reference .ck-item without the class=" prefix and never match.
+  const checklistItemCount = (out.match(/class="ck-item\b/g) ?? []).length;
   // compliance_flags lives in a <div class="flags" data-hide-when-empty="..."> wrapper (§04).
   // The other two are <section> wrappers.
   const passes: Array<{ field: string; isEmpty: boolean }> = [
