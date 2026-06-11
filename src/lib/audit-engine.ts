@@ -448,6 +448,15 @@ export function buildV1PresenceMap(
 
 // ═══════════════════════════════════════════════════════════════════════════
 
+// FA-127 — single source of truth for the DFARS-trap category spelling.
+// Canonical wire enum value lives in risk_findings ("DFARS_Trap"); the
+// display form ("DFARS trap") is shown on prioritized_risks surfaces. All
+// emitters and joins MUST reference these constants — a stray literal with
+// the wrong spelling silently breaks the parseDFARSTraps by-category join
+// and empties §04.
+export const DFARS_TRAP_CATEGORY = "DFARS_Trap" as const;
+export const DFARS_TRAP_CATEGORY_DISPLAY = "DFARS trap" as const;
+
 // Cycle 2 facts-only risk shape. The model emits flat findings; priority,
 // dedup, top-3, per-category buckets, severity_score, exec summary, and
 // verdict rationale are all TS-derived in the VM. RiskFinding.category
@@ -456,7 +465,7 @@ export function buildV1PresenceMap(
 export interface RiskFinding {
   title: string;
   text: string;
-  category: "Disqualification" | "DFARS_Trap" | "Technical" | "Schedule" | "Price" | "Evaluation" | "Compliance";
+  category: "Disqualification" | typeof DFARS_TRAP_CATEGORY | "Technical" | "Schedule" | "Price" | "Evaluation" | "Compliance";
   citation: string;
   faraudit_action: string;
   offerorActionRequired: boolean;
@@ -515,7 +524,7 @@ export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: Risk
   // inherit description + required_action prose. §04 then renders real flag
   // rows instead of firing the W2b soften empty-state. Zero new LLM calls —
   // reuses existing engine output from the risks pass.
-  const dfarsFindings = (risksJson?.risk_findings ?? []).filter((f) => f?.category === "DFARS_Trap");
+  const dfarsFindings = (risksJson?.risk_findings ?? []).filter((f) => f?.category === DFARS_TRAP_CATEGORY);
   const findingByClause = new Map<string, RiskFinding>();
   for (const f of dfarsFindings) {
     const clauseRef = (f.citation || "").match(/\b(?:252|5352)\.\d+(?:-\d+)?\b/)?.[0];
@@ -706,38 +715,44 @@ function cleanFarauditAction(raw: unknown): string | undefined {
 // hasRichSource = any of {pdf, image, extracted text} was attached. Renamed
 // from hasPdf 2026-05-17 (FA-1) — semantics now cover image + extracted-text
 // arms, not just PDF.
-function synthesizeFallbackRisk(complianceJson: ComplianceJSON, hasRichSource: boolean): PrioritizedRisk {
+function synthesizeFallbackRisks(complianceJson: ComplianceJSON, hasRichSource: boolean): PrioritizedRisk[] {
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
-  const dfarsTriggered = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).map((f) => f.title);
+  const dfarsTriggered = (complianceJson.dfars_flags ?? []).filter((f) => f.detected);
 
   if (dfarsTriggered.length > 0) {
-    return {
-      title: `DFARS trap clause active`,
-      text: `Critical DFARS trap clause(s) detected: ${dfarsTriggered.join(", ")}. Confirm representations and flowdown obligations before bidding.`,
-      priority: "P0",
-      category: "DFARS trap",
+    // FA-127 — one risk PER detected trap with citation = clause number.
+    // parseDFARSTraps joins description/required_action onto §04 flags by the
+    // clause ref in citation; the old single aggregated risk carried no
+    // citation, so every detected flag rendered empty and §04 collapsed to
+    // its empty-state while other sections still counted the traps.
+    return dfarsTriggered.map((f) => ({
+      title: `${f.title} — DFARS trap active`,
+      text: `DFARS trap clause ${f.clause} (${f.title}) detected in this solicitation. Confirm representations and flowdown obligations for ${f.clause} before bidding.`,
+      priority: f.severity,
+      category: DFARS_TRAP_CATEGORY_DISPLAY,
+      citation: f.clause,
       provenance: "verified"
-    };
+    }));
   }
 
   if (!hasRichSource && farCount === 0 && dfarsCount === 0) {
-    return {
+    return [{
       title: "Thin source — manual review needed",
       text: "Solicitation context was thin (no PDF attached and SAM.gov metadata limited). Manual review of the full document is required before bid/no-bid decision.",
       priority: "P1",
       category: "Insufficient context",
       provenance: "inferred"
-    };
+    }];
   }
 
-  return {
+  return [{
     title: "Risk extraction empty — review manually",
     text: "AI risk extraction returned empty. Manual review of the full document is required to confirm there are no material risks.",
     priority: "P2",
     category: "Manual review",
     provenance: "inferred"
-  };
+  }];
 }
 
 export type DocumentType =
@@ -1715,7 +1730,7 @@ export function applyRuling3Cap(risks: PrioritizedRisk[]): PrioritizedRisk[] {
 const P0_TRAP_CLAUSES = new Set(["252.223-7008", "252.204-7018", "252.225-7060"]);
 export function derivePriorityFromFinding(category: RiskFinding["category"], citation: string): "P0" | "P1" | "P2" {
   if (category === "Disqualification") return "P0";
-  if (category === "DFARS_Trap") {
+  if (category === DFARS_TRAP_CATEGORY) {
     const cleaned = citation.replace(/^\s+|\s+$/g, "");
     return P0_TRAP_CLAUSES.has(cleaned) ? "P0" : "P1";
   }
@@ -1735,7 +1750,7 @@ export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
     text: f.text,
     title: f.title,
     priority: derivePriorityFromFinding(f.category, f.citation),
-    category: f.category === "DFARS_Trap" ? "DFARS trap" : f.category,
+    category: f.category === DFARS_TRAP_CATEGORY ? DFARS_TRAP_CATEGORY_DISPLAY : f.category,
     citation: f.citation || undefined,
     provenance: hasAnchor ? "verified" : "inferred",
     faraudit_action: f.faraudit_action || undefined,
@@ -1753,7 +1768,7 @@ function mapPrioritizedToFinding(r: PrioritizedRisk): RiskFinding {
   let category: RiskFinding["category"];
   // "market-structure" (sole-source emitter) → Disqualification (structural no-bid).
   if (/disqualif|market[-\s]?structure|no[-\s]?bid|sole[-\s]?source/i.test(cat)) category = "Disqualification";
-  else if (/dfars|\btrap\b|hex[-\s]?chrome|cmmc|telecom/i.test(cat)) category = "DFARS_Trap";
+  else if (/dfars|\btrap\b|hex[-\s]?chrome|cmmc|telecom/i.test(cat)) category = DFARS_TRAP_CATEGORY;
   else if (/schedule|deliver|lead[-\s]?time|sprs[-\s]?lag/i.test(cat)) category = "Schedule";
   else if (/\bprice|pricing|reverse[-\s]?auction|fob|freight/i.test(cat)) category = "Price";
   else if (/evaluation|lpta|\bsection\s*m/i.test(cat)) category = "Evaluation";
@@ -2223,7 +2238,7 @@ JSON only — one key: risk_findings.`;
   // hasRichSource = pdf | image | extracted text (any rich content arm).
   if (prioritized.length === 0) {
     const hasRichSource = !!pdfBase64 || !!pdfFileId || !!imageBase64 || !!extractedText;
-    prioritized = [synthesizeFallbackRisk(complianceJson, hasRichSource)];
+    prioritized = synthesizeFallbackRisks(complianceJson, hasRichSource);
   }
 
   // ━━ Fork 1 post-processors (2026-06-05) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

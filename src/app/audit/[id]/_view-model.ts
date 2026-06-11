@@ -759,18 +759,11 @@ function mapComplianceFlags(compJson: Record<string, unknown>): ComplianceFlag[]
       // Drop flags with no real content — fail-loud rather than fallback.
       .filter((f) => f.description.length > 0 || f.required_action.length > 0);
   }
-  // Fallback: synthesize from raw far/dfars clause lists. We don't have
-  // severity for these — surface as P1 advisories.
-  const far = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as string[]) : [];
-  const dfars = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as string[]) : [];
-  const all = [...dfars, ...far].slice(0, 6);
-  return all.map((c) => ({
-    clause: String(c).trim(),
-    title: "Offeror-action clause",
-    severity: "P1",
-    description: "Required clause flagged in the solicitation — confirm your response addresses it.",
-    required_action: "Verify your proposal addresses this clause before submission."
-  }));
+  // FA-127 — no generic-advisory fallback. Synthesizing first-6 raw clauses
+  // as boilerplate "Offeror-action clause" rows printed fabricated counts
+  // that contradicted the real detection state. Zero detected flags renders
+  // the truthful §04 empty-state instead.
+  return [];
 }
 
 // ─── risks ──────────────────────────────────────────────────────────────────
@@ -1375,31 +1368,39 @@ function deriveTimelineGates(
 
 function deriveComplianceMatrix(
   compJson: Record<string, unknown>,
-  risks: Risk[]
+  risks: Risk[],
+  complianceFlags: ComplianceFlag[]
 ): Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> {
   const rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> = [];
   // Build a lowercase set of citations from the risk register so clauses cited
   // there get status='risk' instead of 'clear'.
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "").trim();
   const riskCites = new Set(risks.map((r) => norm(r.citation || "")).filter(Boolean));
+  // FA-127 — §07's "N need offeror action" rollup counts status==='action'
+  // rows. Pin 'action' to the SAME renderable §04 flag set so the two
+  // sections can never print contradictory counts: zero §04 flags ⇒ zero
+  // 'action' rows ⇒ §07 says 0, and vice versa.
+  const flagClauses = new Set(complianceFlags.map((f) => norm(f.clause)).filter(Boolean));
   const farClauses = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as string[]) : [];
   for (const c of farClauses) {
     if (!c) continue;
-    rows.push({ requirement: c, source: "FAR clause", status: riskCites.has(norm(c)) ? "risk" : "clear" });
+    rows.push({ requirement: c, source: "FAR clause", status: flagClauses.has(norm(c)) ? "action" : riskCites.has(norm(c)) ? "risk" : "clear" });
   }
   const dfarsClauses = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as string[]) : [];
   for (const c of dfarsClauses) {
     if (!c) continue;
-    rows.push({ requirement: c, source: "DFARS clause", status: riskCites.has(norm(c)) ? "risk" : "clear" });
+    rows.push({ requirement: c, source: "DFARS clause", status: flagClauses.has(norm(c)) ? "action" : riskCites.has(norm(c)) ? "risk" : "clear" });
   }
-  // Section L submission requirements — todo/warn become 'action', ok becomes 'clear'.
+  // Section L submission requirements — FA-127: non-ok items surface as
+  // 'risk' (At Risk), not 'action' — 'action' is reserved for the §04 flag
+  // set so the §07 offeror-action rollup has exactly one derivation source.
   const reqs = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : [];
   for (const r of reqs) {
     if (!r.requirement) continue;
     rows.push({
       requirement: r.requirement,
       source: "Section L",
-      status: r.status === "ok" ? "clear" : "action"
+      status: r.status === "ok" ? "clear" : "risk"
     });
   }
   // Section M evaluation factors — informational, always 'clear'.
@@ -2139,7 +2140,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     timeline_gates: deriveTimelineGates(audit, compJson, responseDeadline),
 
-    compliance_matrix: deriveComplianceMatrix(compJson, risks),
+    compliance_matrix: deriveComplianceMatrix(compJson, risks, complianceFlags),
     matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
 
     ko_email: koCard,
