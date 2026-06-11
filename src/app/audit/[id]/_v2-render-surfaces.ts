@@ -74,20 +74,25 @@ export function buildV2ViewModelFromShadow(
       if (v2m && (v2m.required.length > 0 || v2m.reference.length > 0)) return v2m;
       const dfars: string[] = Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as string[]) : [];
       const far: string[] = Array.isArray(comp.far_clauses) ? (comp.far_clauses as string[]) : [];
-      const flags = Array.isArray(comp.dfars_flags) ? (comp.dfars_flags as Array<{clause_number?:string;title?:string;severity?:string;description?:string}>) : [];
+      // FA-134: dfars_flags is the full 13-row hardcoded trap table with a
+      // `detected` boolean — only detected rows are real findings. Severity
+      // values are P0/P1/P2 (not HIGH/CRITICAL) and the clause number lives
+      // in `clause` (not `clause_number`).
+      const allFlags = Array.isArray(comp.dfars_flags) ? (comp.dfars_flags as Array<{clause?:string;title?:string;severity?:string;description?:string;detected?:boolean}>) : [];
+      const flags = allFlags.filter((f) => f?.detected === true);
       if (dfars.length === 0 && far.length === 0 && flags.length === 0) {
         return { required: [], reference: [], reference_count: 0 };
       }
       const required: ClauseMatrixRow[] = flags.map((f) => {
-        const isTrap = f.severity === "HIGH" || f.severity === "CRITICAL";
+        const isTrap = f.severity === "P0" || f.severity === "P1";
         return {
-          number: f.clause_number ?? "",
+          number: f.clause ?? "",
           title: f.title ?? "",
           badge: (isTrap ? "trap" : "required") as MatrixBadge,
-          trapReason: isTrap ? (f.description ?? f.title ?? null) : null,
+          trapReason: isTrap ? (f.description || f.title || null) : null,
         };
       });
-      const flagNums = new Set(flags.map((f) => f.clause_number ?? ""));
+      const flagNums = new Set(flags.map((f) => f.clause ?? ""));
       dfars.forEach((c) => {
         const num = typeof c === "string" ? c : ((c as { number?: string }).number ?? "");
         if (num && !flagNums.has(num)) {

@@ -498,7 +498,7 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.204-7021", title: "CMMC", severity: "P1" },
   { clause: "252.225-7060", title: "Xinjiang Forced Labor", severity: "P0" },
   { clause: "252.232-7006", title: "WAWF Payment Routing", severity: "P1" },
-  { clause: "5352.242-9000", title: "Air Force Base Access", severity: "P1" },
+  { clause: "5352.242-9000", title: "Installation Access (AF 5352.242-9000)", severity: "P1" },
   { clause: "252.225-7001", title: "Buy American / Balance of Payments", severity: "P1" },
   { clause: "252.215-7010", title: "Certified Cost or Pricing Data", severity: "P1" },
   { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" },
