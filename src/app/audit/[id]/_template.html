@@ -499,7 +499,7 @@ button{font-family:inherit}
 .risk-body-inner{padding:2px 16px 16px;border-top:1px solid var(--line-2)}
 .risk-body-inner .rb-desc{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin:13px 0 13px}
 .risk-action{display:flex;align-items:flex-start;gap:11px;background:var(--blue-50);border:1px solid var(--accent-light);border-left:3px solid var(--accent);border-radius:10px;padding:14px 15px;box-shadow:0 1px 2px rgba(55,138,221,.08)}
-[data-theme="dark"] .risk-action{background:rgba(55,138,221,.16);border-color:rgba(181,212,244,.25);border-left-color:var(--accent)}
+[data-theme="dark"] .risk-action{background:rgba(55,138,221,.12);border-color:rgba(181,212,244,.25);border-left-color:var(--accent)}
 .risk-action .ra-ico{width:27px;height:27px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
 .risk-action .ra-ico svg{width:14px;height:14px}
 .risk-action .ra-txt{font-size:13px;line-height:1.55;color:var(--ink);font-weight:500}
@@ -2314,17 +2314,15 @@ Capture Lead, [Company]
   }
 })();
 
-/* ───── §09 submission checklist — live progress + per-audit session persistence ─────
-   Empty-state guard: zero .ck-items → hide the section AND its jump-nav entry.
-   Never render a "0 / 0 complete" empty box. Server-side strip via
-   data-hide-when-empty="submission_checklist" is the primary path; this guard
-   covers the section either way and always clears the jump-nav anchor. */
+/* ───── §09 submission checklist — live progress + per-audit session persistence ───── */
 (function(){
-  var cl=document.querySelector('.checklist');
-  var items=cl?[].slice.call(cl.querySelectorAll('.ck-item input')):[];
+  var cl=document.querySelector('.checklist'); if(!cl) return;
+  var items=[].slice.call(cl.querySelectorAll('.ck-item input'));
+  /* empty-state guard: zero extracted items → hide the whole section + its jump-nav entry
+     (never render a "0 / 0 complete" empty box — matches timeline_gates / §02 / §04 doctrine) */
   if(!items.length){
     var sec=document.getElementById('sec-checklist'); if(sec) sec.style.display='none';
-    var jn=document.querySelector('.jump a[href="#sec-checklist"]'); if(jn) jn.style.display='none';
+    var jn=document.querySelector('.jumpnav a[href="#sec-checklist"], a[href="#sec-checklist"]'); if(jn) jn.style.display='none';
     return;
   }
   var doneEl=document.getElementById('ckDone'), totalEl=document.getElementById('ckTotal');
