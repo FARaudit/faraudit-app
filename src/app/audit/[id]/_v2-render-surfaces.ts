@@ -225,12 +225,28 @@ export function suppressContradictedConfidenceNotes(
     (typeof audit.set_aside === "string" && audit.set_aside.trim().length > 0) ||
     (typeof comp.set_aside_type === "string" && (comp.set_aside_type as string).trim().length > 0) ||
     (typeof comp.set_aside_text === "string" && (comp.set_aside_text as string).trim().length > 0);
+  // Scalar masthead subjects — these render from the audit row / SAM metadata
+  // even when absent from the document text, so a "could not be confirmed
+  // from the document" note still contradicts the page (1232: NAICS 236220
+  // on the masthead beside a NAICS vnote).
+  const overview = (audit.overview_json as Record<string, unknown> | null) ?? {};
+  const str = (v: unknown): boolean => typeof v === "string" && v.trim().length > 0 && v.trim() !== "—";
+  const naicsPresent = str(audit.naics_code) || str(overview.naics_code);
+  const solPresent = str(audit.solicitation_number) || str(overview.solicitation_number);
+  const deadlinePresent = str(audit.response_deadline) || str(overview.response_deadline);
+  const agencyPresent = str(audit.agency) || str(overview.agency);
+  const contractTypePresent = str(overview.contract_type);
   const subjects: Array<[RegExp, boolean]> = [
     [/\bclin/i, clinsPresent],
     [/submission|section\s*l\b|checklist|proposal\s+requirements/i, reqsPresent],
     [/evaluation|section\s*m\b/i, evalPresent],
     [/\bclauses?\b|\bdfars\b/i, clausesPresent],
     [/set.aside/i, setAsidePresent],
+    [/\bnaics\b/i, naicsPresent],
+    [/solicitation\s*(number|no\b|#)/i, solPresent],
+    [/due\s*date|deadline|response\s*date|offer\s*due/i, deadlinePresent],
+    [/issuing\s*(office|agency)|\bagency\b/i, agencyPresent],
+    [/contract\s*type/i, contractTypePresent],
   ];
   return notes.filter((n) => {
     // field is the schema-designated subject; fall back to the uncertainty
