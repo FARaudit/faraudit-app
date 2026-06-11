@@ -26,6 +26,16 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// FA-124 — boot logs the effective env so deploy verification doesn't depend
+// on dashboard screenshots. Flag values are printed; secrets are presence-only.
+const flags = ["CLAUDE_TIMEOUT_MS", "AUDIT_ENGINE_V2", "AUDIT_ASYNC_ENQUEUE", "WORKER_POLL_MS"] as const;
+console.log(
+  "[audit-worker] effective env ·",
+  flags.map((k) => `${k}=${process.env[k] ?? "(unset)"}`).join(" · "),
+  "·",
+  required.map((k) => `${k}=present`).join(" · ")
+);
+
 import("./worker")
   .then((m) => m.runWorker())
   .catch((err) => {
