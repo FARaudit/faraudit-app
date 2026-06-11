@@ -120,11 +120,14 @@ export function buildV2ViewModelFromShadow(
       const v2m = surfaces.matrix_rollup as MatrixRollupReshaped | undefined;
       if (v2m && (v2m.required.length > 0 || v2m.reference.length > 0)) {
         const required = rebadge(v2m.required);
-        const reference = rebadge(v2m.reference);
-        // A §04-rendered trap that V2's extraction omitted from the matrix
-        // would leave the tally chip > TRAP-badged rows. Append it — every
-        // trap card in §04 must have a matrix row (SPRTA1 re-run: 252.211-7003
-        // IUID was a §04 trap but absent from the V2 required list).
+        // A §04 trap hiding in the collapsed reference list carries no
+        // visible TRAP badge (SPRTA1 re-run: 252.211-7003 IUID sat among 151
+        // reference rows) — promote it to required so the chip, the TRAP
+        // rows, and §04 stay one number.
+        const referenceAll = rebadge(v2m.reference);
+        const reference = referenceAll.filter((r) => r.badge !== "trap");
+        required.push(...referenceAll.filter((r) => r.badge === "trap"));
+        // And a trap V2 omitted from the matrix entirely still gets a row.
         const present = new Set(
           [...required, ...reference].map((r) => String(r.number ?? "").trim())
         );
@@ -133,7 +136,7 @@ export function buildV2ViewModelFromShadow(
             required.push({ number: num, title: trap.title, badge: "trap" as MatrixBadge, trapReason: trap.reason });
           }
         }
-        return { ...v2m, required, reference };
+        return { required, reference, reference_count: reference.length };
       }
       const dfars: string[] = Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as string[]) : [];
       const far: string[] = Array.isArray(comp.far_clauses) ? (comp.far_clauses as string[]) : [];
