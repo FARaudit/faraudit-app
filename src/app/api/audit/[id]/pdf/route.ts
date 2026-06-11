@@ -156,7 +156,8 @@ export async function GET(
 
   const pdfBytes = await pdfRes.arrayBuffer();
 
-  // Filename keeps the prior pattern: FARaudit-<sol#>-<YYYY-MM-DD>.pdf
+  // FA-138: filename carries an audit-id suffix so same-day re-audits of the
+  // same solicitation can't collide in the browser's Downloads folder.
   const displayId =
     displaySolicitationId({
       solicitation_number: audit.solicitation_number as string | null | undefined,
@@ -164,7 +165,7 @@ export async function GET(
       title: audit.title as string | null | undefined
     }).replace(/[^A-Za-z0-9_-]+/g, "_") || "audit";
   const generatedAt = new Date().toISOString().slice(0, 10);
-  const filename = `FARaudit-${displayId}-${generatedAt}.pdf`;
+  const filename = `FARaudit-${displayId}-${generatedAt}-${String(audit.id).slice(0, 8)}.pdf`;
 
   return new Response(pdfBytes, {
     status: 200,
