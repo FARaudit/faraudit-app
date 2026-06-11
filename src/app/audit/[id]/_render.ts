@@ -1436,9 +1436,9 @@ function setInnerByClass(html: string, className: string, tagName: string, inner
 function renderGateConditions(
   html: string,
   conditions: Array<{ title: string; context: string; citation: string; blocker_note: string }>,
-  verdictMode: "gate" | "scored"
+  gateModeActive: boolean
 ): string {
-  if (verdictMode !== "gate" || conditions.length === 0) return html;
+  if (!gateModeActive || conditions.length === 0) return html;
   // Masthead .mhv-gates — preserves the cap "<p class='mhv-gates-cap'>" prelude.
   const mhvCap = `<p class="mhv-gates-cap">Bid only if — all true today</p>`;
   const mhvRows = conditions
@@ -1633,6 +1633,34 @@ function renderWorkStatementReveal(
   // of the two). If we do, leave the template's hidden defaults — better
   // than throwing in the render path.
   return html;
+}
+
+// §03 contract: the final DOM carries EXACTLY ONE .ws-reveal block. V1
+// (renderWorkStatementReveal above) and the V2 overlay (renderWorkStatement in
+// _v2-render-surfaces.ts) each un-hide their OWN derivation's block without
+// touching the other; when they disagree, both end up visible (Army live-DOM
+// case, Jun 11). Runs as a final pass in renderAuditReportComplete — after the
+// V2 overlay — and removes the loser via the tag-balanced walker (E13 lesson:
+// never strip with a non-greedy [\s\S]*? regex, it matched THROUGH both
+// blocks). Known wins ties because it is only ever un-hidden when populated;
+// if neither was un-hidden, the unknown no-data variant is kept (still hidden)
+// so the count invariant holds without inventing visible content.
+function enforceSingleWorkStatementReveal(html: string): string {
+  const knownOpenRe =
+    /<div class="ws-reveal" data-state="known" data-field="work_statement"[^>]*>/;
+  const unknownOpenRe =
+    /<div class="ws-reveal is-unknown" data-state="unknown" data-field="work_statement_unknown"[^>]*>/;
+  const known = knownOpenRe.exec(html);
+  const unknown = unknownOpenRe.exec(html);
+  if (!known || !unknown) return html;
+  const knownVisible = !/display:\s*none/.test(known[0]);
+  const unknownVisible = !/display:\s*none/.test(unknown[0]);
+  if (knownVisible && unknownVisible) {
+    console.warn(
+      "[ws-reveal] V1/V2 disagreement: both blocks visible — keeping known, removing unknown"
+    );
+  }
+  return removeElementByOpenRe(html, knownVisible ? unknownOpenRe : knownOpenRe, "div");
 }
 
 function renderKoEmailCard(
@@ -2270,11 +2298,25 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // template's own window.applyVerdictMode('gate') after DOM load — that
   // single call adds .is-gate to .mh-verdict (hides numeric tiles + reveals
   // gates), un-hides #reco-gate, hides .win-themes + .win-h + .st-amend.
-  html = renderGateConditions(html, vm.gate_conditions, vm.verdict_mode);
+  // Gate-mode predicate is shared with the visual toggle below (FA-108): a
+  // score_locked report flips is-gate too, so its gate surfaces must bind —
+  // not just DECISION_GATE verdicts.
+  const gateModeActive = vm.verdict_mode === "gate" || vm.score_locked;
+  html = renderGateConditions(html, vm.gate_conditions, gateModeActive);
+  // Gap-collapse (Jun 11, Army live-DOM): when gate mode is visually active
+  // but the engine emitted no gate_conditions[] (Brain doesn't emit the field
+  // for score_locked yet), applyVerdictMode('gate') would reveal the masthead
+  // .mhv-gates + §06 #reco-gate with template demo/empty content. Remove both
+  // shells server-side until real conditions exist — applyVerdictMode's
+  // lookups are null-guarded, so tile suppression still works.
+  if (gateModeActive && vm.gate_conditions.length === 0) {
+    html = removeElementByOpenRe(html, /<div class="gate-card"[^>]*>/, "div");
+    html = removeElementByOpenRe(html, /<div class="mhv-gates"[^>]*>/, "div");
+  }
   // FA-108: also trigger gate-mode suppression when score_locked (no capability
   // statement on file). The numeric tile gets hidden the same way as DECISION_GATE
   // verdicts; CTA tile-replacement copy lands in a follow-up commit.
-  if (vm.verdict_mode === "gate" || vm.score_locked) {
+  if (gateModeActive) {
     html = injectVerdictModeCall(html);
   }
   // FA-129 — CEO ruling: a NO-BID verdict is final. The interactive bid-gate
@@ -2463,6 +2505,9 @@ export function renderAuditReportComplete(
     // single source of truth.
     html = renderTrapTally(html, vm.compliance_flags);
   }
+  // §03 exactly-one contract — must run AFTER the V2 overlay so it sees both
+  // V1's and V2's un-hide outcomes (see enforceSingleWorkStatementReveal).
+  html = enforceSingleWorkStatementReveal(html);
   html = stripHideWhenEmptyBlocks(html, vm);
   // FA-114: report-wide closed-state framing — operates on FINAL HTML so that
   // checkbox-strip / progress-counter-strip survive renderSubmissionChecklist

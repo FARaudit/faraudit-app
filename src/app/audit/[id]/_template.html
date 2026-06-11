@@ -170,10 +170,10 @@ button{font-family:inherit}
 [data-theme="dark"] .moment-headline em{color:#fcd34d;border-color:rgba(217,119,6,.4)}
 .moment-detail{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin:0;max-width:74ch}
 .moment-detail b{color:var(--ink);font-weight:700}
-.moment-aside{flex-shrink:0;width:188px;display:flex;flex-direction:column;gap:10px;border-left:1px solid var(--amber-200);padding-left:24px}
+.moment-aside{flex-shrink:0;width:188px;min-width:0;display:flex;flex-direction:column;gap:10px;border-left:1px solid var(--amber-200);padding-left:24px}
 [data-theme="dark"] .moment-aside{border-color:rgba(217,119,6,.3)}
 .moment-aside .ma-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
-.moment-aside .ma-v{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35}
+.moment-aside .ma-v{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35;overflow-wrap:anywhere}
 .moment-aside .ma-btn{margin-top:2px;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;border-radius:9px;border:1px solid var(--amber-600);background:var(--amber-600);color:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .14s,box-shadow .14s;box-shadow:0 8px 18px -8px rgba(217,119,6,.6)}
 .moment-aside .ma-btn:hover{transform:translateY(-1px)}
 .moment-aside .ma-btn svg{width:13px;height:13px}
@@ -221,10 +221,16 @@ button{font-family:inherit}
 .tl-lbl{font-size:10.5px;line-height:1.3;color:var(--ink-2);max-width:13ch}
 .tl-node.end .tl-lbl,.tl-node.end .tl-date{color:var(--accent-deep);font-weight:700}
 @media (max-width:760px){.tl-track{overflow-x:auto;gap:18px}.tl-node{min-width:80px}}
-/* ── count-adaptive vertical fallback (canonical tl- vocab): the horizontal strip strands
-   2–3 nodes at opposite ends of a long empty rail. For ≤3 nodes we reflow the same node
-   data into a vertical .vtl block — bigger dates, stacked, no dead rail. The IIFE in the
-   timeline script builds .vtl off the rendered .tl-node set and hides .tl-track. */
+/* ── count-adaptive density (CEO ruling Jun 11): the critical path ALWAYS reads left→right.
+      At 2–3 nodes the full-width space-between strip strands its dots at opposite ends of a dead
+      rail, so the IIFE adds .few — nodes pack from the left on fixed 170px centers and the
+      connector spans only dot-to-dot. (Replaces the vertical .vtl reflow, retired Jun 11;
+      .vtl vocab kept below for the components library.) ── */
+.tl-track.few{justify-content:flex-start;gap:0}
+.tl-track.few .tl-node{flex:0 0 170px;max-width:170px}
+.tl-track.few::before{left:85px;right:auto;width:calc((var(--tl-n,2) - 1)*170px)}
+/* ── vertical timeline vocab (components library; RETIRED from the report Jun 11 —
+      CEO ruled the critical path stays horizontal at every node count) ── */
 .vtl{position:relative;max-width:460px;padding:2px 0}
 .vtl-node{position:relative;display:grid;grid-template-columns:13px 1fr;gap:18px;padding-bottom:30px}
 .vtl-node:last-child{padding-bottom:0}
@@ -426,9 +432,12 @@ button{font-family:inherit}
 .clin-desc{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
 .clin-desc .nsn{display:block;margin-top:4px;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
 .clin-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
-.cpill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:6px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.cpill{display:inline-flex;align-items:center;gap:7px;min-height:24px;padding:2px 10px;border-radius:6px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);max-width:100%}
+/* long extracted values (e.g. multi-range QTY strings) wrap inside the pill instead of clipping at the card edge — Jun 11 five-doc walk, DLA SPRTA126R0220 */
+.cpill .v{overflow-wrap:anywhere}
 .cpill i{font-style:normal;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:8.5px;color:var(--mute-2)}
 .cpill .v{color:var(--ink)}
+.cpill i{flex-shrink:0}
 .cpill.psc{background:rgba(55,138,221,.08);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .cpill.psc{background:rgba(55,138,221,.16);border-color:rgba(181,212,244,.28);color:var(--accent-light)}
 .cpill.flag{background:rgba(217,119,6,.1);border-color:var(--amber-200);color:var(--amber-700)}
@@ -682,9 +691,9 @@ button{font-family:inherit}
   #sec-classify,#sec-incumbent,#sec-ko,.matrix-artifact,.ws-reveal,.award-basis,.gate-card{break-inside:avoid}
   /* 4 · every card / row is atomic — never split down the middle */
   .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,
-  .es-act,.tl-node,.vtl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin,.cmatrix tr,.ko-card,.cmatrix,.v2-overlay{break-inside:avoid}
+  .es-act,.tl-node,.vtl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin,.cmatrix tr,.ko-card,.cmatrix,.sev-legend,.v2-overlay{break-inside:avoid}
   /* 5 · sub-headers / group labels glue to the first row beneath them */
-  .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick{break-after:avoid}
+  .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick,.sev-legend,.vn-frame{break-after:avoid}
   /* 6 · long tables repeat their header row on each page they span */
   .cmatrix thead{display:table-header-group}
   /* 7 · typographic widow/orphan control */
@@ -2353,39 +2362,29 @@ Capture Lead, [Company]
   var WORDS=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
   document.querySelectorAll('.timeline').forEach(function(tl){
     var n=tl.querySelectorAll('.tl-track .tl-node').length;
-    var el=tl.querySelector('.tl-count'); if(!el || !n) return;
+    /* Graceful empty state: no extracted gates -> hide the whole strip rather than render an
+       empty box with a contradictory "six steps" header (the verification notes already disclose
+       the unextracted deadline). Consistent with the §02/§04 empty-state hides. */
+    if(!n){ tl.style.display='none'; return; }
+    var el=tl.querySelector('.tl-count'); if(!el) return;
     el.textContent=(n<=12?WORDS[n]:String(n))+' step'+(n===1?'':'s');
   });
 })();
 
-/* ───── timeline: count-adaptive layout ─────
-   The horizontal .tl-track reads as a left→right critical path and is right for 4+ gates, but a
-   2–3 node render strands the dots at opposite ends of a long empty connector (the SPRRA case).
-   For <=3 nodes we reflow the SAME node data (date + label + status) into the vertical .vtl
-   treatment — bigger dates, stacked, no dead rail. Pure presentational derivation off the
-   rendered nodes; Code keeps rendering timeline_gates[] as .tl-node. */
+/* ───── timeline: count-adaptive density ─────
+   CEO ruling (Jun 11): the critical path always reads horizontally, left→right — including the
+   common 2-node case (Posted → Quote due). At <=3 nodes the default space-between strip strands
+   the dots at opposite ends of a dead rail, so instead of reflowing vertical (retired) we pack
+   the SAME .tl-node elements from the left on fixed 170px centers and shorten the connector to
+   span dot-to-dot. Pure presentational; Code keeps rendering timeline_gates[] as .tl-node. */
 (function(){
-  var FEW=3, STATUS=['ok','warn','bad','end'];
+  var FEW=3;
   document.querySelectorAll('.timeline').forEach(function(tl){
     var track=tl.querySelector('.tl-track'); if(!track) return;
-    var nodes=[].slice.call(track.querySelectorAll('.tl-node'));
-    if(!nodes.length || nodes.length>FEW) return;
-    var vtl=document.createElement('div'); vtl.className='vtl';
-    nodes.forEach(function(n){
-      var cls=STATUS.filter(function(s){return n.classList.contains(s);})[0]||'';
-      var date=(n.querySelector('.tl-date')||{}).textContent||'';
-      var lbl=(n.querySelector('.tl-lbl')||{}).textContent||'';
-      var node=document.createElement('div'); node.className=('vtl-node '+cls).trim();
-      var rail=document.createElement('div'); rail.className='vtl-rail';
-      rail.innerHTML='<span class="vtl-dot"></span><span class="vtl-line"></span>';
-      var body=document.createElement('div'); body.className='vtl-body';
-      var d=document.createElement('div'); d.className='vtl-date'; d.textContent=date; body.appendChild(d);
-      if(lbl){ var m=document.createElement('div'); m.className='vtl-meta'; m.textContent=lbl; body.appendChild(m); }
-      node.appendChild(rail); node.appendChild(body);
-      vtl.appendChild(node);
-    });
-    track.style.display='none';
-    track.parentNode.insertBefore(vtl, track.nextSibling);
+    var n=track.querySelectorAll('.tl-node').length;
+    if(!n || n>FEW) return;
+    track.classList.add('few');
+    track.style.setProperty('--tl-n', n);
   });
 })();
 

@@ -220,8 +220,13 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   // V2 ceiling. BLOCKING — Phase 2 #3.
   const e13 = await page.evaluate(() => {
     const reveals = Array.from(document.querySelectorAll('.ws-reveal'));
-    // Strip hidden defaults — only count blocks that don't have display:none
-    // inline (those are the un-revealed twin still in the markup).
+    // Exactly-one contract (Jun 11): enforceSingleWorkStatementReveal removes
+    // the non-chosen twin server-side, so the final DOM carries ONE .ws-reveal
+    // total — not one-visible-one-hidden. Catches the Army double-reveal
+    // (both data-state blocks visible) AND any hidden leftover.
+    if (reveals.length !== 1) {
+      return { ok: false, detail: `${reveals.length} .ws-reveal in DOM (must be exactly 1)` };
+    }
     const visible = reveals.filter((el) => {
       const style = (el as HTMLElement).style.display;
       const inlineHidden = style === 'none';

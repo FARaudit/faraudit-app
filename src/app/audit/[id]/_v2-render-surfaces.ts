@@ -566,6 +566,12 @@ function renderConfidenceNotes(html: string, v: V2RenderInput): string {
   // strip pass is the empty-section authority; V2 only writes when it has data.
   if (v.confidence_notes.length === 0) return html;
   let out = setSpanByDataField(html, "confidence_count", String(v.confidence_notes.length));
+  // The " notes" suffix is static template text OUTSIDE the count span — bind
+  // the plural so a single-note report doesn't read "1 notes" (Jun 11 walk).
+  out = out.replace(
+    /(<span class="vn-count"><span data-field="confidence_count">\d+<\/span>) notes?(<\/span>)/,
+    `$1${v.confidence_notes.length === 1 ? " note" : " notes"}$2`
+  );
   const rows = v.confidence_notes
     .map(
       (n) =>
