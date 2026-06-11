@@ -76,6 +76,7 @@ const BLOCKING_IDS = new Set<string>([
   'E15', // §05 risk-cap UX — visible cap=10, .risk-more.is-shown, click expands, no orphan labels
   'E16', // FA-112 demo-leak guard — no template demo markers in rendered DOM
   'E17', // FA-114 closed-state mode — symmetric: closed surfaces on expired, active surfaces on live
+  'E18', // canonical backgrounds — §09 critical rows red-50, move callouts blue-50, no gradients (Jun 11 pink defect)
 ]);
 
 const OUT_DIR = 'test-results/_report-conformance';
@@ -587,6 +588,47 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   });
   results.push({ id: 'E17', pass: e17.ok, detail: e17.detail });
 
+  // E18 — canonical backgrounds on §09 critical rows + FARaudit-move callouts.
+  // Jun 11 renders showed a rose-pink gradient where canonical is flat red-50
+  // (critical rows) / blue-50 (move callouts). Root cause: color→transparent /
+  // low-alpha gradients interpolate through rose in the PDF renderer. Asserts
+  // computed style: background-image:none (no gradient of any kind) and the
+  // exact canonical background-color token. Absent elements pass (not every
+  // fixture has critical items / risks / l02 catches).
+  const e18 = await page.evaluate(() => {
+    const RED_50 = 'rgb(254, 242, 242)';
+    const BLUE_50 = 'rgb(239, 246, 255)';
+    const surfaces: Array<{ sel: string; expected: string }> = [
+      { sel: '.ck-item.is-critical', expected: RED_50 },
+      { sel: '.risk-action', expected: BLUE_50 },
+      { sel: '.et-move', expected: BLUE_50 },
+    ];
+    const fails: string[] = [];
+    const counts: string[] = [];
+    for (const s of surfaces) {
+      const els = Array.from(document.querySelectorAll<HTMLElement>(s.sel));
+      counts.push(`${s.sel}=${els.length}`);
+      for (const el of els) {
+        const cs = getComputedStyle(el);
+        if (cs.backgroundImage !== 'none') {
+          fails.push(`${s.sel} has background-image ${cs.backgroundImage.slice(0, 60)}…`);
+          break;
+        }
+        if (cs.backgroundColor !== s.expected) {
+          fails.push(`${s.sel} bg=${cs.backgroundColor} expected=${s.expected}`);
+          break;
+        }
+      }
+    }
+    return {
+      ok: fails.length === 0,
+      detail: fails.length === 0
+        ? `canonical backgrounds ✓ (${counts.join(' · ')})`
+        : 'non-canonical backgrounds: ' + fails.join(' | '),
+    };
+  });
+  results.push({ id: 'E18', pass: e18.ok, detail: e18.detail });
+
   return results;
 }
 
@@ -879,4 +921,56 @@ test('states conformance: progress @ 1440', async ({ page }) => {
     await page.screenshot({ path: path.join(OUT_DIR, `FAIL-states-progress-1440.png`), fullPage: true });
   }
   expect(fails, `states(progress) assertion failures:\n${fails.join('\n')}`).toEqual([]);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §09 EMPTY-STATE GUARD — Jun 11 USDA case: 118 requirements mapped, 0 checklist
+// items derived. The report must hide §09 (server strip via
+// data-hide-when-empty="submission_checklist" + client IIFE belt) AND its
+// jump-nav entry. Never render a "0 / 0 complete" empty box.
+// Fixture: USDA 1232SA26R0020 re-run (complete · matrix=118 · checklist=0).
+// Overridable when a fresher zero-checklist audit exists.
+const EMPTY_CHECKLIST_AUDIT_ID =
+  process.env.EMPTY_CHECKLIST_AUDIT_ID || 'a9e140f7-ae0f-4260-b3b9-91fad47e90b3';
+
+test('§09 empty-state: section + jump-nav hidden @ 1440', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/audit/${EMPTY_CHECKLIST_AUDIT_ID}`);
+  await page.waitForLoadState('networkidle');
+  if (/\/sign-in/.test(page.url())) {
+    throw new Error(`auth redirect → ${page.url()} (storageState stale; re-run auth.setup.ts)`);
+  }
+
+  const r = await page.evaluate(() => {
+    const fails: string[] = [];
+    // Sanity — this must be a complete report, not a transitional state.
+    if (!document.querySelector('.rpt-grid')) fails.push('not a complete report render (.rpt-grid missing)');
+    // Fixture sanity — if the audit now derives checklist items (engine-side
+    // fix landed), the guard legitimately doesn't fire; flag for re-fixture.
+    const visible = (el: Element | null) =>
+      !!el && getComputedStyle(el as HTMLElement).display !== 'none';
+    const sec = document.getElementById('sec-checklist');
+    const items = document.querySelectorAll('.checklist .ck-item').length;
+    if (items > 0) {
+      return { ok: true, skip: true, detail: `fixture now derives ${items} checklist items — §09 legitimately visible; update EMPTY_CHECKLIST_AUDIT_ID` };
+    }
+    if (visible(sec)) fails.push('#sec-checklist rendered despite empty checklist');
+    const jn = document.querySelector('.jump a[href="#sec-checklist"]');
+    if (visible(jn)) fails.push('jump-nav §09 entry still visible');
+    if (/0\s*\/\s*0 complete/.test(document.body.innerText)) fails.push('"0 / 0 complete" box rendered');
+    return { ok: fails.length === 0, skip: false, detail: fails.join(' | ') || '§09 + jump-nav hidden ✓' };
+  });
+
+  console.log(`\n══ §09 EMPTY-STATE · ${EMPTY_CHECKLIST_AUDIT_ID.slice(0, 8)} @ 1440 ══`);
+  console.log(`  ${r.ok ? '✓' : '✗ BLOCK'}        SC1  ${r.detail}`);
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'sc-empty-checklist-1440.json'),
+    JSON.stringify({ auditId: EMPTY_CHECKLIST_AUDIT_ID, result: r }, null, 2)
+  );
+  test.skip(!!r.skip, r.detail);
+  if (!r.ok) {
+    await page.screenshot({ path: path.join(OUT_DIR, 'FAIL-sc-empty-checklist-1440.png'), fullPage: true });
+  }
+  expect(r.ok, r.detail).toBe(true);
 });

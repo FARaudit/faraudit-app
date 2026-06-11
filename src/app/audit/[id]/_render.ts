@@ -2312,6 +2312,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 // AFTER V2 overlay populates content — length-check then sees the real shape.
 export function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): string {
   let out = html;
+  // §09 empty-state guard — an audit can map requirements yet derive zero
+  // checklist items (USDA Jun 11 case). Count ITEMS, not groups: a groups
+  // array of empty buckets must still strip.
+  const checklistItemCount = (vm.submission_checklist_filtered ?? []).reduce(
+    (n, g) => n + (g.items?.length ?? 0),
+    0
+  );
   // compliance_flags lives in a <div class="flags" data-hide-when-empty="..."> wrapper (§04).
   // The other two are <section> wrappers.
   const passes: Array<{ field: string; isEmpty: boolean }> = [
@@ -2331,10 +2338,16 @@ export function stripHideWhenEmptyBlocks(html: string, vm: AuditViewModel): stri
     // vm.v2_surface_lengths, computed in _view-model.ts from compliance_json.v2_shadow.)
     { field: "l02_catches",     isEmpty: (vm.v2_surface_lengths?.l02_catches     ?? 0) === 0 },
     { field: "confidence_notes", isEmpty: (vm.v2_surface_lengths?.confidence_notes ?? 0) === 0 },
+    { field: "submission_checklist", isEmpty: checklistItemCount === 0 },
   ];
   for (const p of passes) {
     if (!p.isEmpty) continue;
     out = stripBlockByHideField(out, p.field);
+  }
+  // §09's jump-nav anchor goes with the section — a stripped section means the
+  // client IIFE's section lookup is moot, so the anchor is removed here too.
+  if (checklistItemCount === 0) {
+    out = out.replace(/<a href="#sec-checklist">[\s\S]*?<\/a>\s*/i, "");
   }
   return out;
 }
