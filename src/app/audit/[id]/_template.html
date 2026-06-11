@@ -1863,7 +1863,7 @@ button{font-family:inherit}
           </section>
 
           <!-- 08 · KO CLARIFICATION EMAIL (full draft lives in #koDrawer) -->
-          <section class="sec" id="sec-ko">
+          <section class="sec" id="sec-ko" data-hide-when-empty="ko_email">
             <div class="sec-head">
               <span class="sec-num">08</span>
               <div class="sec-title">KO Clarification Email<span class="st-sub">Pre-drafted from your audit &mdash; ready to send</span></div>
@@ -2352,6 +2352,23 @@ Capture Lead, [Company]
     i.addEventListener('change',function(){ saved[idx]=i.checked; try{ sessionStorage.setItem(key,JSON.stringify(saved)); }catch(e){} upd(); });
   });
   upd();
+})();
+
+/* ───── §08 KO email — empty-state guard ─────
+   Closed-mode (or any) renders that strip the drafted email body must not leave a visible
+   "ready to send" shell (caught Jun 11, FA930126Q0017 closed doc: header + empty box + a live
+   "Send KO email" rail CTA on a dead deadline). Zero body text → hide §08, its jump-nav entry,
+   and any rail action that opens the KO drawer. Same doctrine as §09/timeline/§02/§04. */
+(function(){
+  var sec=document.getElementById('sec-ko'); if(!sec) return;
+  var body=sec.querySelector('.ko-preview, .ko-print-full, .ko-card');
+  var txt=body?body.textContent.replace(/\s+/g,''):'';
+  if(txt) return;
+  sec.style.display='none';
+  var jn=document.querySelector('a[href="#sec-ko"]'); if(jn) jn.style.display='none';
+  [].forEach.call(document.querySelectorAll('.rail [data-open-ko], .actions [data-open-ko]'),function(a){
+    var act=a.closest('.act')||a; act.style.display='none';
+  });
 })();
 
 /* ───── timeline step-count single-source ─────

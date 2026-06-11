@@ -52,6 +52,13 @@ const AUDIT_DOCS: Array<{ label: string; id: string; expectedWsState?: 'known' |
     id: 'db89100b-f731-44cb-bd38-12eabfb75b23',
     expectedWsState: 'unknown',
     expectedE12Fail: true },
+  // Jun 11 — ACTIVE unknown-state fixture (DOJ 15M10226QA4700149). The USAF
+  // doc above also renders the unknown ws-reveal but in closed mode; this one
+  // proves E13's exactly-one-in-DOM contract on the active unknown path —
+  // the class where a ws-reveal tie-break bug would hide.
+  { label: 'DOJ · unknown-ws · 6927beed',
+    id: '6927beed-b97d-4c21-887c-89776c0757d6',
+    expectedWsState: 'unknown' },
 ];
 
 const VIEWPORTS: Array<{ label: string; width: number; height: number }> = [
@@ -553,6 +560,25 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
       if (!/Closed[^<]{0,60}requirements as posted/i.test(text)) fails.push('critical path not in reference framing');
       if (!/Reference[^<]{0,30}submission requirements as posted/i.test(text)) fails.push('checklist subtitle not in reference framing');
       if (/Pre-flight[^<]{0,30}everything that must be true/i.test(text)) fails.push('Pre-flight subtitle still active');
+      // §08 KO-email empty-guard (Jun 11): closed mode removes the .ko-card,
+      // so a visible #sec-ko with no body text is the "ready to send" shell.
+      const ko = document.getElementById('sec-ko');
+      if (ko && getComputedStyle(ko).display !== 'none') {
+        const body = ko.querySelector('.ko-preview, .ko-print-full, .ko-card');
+        const txt = body ? (body.textContent || '').replace(/\s+/g, '') : '';
+        if (!txt) fails.push('§08 visible with empty body (ready-to-send shell)');
+      }
+      // KO CTA: canonical guard scope is rail/actions only — the masthead
+      // .ma-btn is deliberately exempt. Visibility via closest('.act') wrapper.
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>('.rail [data-open-ko], .actions [data-open-ko]'))) {
+        const target = (el.closest<HTMLElement>('.act') || el);
+        if (getComputedStyle(target).display !== 'none') {
+          fails.push('live [data-open-ko] CTA on closed audit');
+          break;
+        }
+      }
+      // §09 progress counter is incoherent on a closed bid (CEO, Jun 11).
+      if (document.querySelector('#sec-checklist .ck-prog')) fails.push('"N / M complete" counter present on closed audit');
       // post-deadline By-dates check — scan rendered .es-when spans
       const esWhenMatches = Array.from(text.matchAll(/<span class="es-when">By\s+(\S[^<]*?)<\/span>/g));
       const dlEl = document.querySelector('[data-field="response_deadline"]');
@@ -636,17 +662,25 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   results.push({ id: 'E18', pass: e18.ok, detail: e18.detail });
 
   // E19 — §09 progress counter shows real numbers whenever the section is
-  // visible. Jun 11 JLG PDF rendered a bare "complete" (the closed-mode
-  // counter strip ended at the nested ckTotal </span>); active audits relied
-  // on client JS to overwrite the template's demo "0 / 10". Counter is now
-  // server-populated; format must be "N / M complete". Hidden/stripped §09
-  // passes as n/a (the empty-state test covers that path).
+  // visible on an ACTIVE audit. Jun 11 JLG PDF rendered a bare "complete"
+  // (the closed-mode counter strip ended at the nested ckTotal </span>);
+  // active audits relied on client JS to overwrite the template's demo
+  // "0 / 10". Counter is now server-populated; format must be
+  // "N / M complete". Closed mode (CEO, Jun 11): counter is REMOVED — a
+  // progress tracker on a closed bid is incoherent — so closed asserts
+  // absence. Hidden/stripped §09 passes as n/a (empty-state test covers it).
   const e19 = await page.evaluate(() => {
     const sec = document.getElementById('sec-checklist');
     if (!sec || getComputedStyle(sec).display === 'none') {
       return { ok: true, detail: '§09 not visible — counter n/a' };
     }
+    const closed = /Solicitation closed/i.test(document.body.innerHTML);
     const prog = sec.querySelector('.ck-prog');
+    if (closed) {
+      return prog
+        ? { ok: false, detail: 'closed audit still shows .ck-prog counter' }
+        : { ok: true, detail: 'closed mode — counter removed ✓' };
+    }
     if (!prog) return { ok: false, detail: '§09 visible but .ck-prog counter missing' };
     const text = (prog.textContent || '').trim().replace(/\s+/g, ' ');
     if (!/^\d+ \/ \d+ complete$/.test(text)) {

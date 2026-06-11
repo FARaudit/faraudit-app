@@ -1687,7 +1687,8 @@ function renderKoEmailCard(
 }
 
 function applyKoClarifiabilityGate(html: string): string {
-  const start = html.indexOf('<section class="sec" id="sec-ko">');
+  // No trailing ">" — the opener carries data-hide-when-empty="ko_email".
+  const start = html.indexOf('<section class="sec" id="sec-ko"');
   if (start === -1) return html;
   const end = html.indexOf("</section>", start);
   if (end === -1) return html;
@@ -1724,6 +1725,39 @@ function removeKoEmailCard(html: string): string {
   // non-word chars (`"` and the following space/`>`), so removeElementByOpenRe
   // would silently no-op. [^>]*> handles any following attributes safely.
   return removeElementByOpenRe(html, /<div class="ko-card"[^>]*>/, "div");
+}
+
+// §08 KO-email empty-guard (canonical, Jun 11) — server-side mirror of the
+// template's sec-ko IIFE for PDF/no-JS readers. Canonical rule: zero text in
+// the first of .ko-preview/.ko-print-full/.ko-card → hide §08, its jump-nav
+// entry, and the rail [data-open-ko] action. Trigger case: closed-mode
+// removeKoEmailCard strips the whole .ko-card, leaving a "ready to send"
+// header over an empty body with a live "Send KO email" CTA on a dead
+// deadline (FA930126Q0017). Open-mode cards always carry To/Subject label
+// text, so this is a no-op for active audits with a draft.
+function stripEmptyKoSection(html: string): string {
+  const secOpenRe = /<section class="sec" id="sec-ko"[^>]*>/;
+  const secM = secOpenRe.exec(html);
+  if (!secM) return html;
+  const secEnd = html.indexOf("</section>", secM.index);
+  if (secEnd === -1) return html;
+  const section = html.slice(secM.index, secEnd);
+  const bodyM = /<(p|div) class="(?:ko-preview|ko-print-full|ko-card)"[^>]*>/.exec(section);
+  let text = "";
+  if (bodyM) {
+    const range = findMatchingClose(section, bodyM.index, bodyM[1]);
+    if (range) {
+      text = section
+        .slice(range.contentStart, range.contentEnd)
+        .replace(/<[^>]*>/g, "")
+        .replace(/\s+/g, "");
+    }
+  }
+  if (text) return html;
+  let out = removeElementByOpenRe(html, secOpenRe, "section");
+  out = out.replace(/<a href="#sec-ko">[\s\S]*?<\/a>\s*/i, "");
+  out = removeElementByOpenRe(out, /<button class="act primary" data-open-ko>/, "button");
+  return out;
 }
 
 // ─── FA-114: closed-state report-wide mode ────────────────────────────────
@@ -1781,12 +1815,14 @@ function removeNext48HoursBlock(html: string): string {
 
 // (4) §09 Submission Checklist — swap header subtitle to reference framing,
 // and strip interactive checkbox inputs inside the .checklist (items render
-// as plain reference list). The "N / M complete" counter STAYS (Design, Jun
-// 11): server-rendered numbers, format asserted by conformance E19. The old
-// counter strip used a non-greedy regex that ended at the NESTED ckTotal
-// </span>, leaving a dangling bare "complete" in the render (JLG pg-13 bug).
+// as plain reference list). The "N / M complete" counter is REMOVED (CEO,
+// Jun 11 — reverses the earlier counter-STAYS ruling): a progress tracker on
+// a closed bid is incoherent (FA930126Q0017 showed "0 / 1 complete"). The
+// removal is tag-balanced — the JLG pg-13 bug came from a non-greedy regex
+// that ended at the NESTED ckTotal </span>, leaving a dangling "complete".
 function applyClosedChecklistHeader(html: string): string {
   let out = html;
+  out = removeElementByOpenRe(out, /<span class="ck-prog"[^>]*>/, "span");
   // Target the §09 st-sub specifically (multiple st-sub spans exist in the
   // template; .replace without /g would otherwise hit the first one). The
   // <span> directly follows "Submission Checklist" text.
@@ -2521,6 +2557,9 @@ export function renderAuditReportComplete(
     html = applyClosedChecklistHeader(html);
     html = applyClosedBidGate(html);
   }
+  // §08 empty-guard — after the closed-mode passes so it sees the post-
+  // removeKoEmailCard shape (the trigger case). Mirrors the template IIFE.
+  html = stripEmptyKoSection(html);
   // FA-112: final-stage demo-leak guard. Catches any template demo content
   // (SP4701 / Rivera / H-60 / procurexinc / Predictive Maintenance Analytics)
   // that survived all prior render passes. Warn-only on failure to resolve
