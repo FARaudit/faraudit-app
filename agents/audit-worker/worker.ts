@@ -183,6 +183,7 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   if (!solicitation) solicitation = synthesizeFromRow(row);
 
   let pdfBase64: string | null = null;
+  let pdfBuffer: Buffer | null = null;
   let pdfFileId: string | null = null;
   let imageBase64: string | null = null;
   let imageMediaType: "image/jpeg" | "image/png" | null = null;
@@ -204,6 +205,9 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
         } else if (fetched.kind === "pdf") {
           if (fetched.fileId) {
             pdfFileId = fetched.fileId;
+            // FA-130: V2 shadow needs local bytes; the file_id alone starved
+            // it. Same Buffer reference fetchPdfFromSamUrl already holds.
+            pdfBuffer = fetched.buffer ?? null;
             pdfSource = "sam_pdf_via_files_api";
           } else {
             pdfBase64 = fetched.base64;
@@ -232,7 +236,7 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   return {
     solicitation,
     agency: row.agency,
-    pdfBuffer: null,
+    pdfBuffer,
     pdfBase64,
     pdfFileId,
     imageBase64,

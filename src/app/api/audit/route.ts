@@ -233,6 +233,9 @@ export async function POST(req: NextRequest) {
       } else if (fetched.kind === "pdf") {
         if (fetched.fileId) {
           pdfFileId = fetched.fileId;
+          // FA-130: V2 shadow needs local bytes; the file_id alone starved
+          // it. pdfBuffer is guaranteed null in this branch (no user upload).
+          pdfBuffer = fetched.buffer ?? null;
           pdfSource = "sam_pdf_via_files_api";
         } else {
           pdfBase64 = fetched.base64;

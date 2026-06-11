@@ -60,7 +60,7 @@ export { kSamNonPdfError, kImageResizeError };
 const SAM_API_KEY = process.env.SAM_API_KEY;
 
 export type DocumentFetchResult =
-  | { kind: "pdf";   base64: string;        bytes: number; source: "sam.gov"; fileId?: string }
+  | { kind: "pdf";   base64: string;        bytes: number; source: "sam.gov"; fileId?: string; buffer?: Buffer }
   | { kind: "image"; base64: string;        bytes: number; source: "sam.gov"; mediaType: "image/jpeg" | "image/png"; resized: boolean }
   | { kind: "text";  extractedText: string; bytes: number; source: "sam.gov"; format: "docx" | "xlsx" | "doc" | "txt" };
 
@@ -237,8 +237,11 @@ async function classifyAndReturn(buf: Buffer, filename: string | null): Promise<
   if (isPdf(buf)) {
     if (buf.length > PDF_FILES_API_THRESHOLD_BYTES) {
       // FA-2: upload to Anthropic Files API; document block will reference file_id.
+      // FA-130: the raw buffer rides along (same reference, no copy) so the V2
+      // shadow pass — which needs local bytes, not a file_id — still runs on
+      // Files-API audits. Callers pass it through as executeAudit's pdfBuffer.
       const { fileId } = await uploadPdfToFilesApi(buf, filename);
-      return { kind: "pdf", base64: "", bytes: buf.length, source: "sam.gov", fileId };
+      return { kind: "pdf", base64: "", bytes: buf.length, source: "sam.gov", fileId, buffer: buf };
     }
     return { kind: "pdf", base64: buf.toString("base64"), bytes: buf.length, source: "sam.gov" };
   }

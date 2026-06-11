@@ -122,8 +122,11 @@ export async function executeAudit(
   // Hotfix Jun 7 2026 — extended gate to include sam_fetched (the bulk of
   // prod traffic). Original gate only matched user uploads via pdfBuffer;
   // SAM-fetched PDFs land in pdfBase64 and skipped V2 entirely. Now we
-  // derive a V2-eligible Buffer from whichever inline arm has bytes
-  // locally. Out-of-scope: Files API (no local bytes), image, text arms.
+  // derive a V2-eligible Buffer from whichever inline arm has bytes locally.
+  // FA-130 (Jun 11 2026) — sam_pdf_via_files_api callers now retain the
+  // fetched buffer and pass it as pdfBuffer, so that arm reaches V2 too.
+  // Still out-of-scope: uploaded_pdf_via_files_api on the async worker (bytes
+  // never reach the worker — uploaded at enqueue time), image and text arms.
   const v2Buffer: Buffer | null = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
   if (AUDIT_V2_ENABLED && v2Buffer) {
     const v2Start = Date.now();
