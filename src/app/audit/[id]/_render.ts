@@ -1637,7 +1637,7 @@ function renderWorkStatementReveal(
 
 function renderKoEmailCard(
   html: string,
-  ko: { to: string; subject: string; preview: string }
+  ko: { to: string; to_found: boolean; subject: string; preview: string; has_asks: boolean }
 ): string {
   let out = replaceFieldInner(html, "ko_email.to", escapeHtml(ko.to));
   out = replaceFieldInner(out, "ko_email.subject", escapeHtml(ko.subject));
@@ -1648,7 +1648,34 @@ function renderKoEmailCard(
   // hidden Design variant the re-pull pasted), keep the first and remove
   // the rest. Single-source-of-truth guarantee for the preview surface.
   out = dedupeKoPreview(out);
+  // FA-125 clarifiability gate — when no substantive asks exist there is no
+  // draft email: the "Draft ready" pill and the open/copy actions would
+  // promise one. Swap the §08 header chrome to the no-clarifications state
+  // and drop the action buttons (which also makes the drawer unreachable).
+  if (!ko.has_asks) {
+    out = applyKoClarifiabilityGate(out);
+  }
   return out;
+}
+
+function applyKoClarifiabilityGate(html: string): string {
+  const start = html.indexOf('<section class="sec" id="sec-ko">');
+  if (start === -1) return html;
+  const end = html.indexOf("</section>", start);
+  if (end === -1) return html;
+  let block = html.slice(start, end);
+  block = block.replace(
+    /<span class="sh-pill ok">[\s\S]*?<\/span>/,
+    '<span class="sh-pill">No clarifications needed</span>'
+  );
+  block = block.replace(
+    /<span class="st-sub">[\s\S]*?<\/span>/,
+    '<span class="st-sub">No Contracting Officer questions required for this audit</span>'
+  );
+  // Buttons contain only svg/path children, so the lazy match closes on the
+  // ko-actions div itself.
+  block = block.replace(/<div class="ko-actions">[\s\S]*?<\/div>/, "");
+  return html.slice(0, start) + block + html.slice(end);
 }
 
 function dedupeKoPreview(html: string): string {

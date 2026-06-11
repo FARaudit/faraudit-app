@@ -2452,6 +2452,7 @@ document.querySelectorAll('.risk-head').forEach(function(h){
   document.getElementById('koSend').addEventListener('click', function(e){
     e.preventDefault();
     var to=document.querySelector('[data-field="ko_email.to"]').innerText.trim();
+    if(to.indexOf('@')===-1)to='';
     var sub='SP4701-26-Q-0942 — Pre-quote clarifications';
     var body=document.querySelector('#koDrawer .email-text').innerText;
     window.location.href='mailto:'+to+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);

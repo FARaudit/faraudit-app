@@ -183,10 +183,12 @@ export interface AuditViewModel {
   // shape — a fast-follow lambda will serve the matrix as a separate doc.
   matrix_export_url: string;
 
-  // §08 KO Email card (.ko-card) — to/subject from the solicitation cover,
-  // preview is the first ~2 risk titles. The full draft remains in #koDrawer
-  // (reused — no change to ko_email_body).
-  ko_email: { to: string; subject: string; preview: string };
+  // §08 KO Email card (.ko-card) — FA-125: ONE generator feeds both the card
+  // preview and the drawer body (ko_email_body === ko_email.preview).
+  // has_asks=false ⇒ no draft exists — render the "no clarifications needed"
+  // state (no Draft-ready pill, no open/copy actions). to_found=false ⇒ the
+  // to string is the CO-not-found message, not an address.
+  ko_email: { to: string; to_found: boolean; subject: string; preview: string; has_asks: boolean };
 
   // §09 Submission Checklist (.checklist) — grouped from Section L
   // requirements. group: before (pre-submission registration/certs),
@@ -973,25 +975,6 @@ function deriveWinThemes(overviewJson: Record<string, unknown>): string[] {
 
 // ─── KO email body (derive a generic draft if none) ─────────────────────────
 
-function deriveKoBody(audit: AuditRow, headline: Risk, displayId: string): string {
-  const stored = audit.ko_email_body as string | undefined;
-  if (stored && stored.trim()) return stored;
-  const koName = (audit.ko_name as string) || "Contracting Officer";
-  const title = String(audit.title ?? displayId);
-  const cite = headline.citation || "the open clarification items below";
-  return `Dear ${koName},
-
-Thank you for the opportunity to respond to ${displayId} (${title}). We intend to submit and have one clarification that affects how offerors price and structure their responses:
-
-${headline.title}${cite ? ` (${cite})` : ""}. ${headline.description}
-${headline.faraudit_action ? `\n${headline.faraudit_action}\n` : ""}
-We appreciate your time and look forward to your response ahead of the Q&A deadline.
-
-Respectfully,
-[Your Name]
-[Company]`;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Fork 3 derivation helpers (2026-06-05). Six new surfaces from Design's
 // capture package — markup pinned at ceo/redesign-final/platform/audit-report.html.
@@ -1461,16 +1444,18 @@ function deriveKoEmailCard(
   displayId: string,
   risks: Risk[],
   compJson: Record<string, unknown>
-): { to: string; subject: string; preview: string } {
-  // Priority order for the To field:
+): { to: string; to_found: boolean; subject: string; preview: string; has_asks: boolean } {
+  // FA-125 — priority order for the To field:
   //   1. CO extracted from Section L text (the canonical, doc-derived source —
   //      e.g. "Josh E. Long, JOSH.LONG@DLA.MIL" on SPRRA126Q0034)
   //   2. audit.ko_email_recipient column (set by an earlier extraction pass)
-  //   3. Generic stub "contracting-officer@agency.mil" (last-resort placeholder)
+  // NO generic stub — a placeholder address invites a real send to a fake
+  // mailbox. When neither source has a contact, render the truthful
+  // not-found state instead.
   const lExtracted = extractCoFromSectionL(compJson);
-  const to = lExtracted?.email
-    || (audit.ko_email_recipient as string)
-    || "contracting-officer@agency.mil";
+  const extractedTo = (lExtracted?.email || (audit.ko_email_recipient as string) || "").trim();
+  const to_found = extractedTo.length > 0;
+  const to = to_found ? extractedTo : "CO contact not found in document — verify on SAM.gov";
   const subject = `${displayId} — Pre-quote clarifications`;
 
   // Greeting — "Dear [Last name]," when CO extracted; fallback to generic.
@@ -1504,29 +1489,56 @@ function deriveKoEmailCard(
     .filter((r) => !/initial review|no outstanding/i.test(r.title || ''))
     .filter((r) => !NON_CLARIFIABLE_CATEGORIES.has(r.category || ''))
     .slice(0, 3);
-  const body = top.length === 0
-    ? "We are at this time conducting our initial review and have no outstanding clarifications."
-    : top.map((r, i) => `${i + 1}. ${riskToClarificationAsk(r)}`).join("\n\n");
+
+  // FA-125 clarifiability gate — zero substantive asks means there IS no
+  // draft email. Emit the truthful no-clarifications state instead of a
+  // greeting + "request clarification on the following items:" lead that
+  // promises items and delivers none.
+  const has_asks = top.length > 0;
+  if (!has_asks) {
+    return {
+      to,
+      to_found,
+      subject,
+      preview:
+        "No clarification questions are required for this solicitation — the audit surfaced no items that need Contracting Officer input before submission.",
+      has_asks,
+    };
+  }
+
+  const body = top.map((r, i) => `${i + 1}. ${riskToClarificationAsk(r)}`).join("\n\n");
 
   // Sign-off — placeholders the user fills in. Matches canonical structure.
   const signoff = "Thank you for your time.\n\nRespectfully,\n[Your name]\n[Your company]";
 
   const preview = [greeting, "", lead, "", body, "", signoff].join("\n");
-  return { to, subject, preview };
+  return { to, to_found, subject, preview, has_asks };
 }
 
-// FA-106: produce clean CO-facing clarification questions from r.title only.
+// FA-106: produce clean CO-facing clarification questions from risk content.
 // r.faraudit_action is internal bidder-mitigation prose (verbs like "Verify",
 // URLs like https://sprs..., FARaudit-side workflow language) and must NOT
 // be inverted into a CO question — that leaks internal language into the
-// customer-facing email body. Title-only template eliminates the leak.
+// customer-facing email body.
+// FA-125: NO shared canned suffix. Each ask carries its own risk-specific
+// substance — the headline, the clause citation when present, and the first
+// sentence of the document-anchored description. Identical boilerplate tails
+// on every ask read as auto-generated filler to a CO.
 // W3 boundary-cap retained — never mid-word slice into the headline.
 function riskToClarificationAsk(r: Risk): string {
   const title = (r.title || "").trim();
   const headline = title
     ? (title.split(/[.!?;:]\s+|\s+—\s+/)[0].trim() || title)
     : "A risk was identified";
-  return `${headline} — please clarify the Government's intent before submission.`;
+  const cite = (r.citation || "").trim();
+  const anchor = cite && !headline.includes(cite) ? `${headline} (${cite})` : headline;
+  const desc = (r.description || "").trim();
+  const descSentence = desc
+    ? (desc.split(/(?<=[.!?])\s+/)[0] || "").trim().slice(0, 220)
+    : "";
+  return descSentence && descSentence.toLowerCase() !== headline.toLowerCase()
+    ? `${anchor} — ${descSentence}`
+    : anchor;
 }
 
 // Brain ruling Item 3 (2026-06-05): severity recalibration. The prior mapping
@@ -1948,9 +1960,13 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
   // KO email — FA-102: single derivation. Path B retired; deriveKoEmailCard's
   // §05 (Section L) extraction is canonical for ko_email.to on every surface.
+  // FA-125 — ONE generator. The §08 card preview and the drawer body used to
+  // come from two different derivations (deriveKoEmailCard vs deriveKoBody)
+  // and printed two different emails in the same report. The drawer body is
+  // now the card's text verbatim.
   const koCard = deriveKoEmailCard(audit, displayId, risks, compJson);
   const koTo = koCard.to;
-  const koBody = deriveKoBody(audit, headlineRisk, displayId);
+  const koBody = koCard.preview;
 
   // Win probability — null when basis is 0 or value is missing.
   // DESIGN ruling 2026-06-04: "0%" reads as "0% chance" — show "—" instead.
