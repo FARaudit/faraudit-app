@@ -21,6 +21,28 @@ import type { PdfSource } from "@/lib/audit-engine";
 const POLL_MS = Number(process.env.WORKER_POLL_MS || 10_000);
 const STALE_PROCESSING_MS = 30 * 60 * 1000;
 const kStaleMessage = "worker timeout (processing >30min)";
+// FA-149 — drain + reclaim tuning.
+// HEARTBEAT_MS: liveness beat while a run is in flight.
+// RECLAIM_STALE_MS: 3 minutes = 6 missed 30s beats. The beat is a bare
+//   single-row UPDATE on an interval timer, so it survives engine/API stalls
+//   — 6 consecutive misses means the PROCESS is gone (SIGKILL/OOM), not slow.
+//   Minutes-scale reclaim vs the legacy 30-minute sweep is the FA-149 ask.
+// DRAIN_DEADLINE_MS: Railway sends SIGTERM and SIGKILLs after its fixed
+//   ~10s stop grace (no railway.toml knob exists to raise it — verified
+//   against config-as-code schema). A typical audit run needs minutes, so
+//   completing in-window is impossible by design; the drain path RELEASES
+//   the claim instead (single UPDATE, <2s) and the replacement container
+//   re-runs it. 8s self-deadline leaves margin under the platform SIGKILL.
+// MAX_ATTEMPTS: a row released/reclaimed 3 times is a poison pill (e.g. a
+//   PDF that OOMs the worker) — fail it rather than crash-loop forever.
+// WORKER_SOURCE: consumer-set override for test isolation ONLY (the FA-149
+//   verification suite claims source='fa149_test' fixtures so it can never
+//   race the production worker on source='user' rows).
+const HEARTBEAT_MS = 30_000;
+const RECLAIM_STALE_MS = Number(process.env.WORKER_RECLAIM_STALE_MS || 180_000);
+const DRAIN_DEADLINE_MS = 8_000;
+const MAX_ATTEMPTS = 3;
+const SOURCE = process.env.WORKER_SOURCE || "user";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,13 +65,99 @@ interface UserPendingRow {
   anthropic_file_id: string | null;
   pdf_filename: string | null;
   created_at: string;
+  // FA-149 — present once migration 20260612210000 is applied.
+  heartbeat_at?: string | null;
+  attempts?: number | null;
+}
+
+// FA-149 drain state — the signal handler and the claim loop share these.
+let draining = false;
+let inFlightRow: UserPendingRow | null = null;
+let fa149Columns = false;
+
+// Probe for the FA-149 columns (heartbeat_at / attempts). Pre-migration the
+// worker degrades gracefully: SIGTERM release still works (existing columns
+// only), orphan reclaim stays off and the legacy 30-min sweep covers crashes.
+let probeWarned = false;
+export async function probeFa149Columns(): Promise<boolean> {
+  const wasActive = fa149Columns;
+  const { error } = await supabase
+    .from("pending_audits")
+    .select("id, heartbeat_at, attempts")
+    .limit(1);
+  fa149Columns = !error;
+  if (!fa149Columns && !probeWarned) {
+    probeWarned = true;
+    console.warn("[audit-worker] FA-149 columns absent (migration 20260612210000 pending) — orphan reclaim INACTIVE, legacy 30-min sweep only");
+  }
+  if (fa149Columns && !wasActive && probeWarned) {
+    console.log("[audit-worker] FA-149 columns detected — orphan reclaim ACTIVATED (live migration apply)");
+  }
+  return fa149Columns;
+}
+
+// Release a held claim back to 'pending' so the replacement container picks
+// it up. Used by the SIGTERM drain path; reclaimOrphans applies the same
+// semantics to dead workers' claims. NEVER exits silently on failure — a
+// claim held past exit is exactly the f0da5b1a incident class.
+export async function releaseClaim(row: UserPendingRow, reason: string): Promise<boolean> {
+  const payload: Record<string, unknown> = {
+    status: "pending",
+    claimed_at: null,
+    error_message: reason.slice(0, 500)
+  };
+  if (fa149Columns) {
+    payload.heartbeat_at = null;
+    payload.attempts = (row.attempts ?? 0) + 1;
+  }
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const { error } = await supabase
+      .from("pending_audits")
+      .update(payload)
+      .eq("id", row.id)
+      .eq("status", "processing");
+    if (!error) {
+      console.log(`[audit-worker] claim released · ${row.id} · ${reason}`);
+      return true;
+    }
+    console.error(`[audit-worker] releaseClaim(${row.id}) attempt ${attempt} failed: ${error.message}`);
+  }
+  return false;
+}
+
+// FA-149 — drain on SIGTERM/SIGINT (Railway deploy stop). Stop claiming
+// immediately; release any held claim; exit clean. Hard 8s self-deadline so
+// we always exit before the platform SIGKILL (~10s) — a forced exit with the
+// release already attempted twice beats holding the claim into SIGKILL.
+async function drainAndExit(signal: string): Promise<never> {
+  draining = true;
+  console.log(`[audit-worker] ${signal} received — draining (no new claims)`);
+  const forced = setTimeout(() => {
+    console.error(`[audit-worker] drain deadline (${DRAIN_DEADLINE_MS}ms) — forced exit`);
+    process.exit(1);
+  }, DRAIN_DEADLINE_MS);
+  if (inFlightRow) {
+    await releaseClaim(inFlightRow, `released: ${signal} drain (deploy) — replacement container will re-run`);
+    inFlightRow = null;
+  }
+  clearTimeout(forced);
+  console.log("[audit-worker] drain complete — exiting clean");
+  process.exit(0);
 }
 
 export async function runWorker(): Promise<never> {
-  console.log(`[audit-worker] up · poll=${POLL_MS}ms · stale_cutoff=${STALE_PROCESSING_MS / 60000}min`);
+  process.once("SIGTERM", () => { void drainAndExit("SIGTERM"); });
+  process.once("SIGINT", () => { void drainAndExit("SIGINT"); });
+  await probeFa149Columns();
+  console.log(`[audit-worker] up · poll=${POLL_MS}ms · stale_cutoff=${STALE_PROCESSING_MS / 60000}min · drain handler registered · reclaim=${fa149Columns ? `ACTIVE (stale>${RECLAIM_STALE_MS / 1000}s, cap ${MAX_ATTEMPTS})` : "inactive (migration pending)"}`);
+  // Boot reclaim pass — a redeploy replaced a container that may have died
+  // holding a claim; reclaim it before the first poll.
+  await reclaimOrphans().catch((err) => console.error("[audit-worker] boot reclaim error:", err instanceof Error ? err.message : err));
   for (;;) {
+    if (draining) { await sleep(POLL_MS); continue; }
     try {
       await sweepStale();
+      await reclaimOrphans();
       const row = await claimNext();
       if (row) {
         await processOne(row);
@@ -63,18 +171,72 @@ export async function runWorker(): Promise<never> {
   }
 }
 
+// FA-149 — fast orphan reclaim. A processing row whose heartbeat is stale
+// belongs to a worker that died without draining (SIGKILL, OOM). Flip it
+// back to 'pending' in minutes — or to 'failed' at the attempt cap, so a
+// poison-pill row that keeps killing workers cannot crash-loop. Inactive
+// pre-migration (no heartbeat to judge by); the legacy sweep covers that era.
+export async function reclaimOrphans(): Promise<number> {
+  // Re-probe while inactive: applying migration 20260612210000 to a LIVE
+  // deployment activates reclaim within one poll cycle — no restart needed.
+  if (!fa149Columns && !(await probeFa149Columns())) return 0;
+  const staleCutoff = new Date(Date.now() - RECLAIM_STALE_MS).toISOString();
+  const { data: stale, error } = await supabase
+    .from("pending_audits")
+    .select("id, audit_id, attempts, heartbeat_at, solicitation_number, notice_id")
+    .eq("source", SOURCE)
+    .eq("status", "processing")
+    .not("heartbeat_at", "is", null)
+    .lt("heartbeat_at", staleCutoff);
+  if (error) throw new Error(`reclaimOrphans select: ${error.message}`);
+  if (!stale || stale.length === 0) return 0;
+
+  let reclaimed = 0;
+  for (const row of stale as UserPendingRow[]) {
+    const nextAttempts = (row.attempts ?? 0) + 1;
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      const reason = `orphan reclaim: attempt cap (${MAX_ATTEMPTS}) reached — poison-pill guard`;
+      const { error: failErr } = await supabase
+        .from("pending_audits")
+        .update({ status: "failed", error_message: reason, processed_at: new Date().toISOString(), heartbeat_at: null, attempts: nextAttempts })
+        .eq("id", row.id)
+        .eq("status", "processing");
+      if (failErr) { console.error(`[audit-worker] reclaim-cap(${row.id}): ${failErr.message}`); continue; }
+      if (row.audit_id) {
+        await supabase.from("audits").update({ status: "failed", error_message: reason }).eq("id", row.audit_id).eq("status", "processing");
+      }
+      console.warn(`[audit-worker] reclaim CAP · ${row.id} · ${row.solicitation_number || row.notice_id} → failed (${MAX_ATTEMPTS} attempts)`);
+      reclaimed++;
+      continue;
+    }
+    const { error: relErr } = await supabase
+      .from("pending_audits")
+      .update({ status: "pending", claimed_at: null, heartbeat_at: null, attempts: nextAttempts, error_message: "reclaimed: stale heartbeat (worker died mid-run)" })
+      .eq("id", row.id)
+      .eq("status", "processing");
+    if (relErr) { console.error(`[audit-worker] reclaim(${row.id}): ${relErr.message}`); continue; }
+    console.log(`[audit-worker] reclaim · ${row.id} · ${row.solicitation_number || row.notice_id} → pending (attempt ${nextAttempts}/${MAX_ATTEMPTS})`);
+    reclaimed++;
+  }
+  return reclaimed;
+}
+
 // Rows stuck in 'processing' past the cutoff (worker crash/redeploy mid-audit)
 // flip to failed on both tables so the report page exits its wait state.
+// FA-149: once the heartbeat columns exist, this legacy sweep only covers
+// rows claimed WITHOUT a heartbeat (pre-migration claims) — heartbeated rows
+// are reclaimOrphans' domain, and a live >30min run must not be killed here.
 async function sweepStale(): Promise<void> {
   const nowIso = new Date().toISOString();
   const cutoff = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
-  const { data: swept, error } = await supabase
+  let q = supabase
     .from("pending_audits")
     .update({ status: "failed", error_message: kStaleMessage, processed_at: nowIso })
-    .eq("source", "user")
+    .eq("source", SOURCE)
     .eq("status", "processing")
-    .lt("claimed_at", cutoff)
-    .select("id, audit_id");
+    .lt("claimed_at", cutoff);
+  if (fa149Columns) q = q.is("heartbeat_at", null);
+  const { data: swept, error } = await q.select("id, audit_id");
   if (error) throw new Error(`sweepStale(pending_audits): ${error.message}`);
   if (!swept || swept.length === 0) return;
 
@@ -92,11 +254,12 @@ async function sweepStale(): Promise<void> {
 
 // Atomic claim: the UPDATE re-checks status='pending', so if anything else
 // already claimed the row the affected count is 0 and we walk away.
-async function claimNext(): Promise<UserPendingRow | null> {
+export async function claimNext(): Promise<UserPendingRow | null> {
+  if (draining) return null; // FA-149 — a draining worker never claims
   const { data: candidates, error } = await supabase
     .from("pending_audits")
     .select("*")
-    .eq("source", "user")
+    .eq("source", SOURCE)
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(1);
@@ -104,9 +267,21 @@ async function claimNext(): Promise<UserPendingRow | null> {
   if (!candidates || candidates.length === 0) return null;
 
   const cand = candidates[0] as UserPendingRow;
+  // FA-149 — belt to reclaimOrphans' cap: a pending row already at the
+  // attempt ceiling (released/reclaimed by other worker generations) fails
+  // here instead of claiming a fourth run.
+  if (fa149Columns && (cand.attempts ?? 0) >= MAX_ATTEMPTS) {
+    await markFailed(cand.id, `attempt cap (${MAX_ATTEMPTS}) reached before claim — poison-pill guard`);
+    if (cand.audit_id) {
+      await supabase.from("audits").update({ status: "failed", error_message: `attempt cap (${MAX_ATTEMPTS}) reached` }).eq("id", cand.audit_id).eq("status", "processing");
+    }
+    return null;
+  }
+  const claimPayload: Record<string, unknown> = { status: "processing", claimed_at: new Date().toISOString() };
+  if (fa149Columns) claimPayload.heartbeat_at = new Date().toISOString();
   const { data: claimed, error: claimErr } = await supabase
     .from("pending_audits")
-    .update({ status: "processing", claimed_at: new Date().toISOString() })
+    .update(claimPayload)
     .eq("id", cand.id)
     .eq("status", "pending")
     .select("id");
@@ -124,6 +299,21 @@ async function processOne(row: UserPendingRow): Promise<void> {
     await markFailed(row.id, "missing audit_id attribution on user-enqueued row");
     return;
   }
+
+  // FA-149 — drain bookkeeping + liveness beat. inFlightRow lets the SIGTERM
+  // handler release this claim; the 30s heartbeat lets a replacement worker
+  // reclaim it in minutes if this process dies without draining (SIGKILL/OOM).
+  inFlightRow = row;
+  const beat = fa149Columns
+    ? setInterval(() => {
+        void supabase
+          .from("pending_audits")
+          .update({ heartbeat_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .eq("status", "processing")
+          .then(({ error }) => { if (error) console.error(`[audit-worker] heartbeat(${row.id}): ${error.message}`); });
+      }, HEARTBEAT_MS)
+    : null;
 
   try {
     const input = await buildInput(row);
@@ -152,6 +342,11 @@ async function processOne(row: UserPendingRow): Promise<void> {
       .eq("id", row.audit_id);
     if (auErr) console.error(`[audit-worker] audits failed-flip error (${row.audit_id}): ${auErr.message}`);
     await markFailed(row.id, message);
+  } finally {
+    // FA-149 — stop the beat and clear drain state. inFlightRow may already
+    // be null if the SIGTERM handler released the claim mid-run.
+    if (beat) clearInterval(beat);
+    if (inFlightRow?.id === row.id) inFlightRow = null;
   }
 }
 

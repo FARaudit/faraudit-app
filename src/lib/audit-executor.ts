@@ -302,9 +302,15 @@ export async function executeAudit(
   // Best-effort intelligence-corpus write — every audit teaches the engine
   // what trap clauses fire on what document types. Failure here doesn't
   // disrupt the audit response.
+  // FA-149 — delete-before-insert so a reclaimed run that re-executes after
+  // a worker death cannot duplicate corpus rows (the table has no unique
+  // constraint to upsert against). Every other write in this pipeline is an
+  // UPDATE keyed on auditId and tolerates retry; this insert was the one
+  // non-idempotent step.
   try {
     const flags = (result.compliance.json.dfars_flags ?? []).filter((f) => f.detected);
     if (flags.length > 0) {
+      await supabase.from("fa_intelligence_corpus").delete().eq("audit_id", auditId);
       await supabase.from("fa_intelligence_corpus").insert(
         flags.map((f) => ({
           audit_id: auditId,
