@@ -1318,16 +1318,30 @@ function renderMatrixArtifact(
 ): string {
   const total = rows.length;
   const actionCount = rows.filter((r) => r.status === "action").length;
-  const refCount = total - actionCount;
+  const riskCount = rows.filter((r) => r.status === "risk").length;
+  const clearCount = total - actionCount - riskCount;
 
   const countPill = total === 1 ? "1 requirement" : `${total} requirements`;
   // Summary sentence mirrors canonical voice. When zero requirements are
   // extracted (metadata-only paths or pre-render edge cases), emit a
   // truthful empty-state instead of a contradictory "All 0 mapped" string.
-  const summary =
-    total === 0
-      ? "Compliance matrix not yet available for this audit."
-      : `All ${total} solicitation requirements mapped to a response obligation &mdash; <b>${actionCount} need offeror action</b>, the remaining ${refCount} are standard clauses incorporated by reference, present and verified.`;
+  // FA-127d: the rollup must count what the rows actually say. The old line
+  // lumped 'risk' rows into "present and verified" and printed "0 need
+  // offeror action" beside open risks — now each status gets its own segment
+  // and zero-count segments are omitted instead of printed as "0 need …".
+  let summary: string;
+  if (total === 0) {
+    summary = "Compliance matrix not yet available for this audit.";
+  } else {
+    const segs: string[] = [];
+    if (actionCount > 0) segs.push(`<b>${actionCount} need${actionCount === 1 ? "s" : ""} offeror action</b>`);
+    if (riskCount > 0) segs.push(`${riskCount} ${riskCount === 1 ? "is" : "are"} flagged in the risk register`);
+    if (clearCount > 0) segs.push(`${clearCount} ${clearCount === 1 ? "is a standard clause" : "are standard clauses"} incorporated by reference, present and verified`);
+    const tail = segs.length > 0
+      ? segs.join(", ")
+      : "<b>none need offeror action</b>";
+    summary = `All ${total} solicitation requirements mapped to a response obligation &mdash; ${tail}.`;
+  }
 
   // <span data-field="matrix_count"> in the sec-head pill
   let out = html.replace(
