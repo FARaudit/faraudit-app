@@ -1070,16 +1070,12 @@ function deriveExecClass(rec: "GO" | "CAUTION" | "DECLINE"): "es-go" | "es-cauti
   return "es-caution";
 }
 
-// Brain ruling — canonicalization (2026-06-06 + Cycle-1 fact-layer fix).
-// Gate detection lives in the VM (DERIVED layer) and scans the FULL stored
-// extraction corpus, not just dfars_clauses. The engine-side detection used
-// to gate on dfars_clauses[] alone — when the compliance call returned
-// empty arrays (the 0-vs-68 case observed on fixture A), gate detection
-// missed SPRS even though it sat in risks_json.dfars_trap_risks prose.
-// The VM rebuilds the corpus from EVERY stored text field and re-detects;
-// this absorbs the model-layer variance and produces byte-stable gates
-// across runs where the underlying signal is present somewhere in the
-// stored JSON.
+// Brain ruling — canonicalization (2026-06-06 + Cycle-1 fact-layer fix),
+// narrowed by FA-146 (2026-06-12): gate detection lives in the VM (DERIVED
+// layer) as the legacy-row fallback and scans the stored EXTRACTION corpus
+// (clause arrays + facts fields — see buildGateCorpus). It no longer scans
+// risk-register / summary prose: judgment text is inference, and inference
+// must never mint a gate.
 
 // Regex patterns — local copies of the engine's gate detectors. Keep in sync
 // with src/lib/audit-engine.ts. Cycle-2 will deprecate the engine detectors
@@ -1091,27 +1087,25 @@ const VM_FAA145_RE     = /FAA\s*Part\s*145|14\s*CFR\s*145|FAA[-\s]?approved\s+re
 const VM_TEST_JIG_RE   = /test\s*jig|specialized\s+test\s+equipment|government[-\s]furnished\s+test|special\s+test\s+equipment/i;
 const VM_AFTO_RE       = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-]+/i;
 
-// Build a text corpus from every stored audit field that could carry a gate
-// signal. Comprehensive coverage — when one field is missing/empty (model
-// variance), the same signal usually surfaces in a sibling field.
+// FA-146 provenance taxonomy (2026-06-12, CEO ruling): the gate corpus is
+// EXTRACTION-provenance fields only — clause arrays, required certifications,
+// compliance actions, Section L/M extraction, submission requirements, and
+// the solicitation title. LLM judgment prose (prioritized risk text/titles,
+// executive summaries, trap-risk narrative, overview prose, row summaries)
+// is excluded: a hedged inferred risk ("likely ITAR… requiring JCP") fired
+// the JCP gate on SPRTA1-26-R-0081 with zero document anchor (the doc has no
+// text layer and the SAM synopsis denies export control). Inferred-only
+// judgments belong in the risk register, never in gates. Keep field set in
+// sync with the engine detectors (src/lib/audit-engine.ts FA-146 block).
 function buildGateCorpus(
   audit: AuditRow,
   compJson: Record<string, unknown>,
-  risksJson: Record<string, unknown>,
-  overviewJson: Record<string, unknown>
+  _risksJson: Record<string, unknown>,
+  _overviewJson: Record<string, unknown>
 ): string {
   const parts: string[] = [];
   const push = (v: unknown) => { if (typeof v === "string" && v.length > 0) parts.push(v); };
-  // Audit row summary fields
-  push(audit.overview_summary);
-  push(audit.compliance_summary);
-  push(audit.risks_summary);
   push(audit.title);
-  // Overview JSON
-  push(overviewJson.summary);
-  push(overviewJson.scope);
-  push(overviewJson.primary_objective);
-  push(overviewJson.contract_type_detail);
   // Compliance JSON — clause arrays + cert/action arrays + Section L/M summaries
   if (Array.isArray(compJson.far_clauses)) for (const c of compJson.far_clauses) push(c);
   if (Array.isArray(compJson.dfars_clauses)) for (const c of compJson.dfars_clauses) push(c);
@@ -1121,22 +1115,6 @@ function buildGateCorpus(
   push(compJson.section_m_summary);
   if (Array.isArray(compJson.submission_requirements)) {
     for (const r of compJson.submission_requirements as Array<{ requirement?: unknown }>) push(r?.requirement);
-  }
-  // Risks JSON — prioritized + dfars_trap_risks + executive summary + per-category
-  push(risksJson.executive_risk_summary);
-  if (Array.isArray(risksJson.prioritized_risks)) {
-    for (const r of risksJson.prioritized_risks as Array<Record<string, unknown>>) {
-      push(r.text); push(r.title); push(r.citation); push(r.faraudit_action);
-    }
-  }
-  if (Array.isArray(risksJson.dfars_trap_risks)) {
-    for (const t of risksJson.dfars_trap_risks as Array<Record<string, unknown>>) {
-      push(t.trap_name); push(t.specific_risk); push(t.required_verification);
-    }
-  }
-  for (const arrKey of ["top_3_risks", "technical_risks", "schedule_risks", "price_risks", "evaluation_risks"]) {
-    const arr = (risksJson as Record<string, unknown>)[arrKey];
-    if (Array.isArray(arr)) for (const v of arr) push(v);
   }
   return parts.join(" \n ");
 }

@@ -1540,23 +1540,27 @@ export function buildSoleSourceGate(vendor: { name: string; cage?: string | null
   };
 }
 
-// Brain ruling Item 1 (2026-06-05): SPRS detection now checks three signals
-// (a hit on ANY fires the gate): broadened clause set (7019/7020/7012),
-// prose mention in solText (literal "SPRS" / "Supplier Performance Risk
-// System" / "NIST SP 800-171 Assessment"), or the engine's own risk register
-// mentioning SPRS by clause or word. The risk-register pass is the SPRRA
-// fix: even if the clause-array misses 7019, an engine-emitted SPRS risk
-// confirms presence. Take a risks param so the detector can self-check.
+// FA-146 provenance taxonomy (2026-06-12, CEO ruling): a gate_condition may
+// only emit with verifiable document provenance —
+//   (a) explicit requirement language anchored in extracted doc/synopsis text
+//       (solText / extractedText), or
+//   (b) a clause whose presence deterministically MANDATES the gated action
+//       (252.204-7019/7020/7012 → SPRS qualifies; 252.225-7048 alone does
+//       NOT mandate JCP — generic export-control compliance ≠ TDP access).
+// Inferred-only LLM judgments ("likely ITAR…") stay in the risk register as
+// hedged risks and never reach gates. The pre-FA-146 risk-register arms were
+// removed here: on SPRTA1-26-R-0081 a speculative inferred risk fired the
+// JCP gate on 1 of 3 identical runs (616efb58) with zero document anchor —
+// source PDF has no text layer and the SAM synopsis states export control
+// does not apply.
 export function detectSprsGate(
   dfarsClauses: string[] | undefined,
   responseDeadline: Date | null,
-  docText: string = "",
-  risks: PrioritizedRisk[] = []
+  docText: string = ""
 ): DecisionGate | null {
   const inClauses = Array.isArray(dfarsClauses) && dfarsClauses.some((c) => SPRS_CLAUSE_RE.test(c));
   const inDocText = SPRS_TEXT_RE.test(docText);
-  const inRisks = risks.some((r) => SPRS_TEXT_RE.test(r.text) || SPRS_TEXT_RE.test(r.title || "") || (r.citation && SPRS_CLAUSE_RE.test(r.citation)));
-  if (!inClauses && !inDocText && !inRisks) return null;
+  if (!inClauses && !inDocText) return null;
   const days = daysUntil(responseDeadline);
   // 30-day posting lag + 5-day buffer = 35-day threshold.
   const curable = days == null ? false : days >= 35;
@@ -1570,20 +1574,16 @@ export function detectSprsGate(
   };
 }
 
-// Brain ruling Item 1 (2026-06-05): JCP gate now also scans the engine's risk
-// register for JCP/TDP mentions. The model frequently emits a JCP/TDP risk
-// even when the doc-text scanner misses the keyword (e.g. when the JCP gap
-// is described in compliance-prose terms — "controlled technical data
-// requires Joint Certification"). The risk-register check rides on the same
-// JCP_RE so the patterns stay in sync.
+// FA-146: JCP gate requires taxonomy arm (a) — explicit JCP/DD 2345 language
+// anchored in extracted doc/synopsis text. No mandating-clause arm exists for
+// JCP (252.227-7025 in a clause list restricts data use; it does not by
+// itself mandate JCP certification to bid). The former risk-register arm was
+// the FA-146 false-positive vector and is gone.
 export function detectJcpGate(
   docText: string,
-  responseDeadline: Date | null,
-  risks: PrioritizedRisk[] = []
+  responseDeadline: Date | null
 ): DecisionGate | null {
-  const inDocText = JCP_RE.test(docText);
-  const inRisks = risks.some((r) => JCP_RE.test(r.text) || JCP_RE.test(r.title || ""));
-  if (!inDocText && !inRisks) return null;
+  if (!JCP_RE.test(docText)) return null;
   const days = daysUntil(responseDeadline);
   // JCP processing is 5-10 business days; require ~15 days runway.
   const curable = days == null ? false : days >= 15;
@@ -2431,9 +2431,9 @@ JSON only — one key: risk_findings.`;
   const gates: DecisionGate[] = [];
   if (isRetrieved) {
     if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
-    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText, prioritized);
+    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText);
     if (sprsG) gates.push(sprsG);
-    const jcpG = detectJcpGate(solText, responseDeadline, prioritized);
+    const jcpG = detectJcpGate(solText, responseDeadline);
     if (jcpG) gates.push(jcpG);
     const faaG = detectFaa145Gate(solText);
     if (faaG) gates.push(faaG);
