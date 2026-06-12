@@ -20,5 +20,13 @@
 buildCommand = ""
 
 [deploy]
-startCommand = "npx tsx agents/audit-worker/index.ts"
+# FA-149/FA-147 production finding (deploy 8999d4b4 replacing e81c53c6):
+# "npx tsx …" runs as sh -c → npm → sh -c → tsx → node, and the npm/sh layers
+# do NOT forward SIGTERM to the node process holding the drain handler — the
+# old container died with "npm error signal SIGTERM" and no drain log, exactly
+# the claim-stranding FA-149 exists to prevent. `exec` replaces Railway's
+# sh -c with the tsx CLI (a node script: .bin/tsx shebang is /usr/bin/env
+# node), and tsx relays signals to its child — so SIGTERM reaches
+# process.once("SIGTERM") in worker.ts.
+startCommand = "exec node_modules/.bin/tsx agents/audit-worker/index.ts"
 restartPolicyType = "ALWAYS"
