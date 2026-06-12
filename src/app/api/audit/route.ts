@@ -393,6 +393,29 @@ async function enqueueAsyncAudit(args: {
     }
   }
 
+  // FA-132 — stash the bytes in Supabase Storage (bucket "audit-pdfs") so
+  // the worker's V2 shadow pass can read them. The Files API refuses to
+  // download UPLOADED files back (400 "File is not downloadable", verified
+  // req_011CbytNVFqgY1KeB5HG8Rq2), so storage is the only bytes channel to
+  // the worker. Best-effort: a storage failure must not block a paid run —
+  // V1 reads the file_id; the worker logs loudly and skips V2 when pdf_path
+  // is absent.
+  let pdfPath: string | null = null;
+  if (pdfBuffer) {
+    const adminForStorage = getAdminClient();
+    if (adminForStorage) {
+      const key = `uploads/${Date.now()}-${(safeName || "document.pdf").replace(/[^\w.-]/g, "_")}`;
+      const { error: storageErr } = await adminForStorage.storage
+        .from("audit-pdfs")
+        .upload(key, pdfBuffer, { contentType: "application/pdf", upsert: false });
+      if (storageErr) {
+        console.error(`[enqueue] FA-132 storage stash failed (V2 shadow will be skipped for this run): ${storageErr.message}`);
+      } else {
+        pdfPath = key;
+      }
+    }
+  }
+
   // Agency resolution — mirror of the sync path (resolveAgency + sam-ingest
   // pending_audits fallback, scoped to non-user rows).
   let agency: string | null = resolveAgency(solicitation);
@@ -456,7 +479,10 @@ async function enqueueAsyncAudit(args: {
     user_id: userId,
     audit_id: audit.id,
     anthropic_file_id: anthropicFileId,
-    pdf_filename: pdfBuffer ? safeName : null
+    pdf_filename: pdfBuffer ? safeName : null,
+    // FA-132 — storage key for the worker's V2 bytes (null when the stash
+    // failed or there was no upload; worker degrades to V1-only shadow-less).
+    pdf_path: pdfPath
   });
 
   if (enqueueErr) {

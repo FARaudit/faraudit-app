@@ -124,6 +124,14 @@ export async function uploadPdfToFilesApi(
   return { fileId: result.id, sizeBytes: buffer.length };
 }
 
+// FA-132 NOTE — there is deliberately NO downloadPdfFromFilesApi here.
+// Empirically verified 2026-06-12 (req_011CbytNVFqgY1KeB5HG8Rq2): the Files
+// API returns 400 "File is not downloadable" for user-UPLOADED files — only
+// API-created files (e.g. code-execution outputs) can be downloaded back.
+// The worker upload arm gets its V2 bytes from Supabase Storage instead
+// (bucket "audit-pdfs", pending_audits.pdf_path) — see enqueueAsyncAudit and
+// worker buildInput.
+
 // Best-effort cleanup. Never throws — by the time this fires the audit has
 // already returned its result, so a delete failure just leaves the file in
 // Anthropic's storage (no functional impact, only a small storage-cost leak).

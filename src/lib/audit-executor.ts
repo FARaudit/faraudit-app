@@ -194,8 +194,10 @@ export async function executeAudit(
   // derive a V2-eligible Buffer from whichever inline arm has bytes locally.
   // FA-130 (Jun 11 2026) — sam_pdf_via_files_api callers now retain the
   // fetched buffer and pass it as pdfBuffer, so that arm reaches V2 too.
-  // Still out-of-scope: uploaded_pdf_via_files_api on the async worker (bytes
-  // never reach the worker — uploaded at enqueue time), image and text arms.
+  // FA-132 (Jun 12 2026) — uploaded_pdf_via_files_api on the async worker now
+  // reaches V2 as well: the worker downloads the bytes back from the Files
+  // API at claim time (see worker buildInput). Still out-of-scope: image and
+  // text arms (no PDF bytes exist).
   const v2Buffer: Buffer | null = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
   if (AUDIT_V2_ENABLED && v2Buffer) {
     const v2Start = Date.now();

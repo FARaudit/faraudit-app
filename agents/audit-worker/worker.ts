@@ -65,6 +65,8 @@ interface UserPendingRow {
   pdf_url: string | null;
   anthropic_file_id: string | null;
   pdf_filename: string | null;
+  // FA-132 — Supabase Storage key for the worker's V2 bytes (upload arm).
+  pdf_path: string | null;
   created_at: string;
   // FA-149 — present once migration 20260612210000 is applied.
   heartbeat_at?: string | null;
@@ -331,6 +333,13 @@ async function processOne(row: UserPendingRow): Promise<void> {
       .eq("id", row.id);
     if (error) throw new Error(`markProcessed(${row.id}): ${error.message}`);
     console.log(`[audit-worker] done ${label} · ${result.recommendation} · score=${result.compliance_score} · ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    // FA-132 — storage hygiene: the stashed bytes served their purpose once
+    // the run completes. Best-effort delete on SUCCESS only — failed rows
+    // keep their bytes (forensics + a released claim's re-run needs them).
+    if (row.pdf_path) {
+      const { error: rmErr } = await supabase.storage.from("audit-pdfs").remove([row.pdf_path]);
+      if (rmErr) console.warn(`[audit-worker] FA-132: storage cleanup failed for ${row.pdf_path}: ${rmErr.message}`);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     // FA-147 — transient Anthropic failure (5xx exhaust on upload or any
@@ -419,6 +428,25 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   if (row.anthropic_file_id) {
     pdfFileId = row.anthropic_file_id;
     pdfSource = "uploaded_pdf_via_files_api";
+    // FA-132 — closes the FA-130 residual class: the V2 shadow needs local
+    // bytes (file_id alone starves it), and the worker never saw the
+    // multipart upload. The enqueue route stashes the bytes in Supabase
+    // Storage (the Files API refuses to download uploaded files back) and
+    // records the key in pdf_path. Loud but NON-fatal on failure: V1 reads
+    // the file_id directly, and V2 is a shadow surface (FA-147 leaves shadow
+    // errors swallowed by design) — failing a paid customer run over shadow
+    // input would invert priorities. Legacy rows (pdf_path null, enqueued
+    // before FA-132) degrade the same way.
+    if (row.pdf_path) {
+      const { data: blob, error: dlErr } = await supabase.storage.from("audit-pdfs").download(row.pdf_path);
+      if (dlErr || !blob) {
+        console.error(`[audit-worker] FA-132: storage download failed for ${row.pdf_path} — V2 shadow will be skipped this run: ${dlErr?.message ?? "empty blob"}`);
+      } else {
+        pdfBuffer = Buffer.from(await blob.arrayBuffer());
+      }
+    } else {
+      console.warn(`[audit-worker] FA-132: no pdf_path on upload-arm row ${row.id} (pre-FA-132 enqueue or stash failure) — V2 shadow skipped`);
+    }
   } else {
     const docUrl = row.pdf_url ?? solicitation.resourceLinks[0] ?? null;
     if (docUrl) {
