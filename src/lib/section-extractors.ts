@@ -409,22 +409,51 @@ export function extractEvaluationFactors(section: DetectedSection | null): Evalu
 
 // ── Header (cross-section) extractor ────────────────────────────────────
 
+// FA-142 — masthead shape validators. The header regexes scan FULL document
+// text, so clause boilerplate can satisfy them mid-sentence ("…issued by the
+// IRS…", "…100 % FOR: …" inside a rep/cert). A captured value only counts if
+// it has the SHAPE of the field it claims to be; otherwise extraction yields
+// null and the external SAM/V1 metadata gets to bind instead.
+const ORG_JUNK_RE = /\b(deviation|paragraph|clause|pursuant|shall|will|offeror|hereby|representation|certification|provision)\b/i;
+
+export function looksLikeOrgName(v: string | null | undefined): boolean {
+  const s = (v ?? "").trim();
+  if (s.length < 3 || s.length > 80) return false;
+  if (!/^[A-Z0-9]/.test(s)) return false;      // fragments start mid-sentence, lowercase
+  if (/[%;:]/.test(s)) return false;
+  if (ORG_JUNK_RE.test(s)) return false;
+  return /[A-Za-z]{2}/.test(s);
+}
+
+export function looksLikeSetAsideValue(v: string | null | undefined): boolean {
+  const s = (v ?? "").trim();
+  if (!s || s.length > 80) return false;
+  return (
+    /(small\s+business|8\s*\(\s*a\s*\)|hubzone|wosb|edwosb|sdvosb|vosb|veteran[\s-]owned|service[\s-]disabled|unrestricted|full\s+(?:and|&)\s+open|sole\s+source|set[\s-]?aside)/i.test(s) ||
+    /^\d{1,3}\s*%\s*(?:small|sb\b|set)/i.test(s)
+  );
+}
+
 export function extractHeader(sections: Record<string, DetectedSection>): Partial<ExtractedFacts> {
   const fullText = Object.values(sections).map((s) => s.text).join("\n");
 
   const solicNumPattern = /(?:Solicitation\s+Number|SOLICITATION\s+NUMBER|solicitation\s+no\.?)[:\s]+([A-Z0-9-]+)/i;
   const naicsPattern = /\bNAICS[:\s]+(\d{6})/i;
-  const setAsidePattern = /SET[\s-]?ASIDE[:\s]+([^\n]{5,80})|100\s*%\s+(?:FOR\s+)?([^\n]{5,80})/i;
+  const setAsidePattern = /SET[\s-]?ASIDE[:\s]+([^\n]{5,80})|100\s*%\s+(?:SET[\s-]?ASIDE\s+)?(?:FOR\s+)?([^\n]{5,80})/i;
   const offerDuePattern = /(?:OFFER\s+DUE\s+DATE|Quote\s+Due|Proposal\s+due|due\s+date)[:\s/-]+([^\n]{5,80})/i;
-  const issuingPattern = /ISSUED\s+BY[:\s]+\n?([A-Z][A-Z0-9\s\-,]{3,80})/i;
+  // Case-SENSITIVE + line-anchored: only the uppercase form-box label counts,
+  // never prose "…issued by …" inside a clause (the Army/DLA SPRS fragment).
+  const issuingPattern = /(?:^|\n)[^\S\n]*ISSUED\s+BY\b[:\s]*\n?\s*([A-Z][A-Z0-9 \-,.&()/]{3,80})/;
 
   const sa = setAsidePattern.exec(fullText);
+  const saRaw = (sa?.[1] ?? sa?.[2] ?? null)?.trim() ?? null;
+  const issRaw = issuingPattern.exec(fullText)?.[1]?.trim() ?? null;
   return {
     solicitorNumber: solicNumPattern.exec(fullText)?.[1]?.trim() ?? null,
     naicsCode: naicsPattern.exec(fullText)?.[1] ?? null,
-    setAside: (sa?.[1] ?? sa?.[2] ?? null)?.trim() ?? null,
+    setAside: saRaw && looksLikeSetAsideValue(saRaw) ? saRaw : null,
     offerDueDate: offerDuePattern.exec(fullText)?.[1]?.trim() ?? null,
-    issuingOffice: issuingPattern.exec(fullText)?.[1]?.trim() ?? null,
+    issuingOffice: issRaw && looksLikeOrgName(issRaw) ? issRaw : null,
   };
 }
 

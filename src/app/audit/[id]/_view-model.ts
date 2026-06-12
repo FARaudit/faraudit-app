@@ -7,6 +7,7 @@
 // the 1:1 visual port renders without demo strings or blank sections.
 
 import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
+import { looksLikeOrgName, looksLikeSetAsideValue } from "@/lib/section-extractors";
 import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
 import type { AuditConfidenceNote } from "@/lib/audit-judgment";
 
@@ -594,6 +595,31 @@ function normalizeSetAside(s: unknown): string {
   }
   // Unknown value — pass through verbatim. Never invent.
   return v;
+}
+
+// FA-142 — masthead fields bind validated values or honest-empty. Historical
+// audits carry clause fragments in v2 metadata / audit columns (the header
+// regexes used to match boilerplate mid-sentence); the gate runs per-candidate
+// so a fragment in one source doesn't block a real value in the next.
+function validatedAgency(...candidates: Array<unknown>): string {
+  for (const c of candidates) {
+    const v = typeof c === "string" ? c.trim() : "";
+    if (v && looksLikeOrgName(v)) return v;
+  }
+  return "—";
+}
+
+function validatedSetAside(...candidates: Array<unknown>): string {
+  for (const c of candidates) {
+    const v = typeof c === "string" ? c.trim() : "";
+    if (!v) continue;
+    const key = v.toUpperCase();
+    if (Object.prototype.hasOwnProperty.call(SET_ASIDE_LABEL, key)) {
+      return SET_ASIDE_LABEL[key];
+    }
+    if (looksLikeSetAsideValue(v)) return v;
+  }
+  return "—";
 }
 
 function fmtStamp(d: Date | null): string {
@@ -2053,7 +2079,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     page_title: `FARaudit — Audit Report · ${displayId}`,
 
     title,
-    agency: (v2Meta?.agency as string | undefined) || (audit.agency as string) || "—",
+    agency: validatedAgency(v2Meta?.agency, audit.agency),
     agency_sub: "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
@@ -2061,10 +2087,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
     // column. Doc text overrides metadata — masthead must show what the
     // solicitation actually says.
-    set_aside: normalizeSetAside(
-      (v2Meta?.set_aside as string | undefined)
-        ?? (compJson.set_aside_type as string | undefined)
-        ?? (audit.set_aside as string | undefined)
+    set_aside: validatedSetAside(
+      v2Meta?.set_aside,
+      compJson.set_aside_type,
+      audit.set_aside
     ),
     set_aside_sub: "",
     contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
