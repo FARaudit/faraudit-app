@@ -703,6 +703,61 @@ function verdictTagline(verdict: "GO" | "CAUTION" | "DECLINE", bidRecommendation
   return "Biddable — but only after the open compliance gaps are closed.";
 }
 
+// P2 polish: source-typo guard. Government-typed SAM titles occasionally
+// carry transposition typos ("USMS FY26 D07 PRIOSNER RESTRAINTS") that the
+// body of the same audit spells correctly ("prisoner restraint equipment").
+// Correct a title token only when (a) the token is absent from the audit
+// corpus AND (b) a single adjacent-letter transposition of it IS present —
+// unusual-but-correct words fail (b) and pass through untouched.
+function spellGuardTitle(title: string, corpusSources: unknown[]): string {
+  let corpus = "";
+  try {
+    corpus = JSON.stringify(corpusSources).toLowerCase();
+  } catch {
+    return title;
+  }
+  const corpusWords = new Set(corpus.match(/[a-z]{4,}/g) ?? []);
+  if (corpusWords.size === 0) return title;
+  return title.replace(/[A-Za-z]{5,}/g, (w) => {
+    const lw = w.toLowerCase();
+    if (corpusWords.has(lw)) return w;
+    for (let i = 0; i < lw.length - 1; i++) {
+      if (lw[i] === lw[i + 1]) continue;
+      const cand = lw.slice(0, i) + lw[i + 1] + lw[i] + lw.slice(i + 2);
+      if (corpusWords.has(cand)) {
+        if (w === w.toUpperCase()) return cand.toUpperCase();
+        if (/^[A-Z]/.test(w)) return cand[0].toUpperCase() + cand.slice(1);
+        return cand;
+      }
+    }
+    return w;
+  });
+}
+
+// P2 polish: issuing-vs-end-user identity. When the document's ISSUED BY
+// office and the SAM end-user agency are both valid org names and clearly
+// different organizations, show both roles instead of silently picking one.
+// Guards: shared significant token (DLA AVIATION vs DLA DISTRIBUTION) or an
+// initials match (IRS vs Internal Revenue Service) means same org family —
+// fall back to the single validated value.
+function formatIssuingEndUser(issuingRaw: unknown, endUserRaw: unknown): string | null {
+  const issuing = typeof issuingRaw === "string" ? issuingRaw.trim() : "";
+  const endUser = typeof endUserRaw === "string" ? endUserRaw.trim() : "";
+  if (!issuing || !endUser) return null;
+  if (!looksLikeOrgName(issuing) || !looksLikeOrgName(endUser)) return null;
+  if (issuing.toUpperCase() === endUser.toUpperCase()) return null;
+  const tokens = (s: string) => new Set(s.toUpperCase().match(/[A-Z]{3,}/g) ?? []);
+  const a = tokens(issuing);
+  const b = tokens(endUser);
+  for (const t of a) if (b.has(t)) return null;
+  const initials = (s: string) => {
+    const words = s.toUpperCase().match(/\b[A-Z][A-Z]+/g) ?? [];
+    return words.length >= 3 ? words.map((w) => w[0]).join("") : "";
+  };
+  if (a.has(initials(endUser)) || b.has(initials(issuing))) return null;
+  return `${issuing} (issuing) · ${endUser} (end user)`;
+}
+
 // ─── confidence label ───────────────────────────────────────────────────────
 
 function confidenceLabel(c: unknown): { pct: number; label: string } {
@@ -1853,17 +1908,25 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const v2SurfacesObj = (v2Shadow?.surfaces as Record<string, unknown> | undefined) ?? {};
   // FA-110/111: surface V2 metadata_brief for masthead consumption (set_aside/agency/naics)
   const v2Meta = (v2SurfacesObj.metadata_brief as Record<string, unknown> | null) ?? null;
+  // FA-139: count POST-suppression so .confidence_count and the strip
+  // gate agree with the rows buildV2ViewModelFromShadow actually renders.
+  const survivingConfidenceNotes: AuditConfidenceNote[] = Array.isArray(v2SurfacesObj.confidence_notes)
+    ? suppressContradictedConfidenceNotes(
+        v2SurfacesObj.confidence_notes as AuditConfidenceNote[],
+        audit as unknown as Record<string, unknown>
+      )
+    : [];
   const v2SurfaceLengths = {
     l02_catches: Array.isArray(v2SurfacesObj.l02_catches) ? (v2SurfacesObj.l02_catches as unknown[]).length : 0,
-    // FA-139: count POST-suppression so .confidence_count and the strip
-    // gate agree with the rows buildV2ViewModelFromShadow actually renders.
-    confidence_notes: Array.isArray(v2SurfacesObj.confidence_notes)
-      ? suppressContradictedConfidenceNotes(
-          v2SurfacesObj.confidence_notes as AuditConfidenceNote[],
-          audit as unknown as Record<string, unknown>
-        ).length
-      : 0,
+    confidence_notes: survivingConfidenceNotes.length,
   };
+  // P2 polish: when a surviving verification note declares the PoP assumed,
+  // the §03 value carries the marker inline instead of reading as extracted fact.
+  const popAssumed = survivingConfidenceNotes.some(
+    (n) =>
+      /period[\s_-]?of[\s_-]?performance|\bpop\b/i.test(String(n?.field ?? "")) &&
+      String(n?.assumption ?? "").trim().length > 0
+  );
   const canonicalSol = (compJsonEarly.solicitation_number_canonical as string | null | undefined) ?? null;
   const dbSol = audit.solicitation_number as string | null | undefined;
   const displayId = displaySolicitationId({
@@ -2169,8 +2232,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     generated_at: fmtStamp(parseDate(audit.completed_at ?? audit.created_at)),
     page_title: `FARaudit — Audit Report · ${displayId}`,
 
-    title,
-    agency: validatedAgency(v2Meta?.agency, audit.agency),
+    title: spellGuardTitle(title, [overviewJson, risksJson, compJson.section_l_summary, compJson.submission_requirements]),
+    agency: formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(v2Meta?.agency, audit.agency),
     agency_sub: "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
@@ -2389,7 +2452,12 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     clin_summary: sanitizeDisplayText(overviewJson.summary) || "Scope summary not available — upload the full PDF to extract scope detail.",
     primary_objective: sanitizeDisplayText(overviewJson.primary_objective) || "Primary objective not extracted.",
-    period_of_performance: sanitizeDisplayText(overviewJson.period_of_performance) || "Period of performance not extracted.",
+    period_of_performance: ((): string => {
+      const pop = sanitizeDisplayText(overviewJson.period_of_performance);
+      if (!pop) return "Period of performance not extracted.";
+      // P2 polish: a vnote-declared assumption must show at the value itself.
+      return popAssumed && !/assum/i.test(pop) ? `${pop} (assumed)` : pop;
+    })(),
     customer_office: customerOffice,
     customer_hierarchy: hierarchy,
     contract_type_detail: sanitizeDisplayText(overviewJson.contract_type_detail) || sanitizeDisplayText(overviewJson.contract_type) || "Contract vehicle detail not extracted.",

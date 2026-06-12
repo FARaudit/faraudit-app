@@ -105,16 +105,27 @@ export function buildV2ViewModelFromShadow(
     matrix_rollup: ((): MatrixRollupReshaped => {
       // FA-127b: TRAP badges derive solely from the §04-rendered flag set.
       const trapMap = sec04TrapClauses(comp);
+      // P2 polish: a clause title renders in full or not at all — a garbled
+      // single-word extraction fragment ("Heavalent") reads worse than a bare
+      // clause number. Known trap numbers rebind their canonical title.
+      const vetClauseTitle = (raw: unknown, canonical?: string): string => {
+        const t = typeof raw === "string" ? raw.trim() : "";
+        if (!t) return canonical ?? "";
+        const oneWord = !/\s/.test(t);
+        if (oneWord && !/^[A-Z0-9.&-]+$/.test(t)) return canonical ?? "";
+        return t;
+      };
       const rebadge = (rows: ClauseMatrixRow[]): ClauseMatrixRow[] =>
         rows.map((r) => {
           const num = String(r.number ?? "").trim();
           const trap = trapMap.get(num);
+          const title = vetClauseTitle(r.title, trap?.title);
           if (trap) {
-            return { ...r, badge: "trap" as MatrixBadge, trapReason: r.trapReason ?? trap.reason };
+            return { ...r, title, badge: "trap" as MatrixBadge, trapReason: r.trapReason ?? trap.reason };
           }
           return r.badge === "trap"
-            ? { ...r, badge: "required" as MatrixBadge, trapReason: null }
-            : r;
+            ? { ...r, title, badge: "required" as MatrixBadge, trapReason: null }
+            : { ...r, title };
         });
       // FA-103 fix: fall back to V1 clause lists when V2 extraction returned empty
       const v2m = surfaces.matrix_rollup as MatrixRollupReshaped | undefined;

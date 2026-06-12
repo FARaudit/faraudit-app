@@ -202,6 +202,27 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     return "$" + v;
   };
 
+  // P2 polish: acronym guard for the naive word-by-word title-case below —
+  // "USMS" must not become "Usms", "AQ HQ" not "Aq Hq". Tokens in the set
+  // (and tokens containing digits, e.g. FY26 / D07 / 15M10226QA4700149)
+  // keep their original uppercase form.
+  const TITLE_ACRONYMS = new Set([
+    "USMS","USCG","USAF","USMC","USN","USA","USDA","USPS","US","U.S.",
+    "DLA","DFAS","DISA","DCMA","DCSA","DOD","DOJ","DOE","DOT","DOI","DOL","DOC","DHS","HHS",
+    "IRS","FBI","ATF","DEA","ICE","CBP","TSA","FAA","FEMA","NIH","CDC","VA","GSA","NASA","NOAA",
+    "HQ","AQ","AFB","AFMC","AFLCMC","NAVSUP","NAVAIR","NAVSEA",
+    "RFQ","RFP","IFB","RFI","IDIQ","BPA","PWS","SOW","SOO","CLIN","NSN","FOB",
+    "FAR","DFARS","CFR","USC","II","III","IV"
+  ]);
+  const caseToken = (t: string): string => {
+    const m = /^([A-Za-z0-9.&-]+)(.*)$/.exec(t);
+    const core = m ? m[1] : t;
+    const rest = m ? m[2] : "";
+    if (TITLE_ACRONYMS.has(core.toUpperCase())) return core.toUpperCase() + rest;
+    if (/\d/.test(core)) return core.toUpperCase() + rest;
+    return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+  };
+
   // FA-89j: agency short-name display. pending_audits.agency arrives as
   // "DEPT OF DEFENSE · DEPT OF THE AIR FORCE" from resolveAgency in sam-ingest
   // helpers (two segments joined by " · "). Take first segment, strip prefix/
@@ -218,7 +239,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     s = s.replace(/^DEPARTMENT\s+OF\s+/i, "").trim();
     s = s.replace(/^DEPT\s+OF\s+/i, "").trim();
     if (!s) return "—";
-    const titled = s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+    const titled = s.replace(/\w\S*/g, caseToken);
     const shortMap: Record<string, string> = {
       "Defense": "Dept of Defense",
       "Dept Of Defense": "Dept of Defense",
@@ -243,9 +264,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   const cleanTitle = (raw: string | null): string => {
     if (!raw) return "—";
     const stripped = raw.replace(/^[A-Z0-9]{2,6}--\s*/i, "");
-    return stripped.replace(/\w\S*/g, (t) =>
-      t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()
-    );
+    return stripped.replace(/\w\S*/g, caseToken);
   };
 
     const oppRows = useMemo(() => {
