@@ -750,11 +750,17 @@ function formatIssuingEndUser(issuingRaw: unknown, endUserRaw: unknown): string 
   const a = tokens(issuing);
   const b = tokens(endUser);
   for (const t of a) if (b.has(t)) return null;
-  const initials = (s: string) => {
-    const words = s.toUpperCase().match(/\b[A-Z][A-Z]+/g) ?? [];
-    return words.length >= 3 ? words.map((w) => w[0]).join("") : "";
-  };
-  if (a.has(initials(endUser)) || b.has(initials(issuing))) return null;
+  // Initials are computed PER hierarchy segment, not across the whole path —
+  // "DEPT OF DEFENSE · DEFENSE LOGISTICS AGENCY" as one string yields "DODDLA"
+  // and never matches the issuing arm's "DLA" token, so same-family pairs
+  // leaked through as "issuing · end user" duplicates (R-0081 masthead).
+  const segmentInitials = (s: string) =>
+    s.split(/·|\./).map((seg) => {
+      const words = seg.toUpperCase().match(/\b[A-Z][A-Z]+/g) ?? [];
+      return words.length >= 3 ? words.map((w) => w[0]).join("") : "";
+    }).filter(Boolean);
+  for (const ini of segmentInitials(endUser)) if (a.has(ini)) return null;
+  for (const ini of segmentInitials(issuing)) if (b.has(ini)) return null;
   return `${issuing} (issuing) · ${endUser} (end user)`;
 }
 
@@ -2211,7 +2217,13 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     page_title: `FARaudit — Audit Report · ${displayId}`,
 
     title: spellGuardTitle(title, [overviewJson, risksJson, compJson.section_l_summary, compJson.submission_requirements]),
-    agency: formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(v2Meta?.agency, audit.agency),
+    // Identity slot binds structured SAM provenance FIRST. The vision-read
+    // issuing office is provenance-weak for identity — on R-0081 the model
+    // faithfully reproduced a scan-clipped form box ("OKLAHOMA CIT", office
+    // code "(AO)") across 5 independent runs while SAM's hierarchy says
+    // "DLA AVIATION AT OKLAHOMA CITY". Doc-read strings may appear only via
+    // the labeled issuing·end-user pair or when SAM has nothing.
+    agency: formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(audit.agency, v2Meta?.agency),
     agency_sub: "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
