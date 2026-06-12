@@ -1491,6 +1491,34 @@ function extractCoFromSectionL(compJson: Record<string, unknown>): { email: stri
   return { email, name: nameMatch ? nameMatch[1].trim() : null };
 }
 
+// FA-125c: last-resort TO source — when Section L and the ko_email_recipient
+// column both miss, scan the full extracted fact set (§04 actions, §05 risks,
+// compliance flags) for a government address before declaring not-found.
+// Restricted to .mil/.gov so a vendor or distributor email in a risk excerpt
+// can never be bound as the CO (DLA fixture: asaycia.clayton.1@us.af.mil
+// lives in a risk description while Section L has no contact).
+function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const r of risks) {
+    for (const v of [r.title, r.description, r.faraudit_action]) {
+      if (typeof v === "string") parts.push(v);
+    }
+  }
+  const pushRowStrings = (v: unknown): void => {
+    if (!Array.isArray(v)) return;
+    for (const row of v as Array<Record<string, unknown>>) {
+      if (!row || typeof row !== "object") continue;
+      for (const x of Object.values(row)) if (typeof x === "string") parts.push(x);
+    }
+  };
+  pushRowStrings(compJson.compliance_flags);
+  const exec = compJson.executive_summary as Record<string, unknown> | undefined;
+  if (exec && typeof exec === "object") pushRowStrings(exec.actions);
+  const corpus = parts.join(" \n ");
+  const m = corpus.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:MIL|GOV)\b/i);
+  return m ? m[0].toLowerCase() : null;
+}
+
 // §08 — Phase 2 #2 (Option B drafted email body, Jun 8 2026).
 // Replaces the legacy "1. <risk> · 2. <risk>" run-on with a structured
 // pre-quote clarification email matching the canonical §08 voice:
@@ -1511,7 +1539,14 @@ function deriveKoEmailCard(
   // mailbox. When neither source has a contact, render the truthful
   // not-found state instead.
   const lExtracted = extractCoFromSectionL(compJson);
-  const extractedTo = (lExtracted?.email || (audit.ko_email_recipient as string) || "").trim();
+  // FA-125c: fact-set scan runs only when both primary sources miss —
+  // priority stays Section L → ko_email_recipient column → fact set → not-found.
+  const extractedTo = (
+    lExtracted?.email ||
+    (audit.ko_email_recipient as string) ||
+    extractCoFromFactSet(risks, compJson) ||
+    ""
+  ).trim();
   const to_found = extractedTo.length > 0;
   const to = to_found ? extractedTo : "CO contact not found in document — verify on SAM.gov";
   const subject = `${displayId} — Pre-quote clarifications`;
@@ -1591,9 +1626,16 @@ function riskToClarificationAsk(r: Risk): string {
   const cite = (r.citation || "").trim();
   const anchor = cite && !headline.includes(cite) ? `${headline} (${cite})` : headline;
   const desc = (r.description || "").trim();
-  const descSentence = desc
-    ? (desc.split(/(?<=[.!?])\s+/)[0] || "").trim().slice(0, 220)
-    : "";
+  // FA-125c: the char budget must never cut mid-word ("...the requiremen").
+  // Keep the whole first sentence when it fits; when it overruns the budget,
+  // back off to the last word boundary and mark the cut with an ellipsis.
+  const firstSentence = desc ? (desc.split(/(?<=[.!?])\s+/)[0] || "").trim() : "";
+  let descSentence = firstSentence;
+  if (firstSentence.length > 220) {
+    const cut = firstSentence.slice(0, 219);
+    const lastSpace = cut.lastIndexOf(" ");
+    descSentence = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—-]+$/, "") + "…";
+  }
   return descSentence && descSentence.toLowerCase() !== headline.toLowerCase()
     ? `${anchor} — ${descSentence}`
     : anchor;
