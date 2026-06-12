@@ -321,6 +321,34 @@ const SUBMISSION_BUCKETS: Array<{ bucket: SubmissionRequirement["bucket"]; patte
   { bucket: "format",          pattern: /english\s+language|U\.?S\.?\s+Currency|\bUSD\b|via\s+email|page\s+limit|font|format/i, critical: false },
 ];
 
+// FA-128a: §09 item quality gate — an item must read as an actionable
+// instruction to the offeror, not a clause excerpt. Rep/cert provisions
+// (FAR 52.212-3 etc.) arrive as full clause text in many solicitations;
+// line-splitting then turns every wrapped line into a "requirement"
+// (DLA fixture: 42 junk items like "'will' in the representation in
+// paragraph (d)(1) …"). Two-stage gate:
+//   1. hard-reject clause-excerpt fingerprints + wrapped-line fragments
+//   2. the broad rep/cert bucket and the verb-only fallback must also show
+//      an instruction signal (precise buckets carry their own precision)
+const EXCERPT_FINGERPRINTS: RegExp[] = [
+  /["'“”‘’][a-z]{2,}["'“”‘’]\s+in\s+the\s+\w+/i,           // quoted-word definition ("'will' in the representation…")
+  /\(end of (?:provision|clause)\)/i,
+  /\bas\s+(?:defined|prescribed|used)\s+in\b/i,
+  /\bparagraph\s*\([a-z0-9]{1,4}\)[\s\S]{0,40}?\bof\s+this\s+(?:provision|clause|section|solicitation)/i,
+  /\b(?:offeror|quoter|contractor)\s+(?:represents?|certifies)\b/i, // declarative rep/cert boilerplate
+  /\bby\s+submission\s+of\s+(?:its|this)\s+(?:offer|quotation|quote)\b/i,
+];
+const ACTION_SIGNAL_RE =
+  /\b(?:shall|must|will|(?:is|are)\s+(?:required|requested)\s+to)\b[\s\S]{0,60}?\b(?:submit|provid\w*|includ\w*|complet\w*|regist\w*|sign\w*|return\w*|acknowledg\w*|deliver\w*|furnish\w*|insert\w*|check\w*|mark\w*|email\w*|upload\w*|attach\w*|quot\w*|propos\w*|compl\w*|address\w*)\b|^\s*(?:\(?\w{1,4}\)?[\s.:-]*)?(?:submit|provide|include|complete|register|email|upload|attach|ensure|verify|sign)\b|due\s+(?:date|time)|no\s+later\s+than|submit\s+by|close\s+of\s+business|\bdeadline\b/i;
+
+export function isActionableSubmissionItem(text: string, bucket: string): boolean {
+  const t = text.trim();
+  if (/^[a-z]/.test(t)) return false; // mid-sentence wrap fragment
+  if (EXCERPT_FINGERPRINTS.some((re) => re.test(t))) return false;
+  if (bucket === "representation" || bucket === "other") return ACTION_SIGNAL_RE.test(t);
+  return true;
+}
+
 // FA-139 — shared bucketizer so externally bound §L lines (V1 vision) get
 // the same bucket/criticality treatment as document-extracted ones.
 export function bucketizeSubmissionLine(text: string): { bucket: SubmissionRequirement["bucket"]; isCritical: boolean } {
@@ -347,14 +375,21 @@ export function extractSubmissionRequirements(section: DetectedSection | null): 
     let matched = false;
     for (const { bucket, pattern, critical } of buckets) {
       if (pattern.test(trimmed)) {
-        reqs.push({ bucket, text: trimmed.slice(0, 300), sourceClause: null, isCritical: critical });
+        // FA-128a: bucket-matched lines still pass the quality gate — a
+        // rejected line is consumed (seen) but never emitted, and never
+        // falls through to the 'other' fallback.
+        if (isActionableSubmissionItem(trimmed, bucket)) {
+          reqs.push({ bucket, text: trimmed.slice(0, 300), sourceClause: null, isCritical: critical });
+        }
         seen.add(fp);
         matched = true;
         break;
       }
     }
     if (!matched && /\b(shall|must|required|mandatory|submit|offeror)\b/i.test(trimmed)) {
-      reqs.push({ bucket: "other", text: trimmed.slice(0, 300), sourceClause: null, isCritical: false });
+      if (isActionableSubmissionItem(trimmed, "other")) {
+        reqs.push({ bucket: "other", text: trimmed.slice(0, 300), sourceClause: null, isCritical: false });
+      }
       seen.add(fp);
     }
   }

@@ -7,7 +7,7 @@
 // the 1:1 visual port renders without demo strings or blank sections.
 
 import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
-import { looksLikeOrgName, looksLikeSetAsideValue } from "@/lib/section-extractors";
+import { isActionableSubmissionItem, looksLikeOrgName, looksLikeSetAsideValue } from "@/lib/section-extractors";
 import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
 import type { AuditConfidenceNote } from "@/lib/audit-judgment";
 
@@ -1813,6 +1813,10 @@ function deriveSubmissionChecklistFiltered(
     if (!fp || seen.has(fp)) continue;
     seen.add(fp);
     const bucket = categorizeChecklistBucket(line);
+    // FA-128a: same quality gate the extractor now applies — covers rows
+    // persisted before the engine-side fix (DLA fixture's 42 rep/cert
+    // clause-excerpt fragments).
+    if (!isActionableSubmissionItem(line, bucket)) continue;
     items.push({
       bucket,
       text: line,
