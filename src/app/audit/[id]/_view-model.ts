@@ -1342,6 +1342,30 @@ function deriveGateConditions(
   });
 }
 
+// FA-144: read the engine-persisted gate_conditions[] (written by
+// projectGateConditions at audit time). Shape-validated + sanitized — rows
+// missing a usable title are dropped rather than rendered blank.
+function readEngineGateConditions(
+  compJson: Record<string, unknown>
+): AuditViewModel["gate_conditions"] {
+  const raw = compJson.gate_conditions;
+  if (!Array.isArray(raw)) return [];
+  const out: AuditViewModel["gate_conditions"] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const o = r as Record<string, unknown>;
+    const title = sanitizeDisplayText(o.title);
+    if (!title) continue;
+    out.push({
+      title,
+      context: sanitizeDisplayText(o.context) || "",
+      citation: sanitizeDisplayText(o.citation) || "—",
+      blocker_note: sanitizeDisplayText(o.blocker_note) || ""
+    });
+  }
+  return out;
+}
+
 function deriveTimelineGates(
   audit: AuditRow,
   compJson: Record<string, unknown>,
@@ -1940,6 +1964,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     : null;
   const canonicalGateCorpus = buildGateCorpus(audit, compJson, risksJson, overviewJson);
   const canonicalGates = detectGatesCanonical(canonicalGateCorpus, canonicalDaysToDeadline);
+  // FA-144: the engine now persists renderable gate rows at audit time
+  // (complianceJson.gate_conditions). Prefer that emission — it's frozen with
+  // the row, so byte-stable — and fall back to the VM canonical re-detection
+  // for rows written before the engine emitted the field.
+  const engineGateConditions = readEngineGateConditions(compJson);
+  const gateConditions = engineGateConditions.length > 0
+    ? engineGateConditions
+    : deriveGateConditions(canonicalGates, canonicalDaysToDeadline);
 
   // Incumbent
   const incumbentExpiry = parseDate(audit.incumbent_expiry);
@@ -2070,6 +2102,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         ? "No-bid — bid not recommended"
         : "Caution → close gaps before bid";
   const taglineForUnscored = "Upload the PDF to get a full audit score.";
+  // FA-144: a gate-mode report suppresses the numeric score, so its tagline
+  // must carry gate framing — never "Score 35/100." beside a "—" score tile.
+  // New rows already arrive gate-framed from the engine; this also rewrites
+  // historical rows whose persisted bid_recommendation is the score fallback.
+  const gateTagline: string | null = ((): string | null => {
+    if (verdictMode !== "gate" || gateConditions.length === 0) return null;
+    const persisted = sanitizeDisplayText(audit.bid_recommendation as string) || "";
+    if (persisted && !/^score\s+\d|^score\s+unscored/i.test(persisted)) {
+      return null; // engine-framed or model rationale — verdictTagline handles it
+    }
+    const n = gateConditions.length;
+    return `${n} gate${n === 1 ? "" : "s"} to clear before bid.`;
+  })();
 
   return {
     solicitation_number: displayId,
@@ -2108,19 +2153,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     recommendation: verdict.word,
     recommendation_class: verdict.cls,
-    recommendation_tagline: isUnscored
-      ? taglineForUnscored
-      : verdictTagline(verdict.word, sanitizeDisplayText(audit.bid_recommendation as string) || ""),
+    recommendation_tagline: gateTagline
+      ?? (isUnscored
+        ? taglineForUnscored
+        : verdictTagline(verdict.word, sanitizeDisplayText(audit.bid_recommendation as string) || "")),
     recommendation_pill_text: recommendationPill,
     score,
     score_display: score == null ? "—" : String(Math.round(score)),
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
     verdict_mode: verdictMode,
-    // Cycle-1 canonical gate conditions — sourced from canonicalGates (VM-side
-    // corpus scan), not compJson.verdict.gates. Same gates fire across all
-    // extraction runs when the underlying signal is in any stored field.
-    gate_conditions: deriveGateConditions(canonicalGates, canonicalDaysToDeadline),
+    // FA-144: engine-persisted gate rows when present, canonical VM-side
+    // re-detection as the legacy-row fallback (hoisted above as gateConditions).
+    gate_conditions: gateConditions,
     gate_pearl: null,
 
     // ─── Fork 3 surfaces (2026-06-05) — derived from existing engine output ──

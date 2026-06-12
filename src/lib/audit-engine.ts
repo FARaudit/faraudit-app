@@ -261,6 +261,9 @@ export interface ComplianceJSON {
   // DECISION_GATE audits. Mirror of AuditResult.verdict; redundant by design
   // so the route handler doesn't need a separate column to persist it.
   verdict?: AuditVerdict;
+  // FA-144: renderable gate rows (projectGateConditions output) for the
+  // masthead .mhv-gates / §06 .g-rows binding. Empty array on scored audits.
+  gate_conditions?: Array<{ title: string; context: string; citation: string; blocker_note: string }>;
   // Fork 3 (2026-06-05): engine-emitted executive summary feeding the
   // .exec-sum surface in the redesigned template. Composed deterministically
   // from existing extraction (overview summary + top 3 prioritized risks +
@@ -1637,6 +1640,45 @@ export function aggregateGateRecommendation(gates: DecisionGate[]): "PROCEED_WIT
   return anyCurable ? "PROCEED_WITH_CAUTION" : "DECLINE";
 }
 
+// FA-144: project the engine's DecisionGate list onto the renderable row
+// shape the masthead .mhv-gates / §06 .g-rows template binding consumes.
+// Persisted into complianceJson.gate_conditions at audit time so the rows
+// are byte-stable across renders (frozen with the row, unlike re-detection).
+const GATE_CITATIONS: Record<string, string> = {
+  SPRS_SCORE_REQUIRED: "DFARS 252.204-7020",
+  JCP_CERTIFICATION_REQUIRED: "DD Form 2345 / 252.227-7025",
+  FAA_145_SPECIFIC_PNS: "14 CFR Part 145",
+  TEST_JIG_APPROVAL: "Section L / specialized test",
+  AFTO_ACCESS: "AFTO / TO library",
+  SOLE_SOURCE_NAMED_VENDOR: "FAR 6.302"
+};
+
+export function projectGateConditions(
+  gates: DecisionGate[],
+  daysToDeadline: number | null
+): Array<{ title: string; context: string; citation: string; blocker_note: string }> {
+  return gates.map((g) => {
+    let context = "";
+    if (g.named_entity) {
+      context = g.named_entity.trim();
+    } else if (g.verification_action) {
+      const firstSentence = g.verification_action.split(/[.!?](?:\s|$)/)[0].trim();
+      context = firstSentence.length > 110 ? firstSentence.slice(0, 108) + "…" : firstSentence;
+    }
+    const blocker_note = g.cure_possible_in_window === false
+      ? (daysToDeadline != null && daysToDeadline > 0
+          ? `UNFIXABLE IN ${daysToDeadline} DAYS IF MISSING`
+          : "UNFIXABLE BEFORE DEADLINE IF MISSING")
+      : "";
+    return {
+      title: (g.gate_label || g.gate_id || "Gate condition").trim(),
+      context,
+      citation: GATE_CITATIONS[g.gate_id] || "—",
+      blocker_note
+    };
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Ruling 3 (2026-06-05): risk dedup + priority-tier fill cap. Replaces the
 // flat slice(0, MAX_RISKS_RENDERED) cap with a structured fill: 4 P0 + 2 P1
@@ -2426,6 +2468,10 @@ JSON only — one key: risk_findings.`;
   // writes the whole compliance.json blob to the audits.compliance_json
   // JSONB column — no schema migration needed.
   complianceJson.verdict = verdict;
+  // FA-144: emit the renderable gate rows alongside the typed verdict. The
+  // view-model prefers this over its canonical re-detection when non-empty,
+  // so the masthead .mhv-gates binding is engine-driven end-to-end.
+  complianceJson.gate_conditions = projectGateConditions(gates, daysUntil(responseDeadline));
 
   // Brain ruling Item 2 (2026-06-05): differentiated exec_factors vs
   // exec_actions; one-line synthesis for exec_what.
@@ -2566,9 +2612,16 @@ JSON only — one key: risk_findings.`;
   for (let i = 0; i < 3 && VERDICT_LEAD_RE.test(rationale); i++) {
     rationale = rationale.replace(VERDICT_LEAD_RE, "").trim();
   }
-  const bid_recommendation = rationale
-    ? rationale
-    : `Score ${scoreLabel}. Top risk: ${topRisk}`;
+  // FA-144: a DECISION_GATE verdict suppresses the numeric score — its
+  // tagline must carry gate framing, never "Score N/100" beside a "—" score.
+  const gateFraming = gates.length > 0
+    ? `${gates.length} gate${gates.length === 1 ? "" : "s"} to clear before bid.`
+    : null;
+  const bid_recommendation = gateFraming
+    ? (rationale ? `${gateFraming} ${rationale}` : `${gateFraming} Top risk: ${topRisk}`)
+    : rationale
+      ? rationale
+      : `Score ${scoreLabel}. Top risk: ${topRisk}`;
 
   // Score benchmark — score-derived, hidden on low scores so the static
   // design demo text "Top quartile of your audits" doesn't leak onto a
