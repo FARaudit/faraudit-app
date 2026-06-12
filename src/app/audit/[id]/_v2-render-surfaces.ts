@@ -289,9 +289,22 @@ export function suppressContradictedConfidenceNotes(
   const sj = (shadow.judgment as Record<string, unknown> | null) ?? {};
   const sjRisks = Array.isArray(sj.risks) ? (sj.risks as Array<Record<string, unknown>>) : [];
   const sjL02 = Array.isArray(sj.l02Catches) ? (sj.l02Catches as Array<Record<string, unknown>>) : [];
+  // FA-143 — historical shadows don't persist facts.delivery, but the V1
+  // columns that render §03 CLINs and §04 rows carry the same delivery
+  // assertions (dates, DoDAACs, FOB terms); serialize their string fields.
+  const rowStrings = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? (v as Array<Record<string, unknown>>).flatMap((row) =>
+          row && typeof row === "object"
+            ? Object.values(row).filter((x): x is string => typeof x === "string")
+            : []
+        )
+      : [];
   const assertions: Array<string | null | undefined> = [
     ...sjRisks.flatMap((r) => [r.title, r.description, r.mitigation, r.trapClause] as Array<string | null | undefined>),
     ...sjL02.flatMap((c) => [c.title, c.why_invisible, c.move] as Array<string | null | undefined>),
+    ...rowStrings(comp.clins),
+    ...rowStrings(comp.compliance_flags),
   ];
   const docClass = (sj.documentClassification as Record<string, unknown> | null) ?? {};
   if (typeof docClass.type === "string" && !["unknown", "wrong_doc", "metadata_only"].includes(docClass.type)) {

@@ -375,6 +375,29 @@ const FA141_MATCHERS: Array<{ id: string; subjectRe: RegExp; assertionRe: RegExp
     subjectRe: /work\s*statement\s*type|document\s*type|\btype\b[\s\S]{0,20}\b(?:sow|pws|soo)\b|\b(?:sow|pws|soo)\b[\s\S]{0,20}\btype\b/i,
     assertionRe: /document\s*type\s*[:=]\s*(?:sow|pws|soo|combined)\b/i,
   },
+  // FA-143 — delivery family. Hedges like "no delivery dates extracted" /
+  // "zero delivery items" / "no FOB confirmed" die when §03 CLIN bodies,
+  // §04 rows, or §05 risks quote a Section-F schedule, a DoDAAC, or an FOB
+  // designation (ROV: 6-week cite + DoDAACs in §04; DOJ: "FOB: Destination"
+  // in §05; DLA: CLIN "Required Delivery: 15 DEC 2026").
+  {
+    id: "delivery",
+    subjectRe: /delivery[\s\S]{0,30}?(?:date|schedule|timeline|period|item|line)|(?:date|schedule)[\s\S]{0,30}?delivery/i,
+    assertionRe:
+      /delivery[\s\S]{0,60}?(?:\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s*\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d+\s*[\s-]?(?:week|day|month)s?|\baro\b)|\d+[\s-]*(?:week|day|month)s?[\s\S]{0,30}?delivery/i,
+  },
+  {
+    id: "dodaac",
+    subjectRe: /\bdodaac/i,
+    // Case-SENSITIVE code shape with a required digit — /i would let an
+    // uppercase word like "STATED" pass for a DoDAAC.
+    assertionRe: /D[oO]DAAC[\s\S]{0,30}?\b[A-Z](?=[A-Z0-9]*\d)[A-Z0-9]{5}\b/,
+  },
+  {
+    id: "fob",
+    subjectRe: /\bfob\b/i,
+    assertionRe: /\bfob\b[\s\S]{0,15}?(?:origin|destination|government|contractor)/i,
+  },
 ];
 
 function titleDefinesAcronym(subject: string, title: string): string | null {

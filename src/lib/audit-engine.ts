@@ -3523,6 +3523,16 @@ export async function runAuditV2(pdfBuffer: Buffer, external?: ExternalBoundFact
     facts.naicsCode ? `NAICS ${facts.naicsCode}` : null,
     facts.setAside ? `set-aside: ${facts.setAside}` : null,
     facts.offerDueDate ? `responses due ${facts.offerDueDate}` : null,
+    // FA-143 — §03 CLINs and the Section-F delivery table render in the
+    // report; their dates/DoDAACs/FOB terms are assertions a delivery hedge
+    // can contradict.
+    ...facts.clins.flatMap((c) => [c.lineItem, c.description]),
+    ...facts.delivery.flatMap((d) => [
+      d.deliveryDate ? `required delivery ${d.deliveryDate}` : null,
+      d.dodaac ? `DoDAAC ${d.dodaac}` : null,
+      d.fobType ? `FOB ${d.fobType}` : null,
+      d.shipToAddress,
+    ]),
   ];
   if (!["unknown", "wrong_doc", "metadata_only"].includes(judgment.documentClassification.type)) {
     fa141Assertions.push(`document type: ${judgment.documentClassification.type}`);
