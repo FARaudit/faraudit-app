@@ -12,7 +12,8 @@
 // route pre-attributed at enqueue time under the user's RLS session.
 
 import { createClient } from "@supabase/supabase-js";
-import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
+import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/audit-executor";
+import { isAnthropicTransient } from "@/lib/anthropic-files";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { MAX_PDF_BYTES } from "@/lib/validators";
@@ -332,6 +333,23 @@ async function processOne(row: UserPendingRow): Promise<void> {
     console.log(`[audit-worker] done ${label} · ${result.recommendation} · score=${result.compliance_score} · ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
+    // FA-147 — transient Anthropic failure (5xx exhaust on upload or any
+    // engine call) or a structurally collapsed run: RELEASE the claim via the
+    // FA-149 path instead of failing. The replacement attempt re-runs it;
+    // attempts+1 means the poison-pill cap (3) naturally bounds retries
+    // against a long outage. The reason lands on the pending_audits row —
+    // diagnosable without log archaeology. The audits row stays 'processing'
+    // (report page keeps waiting); the cap path fails both if it triggers.
+    const mode = decideRunFailureMode(err);
+    if (mode === "release") {
+      const marker = err instanceof DegradedRunError ? "degraded_run_shape" : "anthropic_5xx_degraded";
+      console.error(`[audit-worker] ${marker} ${label}: ${message} — releasing claim for re-run`);
+      const released = await releaseClaim(row, `${marker}: ${message.slice(0, 400)}`);
+      if (released) return;
+      // Release failed twice — fall through to the loud terminal path rather
+      // than leave the row in limbo.
+      console.error(`[audit-worker] release failed for ${row.id} — falling back to terminal failure`);
+    }
     console.error(`[audit-worker] failed ${label}: ${message}`);
     // Best-effort: flip the audits row too so the report page exits its
     // wait state. AuditPersistError lands here as well — in the worker
@@ -348,6 +366,17 @@ async function processOne(row: UserPendingRow): Promise<void> {
     if (beat) clearInterval(beat);
     if (inFlightRow?.id === row.id) inFlightRow = null;
   }
+}
+
+// FA-147 — failure routing. 'release' = transient upstream (Anthropic 5xx
+// exhaust) or structurally collapsed output: re-runnable, so the claim goes
+// back to pending (bounded by the FA-149 attempt cap). 'fail' = everything
+// else (bad input, SAM 404, persist errors): a re-run would hit the same
+// wall, so fail terminally. Exported for the FA-147 gate suite.
+export function decideRunFailureMode(err: unknown): "release" | "fail" {
+  if (err instanceof DegradedRunError) return "release";
+  if (isAnthropicTransient(err)) return "release";
+  return "fail";
 }
 
 async function markFailed(id: string, message: string): Promise<void> {
@@ -418,6 +447,11 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
           pdfSource = "sam_text_extracted";
         }
       } catch (err) {
+        // FA-147 — a transient Anthropic failure (Files API 503 on the
+        // oversize-PDF upload arm) is NOT "document unavailable". Laundering
+        // it into pdfUnavailableReason shipped a794ca3b as a complete
+        // metadata-only audit. Rethrow so processOne releases the claim.
+        if (isAnthropicTransient(err)) throw err;
         pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
       }
     } else {

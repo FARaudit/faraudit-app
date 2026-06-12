@@ -34,6 +34,41 @@ export class AuditPersistError extends Error {
   }
 }
 
+// FA-147 — a structurally collapsed run must never persist as complete.
+export class DegradedRunError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DegradedRunError";
+  }
+}
+
+// FA-147 — minimum-shape assertion, the net for degradation modes we haven't
+// met yet. THRESHOLD RATIONALE: this is deliberately the UNAMBIGUOUS
+// structural floor — each of the three call outputs must exist as parsed,
+// non-empty JSON. callWithRetry already retried (Sonnet → Opus escalation)
+// before falling back to {}, so an empty object here means BOTH models failed
+// to produce parseable output for that call: never a legitimate product, on
+// any arm (full-doc, image, text, and the deliberate metadata-only path all
+// populate all three). Anything stricter — minimum risk counts, clause-list
+// floors, checklist lengths — would be a PRODUCT judgment about acceptable
+// thinness and is explicitly NOT made here (Brain call, per FA-147 filing).
+export function assertMinimumAuditShape(result: {
+  overview: { json: object | null };
+  compliance: { json: object | null };
+  risks: { json: object | null };
+}): void {
+  const collapsed: string[] = [];
+  for (const call of ["overview", "compliance", "risks"] as const) {
+    const j = result[call].json;
+    if (!j || typeof j !== "object" || Object.keys(j).length === 0) collapsed.push(call);
+  }
+  if (collapsed.length > 0) {
+    throw new DegradedRunError(
+      `degraded_run_shape: call output collapsed for [${collapsed.join(", ")}] — refusing to persist a thin report as complete`
+    );
+  }
+}
+
 export interface AuditExecutionInput {
   solicitation: Solicitation;
   agency: string | null;
@@ -75,6 +110,11 @@ export async function executeAudit(
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+
+  // FA-147 — refuse to persist a structurally collapsed run as complete.
+  // Throws DegradedRunError; the worker routes it to the FA-149 release path
+  // (re-run, bounded by the attempt cap), the sync route surfaces a failure.
+  assertMinimumAuditShape(result);
 
   // audit-engine 13f4743 emits score_confidence + is_not_solicitation on
   // the result root. Fold them into compliance_json so the renderer can

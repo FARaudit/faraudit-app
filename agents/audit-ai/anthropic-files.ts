@@ -29,6 +29,68 @@ import Anthropic, { toFile } from "@anthropic-ai/sdk";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 export const FILES_API_BETA = "files-api-2025-04-14";
 
+// ─── FA-147 · transient-failure taxonomy ────────────────────────────────────
+// A 503/529/overloaded from Anthropic is a CAPACITY DIP, not a property of
+// the solicitation — it must never be laundered into "document unavailable"
+// (the a794ca3b incident: Files API 503 'File storage is temporarily
+// unavailable' → pdfUnavailableReason → metadata-only audit shipped as
+// complete). Typed error + classifier so every layer can route transient
+// failures to the FA-149 release path instead of degrading the product.
+
+export class AnthropicTransientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnthropicTransientError";
+  }
+}
+
+// True for transient Anthropic upstream failures, wherever they surface:
+// - AnthropicTransientError (the typed exhaust from withAnthropicRetry)
+// - SDK errors carrying status 503/529 or the overloaded_error type
+// - audit-engine's raw-fetch throw format ("Claude API 503: …" / 529)
+// - the literal file-storage outage message from the a794ca3b incident
+export function isAnthropicTransient(err: unknown): boolean {
+  if (err instanceof AnthropicTransientError) return true;
+  const status = (err as { status?: unknown })?.status;
+  if (status === 503 || status === 529) return true;
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return (
+    /Claude API (503|529)\b/.test(msg) ||
+    /\boverloaded_error\b/i.test(msg) ||
+    /file storage is temporarily unavailable/i.test(msg)
+  );
+}
+
+// Bounded retry for transient 5xx. 3 attempts with 2s/4s backoff — the same
+// numbers the engine's Messages-call retry has used in production since the
+// 529 capacity dips of May 2026 (empirically enough for momentary dips). A
+// longer outage SHOULD exhaust here: the worker then releases the claim
+// (attempts+1) and the FA-149 poison-pill cap bounds total retries across
+// containers — the right place to absorb a multi-minute outage is the queue,
+// not a sleeping worker. backoffMs is parameterized for the test harness only.
+export async function withAnthropicRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  backoffMs: (attempt: number) => number = (a) => a * 2000
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isAnthropicTransient(err)) throw err;
+      if (attempt < 3) {
+        const waitMs = backoffMs(attempt);
+        console.warn(`[anthropic-files] ${label}: transient Anthropic failure attempt ${attempt}/3 — backing off ${waitMs}ms · ${err instanceof Error ? err.message.slice(0, 160) : err}`);
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+    }
+  }
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new AnthropicTransientError(`${label}: Anthropic transient failure persisted across 3 attempts — ${msg.slice(0, 300)}`);
+}
+
 let _client: Anthropic | null = null;
 function client(): Anthropic {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
@@ -53,10 +115,12 @@ export async function uploadPdfToFilesApi(
 ): Promise<UploadedPdf> {
   const name = filename && filename.trim() ? filename : "sam-document.pdf";
   const fileLike = await toFile(buffer, name, { type: "application/pdf" });
-  const result = await client().beta.files.upload({
-    file: fileLike,
-    betas: [FILES_API_BETA]
-  });
+  // FA-147 — retry transient 5xx; exhaust throws AnthropicTransientError so
+  // callers can never mistake a capacity dip for a missing document.
+  const result = await withAnthropicRetry(
+    () => client().beta.files.upload({ file: fileLike, betas: [FILES_API_BETA] }),
+    "files-api upload"
+  );
   return { fileId: result.id, sizeBytes: buffer.length };
 }
 

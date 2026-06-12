@@ -14,5 +14,9 @@ export {
   uploadPdfToFilesApi,
   deletePdfFromFilesApi,
   FILES_API_BETA,
+  // FA-147 — transient-failure taxonomy (typed error + classifier + retry)
+  AnthropicTransientError,
+  isAnthropicTransient,
+  withAnthropicRetry,
   type UploadedPdf
 } from "../../agents/audit-ai/anthropic-files";

@@ -1102,11 +1102,18 @@ async function callWithRetry(
   imageMediaType?: "image/jpeg" | "image/png" | null,
   pdfFileId?: string | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId);
+  // FA-147 — label the throw. callClaude's 5xx exhaust says "Claude API 503:"
+  // but not WHICH call died; the worker's release reason must be diagnosable
+  // from the pending_audits row alone. Prefix only — the substring the
+  // transient classifier matches ("Claude API 503/529") is preserved.
+  const labeled = (err: unknown): never => {
+    throw new Error(`[call:${label}] ${err instanceof Error ? err.message : String(err)}`);
+  };
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId).catch(labeled);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId).catch(labeled);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
