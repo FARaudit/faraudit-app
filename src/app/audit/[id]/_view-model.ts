@@ -1405,6 +1405,112 @@ function readEngineGateConditions(
   return out;
 }
 
+// ─── FA-153 · NAICS-appeal (OHA) deadline binding ────────────────────────────
+// The engine's appeal-action prose dates itself off whatever it saw — on
+// amended notices that is posted_date (latest version), which overstates the
+// 10-calendar-day OHA window (13 CFR 121.1103(b)(1)). Deterministically bind
+// every appeal-flavored action to audits.original_posted_date (or the
+// compliance_json.naics_appeal copy), honoring FAR 19.103(a)(1): the clock
+// restarts only for amendments that change the NAICS code or size standard.
+// Anchor unknown → say "verify issuance date on SAM.gov"; NEVER fall back to
+// posted_date (Rule 64 — no confident wrong dates).
+
+const NAICS_APPEAL_RE = /naics[\s-]+(?:code\s+)?appeal|office of hearings\s*(?:and|&)\s*appeals|\bOHA\b|121\.1103/i;
+
+interface NaicsAppealBinding {
+  originalIso: string;
+  anchorIso: string;
+  closeIso: string;
+  restarted: boolean;
+}
+
+function isoToUtcDate(iso: string): Date | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function deriveNaicsAppealBinding(
+  audit: AuditRow,
+  compJson: Record<string, unknown>
+): NaicsAppealBinding | null {
+  const ja = (compJson.naics_appeal ?? null) as {
+    original_posted_date?: unknown;
+    anchor_date?: unknown;
+    naics_changed_by_amendment?: unknown;
+  } | null;
+  const originalIso =
+    (typeof audit.original_posted_date === "string" && audit.original_posted_date) ||
+    (typeof ja?.original_posted_date === "string" && ja.original_posted_date) ||
+    null;
+  if (!originalIso) return null;
+  // Backfilled column without the JSON copy: anchor defaults to original
+  // issuance (no restart claimed — the conservative FAR 19.103(a)(1) read).
+  const anchorIso =
+    (typeof ja?.anchor_date === "string" && ja.anchor_date) || originalIso;
+  const anchor = isoToUtcDate(anchorIso);
+  if (!anchor) return null;
+  const close = new Date(anchor.getTime());
+  close.setUTCDate(close.getUTCDate() + 10);
+  return {
+    originalIso,
+    anchorIso,
+    closeIso: close.toISOString().slice(0, 10),
+    restarted: ja?.naics_changed_by_amendment === true
+  };
+}
+
+function rewriteNaicsAppealText(text: string, binding: NaicsAppealBinding | null): string {
+  if (!text || !NAICS_APPEAL_RE.test(text)) return text;
+  // Idempotent: the exec-actions fallback reuses risk actions this function
+  // already rewrote — the appended citation is the marker.
+  if (/121\.1103\(b\)\(1\)/.test(text)) return text;
+  // Scrub the wrong-deadline framing the engine tends to emit — the appeal
+  // clock is statutory, not the quote deadline.
+  let t = text
+    .replace(/before the response deadline(?:\s+of\s+\d{4}-\d{2}-\d{2})?/gi, "within the 10-day OHA window")
+    .trim();
+  if (!/[.!?]$/.test(t)) t += ".";
+  if (!binding) {
+    return `${t} Verify the original issuance date on SAM.gov before relying on any appeal deadline — the 10-calendar-day OHA window (13 CFR 121.1103(b)(1)) runs from issuance, and amendments that do not change the NAICS code or size standard do not restart it (FAR 19.103(a)(1)).`;
+  }
+  const closeDate = isoToUtcDate(binding.closeIso);
+  const closed = closeDate !== null && closeDate.getTime() < Date.now();
+  const clockNote = binding.restarted
+    ? `restarted by a NAICS-changing amendment posted ${fmtDayMonYear(isoToUtcDate(binding.anchorIso))}`
+    : `runs from original issuance ${fmtDayMonYear(isoToUtcDate(binding.originalIso))} — later amendments did not change the NAICS/size standard and do not restart it (FAR 19.103(a)(1))`;
+  return `${t} The 10-calendar-day OHA window (13 CFR 121.1103(b)(1)) ${clockNote}; it ${closed ? "closed" : "closes"} ${fmtDayMonYear(closeDate)}.`;
+}
+
+function bindNaicsAppealRiskActions(risks: Risk[], binding: NaicsAppealBinding | null): Risk[] {
+  return risks.map((r) =>
+    r.faraudit_action && NAICS_APPEAL_RE.test(r.faraudit_action)
+      ? { ...r, faraudit_action: rewriteNaicsAppealText(r.faraudit_action, binding) }
+      : r
+  );
+}
+
+function bindNaicsAppealExecActions(
+  actions: Array<{ when: string; text: string }>,
+  binding: NaicsAppealBinding | null
+): Array<{ when: string; text: string }> {
+  return actions.map((a) => {
+    if (!NAICS_APPEAL_RE.test(a.text)) return a;
+    const closeDate = binding ? isoToUtcDate(binding.closeIso) : null;
+    const closed = closeDate !== null && closeDate.getTime() < Date.now();
+    return {
+      // Deterministic "when": the statutory close date — never the engine's
+      // guess, never clamped to the quote deadline. Unknown or closed → no
+      // date chip; the rewritten text explains.
+      when: binding && closeDate && !closed
+        ? `By ${closeDate.getUTCDate()} ${MONTHS_SHORT[closeDate.getUTCMonth()]}`
+        : "",
+      text: rewriteNaicsAppealText(a.text, binding)
+    };
+  });
+}
+
 function deriveTimelineGates(
   audit: AuditRow,
   compJson: Record<string, unknown>,
@@ -2085,7 +2191,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
   // Compliance + risks
   const complianceFlags = mapComplianceFlags(compJson);
-  const risks = mapRisks(risksJson);
+  // FA-153 — appeal-flavored actions get their deadline math re-anchored to
+  // original issuance (or an honest "verify on SAM.gov" when unknown).
+  const naicsAppealBinding = deriveNaicsAppealBinding(audit, compJson);
+  const risks = bindNaicsAppealRiskActions(mapRisks(risksJson), naicsAppealBinding);
   const headlineRisk = pickHeadlineRisk(risks);
   const scoreFactors = deriveScoreFactors();
   const clinLineItems = mapClins(compJson, risks);
@@ -2289,7 +2398,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       if (Array.isArray(eng?.factors)) return (eng.factors as unknown[]).map((f) => sanitizeDisplayText(String(f)));
       return risks.slice(0, 3).map((r) => sanitizeDisplayText(r.title || r.description.slice(0, 100)));
     })(),
-    exec_actions: (() => {
+    exec_actions: bindNaicsAppealExecActions((() => {
       // FA-114: clamp generated action dates against responseDeadline. Engine
       // can emit "By 11 Jun" strings that exceed the deadline; the VM-derived
       // fallback can also overshoot when risks.length > days_remaining. In
@@ -2346,7 +2455,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
           text: sanitizeDisplayText(r.faraudit_action || r.title || r.description.slice(0, 160))
         };
       });
-    })(),
+    })(), naicsAppealBinding),
     exec_class: deriveExecClass(verdict.word),
 
     timeline_gates: deriveTimelineGates(audit, compJson, responseDeadline),

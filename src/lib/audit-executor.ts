@@ -25,6 +25,7 @@ import {
   type PdfSource,
   type ExternalBoundFacts
 } from "@/lib/audit-engine";
+import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -83,32 +84,59 @@ export async function executeAudit(
   // Also fold notice_type (from the SAM v2 Solicitation interface — e.g.
   // "Sources Sought", "Presolicitation", "Solicitation") so the view-
   // model's prelim-mode classifier can read it. No new column needed.
+  // FA-153 — capture the NAICS-appeal anchor from SAM version history.
+  // posted_date is the LATEST version's date (amendments overwrite it); the
+  // 10-day OHA clock runs from ORIGINAL issuance, restarting only for
+  // NAICS/size-standard amendments (FAR 19.103(a)(1)). Best-effort: failure
+  // yields nulls, and the view-model then says "verify issuance date on
+  // SAM.gov" — it never falls back to posted_date.
+  const appealAnchor = await fetchNaicsAppealAnchor(solicitation.noticeId).catch(() => UNKNOWN_ANCHOR);
+
   const persistedComplianceJson = {
     ...result.compliance.json,
     score_confidence: result.score_confidence ?? null,
     is_not_solicitation: result.is_not_solicitation ?? false,
-    notice_type: solicitation.type ?? null
+    notice_type: solicitation.type ?? null,
+    // FA-153 — JSON copy needs no migration; audits.original_posted_date is
+    // the queryable column once 20260612150000 is applied.
+    naics_appeal: {
+      original_posted_date: appealAnchor.originalPostedDate,
+      anchor_date: appealAnchor.anchorDate,
+      naics_changed_by_amendment: appealAnchor.naicsChangedByAmendment,
+      version_count: appealAnchor.versionCount,
+      fetched_at: new Date().toISOString()
+    }
   };
 
-  const { error: updateError } = await supabase
+  const completeUpdate = {
+    overview_summary: result.overview.summary,
+    overview_json: result.overview.json,
+    compliance_summary: result.compliance.summary,
+    compliance_json: persistedComplianceJson,
+    risks_summary: result.risks.summary,
+    risks_json: result.risks.json,
+    compliance_score: result.compliance_score,
+    recommendation: result.recommendation,
+    bid_recommendation: result.bid_recommendation,
+    document_type: result.classification.document_type,
+    document_type_rationale: result.classification.rationale,
+    document_type_confidence: result.classification.confidence,
+    status: "complete",
+    completed_at: new Date().toISOString()
+  };
+
+  let { error: updateError } = await supabase
     .from("audits")
-    .update({
-      overview_summary: result.overview.summary,
-      overview_json: result.overview.json,
-      compliance_summary: result.compliance.summary,
-      compliance_json: persistedComplianceJson,
-      risks_summary: result.risks.summary,
-      risks_json: result.risks.json,
-      compliance_score: result.compliance_score,
-      recommendation: result.recommendation,
-      bid_recommendation: result.bid_recommendation,
-      document_type: result.classification.document_type,
-      document_type_rationale: result.classification.rationale,
-      document_type_confidence: result.classification.confidence,
-      status: "complete",
-      completed_at: new Date().toISOString()
-    })
+    .update({ ...completeUpdate, original_posted_date: appealAnchor.originalPostedDate })
     .eq("id", auditId);
+
+  // PGRST204 = column not in schema cache — migration 20260612150000 not yet
+  // applied. Retry without the column so the audit still completes; the JSON
+  // copy in compliance_json.naics_appeal carries the same fact.
+  if (updateError && updateError.code === "PGRST204") {
+    console.warn("[FA-153] audits.original_posted_date missing (migration pending) — persisting JSON copy only");
+    ({ error: updateError } = await supabase.from("audits").update(completeUpdate).eq("id", auditId));
+  }
 
   if (updateError) {
     throw new AuditPersistError(updateError.message);
