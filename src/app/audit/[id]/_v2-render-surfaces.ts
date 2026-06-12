@@ -311,11 +311,19 @@ export function suppressContradictedConfidenceNotes(
             : []
         )
       : [];
+  // FA-143 — §05 renders from the V1 risks_json columns, and those rows can
+  // assert facts the shadow judgment's own risks hedge on (ROV: "6 weeks"
+  // schedule + DoDAAC codes live only in risk_findings while the shadow risk
+  // says "not confirmed"). The page-visible assertion must join the corpus,
+  // or the contradicted vnote survives beside it.
+  const risksJson = (audit.risks_json as Record<string, unknown> | null) ?? {};
   const assertions: Array<string | null | undefined> = [
     ...sjRisks.flatMap((r) => [r.title, r.description, r.mitigation, r.trapClause] as Array<string | null | undefined>),
     ...sjL02.flatMap((c) => [c.title, c.why_invisible, c.move] as Array<string | null | undefined>),
     ...rowStrings(comp.clins),
     ...rowStrings(comp.compliance_flags),
+    ...rowStrings(risksJson.risk_findings),
+    ...rowStrings(risksJson.prioritized_risks),
   ];
   const docClass = (sj.documentClassification as Record<string, unknown> | null) ?? {};
   if (typeof docClass.type === "string" && !["unknown", "wrong_doc", "metadata_only"].includes(docClass.type)) {
