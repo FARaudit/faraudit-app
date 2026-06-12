@@ -414,7 +414,7 @@ export function applyContradictionFilter<T extends FA113FilterTarget>(
 // ordering for temp-0 reproducibility. Built pre-LLM from the `solicitation`
 // payload (always in scope in runAudit), so context injection is free of any
 // circular dependency on the call results themselves.
-function buildV1FactsDigest(
+export function buildV1FactsDigest(
   solicitation: Record<string, unknown> | null,
   responseDeadline: Date | null
 ): string {
@@ -438,6 +438,16 @@ function buildV1FactsDigest(
   const title = pick("title");
   if (title) lines.push(`- title: ${title.slice(0, 120)}`);
   if (responseDeadline) lines.push(`- response_deadline: ${responseDeadline.toISOString().slice(0, 10)}`);
+  // FA-148 — the resolved notice text (provenance-labeled sam_description so
+  // claims citing it are traceable). Skipped when the field is still a
+  // noticedesc URL (fetch failed / pre-FA-148 caller) — a URL is not a fact.
+  // Sanitized: this is externally published prose, same injection surface as
+  // document text (solText runs through sanitizePdfText; this line must too).
+  const desc = pick("description");
+  if (desc && !/^https?:\/\//i.test(desc.trim())) {
+    const { sanitized } = sanitizePdfText(desc.slice(0, 1500));
+    lines.push(`- description (sam_description): ${sanitized}`);
+  }
   return lines.join("\n");
 }
 

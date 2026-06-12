@@ -26,6 +26,7 @@ import {
   type ExternalBoundFacts
 } from "@/lib/audit-engine";
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
+import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -95,7 +96,6 @@ export async function executeAudit(
   input: AuditExecutionInput
 ): Promise<AuditExecutionResult> {
   const {
-    solicitation,
     agency,
     pdfBuffer,
     pdfBase64,
@@ -107,6 +107,24 @@ export async function executeAudit(
     pdfSource,
     pdfUnavailableReason
   } = input;
+  let solicitation = input.solicitation;
+
+  // ━━ FA-148 — resolve the REAL notice description before any engine call ━━
+  // SAM v2 search hands us a noticedesc URL, not text. Resolving here (the
+  // single point both the sync route and the worker pass through) means the
+  // real text flows everywhere description already flows: solText for all
+  // engine calls + classifier (via JSON.stringify(solicitation)), the FA-113
+  // facts digest, and the V2 metadata arm's input.description. Best-effort:
+  // failure proceeds exactly as pre-FA-148 (URL-only), loudly marked below.
+  let resolvedDescription: ResolvedDescription | null = null;
+  if (isNoticedescUrl(solicitation.description)) {
+    resolvedDescription = await resolveSamDescription(solicitation.noticeId, solicitation.description);
+    if (resolvedDescription.fetched) {
+      solicitation = { ...solicitation, description: resolvedDescription.text };
+    } else {
+      console.warn(`[FA-148] description fetch failed for ${solicitation.noticeId} — proceeding URL-only: ${resolvedDescription.reason}`);
+    }
+  }
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
@@ -145,7 +163,14 @@ export async function executeAudit(
       naics_changed_by_amendment: appealAnchor.naicsChangedByAmendment,
       version_count: appealAnchor.versionCount,
       fetched_at: new Date().toISOString()
-    }
+    },
+    // FA-148 — description provenance, row-diagnosable: was the engine fed
+    // real notice text (sam_description) or did the fetch fail loudly
+    // (noticedesc_url_unfetched + reason)? null = field wasn't a noticedesc
+    // URL (PDF uploads, legacy inline text).
+    sam_description: resolvedDescription
+      ? { provenance: resolvedDescription.provenance, fetched: resolvedDescription.fetched, chars: resolvedDescription.chars, ...(resolvedDescription.reason ? { reason: resolvedDescription.reason } : {}) }
+      : null
   };
 
   const completeUpdate = {
