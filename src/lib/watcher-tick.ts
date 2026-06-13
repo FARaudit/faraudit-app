@@ -16,7 +16,7 @@
 // responsible for the gate (Bearer check inside the API route).
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { MAX_PDF_BYTES } from "@/lib/validators";
@@ -227,6 +227,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
         watcher_audited_at: new Date().toISOString()
       };
       const refreshedAgency = resolveAgency(solicitation) || row.agency;
+      const officeLeaf = resolveOfficeLeaf(solicitation); // FA-151
 
       const insertRow = {
         user_id: row.user_id,
@@ -234,6 +235,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
         solicitation_number: solicitation.solicitationNumber ?? row.solicitation_number ?? null,
         title: solicitation.title ?? row.title ?? null,
         agency: refreshedAgency,
+        office_leaf: officeLeaf,
         naics_code: solicitation.naicsCode ?? null,
         set_aside: solicitation.typeOfSetAside ?? null,
         posted_date: solicitation.postedDate ?? null,

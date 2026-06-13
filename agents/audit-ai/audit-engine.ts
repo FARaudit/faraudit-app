@@ -1549,7 +1549,7 @@ You are extracting FACTS from a federal solicitation. Output ONLY a JSON object 
 - summary (string): 2-3 sentence factual paraphrase of what is being procured. No verdicts, no recommendations.
 - scope (string): verbatim scope-of-work statement (or close paraphrase).
 - primary_objective (string): the core deliverable or outcome as stated.
-- customer (string): buying agency / program office name AS PRINTED (raw caps OK; downstream normalization is automated).
+- customer (string): buying agency / program office name AS PRINTED. Office symbols, contract numbers, and agency codes (e.g. "FA4800 633 CONS PKP") MUST be preserved in ALL CAPS exactly as they appear in the source document — NEVER title-case or lowercase them (emit "FA4800 633 CONS PKP", never "Fa4800 633 Cons Pkp"). Raw caps OK throughout; downstream normalization is automated.
 - contract_type (string): FFP, CPFF, CPIF, IDIQ, BPA, etc. Empty string "" if not stated.
 - ceiling_value_estimate (string or null): "$X-Y million" if stated; null if not.
 - period_of_performance (string): verbatim duration / start-end date range.

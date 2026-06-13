@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine";
@@ -316,6 +316,7 @@ export async function POST(req: NextRequest) {
       solicitation_number: solicitation.solicitationNumber,
       title: solicitation.title,
       agency,
+      office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,
@@ -463,6 +464,7 @@ async function enqueueAsyncAudit(args: {
       solicitation_number: solicitation.solicitationNumber,
       title: solicitation.title,
       agency,
+      office_leaf: resolveOfficeLeaf(solicitation), // FA-151
       naics_code: solicitation.naicsCode,
       set_aside: solicitation.typeOfSetAside,
       posted_date: solicitation.postedDate,

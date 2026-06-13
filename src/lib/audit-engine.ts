@@ -2228,7 +2228,7 @@ You are extracting FACTS from a federal solicitation. Output ONLY a JSON object 
 - summary (string): 2-3 sentence factual paraphrase of what is being procured. No verdicts, no recommendations.
 - scope (string): verbatim scope-of-work statement (or close paraphrase).
 - primary_objective (string): the core deliverable or outcome as stated.
-- customer (string): buying agency / program office name AS PRINTED (raw caps OK; downstream normalization is automated).
+- customer (string): buying agency / program office name AS PRINTED. Office symbols, contract numbers, and agency codes (e.g. "FA4800 633 CONS PKP") MUST be preserved in ALL CAPS exactly as they appear in the source document — NEVER title-case or lowercase them (emit "FA4800 633 CONS PKP", never "Fa4800 633 Cons Pkp"). Raw caps OK throughout; downstream normalization is automated.
 - contract_type (string): FFP, CPFF, CPIF, IDIQ, BPA, etc. Empty string "" if not stated.
 - ceiling_value_estimate (string or null): "$X-Y million" if stated; null if not.
 - period_of_performance (string): verbatim duration / start-end date range.
@@ -2266,7 +2266,7 @@ You are a compliance officer reading every page of this solicitation. Extract FA
 Output ONLY a JSON object with these keys — facts only, no severities or risk levels:
 
 - far_clauses (string[]): EVERY FAR clause cited (format: "52.212-1", "52.212-4", etc.). Scan ALL sections. Empty array ONLY if you have read every page and confirmed none are cited. Do not omit common clauses (52.212-1, 52.212-4, 52.232-33 are essentially universal — list when present).
-- dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.). Common trap clauses to look for explicitly: 252.204-7020 (SPRS / NIST SP 800-171 Assessment), 252.227-7025 (JCP / limited rights data), 252.225-7009 (specialty metals), 252.211-7003 (IUID), 252.225-7060 (Xinjiang), 252.204-7021 (CMMC) — list ANY that appear in the document.
+- dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.). Common trap clauses to look for explicitly: 252.204-7020 (SPRS score / NIST SP 800-171 DoD Assessment), 252.227-7025 (JCP / limited rights data), 252.225-7009 (specialty metals), 252.211-7003 (IUID), 252.225-7060 (Xinjiang), 252.204-7021 (CMMC) — list ANY that appear in the document.
 - required_certifications (string[]): EVERY certification / registration / compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
 - key_compliance_actions (string[]): verbatim required-action language for items a small business must complete to bid (e.g. "Submit past performance for similar contract value within last 3 years", "Complete representations 52.204-24 + 52.204-26").
 - set_aside_text (string or null): VERBATIM citation if the document explicitly states a set-aside — quote the literal sentence or clause reference (e.g. "100% small business set-aside" / "FAR 52.219-6 notice present" / "Block 10 box X checked"). null if no document text triggers a set-aside. (TS derives the enum value via regex on the full solText; this raw signal preserves the document's literal wording.)
@@ -2691,6 +2691,15 @@ JSON only — one key: risk_findings.`;
     const topTheme = topRisk ? (topRisk.category || "the top risk") : "the top compliance risk";
     bidCondition = `bid with caution — close ${topTheme} first.`;
   }
+  // FA-145: closed-doc branch. Once the response deadline has passed the
+  // solicitation can no longer be quoted, so action-now copy ("file the
+  // clarifications below before quoting", "clear ... before quoting") is
+  // incoherent. Override with retrospective/recompete framing. A future or
+  // unknown (null) deadline keeps the action-now language above unchanged.
+  const deadlineClosed = responseDeadline !== null && responseDeadline.getTime() < Date.now();
+  if (deadlineClosed) {
+    bidCondition = "this solicitation has closed — use this analysis for recompete preparation and incumbent benchmarking.";
+  }
   const execWhat = objectiveShort
     ? `${agencyShort} is buying ${objectiveShort} — ${bidCondition}`
     : `${agencyShort} — ${bidCondition}`;
@@ -2727,11 +2736,18 @@ JSON only — one key: risk_findings.`;
       return { when, text };
     });
 
+  // FA-145: a closed doc gets no future-dated "next 48 hours" task list —
+  // replace the action-now sequence with a single recompete-prep note so the
+  // exec summary stays coherent for retrospective/incumbent-benchmark reads.
+  const execActionsFinal: Array<{ when: string; text: string }> = deadlineClosed
+    ? [{ when: "Closed", text: "Response deadline has passed. Use this audit for recompete preparation and incumbent benchmarking ahead of the next cycle." }]
+    : execActions;
+
   complianceJson.executive_summary = {
     verdict: execVerdictWord,
     what: execWhat,
     factors: execFactors,
-    actions: execActions
+    actions: execActionsFinal
   };
 
   const topRisk = prioritized[0]?.text || risksJson.top_3_risks?.[0] || "—";

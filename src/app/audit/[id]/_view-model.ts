@@ -1775,6 +1775,29 @@ function deriveKoEmailCard(
 // sentence of the document-anchored description. Identical boilerplate tails
 // on every ask read as auto-generated filler to a CO.
 // W3 boundary-cap retained — never mid-word slice into the headline.
+// FA-152: a word-boundary cap (below) can leave the ask ending on a dangling
+// conjunction or preposition ("…provide the CSI source approval requirements
+// and"). Strip any trailing connective token(s) so the capped ask reads as a
+// complete clause before the ellipsis is appended.
+const TRAILING_CONNECTIVES = new Set<string>([
+  // coordinating conjunctions
+  "and", "or", "but", "nor", "for", "yet", "so",
+  // common prepositions / relativizers
+  "to", "of", "in", "on", "at", "by", "with", "from", "that", "which",
+]);
+function stripTrailingConnective(s: string): string {
+  let out = s.replace(/[\s,;:—-]+$/, "");
+  // Loop in case the cap left more than one trailing connective ("...and to").
+  for (;;) {
+    const m = out.match(/[\s,;:—-]+([A-Za-z]+)$/);
+    if (!m || !TRAILING_CONNECTIVES.has(m[1].toLowerCase())) break;
+    const stripped = out.slice(0, m.index).replace(/[\s,;:—-]+$/, "");
+    if (stripped.trim().length === 0) break; // never strip the clause to empty
+    out = stripped;
+  }
+  return out;
+}
+
 function riskToClarificationAsk(r: Risk): string {
   const title = (r.title || "").trim();
   const headline = title
@@ -1791,7 +1814,9 @@ function riskToClarificationAsk(r: Risk): string {
   if (firstSentence.length > 220) {
     const cut = firstSentence.slice(0, 219);
     const lastSpace = cut.lastIndexOf(" ");
-    descSentence = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—-]+$/, "") + "…";
+    const capped = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—-]+$/, "");
+    // FA-152: drop a dangling conjunction/preposition left by the word-boundary cap.
+    descSentence = stripTrailingConnective(capped) + "…";
   }
   return descSentence && descSentence.toLowerCase() !== headline.toLowerCase()
     ? `${anchor} — ${descSentence}`
@@ -2330,6 +2355,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     return `${n} gate${n === 1 ? "" : "s"} to clear before bid.`;
   })();
 
+  // FA-151: masthead identity prefers the SAM office leaf (persisted at
+  // ingestion via resolveOfficeLeaf) as the first line; the department ·
+  // service top-2 hierarchy drops to the agency_detail subnote. No leaf →
+  // prior behavior unchanged (identity = issuing/end-user or validated
+  // agency, empty subnote).
+  const officeLeaf = sanitizeDisplayText(audit.office_leaf as string) || "";
+  const topHierarchyAgency = validatedAgency(audit.agency, v2Meta?.agency);
+
   return {
     solicitation_number: displayId,
     audit_id_short: String(audit.id ?? "").slice(0, 8),
@@ -2344,8 +2377,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code "(AO)") across 5 independent runs while SAM's hierarchy says
     // "DLA AVIATION AT OKLAHOMA CITY". Doc-read strings may appear only via
     // the labeled issuing·end-user pair or when SAM has nothing.
-    agency: formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(audit.agency, v2Meta?.agency),
-    agency_sub: "",
+    agency: officeLeaf || (formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(audit.agency, v2Meta?.agency)),
+    agency_sub: officeLeaf ? topHierarchyAgency : "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
     // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived

@@ -11,6 +11,7 @@
 
 import type { ExtractedFacts, ClauseItem } from "../../../lib/section-extractors";
 import type { AuditRisk, AuditJudgment } from "../../../lib/audit-judgment";
+import { resolveClauseTitle } from "../../../lib/clause-titles";
 
 // ───────────────────────────────────────────────────────────────────────────
 // workStatement — §03-HEAD reveal (Cycle 2 v2)
@@ -165,20 +166,21 @@ export function matrixRollupReshape(clauses: ClauseItem[]): MatrixRollupReshaped
   const required: ClauseMatrixRow[] = [
     ...traps.map((c) => ({
       number: c.number,
-      title: c.title || "(title not extracted — verify in solicitation)",
+      // FA-150: static clause-title lookup before the honest placeholder.
+      title: c.title || resolveClauseTitle(c.number) || "(title not extracted — verify in solicitation)",
       badge: "trap" as const,
       trapReason: c.trapReason,
     })),
     ...fullText.map((c) => ({
       number: c.number,
-      title: c.title || "(title not extracted)",
+      title: c.title || resolveClauseTitle(c.number) || "(title not extracted)",
       badge: "required" as const,
       trapReason: null,
     })),
   ];
   const reference: ClauseMatrixRow[] = byRef.map((c) => ({
     number: c.number,
-    title: c.title || "(title not extracted)",
+    title: c.title || resolveClauseTitle(c.number) || "(title not extracted)",
     badge: "reference" as const,
     trapReason: null,
   }));

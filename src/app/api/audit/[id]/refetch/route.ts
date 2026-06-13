@@ -24,7 +24,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchSolicitationByNoticeId, resolveAgency } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { runAudit, type PdfSource } from "@/lib/audit-engine";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -220,6 +220,8 @@ export async function POST(
   };
 
   const refreshedAgency = resolveAgency(solicitation) || (audit.agency as string | null);
+  // FA-151: keep the prior leaf if SAM omits the full path on refetch.
+  const refreshedOfficeLeaf = resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null);
   const { error: updateError } = await supabase
     .from("audits")
     .update({
@@ -236,6 +238,7 @@ export async function POST(
       document_type_rationale: result.classification.rationale,
       document_type_confidence: result.classification.confidence,
       agency: refreshedAgency,
+      office_leaf: refreshedOfficeLeaf,
       title: solicitation.title ?? audit.title,
       response_deadline: solicitation.responseDeadLine ?? audit.response_deadline,
       status: "complete",

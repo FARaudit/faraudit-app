@@ -70,6 +70,26 @@ export function resolveAgency(s: {
   return cleaned.length > 0 ? cleaned.join(" · ") : null;
 }
 
+// FA-151 — office leaf. resolveAgency() keeps only the department · service
+// top-2 of fullParentPathName; the buying-office leaf below it (e.g. "DLA
+// AVIATION AT OKLAHOMA CITY, OK") is dropped. This returns that leaf so the
+// masthead can show the specific office as its identity first line, with the
+// top-2 hierarchy as the subnote. Returns null when there is no genuine leaf
+// below the top-2 (≤2 path segments → the leaf is already in the agency line)
+// or when SAM has no full path at all.
+export function resolveOfficeLeaf(s: {
+  fullParentPathName?: string | null;
+}): string | null {
+  const raw = s.fullParentPathName || null;
+  if (!raw || !raw.includes(".")) return null;
+  const segments = raw
+    .split(".")
+    .map((seg) => seg.replace(/\s*\([^)]*\)\s*$/, "").trim())
+    .filter(Boolean);
+  if (segments.length <= 2) return null;
+  return segments[segments.length - 1] || null;
+}
+
 // Host: sam.gov/api/prod, NOT api.sam.gov — the latter returns 404. See
 // agents/sam-ingest/sam-client.ts for the same fix applied to the cron.
 const SAM_SEARCH = "https://sam.gov/api/prod/opportunities/v2/search";
