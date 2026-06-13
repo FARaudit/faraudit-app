@@ -6,18 +6,45 @@
       "Edit",
       "Write",
       "Read",
-      "Bash(git:*)",
-      "Bash(npm:*)",
-      "Bash(npx:*)",
-      "Bash(node:*)",
-      "Bash(curl:*)",
-      "Bash(railway:*)",
-      "Bash(bash ~/faraudit-app/*)",
-      "Bash(grep:*)",
-      "Bash(sed:*)",
-      "Bash(cat:*)",
+
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+
       "Bash(ls:*)",
-      "Bash(tail:*)"
+      "Bash(cat:*)",
+      "Bash(sed:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(md5:*)",
+
+      "Bash(npx tsc:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx tsx:*)",
+      "Bash(node:*)",
+      "Bash(npm run:*)",
+
+      "Bash(cp:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+
+      "Bash(curl:*)",
+
+      "Bash(bash ~/faraudit-app/ceo/update-digest.sh:*)",
+      "Bash(bash ~/faraudit-app/scripts/security/fort-knox-scan.sh:*)",
+
+      "Bash(railway deployment list:*)",
+      "Bash(railway logs:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(vercel list:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
