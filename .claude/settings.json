@@ -14,6 +14,8 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash list:*)",
 
       "Bash(ls:*)",
       "Bash(cat:*)",
@@ -25,7 +27,22 @@
       "Bash(find:*)",
       "Bash(wc:*)",
       "Bash(md5:*)",
+      "Bash(jq:*)",
+      "Bash(awk:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(cut:*)",
+      "Bash(tr:*)",
+      "Bash(diff:*)",
+      "Bash(comm:*)",
 
+      "Bash(echo:*)",
+      "Bash(printf:*)",
+      "Bash(pwd:*)",
+      "Bash(env:*)",
+
+      "Bash(python3:*)",
+      "Bash(python:*)",
       "Bash(npx tsc:*)",
       "Bash(npx playwright:*)",
       "Bash(npx tsx:*)",
@@ -36,6 +53,11 @@
       "Bash(mkdir:*)",
       "Bash(touch:*)",
 
+      "Bash(sleep:*)",
+      "Bash(seq:*)",
+      "Bash(test -f:*)",
+      "Bash(test -d:*)",
+
       "Bash(curl:*)",
 
       "Bash(bash ~/faraudit-app/ceo/update-digest.sh:*)",
@@ -43,8 +65,12 @@
 
       "Bash(railway deployment list:*)",
       "Bash(railway logs:*)",
+      "Bash(railway status:*)",
+      "Bash(railway variables --kv:*)",
       "Bash(vercel inspect:*)",
-      "Bash(vercel list:*)"
+      "Bash(vercel list:*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel logs:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
