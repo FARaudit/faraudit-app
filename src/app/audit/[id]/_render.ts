@@ -619,6 +619,29 @@ function insertNotSolicitationBanner(html: string): string {
   );
 }
 
+// FA-137: CALL-3 DEGRADED banner — injected as the first child of §05 Risk
+// Register when compliance_json.call3.outcome === "collapsed". A collapsed
+// risks call must never render as a silently empty section. Red theme +
+// inline styles mirror the not-solicitation/expired banner pattern (no
+// template CSS touch); data-call3-degraded is the conformance hook.
+function insertCall3CollapsedBanner(html: string, note: string): string {
+  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--red-50),var(--card) 64%);border:1px solid var(--red-200);border-left:4px solid var(--red-700);border-radius:16px;box-shadow:var(--shadow);margin:0 0 18px";
+  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--red-700);color:#fff;display:grid;place-items:center";
+  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--red-700);margin:0 0 6px";
+  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  const banner = `
+        <section style="${bannerStyle}" role="status" data-call3-degraded aria-label="Risk register degraded">
+          <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+          <div style="min-width:0"><p style="${eyebrowStyle}">Risk register degraded</p><p style="${bodyStyle}">${escapeHtml(note)}</p></div>
+        </section>
+`;
+  // First child of §05 so the degradation is read before any risk rows.
+  return html.replace(
+    /(<section class="sec" id="sec-risks">)/,
+    `$1${banner}`
+  );
+}
+
 // FA-107: SOLICITATION CLOSED banner — injected above the recommendation card
 // when vm.is_expired (response_deadline has passed). Red theme mirrors the
 // amber not-solicitation banner pattern. The KO email card is suppressed
@@ -2011,6 +2034,14 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   //   2. is_unscored          → neutralize the gradient + render "—" / "Not
   //      yet scored" / upload-prompt subtext. No green/amber/red allowed.
   //   3. otherwise            → normal verdict colors + score/win-prob fill.
+  // FA-137 — call-3 degradation banner lands inside §05 before any other
+  // branch can strip/transform the section; on the not-solicitation branch
+  // §05 is removed wholesale below and the banner goes with it (correct —
+  // that branch has its own page-level banner).
+  if (vm.call3_collapsed) {
+    html = insertCall3CollapsedBanner(html, vm.call3_degradation_note);
+  }
+
   if (vm.is_not_solicitation) {
     html = removeVerdictBlock(html);
     html = insertNotSolicitationBanner(html);

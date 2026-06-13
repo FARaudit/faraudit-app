@@ -133,6 +133,12 @@ export interface AuditViewModel {
   // Renderer suppresses the verdict block + shows a warning banner instead.
   is_not_solicitation: boolean;
 
+  // FA-137 — call-3 (risks) collapsed after the full retry ladder
+  // (compliance_json.call3.outcome === "collapsed"). Renderer shows a loud
+  // degradation banner inside §05 — never a silently empty risk register.
+  call3_collapsed: boolean;
+  call3_degradation_note: string;
+
   // Fix 2 (2026-06-05 — Ruling 1 wiring). 'gate' when the engine emitted a
   // DECISION_GATE verdict (one or more credential/sole-source gates fired);
   // 'scored' otherwise. Renderer reads this to switch to the interactive
@@ -2370,6 +2376,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     score_display: score == null ? "—" : String(Math.round(score)),
     is_unscored: isUnscored,
     is_not_solicitation: isNotSolicitation,
+    // FA-137 — call-3 degradation surface. Reason stays internal (row JSON);
+    // the customer copy explains the state without engine jargon.
+    call3_collapsed: ((): boolean => {
+      const c3 = compJson.call3 as { outcome?: string } | undefined;
+      return c3?.outcome === "collapsed";
+    })(),
+    call3_degradation_note: ((): string => {
+      const c3 = compJson.call3 as { outcome?: string } | undefined;
+      return c3?.outcome === "collapsed"
+        ? "Risk analysis for this run is degraded: the risks engine call returned no structurally valid findings after both model attempts (call3_collapsed). The overview and compliance sections above are complete and reliable. Re-run this audit to generate the risk register."
+        : "";
+    })(),
     verdict_mode: verdictMode,
     // FA-144: engine-persisted gate rows when present, canonical VM-side
     // re-detection as the legacy-row fallback (hoisted above as gateConditions).

@@ -57,9 +57,14 @@ export function assertMinimumAuditShape(result: {
   overview: { json: object | null };
   compliance: { json: object | null };
   risks: { json: object | null };
+}, opts?: {
+  // FA-137 — when call-3 collapsed, the run completes WITH the explicit
+  // call3_collapsed marker + §05 banner instead of tripping this floor.
+  allowCollapsedRisks?: boolean;
 }): void {
   const collapsed: string[] = [];
-  for (const call of ["overview", "compliance", "risks"] as const) {
+  const calls = opts?.allowCollapsedRisks ? (["overview", "compliance"] as const) : (["overview", "compliance", "risks"] as const);
+  for (const call of calls) {
     const j = result[call].json;
     if (!j || typeof j !== "object" || Object.keys(j).length === 0) collapsed.push(call);
   }
@@ -132,7 +137,16 @@ export async function executeAudit(
   // FA-147 — refuse to persist a structurally collapsed run as complete.
   // Throws DegradedRunError; the worker routes it to the FA-149 release path
   // (re-run, bounded by the attempt cap), the sync route surfaces a failure.
-  assertMinimumAuditShape(result);
+  // FA-137 — call-3 collapse is EXEMPT from the generic floor: it completes
+  // WITH the explicit call3_collapsed marker + §05 degradation banner instead
+  // (overview + compliance are intact and customer-valuable; failing the
+  // whole run over the risks call would discard them — the marker makes the
+  // degradation loud, never silent). Overview/compliance collapse still
+  // throws here.
+  if (result.call3.outcome === "collapsed") {
+    console.error(`[FA-137] call3_collapsed for audit ${auditId} — persisting WITH degradation marker (not clean): ${result.call3.reason}`);
+  }
+  assertMinimumAuditShape(result, { allowCollapsedRisks: result.call3.outcome === "collapsed" });
 
   // audit-engine 13f4743 emits score_confidence + is_not_solicitation on
   // the result root. Fold them into compliance_json so the renderer can
@@ -170,7 +184,11 @@ export async function executeAudit(
     // URL (PDF uploads, legacy inline text).
     sam_description: resolvedDescription
       ? { provenance: resolvedDescription.provenance, fetched: resolvedDescription.fetched, chars: resolvedDescription.chars, ...(resolvedDescription.reason ? { reason: resolvedDescription.reason } : {}) }
-      : null
+      : null,
+    // FA-137 — call-3 outcome telemetry: {outcome: ok|retried_ok|collapsed,
+    // saved_by?, reason?}. The stress suite reads this per run; the view-model
+    // renders the §05 degradation banner when outcome === "collapsed".
+    call3: result.call3
   };
 
   const completeUpdate = {

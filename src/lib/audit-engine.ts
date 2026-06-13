@@ -861,6 +861,47 @@ export interface AuditResult {
   // (migration 012).
   model_used: string;
   retry_escalations: string[];
+  // FA-137 — call-3 outcome telemetry. ok = first attempt structurally valid;
+  // retried_ok = the retry ladder saved it (saved_by = the model that did);
+  // collapsed = ladder exhausted, no structurally valid risks output. The
+  // executor persists this to audits.compliance_json.call3 so the stress
+  // suite can read per-run call-3 health.
+  call3: Call3Outcome;
+}
+
+// FA-137 — call-3 (risks) outcome classification.
+export interface Call3Outcome {
+  outcome: "ok" | "retried_ok" | "collapsed";
+  saved_by?: string;
+  reason?: string;
+}
+
+// FA-137 — STRUCTURAL validity only, per Brain ruling: thinness thresholds
+// ("too few risks") are deferred and NOT implemented here. Invalid =
+// unparseable JSON (null), missing risk_findings array, empty array (the
+// Cycle-2 engine contract always emits findings — the risks prompt instructs
+// inferred findings even on thin sources, so [] is a collapse, not a
+// judgment), or every row lacking both title and text (schema-invalid).
+export function validateRisksJson(json: Record<string, unknown> | null): { valid: boolean; reason?: string } {
+  if (!json || typeof json !== "object") return { valid: false, reason: "unparseable or empty call-3 output" };
+  const rf = (json as RisksJSON).risk_findings;
+  if (!Array.isArray(rf)) return { valid: false, reason: "risk_findings missing or not an array" };
+  if (rf.length === 0) return { valid: false, reason: "risk_findings empty — engine contract requires findings on every arm" };
+  const invalidRows = rf.filter((r) => {
+    const row = r as { title?: unknown; text?: unknown } | null;
+    const title = typeof row?.title === "string" ? row.title.trim() : "";
+    const text = typeof row?.text === "string" ? row.text.trim() : "";
+    return !title && !text;
+  }).length;
+  if (invalidRows === rf.length) return { valid: false, reason: `all ${rf.length} risk_findings rows schema-invalid (no title or text)` };
+  return { valid: true };
+}
+
+// FA-137 — test hook: lets the forced-collapse gate inject call-3 raw text
+// per attempt without real model calls. Production never sets this.
+let _call3StubForTests: ((attempt: 1 | 2, model: string) => string) | null = null;
+export function __setCall3StubForTests(stub: typeof _call3StubForTests): void {
+  _call3StubForTests = stub;
 }
 
 export interface AuditInput {
@@ -1127,6 +1168,55 @@ async function callWithRetry(
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
+}
+
+// FA-137 — call-3 (risks) variant of callWithRetry with STRUCTURAL validation
+// driving the ladder, not just parseability. The 616efb58 class (unparseable
+// → Opus retry saves it) already worked; this hardens the two paths that
+// didn't: parseable-but-collapsed output (e.g. {"risk_findings":[]}) never
+// triggered the retry at all, and an Opus failure fell back to {} silently.
+// Ladder per standing model doctrine: Sonnet temp-0 → Opus
+// (CLAUDE_RETRY_MODEL). On exhaustion the run does NOT complete clean — the
+// executor persists call3.outcome="collapsed" and the report renders the §05
+// degradation banner. 5xx throws propagate unchanged (FA-147 release path).
+async function callRisksWithValidation(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number,
+  pdfBase64: string | null | undefined,
+  imageBase64?: string | null,
+  imageMediaType?: "image/jpeg" | "image/png" | null,
+  pdfFileId?: string | null
+): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean; call3: Call3Outcome }> {
+  const labeled = (err: unknown): never => {
+    throw new Error(`[call:risks] ${err instanceof Error ? err.message : String(err)}`);
+  };
+  const attempt = async (n: 1 | 2, model: string | undefined): Promise<string> =>
+    _call3StubForTests
+      ? _call3StubForTests(n, model ?? _activeModel ?? CLAUDE_MODEL)
+      : callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, model, imageBase64, imageMediaType, pdfFileId).catch(labeled);
+
+  const text1 = await attempt(1, undefined);
+  const json1 = extractJSON(text1);
+  const v1 = validateRisksJson(json1);
+  if (v1.valid) return { text: text1, json: json1, escalated: false, call3: { outcome: "ok" } };
+
+  console.warn(`[audit-engine] FA-137: call-3 structurally invalid on first attempt (${v1.reason}) · retrying with ${CLAUDE_RETRY_MODEL}`);
+  const text2 = await attempt(2, CLAUDE_RETRY_MODEL);
+  const json2 = extractJSON(text2);
+  const v2 = validateRisksJson(json2);
+  if (v2.valid) {
+    console.log(`[audit-engine] FA-137: call-3 saved by ${CLAUDE_RETRY_MODEL} (retried_ok)`);
+    return { text: text2, json: json2, escalated: true, call3: { outcome: "retried_ok", saved_by: CLAUDE_RETRY_MODEL } };
+  }
+
+  console.error(`[audit-engine] FA-137: call3_collapsed — ladder exhausted (attempt1: ${v1.reason} · attempt2 ${CLAUDE_RETRY_MODEL}: ${v2.reason}). Run will persist with loud degradation marker, NOT as clean.`);
+  return {
+    text: text2,
+    json: json2,
+    escalated: true,
+    call3: { outcome: "collapsed", reason: `attempt1: ${v1.reason} · attempt2 (${CLAUDE_RETRY_MODEL}): ${v2.reason}` }
+  };
 }
 
 function isDocumentType(v: unknown): v is DocumentType {
@@ -2227,12 +2317,13 @@ JSON only — one key: risk_findings.`;
       imageMediaType,
       pdfFileId
     ),
-    callWithRetry(
+    // FA-137 — risks uses the validation-driven ladder (structural checks
+    // decide the retry, not just parseability) and reports a Call3Outcome.
+    callRisksWithValidation(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
       risksPrompt,
       6000,
       pdfBase64,
-      "risks",
       imageBase64,
       imageMediaType,
       pdfFileId
@@ -2687,7 +2778,10 @@ JSON only — one key: risk_findings.`;
       overviewResult.escalated ? "overview" : null,
       complianceResult.escalated ? "compliance" : null,
       risksResult.escalated ? "risks" : null
-    ].filter((x): x is string => x !== null)
+    ].filter((x): x is string => x !== null),
+    // FA-137 — call-3 outcome telemetry (persisted by the executor to
+    // audits.compliance_json.call3).
+    call3: risksResult.call3
   };
   } finally {
     if (pdfFileId) {
