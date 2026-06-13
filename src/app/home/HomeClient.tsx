@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
+import { isPieeUrl, getPieeInstructions } from "@/lib/piee-detector";
 import type {
   HeaderCounter,
   OpportunityRow,
@@ -1037,9 +1038,11 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
 
                       const isHovered = hoveredRowId === r.row.notice_id;
+                      // FA-PIEE-01: PIEE-hosted solicitations can't be auto-fetched.
+                      const isPiee = isPieeUrl(r.row.pdf_url ?? "");
                       return (
+                        <Fragment key={r.row.id}>
                         <div
-                          key={r.row.id}
                           onMouseEnter={() => setHoveredRowId(r.row.notice_id)}
                           onMouseLeave={() => setHoveredRowId((curr) => curr === r.row.notice_id ? null : curr)}
                           style={{
@@ -1051,6 +1054,9 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         >
                           <span onClick={onOpenAudit} title={r.row.title || displaySolicitationId(r.row)} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--gold)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{displaySolicitationId(r.row)}</span>
                           <div onClick={onOpenAudit} title={r.row.title || ""} style={{ display: "flex", flexDirection: "column", gap: 1, overflow: "hidden", cursor: "pointer", minWidth: 0 }}>
+                            {isPiee && (
+                              <span style={{ alignSelf: "flex-start", fontSize: 8, background: "rgba(168,85,247,.15)", color: "#C084FC", padding: "1px 5px", borderRadius: 2, marginBottom: 2, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: ".08em", lineHeight: 1, flexShrink: 0 }} title="Hosted on PIEE — manual download + upload required">PIEE</span>
+                            )}
                             {r.row.title_plain ? (
                               <>
                                 <div style={{ display: "flex", alignItems: "baseline", overflow: "hidden" }}>
@@ -1119,6 +1125,14 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             );
                           })()}
                         </div>
+                        {/* FA-PIEE-01: manual-upload instruction on hover for PIEE-gated rows. */}
+                        {isPiee && isHovered && (
+                          <div style={{ padding: "6px 12px 9px 140px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 8, background: "rgba(168,85,247,.04)" }}>
+                            <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", padding: "1px 5px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5 }}>{getPieeInstructions()}</span>
+                          </div>
+                        )}
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -1380,6 +1394,47 @@ interface RunAuditPrefill {
 
 type RunAuditMode = "notice" | "pdf";
 
+// FA-118 — classify an audit fetch failure into one of three customer-facing
+// states instead of surfacing one generic error for everything:
+//   • piee     — the attempted document is PIEE-gated (badge + manual-upload
+//                instruction; NO generic error copy)
+//   • rejected — 422 / document rejected or ungettable (auth-walled, missing)
+//   • network  — connection / timeout class failure
+// Anything unclassified falls back to the prior generic message (with the
+// existing "try the PDF upload" hint for notice-mode fetch failures), so no
+// real failure mode goes dark.
+function classifyAuditError(
+  reason: string,
+  httpStatus: number | undefined,
+  mode: RunAuditMode
+): { kind: "piee" | "rejected" | "network" | "other"; message: string } {
+  if (isPieeUrl(reason)) {
+    return { kind: "piee", message: getPieeInstructions() };
+  }
+  if (
+    httpStatus === 422 ||
+    /\b(401|403|404)\b|reject|not\s*fetchable|ungettable|forbidden|unauthor|require[sd]?\s+(authentication|login|sign[-\s]?in|credential)/i.test(reason)
+  ) {
+    return {
+      kind: "rejected",
+      message:
+        "FARaudit couldn't retrieve this document. The link may require authentication or the file is unavailable.",
+    };
+  }
+  if (/network|timeout|timed\s*out|ETIMEDOUT|ECONN|EAI_AGAIN|failed\s+to\s+fetch|connection|socket|aborted/i.test(reason)) {
+    return {
+      kind: "network",
+      message: "Connection failed. Check your network and try again.",
+    };
+  }
+  const fetchClass = /fetch|download|resource|sam|pdf|unavailable|timeout/i.test(reason);
+  const hint =
+    fetchClass && mode === "notice"
+      ? " Try uploading the solicitation PDF directly — SAM.gov attachments aren't always retrievable."
+      : "";
+  return { kind: "other", message: `Audit failed: ${reason}.${hint}` };
+}
+
 function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAuditPrefill | null; active?: boolean; onPrefillClear?: () => void }) {
   const router = useRouter();
   // Architectural mutual exclusion: user picks a mode FIRST, only that mode's
@@ -1392,6 +1447,9 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   const [pdf, setPdf] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // FA-118 — true when the failure is PIEE-gated; renders the badge + manual-
+  // upload instruction instead of generic error copy.
+  const [pieeGated, setPieeGated] = useState(false);
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
   // FA-116 — progress copy while an async-enqueued audit (202) is polled.
   const [queuedNote, setQueuedNote] = useState<string | null>(null);
@@ -1433,9 +1491,24 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     if (next === "notice") setPdf(null);
     else setNoticeId("");
     setError(null);
+    setPieeGated(false);
     setResult(null);
     setMode(next);
   }
+
+  // FA-118 — classify a failure reason and route it to the right surface:
+  // PIEE-gated → badge + manual-upload instruction (no generic copy); else a
+  // single, specific error string.
+  const applyAuditError = (reason: string, httpStatus?: number) => {
+    const cls = classifyAuditError(reason, httpStatus, mode);
+    if (cls.kind === "piee") {
+      setPieeGated(true);
+      setError(null);
+    } else {
+      setPieeGated(false);
+      setError(cls.message);
+    }
+  };
 
   // FA-116 — poll loop for async-enqueued audits. The server returned 202
   // before the engine ran; we poll /api/audit/[id]/status every 4s until the
@@ -1463,13 +1536,10 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       }
       if (status.status === "failed") {
         setQueuedNote(null);
-        const reason = status.error_message || "unknown error";
-        const fetchClass = /fetch|download|resource|sam|pdf|unavailable|timeout/i.test(reason);
-        throw new Error(
-          `Audit failed: ${reason}.${fetchClass && mode === "notice"
-            ? " Try uploading the solicitation PDF directly — SAM.gov attachments aren't always retrievable."
-            : ""}`
-        );
+        // FA-118 — three-way split (PIEE / rejected / network) replaces the
+        // single generic "Audit failed" string.
+        applyAuditError(status.error_message || "unknown error");
+        return;
       }
       if (Date.now() - started > 8 * 60 * 1000) {
         setQueuedNote("Still running — large solicitations can take a while. You can leave this page; the finished report will appear in Past Audits.");
@@ -1479,7 +1549,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null); setResult(null); setQueuedNote(null);
+    setError(null); setPieeGated(false); setResult(null); setQueuedNote(null);
     if (mode === "notice" && !noticeId) { setError("Paste a SAM Notice ID."); return; }
     if (mode === "pdf" && !pdf) { setError("Select a PDF to upload."); return; }
     setSubmitting(true);
@@ -1489,7 +1559,11 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       else if (pdf) fd.set("pdf", pdf);
       const res = await fetch("/api/audit", { method: "POST", body: fd });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || `audit failed (${res.status})`);
+      if (!res.ok) {
+        // FA-118 — classify by HTTP status + server reason (422 / PIEE / network).
+        applyAuditError(json.error || `audit failed (${res.status})`, res.status);
+        return;
+      }
       if (res.status === 202 && json.auditId) {
         // FA-116 async path — flag-on servers enqueue and 202 immediately.
         await pollUntilDone(json.auditId as string, (json.solicitationNumber as string | null) ?? null);
@@ -1505,7 +1579,8 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
         setTimeout(() => router.push(dest), 800);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // Reaches here on a client-side network failure talking to /api/audit.
+      applyAuditError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
     }
@@ -1627,8 +1702,15 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
           <span className="af">IFB</span><span className="af">Sources Sought</span><span className="af">Pre-Sol Synopsis</span>
           <span className="af">Task Order</span><span className="af">Modification</span>
         </div>
-        {error && <div className="audit-error">{error}</div>}
-        {queuedNote && !error && <div className="audit-success">⟳ {queuedNote}</div>}
+        {/* FA-118 — PIEE-gated failure: badge + manual-upload instruction, no generic error copy. */}
+        {pieeGated && (
+          <div className="audit-error" style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left" }}>
+            <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", padding: "2px 6px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
+            <span>{getPieeInstructions()}</span>
+          </div>
+        )}
+        {error && !pieeGated && <div className="audit-error">{error}</div>}
+        {queuedNote && !error && !pieeGated && <div className="audit-success">⟳ {queuedNote}</div>}
         {result && (
           <div className="audit-success">
             ✓ Audit complete · {result.auditId}
