@@ -70,16 +70,50 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ━━ Parse multipart body ━━
-  let formData: FormData;
-  try {
-    formData = await req.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+  // ━━ Parse body — two shapes (FA-122) ━━
+  //   • multipart/form-data { noticeId?, pdf? } — original path: SAM Notice IDs
+  //     and direct PDF uploads up to Vercel's ~4.5MB request-body limit.
+  //   • application/json { noticeId? | solicitation_number?, storage_path? } —
+  //     large-PDF path: the client uploads the file straight to Supabase
+  //     Storage (bucket "audit-pdfs") and sends only its path, so a 52MB IDIQ
+  //     never crosses the Vercel request-body limit. Bytes are pulled
+  //     server-side via the service role below.
+  const contentType = req.headers.get("content-type") || "";
+  let noticeIdRaw = "";
+  let pdf: File | null = null;
+  let storagePathInput: string | null = null;
+
+  if (contentType.includes("application/json")) {
+    let body: { noticeId?: string; solicitation_number?: string; storage_path?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    noticeIdRaw = String(body.noticeId || body.solicitation_number || "");
+    storagePathInput = body.storage_path ? String(body.storage_path) : null;
+  } else {
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+    }
+    noticeIdRaw = String(formData.get("noticeId") || "");
+    const pdfEntry = formData.get("pdf");
+    if (pdfEntry instanceof File && pdfEntry.size > 0) {
+      const pdfResult = pdfFileSchema.safeParse(pdfEntry);
+      if (!pdfResult.success) {
+        return NextResponse.json(
+          { error: pdfResult.error.issues[0]?.message || "Invalid PDF" },
+          { status: 400 }
+        );
+      }
+      pdf = pdfResult.data;
+    }
   }
 
   // ━━ Validate notice ID with zod ━━
-  const noticeIdRaw = String(formData.get("noticeId") || "");
   const noticeIdResult = noticeIdSchema.safeParse(noticeIdRaw);
   if (!noticeIdResult.success) {
     return NextResponse.json(
@@ -89,48 +123,68 @@ export async function POST(req: NextRequest) {
   }
   const noticeId = noticeIdResult.data;
 
-  // ━━ Validate PDF (zod) ━━
-  const pdfEntry = formData.get("pdf");
-  let pdf: File | null = null;
-  if (pdfEntry instanceof File && pdfEntry.size > 0) {
-    const pdfResult = pdfFileSchema.safeParse(pdfEntry);
-    if (!pdfResult.success) {
-      return NextResponse.json(
-        { error: pdfResult.error.issues[0]?.message || "Invalid PDF" },
-        { status: 400 }
-      );
-    }
-    pdf = pdfResult.data;
-  }
-
-  if (!noticeId && !pdf) {
-    return NextResponse.json({ error: "noticeId or pdf required" }, { status: 400 });
-  }
-
-  // ━━ Hard byte cap (defense in depth — zod already checked) ━━
-  if (pdf && pdf.size > MAX_PDF_BYTES) {
-    return NextResponse.json(
-      { error: `PDF exceeds ${MAX_PDF_BYTES / 1024 / 1024}MB limit` },
-      { status: 413 }
-    );
-  }
-
-  // ━━ Magic-byte verification ━━
-  // Defends against rename attacks (e.g. evil.exe.pdf with image/jpeg MIME).
+  // ━━ Resolve PDF bytes from whichever arm supplied them ━━
   let pdfBuffer: Buffer | null = null;
   // safeName is hoisted above the Files API upload path so the filename is
   // available both for that upload (passes a real name to Anthropic) and for
   // the synthesized solicitation block below.
   let safeName: string | null = null;
-  if (pdf) {
+
+  // FA-122 — storage arm. storage_path is attacker-controlled and the download
+  // runs with the service role, which BYPASSES storage RLS — so we must confirm
+  // the path is in the caller's own namespace before fetching. Without this any
+  // authenticated user could audit another user's document by guessing its path
+  // (IDOR). Client uploads are keyed "uploads/<user.id>/<file>"; enforce that.
+  if (storagePathInput) {
+    const ownerPrefix = `uploads/${user.id}/`;
+    if (!storagePathInput.startsWith(ownerPrefix) || storagePathInput.includes("..")) {
+      return NextResponse.json(
+        { error: "storage_path is outside your upload namespace" },
+        { status: 403 }
+      );
+    }
+    const adminForDownload = getAdminClient();
+    if (!adminForDownload) {
+      return NextResponse.json({ error: "Storage client unavailable" }, { status: 503 });
+    }
+    const { data: blob, error: dlErr } = await adminForDownload.storage
+      .from("audit-pdfs")
+      .download(storagePathInput);
+    if (dlErr || !blob) {
+      return NextResponse.json(
+        { error: "Stored PDF not found — re-upload and try again." },
+        { status: 404 }
+      );
+    }
+    pdfBuffer = Buffer.from(await blob.arrayBuffer());
+    safeName = sanitizeFilename(storagePathInput.split("/").pop() || "upload.pdf");
+  }
+
+  // ━━ Multipart PDF arm (≤ Vercel request-body limit) ━━
+  if (!pdfBuffer && pdf) {
     pdfBuffer = Buffer.from(await pdf.arrayBuffer());
+    safeName = sanitizeFilename(pdf.name);
+  }
+
+  if (!noticeId && !pdfBuffer) {
+    return NextResponse.json({ error: "noticeId or pdf required" }, { status: 400 });
+  }
+
+  // ━━ Hard byte cap + magic-byte verification (shared by both PDF arms) ━━
+  // Magic-byte check defends against rename attacks (evil.exe.pdf w/ spoofed MIME).
+  if (pdfBuffer) {
+    if (pdfBuffer.length > MAX_PDF_BYTES) {
+      return NextResponse.json(
+        { error: `PDF exceeds ${MAX_PDF_BYTES / 1024 / 1024}MB limit` },
+        { status: 413 }
+      );
+    }
     if (!isPdfMagicValid(pdfBuffer)) {
       return NextResponse.json(
         { error: "File is not a valid PDF (magic bytes mismatch)" },
         { status: 400 }
       );
     }
-    safeName = sanitizeFilename(pdf.name);
   }
 
   // ━━ Build solicitation source ━━

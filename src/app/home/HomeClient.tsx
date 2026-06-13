@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { isPieeUrl, getPieeInstructions } from "@/lib/piee-detector";
+import { createBrowserClient } from "@/lib/supabase-browser";
+import { STORAGE_UPLOAD_THRESHOLD_BYTES } from "@/lib/validators";
 import type {
   HeaderCounter,
   OpportunityRow,
@@ -1554,10 +1556,43 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     if (mode === "pdf" && !pdf) { setError("Select a PDF to upload."); return; }
     setSubmitting(true);
     try {
-      const fd = new FormData();
-      if (mode === "notice") fd.set("noticeId", noticeId);
-      else if (pdf) fd.set("pdf", pdf);
-      const res = await fetch("/api/audit", { method: "POST", body: fd });
+      // FA-122 — PDFs at/above the Vercel request-body limit (~4.5MB) can't go
+      // through multipart /api/audit; upload them straight to Supabase Storage
+      // and POST only the storage path as JSON. Notice IDs + smaller PDFs keep
+      // the original multipart path.
+      let res: Response;
+      if (mode === "pdf" && pdf && pdf.size >= STORAGE_UPLOAD_THRESHOLD_BYTES) {
+        setQueuedNote("Large file — uploading securely to storage…");
+        const sb = createBrowserClient();
+        const { data: { user: u } } = await sb.auth.getUser();
+        if (!u) {
+          setQueuedNote(null);
+          setError("Your session expired — sign in again to upload.");
+          setSubmitting(false);
+          return;
+        }
+        const key = `uploads/${u.id}/${Date.now()}-${pdf.name.replace(/[^\w.-]/g, "_")}`;
+        const up = await sb.storage.from("audit-pdfs").upload(key, pdf, {
+          contentType: "application/pdf",
+          upsert: false,
+        });
+        setQueuedNote(null);
+        if (up.error) {
+          applyAuditError(`storage upload failed: ${up.error.message}`);
+          setSubmitting(false);
+          return;
+        }
+        res = await fetch("/api/audit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ storage_path: key }),
+        });
+      } else {
+        const fd = new FormData();
+        if (mode === "notice") fd.set("noticeId", noticeId);
+        else if (pdf) fd.set("pdf", pdf);
+        res = await fetch("/api/audit", { method: "POST", body: fd });
+      }
       const json = await res.json();
       if (!res.ok) {
         // FA-118 — classify by HTTP status + server reason (422 / PIEE / network).

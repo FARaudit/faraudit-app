@@ -8,6 +8,13 @@ import { z } from "zod";
 // the maximum acceptable PDF size.
 export const MAX_PDF_BYTES = 500 * 1024 * 1024; // 500 MB (Anthropic Files API cap)
 
+// FA-122 — Vercel serverless functions reject request bodies above ~4.5MB
+// with a 413 before the route handler runs. PDFs at or above this threshold
+// must NOT be sent through the multipart /api/audit path; the client uploads
+// them straight to Supabase Storage and posts only the storage path. Set a
+// conservative 4MB trigger to stay clear of the hard ceiling.
+export const STORAGE_UPLOAD_THRESHOLD_BYTES = 4 * 1024 * 1024; // 4 MB
+
 // Notice IDs from SAM.gov are alphanumeric with optional hyphens (and sometimes
 // dots in solicitation numbers — accept hyphens only per spec). Empty allowed
 // when the user is uploading a PDF without a SAM.gov reference.
