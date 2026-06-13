@@ -619,6 +619,28 @@ function insertNotSolicitationBanner(html: string): string {
   );
 }
 
+// FA-136: PARTIAL INGESTION banner — page-level (above the rpt-grid, same
+// anchor as the not-solicitation/expired banners) when the multi-attachment
+// document set was only partially ingested or the form couldn't be
+// identified. Amber: the audit is real but its input set is incomplete —
+// a different severity class than FA-137's red §05 collapse.
+function insertIngestionBanner(html: string, note: string): string {
+  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);margin:18px 0";
+  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--amber-600);color:#fff;display:grid;place-items:center";
+  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin:0 0 6px";
+  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  const banner = `
+      <section style="${bannerStyle}" role="status" data-ingestion-incomplete aria-label="Document set partially ingested">
+        <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div style="min-width:0"><p style="${eyebrowStyle}">Document set partially ingested</p><p style="${bodyStyle}">${escapeHtml(note)}</p></div>
+      </section>
+`;
+  return html.replace(
+    /(<div class="rpt-grid">)/,
+    `${banner}      $1`
+  );
+}
+
 // FA-137: CALL-3 DEGRADED banner — injected as the first child of §05 Risk
 // Register when compliance_json.call3.outcome === "collapsed". A collapsed
 // risks call must never render as a silently empty section. Red theme +
@@ -2040,6 +2062,11 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // that branch has its own page-level banner).
   if (vm.call3_collapsed) {
     html = insertCall3CollapsedBanner(html, vm.call3_degradation_note);
+  }
+  // FA-136 — partial-ingestion flag (amber, page-level). Renders alongside
+  // §05 content; suppressed wholesale on the not-solicitation branch below.
+  if (vm.ingestion_incomplete) {
+    html = insertIngestionBanner(html, vm.ingestion_note);
   }
 
   if (vm.is_not_solicitation) {

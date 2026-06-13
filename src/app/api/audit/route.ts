@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
+import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -213,6 +214,10 @@ export async function POST(req: NextRequest) {
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
+  // FA-136 — multi-attachment plan outputs (SAM arm only).
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  let primaryDocName: string | null = null;
+  let ingestion: IngestionMeta | null = null;
 
   if (pdfBuffer) {
     if (pdfBuffer.length > PDF_FILES_API_THRESHOLD_BYTES) {
@@ -225,6 +230,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
+    // FA-136 — deterministic form-first multi-attachment assembly (mirrors
+    // the worker arm). Manifest failure or no ingestible primary falls
+    // through to the legacy single-URL path unchanged.
+    if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+      const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+      if (assembled?.primary) {
+        pdfBase64 = assembled.primary.base64;
+        pdfBuffer = assembled.primary.buffer;
+        pdfSource = "sam_fetched";
+        attachmentPdfs = assembled.attachments;
+        primaryDocName = assembled.primary.name;
+        ingestion = assembled.ingestion;
+        console.log(`[audit] FA-136: document set assembled · ${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} ingested · form_identified=${assembled.ingestion.form_identified}`);
+      } else if (assembled) {
+        ingestion = assembled.ingestion;
+      }
+    }
+  }
   if (!pdfBase64 && !pdfFileId && noticeId && solicitation.resourceLinks.length > 0) {
     try {
       const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
@@ -326,7 +350,10 @@ export async function POST(req: NextRequest) {
       extractedText,
       extractedFormat,
       pdfSource,
-      pdfUnavailableReason
+      pdfUnavailableReason,
+      attachmentPdfs,
+      primaryDocName,
+      ingestion
     });
 
     return NextResponse.json(

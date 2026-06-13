@@ -27,6 +27,7 @@ import {
 } from "@/lib/audit-engine";
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
+import type { IngestionMeta } from "@/lib/sam-attachments";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -87,6 +88,13 @@ export interface AuditExecutionInput {
   extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null;
   pdfSource: PdfSource;
   pdfUnavailableReason: string | null;
+  // FA-136 — multi-attachment plan results (inline-pdf arms): further
+  // documents in deterministic order + the ingestion-completeness meta
+  // persisted to compliance_json.ingestion. Absent on single-doc/upload
+  // arms (ingestion null → no banner, pre-FA-136 behavior).
+  attachmentPdfs?: Array<{ name: string; base64: string; buffer: Buffer }> | null;
+  primaryDocName?: string | null;
+  ingestion?: IngestionMeta | null;
 }
 
 export interface AuditExecutionResult {
@@ -132,7 +140,12 @@ export async function executeAudit(
   }
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
-  const result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+  const attachmentPdfs = input.attachmentPdfs ?? null;
+  const result = await runAudit({
+    solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
+    attachmentPdfs: attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
+    primaryDocName: input.primaryDocName ?? null
+  });
 
   // FA-147 — refuse to persist a structurally collapsed run as complete.
   // Throws DegradedRunError; the worker routes it to the FA-149 release path
@@ -188,7 +201,13 @@ export async function executeAudit(
     // FA-137 — call-3 outcome telemetry: {outcome: ok|retried_ok|collapsed,
     // saved_by?, reason?}. The stress suite reads this per run; the view-model
     // renders the §05 degradation banner when outcome === "collapsed".
-    call3: result.call3
+    call3: result.call3,
+    // FA-136 — ingestion-completeness state: {files_total, files_ingested,
+    // form_identified, form_name, overflow?, portfolio_detected?, files[]}.
+    // null = single-doc/upload arm (no manifest — pre-FA-136 semantics).
+    // The view-model renders the loud partial-ingestion banner when
+    // files_ingested < files_total or !form_identified.
+    ingestion: input.ingestion ?? null
   };
 
   const completeUpdate = {
@@ -288,7 +307,13 @@ export async function executeAudit(
             : [],
         },
       };
-      const v2Result = await runAuditV2(v2Buffer, v2External);
+      // FA-136 — V2 sees the same assembled document set as V1 (attachment
+      // text appended to the form's text layer before section detection).
+      const v2Result = await runAuditV2(
+        v2Buffer,
+        v2External,
+        attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
+      );
       const v2Shadow = {
         path: "pdf",
         judgment: v2Result.judgment,

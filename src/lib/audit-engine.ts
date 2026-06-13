@@ -929,6 +929,13 @@ export interface AuditInput {
   // sets this; runAudit stamps it onto compliance.json.pdf_source.
   pdfSource?: PdfSource;
   pdfUnavailableReason?: string | null;
+  // FA-136 — additional inline PDFs from the multi-attachment plan (form is
+  // the primary pdfBase64; these are amendments/attachments in deterministic
+  // order). Inline-pdf arms only.
+  attachmentPdfs?: Array<{ name: string; base64: string }> | null;
+  // FA-136 — primary document's name (for the DOCUMENT SET provenance
+  // manifest in the prompt).
+  primaryDocName?: string | null;
 }
 
 const DOC_TYPE_HINTS: Record<DocumentType, string> = {
@@ -1041,7 +1048,10 @@ async function callClaude(
   modelOverride?: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  // FA-136 — additional inline PDF documents (form-first multi-attachment
+  // sets). Each becomes its own document block after the primary.
+  extraDocs?: Array<{ name: string; base64: string }> | null
 ): Promise<string> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -1068,6 +1078,18 @@ async function callClaude(
       type: "document",
       source: { type: "base64", media_type: "application/pdf", data: pdfBase64 }
     });
+  }
+  // FA-136 — attachment documents ride after the primary, in the
+  // deterministic plan order. The prompt's DOCUMENT SET manifest (assembled
+  // in runAudit) tells the model which block is the form and which are
+  // attachments, so claims stay provenance-traceable.
+  if (extraDocs) {
+    for (const d of extraDocs) {
+      content.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: d.base64 }
+      });
+    }
   }
   content.push({ type: "text", text: userPrompt });
 
@@ -1151,7 +1173,8 @@ async function callWithRetry(
   label: string,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  extraDocs?: Array<{ name: string; base64: string }> | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean }> {
   // FA-147 — label the throw. callClaude's 5xx exhaust says "Claude API 503:"
   // but not WHICH call died; the worker's release reason must be diagnosable
@@ -1160,11 +1183,11 @@ async function callWithRetry(
   const labeled = (err: unknown): never => {
     throw new Error(`[call:${label}] ${err instanceof Error ? err.message : String(err)}`);
   };
-  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId).catch(labeled);
+  const text1 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, undefined, imageBase64, imageMediaType, pdfFileId, extraDocs).catch(labeled);
   const json1 = extractJSON(text1);
   if (json1) return { text: text1, json: json1, escalated: false };
   console.warn(`[audit-engine] ${label} returned empty/unparseable JSON · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId).catch(labeled);
+  const text2 = await callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, CLAUDE_RETRY_MODEL, imageBase64, imageMediaType, pdfFileId, extraDocs).catch(labeled);
   const json2 = extractJSON(text2);
   if (!json2) console.warn(`[audit-engine] ${label} retry on ${CLAUDE_RETRY_MODEL} also failed · falling back to {}`);
   return { text: text2, json: json2, escalated: true };
@@ -1186,7 +1209,8 @@ async function callRisksWithValidation(
   pdfBase64: string | null | undefined,
   imageBase64?: string | null,
   imageMediaType?: "image/jpeg" | "image/png" | null,
-  pdfFileId?: string | null
+  pdfFileId?: string | null,
+  extraDocs?: Array<{ name: string; base64: string }> | null
 ): Promise<{ text: string; json: Record<string, unknown> | null; escalated: boolean; call3: Call3Outcome }> {
   const labeled = (err: unknown): never => {
     throw new Error(`[call:risks] ${err instanceof Error ? err.message : String(err)}`);
@@ -1194,7 +1218,7 @@ async function callRisksWithValidation(
   const attempt = async (n: 1 | 2, model: string | undefined): Promise<string> =>
     _call3StubForTests
       ? _call3StubForTests(n, model ?? _activeModel ?? CLAUDE_MODEL)
-      : callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, model, imageBase64, imageMediaType, pdfFileId).catch(labeled);
+      : callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, model, imageBase64, imageMediaType, pdfFileId, extraDocs).catch(labeled);
 
   const text1 = await attempt(1, undefined);
   const json1 = extractJSON(text1);
@@ -2112,10 +2136,17 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
     : "sam_unavailable"
   );
   const pdfUnavailableReason = input.pdfUnavailableReason ?? null;
+  // FA-136 — multi-attachment set: extra document blocks ride on every call;
+  // the DOCUMENT SET manifest below provenance-labels each block so claims
+  // are traceable to a named file (form vs attachment).
+  const attachmentPdfs = input.attachmentPdfs ?? null;
+  const docSetManifest = attachmentPdfs && attachmentPdfs.length > 0
+    ? `\n\n--- DOCUMENT SET (sam_attachments · provenance per attached document block, in order) ---\n1. PRIMARY (solicitation form): ${input.primaryDocName ?? "primary document"}\n${attachmentPdfs.map((d, i) => `${i + 2}. ATTACHMENT: ${d.name}`).join("\n")}`
+    : "";
   // When extractedText is provided (DOCX/XLSX/DOC/TXT from SAM), append it to
   // the SAM metadata so the model sees both via the prompt channel. Image
   // content rides on a separate Anthropic vision block, not the prompt body.
-  const metadataText = JSON.stringify(solicitation).slice(0, 4000);
+  const metadataText = JSON.stringify(solicitation).slice(0, 4000) + docSetManifest;
   const rawText = extractedText
     ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${extractedText}`
     : metadataText;
@@ -2305,7 +2336,8 @@ JSON only — one key: risk_findings.`;
       "overview",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      attachmentPdfs
     ),
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
@@ -2315,7 +2347,8 @@ JSON only — one key: risk_findings.`;
       "compliance",
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      attachmentPdfs
     ),
     // FA-137 — risks uses the validation-driven ladder (structural checks
     // decide the retry, not just parseability) and reports a Call3Outcome.
@@ -2326,7 +2359,8 @@ JSON only — one key: risk_findings.`;
       pdfBase64,
       imageBase64,
       imageMediaType,
-      pdfFileId
+      pdfFileId,
+      attachmentPdfs
     )
   ]);
 
@@ -3617,8 +3651,27 @@ function bindExternalFacts(
   return boundSources;
 }
 
-export async function runAuditV2(pdfBuffer: Buffer, external?: ExternalBoundFacts): Promise<AuditV2Result> {
+export async function runAuditV2(
+  pdfBuffer: Buffer,
+  external?: ExternalBoundFacts,
+  // FA-136 — attachment buffers from the multi-document plan. V2 parity with
+  // V1: each attachment's text layer is appended to the form's rawText with
+  // a provenance separator BEFORE section detection, so both engines see the
+  // same assembled input (no arm divergence). Extraction failure on an
+  // attachment degrades to a warning, never kills the run.
+  extraDocs?: Array<{ name: string; buffer: Buffer }> | null
+): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
+  if (extraDocs && extraDocs.length > 0) {
+    for (const d of extraDocs) {
+      try {
+        const extra = await _v2ExtractText(d.buffer);
+        doc.rawText += `\n\n=== ATTACHMENT DOCUMENT: ${d.name} (sam_attachment) ===\n\n${extra.rawText}`;
+      } catch (err) {
+        console.warn(`[audit-v2] FA-136: attachment text extraction failed for ${d.name}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  }
 
   // Fix 7 — pre-extraction wrong-doc detection. Returns synthesized
   // AuditV2Result with judgment.documentClassification.type="wrong_doc" and

@@ -16,6 +16,7 @@ import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/
 import { isAnthropicTransient } from "@/lib/anthropic-files";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
+import { assembleSamDocumentSet, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import type { PdfSource } from "@/lib/audit-engine";
 
@@ -424,6 +425,10 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
+  // FA-136 — multi-attachment plan outputs.
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  let primaryDocName: string | null = null;
+  let ingestion: import("@/lib/sam-attachments").IngestionMeta | null = null;
 
   if (row.anthropic_file_id) {
     pdfFileId = row.anthropic_file_id;
@@ -448,6 +453,32 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
       console.warn(`[audit-worker] FA-132: no pdf_path on upload-arm row ${row.id} (pre-FA-132 enqueue or stash failure) — V2 shadow skipped`);
     }
   } else {
+    // FA-136 — multi-attachment plan first: deterministic form-first
+    // assembly from the v3 resources manifest. Manifest failure or no
+    // ingestible primary → legacy single-URL path exactly as pre-FA-136
+    // (assembled stays null → ingestion meta null → no banner).
+    let assembled: AssembledDocumentSet | null = null;
+    if (/^[a-f0-9]{32}$/i.test(row.notice_id)) {
+      assembled = await assembleSamDocumentSet(row.notice_id, row.solicitation_number).catch((err) => {
+        console.warn(`[audit-worker] FA-136: document-set assembly failed for ${row.notice_id} — legacy single-URL path: ${err instanceof Error ? err.message : err}`);
+        return null;
+      });
+    }
+    if (assembled?.primary) {
+      pdfBase64 = assembled.primary.base64;
+      pdfBuffer = assembled.primary.buffer;
+      pdfSource = "sam_fetched";
+      attachmentPdfs = assembled.attachments;
+      primaryDocName = assembled.primary.name;
+      ingestion = assembled.ingestion;
+      console.log(`[audit-worker] FA-136: document set assembled · ${assembled.ingestion.files_ingested}/${assembled.ingestion.files_total} ingested · form_identified=${assembled.ingestion.form_identified} · primary=${assembled.primary.name}`);
+    } else {
+      if (assembled) {
+        // Manifest readable but nothing ingestible (e.g. oversize form) —
+        // keep the completeness flag, fall through to legacy for the bytes.
+        ingestion = assembled.ingestion;
+        console.warn(`[audit-worker] FA-136: manifest read but no ingestible primary (${assembled.ingestion.files_total} files) — legacy single-URL path with completeness flag`);
+      }
     const docUrl = row.pdf_url ?? solicitation.resourceLinks[0] ?? null;
     if (docUrl) {
       try {
@@ -488,6 +519,7 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
           ? "no resourceLinks on SAM opportunity"
           : "missing PDF source";
     }
+    }
   }
 
   return {
@@ -501,7 +533,10 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     extractedText,
     extractedFormat,
     pdfSource,
-    pdfUnavailableReason
+    pdfUnavailableReason,
+    attachmentPdfs,
+    primaryDocName,
+    ingestion
   };
 }
 

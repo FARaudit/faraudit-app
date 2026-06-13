@@ -139,6 +139,12 @@ export interface AuditViewModel {
   call3_collapsed: boolean;
   call3_degradation_note: string;
 
+  // FA-136 — ingestion completeness (compliance_json.ingestion). Banner when
+  // the document set was only partially ingested or the form couldn't be
+  // identified. False/empty on single-doc and pre-FA-136 audits (null meta).
+  ingestion_incomplete: boolean;
+  ingestion_note: string;
+
   // Fix 2 (2026-06-05 — Ruling 1 wiring). 'gate' when the engine emitted a
   // DECISION_GATE verdict (one or more credential/sole-source gates fired);
   // 'scored' otherwise. Renderer reads this to switch to the interactive
@@ -2387,6 +2393,23 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       return c3?.outcome === "collapsed"
         ? "Risk analysis for this run is degraded: the risks engine call returned no structurally valid findings after both model attempts (call3_collapsed). The overview and compliance sections above are complete and reliable. Re-run this audit to generate the risk register."
         : "";
+    })(),
+    // FA-136 — partial-ingestion / form-unidentified loud flag. null meta
+    // (single-doc, upload arm, pre-FA-136 rows) → never flags.
+    ...((): { ingestion_incomplete: boolean; ingestion_note: string } => {
+      const ing = compJson.ingestion as { files_total?: number; files_ingested?: number; form_identified?: boolean; form_name?: string | null; overflow?: string; portfolio_detected?: boolean } | null | undefined;
+      if (!ing || typeof ing.files_total !== "number") return { ingestion_incomplete: false, ingestion_note: "" };
+      const partial = (ing.files_ingested ?? 0) < ing.files_total;
+      const formless = ing.form_identified !== true;
+      if (!partial && !formless && !ing.portfolio_detected) return { ingestion_incomplete: false, ingestion_note: "" };
+      const parts: string[] = [];
+      if (formless) parts.push("the solicitation form could not be identified in the posted document set — findings are based on the attachments that were ingested");
+      if (partial) parts.push(`${ing.files_ingested} of ${ing.files_total} posted files were ingested${ing.overflow ? ` (${ing.overflow})` : ""} — findings may not reflect the full document set`);
+      if (ing.portfolio_detected) parts.push("the primary PDF is a portfolio/wrapper containing embedded files that were not unpacked");
+      return {
+        ingestion_incomplete: true,
+        ingestion_note: `Partial document-set ingestion: ${parts.join("; ")}. Review the un-ingested files on SAM.gov before relying on this audit for a bid decision.`
+      };
     })(),
     verdict_mode: verdictMode,
     // FA-144: engine-persisted gate rows when present, canonical VM-side
