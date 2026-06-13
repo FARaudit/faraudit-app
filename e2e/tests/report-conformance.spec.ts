@@ -188,6 +188,19 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   });
   results.push({ id: 'E20', pass: e20.ok, detail: e20.detail });
 
+  // E21 (FA-136) — the "Document set partially ingested" banner must be
+  // ABSENT on clean single-doc audits. It renders only when
+  // compliance_json.ingestion records a partial/form-unidentified set; every
+  // conformance fixture is a single-document full audit (the standing demo
+  // guardrail), so any [data-ingestion-incomplete] here is the banner
+  // leaking onto clean reports — the inverse of FA-136's silent-partial
+  // failure mode. Same justification class as E20.
+  const e21 = await page.evaluate(() => {
+    const banners = document.querySelectorAll('[data-ingestion-incomplete]').length;
+    return { ok: banners === 0, detail: banners === 0 ? 'no ingestion banner (single-doc fixture)' : `${banners} data-ingestion-incomplete banner(s) on a clean audit` };
+  });
+  results.push({ id: 'E21', pass: e21.ok, detail: e21.detail });
+
   // E10 — jump-nav inside .rail
   const e10 = await page.evaluate(() => {
     const jump = document.querySelector('nav.jump');
