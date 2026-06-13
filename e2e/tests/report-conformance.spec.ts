@@ -177,6 +177,17 @@ async function runAssertions(page: import('@playwright/test').Page): Promise<Ass
   });
   results.push({ id: 'E6', pass: e6.ok, detail: e6.detail });
 
+  // E20 (FA-137) — the §05 "Risk register degraded" banner must be ABSENT on
+  // healthy audits. It renders ONLY when compliance_json.call3.outcome ===
+  // "collapsed"; every conformance fixture is a clean full-audit run, so any
+  // [data-call3-degraded] here means the degradation surface is leaking into
+  // clean reports — the inverse of FA-137's silent-collapse failure mode.
+  const e20 = await page.evaluate(() => {
+    const banners = document.querySelectorAll('[data-call3-degraded]').length;
+    return { ok: banners === 0, detail: banners === 0 ? 'no degradation banner (clean run)' : `${banners} data-call3-degraded banner(s) on a clean audit` };
+  });
+  results.push({ id: 'E20', pass: e20.ok, detail: e20.detail });
+
   // E10 — jump-nav inside .rail
   const e10 = await page.evaluate(() => {
     const jump = document.querySelector('nav.jump');
