@@ -1573,6 +1573,20 @@ export function cleanAgencyName(raw: string): string {
   s = s.replace(/\s*\([^)]*\)\s*/g, "").trim();
   s = s.split(",")[0].trim();
   if (!s) return raw;
+  // FA-156: office-symbol / DoDAAC identifier lines (e.g. "FA4600 55 CONS PKP",
+  // "W6QK ACC-DTA", "633 CONS LGCP") are codes, not prose — the model already
+  // emits them ALL CAPS; cleanAgencyName must not title-case "FA4600"→"Fa4600",
+  // "CONS"→"Cons", "PKP"→"Pkp". Two signals mark the whole segment as an
+  // identifier: (a) an alphanumeric-mixed token (adjacent letter+digit, e.g.
+  // FA4600 / W6QK / W912CH); or (b) it carries a digit AND every token is a
+  // short code (≤8 alnum/hyphen chars), never a prose word like "DEFENSE".
+  const _tokens = s.split(/\s+/).filter(Boolean);
+  const _isOfficeCode =
+    /[A-Za-z]\d|\d[A-Za-z]/.test(s) ||
+    (/\d/.test(s) && _tokens.every((t) => /^[A-Za-z0-9-]{1,8}$/.test(t)));
+  if (_isOfficeCode) {
+    return s.toUpperCase();
+  }
   // Title-case with acronym preservation + preposition strip.
   const words = s.split(/\s+/).filter(Boolean);
   const out: string[] = [];

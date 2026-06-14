@@ -463,6 +463,22 @@ export function looksLikeOrgName(v: string | null | undefined): boolean {
 export function looksLikeSetAsideValue(v: string | null | undefined): boolean {
   const s = (v ?? "").trim();
   if (!s || s.length > 80) return false;
+  // FA-158: reject clause-prose fragments that merely MENTION a set-aside term
+  // inside a sentence (e.g. "for small business and has a value above the
+  // simplified acquisition threshold"). A real set-aside value is a short
+  // vocabulary phrase, never a sentence — so 3+ words AND a sentence-structure
+  // connector ⇒ clause prose ⇒ reject (caller falls through to the next
+  // source). Exempt the canonical "full and open" phrase, whose "and" is
+  // vocabulary (matched on the line below), not sentence structure.
+  const wordCount = s.split(/\s+/).filter(Boolean).length;
+  const isFullAndOpen = /^full\s+(?:and|&)\s+open(?:\s+competition)?$/i.test(s);
+  if (
+    !isFullAndOpen &&
+    wordCount >= 3 &&
+    /\b(?:for|and|that|which|with|above|below|under|has|have|is|are|was|were)\b/i.test(s)
+  ) {
+    return false;
+  }
   return (
     /(small\s+business|8\s*\(\s*a\s*\)|hubzone|wosb|edwosb|sdvosb|vosb|veteran[\s-]owned|service[\s-]disabled|unrestricted|full\s+(?:and|&)\s+open|sole\s+source|set[\s-]?aside)/i.test(s) ||
     /^\d{1,3}\s*%\s*(?:small|sb\b|set)/i.test(s)
