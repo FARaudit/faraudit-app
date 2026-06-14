@@ -2306,7 +2306,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       : null;
   const wpBenchmark = wp != null
     ? `Based on ${winBasis} comparable audit${winBasis === 1 ? "" : "s"}`
-    : "Add outcomes to seed the model";
+    // FA-164: the "seed the model" nag belongs only on truly unscored audits.
+    // A verified/scored audit with no win-prob basis shows a neutral dash.
+    : isUnscored ? "Add outcomes to seed the model" : "—";
 
   // Customer hierarchy
   const fullParentPath = (overviewJson.full_parent_path as string) || null;

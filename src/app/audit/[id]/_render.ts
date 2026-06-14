@@ -1380,7 +1380,7 @@ function renderMatrixArtifact(
   } else {
     const segs: string[] = [];
     if (actionCount > 0) segs.push(`<b>${actionCount} need${actionCount === 1 ? "s" : ""} offeror action</b>`);
-    if (riskCount > 0) segs.push(`${riskCount} ${riskCount === 1 ? "is" : "are"} flagged in the risk register`);
+    if (riskCount > 0) segs.push(`${riskCount} requirement${riskCount === 1 ? "" : "s"} flagged for review`);
     if (clearCount > 0) segs.push(`${clearCount} ${clearCount === 1 ? "is a standard clause" : "are standard clauses"} incorporated by reference, present and verified`);
     const tail = segs.length > 0
       ? segs.join(", ")

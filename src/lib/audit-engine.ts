@@ -1487,14 +1487,28 @@ export function checkSprsLagRisk(dfarsClauses: string[] | undefined, responseDea
   const daysToDeadline = Math.floor((responseDeadline.getTime() - Date.now()) / 86_400_000);
   if (daysToDeadline >= SPRS_POSTING_LAG_DAYS + SPRS_BUFFER_DAYS) return null;
   const deadlineStr = responseDeadline.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  // FA-164 two-tier. <7 days = structurally uncurable → P0 no-bid. 7–35 days =
+  // a self-assessment can still post in time → P1 CONDITION (CAUTION).
+  if (daysToDeadline < 7) {
+    return {
+      text: `SPRS posting lag makes remediation impossible before the ${deadlineStr} deadline. DFARS 252.204-7020 requires a current SPRS score; scores require ${SPRS_POSTING_LAG_DAYS} days to post after NIST SP 800-171 self-assessment submission. With ${daysToDeadline} days to deadline, a firm without a current score cannot remedy the gap in time — this is a no-bid condition, not an action item.`,
+      title: "SPRS remediation impossible before deadline",
+      priority: "P0",
+      category: "compliance",
+      citation: "DFARS 252.204-7020",
+      provenance: "verified",
+      faraudit_action: `Verify your SPRS score is current at https://www.sprs.csd.disa.mil/ before the ${deadlineStr} deadline. If not current, this acquisition is structurally out of reach this cycle — track for the next solicitation.`,
+      offerorActionRequired: true
+    };
+  }
   return {
-    text: `SPRS posting lag makes remediation impossible before the ${deadlineStr} deadline. DFARS 252.204-7020 requires a current SPRS score; scores require ${SPRS_POSTING_LAG_DAYS} days to post after NIST SP 800-171 self-assessment submission. With ${daysToDeadline} days to deadline, a firm without a current score cannot remedy the gap in time — this is a no-bid condition, not an action item.`,
-    title: "SPRS remediation impossible before deadline",
-    priority: "P0",
+    text: `Requires a current SPRS score (DFARS 252.204-7020). If your SPRS Basic Assessment is already posted and current, this is cleared. If not, self-post at https://www.sprs.csd.disa.mil/ — scores can post within days, and with ${daysToDeadline} days to the ${deadlineStr} deadline there is runway to remedy it.`,
+    title: "Current SPRS score required",
+    priority: "P1",
     category: "compliance",
     citation: "DFARS 252.204-7020",
     provenance: "verified",
-    faraudit_action: `Verify your SPRS score is current at https://www.sprs.csd.disa.mil/ before the ${deadlineStr} deadline. If not current, this acquisition is structurally out of reach this cycle — track for the next solicitation.`,
+    faraudit_action: `Confirm your SPRS Basic Assessment is current at https://www.sprs.csd.disa.mil/. If it is missing, run the NIST SP 800-171 self-assessment and post it now — it can appear within days, ahead of the ${deadlineStr} deadline.`,
     offerorActionRequired: true
   };
 }
@@ -1707,8 +1721,9 @@ export function detectSprsGate(
   const inDocText = SPRS_TEXT_RE.test(docText);
   if (!inClauses && !inDocText) return null;
   const days = daysUntil(responseDeadline);
-  // 30-day posting lag + 5-day buffer = 35-day threshold.
-  const curable = days == null ? false : days >= 35;
+  // FA-164: a SPRS Basic Assessment can post within days, so only a <7-day
+  // window is structurally uncurable. ≥7 days → curable → CAUTION, not NO-BID.
+  const curable = days == null ? false : days >= 7;
   return {
     gate_id: "SPRS_SCORE_REQUIRED",
     gate_label: "Current SPRS score required",
