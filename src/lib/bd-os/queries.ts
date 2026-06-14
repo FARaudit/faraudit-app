@@ -124,6 +124,7 @@ export async function fetchOpportunities(
     let q = client
       .from("pending_audits")
       .select(cols)
+      .not("notice_id", "like", "fa7-demo-%") // FA-164: hide FA-7 demo-queue seed rows
       .order("created_at", { ascending: false })
       .limit(opts.limit || 100);
     if (opts.status) q = q.eq("status", opts.status);
