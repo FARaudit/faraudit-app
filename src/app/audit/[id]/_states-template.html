@@ -372,7 +372,7 @@ button{font-family:inherit}
         <div class="st-panel p-progress">
           <p class="sp-k">Engine Status</p>
           <p class="sp-word">Analyzing</p>
-          <p class="sp-tag">Stage <b id="spStageNo">2</b> of 5 — no action required.</p>
+          <p class="sp-tag">Stage <b id="spStageNo">2</b> of 4 — no action required.</p>
           <p class="sp-elapsed"><span id="spElapsed">00:00</span><small>Elapsed</small></p>
         </div>
       </header>
@@ -392,23 +392,23 @@ button{font-family:inherit}
         <div class="stage is-active" data-stage="extraction">
           <span class="sg-no">02</span>
           <span class="sg-dot"></span>
-          <span class="sg-lbl">Clause extraction<small>FAR/DFARS clauses, CLINs, key dates, evaluation factors</small></span>
+          <span class="sg-lbl">Analysis<small>Clause extraction, compliance scan, and risk register</small></span>
           <span class="sg-status">IN PROGRESS</span>
         </div>
-        <div class="stage is-pending" data-stage="risk">
+        <div class="stage is-pending" data-stage="risk" style="display:none">
           <span class="sg-no">03</span>
           <span class="sg-dot"></span>
           <span class="sg-lbl">Risk analysis<small>Compliance traps, execution traps, risk register</small></span>
           <span class="sg-status">PENDING</span>
         </div>
         <div class="stage is-pending" data-stage="verdict">
-          <span class="sg-no">04</span>
+          <span class="sg-no">03</span>
           <span class="sg-dot"></span>
           <span class="sg-lbl">Verdict &amp; scoring<small>Bid gates, fit score, recommendation</small></span>
           <span class="sg-status">PENDING</span>
         </div>
         <div class="stage is-pending" data-stage="assembly">
-          <span class="sg-no">05</span>
+          <span class="sg-no">04</span>
           <span class="sg-dot"></span>
           <span class="sg-lbl">Report assembly<small>Compliance matrix, pre-flight checklist, KO email</small></span>
           <span class="sg-status">PENDING</span>
@@ -561,7 +561,20 @@ button{font-family:inherit}
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(d){
           lastPoll = Date.now();
-          if (d && d.status && d.status !== 'processing') location.reload();
+          if (!d) return;
+          /* FA-160 — advance stage rows live from current_stage */
+          if (d.current_stage) {
+            var order = ['retrieval','extraction','verdict','assembly'];
+            var ci = d.current_stage === 'complete' ? order.length - 1 : order.indexOf(d.current_stage);
+            if (ci < 0) ci = 0;
+            order.forEach(function(s, i){
+              var el = document.querySelector('[data-stage="' + s + '"]');
+              if (el) el.className = 'stage ' + (i < ci ? 'is-done' : i === ci ? 'is-active' : 'is-pending');
+            });
+            var noEl = document.getElementById('spStageNo');
+            if (noEl) noEl.textContent = String(ci + 1);
+          }
+          if (d.status && d.status !== 'processing') location.reload();
         })
         .catch(function(){});
     };

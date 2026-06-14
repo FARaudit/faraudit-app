@@ -315,12 +315,22 @@ export function renderAuditTransitionalState(
     const requestedBy = str(opts.requestedBy);
     out = requestedBy ? replaceFieldText(out, "requested_by", requestedBy) : removeFactCell(out, "requested_by");
 
-    // stages — no per-stage telemetry exists yet (status endpoint reports the
-    // run, not the stage), so render honestly: stage 01 active, rest pending.
-    // Demo advancement was reviewer-only and is stripped from the template.
-    out = setStageRow(out, "extraction", "is-pending", "PENDING");
-    out = setStageRow(out, "retrieval", "is-active", "IN PROGRESS");
-    out = out.replace(/<b id="spStageNo">\d+<\/b>/, '<b id="spStageNo">1</b>');
+    // FA-160 — drive stage rows from the persisted current_stage. 4 honest
+    // stages: retrieval → extraction (labelled "Analysis") → verdict → assembly.
+    // "risk" is hidden in the template and mirrors extraction (the engine runs
+    // extraction+risk in parallel). NULL current_stage → stage 1 active.
+    const STAGE_ORDER = ["retrieval", "extraction", "verdict", "assembly"] as const;
+    const cur = str(audit.current_stage) || "retrieval";
+    const curIdx = cur === "complete"
+      ? STAGE_ORDER.length - 1
+      : Math.max(0, STAGE_ORDER.indexOf(cur as (typeof STAGE_ORDER)[number]));
+    STAGE_ORDER.forEach((s, i) => {
+      const st = i < curIdx ? "is-done" : i === curIdx ? "is-active" : "is-pending";
+      out = setStageRow(out, s, st, st === "is-done" ? "DONE" : st === "is-active" ? "IN PROGRESS" : "PENDING");
+    });
+    const exState = curIdx < 1 ? "is-pending" : curIdx === 1 ? "is-active" : "is-done";
+    out = setStageRow(out, "risk", exState, exState === "is-done" ? "DONE" : exState === "is-active" ? "IN PROGRESS" : "PENDING");
+    out = out.replace(/<b id="spStageNo">\d+<\/b>/, `<b id="spStageNo">${curIdx + 1}</b>`);
   } else {
     const errorMessage = str(audit.error_message) || "unknown error";
     const cls = classifyError(errorMessage);

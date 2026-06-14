@@ -103,6 +103,23 @@ export interface AuditExecutionResult {
   bid_recommendation: string | null;
 }
 
+// FA-160 — write current_stage to audits for the real-time progress UI.
+// Best-effort: a stage-write failure must never block or fail the audit.
+async function markStage(
+  supabase: SupabaseClient,
+  auditId: string,
+  stage: "retrieval" | "extraction" | "verdict" | "assembly"
+): Promise<void> {
+  try {
+    await supabase
+      .from("audits")
+      .update({ current_stage: stage, stage_updated_at: new Date().toISOString() })
+      .eq("id", auditId);
+  } catch {
+    /* never block the audit on a stage write */
+  }
+}
+
 export async function executeAudit(
   supabase: SupabaseClient,
   auditId: string,
@@ -141,11 +158,14 @@ export async function executeAudit(
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
   const attachmentPdfs = input.attachmentPdfs ?? null;
+  await markStage(supabase, auditId, "extraction");
   const result = await runAudit({
     solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
     attachmentPdfs: attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
     primaryDocName: input.primaryDocName ?? null
   });
+
+  await markStage(supabase, auditId, "verdict");
 
   // FA-147 — refuse to persist a structurally collapsed run as complete.
   // Throws DegradedRunError; the worker routes it to the FA-149 release path
@@ -177,6 +197,7 @@ export async function executeAudit(
   // SAM.gov" — it never falls back to posted_date.
   const appealAnchor = await fetchNaicsAppealAnchor(solicitation.noticeId).catch(() => UNKNOWN_ANCHOR);
 
+  await markStage(supabase, auditId, "assembly");
   const persistedComplianceJson = {
     ...result.compliance.json,
     score_confidence: result.score_confidence ?? null,
@@ -224,6 +245,8 @@ export async function executeAudit(
     document_type_rationale: result.classification.rationale,
     document_type_confidence: result.classification.confidence,
     status: "complete",
+    current_stage: "complete",
+    stage_updated_at: new Date().toISOString(),
     completed_at: new Date().toISOString()
   };
 
