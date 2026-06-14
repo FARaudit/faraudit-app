@@ -677,13 +677,18 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     )}
                     {recentAudits.slice(0, 5).map((a) => {
                       const r = riskFromScore(a.compliance_score);
-                      const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
-                      const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
+                      // FA-163 P0-4: gate-mode audits null their score and would
+                      // mislabel as "Watch" — surface the NO-BID gate count.
+                      const gateN = a.verdict_type === "DECISION_GATE" && Array.isArray(a.verdict_gates) ? a.verdict_gates.length : 0;
+                      const cls = gateN > 0 ? "rk0" : r.cls;
+                      const badgeLabel = gateN > 0 ? `${gateN} gate${gateN > 1 ? "s" : ""}` : r.label;
+                      const rc = cls === "rk0" ? "var(--red)" : cls === "rk1" ? "var(--amber)" : "var(--gold)";
+                      const bg = cls === "rk0" ? "rgba(220,38,38,.14)" : cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
                       return (
                         <a key={a.id} className="audit-item" href={auditHref(a)} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
                           <div className="ai-top">
                             <div className="ai-title">{auditDisplayName(a)}</div>
-                            <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{r.label}</span>
+                            <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{badgeLabel}</span>
                           </div>
                           <div className="ai-meta">{displaySolicitationId(a) || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                           <div className="ai-btns">
