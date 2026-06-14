@@ -320,6 +320,11 @@ async function processOne(row: UserPendingRow): Promise<void> {
     : null;
 
   try {
+    // FA-160 — mark retrieval; the PDF/SAM fetch happens inside buildInput.
+    await supabase
+      .from("audits")
+      .update({ current_stage: "retrieval", stage_updated_at: new Date().toISOString() })
+      .eq("id", row.audit_id);
     const input = await buildInput(row);
     const result = await executeAudit(supabase, row.audit_id, input);
     const { error } = await supabase

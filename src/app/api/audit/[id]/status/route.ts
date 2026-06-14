@@ -23,7 +23,7 @@ export async function GET(
 
   const { data: audit, error } = await supabase
     .from("audits")
-    .select("id, status, error_message, solicitation_number")
+    .select("id, status, current_stage, stage_updated_at, error_message, solicitation_number")
     .eq("id", id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 503 });
@@ -32,6 +32,7 @@ export async function GET(
   return NextResponse.json({
     auditId: audit.id,
     status: audit.status,
+    current_stage: audit.current_stage ?? null,
     error_message: audit.error_message ?? null,
     solicitationNumber: audit.solicitation_number ?? null
   });
