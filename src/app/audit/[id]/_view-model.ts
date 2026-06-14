@@ -1633,17 +1633,19 @@ function extractCoFromSectionL(compJson: Record<string, unknown>): { email: stri
   }
   const corpus = parts.join(" \n ");
   if (!corpus) return null;
-  // Email regex — DLA/DoD addresses are uppercase by convention but the
-  // RFC pattern is case-insensitive. Capture group 0 = whole match.
-  const emailRe = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  const emailMatch = corpus.match(emailRe);
-  if (!emailMatch) return null;
-  const email = emailMatch[0].toLowerCase();
+  // FA-163: CO addresses are always government — restrict to .mil/.gov and skip
+  // known non-CO mailboxes so a vendor .com or a submission inbox in the L text
+  // can never be bound as the contracting officer. (DLA/DoD addresses are
+  // uppercase by convention; the RFC pattern is case-insensitive.)
+  const candidates = corpus.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:MIL|GOV)\b/gi) || [];
+  const matched = candidates.find((raw) => !CO_EMAIL_DENYLIST.has(raw.toLowerCase()));
+  if (!matched) return null;
+  const email = matched.toLowerCase();
   // Try to find a comma-separated name immediately before the email:
   //   "Josh E. Long, JOSH.LONG@DLA.MIL"
   //   "Submit to Mary L. Smith, MARY.SMITH@USCG.MIL"
   // Capture group 1 = the name (2-4 word title-case form).
-  const namePattern = new RegExp(`([A-Z][A-Za-z]+(?:\\s+[A-Z]\\.?)?(?:\\s+[A-Z][A-Za-z]+){1,2}),\\s*${emailMatch[0].replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`, "i");
+  const namePattern = new RegExp(`([A-Z][A-Za-z]+(?:\\s+[A-Z]\\.?)?(?:\\s+[A-Z][A-Za-z]+){1,2}),\\s*${matched.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`, "i");
   const nameMatch = corpus.match(namePattern);
   return { email, name: nameMatch ? nameMatch[1].trim() : null };
 }
@@ -1654,10 +1656,20 @@ function extractCoFromSectionL(compJson: Record<string, unknown>): { email: stri
 // Restricted to .mil/.gov so a vendor or distributor email in a risk excerpt
 // can never be bound as the CO (DLA fixture: asaycia.clayton.1@us.af.mil
 // lives in a risk description while Section L has no contact).
+//
+// FA-163: .mil/.gov submission/helpdesk mailboxes (the SPRS gate's
+// faraudit_action names webptsmh@navy.mil) are government but never the CO.
+// Denylisted below; faraudit_action (FARaudit advice prose) is also excluded
+// from the corpus so our own text can't seed the recipient.
+const CO_EMAIL_DENYLIST = new Set<string>([
+  "webptsmh@navy.mil", // SPRS / NIST SP 800-171 self-assessment submission
+]);
 function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>): string | null {
   const parts: string[] = [];
   for (const r of risks) {
-    for (const v of [r.title, r.description, r.faraudit_action]) {
+    // faraudit_action is FARaudit-authored advice prose (it names submission
+    // mailboxes like webptsmh@navy.mil) — never a source for the real CO.
+    for (const v of [r.title, r.description]) {
       if (typeof v === "string") parts.push(v);
     }
   }
@@ -1672,8 +1684,13 @@ function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>):
   const exec = compJson.executive_summary as Record<string, unknown> | undefined;
   if (exec && typeof exec === "object") pushRowStrings(exec.actions);
   const corpus = parts.join(" \n ");
-  const m = corpus.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:MIL|GOV)\b/i);
-  return m ? m[0].toLowerCase() : null;
+  // First .mil/.gov address that is not a known non-CO mailbox.
+  const matches = corpus.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:MIL|GOV)\b/gi) || [];
+  for (const raw of matches) {
+    const email = raw.toLowerCase();
+    if (!CO_EMAIL_DENYLIST.has(email)) return email;
+  }
+  return null;
 }
 
 // §08 — Phase 2 #2 (Option B drafted email body, Jun 8 2026).
