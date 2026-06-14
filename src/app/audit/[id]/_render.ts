@@ -222,8 +222,8 @@ function renderProvenanceBadge(provenance: "verified" | "inferred"): string {
   const verifiedStyle = "display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200);margin-right:8px;vertical-align:1px;white-space:nowrap";
   const inferredStyle = "display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);color:var(--mute);border:1px solid var(--line);margin-right:8px;vertical-align:1px;white-space:nowrap";
   return provenance === "verified"
-    ? `<span style="${verifiedStyle}" title="Anchored to a FAR/DFARS clause in the source">✓ Document</span>`
-    : `<span style="${inferredStyle}" title="Pattern-derived from typical solicitations in this category">≈ Pattern</span>`;
+    ? `<span style="${verifiedStyle}" title="Anchored to a FAR/DFARS clause in the source"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0"><polyline points="1.5,5 4,7.5 8.5,2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Document</span>`
+    : `<span style="${inferredStyle}" title="Pattern-derived from typical solicitations in this category"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0"><line x1="2" y1="5" x2="8" y2="5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Pattern</span>`;
 }
 
 function renderRisk(r: Risk, isFirst: boolean): string {

@@ -191,6 +191,10 @@ export interface AuditRow {
   // must mirror that so the same audit never shows 35 in one place and "—"
   // in another.
   verdict_type: string | null;
+  // FA-163 P0-4 — DECISION_GATE audits null their score; the gate array
+  // (compliance_json.verdict.gates) drives the ledger "N gates" badge so they
+  // don't fall through to a misleading "Watch".
+  verdict_gates: unknown[] | null;
 }
 
 // ─── Tab 4: Defense Spending Intel (FA-96) ────────────────────────────────
@@ -236,7 +240,7 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type")
+    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
