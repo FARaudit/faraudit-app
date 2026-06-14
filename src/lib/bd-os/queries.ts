@@ -369,11 +369,20 @@ export interface HeaderCounter {
 }
 
 export async function fetchHeaderCounter(client: SupabaseClient): Promise<HeaderCounter> {
-  const [a, c] = await Promise.all([
-    client.from("audits").select("*", { count: "exact", head: true }),
-    client.from("fa_intelligence_corpus").select("*", { count: "exact", head: true })
-  ]);
-  return { audits: a.count || 0, traps: c.count || 0 };
+  // FA-164: scope to the current user. audits is RLS-scoped to the owner (017).
+  // Traps = sum of each audit's compliance_json.dfars_flags. The
+  // fa_intelligence_corpus is a service-role-only, cross-customer, cron-built
+  // aggregate — it reads 0 under a user session (verified), so the prior
+  // corpus count never reflected the user (the "500" was a service-role view).
+  const { data } = await client
+    .from("audits")
+    .select("dfars_flags:compliance_json->dfars_flags");
+  const rows = (data ?? []) as Array<{ dfars_flags: unknown }>;
+  const traps = rows.reduce(
+    (n, r) => n + (Array.isArray(r.dfars_flags) ? r.dfars_flags.length : 0),
+    0
+  );
+  return { audits: rows.length, traps };
 }
 
 // ─── Intelligence Home: 4 stat cards ──────────────────────────────────────
@@ -388,7 +397,16 @@ export interface HomeStats {
 
 export async function fetchHomeStats(client: SupabaseClient): Promise<HomeStats> {
   const since30d = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const [p0, live, month, traps] = await Promise.all([
+  // FA-164: traps = sum of dfars_flags across the user's audits (RLS-scoped);
+  // the corpus reads 0 under a user session (service-role-only aggregate).
+  const { data: flagRows } = await client
+    .from("audits")
+    .select("dfars_flags:compliance_json->dfars_flags");
+  const total_traps_caught = ((flagRows ?? []) as Array<{ dfars_flags: unknown }>).reduce(
+    (n, r) => n + (Array.isArray(r.dfars_flags) ? r.dfars_flags.length : 0),
+    0
+  );
+  const [p0, live, month] = await Promise.all([
     client
       .from("audits")
       .select("*", { count: "exact", head: true })
@@ -400,8 +418,7 @@ export async function fetchHomeStats(client: SupabaseClient): Promise<HomeStats>
     client
       .from("audits")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", since30d),
-    client.from("fa_intelligence_corpus").select("*", { count: "exact", head: true })
+      .gte("created_at", since30d)
   ]);
 
   return {
@@ -409,7 +426,7 @@ export async function fetchHomeStats(client: SupabaseClient): Promise<HomeStats>
     expiring_7d: live.count || 0, // proxy until deadline column wired in
     live_sam_gov: live.count || 0,
     audit_activity_month: month.count || 0,
-    total_traps_caught: traps.count || 0,
+    total_traps_caught,
     value_audited_estimate: "$48.2M" // placeholder — sum of ceiling_value_estimate when wired
   };
 }
