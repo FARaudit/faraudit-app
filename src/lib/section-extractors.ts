@@ -60,6 +60,8 @@ export interface ExtractedFacts {
   offerDueDate: string | null;
   issuingOffice: string | null;
   extractionWarnings: string[];
+  /** Section C / attached PWS body — input for the SOW/PWS/SOO classifier (§03, FA-119). */
+  workStatementText?: string;
 }
 
 // ── DFARS trap clause list (matches engine DFARS_TRAPS) ───────────────────
@@ -510,6 +512,14 @@ export function extractHeader(sections: Record<string, DetectedSection>): Partia
 
 // ── Main orchestrator ────────────────────────────────────────────────────
 
+// §03 FIX (FA-119): Section C (scope / SOW / PWS body) IS detected by the
+// boundary detector but was never read into facts — so the classifier saw no
+// work-statement text and defaulted to "unknown". Lift §C into the facts.
+function extractScope(section: DetectedSection | null | undefined): string | undefined {
+  const t = section?.text?.trim();
+  return t ? t.slice(0, 4000) : undefined; // cap: classifier needs the type signal, not the full text
+}
+
 export function extractAllFacts(sections: Record<string, DetectedSection>): ExtractedFacts {
   const warnings: string[] = [];
   const s = sections;
@@ -519,6 +529,7 @@ export function extractAllFacts(sections: Record<string, DetectedSection>): Extr
   const clauses = extractClauses(s["I"] ?? null);
   const submission = extractSubmissionRequirements(s["L"] ?? null);
   const evaluation = extractEvaluationFactors(s["M"] ?? null);
+  const workStatementText = extractScope(s["C"]); // §03 FIX (FA-119)
   const header = extractHeader(s);
 
   if (clins.length === 0 && s["B"]) warnings.push("§B present but no CLINs extracted — verify format");
@@ -544,5 +555,6 @@ export function extractAllFacts(sections: Record<string, DetectedSection>): Extr
     offerDueDate: header.offerDueDate ?? null,
     issuingOffice: header.issuingOffice ?? null,
     extractionWarnings: warnings,
+    workStatementText,
   };
 }
