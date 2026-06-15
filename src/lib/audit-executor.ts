@@ -231,7 +231,19 @@ export async function executeAudit(
     ingestion: input.ingestion ?? null
   };
 
+  // FA-166: PDF uploads carry no SAM solicitation number, but the engine often
+  // extracts the canonical one from the document text. Backfill it (only when
+  // the input had none, so a real SAM number is never overwritten) so the
+  // masthead + ledger show a real ID instead of blank / "pdf-<ts>".
+  const solCanonical =
+    typeof persistedComplianceJson.solicitation_number_canonical === "string" &&
+    persistedComplianceJson.solicitation_number_canonical.trim()
+      ? persistedComplianceJson.solicitation_number_canonical.trim()
+      : null;
+  const backfillSol = !solicitation.solicitationNumber && solCanonical ? solCanonical : null;
+
   const completeUpdate = {
+    ...(backfillSol ? { solicitation_number: backfillSol } : {}),
     overview_summary: result.overview.summary,
     overview_json: result.overview.json,
     compliance_summary: result.compliance.summary,
