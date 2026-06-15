@@ -675,30 +675,41 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                     {recentAudits.length === 0 && (
                       <div className="empty-state">No audits yet.</div>
                     )}
+                    <div className="ra-dark ra-list">
                     {recentAudits.slice(0, 5).map((a) => {
-                      const r = riskFromScore(a.compliance_score);
-                      // FA-163 P0-4: gate-mode audits null their score and would
-                      // mislabel as "Watch" — surface the NO-BID gate count.
-                      const gateN = a.verdict_type === "DECISION_GATE" && Array.isArray(a.verdict_gates) ? a.verdict_gates.length : 0;
-                      const cls = gateN > 0 ? "rk0" : r.cls;
-                      const badgeLabel = gateN > 0 ? `${gateN} gate${gateN > 1 ? "s" : ""}` : r.label;
-                      const rc = cls === "rk0" ? "var(--red)" : cls === "rk1" ? "var(--amber)" : "var(--gold)";
-                      const bg = cls === "rk0" ? "rgba(220,38,38,.14)" : cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
+                      // FA-167 — Design-lead "Recently Audited" card. Whole card
+                      // links to the report; verdict drives badge + pill colour
+                      // from the spec --vd-* tokens (one is-* class).
+                      const v = raVerdict(a);
+                      const insight = raInsight(a);
+                      const office = a.office_display || "";
+                      const sol = displaySolicitationId(a) || "—";
+                      const hasScore = a.compliance_score != null;
                       return (
-                        <a key={a.id} className="audit-item" href={auditHref(a)} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
-                          <div className="ai-top">
-                            <div className="ai-title">{auditDisplayName(a)}</div>
-                            <span className="ai-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{badgeLabel}</span>
+                        <a key={a.id} className={`rac ${v.cls}`} href={auditHref(a)}>
+                          <div className="rac-badge">
+                            <span className="rac-score">{hasScore ? a.compliance_score : "—"}</span>
+                            {hasScore && <span className="rac-of">/ 100</span>}
                           </div>
-                          <div className="ai-meta">{displaySolicitationId(a) || "—"} · {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
-                          <div className="ai-btns">
-                            <span className="ai-btn pri">View Report</span>
-                            <span className="ai-btn">PDF</span>
-                            <span className="ai-btn">KO Email</span>
+                          <div className="rac-main">
+                            <div className="rac-metarow">
+                              <span className="rac-id">{sol}</span>
+                              {office && <span className="rac-office">{office}</span>}
+                            </div>
+                            <div className="rac-title">{auditDisplayName(a)}</div>
+                            {insight && (
+                              <div className="rac-insight"><span className="rac-spark" />{insight}</div>
+                            )}
+                          </div>
+                          <div className="rac-right">
+                            <span className="rac-pill"><span className="rac-pill-dot" />{v.label}</span>
+                            <span className="rac-ago">{timeAgo(a.created_at)}</span>
+                            <span className="rac-chev">→</span>
                           </div>
                         </a>
                       );
                     })}
+                    </div>
                   </div>
                   <div className="rc-section">
                     <div className="rc-hdr"><div className="rc-title">Account Intelligence</div></div>
@@ -1390,6 +1401,64 @@ function riskFromScore(score: number | null): { cls: "rk0" | "rk1" | "rkw"; labe
   if (score < 40) return { cls: "rk0", label: "P0" };
   if (score < 70) return { cls: "rk1", label: "P1" };
   return { cls: "rkw", label: "P2" };
+}
+
+// ─── FA-167 · Recently Audited card derivations ───────────────────────────
+// Verdict → spec class + pill label. Prefers the canonical
+// executive_summary.verdict ("NO-BID"/"CAUTION"/"PROCEED"); falls back to the
+// recommendation enum, then to score bands. Drives badge, pill, rail + spark
+// (all from the --vd-* tokens) — exactly one class.
+function raVerdict(a: AuditRow): { cls: "is-proceed" | "is-caution" | "is-nobid"; label: "PROCEED" | "CAUTION" | "NO-BID" } {
+  const ev = (a.exec_verdict || "").toUpperCase().replace(/[\s_]+/g, "-");
+  if (ev === "NO-BID" || ev === "NOBID") return { cls: "is-nobid", label: "NO-BID" };
+  if (ev === "CAUTION") return { cls: "is-caution", label: "CAUTION" };
+  if (ev === "PROCEED" || ev === "GO" || ev === "BID") return { cls: "is-proceed", label: "PROCEED" };
+  const rec = (a.recommendation || "").toUpperCase();
+  if (rec === "DECLINE") return { cls: "is-nobid", label: "NO-BID" };
+  if (rec === "PROCEED") return { cls: "is-proceed", label: "PROCEED" };
+  if (rec.includes("CAUTION")) return { cls: "is-caution", label: "CAUTION" };
+  if (a.compliance_score != null) {
+    if (a.compliance_score >= 70) return { cls: "is-proceed", label: "PROCEED" };
+    if (a.compliance_score < 40) return { cls: "is-nobid", label: "NO-BID" };
+  }
+  return { cls: "is-caution", label: "CAUTION" };
+}
+
+// Insight (spec .rac-insight) = the verdict tail of executive_summary.what
+// (CEO call, FA-167): everything after the first " — " in the synthesized
+// "<office> is buying <item> — <bid condition>" sentence, so the line carries
+// the recommendation rather than the office/title shown elsewhere. Falls back
+// to the top risk factor (citation parenthetical stripped). Capped at 90 chars
+// per spec; the CSS text-overflow ellipsis is the backstop.
+function raInsight(a: AuditRow): string {
+  let s = "";
+  const what = (a.exec_what || "").trim();
+  if (what) {
+    const parts = what.split(" — ");
+    if (parts.length > 1) s = parts.slice(1).join(" — ").trim();
+  }
+  if (!s) {
+    const f = (a.exec_factors || "").split(",")[0].trim();
+    s = f.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  }
+  if (!s) return "";
+  return s.length > 90 ? s.slice(0, 89).trimEnd() + "…" : s;
+}
+
+// Relative "ago" stamp (spec .rac-ago): "3h ago", "Yesterday", "5d ago"…
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const sec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "Yesterday";
+  if (day < 7) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 interface RunAuditPrefill {

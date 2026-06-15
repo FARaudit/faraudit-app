@@ -2,6 +2,8 @@
    Every selector is scoped under .bd-home so styles cannot leak. */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* FA-167 — fonts the Recently Audited card spec is drawn in (IBM Plex Mono + Manrope). */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Manrope:wght@400..700&display=swap');
 
 .bd-home {
   --void:#030810;--void2:#060F1C;--void3:#0A1628;
@@ -326,3 +328,49 @@
   /* Hide footer plan card and counter pills on phone */
   .bd-home .sb-footer { display: none; }
 }
+
+/* ─── FA-167 · Recently Audited card (Design-lead spec v1 · primary list) ───
+   Copied verbatim from ceo/redesign-final/Review/recently-audited-card-spec.html.
+   Scoped under .bd-home. Rendered in the spec's dark variant (.ra-dark wrapper)
+   because /home is a dark surface. The compact ".racc" / "View all 20" variant
+   is intentionally NOT included — that is the separate later task. Verdict
+   colors come only from the spec's --vd-* tokens (single source of truth). */
+.bd-home{
+  --vd-proceed:#1f8a5b;--vd-proceed-tint:#e7f4ed;--vd-proceed-line:#bfe3cf;--vd-proceed-ink:#15623f;
+  --vd-caution:#c2861a;--vd-caution-tint:#fbf1dc;--vd-caution-line:#ecd5a3;--vd-caution-ink:#8a5d11;
+  --vd-nobid:#c0352b;--vd-nobid-tint:#fbeae8;--vd-nobid-line:#eec4bf;--vd-nobid-ink:#9a261d;
+  --ra-ink:#101728;--ra-slate:#586073;--ra-mute:#8b94a3;--ra-line:#e9ecf2;
+}
+.bd-home .ra-list{display:flex;flex-direction:column;gap:9px;}
+.bd-home .rac.is-proceed{--v:var(--vd-proceed);--vt:var(--vd-proceed-tint);--vl:var(--vd-proceed-line);--vi:var(--vd-proceed-ink)}
+.bd-home .rac.is-caution{--v:var(--vd-caution);--vt:var(--vd-caution-tint);--vl:var(--vd-caution-line);--vi:var(--vd-caution-ink)}
+.bd-home .rac.is-nobid{--v:var(--vd-nobid);--vt:var(--vd-nobid-tint);--vl:var(--vd-nobid-line);--vi:var(--vd-nobid-ink)}
+.bd-home .rac{display:grid;grid-template-columns:54px 1fr auto;gap:15px;align-items:center;background:#fff;border:1px solid var(--ra-line);border-radius:13px;padding:13px 15px;text-decoration:none;cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;position:relative}
+.bd-home .rac::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:0 3px 3px 0;background:var(--v);opacity:0;transition:opacity .14s ease}
+.bd-home .rac:hover{transform:translateY(-1px);border-color:var(--vl);box-shadow:0 1px 2px rgba(16,23,40,.05),0 14px 28px -18px rgba(16,23,40,.28)}
+.bd-home .rac:hover::before{opacity:1}
+.bd-home .rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
+.bd-home .rac-score{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700;letter-spacing:-.02em}
+.bd-home .rac-of{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;letter-spacing:.06em;opacity:.8;margin-top:3px}
+.bd-home .rac-main{min-width:0}
+.bd-home .rac-metarow{display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.bd-home .rac-id{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ra-ink);white-space:nowrap;flex:none}
+.bd-home .rac-office{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;letter-spacing:.07em;color:var(--ra-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;padding-left:10px}
+.bd-home .rac-office::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:3px;border-radius:50%;background:#c3cad6}
+.bd-home .rac-title{font-family:"Manrope",system-ui,sans-serif;font-size:15.5px;font-weight:600;color:var(--ra-ink);letter-spacing:-.01em;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-home .rac-insight{font-family:"Manrope",system-ui,sans-serif;display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13px;font-weight:450;color:var(--ra-slate);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-home .rac-spark{flex:none;width:6px;height:6px;background:var(--v);transform:rotate(45deg) translateY(2px);border-radius:1px}
+.bd-home .rac-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-left:6px;position:relative}
+.bd-home .rac-pill{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;padding:4px 9px 4px 8px;border-radius:999px;white-space:nowrap;background:var(--vt);color:var(--vi);border:1px solid var(--vl)}
+.bd-home .rac-pill-dot{width:5px;height:5px;border-radius:50%;background:var(--v)}
+.bd-home .rac-ago{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ra-mute)}
+.bd-home .rac-chev{position:absolute;right:-4px;bottom:-2px;font-size:14px;color:#c3cad6;opacity:0;transform:translateX(-4px);transition:opacity .14s ease,transform .14s ease}
+.bd-home .rac:hover .rac-chev{opacity:1;transform:translateX(0);color:var(--v)}
+/* dark variant — /home is a dark surface; mirrors the spec's .ra-dark overrides */
+.bd-home .ra-dark .rac{background:rgba(22,33,54,.31);border-color:#233247}
+.bd-home .ra-dark .rac-id{color:#eef2f8}
+.bd-home .ra-dark .rac-office{color:#79839a}
+.bd-home .ra-dark .rac-title{color:#f3f6fb}
+.bd-home .ra-dark .rac-insight{color:#aeb7c8}
+.bd-home .ra-dark .rac-pill{background:transparent;color:var(--v);border-color:var(--v)}
+.bd-home .ra-dark .rac-ago{color:#79839a}
