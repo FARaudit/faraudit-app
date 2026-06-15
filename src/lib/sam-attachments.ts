@@ -14,7 +14,7 @@
 //      amendments, then attachments name-sorted. Never download-order.
 //   3. Budget BEFORE download (sizes are known up front): ≤ MAX_DOCS
 //      documents, ≤ MAX_TOTAL_INLINE_BYTES total, PDF members only. The
-//      Anthropic request ceiling (~100 PDF pages / 32MB) makes full-set
+//      Anthropic request ceiling (~600 PDF pages / 32MB) makes full-set
 //      ingestion of a 1232-class notice impossible — overflow is FLAGGED
 //      loudly (compliance_json.ingestion), never silent.
 //   4. PDF-portfolio wrappers are DETECTED and flagged, not unpacked —
@@ -28,13 +28,21 @@
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
 
-// Budget rationale: 5 docs × inline base64 keeps the request far under the
-// API's 100-page/32MB PDF ceiling for real solicitation sets (forms are
+// Budget rationale: 5 docs × inline base64 keeps the request under the API's
+// 600-page / 32MB PDF ceiling for real solicitation sets (forms are
 // 100KB-600KB; specs/amendments similar); 15MB total leaves headroom for
 // prompt + metadata. Members above the single-file Files-API threshold are
 // never inlined in a multi-set.
 export const MAX_DOCS = 5;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
+// FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
+// 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
+// FAILS the run (unlike an empty-JSON call-3 collapse). Bytes (15MB) do NOT
+// bound pages: a page-dense spec is small in MB. Promoting the work statement
+// + specs (FA-119 Phase 2) raised the page-overflow risk. 550 = safety margin
+// under 600. Enforced post-download (page count needs the bytes), in tier
+// order, with the form exempt — so generic attachments drop first.
+export const MAX_TOTAL_PAGES = 550;
 
 export interface AttachmentManifestEntry {
   name: string;
@@ -201,6 +209,54 @@ async function downloadPdf(url: string): Promise<Buffer | null> {
   }
 }
 
+// FA-119 Phase 2B — light page counter. pdf-parse v2's getInfo() returns the
+// page count (`total`) WITHOUT full text extraction (getText) — cheap. Mirrors
+// pdf-text-extractor's defensive require + v1 fallback. A counter failure
+// returns 0 so a bad parse never blocks ingestion (pages-unknown == not-counted).
+async function countPdfPages(buf: Buffer): Promise<number> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("pdf-parse");
+    const Ctor = mod?.PDFParse ?? mod?.default ?? mod;
+    if (typeof Ctor !== "function") return 0;
+    const inst = new Ctor({ data: buf });
+    if (typeof inst.getInfo === "function") {
+      const info = await inst.getInfo();
+      const n = Number(info?.total ?? 0);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    // pdf-parse v1 callable fallback → { numpages }
+    const out = await Ctor(buf);
+    const n = Number(out?.numpages ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// FA-119 Phase 2B — page budget. Pure + exported for the gate suite. Runs AFTER
+// download (page count needs the bytes) over the byte/doc-budgeted set, in tier
+// order (planDocumentOrder output). The form is EXEMPT — it is the solicitation
+// and must never be dropped. Tier order means the work statement is evaluated
+// before generic attachments, so generics drop first when the ceiling is hit.
+export function applyPageBudget<T extends { role: DocumentPlanEntry["role"]; pages: number; name?: string }>(
+  docs: T[],
+  maxPages = MAX_TOTAL_PAGES
+): { ingest: T[]; skipped: Array<{ entry: T; reason: string }> } {
+  const ingest: T[] = [];
+  const skipped: Array<{ entry: T; reason: string }> = [];
+  let total = 0;
+  for (const d of docs) {
+    if (d.role !== "form" && total + d.pages > maxPages) {
+      skipped.push({ entry: d, reason: `page budget (${maxPages}pp) exceeded` });
+      continue;
+    }
+    total += d.pages;
+    ingest.push(d);
+  }
+  return { ingest, skipped };
+}
+
 export async function assembleSamDocumentSet(
   noticeId: string,
   solicitationNumber: string | null
@@ -212,8 +268,10 @@ export async function assembleSamDocumentSet(
   const formEntry = plan.find((e) => e.role === "form") ?? null;
   const { ingest, skipped } = applyBudget(plan);
 
+  // FA-119 Phase 2B — page budget runs AFTER download (page count needs bytes).
+  // Pass 1: download + page-count every byte/doc-budgeted member, in tier order.
   const files: IngestionFileMeta[] = [];
-  const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -226,8 +284,24 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: "download failed or not a PDF" });
       continue;
     }
-    downloaded.push({ name: e.name, base64: buf.toString("base64"), buffer: buf, role: e.role });
-    files.push({ name: e.name, role: e.role, bytes: buf.length, ingested: true });
+    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
+  }
+  // Pass 2: trim by the page ceiling (pure, tier order, form exempt → generics
+  // drop first; the work statement, evaluated first, is never the one dropped).
+  const { ingest: pageKept } = applyPageBudget(
+    fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: f.pages })),
+    MAX_TOTAL_PAGES
+  );
+  const keptIds = new Set(pageKept.map((k) => k.resourceId));
+  // Pass 3: build the ingested set + the loud per-file record.
+  const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  for (const f of fetched) {
+    if (keptIds.has(f.entry.resourceId)) {
+      downloaded.push({ name: f.entry.name, base64: f.base64, buffer: f.buffer, role: f.entry.role });
+      files.push({ name: f.entry.name, role: f.entry.role, bytes: f.buffer.length, ingested: true });
+    } else {
+      files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `page budget (${MAX_TOTAL_PAGES}pp) exceeded` });
+    }
   }
 
   const primary = downloaded.find((d) => d.role === "form") ?? downloaded[0] ?? null;
@@ -240,7 +314,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form"),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline; non-PDF members never inlined)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
     files
   };
   return {

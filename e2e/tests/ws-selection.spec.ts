@@ -15,8 +15,10 @@ import { test, expect } from '@playwright/test';
 import {
   planDocumentOrder,
   applyBudget,
+  applyPageBudget,
   MAX_DOCS,
   MAX_TOTAL_INLINE_BYTES,
+  MAX_TOTAL_PAGES,
   type AttachmentManifestEntry,
 } from '../../src/lib/sam-attachments';
 
@@ -84,4 +86,33 @@ test('WS-4 budget constants honored (≤5 docs / ≤15MB) on both manifests', ()
     expect(ingest.length).toBeLessThanOrEqual(MAX_DOCS);
     expect(totalBytes).toBeLessThanOrEqual(MAX_TOTAL_INLINE_BYTES);
   }
+});
+
+// FA-119 Phase 2B — page budget (proactive). Pages injected per fixture entry,
+// no real PDFs: a ~400pp work statement (counted first, tier order) + two
+// ~300pp generics must blow the 550pp ceiling and drop the generics, never the
+// work statement.
+test('WS-5 page budget: work statement kept, generics dropped past the page ceiling', () => {
+  const docs = [
+    { name: 'Performance Work Statement PWS.pdf', role: 'attachment' as const, pages: 400 },
+    { name: 'Drawing Set Part 1.pdf', role: 'attachment' as const, pages: 300 },
+    { name: 'Drawing Set Part 2.pdf', role: 'attachment' as const, pages: 300 },
+  ];
+  const { ingest, skipped } = applyPageBudget(docs, MAX_TOTAL_PAGES);
+  expect(ingest.map((d) => d.name).some((n) => /PWS|Work Statement/i.test(n))).toBe(true);
+  expect(skipped.some((s) => /page budget/i.test(s.reason))).toBe(true);
+  const totalPages = ingest.reduce((s, d) => s + d.pages, 0);
+  expect(totalPages).toBeLessThanOrEqual(MAX_TOTAL_PAGES);
+});
+
+// The form is the solicitation — exempt from the page budget even if it alone
+// exceeds the ceiling (a generic after it still drops).
+test('WS-6 page budget: the form is exempt (never dropped)', () => {
+  const docs = [
+    { name: 'Solicitation form.pdf', role: 'form' as const, pages: 700 },
+    { name: 'Generic spec.pdf', role: 'attachment' as const, pages: 50 },
+  ];
+  const { ingest, skipped } = applyPageBudget(docs, MAX_TOTAL_PAGES);
+  expect(ingest.some((d) => d.role === 'form')).toBe(true);
+  expect(skipped.some((s) => /Generic spec/.test(s.entry.name ?? ''))).toBe(true);
 });
