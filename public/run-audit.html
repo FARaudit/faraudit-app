@@ -1070,10 +1070,10 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   // ("not wired yet"). Mirrors the reference rows from
   // ceo/redesign-final/platform/run-audit.html.
   var STATIC_FALLBACK = [
-    { sol:'N00024-26-R-2207', agency:'Naval Sea Systems Command', title:'SPY-6 Phase IV Radar',         ago:'2m ago',    score:94, status:'complete' },
-    { sol:'FA8730-26-Q-0114', agency:'Dept. of the Air Force',    title:'F-35 Test Harness',             ago:'38m ago',   score:88, status:'complete' },
-    { sol:'W56KGY-26-R-0014', agency:'CECOM',                     title:'Tactical Network Support Svcs', ago:'2h ago',    score:58, status:'complete' },
-    { sol:'N00178-26-R-3071', agency:'NSWC Indian Head',          title:'Energetics Support',            ago:'yesterday', score:42, status:'complete', pdfUpload:true }
+    { sol:'N00024-26-R-2207', agency:'Naval Sea Systems Command', title:'SPY-6 Phase IV Radar',         ago:'2m ago',    score:94, status:'complete', insight:'Strong fit — every gate clears and past performance matches your profile.' },
+    { sol:'FA8730-26-Q-0114', agency:'Dept. of the Air Force',    title:'F-35 Test Harness',             ago:'38m ago',   score:88, status:'complete', insight:'Strong fit — set-aside and NAICS align; file clarifications before quoting.' },
+    { sol:'W56KGY-26-R-0014', agency:'CECOM',                     title:'Tactical Network Support Svcs', ago:'2h ago',    score:58, status:'complete', insight:'Bid with caution — clear your SPRS score before quoting.' },
+    { sol:'N00178-26-R-3071', agency:'NSWC Indian Head',          title:'Energetics Support',            ago:'yesterday', score:42, status:'complete', pdfUpload:true, insight:'Bid with caution — confirm facility clearance before committing.' }
   ];
   function isComplete(a){
     return typeof a.compliance_score === 'number' || typeof a.score === 'number';
@@ -1155,12 +1155,23 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
   // the citation parenthetical stripped. Capped at 90 chars (CSS ellipsis backs it).
   function insightOf(a){
     var s = '';
-    var what = String(a.exec_what || '').trim();
-    if (what) { var p = what.split(' — '); if (p.length > 1) s = p.slice(1).join(' — ').trim(); }
+    // Explicit insight wins — the curated demo rows (STATIC_FALLBACK) carry a
+    // one-line string in the production voice so the demo matches live cards.
+    if (a.insight) s = String(a.insight).trim();
+    if (!s) { var what = String(a.exec_what || '').trim();
+              if (what) { var p = what.split(' — '); if (p.length > 1) s = p.slice(1).join(' — ').trim(); } }
     if (!s) { var f = String(a.exec_factors || '').split(',')[0].trim();
               s = f.replace(/\s*\([^)]*\)\s*$/, '').trim(); }
     if (!s) return '';
+    s = s.charAt(0).toUpperCase() + s.slice(1);  // sentence-case (the es.what tail starts lowercase)
     return s.length > 90 ? s.slice(0, 89).replace(/\s+$/, '') + '…' : s;
+  }
+  // Never-blank guarantee (spec: every .rac carries an insight) — when an audit
+  // has no synthesized sentence at all, derive a verdict-voiced one-liner.
+  function verdictBlurb(label){
+    if (label === 'PROCEED') return 'Strong fit — review the full report before quoting.';
+    if (label === 'NO-BID')  return 'No-bid — compliance gaps do not support a bid.';
+    return 'Bid with caution — clear the flagged items before committing.';
   }
   // Office leaf — /api/audits returns office_display (cleanAgencyName-resolved
   // server-side); fallback to agency for the static rows. Never the DoD parent.
@@ -1174,7 +1185,7 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
               : (typeof a.compliance_score === 'number') ? a.compliance_score : null;
     var v       = verdictOf(a);
     var office  = officeOf(a);
-    var insight = insightOf(a);
+    var insight = insightOf(a) || verdictBlurb(v.label);  // never blank
     var when    = a.ago || ago(a.completed_at || a.created_at);
     var titleText = stripTrailingHexBlob((a.title || '').trim());
     if (titleText && titleText.toLowerCase() === 'untitled solicitation') titleText = '';
@@ -1194,7 +1205,7 @@ function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.remove
           (office ? '<span class="rac-office">'+escapeHtml(office)+'</span>' : '')+
         '</div>'+
         '<div class="rac-title">'+escapeHtml(titleLine)+'</div>'+
-        (insight ? '<div class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(insight)+'</div>' : '')+
+        '<div class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(insight)+'</div>'+
       '</div>'+
       '<div class="rac-right">'+
         '<span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span>'+
