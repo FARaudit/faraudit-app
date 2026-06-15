@@ -196,6 +196,11 @@ function buildJudgmentPrompt(facts: ExtractedFacts, boundSources?: BoundFactSour
   const trapClauses = facts.clauses.filter((c) => c.isTrap);
   const criticalReqs = facts.submissionRequirements.filter((r) => r.isCritical);
   const lbl = (key: ScalarFactKey | ListFactKey) => bindingLabel(boundSources, key);
+  // §03 FIX (FA-119): surface Section C / PWS body so the SOW/PWS/SOO classifier
+  // can actually read the work statement instead of defaulting to "unknown".
+  const scopeBlock = facts.workStatementText
+    ? `\n\nWORK STATEMENT (Section C / attached PWS — read this to determine the document type SOW/PWS/SOO):\n${facts.workStatementText}\n`
+    : "";
 
   return `You are a defense contract compliance expert. Analyze this solicitation and produce a structured audit judgment.
 
@@ -229,7 +234,7 @@ ${facts.evaluationFactors.map((e) => `- ${e.factor.slice(0, 100)}${e.weight ? ` 
 
 **Extraction warnings (pre-verified issues):**
 ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- ${w}`).join("\n") : "None"}
-
+${scopeBlock}
 ## Your task
 
 1. Classify the document type (SOW / PWS / SOO / combined / unknown) — this changes the bid strategy.
