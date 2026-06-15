@@ -538,7 +538,11 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.204-7018", title: "Covered Telecom", severity: "P0" },
   { clause: "252.204-7021", title: "CMMC", severity: "P1" },
   { clause: "252.225-7060", title: "Xinjiang Forced Labor", severity: "P0" },
-  { clause: "252.232-7006", title: "WAWF Payment Routing", severity: "P1" },
+  // Gap 2 (FA-119): WAWF (252.232-7006) is a post-award payment-routing
+  // requirement, not a pre-submission disqualifier. Demote P1 → P2 so it drops
+  // out of the §04 trap tally and matrix TRAP badge (sec04TrapClauses excludes
+  // P2) and renders as a plain "required" clause instead of a trap.
+  { clause: "252.232-7006", title: "WAWF Payment Routing", severity: "P2" },
   { clause: "5352.242-9000", title: "Installation Access (AF 5352.242-9000)", severity: "P1" },
   { clause: "252.225-7001", title: "Buy American / Balance of Payments", severity: "P1" },
   { clause: "252.215-7010", title: "Certified Cost or Pricing Data", severity: "P1" },
@@ -1281,13 +1285,17 @@ Classify this federal procurement document into ONE category:
 - "Sources Sought" — Market research / RFI / pre-solicitation notice (no bid commitment)
 - "Other" — none of the above or unable to determine
 
-Heuristics:
-- The TITLE and the document HEADER usually contain the document type explicitly ("Performance Work Statement", "Sources Sought Notice", etc.) — give that highest weight.
-- A SAM.gov "type" field of "Combined Synopsis/Solicitation" usually means RFP or RFQ — look at the body to disambiguate.
-- "Special Notice" or "Sources Sought" types are research notices, not solicitations.
-- If you see Section L and Section M, it is almost certainly an RFP.
-- If you see "performance standards" or a QASP attachment, it is a PWS.
-- If you see numbered objectives without prescriptive deliverables, it is a SOO.
+Heuristics — read BODY SIGNALS across the FULL text (including amendments and attachments), not just the title/header. A PWS/SOW frequently arrives as an amendment attachment rather than the base notice:
+- Work-statement body signals (scan everywhere, any section or attachment):
+  • SOW — explicit task lists, "the contractor shall" statements, prescriptive deliverable lists, "how-to" specifications.
+  • PWS — "performance standards", outcome-based / measurable-results language, a QASP attachment.
+  • SOO — numbered objectives stated by the government with the contractor proposing its own approach (ends, not means).
+- Phrases like "the contractor shall", "performance standards", "the government will", "deliverables include", "period of performance", "tasks include" identify a work statement REGARDLESS of which section or attachment they appear in.
+- The TITLE/header may name the type explicitly ("Performance Work Statement", "Sources Sought Notice") — use it, but never let a generic base-notice title override clear work-statement body signals in an attachment.
+- If you see Section L and Section M, it is almost certainly an RFP. A SAM.gov "type" of "Combined Synopsis/Solicitation" usually means RFP or RFQ — disambiguate from the body.
+- "Special Notice" / "Sources Sought" are research notices, not solicitations.
+- If signals from multiple work-statement types are present, classify by the DOMINANT signal.
+- Only classify "Other" / unable-to-determine when the document contains NONE of these signals after searching the full text.
 
 Output ONLY a JSON object with these keys:
 - document_type (string): EXACTLY one of the categories above
@@ -2252,7 +2260,11 @@ DOCUMENT-TYPE-SPECIFIC FOCUS: ${DOC_TYPE_FOCUS[classification.document_type]}
   const overviewPrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-You are extracting FACTS from a federal solicitation. Output ONLY a JSON object with these keys — verbatim or factual paraphrase, no interpretive scoring:
+You are a BD Director at a defense prime analyzing this solicitation for a live bid/no-bid decision. Read it the way a capture team does: what the requiring activity actually needs versus what they literally asked for, what is unusual, and what the document signals about the competitive landscape. Bring that judgment to the prose fields below (summary, scope, primary_objective) — interpret, don't merely transcribe.
+
+AMENDMENT AWARENESS: if this document references amendments, the MOST RECENT amendment supersedes earlier versions. Use the most-recently-amended values for every date and requirement. The originally-posted date is NOT the operative deadline once an amendment has moved it.
+
+Output ONLY a JSON object with these keys. The §M/§L structured arrays below stay RAW (facts only — downstream code derives coverage, tone, and scoring from them); the prose fields carry your interpretation:
 
 - summary (string): 2-3 sentence factual paraphrase of what is being procured. No verdicts, no recommendations.
 - scope (string): verbatim scope-of-work statement (or close paraphrase).
@@ -2290,14 +2302,14 @@ No prose, no markdown, JSON only.`;
   const compliancePrompt = `${pdfHeader}SAM.gov metadata:
 ${solText}
 
-You are a compliance officer reading every page of this solicitation. Extract FACTS EXHAUSTIVELY — no interpretive severity scoring, no trap risk-level assignments. The solicitation typically has FAR/DFARS clauses listed in Section I, Section H, or as inline citations in Sections C, L, and M. CLINs are in Section B.
+You are a senior compliance officer screening this solicitation for a small business about to bid. You have two jobs: (1) extract EVERY FAR/DFARS clause and CLIN exhaustively — these are FACTS the downstream surfaces depend on, so completeness matters and you do NOT assign severities or trap risk-levels here; and (2) for the clauses that impose an offeror action BEFORE or AT submission, state what the contractor must DO, by WHEN, and the consequence of missing it. Do NOT treat reference-only clauses as action items. The solicitation typically lists FAR/DFARS clauses in Section I, Section H, or inline in Sections C, L, and M. CLINs are in Section B.
 
 Output ONLY a JSON object with these keys — facts only, no severities or risk levels:
 
 - far_clauses (string[]): EVERY FAR clause cited (format: "52.212-1", "52.212-4", etc.). Scan ALL sections. Empty array ONLY if you have read every page and confirmed none are cited. Do not omit common clauses (52.212-1, 52.212-4, 52.232-33 are essentially universal — list when present).
 - dfars_clauses (string[]): EVERY DFARS clause cited (format: "252.204-7012", "252.223-7008", etc.). Common trap clauses to look for explicitly: 252.204-7020 (SPRS score / NIST SP 800-171 DoD Assessment), 252.227-7025 (JCP / limited rights data), 252.225-7009 (specialty metals), 252.211-7003 (IUID), 252.225-7060 (Xinjiang), 252.204-7021 (CMMC) — list ANY that appear in the document.
 - required_certifications (string[]): EVERY certification / registration / compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
-- key_compliance_actions (string[]): verbatim required-action language for items a small business must complete to bid (e.g. "Submit past performance for similar contract value within last 3 years", "Complete representations 52.204-24 + 52.204-26").
+- key_compliance_actions (string[]): for EVERY clause or requirement that imposes an offeror action BEFORE or AT submission, one imperative string stating (a) what the contractor must DO, (b) by WHEN — cite the deadline; if it cannot be determined from the document write "deadline unknown — confirm with CO" rather than omitting the item, and (c) the consequence of missing it (price rejection / technically unacceptable / post-award default). Do NOT list reference-only clauses here. e.g. "Submit past performance for similar contract value within last 3 years by the proposal due date — or be rated technically unacceptable", "Complete representations 52.204-24 + 52.204-26 in SAM before submission — or the quote is non-conforming".
 - set_aside_text (string or null): VERBATIM citation if the document explicitly states a set-aside — quote the literal sentence or clause reference (e.g. "100% small business set-aside" / "FAR 52.219-6 notice present" / "Block 10 box X checked"). null if no document text triggers a set-aside. (TS derives the enum value via regex on the full solText; this raw signal preserves the document's literal wording.)
 - deadlines (object[]): array of {label: string, date: string} — verbatim date strings as printed (e.g. {label: "Proposal due", date: "25 June 2026 4:00 PM CST"}). Do not canonicalize dates here; TS parses + canonicalizes downstream.
 - clins (object[]): array of {clin: "0001", description, quantity, pricing_arrangement, fob} for EVERY CLIN in Section B. Use raw strings; TS normalizes units and FOB enum downstream.
@@ -2316,12 +2328,13 @@ ${solText}
 EXTRACTED FACTS (from SAM.gov listing — DO NOT generate risks claiming any of these fields are missing, unextractable, or unknown; they have been confirmed extracted):
 ${v1FactsDigest || "(no SAM metadata available)"}
 
-You are a senior capture manager identifying SPECIFIC, ACTIONABLE risks tied to provisions of THIS solicitation, for a small defense subcontractor in the continental United States. You emit FACTS — risk findings with document evidence. Priority, severity_score, top-3 selection, per-category buckets, verdict rationale, and exec summaries are all TS-derived downstream from your findings; do NOT emit any of those.
+You are a senior capture manager reviewing THIS solicitation for a small defense subcontractor in the continental United States BEFORE they submit. Identify every risk that could cause: (1) technical unacceptability at evaluation, (2) a pricing surprise after award, (3) a compliance failure during performance, or (4) a delivery or payment delay. For each risk: name it, cite the specific clause or section, state the exact consequence, and state what the contractor must do to mitigate it. You emit FACTS — risk findings with document evidence. Priority, severity_score, top-3 selection, per-category buckets, verdict rationale, and exec summaries are all TS-derived downstream from your findings; do NOT emit any of those.
 
 PRINCIPLES:
 - One finding per distinct risk chain. If multiple observations point to the same underlying risk (e.g. JCP + ITAR + TDP access form ONE chain), emit ONE finding for the chain. Do NOT pad with near-duplicates; TS dedupes by (theme, citation) fingerprint but cannot recover from over-merged findings.
 - Specific FARaudit move per risk. Each finding carries a SPECIFIC neutralizing action the customer can take this week (verify JCP at dla.mil/JCP, calendar a 15-day DPAS notify window, price CLIN with breakout, etc.). NEVER canned filler ("Address this risk before submission" / "see KO email"). If no distinct move exists beyond the KO email, emit faraudit_action="" — the renderer hides the action chip rather than show filler.
 - Short titles. Each finding has an 8-word-or-fewer title. NO "RISK N (DISQUALIFICATION):" / "P0 —" / "[DEAL-BREAKER]" prefixes — TS handles severity tagging. Good titles: "JCP certification gap — TDP access blocked", "LPTA with no discussions allowed", "Container price must be broken out from CLIN".
+- offerorActionRequired discipline (Gap 5). Every risk a contractor must actively address before or at submission — certification, representation, registration, product-data/TDP access, Buy-American cert, cure step — MUST carry offerorActionRequired: true. Do NOT omit this field. When you are unsure, default to true. This field is the SOLE source feeding the §04 Compliance Flags surface, which collapses to empty if the flag is wrongly false.
 
 Output ONLY a JSON object with ONE key:
 
@@ -2547,7 +2560,7 @@ JSON only — one key: risk_findings.`;
   risksJson.risk_findings = prioritized.map(mapPrioritizedToFinding);
 
   // Composite scoring (FA-126 — deterministic, documented):
-  //   score = clamp(0..100, 100 − min(40, (FAR + DFARS + certs) × 1.5) − severity × 5)
+  //   score = clamp(0..100, 100 − min(25, (FAR + DFARS + certs) × 1.0) − severity × 5)  [FA-119 recal]
   //   rec   = score ≥ 70 → PROCEED · 40-69 → PROCEED_WITH_CAUTION · < 40 → DECLINE
   //           (null score → PROCEED_WITH_CAUTION; fired gates SUPERSEDE the
   //           scored tier via aggregateGateRecommendation — this is why a
@@ -2561,7 +2574,14 @@ JSON only — one key: risk_findings.`;
   const certCount = complianceJson.required_certifications?.length || 0;
   const severity = typeof risksJson.severity_score === "number" ? risksJson.severity_score : 5;
 
-  const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
+  // Gap 3 (FA-119) recalibration: min(40, …×1.5) pinned every clause-heavy DoD
+  // solicitation at the 40 cap (most cited clauses are universal boilerplate,
+  // not real complexity), which — with the modal severity of 5 — forced the
+  // recurring 35 and punished clean set-asides as hard as genuinely hard ones.
+  // Soften to min(25, …×1.0) so a clean small-business set-aside with no
+  // disqualifiers baselines ~50-70, while severity × 5 still pulls genuinely
+  // risky pursuits down (e.g. severity 8 → −40).
+  const complexityPenalty = Math.min(25, (farCount + dfarsCount + certCount) * 1.0);
   const riskPenalty = severity * 5;
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
@@ -2589,8 +2609,18 @@ JSON only — one key: risk_findings.`;
   // a real solicitation with thin clause extraction from being suppressed.
   const hasSectionL = (complianceJson.submission_requirements?.length ?? 0) > 0;
   const hasSectionM = (complianceJson.evaluation_factors?.length ?? 0) > 0;
+  // Gap 1 (FA-119): a document the classifier landed on a real work-statement
+  // type (SOW / PWS / SOO) IS a solicitation component — it must NOT be
+  // suppressed as "not a solicitation" merely because it lacks §L/§M or cites
+  // few clauses (PWS bodies often arrive as amendment attachments with no §L/§M
+  // and zero FAR/DFARS citations). Only the genuine "Other"/unknown bucket or a
+  // clause-less non-work-statement falls through to suppression.
+  const isWorkStatement =
+    classification.document_type === "SOW" ||
+    classification.document_type === "PWS" ||
+    classification.document_type === "SOO";
   const is_not_solicitation =
-    !hasSectionL && !hasSectionM && (
+    !isWorkStatement && !hasSectionL && !hasSectionM && (
       classification.document_type === "Other" ||
       (isRetrieved && farCount === 0 && dfarsCount === 0)
     );

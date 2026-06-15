@@ -374,7 +374,15 @@ export function complianceFlags(
   risks: AuditRisk[],
   offerorActionRequiredFilter: (r: AuditRisk) => boolean
 ): { flags: ComplianceFlag[]; allInferred: boolean } {
-  const filtered = risks.filter(offerorActionRequiredFilter);
+  let filtered = risks.filter(offerorActionRequiredFilter);
+  // Gap 5 (FA-119): §04 must not collapse when the LLM omitted
+  // offerorActionRequired on risks that plainly need contractor action. If the
+  // primary filter yields nothing but P0/P1 risks exist, fall back to those —
+  // a P0/P1 risk is by definition something the offeror must act on. Keeps the
+  // rich flag shape (severity + mitigation + clause), not bare titles.
+  if (filtered.length === 0) {
+    filtered = risks.filter((r) => r.severity === "P0" || r.severity === "P1");
+  }
   const flags: ComplianceFlag[] = filtered.map((r) => ({
     id: r.id,
     title: r.title,
