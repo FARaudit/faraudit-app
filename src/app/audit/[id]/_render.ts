@@ -1564,8 +1564,15 @@ function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
   // state only; the §06 resolver IIFE flips this to BID when all rows are
   // ticked client-side.
   out = out.replace(
-    /(<span class="gs-pill )(?:go|no)("[^>]*>)[^<]*(<\/span>)/g,
-    `$1${vm.gate_card.pill_text === "BID" ? "go" : "no"}$2${escapeHtml(vm.gate_card.pill_text)}$3`
+    /(<span class="gs-pill )(?:go|no|caution)("[^>]*>)[^<]*(<\/span>)/g,
+    `$1${vm.gate_card.pill_text === "BID" ? "go" : vm.gate_card.pill_text === "CAUTION" ? "caution" : "no"}$2${escapeHtml(vm.gate_card.pill_text)}$3`
+  );
+  // FA-165: flag curability on the gate card so the §06 resolver renders an
+  // uncleared curable gate as CAUTION (amber), matching the masthead — not a
+  // hard NO-BID. (curable = pill_text is anything other than "NO-BID".)
+  out = out.replace(
+    '<div class="gate-card" id="reco-gate" style="display:none" data-field="gate_block">',
+    `<div class="gate-card" id="reco-gate" style="display:none" data-curable="${vm.gate_card.pill_text === "NO-BID" ? "false" : "true"}" data-field="gate_block">`
   );
   // Phase 3 E7 (F7) — .g-oc.win and .g-oc.no <b>...</b> outcome lead words.
   // Template ships hardcoded 'All three ✓' / 'Any ✗' which contradicts a

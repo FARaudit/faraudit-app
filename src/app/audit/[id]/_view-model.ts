@@ -284,8 +284,8 @@ export interface AuditViewModel {
     verdict_text: string;       // .gate-verdict text inside .gc-h
     lead_text: string;          // .gc-lead text
     count_text: string;         // .gs-cnt initial "0 / N cleared"
-    pill_text: "BID" | "NO-BID"; // .gs-pill initial — NO-BID by default,
-                                 // user resolver flips to BID on full check
+    pill_text: "BID" | "CAUTION" | "NO-BID"; // .gs-pill initial — matches the
+                                 // verdict (CAUTION when curable); resolver flips to BID on full check
     // Phase 3 E7 (F7) — outcome lead words inside .g-oc.win/.g-oc.no <b>
     // prefix. Derived from gate count so "All three ✓" never leaks on a
     // 2-gate audit. Renderer regex-replaces only the <b>...</b> content.
@@ -1144,7 +1144,8 @@ function buildGateCorpus(
 // section_l_summary, etc).
 //
 // Curability gating uses one canonical daysToDeadline value (passed in).
-// SPRS: 30-day posting lag + 5-day buffer = curable if >= 35 days.
+// SPRS: a self-assessment can post within days — curable if >= 7 days
+// (FA-164/165; mirrors the engine's detectSprsGate so masthead + gate card agree).
 // JCP: 5-10 BD processing + buffer = curable if >= 15 days.
 // FAA145, test jig, AFTO: not curable in typical solicitation windows.
 function detectGatesCanonical(
@@ -1158,7 +1159,7 @@ function detectGatesCanonical(
       gate_id: "SPRS_SCORE_REQUIRED",
       gate_label: "Current SPRS score required",
       status: "UNKNOWN",
-      cure_possible_in_window: daysToDeadline != null && daysToDeadline >= 35,
+      cure_possible_in_window: daysToDeadline != null && daysToDeadline >= 7,
       verification_url: "https://www.sprs.csd.disa.mil/",
       verification_action: "Verify your SPRS Basic Assessment is posted and current (within 3 years) before the response deadline."
     });
@@ -1256,7 +1257,7 @@ function deriveGateCardProse(
   recommendation: "GO" | "CAUTION" | "DECLINE",
   daysToDeadline: number | null,
   evalFraming?: { label: string | null; description: string | null }
-): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "NO-BID"; outcome_win_lead: string; outcome_no_lead: string; outcome_win_tail: string; outcome_no_tail: string } {
+): { verdict_text: string; lead_text: string; count_text: string; pill_text: "BID" | "CAUTION" | "NO-BID"; outcome_win_lead: string; outcome_no_lead: string; outcome_win_tail: string; outcome_no_tail: string } {
   // FA-115 Item 5 — outcome tails reference the single derived evaluation
   // framing so §06 can never assert "LPTA win" on a best-value solicitation.
   const winTail = evalFraming?.label
@@ -1269,7 +1270,7 @@ function deriveGateCardProse(
       verdict_text: recommendation === "GO" ? "Bid with confidence" : recommendation === "DECLINE" ? "No-bid — bid not recommended" : "Caution — close gaps before bid",
       lead_text: "No structural gates fired on this audit. Standard scored audit applies.",
       count_text: "0 / 0 cleared",
-      pill_text: recommendation === "GO" ? "BID" : "NO-BID",
+      pill_text: recommendation === "GO" ? "BID" : recommendation === "DECLINE" ? "NO-BID" : "CAUTION",
       // No gates → outcome words are placeholders; .gate-card is hidden
       // when verdict_mode !== "gate", so these never render in practice.
       outcome_win_lead: "If clear ✓",
@@ -1346,7 +1347,8 @@ function deriveGateCardProse(
     verdict_text: verdictText,
     lead_text: leadText,
     count_text: `0 / ${n} cleared`,
-    pill_text: "NO-BID",
+    // FA-165: curable gates are CAUTION (match verdict_word), not a hard NO-BID.
+    pill_text: allUncurable ? "NO-BID" : "CAUTION",
     outcome_win_lead: outcomeWin,
     outcome_no_lead: outcomeNo,
     outcome_win_tail: winTail,
@@ -1681,6 +1683,10 @@ function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>):
     }
   };
   pushRowStrings(compJson.compliance_flags);
+  // FA-165: dfars_flags[].required_action often carries the real CO email
+  // ("Email Jane Doe (jane.doe@us.af.mil) before…") when Section L holds only
+  // the name — scan it so the CO isn't lost to a false "not found".
+  pushRowStrings(compJson.dfars_flags);
   const exec = compJson.executive_summary as Record<string, unknown> | undefined;
   if (exec && typeof exec === "object") pushRowStrings(exec.actions);
   const corpus = parts.join(" \n ");
