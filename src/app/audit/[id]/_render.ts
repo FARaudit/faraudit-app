@@ -1201,8 +1201,13 @@ function setClinEmptyState(html: string): string {
 // Replace the win_probability metric tile contents when the value is null
 // (basis=0 / unknown). DESIGN ruling 2026-06-04: don't render 0% — it reads
 // as "0% chance". Show "—" + hide the bar.
+// Gap 4 (FA-119): basis is only written by the on-demand /api/win-probability
+// endpoint, so a fresh audit lands here with value "—" AND benchmark "—" — a
+// fully blank tile. Override the benchmark sub-line with an explicit pending
+// affordance so the tile reads as "not computed yet", not "no data". We do NOT
+// trigger the endpoint from the render path — it stays on-demand.
 function setWinProbabilityNull(html: string): string {
-  return html
+  const withDash = html
     .replace(
       /(<div class="mhv-metric">[\s\S]*?<span data-field="win_probability">)\d+(<\/span><span class="u">)%(<\/span>)/,
       `$1—$2$3`
@@ -1211,6 +1216,7 @@ function setWinProbabilityNull(html: string): string {
       /(<div class="mhv-metric">[\s\S]*?<span data-field="win_probability">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
       `$10%$2`
     );
+  return replaceFieldText(withDash, "win_probability_benchmark", "Win probability — available after audit opens");
 }
 
 // ─── main entry ─────────────────────────────────────────────────────────────
@@ -2501,7 +2507,19 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // §03 work-statement reveal — Phase 2 #3. Floor: never silently vanish.
   html = renderWorkStatementReveal(html, vm.work_statement, vm.work_statement_unknown);
 
-  html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
+  // Gap 6 (FA-119): on a closed solicitation the §09 Pre-flight Checklist is
+  // reference-only — suppress the live submission action items (which imply a
+  // submission is still possible) and show a closed notice instead.
+  if (vm.is_expired) {
+    html = setFieldInner(
+      html,
+      "submission_checklist_filtered",
+      "div",
+      `<div class="ck-expired-notice"><span class="ck-expired-badge">Solicitation closed — checklist is reference only</span></div>`
+    );
+  } else {
+    html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
+  }
 
   html = renderIncumbentBranch(html, vm.has_incumbent);
   html = replaceFieldText(html, "incumbent_none_head", vm.incumbent_none_head);
