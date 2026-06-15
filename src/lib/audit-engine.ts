@@ -1224,27 +1224,43 @@ async function callRisksWithValidation(
       ? _call3StubForTests(n, model ?? _activeModel ?? CLAUDE_MODEL)
       : callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, model, imageBase64, imageMediaType, pdfFileId, extraDocs).catch(labeled);
 
-  const text1 = await attempt(1, undefined);
-  const json1 = extractJSON(text1);
-  const v1 = validateRisksJson(json1);
-  if (v1.valid) return { text: text1, json: json1, escalated: false, call3: { outcome: "ok" } };
+  try {
+    const text1 = await attempt(1, undefined);
+    const json1 = extractJSON(text1);
+    const v1 = validateRisksJson(json1);
+    if (v1.valid) return { text: text1, json: json1, escalated: false, call3: { outcome: "ok" } };
 
-  console.warn(`[audit-engine] FA-137: call-3 structurally invalid on first attempt (${v1.reason}) · retrying with ${CLAUDE_RETRY_MODEL}`);
-  const text2 = await attempt(2, CLAUDE_RETRY_MODEL);
-  const json2 = extractJSON(text2);
-  const v2 = validateRisksJson(json2);
-  if (v2.valid) {
-    console.log(`[audit-engine] FA-137: call-3 saved by ${CLAUDE_RETRY_MODEL} (retried_ok)`);
-    return { text: text2, json: json2, escalated: true, call3: { outcome: "retried_ok", saved_by: CLAUDE_RETRY_MODEL } };
+    console.warn(`[audit-engine] FA-137: call-3 structurally invalid on first attempt (${v1.reason}) · retrying with ${CLAUDE_RETRY_MODEL}`);
+    const text2 = await attempt(2, CLAUDE_RETRY_MODEL);
+    const json2 = extractJSON(text2);
+    const v2 = validateRisksJson(json2);
+    if (v2.valid) {
+      console.log(`[audit-engine] FA-137: call-3 saved by ${CLAUDE_RETRY_MODEL} (retried_ok)`);
+      return { text: text2, json: json2, escalated: true, call3: { outcome: "retried_ok", saved_by: CLAUDE_RETRY_MODEL } };
+    }
+
+    console.error(`[audit-engine] FA-137: call3_collapsed — ladder exhausted (attempt1: ${v1.reason} · attempt2 ${CLAUDE_RETRY_MODEL}: ${v2.reason}). Run will persist with loud degradation marker, NOT as clean.`);
+    return {
+      text: text2,
+      json: json2,
+      escalated: true,
+      call3: { outcome: "collapsed", reason: `attempt1: ${v1.reason} · attempt2 (${CLAUDE_RETRY_MODEL}): ${v2.reason}` }
+    };
+  } catch (err) {
+    // FA-119 Phase 2B — a payload/page 4xx (e.g. the API's 600-page ceiling)
+    // throws today and HARD-FAILS the whole run, discarding the intact overview
+    // + compliance. Convert it to the SAME graceful collapse the empty-JSON
+    // path uses: assertMinimumAuditShape(..., {allowCollapsedRisks:true}) then
+    // completes the run WITH the §05 degradation banner. Non-payload errors
+    // (5xx exhaust, network, etc.) still propagate — never swallow a real
+    // failure (FA-147 release path).
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/Claude API 4\d\d/.test(msg) && /page|payload|size|maximum|too\s*(large|long|many)/i.test(msg)) {
+      console.error(`[audit-engine] FA-119: call-3 payload-4xx → graceful collapse (not hard fail): ${msg.slice(0, 160)}`);
+      return { text: "", json: null, escalated: true, call3: { outcome: "collapsed", reason: `API 4xx (payload/pages): ${msg.slice(0, 160)}` } };
+    }
+    throw err;
   }
-
-  console.error(`[audit-engine] FA-137: call3_collapsed — ladder exhausted (attempt1: ${v1.reason} · attempt2 ${CLAUDE_RETRY_MODEL}: ${v2.reason}). Run will persist with loud degradation marker, NOT as clean.`);
-  return {
-    text: text2,
-    json: json2,
-    escalated: true,
-    call3: { outcome: "collapsed", reason: `attempt1: ${v1.reason} · attempt2 (${CLAUDE_RETRY_MODEL}): ${v2.reason}` }
-  };
 }
 
 function isDocumentType(v: unknown): v is DocumentType {
