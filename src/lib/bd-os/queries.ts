@@ -196,6 +196,17 @@ export interface AuditRow {
   // (compliance_json.verdict.gates) drives the ledger "N gates" badge so they
   // don't fall through to a misleading "Watch".
   verdict_gates: unknown[] | null;
+  // FA-167 — Recently Audited card bindings. office_leaf is the persisted SAM
+  // buying-office leaf (FA-151); home/page.tsx server-resolves it through
+  // cleanAgencyName() into office_display so the card never renders the
+  // redundant "DEPT OF DEFENSE" parent. exec_* are the executive_summary
+  // sub-fields the card binds (verdict pill + insight = verdict tail of `what`).
+  office_leaf: string | null;
+  exec_what: string | null;
+  exec_verdict: string | null;
+  exec_factors: string | null;
+  // Server-derived in home/page.tsx — cleanAgencyName(office_leaf || agency).
+  office_display?: string;
 }
 
 // ─── Tab 4: Defense Spending Intel (FA-96) ────────────────────────────────
@@ -241,7 +252,7 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates")
+    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates, office_leaf, exec_what:compliance_json->executive_summary->>what, exec_verdict:compliance_json->executive_summary->>verdict, exec_factors:compliance_json->executive_summary->>factors")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);

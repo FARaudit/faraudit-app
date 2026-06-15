@@ -8,6 +8,7 @@ import {
   fetchAgencyStats,
   fetchDefenseSpending
 } from "@/lib/bd-os/queries";
+import { cleanAgencyName } from "@/lib/audit-engine";
 import HomeClient from "./HomeClient";
 import "./home.css";
 
@@ -30,12 +31,25 @@ export default async function HomePage() {
     fetchDefenseSpending(supabase).catch(() => [])
   ]);
 
+  // FA-167 — resolve the buying-office leaf server-side through the SAME
+  // cleanAgencyName() the audit report uses (FA-151). office_leaf is the raw
+  // SAM leaf ("FA4600  55 CONS  PKP" / "DLA AVIATION AT OKLAHOMA CITY, OK");
+  // cleanAgencyName strips the redundant DEPT-OF-DEFENSE parent, the "AT"
+  // preposition and trailing state code. Done here (server) so the heavy
+  // engine module never reaches the client bundle.
+  const recentAuditsForCard = recentAudits.map((a) => ({
+    ...a,
+    office_display: (a.office_leaf || a.agency)
+      ? cleanAgencyName(a.office_leaf || a.agency || "").replace(/\s{2,}/g, " ").trim()
+      : ""
+  }));
+
   return (
     <HomeClient
       user={{ email: user.email || "", id: user.id }}
       counter={counter}
       opportunities={opportunities}
-      recentAudits={recentAudits}
+      recentAudits={recentAuditsForCard}
       kos={kos}
       agencies={agencies}
       defenseSpending={defenseSpending}
