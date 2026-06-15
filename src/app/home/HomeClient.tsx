@@ -1442,6 +1442,7 @@ function raInsight(a: AuditRow): string {
     s = f.replace(/\s*\([^)]*\)\s*$/, "").trim();
   }
   if (!s) return "";
+  s = s.charAt(0).toUpperCase() + s.slice(1);  // FA-167.1 — sentence-case (es.what tail starts lowercase); matches /audit
   return s.length > 90 ? s.slice(0, 89).trimEnd() + "…" : s;
 }
 
