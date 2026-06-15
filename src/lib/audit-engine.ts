@@ -878,6 +878,14 @@ export interface Call3Outcome {
   outcome: "ok" | "retried_ok" | "collapsed";
   saved_by?: string;
   reason?: string;
+  // FA-119 Phase 3 (OUTCOME 3) — raw-output telemetry so a reader can tell
+  // "truncated" (large raw_chars + ends_clean=false + salvaged findings) from
+  // "genuinely empty" (raw_chars ≈ 0) by reading compliance_json.call3, not by
+  // inferring. Persisted in the existing JSONB column — no schema change.
+  raw_chars?: number;   // length of the deciding attempt's raw model text
+  ends_clean?: boolean; // raw text ends in } or ] (vs cut off mid-JSON = truncated)
+  salvaged?: boolean;   // findings were recovered from a truncated response
+  recovered?: number;   // count of complete findings salvaged
 }
 
 // FA-137 — STRUCTURAL validity only, per Brain ruling: thinness thresholds
@@ -1015,6 +1023,45 @@ function extractJSON(text: string | undefined): Record<string, unknown> | null {
     if (p) return p;
   }
   return null;
+}
+
+// FA-119 Phase 3 (OUTCOME 2) — recover COMPLETE risk_findings objects from a
+// TRUNCATED risks response. The capture-manager call can overrun max_tokens on
+// clause-dense solicitations and cut the JSON mid-array; rather than discard a
+// real-but-partial register in favour of DFARS-trap boilerplate, collect every
+// balanced {...} object inside the "risk_findings" array up to the cutoff.
+// Brace/string-aware (mirrors findBalancedJSON). Returns [] when unrecoverable.
+// Exported for the gate suite (tested against a REAL truncated risks response).
+export function salvageRiskFindings(text: string | undefined): Record<string, unknown>[] {
+  if (!text) return [];
+  const key = text.indexOf('"risk_findings"');
+  if (key === -1) return [];
+  const open = text.indexOf("[", key);
+  if (open === -1) return [];
+  const out: Record<string, unknown>[] = [];
+  let depth = 0, start = -1, inString = false, escape = false;
+  for (let i = open + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{") { if (depth === 0) start = i; depth++; }
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const obj = tryParse(text.slice(start, i + 1));
+        if (obj) out.push(obj);
+        start = -1;
+      }
+    } else if (ch === "]" && depth === 0) {
+      break; // array closed cleanly
+    }
+  }
+  return out;
 }
 
 function tryParse(s: string): Record<string, unknown> | null {
@@ -1224,11 +1271,14 @@ async function callRisksWithValidation(
       ? _call3StubForTests(n, model ?? _activeModel ?? CLAUDE_MODEL)
       : callClaude(systemPrompt, userPrompt, maxTokens, pdfBase64, model, imageBase64, imageMediaType, pdfFileId, extraDocs).catch(labeled);
 
+  // OUTCOME 3 — raw-output telemetry for the call3 record (truncated vs empty).
+  const tele = (t: string) => ({ raw_chars: t.length, ends_clean: /[}\]]\s*$/.test(t.trim()) });
+
   try {
     const text1 = await attempt(1, undefined);
     const json1 = extractJSON(text1);
     const v1 = validateRisksJson(json1);
-    if (v1.valid) return { text: text1, json: json1, escalated: false, call3: { outcome: "ok" } };
+    if (v1.valid) return { text: text1, json: json1, escalated: false, call3: { outcome: "ok", ...tele(text1) } };
 
     console.warn(`[audit-engine] FA-137: call-3 structurally invalid on first attempt (${v1.reason}) · retrying with ${CLAUDE_RETRY_MODEL}`);
     const text2 = await attempt(2, CLAUDE_RETRY_MODEL);
@@ -1236,7 +1286,24 @@ async function callRisksWithValidation(
     const v2 = validateRisksJson(json2);
     if (v2.valid) {
       console.log(`[audit-engine] FA-137: call-3 saved by ${CLAUDE_RETRY_MODEL} (retried_ok)`);
-      return { text: text2, json: json2, escalated: true, call3: { outcome: "retried_ok", saved_by: CLAUDE_RETRY_MODEL } };
+      return { text: text2, json: json2, escalated: true, call3: { outcome: "retried_ok", saved_by: CLAUDE_RETRY_MODEL, ...tele(text2) } };
+    }
+
+    // OUTCOME 2 — both parse attempts failed (truncation or empty). Before
+    // discarding everything for DFARS-trap boilerplate, salvage the COMPLETE
+    // risk_findings objects the model produced before the cutoff. A partial set
+    // of REAL findings beats synthesized filler. Prefer whichever attempt
+    // recovered more; engine uses these as risksJson.risk_findings, so the §05
+    // fallback (synthesizeFallbackRisks) never fires.
+    const salv1 = salvageRiskFindings(text1);
+    const salv2 = salvageRiskFindings(text2);
+    const useTwo = salv2.length >= salv1.length;
+    const salvaged = useTwo ? salv2 : salv1;
+    const salvText = useTwo ? text2 : text1;
+    const salvJson = { risk_findings: salvaged };
+    if (validateRisksJson(salvJson).valid) {
+      console.warn(`[audit-engine] FA-119: call-3 SALVAGED ${salvaged.length} complete findings from a truncated response — boilerplate fallback avoided.`);
+      return { text: salvText, json: salvJson, escalated: true, call3: { outcome: "retried_ok", saved_by: "salvage", salvaged: true, recovered: salvaged.length, ...tele(salvText) } };
     }
 
     console.error(`[audit-engine] FA-137: call3_collapsed — ladder exhausted (attempt1: ${v1.reason} · attempt2 ${CLAUDE_RETRY_MODEL}: ${v2.reason}). Run will persist with loud degradation marker, NOT as clean.`);
@@ -1244,7 +1311,7 @@ async function callRisksWithValidation(
       text: text2,
       json: json2,
       escalated: true,
-      call3: { outcome: "collapsed", reason: `attempt1: ${v1.reason} · attempt2 (${CLAUDE_RETRY_MODEL}): ${v2.reason}` }
+      call3: { outcome: "collapsed", reason: `attempt1: ${v1.reason} · attempt2 (${CLAUDE_RETRY_MODEL}): ${v2.reason}`, ...tele(text2) }
     };
   } catch (err) {
     // FA-119 Phase 2B — a payload/page 4xx (e.g. the API's 600-page ceiling)
@@ -2413,7 +2480,14 @@ JSON only — one key: risk_findings.`;
     callRisksWithValidation(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
       risksPrompt,
-      6000,
+      // FA-119 Phase 3 (OUTCOME 1): the risks call had the SMALLEST ceiling
+      // (6000) yet needs the most verbose output — on clause-dense solicitations
+      // (b91c1ac6: 142 FAR + 83 DFARS) the capture-manager JSON overran 6000 and
+      // truncated mid-array → extractJSON returned null → call3_collapsed →
+      // DFARS-trap boilerplate fallback. Raise to 16000 (> compliance's 8000;
+      // within Claude 4 native output limits, no beta header needed) so a full
+      // risk register fits. Truncation is now the rare case, handled by salvage.
+      16000,
       pdfBase64,
       imageBase64,
       imageMediaType,
