@@ -1827,8 +1827,21 @@ function parseDocDeadline(deadlines: unknown): Date | null {
 // to avoid matching stray 6-digit numbers (CAGE, ZIP+4, clause IDs).
 function extractNaicsFromText(text: string): string | null {
   if (!text) return null;
-  const m = text.match(/NAICS[^\d]{0,40}(\d{6})\b/i);
-  return m ? m[1] : null;
+  // 1) NAICS label adjacent to the value (clean / linear text layouts).
+  const labeled = text.match(/NAICS[^\d]{0,40}(\d{6})\b/i);
+  if (labeled) return labeled[1];
+  // 2) FA-180 — SF-1449 grids scatter the value far from the "(NAICS):" label in
+  //    the extracted text layer (observed on HM047626R0039: the only 6-digit
+  //    token, 541611, sits lines away from the label). If the doc references
+  //    NAICS and there is exactly ONE 6-digit token with a valid NAICS sector
+  //    prefix, that is the code. More than one candidate → return null (never
+  //    guess; the field stays "not found").
+  if (!/NAICS|NORTH AMERICAN INDUSTRY CLASSIFICATION/i.test(text)) return null;
+  const VALID_NAICS = /^(?:11|21|22|23|31|32|33|42|44|45|48|49|51|52|53|54|55|56|61|62|71|72|81|92)\d{4}$/;
+  const cands = Array.from(
+    new Set(Array.from(text.matchAll(/\b(\d{6})\b/g), (m) => m[1]))
+  ).filter((c) => VALID_NAICS.test(c));
+  return cands.length === 1 ? cands[0] : null;
 }
 
 // FA-172: buying-agency fallback for uploaded audits. Distinctive name
