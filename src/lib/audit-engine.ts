@@ -1768,8 +1768,21 @@ const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-
 // in prose. The original detectSprsGate only checked 252.204-7020 in the
 // DFARS array; SPRRA cites 252.204-7019 + uses "SPRS" verbatim in §L, so
 // it missed.
-const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
+// FA-172 refinement (supersedes the FA-146 7012-inclusion): a HARD "current
+// SPRS score required" decision gate may only fire on clauses that MANDATE a
+// posted NIST SP 800-171 assessment for award eligibility — 252.204-7019 (the
+// Notice of Assessment Requirements) and 252.204-7020. 252.204-7012
+// (safeguarding CDI) and 252.204-7024 (notice on the *use* of SPRS in
+// evaluation) are near-ubiquitous on DoD CUI buys and do NOT mandate a current
+// posted score as a bid gate — including them fired a false NO-BID on
+// HM047626R0039 (de67855a), which carries 7012 + 7024 but neither 7019 nor 7020.
+const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020/;
+// Risk-register trap detection keeps the broad mention pattern (any SPRS signal
+// is worth a hedged risk row); the GATE uses the stricter mandate pattern below.
 const SPRS_TEXT_RE = /\bSPRS\b|Supplier\s+Performance\s+Risk\s+System|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i;
+// Gate-only: language that actually MANDATES a current/posted assessment or
+// score, not a bare mention or the 252.204-7024 "use of SPRS" notice.
+const SPRS_GATE_TEXT_RE = /current\s+SPRS\s+score|summary[-\s]level\s+score|posted\s+in\s+SPRS|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment\s+(?:must|shall|is\s+required|required|posted|submitted)/i;
 
 function daysUntil(d: Date | null): number | null {
   if (!d) return null;
@@ -1809,7 +1822,9 @@ export function detectSprsGate(
   docText: string = ""
 ): DecisionGate | null {
   const inClauses = Array.isArray(dfarsClauses) && dfarsClauses.some((c) => SPRS_CLAUSE_RE.test(c));
-  const inDocText = SPRS_TEXT_RE.test(docText);
+  // FA-172: gate fires only on mandate-grade text, not a bare "SPRS" mention
+  // (which matches the 252.204-7024 "use of SPRS" notice title).
+  const inDocText = SPRS_GATE_TEXT_RE.test(docText);
   if (!inClauses && !inDocText) return null;
   const days = daysUntil(responseDeadline);
   // FA-164: a SPRS Basic Assessment can post within days, so only a <7-day
