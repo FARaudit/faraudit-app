@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
+import { assembleSamDocumentSet, assembleUploadedDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -81,6 +81,10 @@ export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") || "";
   let noticeIdRaw = "";
   let pdf: File | null = null;
+  // FA-170 — multipart "pdf" can now arrive multiple times (group upload:
+  // Solicitation + SOW + Section L/M …). Collected here, validated + buffered
+  // below, then form-first assembled into a document set with ingestion meta.
+  const uploadedFiles: File[] = [];
   let storagePathInput: string | null = null;
 
   if (contentType.includes("application/json")) {
@@ -100,17 +104,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
     }
     noticeIdRaw = String(formData.get("noticeId") || "");
-    const pdfEntry = formData.get("pdf");
-    if (pdfEntry instanceof File && pdfEntry.size > 0) {
-      const pdfResult = pdfFileSchema.safeParse(pdfEntry);
+    // FA-170 — getAll() captures every "pdf" part (legacy clients send one;
+    // group uploads send N). Each is schema-validated; the first valid file is
+    // kept as `pdf` for the title/synthesis fallbacks below.
+    const pdfEntries = formData.getAll("pdf").filter((e): e is File => e instanceof File && e.size > 0);
+    for (const entry of pdfEntries) {
+      const pdfResult = pdfFileSchema.safeParse(entry);
       if (!pdfResult.success) {
         return NextResponse.json(
           { error: pdfResult.error.issues[0]?.message || "Invalid PDF" },
           { status: 400 }
         );
       }
-      pdf = pdfResult.data;
+      uploadedFiles.push(pdfResult.data);
     }
+    pdf = uploadedFiles[0] ?? null;
   }
 
   // ━━ Validate notice ID with zod ━━
@@ -160,13 +168,39 @@ export async function POST(req: NextRequest) {
     safeName = sanitizeFilename(storagePathInput.split("/").pop() || "upload.pdf");
   }
 
-  // ━━ Multipart PDF arm (≤ Vercel request-body limit) ━━
-  if (!pdfBuffer && pdf) {
-    pdfBuffer = Buffer.from(await pdf.arrayBuffer());
-    safeName = sanitizeFilename(pdf.name);
+  // ━━ Multipart PDF arm (≤ Vercel request-body limit) — FA-170 multi-file ━━
+  // Buffer + validate EVERY uploaded file (magic bytes + per-file + total cap);
+  // form-first assembly happens below so the binding solicitation, not the
+  // first-arriving attachment, becomes the primary document.
+  const uploadedDocs: { name: string; buffer: Buffer }[] = [];
+  if (!pdfBuffer && uploadedFiles.length > 0) {
+    let totalBytes = 0;
+    for (const f of uploadedFiles) {
+      const buf = Buffer.from(await f.arrayBuffer());
+      if (buf.length > MAX_PDF_BYTES) {
+        return NextResponse.json(
+          { error: `PDF "${f.name}" exceeds ${MAX_PDF_BYTES / 1024 / 1024}MB limit` },
+          { status: 413 }
+        );
+      }
+      if (!isPdfMagicValid(buf)) {
+        return NextResponse.json(
+          { error: `File "${f.name}" is not a valid PDF (magic bytes mismatch)` },
+          { status: 400 }
+        );
+      }
+      totalBytes += buf.length;
+      uploadedDocs.push({ name: f.name, buffer: buf });
+    }
+    if (totalBytes > MAX_PDF_BYTES) {
+      return NextResponse.json(
+        { error: `Uploaded files total ${(totalBytes / 1048576).toFixed(1)}MB exceeds ${MAX_PDF_BYTES / 1024 / 1024}MB limit` },
+        { status: 413 }
+      );
+    }
   }
 
-  if (!noticeId && !pdfBuffer) {
+  if (!noticeId && !pdfBuffer && uploadedDocs.length === 0) {
     return NextResponse.json({ error: "noticeId or pdf required" }, { status: 400 });
   }
 
@@ -184,6 +218,20 @@ export async function POST(req: NextRequest) {
         { error: "File is not a valid PDF (magic bytes mismatch)" },
         { status: 400 }
       );
+    }
+  }
+
+  // ━━ FA-170 — form-first assembly of the uploaded set ━━
+  // Run BEFORE synthesizing the solicitation title so the title + primary
+  // document come from the binding form (e.g. "Solicitation.pdf"), not the
+  // first-arriving attachment (e.g. "Attachment 1 - SOW.pdf"). Pure local
+  // bytes — no network. Produces the ingestion meta that drives the FA-136
+  // partial-ingestion banner on the upload path (previously always null).
+  let uploadAssembled: AssembledDocumentSet | null = null;
+  if (uploadedDocs.length > 0) {
+    uploadAssembled = await assembleUploadedDocumentSet(uploadedDocs, null);
+    if (uploadAssembled.primary) {
+      safeName = sanitizeFilename(uploadAssembled.primary.name);
     }
   }
 
@@ -205,7 +253,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!solicitation && pdf && safeName) {
+  // safeName is set by every upload arm (storage, single multipart, multi-file
+  // assembly); `pdf` is null on the storage arm, so gate on safeName (FA-170).
+  if (!solicitation && safeName) {
     // PDF filenames downloaded from SAM.gov often look like "Solicitation+-+FA301626Q0068.pdf"
     // (URL-encoded). Decode + normalize so the audit row stores a readable title.
     const rawTitle = safeName.replace(/\.pdf$/i, "").replace(/\+/g, " ").trim();
@@ -225,7 +275,9 @@ export async function POST(req: NextRequest) {
       typeOfSetAside: null,
       postedDate: null,
       responseDeadLine: null,
-      description: `(PDF upload: ${safeName}, ${(pdf.size / 1024).toFixed(0)} KB — Claude reads attached document directly.)`,
+      description: uploadAssembled
+        ? `(Document upload: ${uploadAssembled.ingestion.files_ingested} of ${uploadAssembled.ingestion.files_total} file(s) ingested; primary "${safeName}" — Claude reads the attached documents directly.)`
+        : `(PDF upload: ${safeName}${pdfBuffer ? `, ${(pdfBuffer.length / 1024).toFixed(0)} KB` : ""} — Claude reads attached document directly.)`,
       resourceLinks: []
     };
   }
@@ -240,8 +292,14 @@ export async function POST(req: NextRequest) {
   // audit-worker and return 202 immediately. SAM PDF download is deferred to
   // the worker (pdf_url); uploaded PDFs go to the Anthropic Files API NOW at
   // every size, because the worker never sees the multipart bytes.
-  if (process.env.AUDIT_ASYNC_ENQUEUE === "true") {
-    return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer, safeName, rate });
+  // FA-170 — the async worker is single-document by construction (it reads one
+  // anthropic_file_id / pdf_path / pdf_url). Multi-file uploads MUST take the
+  // synchronous path below, which assembles the form-first set. Single-file
+  // uploads and noticeId runs may still enqueue; feed the single upload buffer
+  // from uploadedDocs (multipart no longer pre-sets pdfBuffer).
+  if (process.env.AUDIT_ASYNC_ENQUEUE === "true" && uploadedDocs.length <= 1) {
+    const singleBuffer = uploadedDocs[0]?.buffer ?? pdfBuffer;
+    return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer: singleBuffer, safeName, rate });
   }
 
   // ━━ Content for Claude — pdf / image / text via fetchPdfFromSamUrl ━━
@@ -273,7 +331,29 @@ export async function POST(req: NextRequest) {
   let primaryDocName: string | null = null;
   let ingestion: IngestionMeta | null = null;
 
-  if (pdfBuffer) {
+  if (uploadAssembled) {
+    // FA-170 — multipart upload arm: primary form inline, the rest as
+    // attachmentPdfs, with the partial-ingestion meta that drives the FA-136
+    // banner. Uploaded files are always ≤ inline budget (multipart is capped
+    // well under the Files-API threshold), so the primary is never offloaded.
+    ingestion = uploadAssembled.ingestion;
+    if (uploadAssembled.primary) {
+      pdfBase64 = uploadAssembled.primary.base64;
+      pdfBuffer = uploadAssembled.primary.buffer;
+      pdfSource = "uploaded";
+      attachmentPdfs = uploadAssembled.attachments;
+      primaryDocName = uploadAssembled.primary.name;
+      console.log(`[audit] FA-170: upload set assembled · ${ingestion.files_ingested}/${ingestion.files_total} ingested · primary=${primaryDocName} · form_identified=${ingestion.form_identified}`);
+    } else if (uploadedDocs[0]) {
+      // Defensive: no ingestible primary (every member dropped by the page
+      // ceiling) — proceed single-doc on the first upload rather than fail.
+      pdfBuffer = uploadedDocs[0].buffer;
+      pdfBase64 = pdfBuffer.toString("base64");
+      pdfSource = "uploaded";
+    }
+  } else if (pdfBuffer) {
+    // Storage arm (single large PDF > Vercel body limit) — unchanged inline /
+    // Files-API split. No multi-file assembly (one file by construction).
     if (pdfBuffer.length > PDF_FILES_API_THRESHOLD_BYTES) {
       const uploaded = await uploadPdfToFilesApi(pdfBuffer, safeName);
       pdfFileId = uploaded.fileId;
