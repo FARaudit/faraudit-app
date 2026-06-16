@@ -249,6 +249,9 @@ export interface ComplianceJSON {
   // any LLM-inferred size-standard text — model variance on this field has
   // shipped wrong numbers ("750 employees" for 336413 which is 1,250).
   naics_size_standard?: string;
+  // FA-172: structured NAICS code (6-digit) — from SAM metadata or extracted
+  // from the SF-1449 cover form for uploaded audits. Header binds this.
+  naics?: string;
   // Fork 1: deterministic regex extraction. Populated when a sole-source J&A
   // names a specific vendor — gates the score cap to ≤25 + DECLINE recommendation
   // (Fix 6). Renderer embeds name + CAGE inline on the "Structural no-bid" risk.
@@ -1819,6 +1822,15 @@ function parseDocDeadline(deadlines: unknown): Date | null {
   return null;
 }
 
+// FA-172: extract a 6-digit NAICS from SF-1449 cover-form text when SAM metadata
+// carries none (uploaded audits). Requires "NAICS" within 40 chars of the digits
+// to avoid matching stray 6-digit numbers (CAGE, ZIP+4, clause IDs).
+function extractNaicsFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(/NAICS[^\d]{0,40}(\d{6})\b/i);
+  return m ? m[1] : null;
+}
+
 export function buildSoleSourceGate(vendor: { name: string; cage?: string | null }): DecisionGate {
   const named = vendor.cage ? `${vendor.name} (CAGE ${vendor.cage})` : vendor.name;
   return {
@@ -2666,11 +2678,17 @@ JSON only — one key: risk_findings.`;
   if (reverseAuctionRisk) prioritized = [reverseAuctionRisk, ...prioritized];
 
   // Fix 1 — NAICS size standard lookup. Pull NAICS from the solicitation
-  // metadata; fall back to overviewJson if the SAM payload didn't carry it.
+  // metadata; FA-172: fall back to the document text (SF-1449 cover form) for
+  // uploaded audits where SAM carries no naicsCode, and persist the structured
+  // value so the header can bind it (was prose-only → header rendered blank).
   const naicsCode =
     (typeof (solicitation as Record<string, unknown> | null)?.["naicsCode"] === "string" ? String((solicitation as Record<string, unknown>)["naicsCode"]) : null)
+    ?? extractNaicsFromText(solText)
     ?? null;
-  if (naicsCode) complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  if (naicsCode) {
+    complianceJson.naics = naicsCode;
+    complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  }
 
   // Fix 11 — PIID decode from the canonical or SAM solicitation number.
   const piidSource =
