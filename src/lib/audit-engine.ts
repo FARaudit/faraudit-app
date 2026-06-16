@@ -1831,6 +1831,39 @@ function extractNaicsFromText(text: string): string | null {
   return m ? m[1] : null;
 }
 
+// FA-172: buying-agency fallback for uploaded audits. Distinctive name
+// substrings (not bare 2-3 letter abbreviations, which collide with address
+// tokens like "...SPRINGFIELD VA 22150"). Ordered most-distinctive first.
+function extractAgencyFromText(text: string): string | null {
+  if (!text) return null;
+  const known: Array<[RegExp, string]> = [
+    [/Geospatial-Intelligence/i, "National Geospatial-Intelligence Agency"],
+    [/Defense Logistics Agency/i, "Defense Logistics Agency"],
+    [/Defense Information Systems/i, "Defense Information Systems Agency"],
+    [/Defense Advanced Research/i, "Defense Advanced Research Projects Agency"],
+    [/Missile Defense Agency/i, "Missile Defense Agency"],
+    [/Defense Intelligence Agency/i, "Defense Intelligence Agency"],
+    [/Department of the Air Force|\bAir Force\b/i, "Department of the Air Force"],
+    [/Department of the Army|\bU\.?S\.? Army\b/i, "Department of the Army"],
+    [/Department of the Navy|\bU\.?S\.? Navy\b|NAVSEA|NAVAIR/i, "Department of the Navy"],
+    [/Veterans Affairs/i, "Department of Veterans Affairs"],
+    [/General Services Administration/i, "General Services Administration"],
+  ];
+  for (const [re, name] of known) if (re.test(text)) return name;
+  // Fallback: SF-1449 Block 9 "ISSUED BY" — first line after an optional CODE token.
+  const m = text.match(/ISSUED BY\s*(?:CODE\s*\S+\s*)?\n?\s*([A-Z][A-Za-z'’.\- ]{4,60})/);
+  return m ? m[1].replace(/\s+/g, " ").trim() : null;
+}
+
+// FA-172: offer-due-date fallback (SF-1449 Block 8) for uploaded audits.
+function extractOfferDueFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(/OFFER DUE DATE[^0-9]{0,40}(\d{1,2}\/\d{1,2}\/\d{2,4}(?:\s+\d{3,4}\s*[A-Z]{2,3})?)/i);
+  if (m) return m[1].replace(/\s+/g, " ").trim();
+  const g = text.match(/(?:offer|proposal|quote|response)s?\s+(?:are\s+)?due[^0-9]{0,30}(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  return g ? g[1].trim() : null;
+}
+
 export function buildSoleSourceGate(vendor: { name: string; cage?: string | null }): DecisionGate {
   const named = vendor.cage ? `${vendor.name} (CAGE ${vendor.cage})` : vendor.name;
   return {
@@ -3785,12 +3818,29 @@ function normalizeContractType(raw: string | null | undefined): ExtractedFacts["
 
 function bindExternalFacts(
   facts: ExtractedFacts,
-  external: ExternalBoundFacts | undefined
+  external: ExternalBoundFacts | undefined,
+  docText: string = ""
 ): _v2BoundFactSources {
   const boundSources: _v2BoundFactSources = {};
   const stringKeys = ["solicitorNumber", "naicsCode", "setAside", "offerDueDate", "issuingOffice"] as const;
+  // FA-172: document-text fallbacks for uploaded audits whose deterministic
+  // extractor missed SF-1449 cover-form fields (header rendered blank: agency /
+  // NAICS / set-aside / due date). Doc wins over v1/sam; only fills when empty.
+  const docFallback: Partial<Record<(typeof stringKeys)[number], (t: string) => string | null>> = {
+    naicsCode: extractNaicsFromText,
+    setAside: (t) => applySetAsideRegex(t, undefined) ?? null,
+    offerDueDate: extractOfferDueFromText,
+    issuingOffice: extractAgencyFromText,
+  };
   for (const key of stringKeys) {
     if (facts[key]) {
+      boundSources[key] = "document";
+      continue;
+    }
+    const docFn = docFallback[key];
+    const fromDoc = docFn && docText ? docFn(docText) : null;
+    if (fromDoc) {
+      facts[key] = fromDoc;
       boundSources[key] = "document";
       continue;
     }
@@ -3933,7 +3983,7 @@ export async function runAuditV2(
   // FA-131 — fill scalar-fact gaps from V1 vision + SAM metadata before the
   // judgment call. The presence map below (FA-113 contradiction filter) reads
   // facts AFTER this fill, so bound facts also suppress contradictory output.
-  const boundSources = bindExternalFacts(facts, external);
+  const boundSources = bindExternalFacts(facts, external, doc.rawText);
 
   // §03 FIX (FA-119) — attachment work-statement fallback. extractScope(s["C"])
   // only reads the in-form Section C; on real solicitations the governing work
