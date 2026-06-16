@@ -249,6 +249,9 @@ export interface ComplianceJSON {
   // any LLM-inferred size-standard text — model variance on this field has
   // shipped wrong numbers ("750 employees" for 336413 which is 1,250).
   naics_size_standard?: string;
+  // FA-172: structured NAICS code (6-digit) — from SAM metadata or extracted
+  // from the SF-1449 cover form for uploaded audits. Header binds this.
+  naics?: string;
   // Fork 1: deterministic regex extraction. Populated when a sole-source J&A
   // names a specific vendor — gates the score cap to ≤25 + DECLINE recommendation
   // (Fix 6). Renderer embeds name + CAGE inline on the "Structural no-bid" risk.
@@ -1768,12 +1771,97 @@ const AFTO_RE = /\bAFTO\b|Air\s*Force\s*Technical\s*Order|TO\s+\d+[A-Z]?\d*-[\d-
 // in prose. The original detectSprsGate only checked 252.204-7020 in the
 // DFARS array; SPRRA cites 252.204-7019 + uses "SPRS" verbatim in §L, so
 // it missed.
-const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020|252\.204-7012/;
+// FA-172 refinement (supersedes the FA-146 7012-inclusion): a HARD "current
+// SPRS score required" decision gate may only fire on clauses that MANDATE a
+// posted NIST SP 800-171 assessment for award eligibility — 252.204-7019 (the
+// Notice of Assessment Requirements) and 252.204-7020. 252.204-7012
+// (safeguarding CDI) and 252.204-7024 (notice on the *use* of SPRS in
+// evaluation) are near-ubiquitous on DoD CUI buys and do NOT mandate a current
+// posted score as a bid gate — including them fired a false NO-BID on
+// HM047626R0039 (de67855a), which carries 7012 + 7024 but neither 7019 nor 7020.
+const SPRS_CLAUSE_RE = /252\.204-7019|252\.204-7020/;
+// Risk-register trap detection keeps the broad mention pattern (any SPRS signal
+// is worth a hedged risk row); the GATE uses the stricter mandate pattern below.
 const SPRS_TEXT_RE = /\bSPRS\b|Supplier\s+Performance\s+Risk\s+System|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment/i;
+// Gate-only: language that actually MANDATES a current/posted assessment or
+// score, not a bare mention or the 252.204-7024 "use of SPRS" notice.
+const SPRS_GATE_TEXT_RE = /current\s+SPRS\s+score|summary[-\s]level\s+score|posted\s+in\s+SPRS|NIST\s*SP\s*800-171\s+(?:Basic\s+)?Assessment\s+(?:must|shall|is\s+required|required|posted|submitted)/i;
 
 function daysUntil(d: Date | null): number | null {
   if (!d) return null;
   return Math.floor((d.getTime() - Date.now()) / 86_400_000);
+}
+
+// FA-172: uploaded audits carry no SAM `responseDeadLine`; the real offer-due
+// date is extracted into complianceJson.deadlines ({label,date}[] | string[]).
+// Parse it so gate curability (SPRS/JCP) + posting-lag math are correct for
+// uploads instead of defaulting to "deadline unknown → uncurable → NO-BID".
+function parseDocDeadline(deadlines: unknown): Date | null {
+  if (!Array.isArray(deadlines)) return null;
+  const entries = deadlines
+    .map((e) =>
+      typeof e === "string"
+        ? { label: "", date: e }
+        : e && typeof e === "object"
+        ? { label: String((e as Record<string, unknown>).label ?? ""), date: String((e as Record<string, unknown>).date ?? "") }
+        : { label: "", date: "" }
+    )
+    .filter((e) => e.date);
+  const dueRe = /due|offer|proposal|response|quote|receipt|clos/i;
+  const tryParse = (s: string): Date | null => {
+    // Strip trailing tz/time-word tokens new Date() can't parse (e.g. "1700 CT").
+    const cleaned = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    const d = new Date(cleaned);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const due = entries.filter((e) => dueRe.test(e.label) || dueRe.test(e.date));
+  for (const e of [...due, ...entries]) {
+    const d = tryParse(e.date);
+    if (d) return d;
+  }
+  return null;
+}
+
+// FA-172: extract a 6-digit NAICS from SF-1449 cover-form text when SAM metadata
+// carries none (uploaded audits). Requires "NAICS" within 40 chars of the digits
+// to avoid matching stray 6-digit numbers (CAGE, ZIP+4, clause IDs).
+function extractNaicsFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(/NAICS[^\d]{0,40}(\d{6})\b/i);
+  return m ? m[1] : null;
+}
+
+// FA-172: buying-agency fallback for uploaded audits. Distinctive name
+// substrings (not bare 2-3 letter abbreviations, which collide with address
+// tokens like "...SPRINGFIELD VA 22150"). Ordered most-distinctive first.
+function extractAgencyFromText(text: string): string | null {
+  if (!text) return null;
+  const known: Array<[RegExp, string]> = [
+    [/Geospatial-Intelligence/i, "National Geospatial-Intelligence Agency"],
+    [/Defense Logistics Agency/i, "Defense Logistics Agency"],
+    [/Defense Information Systems/i, "Defense Information Systems Agency"],
+    [/Defense Advanced Research/i, "Defense Advanced Research Projects Agency"],
+    [/Missile Defense Agency/i, "Missile Defense Agency"],
+    [/Defense Intelligence Agency/i, "Defense Intelligence Agency"],
+    [/Department of the Air Force|\bAir Force\b/i, "Department of the Air Force"],
+    [/Department of the Army|\bU\.?S\.? Army\b/i, "Department of the Army"],
+    [/Department of the Navy|\bU\.?S\.? Navy\b|NAVSEA|NAVAIR/i, "Department of the Navy"],
+    [/Veterans Affairs/i, "Department of Veterans Affairs"],
+    [/General Services Administration/i, "General Services Administration"],
+  ];
+  for (const [re, name] of known) if (re.test(text)) return name;
+  // Fallback: SF-1449 Block 9 "ISSUED BY" — first line after an optional CODE token.
+  const m = text.match(/ISSUED BY\s*(?:CODE\s*\S+\s*)?\n?\s*([A-Z][A-Za-z'’.\- ]{4,60})/);
+  return m ? m[1].replace(/\s+/g, " ").trim() : null;
+}
+
+// FA-172: offer-due-date fallback (SF-1449 Block 8) for uploaded audits.
+function extractOfferDueFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(/OFFER DUE DATE[^0-9]{0,40}(\d{1,2}\/\d{1,2}\/\d{2,4}(?:\s+\d{3,4}\s*[A-Z]{2,3})?)/i);
+  if (m) return m[1].replace(/\s+/g, " ").trim();
+  const g = text.match(/(?:offer|proposal|quote|response)s?\s+(?:are\s+)?due[^0-9]{0,30}(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  return g ? g[1].trim() : null;
 }
 
 export function buildSoleSourceGate(vendor: { name: string; cage?: string | null }): DecisionGate {
@@ -1809,7 +1897,9 @@ export function detectSprsGate(
   docText: string = ""
 ): DecisionGate | null {
   const inClauses = Array.isArray(dfarsClauses) && dfarsClauses.some((c) => SPRS_CLAUSE_RE.test(c));
-  const inDocText = SPRS_TEXT_RE.test(docText);
+  // FA-172: gate fires only on mandate-grade text, not a bare "SPRS" mention
+  // (which matches the 252.204-7024 "use of SPRS" notice title).
+  const inDocText = SPRS_GATE_TEXT_RE.test(docText);
   if (!inClauses && !inDocText) return null;
   const days = daysUntil(responseDeadline);
   // FA-164: a SPRS Basic Assessment can post within days, so only a <7-day
@@ -2605,9 +2695,11 @@ JSON only — one key: risk_findings.`;
     const raw = (solicitation as Record<string, unknown> | null)?.["responseDeadLine"];
     if (typeof raw === "string" && raw.length > 0) {
       const d = new Date(raw);
-      return isNaN(d.getTime()) ? null : d;
+      if (!isNaN(d.getTime())) return d;
     }
-    return null;
+    // FA-172: SAM deadline absent (uploaded audit) → fall back to the offer-due
+    // date extracted from the document so gates compute curability correctly.
+    return parseDocDeadline(complianceJson.deadlines);
   })();
   const sprsRisk = checkSprsLagRisk(complianceJson.dfars_clauses, responseDeadline);
   if (sprsRisk) prioritized = [sprsRisk, ...prioritized];
@@ -2619,11 +2711,17 @@ JSON only — one key: risk_findings.`;
   if (reverseAuctionRisk) prioritized = [reverseAuctionRisk, ...prioritized];
 
   // Fix 1 — NAICS size standard lookup. Pull NAICS from the solicitation
-  // metadata; fall back to overviewJson if the SAM payload didn't carry it.
+  // metadata; FA-172: fall back to the document text (SF-1449 cover form) for
+  // uploaded audits where SAM carries no naicsCode, and persist the structured
+  // value so the header can bind it (was prose-only → header rendered blank).
   const naicsCode =
     (typeof (solicitation as Record<string, unknown> | null)?.["naicsCode"] === "string" ? String((solicitation as Record<string, unknown>)["naicsCode"]) : null)
+    ?? extractNaicsFromText(solText)
     ?? null;
-  if (naicsCode) complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  if (naicsCode) {
+    complianceJson.naics = naicsCode;
+    complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  }
 
   // Fix 11 — PIID decode from the canonical or SAM solicitation number.
   const piidSource =
@@ -3720,12 +3818,29 @@ function normalizeContractType(raw: string | null | undefined): ExtractedFacts["
 
 function bindExternalFacts(
   facts: ExtractedFacts,
-  external: ExternalBoundFacts | undefined
+  external: ExternalBoundFacts | undefined,
+  docText: string = ""
 ): _v2BoundFactSources {
   const boundSources: _v2BoundFactSources = {};
   const stringKeys = ["solicitorNumber", "naicsCode", "setAside", "offerDueDate", "issuingOffice"] as const;
+  // FA-172: document-text fallbacks for uploaded audits whose deterministic
+  // extractor missed SF-1449 cover-form fields (header rendered blank: agency /
+  // NAICS / set-aside / due date). Doc wins over v1/sam; only fills when empty.
+  const docFallback: Partial<Record<(typeof stringKeys)[number], (t: string) => string | null>> = {
+    naicsCode: extractNaicsFromText,
+    setAside: (t) => applySetAsideRegex(t, undefined) ?? null,
+    offerDueDate: extractOfferDueFromText,
+    issuingOffice: extractAgencyFromText,
+  };
   for (const key of stringKeys) {
     if (facts[key]) {
+      boundSources[key] = "document";
+      continue;
+    }
+    const docFn = docFallback[key];
+    const fromDoc = docFn && docText ? docFn(docText) : null;
+    if (fromDoc) {
+      facts[key] = fromDoc;
       boundSources[key] = "document";
       continue;
     }
@@ -3868,7 +3983,7 @@ export async function runAuditV2(
   // FA-131 — fill scalar-fact gaps from V1 vision + SAM metadata before the
   // judgment call. The presence map below (FA-113 contradiction filter) reads
   // facts AFTER this fill, so bound facts also suppress contradictory output.
-  const boundSources = bindExternalFacts(facts, external);
+  const boundSources = bindExternalFacts(facts, external, doc.rawText);
 
   // §03 FIX (FA-119) — attachment work-statement fallback. extractScope(s["C"])
   // only reads the in-form Section C; on real solicitations the governing work
