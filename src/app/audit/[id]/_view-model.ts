@@ -634,6 +634,36 @@ function validatedSetAside(...candidates: Array<unknown>): string {
   return "—";
 }
 
+// FA-172 header redo: the doc-extracted agency arrives as the raw SF-1449
+// "ISSUED BY" block ("National Geospatial-Intelligence Agency (NGA), ATTN:
+// OCSG: MS: S84-OCSG, 7500 GEOINT DRIVE, SPRINGFIELD VA 22150"). The masthead
+// wants the org name only — cut at the ATTN / mail-stop / street-address tail.
+function cleanAgencyDisplay(raw: unknown): string {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return "";
+  return s
+    .split(/,?\s*(?:ATTN\b|MS:|MAIL\s*STOP\b|\d{3,}\s+[A-Z])/i)[0]
+    .trim()
+    .replace(/[,;]\s*$/, "");
+}
+
+// FA-172 header redo: set-aside often arrives as a full sentence ("SET ASIDE:
+// 100.00 % FOR: 8(A) — Block 10 of SF 1449 ..."). Pull the canonical token so
+// validatedSetAside / SET_ASIDE_LABEL can map it to the display label.
+function extractSetAsideToken(raw: unknown): string {
+  const s = (typeof raw === "string" ? raw : "").toUpperCase();
+  if (!s) return "";
+  if (/\bEDWOSB\b/.test(s)) return "EDWOSB";
+  if (/\bWOSB\b|WOMEN-OWNED/.test(s)) return "WOSB";
+  if (/\bSDVOSB\b|SERVICE-DISABLED VETERAN/.test(s)) return "SDVOSB";
+  if (/\bHUBZONE\b|HUB ZONE/.test(s)) return "HUBZONE";
+  if (/8\s*\(\s*A\s*\)|\b8A\b/.test(s)) return "8(A)";
+  if (/\bVOSB\b|VETERAN-OWNED/.test(s)) return "VOSB";
+  if (/TOTAL SMALL BUSINESS|SMALL BUSINESS SET-ASIDE|SET ASIDE[^.]*SMALL BUSINESS/.test(s)) return "SMALL BUSINESS";
+  if (/UNRESTRICTED|FULL AND OPEN|FULL & OPEN/.test(s)) return "UNRESTRICTED";
+  return "";
+}
+
 function fmtStamp(d: Date | null): string {
   if (!d) return "—";
   const m = MONTHS_SHORT[d.getUTCMonth()];
@@ -2402,7 +2432,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code "(AO)") across 5 independent runs while SAM's hierarchy says
     // "DLA AVIATION AT OKLAHOMA CITY". Doc-read strings may appear only via
     // the labeled issuing·end-user pair or when SAM has nothing.
-    agency: officeLeaf || (formatIssuingEndUser(v2Meta?.agency, audit.agency) ?? validatedAgency(audit.agency, v2Meta?.agency)),
+    agency: officeLeaf || (formatIssuingEndUser(cleanAgencyDisplay(v2Meta?.agency), audit.agency) ?? validatedAgency(cleanAgencyDisplay(v2Meta?.agency), audit.agency, v2Meta?.agency)),
     agency_sub: officeLeaf ? topHierarchyAgency : "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
@@ -2411,6 +2441,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // column. Doc text overrides metadata — masthead must show what the
     // solicitation actually says.
     set_aside: validatedSetAside(
+      extractSetAsideToken(v2Meta?.set_aside ?? compJson.set_aside_text),
       v2Meta?.set_aside,
       compJson.set_aside_type,
       audit.set_aside
