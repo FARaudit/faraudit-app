@@ -512,9 +512,9 @@ button{font-family:inherit}
           <div class="ra-input-row" data-mode-panel="upload" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" hidden>
             <label class="ra-dropzone" id="dropzone">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
-              <span class="ra-dz-title">Drop a solicitation PDF or <span class="ra-dz-browse">browse</span></span>
-              <span class="ra-dz-types">PDF · DOCX · max 25MB</span>
-              <input type="file" id="fileInput" hidden accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+              <span class="ra-dz-title">Drop your solicitation set (PDF/DOCX) or <span class="ra-dz-browse">browse</span></span>
+              <span class="ra-dz-types">PDF · DOCX · multiple files OK · 25MB each</span>
+              <input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             </label>
           </div>
           <!-- Q3 — file chip + explicit Run -->
@@ -815,7 +815,7 @@ var DETECT = (function(){
 
   var MAX_BYTES = 25 * 1024 * 1024;
   var ACCEPT_EXT = /\.(pdf|docx)$/i;
-  var selected = null;
+  var selected = [];
 
   function fmtSize(b){
     if(b<1024) return b+' B';
@@ -828,25 +828,33 @@ var DETECT = (function(){
   }
   function hideErr(){ uDetect.className='detect'; uDetect.innerHTML=''; }
 
-  function setFile(f){
-    if(!f){ selected=null; chip.classList.remove('show'); uRow.classList.remove('show'); dz.style.display=''; hideErr(); return; }
-    if(!ACCEPT_EXT.test(f.name)){
-      showErr('PDF or DOCX only · <b>that file is ' + escapeHtml(f.name.split('.').pop().toUpperCase()) + '</b>.');
-      return;
-    }
-    if(f.size > MAX_BYTES){
-      showErr('PDF or DOCX only · 25MB max. <b>That file is '+fmtSize(f.size)+'</b>.');
-      return;
-    }
-    selected = f;
-    fcName.textContent = f.name;
-    fcSize.textContent = fmtSize(f.size);
+  function renderChips(){
+    if(!selected.length){ chip.classList.remove('show'); uRow.classList.remove('show'); dz.style.display=''; return; }
+    var total = 0; for(var i=0;i<selected.length;i++){ total += selected[i].size; }
+    var primary = selected[0].name;
+    fcName.textContent = selected.length === 1 ? primary : primary + '  (+' + (selected.length - 1) + ' more)';
+    fcSize.textContent = selected.length === 1 ? fmtSize(total) : fmtSize(total) + ' · ' + selected.length + ' files';
+    chip.title = selected.map(function(f){ return f.name + ' (' + fmtSize(f.size) + ')'; }).join('\n');
     chip.classList.add('show');
     uRow.classList.add('show');
     dz.style.display='none';
-    hideErr();
   }
-  function clearFile(){ selected=null; fileInp.value=''; setFile(null); }
+  // accept a FileList/array; validate each, dedupe, accumulate (a solicitation set is multiple files)
+  function addFiles(list){
+    if(!list || !list.length) return;
+    var arr = Array.prototype.slice.call(list), added = 0;
+    for(var i=0;i<arr.length;i++){
+      var f = arr[i];
+      if(!ACCEPT_EXT.test(f.name)){ showErr('PDF or DOCX only · <b>'+escapeHtml(f.name)+'</b> is '+escapeHtml((f.name.split('.').pop()||'').toUpperCase())+'.'); continue; }
+      if(f.size > MAX_BYTES){ showErr('25MB max per file · <b>'+escapeHtml(f.name)+'</b> is '+fmtSize(f.size)+'.'); continue; }
+      var dup = false; for(var j=0;j<selected.length;j++){ if(selected[j].name===f.name && selected[j].size===f.size){ dup=true; break; } }
+      if(dup) continue;
+      selected.push(f); added++;
+    }
+    if(added) hideErr();
+    renderChips();
+  }
+  function clearFile(){ selected=[]; fileInp.value=''; renderChips(); hideErr(); }
 
   // dragover / dragleave / drop
   ['dragenter','dragover'].forEach(function(ev){
@@ -858,18 +866,16 @@ var DETECT = (function(){
   dz.addEventListener('drop', function(e){
     e.preventDefault(); e.stopPropagation();
     dz.classList.remove('dragover');
-    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if(f) setFile(f);
+    if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
   });
   // file picker (NOT auto-submit — chip + explicit Run only)
   fileInp.addEventListener('change', function(e){
-    var f = e.target.files && e.target.files[0];
-    if(f) setFile(f);
+    if(e.target.files) addFiles(e.target.files);
   });
   fcX.addEventListener('click', clearFile);
   uRun.addEventListener('click', function(){
-    if(!selected) return;
-    submitAudit({ noticeId: '', pdfFile: selected, sourceBtn: uRun, errorTarget: uDetect });
+    if(!selected.length) return;
+    submitAudit({ noticeId: '', pdfFiles: selected, sourceBtn: uRun, errorTarget: uDetect });
   });
 })();
 
@@ -882,7 +888,7 @@ function submitAudit(opts){
   try { localStorage.setItem('faraudit-ra-has-run','1'); } catch(e) {}
 
   var noticeId   = opts.noticeId || '';
-  var pdfFile    = opts.pdfFile  || null;
+  var pdfFiles   = opts.pdfFiles || (opts.pdfFile ? [opts.pdfFile] : []);
   var sourceBtn  = opts.sourceBtn;
   var errorTarget= opts.errorTarget;
 
@@ -892,7 +898,7 @@ function submitAudit(opts){
 
   var fd = new FormData();
   fd.append('noticeId', noticeId);
-  if(pdfFile) fd.append('pdf', pdfFile);
+  pdfFiles.forEach(function(f){ fd.append('pdf', f); });
 
   fetch('/api/audit', { method:'POST', body:fd, credentials:'include' })
     .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok:r.ok, status:r.status, data:d }; }); })
