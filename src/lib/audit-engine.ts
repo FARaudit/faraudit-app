@@ -3870,6 +3870,39 @@ export async function runAuditV2(
   // facts AFTER this fill, so bound facts also suppress contradictory output.
   const boundSources = bindExternalFacts(facts, external);
 
+  // §03 FIX (FA-119) — attachment work-statement fallback. extractScope(s["C"])
+  // only reads the in-form Section C; on real solicitations the governing work
+  // statement (PWS/SOW/SOO) is an ingested ATTACHMENT, appended to doc.rawText
+  // under "=== ATTACHMENT DOCUMENT: <name> (sam_attachment) ===" and NOT inside
+  // sections["C"]. When §C yielded nothing, recover the work statement from the
+  // named work-statement attachment's body so the classifier gets the SOW/PWS/
+  // SOO type signal (the bug behind §03 "unknown" on the tornado case).
+  //
+  // SUPPLY GUARD (non-negotiable): never fire on manufacturing/supply buys —
+  // NAICS sectors 31/32/33. A supply buy has no work statement; scanning a
+  // "PWS"-named attachment would mis-classify it. naicsCode is read AFTER
+  // bindExternalFacts (SAM-filled), so the guard is reliable. Protects the
+  // gyroscope (336413) and every similar supply buy → they stay honestly UNKNOWN.
+  if (!facts.workStatementText || facts.workStatementText.length < 200) {
+    const isManufacturingSupply = /^3[123]/.test(facts.naicsCode ?? "");
+    if (!isManufacturingSupply) {
+      // Strong work-statement name signals only (full phrases + boundaried
+      // abbreviations) — never anchor on a stray "SOW"/"PWS" clause reference.
+      const WS_NAME = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|project\s*description|scope\s*of\s*work/i;
+      // split → [formText, name1, body1, name2, body2, ...]
+      const parts = doc.rawText.split(/\n\n=== ATTACHMENT DOCUMENT: (.+?) \(sam_attachment\) ===\n\n/);
+      for (let i = 1; i + 1 < parts.length; i += 2) {
+        if (WS_NAME.test(parts[i])) {
+          const body = parts[i + 1].trim();
+          if (body.length >= 100) {
+            facts.workStatementText = body.slice(0, 4000);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   const judgment = await _v2RunJudgment(facts, boundSources);
 
   // FA-113: contradiction filter on V2 surfaces — drop judgment.risks,
