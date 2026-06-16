@@ -137,9 +137,16 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   const isAmendment = (n: string) => /\bamd\b|amendment|_amd_|-amd-/i.test(n);
   const isForm = (n: string) => {
     if (isAmendment(n)) return false;
+    // An attachment/exhibit/wage/drawing/spec is never the form even if its
+    // name contains "solicitation" (e.g. "Attachment 12 Solicitation RFIs.pdf").
+    if (/attach|attch|exhibit|wage|drawing|\bspec\b/i.test(n)) return false;
     const nn = norm(n);
-    if (solNorm && nn.includes(solNorm) && !/attach|attch|exhibit|wage|drawing|spec/i.test(n)) return true;
-    return /^sol[\s_-]|^solicitation\b|solicitation[\s_-]*-|sf[\s-]?1449|sf[\s-]?0?18\b|sf[\s-]?33\b/i.test(n.trim());
+    if (solNorm && nn.includes(solNorm)) return true;
+    // \bsolicitation\b (unanchored) catches the common upload shapes the old
+    // anchored patterns missed: "1. HM047626R0039 - Solicitation.pdf" and
+    // "Solicitation - FA460026Q0047.pdf". SF cover-form numbers cover the rest,
+    // incl. SF-1442 (construction) which the prior list omitted.
+    return /\bsolicitation\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?0?18\b|sf[\s-]?33\b/i.test(n.trim());
   };
   const planned: DocumentPlanEntry[] = entries.map((e) => ({
     ...e,
@@ -312,6 +319,114 @@ export async function assembleSamDocumentSet(
     files_total: plan.length,
     files_ingested: ingestedCount,
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form"),
+    form_name: formEntry?.name ?? null,
+    ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
+    files
+  };
+  return {
+    primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer } : null,
+    attachments: attachments.map((a) => ({ name: a.name, base64: a.base64, buffer: a.buffer })),
+    ingestion
+  };
+}
+
+// FA-170 — multi-FILE UPLOAD assembly (local bytes, no network).
+//
+// Bug: the manual-upload arm (POST /api/audit, multipart) only ever read ONE
+// file (formData.get("pdf")) and never populated compliance_json.ingestion —
+// so a user who uploaded a Solicitation + SOW + Section L/M got an audit of a
+// single file (often the attachment, never the form) with NO partial-ingestion
+// banner. Observed across HM047626R0039, AOCSSB26R0039, FA487726B0001,
+// 1232SA26R0020, FA460026Q0047 (2026-06-16): each audit was titled after the
+// attachment and silently dropped the binding solicitation.
+//
+// This is the upload twin of assembleSamDocumentSet: same deterministic
+// form-first plan + budget + page ceiling + ingestion meta, but the bytes are
+// already in hand (no manifest fetch, no download). Reuses the exact pure
+// planners (planDocumentOrder / applyBudget / applyPageBudget) so upload and
+// SAM ingestion order identically and the gate suite covers both.
+export interface LocalUploadFile {
+  name: string;
+  buffer: Buffer;
+}
+
+// Uploaded filenames frequently arrive URL-encoded ("Statement+of+Work.pdf",
+// "Solicitation+-+FA460026Q0047.pdf") because they were downloaded from SAM.gov
+// and re-uploaded verbatim. The role/work-statement heuristics match on
+// human-readable tokens (\bsolicitation\b, "statement of work"), so the literal
+// "+" must be decoded to spaces first — otherwise the form is never identified
+// and a SOW/PWS wins the size tie-break as primary (observed across all five
+// 2026-06-16 group uploads). No-op for names that already use real spaces.
+export function prettifyUploadName(name: string): string {
+  let s = name;
+  try {
+    s = decodeURIComponent(s.replace(/\+/g, " "));
+  } catch {
+    s = s.replace(/\+/g, " ");
+  }
+  return s.replace(/\s+/g, " ").trim();
+}
+
+export async function assembleUploadedDocumentSet(
+  localFiles: LocalUploadFile[],
+  solicitationNumber: string | null
+): Promise<AssembledDocumentSet> {
+  // Synthesize manifest entries from the local bytes — sizes are known exactly.
+  // Names are decoded so the form-first heuristics see readable tokens.
+  const manifest: AttachmentManifestEntry[] = localFiles.map((f, i) => ({
+    name: prettifyUploadName(f.name),
+    sizeBytes: f.buffer.length,
+    resourceId: `local-${i}`,
+    url: ""
+  }));
+  const bufById = new Map(manifest.map((m, i) => [m.resourceId, localFiles[i].buffer]));
+
+  const plan = planDocumentOrder(manifest, solicitationNumber);
+  const formEntry = plan.find((e) => e.role === "form") ?? null;
+  const { ingest, skipped } = applyBudget(plan);
+
+  // Pass 1: page-count every byte/doc-budgeted member (bytes already local).
+  const files: IngestionFileMeta[] = [];
+  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number }> = [];
+  for (const e of plan) {
+    const planned = ingest.find((i) => i.resourceId === e.resourceId);
+    if (!planned) {
+      const skip = skipped.find((s) => s.entry.resourceId === e.resourceId);
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
+      continue;
+    }
+    const buf = bufById.get(e.resourceId);
+    if (!buf || buf.subarray(0, 4).toString("latin1") !== "%PDF") {
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: "not a valid PDF (magic-byte check)" });
+      continue;
+    }
+    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
+  }
+  // Pass 2: trim by the page ceiling (form exempt → generics drop first).
+  const { ingest: pageKept } = applyPageBudget(
+    counted.map((c) => ({ resourceId: c.entry.resourceId, role: c.entry.role, name: c.entry.name, pages: c.pages })),
+    MAX_TOTAL_PAGES
+  );
+  const keptIds = new Set(pageKept.map((k) => k.resourceId));
+  // Pass 3: build the ingested set + the loud per-file record.
+  const ingested: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  for (const c of counted) {
+    if (keptIds.has(c.entry.resourceId)) {
+      ingested.push({ name: c.entry.name, base64: c.base64, buffer: c.buffer, role: c.entry.role });
+      files.push({ name: c.entry.name, role: c.entry.role, bytes: c.buffer.length, ingested: true });
+    } else {
+      files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `page budget (${MAX_TOTAL_PAGES}pp) exceeded` });
+    }
+  }
+
+  const primary = ingested.find((d) => d.role === "form") ?? ingested[0] ?? null;
+  const attachments = ingested.filter((d) => d !== primary);
+  const skippedCount = files.filter((f) => !f.ingested).length;
+  const ingestion: IngestionMeta = {
+    files_total: plan.length,
+    files_ingested: ingested.length,
+    form_identified: !!formEntry && ingested.some((d) => d.role === "form"),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),

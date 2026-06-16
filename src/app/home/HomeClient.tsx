@@ -1521,7 +1521,10 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   // the UI now.
   const [mode, setMode] = useState<RunAuditMode>("notice");
   const [noticeId, setNoticeId] = useState("");
-  const [pdf, setPdf] = useState<File | null>(null);
+  // FA-170 — group uploads: a solicitation set is multiple files (form + SOW +
+  // Section L/M). Was a single File; now a list so the server can ingest all
+  // of them form-first instead of silently auditing the first attachment.
+  const [pdfs, setPdfs] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // FA-118 — true when the failure is PIEE-gated; renders the badge + manual-
@@ -1538,7 +1541,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     if (prefill?.notice_id) {
       setMode("notice");
       setNoticeId(prefill.notice_id);
-      setPdf(null);
+      setPdfs([]);
     }
   }, [prefill?.notice_id]);
 
@@ -1565,7 +1568,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     if (next === mode) return;
     // Clear the OTHER mode's state on switch so submit can never accidentally
     // see stale input from a mode the user already abandoned.
-    if (next === "notice") setPdf(null);
+    if (next === "notice") setPdfs([]);
     else setNoticeId("");
     setError(null);
     setPieeGated(false);
@@ -1628,15 +1631,25 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     e.preventDefault();
     setError(null); setPieeGated(false); setResult(null); setQueuedNote(null);
     if (mode === "notice" && !noticeId) { setError("Paste a SAM Notice ID."); return; }
-    if (mode === "pdf" && !pdf) { setError("Select a PDF to upload."); return; }
+    if (mode === "pdf" && pdfs.length === 0) { setError("Select at least one PDF to upload."); return; }
+    // FA-170 — multipart carries the whole group in one request; that request is
+    // bounded by Vercel's ~4.5MB body limit. A single large PDF takes the
+    // Storage arm below; a multi-file group whose combined size exceeds the
+    // limit can't be sent this way — fail loud rather than silently truncate.
+    const totalBytes = pdfs.reduce((n, f) => n + f.size, 0);
+    if (mode === "pdf" && pdfs.length > 1 && totalBytes >= STORAGE_UPLOAD_THRESHOLD_BYTES) {
+      setError("Combined upload exceeds ~4.5MB. Audit by SAM Notice ID, or upload fewer/smaller files per group.");
+      return;
+    }
     setSubmitting(true);
     try {
-      // FA-122 — PDFs at/above the Vercel request-body limit (~4.5MB) can't go
-      // through multipart /api/audit; upload them straight to Supabase Storage
-      // and POST only the storage path as JSON. Notice IDs + smaller PDFs keep
-      // the original multipart path.
+      // FA-122 — a SINGLE PDF at/above the Vercel request-body limit (~4.5MB)
+      // can't go through multipart /api/audit; upload it straight to Supabase
+      // Storage and POST only the storage path as JSON. Notice IDs + smaller
+      // PDFs + multi-file groups keep the multipart path (FA-170).
       let res: Response;
-      if (mode === "pdf" && pdf && pdf.size >= STORAGE_UPLOAD_THRESHOLD_BYTES) {
+      if (mode === "pdf" && pdfs.length === 1 && pdfs[0].size >= STORAGE_UPLOAD_THRESHOLD_BYTES) {
+        const big = pdfs[0];
         setQueuedNote("Large file — uploading securely to storage…");
         const sb = createBrowserClient();
         const { data: { user: u } } = await sb.auth.getUser();
@@ -1646,8 +1659,8 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
           setSubmitting(false);
           return;
         }
-        const key = `uploads/${u.id}/${Date.now()}-${pdf.name.replace(/[^\w.-]/g, "_")}`;
-        const up = await sb.storage.from("audit-pdfs").upload(key, pdf, {
+        const key = `uploads/${u.id}/${Date.now()}-${big.name.replace(/[^\w.-]/g, "_")}`;
+        const up = await sb.storage.from("audit-pdfs").upload(key, big, {
           contentType: "application/pdf",
           upsert: false,
         });
@@ -1665,7 +1678,9 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       } else {
         const fd = new FormData();
         if (mode === "notice") fd.set("noticeId", noticeId);
-        else if (pdf) fd.set("pdf", pdf);
+        // FA-170 — append every selected file under the same "pdf" key; the
+        // server form-first assembles them and ingests all (banner on overflow).
+        else for (const f of pdfs) fd.append("pdf", f);
         res = await fetch("/api/audit", { method: "POST", body: fd });
       }
       const json = await res.json();
@@ -1701,7 +1716,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     : mode === "notice"
       ? "Run Audit · Notice ID →"
       : "Run Audit · PDF →";
-  const submitDisabled = submitting || (mode === "notice" ? !noticeId : !pdf);
+  const submitDisabled = submitting || (mode === "notice" ? !noticeId : pdfs.length === 0);
 
   return (
     <div className="audit-tab">
@@ -1790,8 +1805,8 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
           <>
             <label className="audit-drop-zone" style={{ display: "block" }}>
               <div className="adz-title">Drop your solicitation PDF here</div>
-              <div className="adz-sub">{pdf ? pdf.name : "Or click to browse · Any page count · Any agency · Any format"}</div>
-              <input type="file" accept="application/pdf" onChange={(e) => setPdf(e.target.files?.[0] || null)} style={{ display: "none" }} />
+              <div className="adz-sub">{pdfs.length === 0 ? "Or click to browse · Upload the whole group (solicitation + SOW + Section L/M) · Any agency" : pdfs.length === 1 ? pdfs[0].name : `${pdfs.length} files selected — ${pdfs.map((f) => f.name).join(", ")}`}</div>
+              <input type="file" accept="application/pdf" multiple onChange={(e) => setPdfs(e.target.files ? Array.from(e.target.files) : [])} style={{ display: "none" }} />
               <span className="adz-btn" style={{ marginTop: 18 }}>
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M8 2v9M4 7l4-5 4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
