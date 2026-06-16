@@ -1789,6 +1789,36 @@ function daysUntil(d: Date | null): number | null {
   return Math.floor((d.getTime() - Date.now()) / 86_400_000);
 }
 
+// FA-172: uploaded audits carry no SAM `responseDeadLine`; the real offer-due
+// date is extracted into complianceJson.deadlines ({label,date}[] | string[]).
+// Parse it so gate curability (SPRS/JCP) + posting-lag math are correct for
+// uploads instead of defaulting to "deadline unknown → uncurable → NO-BID".
+function parseDocDeadline(deadlines: unknown): Date | null {
+  if (!Array.isArray(deadlines)) return null;
+  const entries = deadlines
+    .map((e) =>
+      typeof e === "string"
+        ? { label: "", date: e }
+        : e && typeof e === "object"
+        ? { label: String((e as Record<string, unknown>).label ?? ""), date: String((e as Record<string, unknown>).date ?? "") }
+        : { label: "", date: "" }
+    )
+    .filter((e) => e.date);
+  const dueRe = /due|offer|proposal|response|quote|receipt|clos/i;
+  const tryParse = (s: string): Date | null => {
+    // Strip trailing tz/time-word tokens new Date() can't parse (e.g. "1700 CT").
+    const cleaned = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    const d = new Date(cleaned);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const due = entries.filter((e) => dueRe.test(e.label) || dueRe.test(e.date));
+  for (const e of [...due, ...entries]) {
+    const d = tryParse(e.date);
+    if (d) return d;
+  }
+  return null;
+}
+
 export function buildSoleSourceGate(vendor: { name: string; cage?: string | null }): DecisionGate {
   const named = vendor.cage ? `${vendor.name} (CAGE ${vendor.cage})` : vendor.name;
   return {
@@ -2620,9 +2650,11 @@ JSON only — one key: risk_findings.`;
     const raw = (solicitation as Record<string, unknown> | null)?.["responseDeadLine"];
     if (typeof raw === "string" && raw.length > 0) {
       const d = new Date(raw);
-      return isNaN(d.getTime()) ? null : d;
+      if (!isNaN(d.getTime())) return d;
     }
-    return null;
+    // FA-172: SAM deadline absent (uploaded audit) → fall back to the offer-due
+    // date extracted from the document so gates compute curability correctly.
+    return parseDocDeadline(complianceJson.deadlines);
   })();
   const sprsRisk = checkSprsLagRisk(complianceJson.dfars_clauses, responseDeadline);
   if (sprsRisk) prioritized = [sprsRisk, ...prioritized];
