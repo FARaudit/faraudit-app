@@ -46,6 +46,22 @@ export interface V2RenderInput {
   // not v2_shadow.surfaces). Per-file role at form/amendment/attachment grain;
   // §C/§L/§M section tags deferred to FA-182. null → banner stripped.
   ingestion?: IngestionRender | null;
+  // ⑤.7 The Capture Play — sequenced move list SYNTHESIZED from the engine's
+  // own findings (v2_shadow.judgment l02Catches + high-severity risks). Every
+  // move traces to a real finding; empty → section stripped.
+  capture_play?: CaptureMove[] | null;
+}
+
+// ⑤.7 — one sequenced capture move. All fields derive from a real engine
+// finding; nothing is invented. `when` drives the timing pill colour.
+export interface CaptureMove {
+  order: number;
+  when: "now" | "qa" | "quote";
+  when_label: string;
+  effort: string; // "" → effort chip hidden (we don't fabricate a duration)
+  do: string;
+  why: string;
+  source_label: string;
 }
 
 // Render-shaped subset of lib/sam-attachments IngestionMeta (kept local to
@@ -55,6 +71,72 @@ export interface IngestionRender {
   files_ingested: number;
   form_name: string | null;
   files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean }>;
+}
+
+// ⑤.7 — synthesize the Capture Play from the engine's persisted judgment. We
+// re-sequence + time-anchor the engine's OWN findings (l02 "invisible catches"
+// + high-severity risk mitigations); we never invent a move. Pure function,
+// exported for test. Empty judgment → []  → section stripped.
+export function synthesizeCapturePlay(shadow: Record<string, unknown> | null | undefined): CaptureMove[] {
+  if (!shadow || typeof shadow !== "object") return [];
+  const sj = (shadow.judgment as Record<string, unknown> | null) ?? null;
+  if (!sj || typeof sj !== "object") return [];
+  const l02 = Array.isArray(sj.l02Catches) ? (sj.l02Catches as Array<Record<string, unknown>>) : [];
+  const risks = Array.isArray(sj.risks) ? (sj.risks as Array<Record<string, unknown>>) : [];
+  const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+  type Cand = { do: string; why: string; source: string; severity: number };
+  const cands: Cand[] = [];
+  // L02 "invisible catches" — the Capture Play's native material (move + why).
+  for (const c of l02) {
+    const move = clean(c.move);
+    if (!move) continue;
+    const src = clean(c.category) || clean(c.title);
+    cands.push({ do: move, why: clean(c.why_invisible), source: src ? `From execution traps · ${src}` : "From execution traps", severity: 2 });
+  }
+  // High-severity risks carrying a concrete mitigation → a move.
+  const sevRank = (s: string): number => {
+    const u = s.toUpperCase();
+    return u === "P0" || u === "CRITICAL" || u === "HIGH" ? 3 : u === "P1" || u === "MEDIUM" ? 2 : 1;
+  };
+  for (const r of risks) {
+    const mit = clean(r.mitigation);
+    if (!mit) continue;
+    const sev = sevRank(clean(r.severity));
+    if (sev < 2) continue; // skip low-severity advisory risks
+    const ref = clean(r.trapClause) || clean(r.sectionReference);
+    cands.push({ do: mit, why: clean(r.description), source: ref ? `From risk register · ${ref}` : "From risk register", severity: sev });
+  }
+  // Dedup by normalized action prefix; keep the richer / higher-severity entry.
+  const seen = new Map<string, Cand>();
+  for (const c of cands) {
+    const key = c.do.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
+    const prev = seen.get(key);
+    if (!prev || c.severity > prev.severity || (c.severity === prev.severity && c.why.length > prev.why.length)) {
+      seen.set(key, c);
+    }
+  }
+  // Timing — classify WHEN each real action must happen from its own text.
+  const whenOf = (c: Cand): "now" | "qa" | "quote" => {
+    const t = `${c.do} ${c.why}`.toLowerCase();
+    if (/\bsprs\b|\bjcp\b|register|registration|sam\.gov|\bcage\b|certif|current score|lead.?time|30.?day|out of reach|structurally|start (today|now)|before anything/.test(t)) return "now";
+    if (/clarif|question|ask the|q&a|q ?and ?a|carve|data.?right|ambig|in writing|pin the|raise.*before|before award|confirm.*(before|in writing)/.test(t)) return "qa";
+    return "quote";
+  };
+  const WHEN_RANK = { now: 0, qa: 1, quote: 2 } as const;
+  const WHEN_LABEL = { now: "Start today", qa: "Before Q&A", quote: "Before quote" } as const;
+  return [...seen.values()]
+    .map((c) => ({ c, when: whenOf(c) }))
+    .sort((a, b) => WHEN_RANK[a.when] - WHEN_RANK[b.when] || b.c.severity - a.c.severity)
+    .slice(0, 6) // keep the move list scannable; top findings only
+    .map((m, i): CaptureMove => ({
+      order: i + 1,
+      when: m.when,
+      when_label: WHEN_LABEL[m.when],
+      effort: m.when === "now" ? "blocks bid" : "",
+      do: m.c.do,
+      why: m.c.why,
+      source_label: m.c.source,
+    }));
 }
 
 // FA-127b — single trap derivation. The trap-tally chip, the matrix TRAP
@@ -260,6 +342,7 @@ export function buildV2ViewModelFromShadow(
       const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
       return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
     })(),
+    capture_play: synthesizeCapturePlay(shadow),
   };
 }
 
@@ -772,6 +855,36 @@ function renderIngestionBanner(html: string, v: V2RenderInput): string {
   return out;
 }
 
+// ─── Surface 11 — The Capture Play (Phase 4 · ⑤.7) ────────────────────────
+
+function renderCapturePlay(html: string, v: V2RenderInput): string {
+  const moves = v.capture_play;
+  if (!moves || moves.length === 0) return stripIfEmpty(html, "capture_moves", true);
+  const WHEN_ICON: Record<string, string> = {
+    qa: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+    now: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>`,
+    quote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>`,
+  };
+  const docSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`;
+  const cards = moves
+    .map(
+      (m) =>
+        `<div class="cap-move"><div class="cap-rail"><span class="cap-n">${m.order}</span></div>` +
+        `<div class="cap-card"><div class="cap-top"><span class="cap-when ${m.when}">${WHEN_ICON[m.when] ?? WHEN_ICON.quote}${esc(m.when_label)}</span>${m.effort ? `<span class="cap-effort">${esc(m.effort)}</span>` : ""}</div>` +
+        `<p class="cap-do">${esc(m.do)}</p>` +
+        (m.why ? `<p class="cap-why">${esc(m.why)}</p>` : "") +
+        `<span class="cap-src">${docSvg}${esc(m.source_label)}</span></div></div>`
+    )
+    .join("");
+  let out = replaceInnerByDataField(html, "capture_moves", cards);
+  const qaCount = moves.filter((m) => m.when === "qa").length;
+  const nowCount = moves.filter((m) => m.when === "now").length;
+  const detail = qaCount > 0 ? `${qaCount} before Q&A` : nowCount > 0 ? `${nowCount} to start now` : "sequenced by cutoff";
+  const summary = `${moves.length} move${moves.length === 1 ? "" : "s"} · ${detail}`;
+  out = setSpanByDataField(out, "capture_summary", summary);
+  return out;
+}
+
 // ─── Main entrypoint ──────────────────────────────────────────────────────
 // Applies all surface renders. Pure function. Determinism contract:
 // renderV2Surfaces(template, vm) === renderV2Surfaces(template, vm) byte-by-byte.
@@ -790,5 +903,6 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   out = renderPriceAnchor(out, v);
   // Phase 4 — agentic report upgrade (⑤)
   out = renderIngestionBanner(out, v);
+  out = renderCapturePlay(out, v);
   return out;
 }
