@@ -1796,7 +1796,7 @@ function daysUntil(d: Date | null): number | null {
 // date is extracted into complianceJson.deadlines ({label,date}[] | string[]).
 // Parse it so gate curability (SPRS/JCP) + posting-lag math are correct for
 // uploads instead of defaulting to "deadline unknown → uncurable → NO-BID".
-function parseDocDeadline(deadlines: unknown): Date | null {
+export function parseDocDeadline(deadlines: unknown): Date | null {
   if (!Array.isArray(deadlines)) return null;
   const entries = deadlines
     .map((e) =>
@@ -1807,19 +1807,36 @@ function parseDocDeadline(deadlines: unknown): Date | null {
         : { label: "", date: "" }
     )
     .filter((e) => e.date);
-  const dueRe = /due|offer|proposal|response|quote|receipt|clos/i;
   const tryParse = (s: string): Date | null => {
     // Strip trailing tz/time-word tokens new Date() can't parse (e.g. "1700 CT").
     const cleaned = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
     const d = new Date(cleaned);
     return isNaN(d.getTime()) ? null : d;
   };
-  const due = entries.filter((e) => dueRe.test(e.label) || dueRe.test(e.date));
-  for (const e of [...due, ...entries]) {
-    const d = tryParse(e.date);
-    if (d) return d;
-  }
-  return null;
+  // FA-183 — pick the OFFER-SUBMISSION deadline, not just the first due-ish date.
+  // Interim milestones (site visit, registration, questions/RFI, pre-proposal
+  // conference, amendments) routinely PRECEDE the offer-due date and often carry
+  // due-ish words ("questions due", "RFI response", "registration due"). The old
+  // "first due-ish date" pick let a PAST interim milestone masquerade as the
+  // submission deadline, flipping the whole report to "closed" on a still-OPEN
+  // solicitation — observed on AOCSSB26R0039 (site visit Jun 15 chosen over the
+  // real proposal due Jul 21, 2026, ~5 weeks out). Fix: drop interim/post-award
+  // labels, prefer true offer-submission entries, and take the LATEST such date —
+  // the binding deadline is always the last pre-award gate, so max() naturally
+  // selects it even when interim dates are unlabeled. A false "open" (keeps
+  // action-now copy) is far safer than a false "closed" (tells a customer to
+  // abandon a winnable bid), so when only interim dates exist we return null.
+  const excludeRe = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|amendment|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)/i;
+  const submissionRe = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+  const valid = entries
+    .map((e) => ({ ...e, d: tryParse(e.date) }))
+    .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
+  if (valid.length === 0) return null;
+  const eligible = valid.filter((e) => !excludeRe.test(e.label));
+  const submission = eligible.filter((e) => submissionRe.test(e.label) || submissionRe.test(e.date));
+  const pool = submission.length > 0 ? submission : eligible;
+  if (pool.length === 0) return null; // only interim/post-award dates → never close on those
+  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
 }
 
 // FA-172: extract a 6-digit NAICS from SF-1449 cover-form text when SAM metadata
@@ -2956,6 +2973,9 @@ JSON only — one key: risk_findings.`;
   // clarifications below before quoting", "clear ... before quoting") is
   // incoherent. Override with retrospective/recompete framing. A future or
   // unknown (null) deadline keeps the action-now language above unchanged.
+  // FA-183: `responseDeadline` now resolves to the true OFFER-submission date
+  // (parseDocDeadline excludes interim milestones), so a passed site-visit /
+  // questions date no longer falsely trips this gate on an open solicitation.
   const deadlineClosed = responseDeadline !== null && responseDeadline.getTime() < Date.now();
   if (deadlineClosed) {
     bidCondition = "this solicitation has closed — use this analysis for recompete preparation and incumbent benchmarking.";
