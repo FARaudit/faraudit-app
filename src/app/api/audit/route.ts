@@ -292,14 +292,17 @@ export async function POST(req: NextRequest) {
   // audit-worker and return 202 immediately. SAM PDF download is deferred to
   // the worker (pdf_url); uploaded PDFs go to the Anthropic Files API NOW at
   // every size, because the worker never sees the multipart bytes.
-  // FA-170 — the async worker is single-document by construction (it reads one
-  // anthropic_file_id / pdf_path / pdf_url). Multi-file uploads MUST take the
-  // synchronous path below, which assembles the form-first set. Single-file
-  // uploads and noticeId runs may still enqueue; feed the single upload buffer
-  // from uploadedDocs (multipart no longer pre-sets pdfBuffer).
-  if (process.env.AUDIT_ASYNC_ENQUEUE === "true" && uploadedDocs.length <= 1) {
-    const singleBuffer = uploadedDocs[0]?.buffer ?? pdfBuffer;
-    return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer: singleBuffer, safeName, rate });
+  // FA-178 — the async worker is now multi-document: a multi-file upload set
+  // is stashed whole (one Storage key per member) and the worker re-runs the
+  // same form-first assembly the sync path runs, so multi-file uploads enqueue
+  // too — fixing the skipped stages screen AND the >5-min sync-path timeout on
+  // large sets. Single-file uploads (feed the single buffer from uploadedDocs)
+  // and noticeId runs are unchanged. (FA-170 forced multi-file to the sync
+  // path because the worker read one anthropic_file_id / pdf_path / pdf_url;
+  // upload_docs lifts that constraint.)
+  if (process.env.AUDIT_ASYNC_ENQUEUE === "true") {
+    const singleBuffer = uploadedDocs.length === 1 ? uploadedDocs[0].buffer : pdfBuffer;
+    return enqueueAsyncAudit({ supabase, userId: user.id, solicitation, pdfBuffer: singleBuffer, uploadedDocs, safeName, rate });
   }
 
   // ━━ Content for Claude — pdf / image / text via fetchPdfFromSamUrl ━━
@@ -534,10 +537,13 @@ async function enqueueAsyncAudit(args: {
   userId: string;
   solicitation: Solicitation;
   pdfBuffer: Buffer | null;
+  // FA-178 — the full uploaded set (≥2 members ⇒ multi-doc async path). Empty
+  // or single-member ⇒ the unchanged single-document path below.
+  uploadedDocs: { name: string; buffer: Buffer }[];
   safeName: string | null;
   rate: { remaining: number; resetAt: number };
 }) {
-  const { supabase, userId, solicitation, pdfBuffer, safeName, rate } = args;
+  const { supabase, userId, solicitation, pdfBuffer, uploadedDocs, safeName, rate } = args;
 
   // Uploaded PDFs go to the Files API before ANY insert — if the upload
   // fails, no rows exist and nothing was charged.
@@ -576,6 +582,49 @@ async function enqueueAsyncAudit(args: {
         pdfPath = key;
       }
     }
+  }
+
+  // FA-178 — multi-document upload set. Stash EVERY member to Supabase Storage
+  // (bucket "audit-pdfs") and record the keys; the worker downloads them all
+  // and re-runs the form-first assembly (assembleUploadedDocumentSet) the sync
+  // path runs. Storage — not the Files API — is the channel because the worker
+  // must re-page-count each member to reproduce the page-budget trim, and the
+  // Files API refuses to download uploaded files back. Unlike the best-effort
+  // single-doc V2 stash above, these bytes ARE the audit input: a failed stash
+  // means the worker cannot reassemble, so we abort before any insert — nothing
+  // charged. pdfBuffer is null here (the route feeds a single buffer only for
+  // a one-member set), so the two single-doc blocks above no-op for this path.
+  let uploadDocs: Array<{ path: string; filename: string }> | null = null;
+  if (uploadedDocs.length > 1) {
+    const adminForStorage = getAdminClient();
+    if (!adminForStorage) {
+      return NextResponse.json(
+        { error: "Audit queue storage is unavailable. Nothing was charged — please try again." },
+        { status: 500 }
+      );
+    }
+    const stamp = Date.now();
+    const docs: Array<{ path: string; filename: string }> = [];
+    for (let i = 0; i < uploadedDocs.length; i++) {
+      const d = uploadedDocs[i];
+      const key = `uploads/${stamp}-${i}-${(d.name || "document.pdf").replace(/[^\w.-]/g, "_")}`;
+      const { error: storageErr } = await adminForStorage.storage
+        .from("audit-pdfs")
+        .upload(key, d.buffer, { contentType: "application/pdf", upsert: false });
+      if (storageErr) {
+        // Best-effort cleanup of any members already stashed this attempt, then
+        // abort — a partial set would silently drop documents from the audit.
+        if (docs.length > 0) {
+          await adminForStorage.storage.from("audit-pdfs").remove(docs.map((x) => x.path)).catch(() => {});
+        }
+        return NextResponse.json(
+          { error: `Document upload failed: ${storageErr.message}. Nothing was charged — please try again.` },
+          { status: 502 }
+        );
+      }
+      docs.push({ path: key, filename: d.name });
+    }
+    uploadDocs = docs;
   }
 
   // Agency resolution — mirror of the sync path (resolveAgency + sam-ingest
@@ -642,10 +691,15 @@ async function enqueueAsyncAudit(args: {
     user_id: userId,
     audit_id: audit.id,
     anthropic_file_id: anthropicFileId,
-    pdf_filename: pdfBuffer ? safeName : null,
+    // FA-178 — safeName is the form-first primary's name (set by the upload
+    // assembly upstream), so it labels the multi-doc set too.
+    pdf_filename: (pdfBuffer || uploadDocs) ? safeName : null,
     // FA-132 — storage key for the worker's V2 bytes (null when the stash
     // failed or there was no upload; worker degrades to V1-only shadow-less).
-    pdf_path: pdfPath
+    pdf_path: pdfPath,
+    // FA-178 — full multi-file set ({path, filename}[]); null for single-doc
+    // uploads, SAM runs, and pre-FA-178 rows.
+    upload_docs: uploadDocs
   });
 
   if (enqueueErr) {
