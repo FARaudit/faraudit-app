@@ -15,7 +15,7 @@ import type {
   EvaluationFactorVM,
   SubmissionRequirementVM
 } from "./_view-model";
-import { buildV2ViewModelFromShadow, renderV2Surfaces } from "./_v2-render-surfaces";
+import { buildV2ViewModelFromShadow, renderV2Surfaces, renderIngestionBannerFromAudit } from "./_v2-render-surfaces";
 
 // ─── safe text helpers ──────────────────────────────────────────────────────
 
@@ -2673,13 +2673,18 @@ export function renderAuditReportComplete(
     // single source of truth.
     html = renderTrapTally(html, vm.compliance_flags);
   } else {
-    // Phase 4 ⑤.5/⑤.7/⑤.4 — no v2_shadow → the V2 render fns never ran. Strip
-    // the placeholders so V1-only audits don't render empty Phase-4 surfaces.
-    // (When v2Input exists, each render fn owns its populate-or-strip decision.)
-    html = stripBlockByHideField(html, "ingestion");
+    // Phase 4 ⑤.7/⑤.4 — no v2_shadow → those V2 render fns never ran. Strip
+    // their placeholders so V1-only audits don't show empty Phase-4 surfaces.
+    // (The ingestion banner is NOT stripped here — it renders standalone below
+    // from compliance_json.ingestion, which is V1-level and present even when
+    // V2 didn't run. Bug fix: it was wrongly coupled to v2_shadow.)
     html = stripBlockByHideField(html, "capture_moves");
     html = stripBlockByHideField(html, "eval_attachment_gap");
   }
+  // Phase 4 ⑤.5 — ingestion banner, ALWAYS from compliance_json.ingestion
+  // (decoupled from v2_shadow so multi-file audits show it even when V2 didn't
+  // run — e.g. the async worker arm). Strips itself when there's no manifest.
+  html = renderIngestionBannerFromAudit(html, audit);
   // Phase 4 ⑤.1 — masthead source/provenance chips (runs after the masthead is
   // populated; value-driven 3-state, independent of the V2 overlay).
   html = renderHeaderSourceChips(html, vm);
