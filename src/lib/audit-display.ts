@@ -31,6 +31,18 @@ interface AuditLike {
   title?: string | null;
 }
 
+// FA-186 — strip filename artifacts from an uploaded-audit title: a leading
+// enumeration prefix ("2. ") and a trailing "- Solicitation / RFP / RFQ / IFB /
+// RFI" boilerplate tail. Caller scopes this to upload rows so SAM-sourced titles
+// (which legitimately contain these words) are untouched.
+export function cleanUploadedTitle(t: string): string {
+  return t
+    .replace(/^\s*\d{1,3}\.\s+/, "")
+    .replace(/\s*[-–—]\s*(?:solicitation|sol|rfp|rfq|ifb|rfi)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function displaySolicitationId(a: AuditLike): string {
   const sn = a.solicitation_number?.trim();
   if (sn && !PSC_LEAK_RE.test(sn) && sn.length <= 25) return sn;
@@ -58,6 +70,17 @@ export function auditDisplayName(
 ): string {
   const t = a.title?.trim();
   if (t && !PDF_UPLOAD_RE.test(t) && !HEX_32_RE.test(t) && !STRANDED_TITLE_RE.test(t) && !/^Untitled/i.test(t)) {
+    // FA-186 — uploaded-audit titles are derived from the primary filename,
+    // which can carry an enumeration prefix and a "- Solicitation" boilerplate
+    // suffix ("2. AOCSSB26R0039 - Solicitation"). Strip them; when the result
+    // collapses to the solicitation number, prefer the clean DB column. Scoped
+    // to uploads (notice_id "pdf-<n>") so SAM-sourced titles are never touched.
+    if (PDF_UPLOAD_RE.test((a.notice_id ?? "").trim())) {
+      const cleaned = cleanUploadedTitle(t);
+      const snUp = a.solicitation_number?.trim();
+      if (snUp && (cleaned === "" || cleaned.toUpperCase() === snUp.toUpperCase())) return snUp;
+      if (cleaned) return cleaned;
+    }
     return t;
   }
   const sn = a.solicitation_number?.trim();
