@@ -39,7 +39,20 @@ const auditDisplayNameCases: Case[] = [
     expected: /^Untitled audit · [A-Z][a-z]{2,} \d+,? \d+:\d{2}[\s  ]?(AM|PM)$/ },
   { label: "T10 · All null falls to bare 'Untitled audit'",
     input: { title: null, notice_id: null, solicitation_number: null, created_at: null },
-    expected: "Untitled audit" }
+    expected: "Untitled audit" },
+  // FA-186 — upload filename titles cleaned; SAM titles untouched.
+  { label: "T14 · Upload filename title collapses to clean solicitation number",
+    input: { title: "2. AOCSSB26R0039 - Solicitation", notice_id: "pdf-1781665187652", solicitation_number: "AOCSSB26R0039" },
+    expected: "AOCSSB26R0039" },
+  { label: "T15 · Upload enumeration + suffix stripped (different sol)",
+    input: { title: "1. HM047626R0039 - Solicitation", notice_id: "pdf-1778078628046", solicitation_number: "HM047626R0039" },
+    expected: "HM047626R0039" },
+  { label: "T16 · Upload with a descriptive filename keeps the subject (not collapsed)",
+    input: { title: "Aircraft Maintenance Services", notice_id: "pdf-1778078628046", solicitation_number: "FA301626Q0068" },
+    expected: "Aircraft Maintenance Services" },
+  { label: "T17 · NON-upload (SAM) title is never filename-cleaned",
+    input: { title: "Roof Replacement - RFQ 2024", notice_id: "7e13f96a69c04c10ba8a0fd004e9ac1b", solicitation_number: "W912XX24Q0001" },
+    expected: "Roof Replacement - RFQ 2024" }
 ];
 
 const displaySolCases: Case[] = [
