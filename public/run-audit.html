@@ -2,57 +2,384 @@
 <html lang="en" data-theme="light" data-sb="open">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>FARaudit — Run a New Audit</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@1,72,500;1,72,600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-/* ═══════════════════════════════════════════════════════════════
-   FARaudit · Run Audit — redesign
-   Spec: ceo/redesign-final/Review/run-audit-interaction-spec.html
-   ─────────────────────────────────────────────────────────────── */
-:root {
-  --accent:#378ADD; --accent-blue:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; --accent-pale:#E6F1FB;
-  --navy-900:#050d1a; --navy-800:#0A1628; --navy-700:#142545; --navy-600:#1e3a8a;
-  --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
-  --green-50:#ecfdf5; --green-100:#d1fae5; --green-200:#a7f3d0; --green-500:#10b981; --green-600:#059669; --green-700:#047857; --green-800:#065f46;
-  --red-50:#fef2f2; --red-100:#fee2e2; --red-200:#fecaca; --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c; --red-800:#991b1b;
-  --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a; --amber-600:#d97706; --amber-700:#b45309; --amber-800:#92400e;
-}
-:root,[data-theme="light"],[data-theme="auto"]{
+:root{ --accent:#378ADD; --accent-deep:#185FA5; --accent-light:#B5D4F4; }
+:root,[data-theme="light"]{
   --page-bg:#eef2f7; --bg:#f0f4f8; --card:#ffffff; --card-soft:#fafcfe;
   --ink:#0A1628; --ink-2:#334155; --mute:#64748b; --mute-2:#94a3b8;
-  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9; --search-bg:#f1f5f9;
-  --sb-bg:var(--navy-800); --sb-border:#0b1a30; --sb-text:#cbd5e1; --sb-text-mute:#6f8099; --sb-hover:#0f1f3a; --sb-active:#13294b; --sb-divider:#1f2e48;
-  --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.10);
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
-  --shadow-pop:0 24px 60px -22px rgba(15,23,42,.28), 0 6px 16px -6px rgba(15,23,42,.12);
+  --line:#e5e7eb; --line-2:#eef2f6; --line-3:#f1f5f9;
+  --accent-soft:#eaf3fc; --accent-hair:#cfe3f7; --accent-on:#185FA5; --accent-btn-text:#fff;
+  --chip-bg:#f1f5f9; --chip-text:#475569;
+  --ok-text:#047857; --ok-soft:#ecfdf5; --ok-hair:#a7f3d0;
+  --miss-text:#b91c1c; --miss-soft:#fef2f2; --miss-hair:#fecaca; --warn-text:#b45309;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 18px 40px -22px rgba(15,23,42,.16);
 }
 [data-theme="dark"]{
   --page-bg:#02060c; --bg:#050d1a; --card:#0c1b30; --card-soft:#0a1729;
   --ink:#e8eef6; --ink-2:#b6c2d3; --mute:#7d8ba0; --mute-2:#5b6778;
-  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04); --search-bg:rgba(255,255,255,0.04);
-  --sb-bg:#02070f; --sb-border:rgba(255,255,255,0.06); --sb-text:#b6c2d3; --sb-text-mute:#5b6778; --sb-hover:rgba(255,255,255,0.04); --sb-active:rgba(59,130,246,0.14); --sb-divider:rgba(255,255,255,0.06);
-  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.6);
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.5);
-  --shadow-pop:0 1px 2px rgba(0,0,0,.5), 0 28px 64px -22px rgba(0,0,0,.85);
+  --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-3:rgba(255,255,255,0.04);
+  --accent-soft:rgba(55,138,221,0.12); --accent-hair:rgba(55,138,221,0.30); --accent-on:#B5D4F4; --accent-btn-text:#04111f;
+  --chip-bg:rgba(255,255,255,0.05); --chip-text:#7d8ba0;
+  --ok-text:#6ee7b7; --ok-soft:rgba(16,185,129,.12); --ok-hair:rgba(16,185,129,.30);
+  --miss-text:#f87171; --miss-soft:rgba(248,113,113,.08); --miss-hair:rgba(248,113,113,.28); --warn-text:#fcd34d;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 18px 40px -20px rgba(0,0,0,.7);
 }
-
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--page-bg);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .25s ease,color .25s ease}
-button{font-family:inherit}
+html,body{margin:0;padding:0;background:var(--page-bg);color:var(--ink);font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer}
+input{font-family:inherit}
+.frame{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
 
-/* Q6 a11y · global focus ring */
-:focus{outline:none}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:5px}
+/* sidebar — dark navy in BOTH themes (matches live) */
+.sidebar{background:#0A1628;color:rgba(255,255,255,.6);display:flex;flex-direction:column;gap:3px;padding:16px 12px 18px;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid rgba(255,255,255,.05)}
+.sidebar::-webkit-scrollbar{width:0}
+.sb-logo-row{display:flex;align-items:center;gap:10px;margin:0 0 12px 4px}
+.sb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#378ADD,#378ADD 55%,#185FA5);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+.sb-wordmark{font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+.sb-wordmark .wm-au{color:#378ADD}
+.sb-group-label{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);padding:14px 8px 5px}
+.sb-icon{display:flex;align-items:center;gap:11px;height:36px;padding:0 10px;border-radius:8px;color:rgba(255,255,255,.62);text-decoration:none;border:0;background:transparent;width:100%;transition:background .14s,color .14s}
+.sb-icon:hover{background:rgba(255,255,255,.06);color:#e2e8f0}
+.sb-icon.active{background:rgba(181,212,244,.08);color:#fff}
+.sb-icon.active svg{color:#378ADD}
+.sb-icon svg{width:18px;height:18px;flex:none}
+.sb-label{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sb-signout{margin-top:2px}
+.sb-badge{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px}
+.sb-badge.count{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78)}
+.sb-badge.new{background:rgba(55,138,221,.9);color:#fff}
+.sb-badge.live{background:rgba(16,185,129,.18);color:#6ee7b7}
+.sb-badge.danger{background:rgba(248,113,113,.18);color:#fca5a5}
+.sb-divider{height:1px;background:rgba(255,255,255,.06);margin:9px 6px}
 
-.frame{width:100%;max-width:1800px;min-width:1280px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:var(--sb-width) 1fr;min-height:100vh;align-items:stretch;transition:grid-template-columns .22s cubic-bezier(0.16,1,0.3,1)}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.topbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--card)}
+.crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
+.crumbs b{color:var(--ink);font-weight:700}
+.live-pill{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:999px;background:var(--ok-soft);color:var(--ok-text);font-size:11.5px;font-weight:700;border:1px solid var(--ok-hair)}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:#10b981}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tb-search{display:flex;align-items:center;gap:9px;height:32px;width:260px;padding:0 12px;border-radius:8px;background:var(--card-soft);border:1px solid var(--line);color:var(--mute-2);font-size:12.5px}
+.tb-search .kbd{margin-left:auto;font-family:"IBM Plex Mono";font-size:10px;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.tbtn{display:inline-flex;gap:2px;padding:3px;background:var(--card-soft);border:1px solid var(--line);border-radius:8px}
+.tbtn button{border:0;background:transparent;color:var(--mute);font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:6px}
+.tbtn button.on{background:var(--accent-soft);color:var(--accent-on)}
+.scroll{flex:1;overflow-y:auto;padding:30px 34px 70px}
+.view{display:none}.view.on{display:block}
+.ribbon{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--mute);margin-bottom:22px;background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:9px;padding:9px 13px}
+.ribbon b{color:var(--accent-on);font-weight:700}
+.ribbon .mono{color:var(--ink-2)}
+.page-h{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+.page-sub{font-size:13.5px;color:var(--mute);margin:0 0 24px;line-height:1.5;max-width:640px}
+.ra-cols{max-width:1080px}
+.ra-modes{display:inline-flex;gap:3px;padding:3px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px;margin-bottom:14px}
+.ra-mode-btn{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--mute);font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:6px}
+.ra-mode-btn svg{width:14px;height:14px}
+.ra-mode-btn.on{background:var(--accent-soft);color:var(--accent-on)}
 
-/* ═══ MAIN ═══ */
-.main{display:flex;flex-direction:column;min-width:0}
+.sb2{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:5px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.03em;white-space:nowrap;flex:none}
+.sb-main{background:var(--accent);color:#fff}
+.sb-sec{background:var(--accent-soft);color:var(--accent-on);border:1px solid var(--accent-hair)}
+.sb-other{background:var(--chip-bg);color:var(--chip-text);border:1px solid var(--line)}
+.sb-opt{background:transparent;color:var(--mute-2);border:1px dashed var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 
+/* upload */
+.uz{padding:18px}
+.uz-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.uz-head .lbl{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
+.seg{display:inline-flex;gap:2px;padding:3px;background:var(--card-soft);border:1px solid var(--line);border-radius:8px}
+.seg button{border:0;background:transparent;color:var(--mute);font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:6px}
+.seg button.on{background:var(--accent-soft);color:var(--accent-on)}
+.dz{border:1.5px dashed var(--line);border-radius:12px;background:var(--card-soft);padding:22px 20px;display:flex;align-items:center;gap:16px}
+.uz.loaded .dz{padding:13px 16px}
+.dz-ico{width:42px;height:42px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent-hair);display:grid;place-items:center;color:var(--accent-on);flex:none}
+.dz-ico svg{width:20px;height:20px}
+.dz-tx{display:flex;flex-direction:column;gap:3px}
+.dz-tx .t{font-size:14px;font-weight:700}.uz.loaded .dz-tx .t{font-size:13px}
+.dz-tx .t .br{color:var(--accent-on);text-decoration:underline;text-underline-offset:3px;margin-left:3px}
+.dz-tx .s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);white-space:nowrap}
+.dz-cta{margin-left:auto;flex:none;height:34px;padding:0 15px;border-radius:8px;background:var(--accent);color:var(--accent-btn-text);font-size:12.5px;font-weight:800;border:0;display:inline-flex;align-items:center;gap:7px}
+.dz-cta svg{width:14px;height:14px}
+.uz-hint{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2)}
+.uz-tease{display:flex;align-items:center;gap:9px;margin-top:13px;padding:11px 14px;border-radius:11px;background:var(--accent-soft);border:1px solid var(--accent-hair);font-size:12.5px;color:var(--accent-on);line-height:1.4}
+.uz-tease svg{width:15px;height:15px;flex:none}
+.uz-tease b{font-weight:700}
+.uz.loaded .uz-tease{display:none}
+.uz.paste .uz-tease{display:none}
+.dz-paste{display:none;flex-direction:column;gap:9px}
+.uz.paste .dz{display:none}
+.uz.paste .dz-paste{display:flex}
+.uz.paste .guide{display:none}
+.uz.paste .uz-files{display:none!important}
+.uz.paste .uz-head .seg{display:none}
+.dzp-row{display:flex;align-items:center;gap:11px}
+.dzp-field{flex:1;display:flex;align-items:center;gap:9px;height:44px;padding:0 14px;border-radius:11px;background:var(--card-soft);border:1px solid var(--line)}
+.dzp-field svg{width:16px;height:16px;color:var(--mute-2);flex:none}
+.dzp-field input{flex:1;border:0;background:transparent;outline:none;color:var(--ink);font-size:13px}
+.dzp-field input::placeholder{color:var(--mute-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.dzp-field:focus-within{border-color:rgba(55,138,221,.5)}
+.dzp-go{height:44px;padding:0 20px;border-radius:11px;background:var(--accent);color:var(--accent-btn-text);font-size:13px;font-weight:800;border:0;flex:none}
+.dzp-note{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mute)}
+.dzp-note svg{width:13px;height:13px;color:var(--accent);flex:none}
+.guide{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.guide>summary{list-style:none;cursor:pointer}
+.guide>summary::-webkit-details-marker{display:none}
+.guide[open]>summary{border-bottom:1px solid var(--line-2)}
+.chiprail{display:flex;gap:5px;flex-wrap:wrap;margin-left:6px}
+.chev{width:13px;height:13px;margin-left:5px;vertical-align:middle;transition:transform .18s}
+details[open]>summary .chev{transform:rotate(180deg)}
+.uz.loaded .guide{display:none}
+.guide-h{display:flex;align-items:center;gap:9px;padding:11px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
+.guide-h .k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mute);text-transform:uppercase}
+.guide-h .hint{margin-left:auto;font-size:11.5px;color:var(--mute-2)}
+.grow{display:grid;grid-template-columns:46px 118px 172px 1fr 84px;gap:14px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--line-3)}
+.grow:last-child{border-bottom:0}
+.ghead{padding:8px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
+.ghead span{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2)}
+.ghead .gh-r{justify-self:end}
+.gdoc{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gread{display:flex;flex-wrap:wrap;gap:5px;align-content:center;padding-left:20px}
+.rtag{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line);border-radius:5px;padding:2px 7px;white-space:nowrap}
+.ghead span:nth-child(4){padding-left:20px}
+.gpri{justify-self:end;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.gpri.req{color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair)}
+.gpri.core{color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line)}
+.gpri.opt{color:var(--mute);background:transparent;border:1px dashed var(--line)}
+.grab.card{margin:0 0 6px;overflow:hidden}
+.grab>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:13px 16px;background:var(--card-soft)}
+.grab>summary::-webkit-details-marker{display:none}
+.grab[open]>summary{border-bottom:1px solid var(--line-2)}
+.grab-h .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.grab-h .hint{margin-left:auto;font-size:11.5px;color:var(--mute-2)}
+.grab-h .chev{margin-left:10px;color:var(--mute-2)}
+.grow:last-child{border-bottom:0}
+.grow .gname{font-size:13px;font-weight:700;color:var(--ink)}
+.grow .gdesc{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
+.grow .gmeta{justify-self:end;font-family:"IBM Plex Mono",monospace;font-size:10.5px}
+.grow.opt .gname{color:var(--mute)}
+.uz-files{display:none;flex-direction:column}
+.uz.loaded .uz-files{display:flex}
+.cov{margin-top:10px;border:0;border-top:1px solid var(--line-2);border-radius:0;background:transparent;padding:13px 2px 3px}
+.cov-h{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.cov-h .pct{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink-2)}
+.cov-h .k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mute);text-transform:uppercase}
+.cov-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.covcell{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:30px;padding:0 10px;border-radius:8px;white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;border:1px solid var(--line)}
+.covcell .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.covcell.ok{background:var(--ok-soft);border-color:var(--ok-hair);color:var(--ok-text)}.covcell.ok .dot{background:#10b981}
+.covcell.miss{background:var(--miss-soft);border-color:var(--miss-hair);color:var(--miss-text)}.covcell.miss .dot{background:#ef4444}
+.covcell.optmiss{background:transparent;border-style:dashed;color:var(--mute-2)}.covcell.optmiss .dot{background:var(--mute-2)}
+.cov-note{margin-top:11px;font-size:12px;line-height:1.5;color:var(--warn-text);display:flex;gap:8px;align-items:flex-start}
+.cov-note svg{width:14px;height:14px;flex:none;margin-top:1px}
+.flist{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.frow{display:grid;grid-template-columns:34px 1fr auto auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card-soft)}
+.frow .fico{width:34px;height:34px;border-radius:8px;background:var(--accent-soft);border:1px solid var(--accent-hair);display:grid;place-items:center;color:var(--accent-on)}
+.frow .fico svg{width:16px;height:16px}
+.frow .fname{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .fsub{display:flex;align-items:center;gap:8px;margin-top:3px}
+.frow .fmeta{min-width:0}
+.frow .fsize{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);white-space:nowrap}
+.frow .fx{width:28px;height:28px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--mute-2);display:grid;place-items:center}
+.frow .fx:hover{background:var(--miss-soft);color:var(--miss-text);border-color:var(--miss-hair)}
+.frow .fx svg{width:14px;height:14px}
+.uz-foot{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:13px;border-top:1px solid var(--line-2)}
+.uz-foot .cnt{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute)}
+.uz-foot .cnt b{color:var(--ink)}
+.uz-run{height:38px;padding:0 20px;border-radius:9px;background:var(--accent);color:var(--accent-btn-text);font-size:13px;font-weight:800;border:0;display:inline-flex;align-items:center;gap:8px}
+.uz-run svg{width:15px;height:15px}
+
+/* SAM */
+.sam{position:sticky;top:0}
+.sam-blk{padding:15px 16px;border-bottom:1px solid var(--line-2)}.sam-blk:last-child{border-bottom:0}
+.sam-bh{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.sam-bh .num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--accent-on);width:18px;height:18px;border-radius:5px;background:var(--accent-soft);border:1px solid var(--accent-hair);display:grid;place-items:center}
+.sam-bh .t{font-size:12.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase}
+.sam-bh .t span{font-size:10px;letter-spacing:.1em}
+.frule{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px}
+.frule .fk{color:var(--mute);min-width:92px}
+.frule .fv{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:var(--ink-2);white-space:nowrap;background:var(--card-soft);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.fv.on{color:var(--accent-on);border-color:var(--accent-hair);background:var(--accent-soft)}
+.sam-skip{margin-top:10px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mute);padding:8px 10px;border:1px dashed var(--line);border-radius:8px}
+.sam-skip svg{width:13px;height:13px;flex:none;color:var(--miss-text)}.sam-skip b{color:var(--ink-2);font-weight:700}
+.porder{display:flex;flex-direction:column}
+.pstep{display:grid;grid-template-columns:14px 84px 1fr auto;gap:11px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-3)}
+.pstep:last-child{border-bottom:0}
+.pstep .arr{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);text-align:center}
+.pstep .pn{font-size:12.5px;font-weight:700;color:var(--ink)}
+.pstep .pd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pstep.dim .pn{color:var(--mute)}
+.lim-note{margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);white-space:nowrap;display:flex;align-items:center;gap:7px;padding-top:10px;border-top:1px solid var(--line-3)}
+.lim-note b{color:var(--accent-on);font-weight:700}.lim-note .q{margin-left:auto;color:var(--mute-2)}
+.ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.ct{display:flex;flex-direction:column;gap:2px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card-soft)}
+.ct .c{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--accent-on)}
+.ct .d{font-size:10.5px;color:var(--mute);line-height:1.3}
+.ct-vs{margin-top:9px;display:flex;align-items:stretch;gap:8px}
+.ct-vs .side{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:8px}
+.ct-vs .side .h{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.ct-vs .side .d{font-size:10.5px;color:var(--mute);line-height:1.35}
+.ct-vs .mid{align-self:center;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+
+/* NAICS */
+.naics{overflow:hidden;max-width:1060px}
+.nx-top{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.nx-search{display:flex;align-items:center;gap:9px;height:36px;flex:1;min-width:220px;padding:0 12px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px}
+.nx-search svg{width:15px;height:15px;color:var(--mute-2);flex:none}
+.nx-search input{border:0;background:transparent;outline:none;color:var(--ink);font-size:13px;width:100%}
+.nx-search input::placeholder{color:var(--mute-2);font-family:"IBM Plex Mono",monospace;font-size:12px}
+.nx-legend{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--mute);white-space:nowrap}
+.nx-legend .mon{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.nx-legend b{color:var(--accent-on);font-weight:700}
+.nx-pills{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.npill{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--mute);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:7px}
+.npill .ct{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+.npill:hover{border-color:var(--mute-2);color:var(--ink-2)}
+.npill.on{background:var(--accent-soft);border-color:var(--accent-hair);color:var(--accent-on)}
+.npill.on .ct{color:var(--accent)}
+.npill .pdot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:1px}
+.nx-resbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px 4px}
+.nx-resbar .res{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}.nx-resbar .res b{color:var(--ink);font-weight:700}
+.nx-resbar .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+.nx-cards{display:grid;grid-template-columns:1fr;gap:12px;padding:8px 18px 18px}
+@media(min-width:760px){.nx-cards{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1200px){.nx-cards{grid-template-columns:repeat(3,1fr)}}
+.ncard{border:1px solid var(--line);border-radius:13px;background:var(--card-soft);padding:15px 16px;display:flex;flex-direction:column;gap:11px}
+.ncard.mon{border-color:var(--accent-hair);box-shadow:inset 3px 0 0 0 var(--accent)}
+.ncard-top{display:flex;align-items:center;gap:9px}
+.ncard-code{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center}
+.ncard-code .mdot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:9px;opacity:0}
+.ncard.mon .ncard-code .mdot{opacity:1}
+.ncard-mon{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:4px;padding:2px 6px}
+.ncard-mine{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#15623f;background:#e7f4ed;border:1px solid #bfe3cf;border-radius:4px;padding:2px 6px}
+[data-theme="dark"] .ncard-mine{color:#6ee7b7;background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
+.ncard-cat{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.ncard-cat .cd{width:6px;height:6px;border-radius:50%}
+.ncard-title{font-size:15px;font-weight:600;color:var(--ink);line-height:1.3;letter-spacing:-.01em}
+.ncard-facts{display:flex;flex-direction:column;gap:7px;padding:11px 0;border-top:1px solid var(--line-3);border-bottom:1px solid var(--line-3)}
+.ncard-facts .fact{display:flex;align-items:baseline;gap:12px}
+.fact .fk{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);width:88px;flex:none}
+.fact .fv{font-size:13px;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fact .fv .sv2{font-family:"IBM Plex Mono",monospace;font-weight:700;color:var(--ink)}
+.ncard-facts .fnote{font-size:10px;color:var(--mute-2);font-style:italic;margin-left:100px;margin-top:-1px}
+.ncard-insight{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border:1px solid var(--accent-hair);border-radius:9px;padding:11px 12px}
+.ncard-insight .ai-spark{margin-top:4px;margin-right:0}
+.ncard-insight .ins-k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-on);display:block;margin-bottom:3px}
+.ncard-insight p{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.nx-empty{padding:30px 18px;text-align:center;color:var(--mute);font-size:13px;display:none}
+.nx-tablewrap{overflow-x:auto}
+.ntable{width:100%;min-width:980px;border-collapse:collapse;table-layout:fixed}
+.ntable thead th:nth-child(1),.ntable td.code{width:9%}
+.ntable thead th:nth-child(2){width:13%}
+.ntable thead th:nth-child(3){width:24%}
+.ntable thead th:nth-child(4){width:10%}
+.ntable thead th:nth-child(5){width:13%}
+.ntable thead th:nth-child(6){width:31%}
+.ntable td.terms .termstack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.ntable thead th.ai-h{color:var(--accent-on)}
+.ai-spark{display:inline-block;width:5px;height:5px;background:var(--accent);transform:rotate(45deg);border-radius:1px;margin-right:7px;vertical-align:middle;flex:none}
+.ntable td.notes.ai{color:var(--ink-2);font-weight:500;border-left:1px solid var(--line-2)}
+.ntable thead th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2);text-align:left;padding:9px 16px;background:var(--card-soft);border-bottom:1px solid var(--line-2)}
+.ntable th.r,.ntable td.r{text-align:right}
+.ntable tbody tr{border-bottom:1px solid var(--line-3)}
+.ntable tbody tr:hover{background:var(--card-soft)}
+.ntable tbody tr.mon{background:linear-gradient(var(--accent-soft),var(--accent-soft))}
+.ntable tbody tr.mon td:first-child{box-shadow:inset 3px 0 0 0 var(--accent)}
+.ntable td{padding:8px 13px;vertical-align:middle}
+.ntable td.size{font-family:"IBM Plex Mono",monospace;white-space:nowrap;text-align:right;width:1%}
+.ntable td.size .sv{font-size:12px;font-weight:700;color:var(--ink)}
+.ntable td.size .su{display:block;font-size:9px;font-weight:500;color:var(--mute-2);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.ntable td.eval,.ntable td.clause{white-space:nowrap;width:1%}
+.ntable td.notes{font-size:11.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nchip{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.03em;border-radius:5px;padding:2px 7px;white-space:nowrap;border:1px solid var(--line);color:var(--chip-text);background:var(--chip-bg)}
+.nchip .cd{width:5px;height:5px;border-radius:50%;flex:none}
+.nchip.rev{color:#1f6f4f;background:var(--ok-soft);border-color:var(--ok-hair)}
+.nchip.emp{color:#7c5e16;background:#fbf3df;border-color:#ecd9a8}
+.nchip.bv{color:var(--accent-on);background:transparent;border-color:var(--accent-hair)}
+.nchip.lpta{color:#9a5a12;background:transparent;border-color:#eccfa8}
+.nchip.cl-far,.nchip.cl-dfars,.nchip.cl-agar,.nchip.cl-affars{background:transparent;color:var(--mute);border-color:var(--line)}
+.cl-far .cd{background:#94a3b8}.cl-dfars .cd{background:#378ADD}.cl-agar .cd{background:#2f9e6f}.cl-affars .cd{background:#8a6fd0}
+[data-theme="dark"] .nchip.rev{color:#6ee7b7;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.28)}
+[data-theme="dark"] .nchip.emp{color:#fcd34d;background:rgba(214,162,60,.12);border-color:rgba(214,162,60,.3)}
+[data-theme="dark"] .nchip.lpta{color:#fcd34d;background:transparent;border-color:rgba(214,162,60,.4)}
+.ntable td.code{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;color:var(--ink);width:1%;white-space:nowrap}
+.ntable td.code .mdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);margin-right:9px;vertical-align:middle;opacity:0}
+.ntable tr.mon td.code .mdot{opacity:1}
+.ntable td.title{font-size:13px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ntable td.size{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.ntable td.cat{width:1%;white-space:nowrap}
+.catbadge{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:2px 7px}
+.catbadge .cd{width:5px;height:5px;border-radius:50%;flex:none}
+.nx-foot{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--line-2)}
+.nx-foot .res{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}.nx-foot .res b{color:var(--ink-2)}
+.nx-foot .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
+.nx-empty{padding:30px 16px;text-align:center;color:var(--mute);font-size:13px;display:none}
+/* ── page body sections + order flip ── */
+.body-stack{display:flex;flex-direction:column;gap:30px;margin-top:30px;max-width:1080px}
+#view-audit.on{display:flex;flex-direction:column}
+#view-audit .ra-cols{order:1}
+#view-audit .body-stack{order:2}
+#view-audit .prep-wrap{order:3;margin-top:30px}
+#view-audit .page-h,#view-audit .page-sub{order:0}
+.body-stack.flip .blk-recent{order:2}.body-stack.flip .blk-stages{order:1}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+.sec-head .k{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
+.sec-head .all{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--accent-on);text-decoration:none}
+.ra-list{display:flex;flex-direction:column;gap:9px}
+.rac{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11;display:grid;grid-template-columns:54px 1fr auto;gap:15px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;text-decoration:none;position:relative;box-shadow:var(--shadow)}
+.rac::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:0 3px 3px 0;background:var(--v)}
+.rac.is-proceed{--v:#1f8a5b;--vt:#e7f4ed;--vl:#bfe3cf;--vi:#15623f}
+.rac.is-caution{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11}
+.rac.is-nobid{--v:#c0352b;--vt:#fbeae8;--vl:#eec4bf;--vi:#9a261d}
+.rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
+.rac-score{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700}
+.rac-of{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;opacity:.85;margin-top:3px}
+.rac-main{min-width:0}
+.rac-metarow{display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.rac-id{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
+.rac-office{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;letter-spacing:.06em;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:10px;position:relative}
+.rac-office::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
+.rac-title{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rac-insight{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rac-spark{flex:none;width:6px;height:6px;background:var(--v);transform:rotate(45deg);border-radius:1px}
+.rac-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.rac-pill{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:999px;white-space:nowrap;background:var(--vt);color:var(--vi);border:1px solid var(--vl)}
+.rac-pill-dot{width:5px;height:5px;border-radius:50%;background:var(--v)}
+.rac-ago{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute)}
+[data-theme="dark"] .rac-pill{background:transparent;color:var(--v)}
+.stages-strip{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+.stg{flex:1;min-width:158px;display:flex;gap:10px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--card-soft)}
+.stg-n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 6px;height:fit-content}
+.stg-h{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.stg-d{font-size:11px;color:var(--mute);line-height:1.4}
+.stg.deliver{background:#0c1b30;border-color:#0c1b30}
+.stg.deliver .stg-h{color:#e8eef6}.stg.deliver .stg-d{color:#9fb0c4}
+.stg-badge{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;color:#6ee7b7;border:1px solid rgba(110,231,183,.4);border-radius:5px;padding:2px 6px;margin-bottom:7px}
+.prep-wrap{max-width:1080px;margin-top:30px}
+.prep-wrap>summary{list-style:none;cursor:pointer}
+.prep-wrap>summary::-webkit-details-marker{display:none}
+.prep-wrap .all{display:inline-flex;align-items:center}
+.prep-sub{display:flex;align-items:center;gap:9px;margin:18px 2px 10px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.prep-sub::before{content:"";width:3px;height:11px;border-radius:2px;background:var(--accent);flex:none;opacity:.5}
+.prep-sub span{font-family:"Manrope",sans-serif;font-size:11.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--mute-2)}
+.prep-wrap .sam-strip{margin-top:0}
+.sam-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:880px){.sam-strip{grid-template-columns:1fr}}
+.samp{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:14px 15px}
+.samp-h{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.samp-h .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:2px 6px}
+.samp-h .t{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:.01em}
+.samp-h .t span{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;color:var(--mute)}
+.samp .ct-vs{margin-top:0}
+
+/* ── FA-PHASE1: production chrome grafted onto design base (overrides design's simpler chrome via cascade) ── */
+.frame{grid-template-columns:var(--sb-width) 1fr}
 /* topbar (canonical) */
 .topbar{height:60px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 24px;transition:background-color .25s, border-color .25s}
 .crumbs{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;font-weight:500}
@@ -104,49 +431,6 @@ button{font-family:inherit}
 .np-foot a svg{width:13px;height:13px}
 [data-theme="dark"] .np-foot a{color:var(--accent-light)}
 
-/* ═══ LAUNCHPAD STAGE ═══ */
-.body{flex:1;display:flex;flex-direction:column;align-items:center;padding:36px 42px 64px;position:relative;overflow:hidden}
-/* faint dotted backdrop to give the focused stage depth (KEEP per spec) */
-.body::before{content:"";position:absolute;inset:0;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 30%,#000 0%,transparent 72%);mask-image:radial-gradient(ellipse 80% 55% at 50% 30%,#000 0%,transparent 72%);opacity:.55;pointer-events:none}
-[data-theme="dark"] .body::before{opacity:.35}
-.stage{position:relative;z-index:1;width:100%;max-width:880px;display:flex;flex-direction:column;align-items:center;text-align:center}
-
-/* Q6 — tightened hero (was: eyebrow + 64px shield + 48px italic + mono sub stacked) */
-.ra-eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
-.ra-head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
-.ra-shield{width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--card),var(--card-soft));border:1px solid var(--line);box-shadow:var(--shadow-sm);display:grid;place-items:center;color:var(--accent);position:relative;flex-shrink:0}
-.ra-shield svg{width:22px;height:22px}
-[data-theme="dark"] .ra-shield{background:linear-gradient(135deg,#152033,#0e1727)}
-.ra-title{margin:0;font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:34px;letter-spacing:-.02em;line-height:1.05;color:var(--ink)}
-.ra-sub{margin:0 0 22px;max-width:600px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:400;line-height:1.6;letter-spacing:.005em;color:var(--mute)}
-.ra-sub b{color:var(--ink-2);font-weight:600}
-
-/* ── COMPOSER (hero · KEEP focus-ring, gradient, dotted bg per spec) ── */
-.composer{width:100%;max-width:720px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-pop);padding:14px;text-align:left}
-.composer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 4px 12px}
-.ra-mode{display:inline-flex;background:var(--card-soft);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
-.ra-mode-btn{min-height:44px;height:auto;padding:0 14px;border:0;border-radius:8px;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--mute);letter-spacing:.01em;display:inline-flex;align-items:center;gap:7px;transition:all .14s}
-.ra-mode-btn:hover{color:var(--ink-2)}
-.ra-mode-btn svg{width:13px;height:13px;opacity:.85}
-.ra-mode-btn.active{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08), inset 0 0 0 1px var(--line)}
-[data-theme="dark"] .ra-mode-btn.active{background:rgba(255,255,255,0.06);color:#fff;box-shadow:none}
-.ra-mode-btn.active svg{opacity:1;color:var(--accent)}
-.composer-head .paste-hint{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2);letter-spacing:.04em;white-space:nowrap}
-
-.ra-input-row{display:flex;gap:10px;align-items:stretch;background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:8px;transition:border-color .15s, box-shadow .15s}
-.ra-input-row[hidden]{display:none !important}
-.ra-input-row:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px rgba(55,138,221,0.12)}
-.ra-input-lead{display:grid;place-items:center;width:38px;flex-shrink:0;color:var(--mute-2);transition:color .14s}
-.ra-input-row.is-url .ra-input-lead{color:var(--accent-deep)}
-.ra-input-row.is-id .ra-input-lead{color:var(--accent-deep)}
-.ra-input-lead svg{width:17px;height:17px}
-.ra-input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--ink);padding:0}
-.ra-input::placeholder{color:var(--mute-2);font-weight:400}
-.ra-run-btn{flex-shrink:0;border:0;cursor:pointer;height:46px;min-height:44px;padding:0 18px;border-radius:9px;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#fff;font-weight:800;font-size:13px;letter-spacing:.03em;display:inline-flex;align-items:center;gap:9px;box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 10px 20px -8px rgba(55,138,221,.55);transition:transform .14s, box-shadow .14s, opacity .14s}
-.ra-run-btn:hover:not([disabled]){transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 14px 26px -8px rgba(55,138,221,.6)}
-.ra-run-btn[disabled]{opacity:.5;cursor:not-allowed}
-.ra-run-btn svg{width:14px;height:14px}
-
 /* Q1 — detect chip / Q4 inline error row */
 .detect{min-height:0;display:none;align-items:center;gap:9px;padding:9px 12px;margin-top:8px;border-radius:9px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);transition:all .14s;line-height:1.4}
 .detect.show{display:flex}
@@ -162,184 +446,6 @@ button{font-family:inherit}
 [data-theme="dark"] .detect.err{color:#fca5a5}
 [data-theme="dark"] .detect.err .d-res b{color:#fee2e2}
 [data-theme="dark"] .detect.ok{color:#6ee7b7}
-
-/* dropzone (Q3: real drag + drop) */
-.ra-dropzone{flex:1;cursor:pointer;border:1.5px dashed var(--line);border-radius:10px;background:transparent;padding:26px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;transition:border-color .15s, background .15s, transform .15s}
-.ra-dropzone:hover{border-color:var(--accent);background:rgba(55,138,221,0.04)}
-.ra-dropzone.dragover{border-color:var(--accent);border-style:solid;background:rgba(55,138,221,0.10);transform:scale(1.005)}
-.ra-dropzone svg{width:26px;height:26px;color:var(--accent)}
-.ra-dz-title{font-size:13px;font-weight:600;color:var(--ink)}
-.ra-dz-browse{color:var(--accent-deep);text-decoration:underline;text-underline-offset:3px}
-[data-theme="dark"] .ra-dz-browse{color:var(--accent-light)}
-.ra-dz-types{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute)}
-
-/* Q3 — file chip + explicit Run row */
-.file-chip{display:none;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2);margin-top:8px}
-.file-chip.show{display:flex}
-.file-chip .fc-ico{width:32px;height:32px;border-radius:7px;background:var(--accent-pale);color:var(--accent-deep);display:grid;place-items:center;flex-shrink:0}
-.file-chip .fc-ico svg{width:16px;height:16px}
-[data-theme="dark"] .file-chip .fc-ico{background:rgba(55,138,221,0.18);color:var(--accent-light)}
-.file-chip .fc-name{flex:1;font-weight:700;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-chip .fc-size{color:var(--mute);font-size:11px;flex-shrink:0}
-.file-chip .fc-x{border:0;background:transparent;color:var(--mute);cursor:pointer;padding:0;width:28px;height:28px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
-.file-chip .fc-x:hover{background:rgba(220,38,38,0.08);color:var(--red-600)}
-.file-chip .fc-x svg{width:14px;height:14px}
-.upload-run-row{display:none;justify-content:center;margin-top:10px}
-.upload-run-row.show{display:flex}
-.upload-run-row .ra-run-btn{height:42px;padding:0 22px}
-
-/* Q6 composer footer — format hint (was: 6 fake-button chips) */
-.composer-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 6px 4px;margin-top:2px;border-top:1px solid var(--line-2)}
-.composer-foot .meta{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;color:var(--mute);letter-spacing:.005em}
-.composer-foot .meta svg{width:12px;height:12px;opacity:.7}
-.composer-foot .meta b{color:var(--ink-2);font-weight:700}
-.composer-foot .sep{width:1px;height:12px;background:var(--line);flex-shrink:0}
-.composer-foot .format-hint{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);letter-spacing:.02em;font-weight:500}
-.composer-foot .format-hint b{color:var(--mute);font-weight:600}
-
-.sample-link{margin-top:18px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--accent-deep);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-.sample-link:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
-[data-theme="dark"] .sample-link{color:var(--accent-light)}
-
-/* ═══ RECENTLY AUDITED (Q5: now above the pipeline explainer) ═══ */
-.ra-recent{width:100%;max-width:980px;margin-top:48px;text-align:left}
-.ra-recent-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.ra-recent-label{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
-.ra-recent-all{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);text-decoration:none}
-.ra-recent-all:hover{text-decoration:underline;text-underline-offset:3px}
-[data-theme="dark"] .ra-recent-all{color:var(--accent-light)}
-.ra-recent-list{display:flex;flex-direction:column;gap:8px}
-.ra-row{display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:center;padding:13px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);text-decoration:none;color:inherit;transition:border-color .14s,transform .14s,box-shadow .14s}
-.ra-row:hover{border-color:var(--accent-light);transform:translateY(-1px);box-shadow:var(--shadow)}
-.ra-score{width:48px;height:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:11px;color:#fff;font-family:"IBM Plex Mono",monospace}
-.ra-score .n{font-size:17px;font-weight:700;line-height:1}
-.ra-score .v{font-size:7px;font-weight:700;letter-spacing:.06em;opacity:.92}
-.ra-score.s-hi{background:linear-gradient(135deg,var(--green-700),var(--green-500))}
-.ra-score.s-md{background:linear-gradient(135deg,var(--accent-deep),var(--accent))}
-.ra-score.s-lo{background:linear-gradient(135deg,#b45309,#f59e0b)}
-.ra-score.s-no{background:linear-gradient(135deg,var(--red-800),var(--red-600))}
-.ra-score.s-none{background:var(--mute-2)}
-.ra-row-main{min-width:0}
-.ra-row-sol{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:.01em;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ra-row-meta{font-size:12px;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ra-row-meta .agency{color:var(--ink-2);font-weight:600}
-.ra-row-tag{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--card-soft);border:1px solid var(--line);color:var(--mute);margin-left:7px;vertical-align:1px}
-.ra-row-right{display:flex;align-items:center;gap:14px;flex-shrink:0}
-.ra-row-date{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute-2);white-space:nowrap}
-.ra-row-arrow{color:var(--mute-2);display:grid;place-items:center;transition:color .14s,transform .14s}
-.ra-row-arrow svg{width:16px;height:16px}
-.ra-row:hover .ra-row-arrow{color:var(--accent-deep);transform:translateX(3px)}
-[data-theme="dark"] .ra-row:hover .ra-row-arrow{color:var(--accent-light)}
-/* Q6 — sr-only score text label (colorblind a11y) */
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.ra-recent-empty{padding:36px 18px;text-align:center;border:1.5px dashed var(--line);border-radius:14px;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:12px}
-.ra-recent-empty b{color:var(--ink-2);font-weight:700}
-
-/* ─── FA-167.1 · Recently Audited spec card (.rac) — ported to /audit ───
-   Copied from ceo/redesign-final/Review/recently-audited-card-spec.html.
-   Light base = the spec's primary section 1 (run-audit.html is light-default);
-   dark handled via this file's [data-theme=dark] toggle (not the spec's
-   .ra-dark wrapper). Verdict colours come only from the --vd-* tokens. The
-   compact ".racc" / "View all" variant is intentionally not ported. */
-.ra-recent-list{
-  --vd-proceed:#1f8a5b;--vd-proceed-tint:#e7f4ed;--vd-proceed-line:#bfe3cf;--vd-proceed-ink:#15623f;
-  --vd-caution:#c2861a;--vd-caution-tint:#fbf1dc;--vd-caution-line:#ecd5a3;--vd-caution-ink:#8a5d11;
-  --vd-nobid:#c0352b;--vd-nobid-tint:#fbeae8;--vd-nobid-line:#eec4bf;--vd-nobid-ink:#9a261d;
-  --ra-ink:#101728;--ra-slate:#586073;--ra-mute:#8b94a3;--ra-line:#e9ecf2;
-}
-.rac.is-proceed{--v:var(--vd-proceed);--vt:var(--vd-proceed-tint);--vl:var(--vd-proceed-line);--vi:var(--vd-proceed-ink)}
-.rac.is-caution{--v:var(--vd-caution);--vt:var(--vd-caution-tint);--vl:var(--vd-caution-line);--vi:var(--vd-caution-ink)}
-.rac.is-nobid{--v:var(--vd-nobid);--vt:var(--vd-nobid-tint);--vl:var(--vd-nobid-line);--vi:var(--vd-nobid-ink)}
-.rac{display:grid;grid-template-columns:54px 1fr auto;gap:15px;align-items:center;background:#fff;border:1px solid var(--ra-line);border-radius:13px;padding:13px 15px;text-decoration:none;cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;position:relative}
-.rac::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:0 3px 3px 0;background:var(--v);opacity:0;transition:opacity .14s ease}
-.rac:hover{transform:translateY(-1px);border-color:var(--vl);box-shadow:0 1px 2px rgba(16,23,40,.05),0 14px 28px -18px rgba(16,23,40,.28)}
-.rac:hover::before{opacity:1}
-.rac-badge{width:54px;height:54px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;line-height:1;background:var(--v)}
-.rac-score{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:700;letter-spacing:-.02em}
-.rac-of{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:600;letter-spacing:.06em;opacity:.8;margin-top:3px}
-.rac-main{min-width:0}
-.rac-metarow{display:flex;align-items:center;gap:9px;margin-bottom:3px}
-.rac-id{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ra-ink);white-space:nowrap;flex:none}
-.rac-office{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;letter-spacing:.07em;color:var(--ra-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;padding-left:10px}
-.rac-office::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:3px;border-radius:50%;background:#c3cad6}
-.rac-title{font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;font-size:15.5px;font-weight:600;color:var(--ra-ink);letter-spacing:-.01em;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rac-insight{font-family:"Manrope",ui-sans-serif,system-ui,sans-serif;display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13px;font-weight:450;color:var(--ra-slate);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rac-spark{flex:none;width:6px;height:6px;background:var(--v);transform:rotate(45deg) translateY(2px);border-radius:1px}
-.rac-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-left:6px;position:relative}
-.rac-pill{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;padding:4px 9px 4px 8px;border-radius:999px;white-space:nowrap;background:var(--vt);color:var(--vi);border:1px solid var(--vl)}
-.rac-pill-dot{width:5px;height:5px;border-radius:50%;background:var(--v)}
-.rac-ago{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ra-mute)}
-.rac-chev{position:absolute;right:-4px;bottom:-2px;font-size:14px;color:#c3cad6;opacity:0;transform:translateX(-4px);transition:opacity .14s ease,transform .14s ease}
-.rac:hover .rac-chev{opacity:1;transform:translateX(0);color:var(--v)}
-/* dark — via this file's [data-theme=dark] toggle; mirrors spec .ra-dark */
-[data-theme="dark"] .rac{background:rgba(22,33,54,.31);border-color:#233247}
-[data-theme="dark"] .rac-id{color:#eef2f8}
-[data-theme="dark"] .rac-office{color:#79839a}
-[data-theme="dark"] .rac-title{color:#f3f6fb}
-[data-theme="dark"] .rac-insight{color:#aeb7c8}
-[data-theme="dark"] .rac-pill{background:transparent;color:var(--v);border-color:var(--v)}
-[data-theme="dark"] .rac-ago{color:#79839a}
-
-/* ═══ 3-CALL PIPELINE EXPLAINER (Q2 live loader + Q5 collapsible) ═══ */
-.pipeline{width:100%;max-width:980px;margin-top:38px;text-align:left;background:transparent;border:0;padding:0}
-.pipeline > .pipeline-label{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);padding:8px 0;margin-bottom:12px}
-.pipeline > .pipeline-label .rule{height:1px;flex:1;background:var(--line)}
-.pipeline-track{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto auto;align-items:stretch;gap:0}
-.pcall{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow-sm);padding:16px 16px 15px;display:flex;flex-direction:column;gap:10px;transition:border-color .25s, box-shadow .25s, opacity .2s;position:relative}
-.pcall-top{display:flex;align-items:center;gap:10px}
-.pcall-num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.08em;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-deep));width:30px;height:22px;border-radius:6px;display:grid;place-items:center;flex-shrink:0}
-.pcall-title{font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.2;flex:1;min-width:0}
-.pcall-state{width:22px;height:22px;display:grid;place-items:center;flex-shrink:0}
-.pcall-state .spin{width:14px;height:14px;border:2px solid rgba(55,138,221,0.2);border-top-color:var(--accent);border-radius:50%;animation:spinner .8s linear infinite;display:none}
-.pcall-state .chk{width:17px;height:17px;color:var(--green-600);display:none}
-.pcall.active{border-color:var(--accent-light);box-shadow:0 0 0 3px rgba(55,138,221,0.10), var(--shadow-sm)}
-.pcall.active .pcall-state .spin{display:block}
-.pcall.done{border-color:rgba(16,185,129,0.32);box-shadow:0 0 0 3px rgba(16,185,129,0.08), var(--shadow-sm)}
-.pcall.done .pcall-state .chk{display:block}
-.pcall.pending{opacity:.55}
-.pcall.err{border-color:var(--red-200);box-shadow:0 0 0 3px rgba(220,38,38,0.08), var(--shadow-sm)}
-.pcall.err .pcall-state .chk{display:block;color:var(--red-600)}
-@keyframes spinner{to{transform:rotate(360deg)}}
-.pcall-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
-.pcall-list li{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.45;color:var(--mute);padding-left:14px;position:relative}
-.pcall-list li::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
-.pcall-bar{height:3px;border-radius:2px;background:var(--line-3);overflow:hidden;margin-top:2px;display:none}
-.pcall.active .pcall-bar,
-.pcall.done .pcall-bar,
-.pcall.err .pcall-bar{display:block}
-.pcall-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));width:0%;transition:width .35s ease}
-.pcall.done .pcall-bar i{background:linear-gradient(90deg,var(--green-500),var(--green-700));width:100%}
-.pcall.err .pcall-bar i{background:linear-gradient(90deg,var(--red-500),var(--red-700));width:100%}
-.pcall-arrow{display:grid;place-items:center;color:var(--mute-2);padding:0 6px}
-.pcall-arrow svg{width:18px;height:18px}
-/* delivers */
-.pcall-deliver{background:linear-gradient(160deg,var(--navy-800),var(--navy-900));border:1px solid var(--navy-700);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:10px;color:#e8eef6;min-width:188px}
-.pcall-deliver .d-top{display:flex;align-items:center;gap:8px}
-.pcall-deliver .d-badge{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#86efac;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.32);border-radius:5px;padding:3px 7px}
-.pcall-deliver .d-title{font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:800;letter-spacing:-.01em;color:#fff;line-height:1.2}
-.pcall-deliver .d-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
-.pcall-deliver .d-list li{font-family:"IBM Plex Mono",monospace;font-size:10.5px;line-height:1.35;color:#b6c2d3;padding-left:18px;position:relative}
-.pcall-deliver .d-list li::before{content:"✓";position:absolute;left:0;top:0;color:#6ee7b7;font-weight:800;font-family:"Manrope"}
-
-/* Q2 — pipeline footer (elapsed + view-report reveal) */
-.pl-foot{display:flex;align-items:center;gap:14px;margin-top:18px;justify-content:center}
-.pl-elapsed{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);min-height:22px;display:none;align-items:center;gap:6px}
-.pl-elapsed.show{display:inline-flex}
-.pl-elapsed b{color:var(--ink-2);font-weight:700}
-.pl-elapsed.slow{color:var(--amber-700)}
-[data-theme="dark"] .pl-elapsed.slow{color:#fcd34d}
-.pl-done{display:none;align-items:center;gap:7px;padding:11px 18px;border-radius:9px;background:var(--green-700);color:#fff;text-decoration:none;font-weight:700;font-size:13px;box-shadow:0 8px 18px -6px rgba(16,185,129,0.5);transition:transform .14s}
-.pl-done.show{display:inline-flex;animation:fadeUp .35s ease}
-.pl-done:hover{transform:translateY(-2px)}
-.pl-done svg{width:14px;height:14px}
-@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-
-@media (max-width:1180px){
-  .pipeline-track{grid-template-columns:1fr 1fr;gap:10px}
-  .pcall-arrow{display:none}
-  .pcall-deliver{grid-column:1 / -1}
-}
-
 /* ── canonical toggle sidebar — collapsed icon-rail + expanded labels ── */
 :root{--sb-width:56px}
 [data-sb="open"]{--sb-width:232px}
@@ -390,10 +496,7 @@ button{font-family:inherit}
 </style>
 </head>
 <body>
-
 <div class="frame">
-
-  <!-- ═════════════ SIDEBAR ═════════════ -->
   <aside class="sidebar">
   <button class="sb-toggle" id="sbToggle" type="button" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
   <div class="sb-logo-row"><div class="sb-logo">F</div><span class="sb-wordmark">FAR<span class="wm-au">audit</span></span></div>
@@ -428,10 +531,7 @@ button{font-family:inherit}
   <div class="sb-bottom"><div class="sb-avatar">JR</div></div>
 </aside>
 
-  <!-- ═════════════ MAIN ═════════════ -->
-  <main class="main">
-
-    <!-- topbar -->
+  <div class="main">
     <div class="topbar">
       <div class="crumbs"><b>Run Audit</b><span class="sep">/</span><span>New solicitation</span></div>
       <span class="live-pill">LIVE</span>
@@ -465,880 +565,252 @@ button{font-family:inherit}
       </div>
     </div>
 
-    <!-- launchpad -->
-    <div class="body">
-      <div class="stage">
-
-        <p class="ra-eyebrow">New Audit</p>
-
-        <!-- Q6 — tightened hero: shield beside title, not stacked -->
-        <div class="ra-head">
-          <div class="ra-shield">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-          </div>
-          <h1 class="ra-title">Run a New Audit</h1>
-        </div>
-        <p class="ra-sub">Drop in any federal solicitation. FARaudit runs <b>three sequential intelligence calls</b> and returns a ranked report — with a KO clarification email drafted and ready to send.</p>
-
-        <!-- COMPOSER -->
-        <div class="composer">
-          <div class="composer-head">
-            <!-- Q1 — 2 modes (collapsed from 3) -->
-            <div class="ra-mode" role="tablist" aria-label="Input method">
-              <button class="ra-mode-btn active" data-mode="smart" role="tab" aria-selected="true" aria-controls="panel-smart" id="tab-smart">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
-                Paste link or ID
-              </button>
-              <button class="ra-mode-btn" data-mode="upload" role="tab" aria-selected="false" aria-controls="panel-upload" id="tab-upload">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
-                Upload
-              </button>
+      <div class="scroll">
+      <div class="view on" id="view-audit">
+        <h1 class="page-h">Run a New Audit</h1>
+        <p class="page-sub">Drop the solicitation package and FARaudit runs three sequential intelligence calls — returning a ranked report with a KO clarification email drafted and ready.</p>
+        <div class="ra-cols">
+          <div>
+            <div class="ra-modes">
+              <button class="ra-mode-btn" data-mode="paste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>Paste link or ID</button>
+              <button class="ra-mode-btn on" data-mode="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload</button>
             </div>
-            <span class="paste-hint">⌘V to paste</span>
-          </div>
-
-          <!-- Mode: Smart field (URL or ID auto-detect) -->
-          <div class="ra-input-row" data-mode-panel="smart" id="panel-smart" role="tabpanel" aria-labelledby="tab-smart">
-            <span class="ra-input-lead" id="smartLead">
-              <svg id="smartLeadIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-            </span>
-            <input type="text" class="ra-input" id="smartInput" placeholder="Paste a SAM.gov URL or Notice ID — we figure out which" autocomplete="off" />
-            <button class="ra-run-btn" id="smartRun" type="button" disabled>Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          </div>
-          <!-- Q1/Q4 — detect/error row -->
-          <div class="detect" id="smartDetect" role="status" aria-live="polite"></div>
-
-          <!-- Mode: Upload (Q3: real drag-drop + file chip + explicit Run) -->
-          <div class="ra-input-row" data-mode-panel="upload" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" hidden>
-            <label class="ra-dropzone" id="dropzone">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
-              <span class="ra-dz-title">Drop your solicitation set (PDF/DOCX) or <span class="ra-dz-browse">browse</span></span>
-              <span class="ra-dz-types">PDF · DOCX · multiple files OK · 25MB each</span>
-              <input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-            </label>
-          </div>
-          <!-- Q3 — file chip + explicit Run -->
-          <div class="file-chip" id="fileChip" role="group" aria-label="Selected file">
-            <span class="fc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
-            <span class="fc-name" id="fcName"></span>
-            <span class="fc-size" id="fcSize"></span>
-            <button class="fc-x" id="fcRemove" type="button" aria-label="Remove file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-          </div>
-          <div class="upload-run-row" id="uploadRunRow">
-            <button class="ra-run-btn" id="uploadRun" type="button">Run Audit<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          </div>
-          <!-- Q4 — upload-side inline error -->
-          <div class="detect" id="uploadDetect" role="status" aria-live="polite"></div>
-
-          <div class="composer-foot">
-            <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Avg <b>38&nbsp;sec</b></span>
-            <span class="sep"></span>
-            <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Private · <b>SOC 2 Type II</b></span>
-            <!-- Q6 — format hint caption (was: 6 fake-button chips) -->
-            <span class="format-hint">Handles <b>RFQ, RFP, IDIQ, IFB, Sources Sought, Task Orders</b></span>
-          </div>
-        </div>
-
-        <!-- Q6 — sample link pinned to a curated hero audit so the preview is
-             stable across sessions. See HERO_AUDIT_ID in the script block below. -->
-        <a class="sample-link" id="sampleLink" href="/audit/7e389f1a-0fc4-4ba2-8299-c86d23adb62a">View a sample audit report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="width:12px;height:12px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-
-        <!-- Q5 — RECENTLY AUDITED now appears ABOVE the pipeline explainer -->
-        <div class="ra-recent" id="recentBlock">
-          <div class="ra-recent-head">
-            <div class="ra-recent-label">Recently audited</div>
-            <a class="ra-recent-all" href="/dashboard" id="recentAll">View all →</a>
-          </div>
-          <div class="ra-recent-list" id="recentGrid">
-            <!-- populated by JS from /api/audits -->
-          </div>
-          <div class="ra-recent-empty" id="recentEmpty" style="display:none">
-            <b>No audits yet.</b> Run your first audit above — it'll land here.
-          </div>
-        </div>
-
-        <!-- Pipeline explainer — always visible (core value prop). Q2 loader animates pcalls. -->
-        <div class="pipeline" id="pipelineDetails">
-          <div class="pipeline-label">
-            <span class="t" id="pipelineSummaryT">What runs when you submit</span>
-            <span class="rule"></span>
-          </div>
-          <div class="pipeline-track">
-
-            <div class="pcall" id="pcall1">
-              <div class="pcall-top">
-                <span class="pcall-num">01</span>
-                <span class="pcall-title">Overview</span>
-                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            <div class="uz card" id="uz">
+              <div class="uz-head"><span class="lbl">Upload solicitation</span><span class="uz-hint" id="uzHint"></span></div>
+              <label class="dz"><input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <span class="dz-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></span>
+                <span class="dz-tx"><span class="t">Drop files or <span class="br">browse</span></span><span class="s">PDF · DOCX · 5 files · 15MB max</span></span>
+                <button class="dz-cta" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+              </label>
+              <div class="dz-paste">
+                <div class="dzp-row">
+                  <span class="dzp-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><input type="text" placeholder="Paste a SAM.gov link or solicitation number — e.g. FA4600-26-Q-0047" /></span>
+                  <button class="dzp-go" type="button">Fetch</button>
+                </div>
+                <div class="dzp-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>FARaudit pulls the full package straight from SAM.gov — nothing to download first.</div>
               </div>
-              <ul class="pcall-list">
-                <li>CLIN ambiguities</li>
-                <li>FOB / delivery conflicts</li>
-                <li>Pricing traps</li>
-              </ul>
-              <div class="pcall-bar"><i></i></div>
-            </div>
-
-            <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-
-            <div class="pcall" id="pcall2">
-              <div class="pcall-top">
-                <span class="pcall-num">02</span>
-                <span class="pcall-title">FAR / DFARS Compliance</span>
-                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+              <div class="uz-tease"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z"/></svg><span>FARaudit auto-detects <b>§C</b>, <b>§L</b> and <b>§M</b> on upload — and flags what’s missing before you bid.</span></div>
+              <div class="uz-files">
+                <div class="cov"><div class="cov-h"><span class="k">Section coverage</span><span class="pct" id="covPct"></span></div><div class="cov-grid" id="covGrid"></div><div class="cov-note" id="covNote"></div></div>
+                <div class="flist" id="flist"></div>
+                <div class="uz-foot"><span class="cnt" id="uzCnt"></span><button class="uz-run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 3l14 9-14 9z"/></svg>Run audit</button></div>
               </div>
-              <ul class="pcall-list">
-                <li>Every clause vs. current regs</li>
-                <li>Offeror-action flags</li>
-                <li>Set-aside eligibility</li>
-              </ul>
-              <div class="pcall-bar"><i></i></div>
             </div>
-
-            <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-
-            <div class="pcall" id="pcall3">
-              <div class="pcall-top">
-                <span class="pcall-num">03</span>
-                <span class="pcall-title">Risk Extraction</span>
-                <span class="pcall-state"><span class="spin"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
-              </div>
-              <ul class="pcall-list">
-                <li>6 high-DQ DFARS traps</li>
-                <li>Severity ratings P0–P2</li>
-                <li>Citations attached</li>
-              </ul>
-              <div class="pcall-bar"><i></i></div>
-            </div>
-
-            <div class="pcall-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-
-            <div class="pcall-deliver">
-              <div class="d-top"><span class="d-badge">Delivers</span></div>
-              <div class="d-title">Ranked report</div>
-              <ul class="d-list">
-                <li>Go / caution / decline score</li>
-                <li>KO clarification email, drafted</li>
-                <li>One-click export</li>
-              </ul>
-            </div>
-
           </div>
-          <!-- Q2 — live elapsed counter + reveal-on-done CTA -->
-          <div class="pl-foot">
-            <span class="pl-elapsed" id="plElapsed" aria-live="polite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="plElapsedText"></span></span>
-            <a class="pl-done" id="plDone" href="#" aria-live="polite">View report<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-          </div>
+          <div class="sam card" style="display:none"></div>
         </div>
+        <details class="blk prep-wrap">
+          <summary class="sec-head"><span class="k">Solicitation prep</span><span class="all" style="color:var(--mute);text-decoration:none">reference<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+          <div class="prep-sub">What to grab <span>priority order — more sections, sharper audit</span></div>
+          <div class="grab card">
+            <div class="grow ghead"><span></span><span>Section</span><span>Document</span><span>What FARaudit reads from it</span><span class="gh-r">Priority</span></div>
+            <div class="grow"><span class="sb2 sb-main">MAIN</span><span class="gname">Main solicitation</span><span class="gdoc">SF-1449 / 1442 / 1447 / 18</span><span class="gread"><span class="rtag">CLINs</span><span class="rtag">NAICS</span><span class="rtag">Set-aside</span></span><span class="gpri req">Required</span></div>
+            <div class="grow"><span class="sb2 sb-sec">§C</span><span class="gname">Section C</span><span class="gdoc">SOW / PWS / SOO</span><span class="gread"><span class="rtag">Scope</span><span class="rtag">Deliverables</span><span class="rtag">Place of perf.</span></span><span class="gpri core">Core</span></div>
+            <div class="grow"><span class="sb2 sb-sec">§L</span><span class="gname">Section L</span><span class="gdoc">Instructions to offerors</span><span class="gread"><span class="rtag">Submission</span><span class="rtag">Format</span><span class="rtag">Page limits</span></span><span class="gpri core">Core</span></div>
+            <div class="grow"><span class="sb2 sb-sec">§M</span><span class="gname">Section M</span><span class="gdoc">Evaluation factors</span><span class="gread"><span class="rtag">Award basis</span><span class="rtag">Factor weighting</span></span><span class="gpri core">Core</span></div>
+            <div class="grow"><span class="sb2 sb-sec">§H</span><span class="gname">Section H</span><span class="gdoc">Special contract requirements</span><span class="gread"><span class="rtag">Special terms</span><span class="rtag">CDRLs</span><span class="rtag">Key personnel</span></span><span class="gpri opt">Optional</span></div>
+            <div class="grow"><span class="sb2 sb-other">AMD</span><span class="gname">Latest amendment</span><span class="gdoc">Supersedes prior terms</span><span class="gread"><span class="rtag">Changed terms</span><span class="rtag">Effective date</span></span><span class="gpri opt">Optional</span></div>
+            <div class="grow"><span class="sb2 sb-other">QASP</span><span class="gname">QASP</span><span class="gdoc">Quality surveillance plan</span><span class="gread"><span class="rtag">Perf. standards</span><span class="rtag">Scoring</span></span><span class="gpri opt">Optional</span></div>
+          </div>
+          <div class="prep-sub">Before you go to SAM.gov <span>filters, file types &amp; award basis</span></div>
+          <div class="sam-strip">
+            <div class="samp">
+              <div class="samp-h"><span class="n">1</span><span class="t">Find on <span>SAM.GOV</span></span></div>
+              <div class="frule"><span class="fk">Notice Type</span><span class="fv on">Solicitation</span></div>
+              <div class="frule"><span class="fk">Status</span><span class="fv on">Active</span></div>
+              <div class="frule"><span class="fk">Posted</span><span class="fv on">Last 60 days</span></div>
+              <div class="sam-skip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Skip <b>Sources Sought</b> &amp; <b>Pre-Solicitation</b></span></div>
+            </div>
+            <div class="samp">
+              <div class="samp-h"><span class="n">2</span><span class="t">Contract types</span></div>
+              <div class="ct-grid">
+                <div class="ct"><span class="c">FFP</span><span class="d">Firm-fixed-price</span></div>
+                <div class="ct"><span class="c">T&amp;M</span><span class="d">Time &amp; materials</span></div>
+                <div class="ct"><span class="c">IDIQ</span><span class="d">Indefinite qty</span></div>
+                <div class="ct"><span class="c">CPFF</span><span class="d">Cost-plus-fixed-fee</span></div>
+              </div>
+            </div>
+            <div class="samp">
+              <div class="samp-h"><span class="n">3</span><span class="t">Award basis</span></div>
+              <div class="ct-vs"><div class="side"><div class="h">LPTA</div><div class="d">Lowest price, technically acceptable</div></div><div class="mid">vs</div><div class="side"><div class="h">Best Value</div><div class="d">Tradeoff: price &amp; merit</div></div></div>
+            </div>
+          </div>
+        </details>
+        <div class="body-stack" id="bodyStack">
+          <section class="blk blk-recent">
+            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="#">View all 20 →</a></div>
+            <div class="ra-list">
+              <a class="rac is-nobid" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">HM047626R0039</span><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span></div><div class="rac-title">HM047626R0039 — Solicitation</div><div class="rac-insight"><span class="rac-spark"></span>No-bid unless SPRS is current today.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>NO-BID</span><span class="rac-ago">29m ago</span></div></a>
+              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">69</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA460026Q0047</span><span class="rac-office">AIR FORCE · 55 CONS · OFFUTT AFB NE</span></div><div class="rac-title">Attachment 1 — PWS — 04.15.26 final</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
+              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">1232SA26R0020</span><span class="rac-office">USDA FOREST SERVICE · ALBUQUERQUE NM</span></div><div class="rac-title">Solicitation — Sol_1232SA26R0020_Amd_0001</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
+              <a class="rac is-proceed" href="#"><div class="rac-badge"><span class="rac-score">75</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA487726B00010002</span><span class="rac-office">AIR FORCE · AFLCMC · WPAFB OH</span></div><div class="rac-title">Attachment 3 — Statement of Work</div><div class="rac-insight"><span class="rac-spark"></span>Strong fit — file the clarifications below before quoting.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>PROCEED</span><span class="rac-ago">13h ago</span></div></a>
+            </div>
+          </section>
+          <section class="blk blk-stages">
+            <div class="sec-head"><span class="k">What runs when you submit</span></div>
+            <div class="stages-strip">
+              <div class="stg"><span class="stg-n">01</span><div><div class="stg-h">Overview</div><div class="stg-d">CLIN ambiguities · FOB / delivery conflicts · pricing traps</div></div></div>
+              <div class="stg"><span class="stg-n">02</span><div><div class="stg-h">FAR / DFARS Compliance</div><div class="stg-d">Every clause vs. current regs · offeror-action flags · set-aside eligibility</div></div></div>
+              <div class="stg"><span class="stg-n">03</span><div><div class="stg-h">Risk Extraction</div><div class="stg-d">High-DQ DFARS traps · severity P0–P2 · citations attached</div></div></div>
+              <div class="stg deliver"><div><span class="stg-badge">DELIVERS</span><div class="stg-h">Ranked report</div><div class="stg-d">Go / caution / decline · KO email drafted · one-click export</div></div></div>
+            </div>
+          </section>
+        </div>
+      </div>
 
+      <div class="view" id="view-naics">
+        <h1 class="page-h">NAICS Code Reference</h1>
+        <p class="page-sub">Search any NAICS code, keyword, or type of work — try “ballistic glass” or “paving.” The codes FARaudit monitors show by default; filter to your own once your Capability Statement is set.</p>
+        <div class="naics card">
+          <div class="nx-top">
+            <div class="nx-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="nxSearch" type="text" placeholder="Search code or keyword — e.g. 541512 or “machine shop”…" autocomplete="off" /></div>
+            <span class="nx-legend"><span class="mon"></span><b>FARaudit monitors</b>&nbsp;9 codes</span>
+          </div>
+          <div class="nx-pills" id="nxPills"></div>
+          <div class="nx-resbar"><span class="res" id="nxRes"></span><span class="note">size std = SBA threshold (tbl 3/2023)</span></div>
+          <div class="nx-cards" id="nxCards"></div>
+          <div class="nx-empty" id="nxEmpty">No codes match — try the 6-digit code or a keyword like “repair” or “IT.”</div>
+        </div>
       </div>
     </div>
-  </main>
+  </div>
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════
-   Run Audit — interaction script
-   Spec: ceo/redesign-final/Review/run-audit-interaction-spec.html
-   ─────────────────────────────────────────────────────────────── */
-
-/* ── Theme toggle ── */
+/* FARaudit — Run Audit (Phase 1 relayout). Design body + production plumbing.
+   API contracts preserved: POST /api/audit (FormData noticeId + pdf[]) ; GET /api/audits?limit=20. */
 (function(){
-  var root=document.documentElement, sun=document.getElementById('themeSun'), moon=document.getElementById('themeMoon'), btn=document.getElementById('themeToggle');
-  function sync(){ var t=root.getAttribute('data-theme'); if(t==='light'){sun.style.display='none';moon.style.display='';} else {sun.style.display='';moon.style.display='none';} }
-  try{ var saved=localStorage.getItem('faraudit-theme'); if(saved) root.setAttribute('data-theme',saved); }catch(e){}
-  sync();
-  if(btn) btn.addEventListener('click', function(){ var next=root.getAttribute('data-theme')==='light'?'dark':'light'; root.setAttribute('data-theme',next); try{localStorage.setItem('faraudit-theme',next);}catch(e){} sync(); });
-})();
+"use strict";
+function escapeHtml(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function fmtSize(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(0)+' KB';return (b/1048576).toFixed(1)+' MB';}
+function $(id){return document.getElementById(id);}
 
-/* ── Sidebar toggle ── */
-(function(){
-  var KEY='faraudit-sb', html=document.documentElement;
-  try{var s=localStorage.getItem(KEY); if(s==='closed') html.setAttribute('data-sb','closed'); else if(!html.hasAttribute('data-sb')) html.setAttribute('data-sb','open');}catch(e){}
-  document.addEventListener('click',function(e){
-    var t=e.target&&e.target.closest&&e.target.closest('#sbToggle'); if(!t) return;
-    var next=html.getAttribute('data-sb')==='open'?'closed':'open';
-    html.setAttribute('data-sb',next);
-    try{localStorage.setItem(KEY,next);}catch(e){}
-  });
-})();
+/* ── theme toggle (production) ── */
+(function(){var root=document.documentElement,sun=$('themeSun'),moon=$('themeMoon'),btn=$('themeToggle');
+  function sync(){if(!sun||!moon)return;var t=root.getAttribute('data-theme');if(t==='light'){sun.style.display='none';moon.style.display='';}else{sun.style.display='';moon.style.display='none';}}
+  try{var sv=localStorage.getItem('faraudit-theme');if(sv)root.setAttribute('data-theme',sv);}catch(e){}
+  sync();if(btn)btn.addEventListener('click',function(){var n=root.getAttribute('data-theme')==='light'?'dark':'light';root.setAttribute('data-theme',n);try{localStorage.setItem('faraudit-theme',n);}catch(e){}sync();});})();
 
-/* ── Q1 — Mode switch (2 modes: smart + upload) + Q6 a11y keyboard nav ── */
-(function(){
-  var modeBtns=document.querySelectorAll('.ra-mode-btn');
-  var modePanels=document.querySelectorAll('[data-mode-panel]');
-  function activate(mode){
-    modeBtns.forEach(function(b){
-      var on=b.dataset.mode===mode;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', on?'true':'false');
-      b.tabIndex=on?0:-1;
-    });
-    modePanels.forEach(function(p){ p.hidden=p.dataset.modePanel!==mode; });
-    // Auto-focus the input in the new panel (KEEP per spec)
-    var el = mode==='upload'
-      ? document.getElementById('dropzone')
-      : document.getElementById('smartInput');
-    if(el) el.focus();
-  }
-  modeBtns.forEach(function(btn, idx){
-    btn.addEventListener('click', function(){ activate(btn.dataset.mode); });
-    // Q6 a11y — left/right arrow navigates between mode tabs
-    btn.addEventListener('keydown', function(e){
-      if(e.key==='ArrowRight' || e.key==='ArrowLeft'){
-        e.preventDefault();
-        var dir = e.key==='ArrowRight' ? 1 : -1;
-        var next = modeBtns[(idx+dir+modeBtns.length)%modeBtns.length];
-        next.focus();
-        activate(next.dataset.mode);
-      }
-    });
-  });
-})();
+/* ── sidebar collapse (production) ── */
+(function(){var KEY='faraudit-sb',html=document.documentElement;
+  try{var s=localStorage.getItem(KEY);if(s==='closed')html.setAttribute('data-sb','closed');else if(!html.hasAttribute('data-sb'))html.setAttribute('data-sb','open');}catch(e){}
+  document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('#sbToggle');if(!t)return;var n=html.getAttribute('data-sb')==='open'?'closed':'open';html.setAttribute('data-sb',n);try{localStorage.setItem(KEY,n);}catch(e){}});})();
 
-/* ── Q1 — Smart-field detection (URL vs ID) ── */
-var DETECT = (function(){
-  // URL must look like a URL with sam.gov/opp/ID
-  var URL_RE   = /^https?:\/\/[^\s]+/i;
-  var SAMOPP   = /\/opp\/([A-Za-z0-9][A-Za-z0-9-]*)/i;
-  // Notice IDs: allow hyphens (real solicitations like N00024-26-R-2207)
-  var ID_RE    = /^[A-Za-z0-9][A-Za-z0-9-]{6,}$/;
+/* ── notifications panel + badge hydration (production, real count) ── */
+(function(){var bell=$('bellBtn'),panel=$('notifPanel');
+  if(bell&&panel){bell.addEventListener('click',function(e){e.stopPropagation();panel.classList.toggle('open');bell.classList.toggle('on');});
+    document.addEventListener('click',function(e){if(panel.classList.contains('open')&&!panel.contains(e.target)&&e.target!==bell&&!bell.contains(e.target)){panel.classList.remove('open');bell.classList.remove('on');}});}
+  function setBadge(n){var b=$('bellBadge'),c=$('npCount');if(b){if(n>0){b.textContent=String(n);b.style.display='';}else{b.style.display='none';}}if(c)c.textContent=String(n||0);}
+  function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.style.display='none';}});}
+  fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setBadge(d.unreadCount||0);}).catch(function(){});
+  fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});})();
 
-  function detect(raw){
-    var v = (raw||'').trim();
-    if(!v) return { kind:'empty' };
-    if(URL_RE.test(v)){
-      var m = v.match(SAMOPP);
-      if(m && m[1]) return { kind:'url', noticeId: m[1] };
-      return { kind:'bad-url' };
-    }
-    if(ID_RE.test(v)) return { kind:'id', noticeId: v };
-    return { kind:'bad-id' };
-  }
-  return { detect: detect };
-})();
-
-/* ── Q1 + Q4 — Smart input wiring (detect chip + inline errors) ── */
-(function(){
-  var input  = document.getElementById('smartInput');
-  var lead   = document.getElementById('smartLead');
-  var leadIco= document.getElementById('smartLeadIcon');
-  var run    = document.getElementById('smartRun');
-  var detect = document.getElementById('smartDetect');
-  var row    = input ? input.closest('.ra-input-row') : null;
-  if(!input||!run||!detect||!row) return;
-
-  // SVG paths for the morphing lead icon
-  var ICON_HASH = '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';
-  var ICON_LINK = '<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>';
-  function setLead(kind){
-    row.classList.remove('is-url','is-id');
-    if(kind==='url'){ row.classList.add('is-url'); leadIco.innerHTML = ICON_LINK; }
-    else if(kind==='id'){ row.classList.add('is-id'); leadIco.innerHTML = ICON_HASH; }
-    else { leadIco.innerHTML = ICON_HASH; }
-  }
-  function show(state, html){
-    detect.className = 'detect show ' + state;
-    detect.innerHTML = html;
-  }
-  function hide(){ detect.className='detect'; detect.innerHTML=''; }
-
-  function evaluate(){
-    var d = DETECT.detect(input.value);
-    run.dataset.noticeId = '';
-    switch(d.kind){
-      case 'empty':
-        hide();
-        setLead('id');
-        run.disabled = true;
-        break;
-      case 'url':
-        show('ok',
-          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>URL</span>'+
-          '<span class="d-res">Resolves to Notice ID <b>'+escapeHtml(d.noticeId)+'</b></span>');
-        setLead('url');
-        run.disabled = false;
-        run.dataset.noticeId = d.noticeId;
-        break;
-      case 'id':
-        show('ok',
-          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>ID</span>'+
-          '<span class="d-res">Notice ID <b>'+escapeHtml(d.noticeId)+'</b></span>');
-        setLead('id');
-        run.disabled = false;
-        run.dataset.noticeId = d.noticeId;
-        break;
-      case 'bad-url':
-        show('err',
-          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Bad URL</span>'+
-          '<span class="d-res">No Notice ID found in that link — <b>check it\'s a /opp/ URL</b>.</span>');
-        setLead('url');
-        run.disabled = true;
-        break;
-      case 'bad-id':
-        show('err',
-          '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Invalid</span>'+
-          '<span class="d-res">That doesn\'t look like a SAM.gov Notice ID or URL.</span>');
-        setLead('id');
-        run.disabled = true;
-        break;
-    }
-  }
-  input.addEventListener('input', evaluate);
-  // Q-engineering: Enter submits when valid
-  input.addEventListener('keydown', function(e){
-    if(e.key==='Enter' && !run.disabled){
-      e.preventDefault();
-      run.click();
-    }
-  });
-  run.addEventListener('click', function(){
-    var nid = run.dataset.noticeId;
-    if(!nid) return;
-    submitAudit({ noticeId: nid, pdfFile: null, sourceBtn: run, errorTarget: detect });
-  });
-  evaluate(); // initial state
-})();
-
-/* ── Q3 — Dropzone (real drag + drop + file chip + explicit Run) ── */
-(function(){
-  var dz       = document.getElementById('dropzone');
-  var fileInp  = document.getElementById('fileInput');
-  var chip     = document.getElementById('fileChip');
-  var fcName   = document.getElementById('fcName');
-  var fcSize   = document.getElementById('fcSize');
-  var fcX      = document.getElementById('fcRemove');
-  var uRow     = document.getElementById('uploadRunRow');
-  var uRun     = document.getElementById('uploadRun');
-  var uDetect  = document.getElementById('uploadDetect');
-  if(!dz||!fileInp||!chip||!uRun||!uDetect) return;
-
-  var MAX_BYTES = 25 * 1024 * 1024;
-  var ACCEPT_EXT = /\.(pdf|docx)$/i;
-  var selected = [];
-
-  function fmtSize(b){
-    if(b<1024) return b+' B';
-    if(b<1048576) return (b/1024).toFixed(1)+' KB';
-    return (b/1048576).toFixed(1)+' MB';
-  }
-  function showErr(html){
-    uDetect.className='detect show err';
-    uDetect.innerHTML = '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>File</span><span class="d-res">'+html+'</span>';
-  }
-  function hideErr(){ uDetect.className='detect'; uDetect.innerHTML=''; }
-
-  function renderChips(){
-    if(!selected.length){ chip.classList.remove('show'); uRow.classList.remove('show'); dz.style.display=''; return; }
-    var total = 0; for(var i=0;i<selected.length;i++){ total += selected[i].size; }
-    var primary = selected[0].name;
-    fcName.textContent = selected.length === 1 ? primary : primary + '  (+' + (selected.length - 1) + ' more)';
-    fcSize.textContent = selected.length === 1 ? fmtSize(total) : fmtSize(total) + ' · ' + selected.length + ' files';
-    chip.title = selected.map(function(f){ return f.name + ' (' + fmtSize(f.size) + ')'; }).join('\n');
-    chip.classList.add('show');
-    uRow.classList.add('show');
-    dz.style.display='none';
-  }
-  // accept a FileList/array; validate each, dedupe, accumulate (a solicitation set is multiple files)
-  function addFiles(list){
-    if(!list || !list.length) return;
-    var arr = Array.prototype.slice.call(list), added = 0;
-    for(var i=0;i<arr.length;i++){
-      var f = arr[i];
-      if(!ACCEPT_EXT.test(f.name)){ showErr('PDF or DOCX only · <b>'+escapeHtml(f.name)+'</b> is '+escapeHtml((f.name.split('.').pop()||'').toUpperCase())+'.'); continue; }
-      if(f.size > MAX_BYTES){ showErr('25MB max per file · <b>'+escapeHtml(f.name)+'</b> is '+fmtSize(f.size)+'.'); continue; }
-      var dup = false; for(var j=0;j<selected.length;j++){ if(selected[j].name===f.name && selected[j].size===f.size){ dup=true; break; } }
-      if(dup) continue;
-      selected.push(f); added++;
-    }
-    if(added) hideErr();
-    renderChips();
-  }
-  function clearFile(){ selected=[]; fileInp.value=''; renderChips(); hideErr(); }
-
-  // dragover / dragleave / drop
-  ['dragenter','dragover'].forEach(function(ev){
-    dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover'); });
-  });
-  ['dragleave','dragend'].forEach(function(ev){
-    dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover'); });
-  });
-  dz.addEventListener('drop', function(e){
-    e.preventDefault(); e.stopPropagation();
-    dz.classList.remove('dragover');
-    if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
-  });
-  // file picker (NOT auto-submit — chip + explicit Run only)
-  fileInp.addEventListener('change', function(e){
-    if(e.target.files) addFiles(e.target.files);
-  });
-  fcX.addEventListener('click', clearFile);
-  uRun.addEventListener('click', function(){
-    if(!selected.length) return;
-    submitAudit({ noticeId: '', pdfFiles: selected, sourceBtn: uRun, errorTarget: uDetect });
-  });
-})();
-
-/* ── Q2 — Submit + live pipeline loader ── */
-var __submitting = false;
+/* ── submit (redirect-only; report page shows live 3-stage progress) ── */
+var __submitting=false;
+function setRunning(btn,on){if(!btn)return;if(on){btn.dataset._l=btn.innerHTML;btn.disabled=true;btn.innerHTML='Running…';}else{if(btn.dataset._l)btn.innerHTML=btn.dataset._l;btn.disabled=false;}}
 function submitAudit(opts){
-  if(__submitting) return; // Q-engineering: double-submit guard
-  __submitting = true;
-  // Q5 collapse-persistence: remember the user has run ≥1 audit.
-  try { localStorage.setItem('faraudit-ra-has-run','1'); } catch(e) {}
-
-  var noticeId   = opts.noticeId || '';
-  var pdfFiles   = opts.pdfFiles || (opts.pdfFile ? [opts.pdfFile] : []);
-  var sourceBtn  = opts.sourceBtn;
-  var errorTarget= opts.errorTarget;
-
-  if(sourceBtn){ sourceBtn.disabled = true; sourceBtn.dataset._label = sourceBtn.innerHTML; sourceBtn.innerHTML = 'Running…'; }
-
-  startPipeline();
-
-  var fd = new FormData();
-  fd.append('noticeId', noticeId);
-  pdfFiles.forEach(function(f){ fd.append('pdf', f); });
-
-  fetch('/api/audit', { method:'POST', body:fd, credentials:'include' })
-    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok:r.ok, status:r.status, data:d }; }); })
+  if(__submitting)return;__submitting=true;
+  var noticeId=opts.noticeId||'';var files=opts.pdfFiles||[];var btn=opts.btn;var onErr=opts.onErr||function(m){alert(m);};
+  setRunning(btn,true);
+  var fd=new FormData();fd.append('noticeId',noticeId);files.forEach(function(f){fd.append('pdf',f);});
+  fetch('/api/audit',{method:'POST',body:fd,credentials:'include'})
+    .then(function(r){return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,status:r.status,data:d};});})
     .then(function(out){
-      if(!out.ok){
-        markPipelineErr();
-        var msg = (out.data && out.data.error) || ('Audit didn\'t start (HTTP '+out.status+').');
-        renderInlineServerError(errorTarget, msg, function retry(){
-          hideErrTarget(errorTarget);
-          __submitting = false;
-          if(sourceBtn){ sourceBtn.innerHTML = sourceBtn.dataset._label || 'Run Audit'; sourceBtn.disabled = false; }
-          if(opts.onRetry) opts.onRetry(); else submitAudit(opts);
-        });
-        unBusy(sourceBtn);
-        __submitting = false;
-        return;
-      }
-      var slug = ((out.data.solicitationNumber || out.data.auditId || '') + '').trim().toLowerCase();
-      if(!slug){
-        markPipelineErr();
-        renderInlineServerError(errorTarget, 'Audit started but no audit ID was returned. <b>Nothing was charged.</b>', null);
-        unBusy(sourceBtn);
-        __submitting = false;
-        return;
-      }
-      finishPipeline('/audit/' + encodeURIComponent(slug));
+      if(!out.ok){__submitting=false;setRunning(btn,false);onErr((out.data&&out.data.error)||('Audit didn’t start (HTTP '+out.status+').'));return;}
+      var slug=((out.data.solicitationNumber||out.data.auditId||'')+'').trim().toLowerCase();
+      if(!slug){__submitting=false;setRunning(btn,false);onErr('Audit started but no ID was returned. Nothing was charged.');return;}
+      window.location.href='/audit/'+encodeURIComponent(slug);
     })
-    .catch(function(err){
-      markPipelineErr();
-      renderInlineServerError(errorTarget, 'Network error — '+escapeHtml(err && err.message ? err.message : String(err))+'. <b>Nothing was charged.</b>', function(){
-        hideErrTarget(errorTarget);
-        __submitting = false;
-        if(sourceBtn){ sourceBtn.innerHTML = sourceBtn.dataset._label || 'Run Audit'; sourceBtn.disabled = false; }
-        submitAudit(opts);
-      });
-      unBusy(sourceBtn);
-      __submitting = false;
-    });
+    .catch(function(err){__submitting=false;setRunning(btn,false);onErr('Network error — '+(err&&err.message?err.message:String(err))+'. Nothing was charged.');});
 }
-function unBusy(btn){ if(!btn) return; if(btn.dataset._label){ btn.innerHTML = btn.dataset._label; } btn.disabled = false; }
-function renderInlineServerError(target, msg, retryFn){
-  if(!target){ return; }
-  target.className = 'detect show err';
-  target.setAttribute('role','alert');
-  target.innerHTML = '<span class="d-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Server</span>'+
-                    '<span class="d-res">'+msg+(retryFn?' <button type="button" id="srvRetry" style="background:none;border:0;color:inherit;cursor:pointer;font:inherit;text-decoration:underline;font-weight:700;padding:0">Retry</button>':'')+'</span>';
-  var btn = document.getElementById('srvRetry');
-  if(btn && retryFn) btn.addEventListener('click', retryFn);
-}
-function hideErrTarget(t){ if(t){ t.className='detect'; t.innerHTML=''; t.removeAttribute('role'); } }
 
-/* ── Q2 — pipeline animation state machine ── */
+/* ── mode tabs (paste / upload) ── */
+(function(){var modes=document.querySelector('.ra-modes'),uz=$('uz');if(!modes||!uz)return;
+  modes.addEventListener('click',function(e){var b=e.target.closest('.ra-mode-btn');if(!b)return;[].forEach.call(this.children,function(c){c.classList.toggle('on',c===b);});uz.classList.toggle('paste',b.dataset.mode==='paste');});})();
+
+/* ── smart-detect (paste a SAM URL or Notice ID) ── */
 (function(){
-  var pipelineEl = document.getElementById('pipelineDetails');
-  var elapsedEl  = document.getElementById('plElapsed');
-  var elapsedTxt = document.getElementById('plElapsedText');
-  var doneCta    = document.getElementById('plDone');
-  var STAGES     = [
-    { id:'pcall1', barTo:100, dur:9000  },
-    { id:'pcall2', barTo:100, dur:14000 },
-    { id:'pcall3', barTo:100, dur:12000 }
-  ];
-  var elapsedT0 = 0, elapsedTimer = null, stageTimers = [];
-  function resetPipeline(){
-    STAGES.forEach(function(s){
-      var el = document.getElementById(s.id);
-      if(!el) return;
-      el.classList.remove('active','done','err','pending');
-      var bar = el.querySelector('.pcall-bar i');
-      if(bar) bar.style.width = '0%';
-    });
-    if(doneCta) doneCta.classList.remove('show');
-    if(elapsedEl) elapsedEl.classList.remove('show','slow');
-    if(elapsedTxt) elapsedTxt.innerHTML = '';
-    stageTimers.forEach(clearTimeout); stageTimers = [];
-    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
-  }
-  window.startPipeline = function(){
-    if(!pipelineEl) return;
-    resetPipeline();
-    // pipeline is always visible; no open/close to manage
-    // mark all pending, then progress through them
-    STAGES.forEach(function(s){ var el=document.getElementById(s.id); if(el) el.classList.add('pending'); });
-    elapsedT0 = Date.now();
-    elapsedEl.classList.add('show');
-    elapsedTimer = setInterval(function(){
-      var sec = Math.floor((Date.now()-elapsedT0)/1000);
-      elapsedTxt.innerHTML = sec + 's elapsed · avg <b>38s</b>';
-      if(sec > 57) elapsedEl.classList.add('slow');
-      if(sec > 57) elapsedTxt.innerHTML = sec + 's elapsed · <b>still working — large solicitation.</b>';
-    }, 1000);
+  var URL_RE=/^https?:\/\/[^\s]+/i,SAMOPP=/\/opp\/([A-Za-z0-9][A-Za-z0-9-]*)/i,ID_RE=/^[A-Za-z0-9][A-Za-z0-9-]{6,}$/;
+  function detect(raw){var v=(raw||'').trim();if(!v)return{kind:'empty'};if(URL_RE.test(v)){var m=v.match(SAMOPP);return (m&&m[1])?{kind:'id',noticeId:m[1]}:{kind:'bad'};}if(ID_RE.test(v))return{kind:'id',noticeId:v};return{kind:'bad'};}
+  var field=document.querySelector('.dz-paste .dzp-field input'),go=document.querySelector('.dz-paste .dzp-go'),note=document.querySelector('.dz-paste .dzp-note');
+  if(!field||!go)return;
+  function run(){var d=detect(field.value);if(d.kind!=='id'){if(note){note.style.color='var(--miss-text)';note.textContent='Paste a SAM.gov solicitation URL or a Notice ID.';}return;}submitAudit({noticeId:d.noticeId,btn:go,onErr:function(m){if(note){note.style.color='var(--miss-text)';note.textContent=m;}}});}
+  go.addEventListener('click',run);
+  field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});})();
 
-    var t = 0;
-    STAGES.forEach(function(s, i){
-      stageTimers.push(setTimeout(function(){
-        var el = document.getElementById(s.id);
-        if(!el) return;
-        el.classList.remove('pending');
-        el.classList.add('active');
-        var bar = el.querySelector('.pcall-bar i');
-        if(bar) bar.style.width = (s.barTo - 8) + '%'; // fill while active, leaves headroom
-      }, t));
-      t += Math.max(800, Math.floor(s.dur * 0.18));
-      stageTimers.push(setTimeout(function(){
-        var el = document.getElementById(s.id);
-        if(!el) return;
-        el.classList.remove('active');
-        el.classList.add('done');
-      }, t));
-      t += Math.floor(s.dur * 0.82);
-    });
-  };
-  window.markPipelineErr = function(){
-    // Mark currently-active stage as err; leave others alone.
-    stageTimers.forEach(clearTimeout); stageTimers = [];
-    var hit = null;
-    STAGES.forEach(function(s){
-      var el = document.getElementById(s.id);
-      if(el && el.classList.contains('active')) hit = el;
-    });
-    if(!hit) hit = document.getElementById(STAGES[0].id);
-    if(hit){ hit.classList.remove('active','pending'); hit.classList.add('err'); }
-    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
-  };
-  window.finishPipeline = function(href){
-    stageTimers.forEach(clearTimeout); stageTimers = [];
-    STAGES.forEach(function(s){
-      var el = document.getElementById(s.id);
-      if(el){ el.classList.remove('pending','active','err'); el.classList.add('done'); }
-    });
-    if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
-    if(doneCta){ doneCta.setAttribute('href', href); doneCta.classList.add('show'); doneCta.focus(); }
-    // Auto-redirect after a brief reveal so the user sees the green check
-    setTimeout(function(){ window.location.href = href; }, 900);
-  };
-})();
-
-/* ── Q6 — Recent audits + sample link wired to /api/audits ── */
+/* ── upload zone: real files + coverage strip (filename detection) ── */
 (function(){
-  var grid       = document.getElementById('recentGrid');
-  var empty      = document.getElementById('recentEmpty');
-  var allLink    = document.getElementById('recentAll');
-  var sampleLink = document.getElementById('sampleLink');
-  if(!grid) return;
-
-  // Score → tone class · thresholds per run-audit-restore-list.md §A1
-  function toneClass(s){
-    if(s == null || isNaN(s)) return 's-none';
-    if(s >= 85) return 's-hi';
-    if(s >= 70) return 's-md';
-    if(s >= 58) return 's-lo';
-    return 's-no';
-  }
-  function toneText(s){
-    if(s == null || isNaN(s)) return 'Pending';
-    if(s >= 85) return 'Go';
-    if(s >= 70) return 'Caution';
-    if(s >= 58) return 'Caution';
-    return 'Decline';
-  }
-  function ago(iso){
-    if(!iso) return '';
-    var ms = Date.now() - new Date(iso).getTime();
-    if(isNaN(ms) || ms < 0) return '';
-    if(ms < 60000) return 'just now';
-    if(ms < 3600000) return Math.round(ms/60000)+'m ago';
-    if(ms < 86400000) return Math.round(ms/3600000)+'h ago';
-    if(ms < 7*86400000) return Math.round(ms/86400000)+'d ago';
-    return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  }
-  function arrowSvg(){
-    return '<span class="ra-row-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>';
-  }
-  // Static fallback — used when live /api/audits returns 0 scored audits
-  // ("not wired yet"). Mirrors the reference rows from
-  // ceo/redesign-final/platform/run-audit.html.
-  var STATIC_FALLBACK = [
-    { sol:'N00024-26-R-2207', agency:'Naval Sea Systems Command', title:'SPY-6 Phase IV Radar',         ago:'2m ago',    score:94, status:'complete', insight:'Strong fit — every gate clears and past performance matches your profile.' },
-    { sol:'FA8730-26-Q-0114', agency:'Dept. of the Air Force',    title:'F-35 Test Harness',             ago:'38m ago',   score:88, status:'complete', insight:'Strong fit — set-aside and NAICS align; file clarifications before quoting.' },
-    { sol:'W56KGY-26-R-0014', agency:'CECOM',                     title:'Tactical Network Support Svcs', ago:'2h ago',    score:58, status:'complete', insight:'Bid with caution — clear your SPRS score before quoting.' },
-    { sol:'N00178-26-R-3071', agency:'NSWC Indian Head',          title:'Energetics Support',            ago:'yesterday', score:42, status:'complete', pdfUpload:true, insight:'Bid with caution — confirm facility clearance before committing.' }
-  ];
-  function isComplete(a){
-    return typeof a.compliance_score === 'number' || typeof a.score === 'number';
-  }
-  // Is this a PDF-upload audit with a synthetic notice_id? route.ts stamps
-  // those as "pdf-<timestamp>" when no Notice ID is detectable from the file.
-  function isPdfUpload(a){
-    return typeof a.notice_id === 'string' && /^pdf-/i.test(a.notice_id);
-  }
-  // SAM.gov notice_ids are often 32-char opaque hex blobs (e.g.
-  // "7e13f96a69c04c10ba8a0fd004e9ac1b") — those aren't human-readable, so we
-  // skip them and fall through to the title-based headline candidates. Real
-  // solicitation numbers (FA301626Q0068, N00024-26-R-2207, 36C78626Q501270002)
-  // always contain non-hex letters or hyphens and don't match.
-  function isOpaqueHexId(s){
-    return typeof s === 'string' && /^[0-9a-f]{20,}$/i.test(s);
-  }
-  // Sparse-SAM rows often carry titles like "Stranded notice <hex>" — the
-  // hex blob is the notice_id glued onto a placeholder phrase. Strip the
-  // trailing hex so the headline reads as "Stranded notice".
-  function stripTrailingHexBlob(s){
-    return (typeof s === 'string' ? s : '').replace(/\s+[0-9a-f]{20,}$/i, '').trim();
-  }
-  // Try to pull a real-looking solicitation number out of a free-text title
-  // (e.g. "Solicitation FA301626Q0068 — F-35 Harness" → "FA301626Q0068").
-  // Matches 8–20 chars of letters/digits/hyphens with at least one letter and
-  // at least one digit, anchored on a word boundary so we don't slice nouns.
-  function extractSolNum(title){
-    if (typeof title !== 'string') return null;
-    var m = title.match(/\b([A-Z0-9][A-Z0-9-]{6,18}[A-Z0-9])\b/i);
-    if (!m) return null;
-    var s = m[1];
-    if (!/[A-Z]/i.test(s) || !/\d/.test(s)) return null;
-    return s.toUpperCase();
-  }
-  // Headline + tag + meta resolver. Per CEO 2026-06-03 the headline must
-  // *never* show a.id (UUID), a synthetic "pdf-<ts>" notice_id, or an opaque
-  // hex-blob notice_id — those all read as junk to a human. Priority:
-  //   1) solicitation_number
-  //   2) notice_id, unless it's a "pdf-<ts>" synthetic OR an opaque hex blob
-  //   3) extracted sol-num from title text
-  //   4) cleaned title
-  //   5) "Uploaded PDF"
-  // pdfUpload tag shows whenever isPdfUpload(a) or the row is a fallback flagged with pdfUpload:true.
-  function resolveHeadline(a){
-    var pdfUp = isPdfUpload(a) || a.pdfUpload === true;
-    if (a.sol)                 return { sol: String(a.sol),                 pdfUpload: pdfUp };
-    if (a.solicitation_number) return { sol: String(a.solicitation_number), pdfUpload: pdfUp };
-    if (!pdfUp && a.notice_id && !isOpaqueHexId(a.notice_id)) {
-      return { sol: String(a.notice_id), pdfUpload: false };
-    }
-    var extracted = extractSolNum(a.title);
-    if (extracted)             return { sol: extracted,                     pdfUpload: pdfUp };
-    var t = stripTrailingHexBlob((a.title || '').trim());
-    if (t && t.toLowerCase() !== 'untitled solicitation') {
-      return { sol: t.slice(0, 60), pdfUpload: pdfUp };
-    }
-    return { sol: 'Uploaded PDF', pdfUpload: true };
-  }
-  // FA-167.1 — verdict (spec .rac pill + badge colour). Prefers the canonical
-  // executive_summary.verdict; falls back to recommendation, then score bands.
-  function verdictOf(a){
-    var ev = String(a.exec_verdict || '').toUpperCase().replace(/[\s_]+/g, '-');
-    if (ev === 'NO-BID' || ev === 'NOBID') return { cls:'is-nobid',   label:'NO-BID'  };
-    if (ev === 'CAUTION')                  return { cls:'is-caution',  label:'CAUTION' };
-    if (ev === 'PROCEED' || ev === 'GO' || ev === 'BID') return { cls:'is-proceed', label:'PROCEED' };
-    var rec = String(a.recommendation || '').toUpperCase();
-    if (rec === 'DECLINE')             return { cls:'is-nobid',   label:'NO-BID'  };
-    if (rec === 'PROCEED')             return { cls:'is-proceed', label:'PROCEED' };
-    if (rec.indexOf('CAUTION') !== -1) return { cls:'is-caution', label:'CAUTION' };
-    var s = (typeof a.score === 'number') ? a.score
-          : (typeof a.compliance_score === 'number') ? a.compliance_score : null;
-    if (s != null) { if (s >= 70) return { cls:'is-proceed', label:'PROCEED' };
-                     if (s < 40)  return { cls:'is-nobid',   label:'NO-BID'  }; }
-    return { cls:'is-caution', label:'CAUTION' };
-  }
-  // Insight (spec .rac-insight) = the verdict tail of executive_summary.what
-  // (everything after the first " — "); fallback to the top risk factor with
-  // the citation parenthetical stripped. Capped at 90 chars (CSS ellipsis backs it).
-  function insightOf(a){
-    var s = '';
-    // Explicit insight wins — the curated demo rows (STATIC_FALLBACK) carry a
-    // one-line string in the production voice so the demo matches live cards.
-    if (a.insight) s = String(a.insight).trim();
-    if (!s) { var what = String(a.exec_what || '').trim();
-              if (what) { var p = what.split(' — '); if (p.length > 1) s = p.slice(1).join(' — ').trim(); } }
-    if (!s) { var f = String(a.exec_factors || '').split(',')[0].trim();
-              s = f.replace(/\s*\([^)]*\)\s*$/, '').trim(); }
-    if (!s) return '';
-    s = s.charAt(0).toUpperCase() + s.slice(1);  // sentence-case (the es.what tail starts lowercase)
-    return s.length > 90 ? s.slice(0, 89).replace(/\s+$/, '') + '…' : s;
-  }
-  // Never-blank guarantee (spec: every .rac carries an insight) — when an audit
-  // has no synthesized sentence at all, derive a verdict-voiced one-liner.
-  function verdictBlurb(label){
-    if (label === 'PROCEED') return 'Strong fit — review the full report before quoting.';
-    if (label === 'NO-BID')  return 'No-bid — compliance gaps do not support a bid.';
-    return 'Bid with caution — clear the flagged items before committing.';
-  }
-  // Office leaf — /api/audits returns office_display (cleanAgencyName-resolved
-  // server-side); fallback to agency for the static rows. Never the DoD parent.
-  function officeOf(a){ return String(a.office_display || a.agency || '').trim(); }
-
-  function cellHtml(a){
-    var h     = resolveHeadline(a);
-    // Link to the audit detail page by stable id; never the UUID, never "pdf-<ts>".
-    var slug  = a.id ? String(a.id) : encodeURIComponent(h.sol.toLowerCase());
-    var score = (typeof a.score === 'number') ? a.score
-              : (typeof a.compliance_score === 'number') ? a.compliance_score : null;
-    var v       = verdictOf(a);
-    var office  = officeOf(a);
-    var insight = insightOf(a) || verdictBlurb(v.label);  // never blank
-    var when    = a.ago || ago(a.completed_at || a.created_at);
-    var titleText = stripTrailingHexBlob((a.title || '').trim());
-    if (titleText && titleText.toLowerCase() === 'untitled solicitation') titleText = '';
-    // .rac-title is the item name; if absent or identical to the id, fall back
-    // to the headline so the prominent title line is never blank.
-    var titleLine = (titleText && titleText.toUpperCase() !== h.sol.toUpperCase())
-      ? titleText.slice(0, 80) : h.sol;
-    // Spec badge shows the integer; "/ 100" only when a real score exists.
-    var badgeHtml = (score != null)
-      ? '<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>'
-      : '<span class="rac-score">—</span>';
-    return '<a class="rac '+v.cls+'" href="/audit/'+slug+'">'+
-      '<div class="rac-badge">'+badgeHtml+'</div>'+
-      '<div class="rac-main">'+
-        '<div class="rac-metarow">'+
-          '<span class="rac-id">'+escapeHtml(h.sol)+'</span>'+
-          (office ? '<span class="rac-office">'+escapeHtml(office)+'</span>' : '')+
-        '</div>'+
-        '<div class="rac-title">'+escapeHtml(titleLine)+'</div>'+
-        '<div class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(insight)+'</div>'+
-      '</div>'+
-      '<div class="rac-right">'+
-        '<span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span>'+
-        '<span class="rac-ago">'+escapeHtml(when)+'</span>'+
-        '<span class="rac-chev">→</span>'+
-      '</div>'+
-    '</a>';
-  }
-  function render(audits){
-    audits = Array.isArray(audits) ? audits : [];
-    // Sort scored-first per CEO 2026-06-03 — /api/audits returns newest first
-    // (created_at DESC), but the 7 most-recent are pinned-pending with null
-    // scores. Surfacing completed work fills the top slots; pending only
-    // backfills when fewer than 4 scored audits exist. The underlying reason
-    // those 7 are unscored is a separate Audit-AI cron issue (P0 carry-over).
-    var scored  = audits.filter(function(a){ return typeof a.compliance_score === 'number'; });
-    var pending = audits.filter(function(a){ return typeof a.compliance_score !== 'number'; });
-    var hasScored = scored.length > 0;
-
-    // Render exactly 4 rows in the .ra-recent-list (matches the reference's
-    // approved row count). Scored audits fill first; pending backfills only
-    // when there are fewer than 4 scored; STATIC_FALLBACK fills the rest.
-    var rows;
-    if (hasScored) {
-      rows = scored.slice(0, 4);
-      // Backfill with pending audits if fewer than 4 scored.
-      while (rows.length < 4 && pending.length) rows.push(pending.shift());
-      // Final fallback to static if still under 4 (extreme edge case: < 4 audits total).
-      while (rows.length < 4) rows.push(STATIC_FALLBACK[rows.length]);
-    } else {
-      // Live data isn't wired yet — restore the 4 approved static fallback cards.
-      rows = STATIC_FALLBACK.slice();
-    }
-
-    grid.style.display = '';
-    if (empty) empty.style.display = 'none';
-    grid.innerHTML = rows.slice(0, 4).map(cellHtml).join('');
-
-    if (allLink) allLink.textContent = hasScored ? ('View all ' + audits.length + ' →') : 'View all 15 →';
-
-    // Sample link is pinned in HTML to a curated hero audit
-    // (HERO_AUDIT_ID = 7e389f1a-0fc4-4ba2-8299-c86d23adb62a). Don't overwrite
-    // it with a rolling "highest score" pick — the demo target must stay
-    // stable so Design + prospects always see the same showcase audit.
-  }
-  fetch('/api/audits?limit=20', { credentials:'include' })
-    .then(function(r){ return r.ok ? r.json() : { audits: [] }; })
-    .then(function(d){
-      var audits = (d && d.audits) || [];
-      // Diagnostic (per restore-list A1 follow-up): one-shot dump of first
-      // audit's keys + scalar values so the live API field shape is visible
-      // in the browser console. Safe to leave in — runs once per page load.
-      if (audits.length && typeof console !== 'undefined' && console.log) {
-        try {
-          var first = audits[0];
-          console.log('[run-audit] /api/audits sample · count=' + audits.length + ' · first.keys=' + Object.keys(first).join(','));
-          console.log('[run-audit] first.compliance_score =', first.compliance_score, '· first.status =', first.status, '· first.recommendation =', first.recommendation);
-        } catch (e) {}
-      }
-      render(audits);
-    })
-    .catch(function(){ render([]); });
-})();
-
-/* ── Q6 — Notifications panel (reused from Today) ── */
-(function(){
-  var NDESK = {
-    opp:   { c:'#378ADD', l:'Opportunities', href:'/opportunities' },
-    gao:   { c:'#dc2626', l:'GAO',            href:'/gao-protests' },
-    cmmc:  { c:'#0891b2', l:'CMMC',           href:'/cmmc' },
-    far:   { c:'#7c3aed', l:'FAR/DFARS',      href:'/far-dfars-updates' },
-    co:    { c:'#185FA5', l:'Contracting',    href:'/contracting-officers' },
-    wage:  { c:'#d97706', l:'Wage',           href:'/wage-benchmarks' },
-    spend: { c:'#2C6CB4', l:'Spending',       href:'/defense-spending' }
-  };
-  var ITEMS = [
-    { grp:'Today',   desk:'gao',  t:'AFMC corrective action filed',                d:'Your tracked $5.4M C-17 award may be re-evaluated.',  time:'18m', unread:true  },
-    { grp:'Today',   desk:'opp',  t:'SPY-6 Radar — amendment 0003 posted',          d:'Q&A cutoff moved up 2 days. Re-check your timeline.', time:'1h',  unread:true  },
-    { grp:'Today',   desk:'far',  t:'Clause 252.204-7021 redline published',        d:'Effective in 15 days — 7 of your sols affected.',     time:'3h',  unread:true  },
-    { grp:'Today',   desk:'co',   t:'Greg Bauer (TACOM) opened your capability brief', d:'47 days quiet — good moment to re-warm.',          time:'5h',  unread:true  },
-    { grp:'Earlier', desk:'wage', t:'WD 2015-4267 renewal scheduled',                d:'JBSA inspector categories renew in 22 days.',         time:'Tue', unread:false },
-    { grp:'Earlier', desk:'cmmc', t:'2 controls moved to "Met"',                     d:'You\'re now 78% ready. CM & CA still open.',          time:'Mon', unread:false },
-    { grp:'Earlier', desk:'spend',t:'New FY26 obligations in NAICS 336413',          d:'WA, OH, GA show fresh spend, no activity from you.',  time:'Mon', unread:false }
-  ];
-  var panel = document.getElementById('notifPanel');
-  var bell  = document.getElementById('bellBtn');
-  var scroll= document.getElementById('npScroll');
-  var badge = document.getElementById('bellBadge');
-  var count = document.getElementById('npCount');
-  var mark  = document.getElementById('npMark');
-  if(!panel || !bell || !scroll) return;
-
+  var uz=$('uz'),dz=document.querySelector('.dz'),fileInp=$('fileInput'),flist=$('flist'),covGrid=$('covGrid'),covPct=$('covPct'),covNote=$('covNote'),uzCnt=$('uzCnt'),uzHint=$('uzHint'),runBtn=document.querySelector('.uz-run');
+  if(!uz||!dz||!fileInp)return;
+  var MAX_FILES=5,MAX_TOTAL=15*1024*1024,ACCEPT=/\.(pdf|docx)$/i;
+  var SEC={main:['MAIN','sb-main'],c:['§C','sb-sec'],l:['§L','sb-sec'],m:['§M','sb-sec'],h:['§H','sb-opt'],amd:['AMD','sb-other'],other:['OTHER','sb-other']};
+  var CORE=['main','c','l','m'];var selected=[];
+  // filename section detection — mirrors FA-182 name rules (client-side, pre-submit, honest)
+  function detectSection(name){var n=name.toLowerCase();var m=name.match(/^\s*§?\s*([chlm])[.\s)\-]/i);if(m)return m[1].toLowerCase();
+    if(/statement of work|performance work statement|\bpws\b|\bsoo\b|statement of objectives|scope of work|\bsow\b/.test(n))return 'c';
+    if(/instructions?\s+(to\s+)?offerors|section\s*l\b/.test(n))return 'l';
+    if(/evaluation factors|basis of award|section\s*m\b/.test(n))return 'm';
+    if(/special contract requirements|section\s*h\b/.test(n))return 'h';
+    if(/amend|\bamd\b|sf[\s-]?30/.test(n))return 'amd';
+    if(/sf[\s-]?1449|sf[\s-]?33|sf[\s-]?1442|sf[\s-]?18|solicitation/.test(n))return 'main';
+    return 'other';}
+  function err(msg){if(covNote){covNote.style.color='var(--miss-text)';covNote.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>'+msg+'</span>';}}
+  function totalBytes(){return selected.reduce(function(a,f){return a+f.size;},0);}
+  function addFiles(list){if(!list||!list.length)return;var arr=Array.prototype.slice.call(list);
+    for(var i=0;i<arr.length;i++){var f=arr[i];
+      if(!ACCEPT.test(f.name)){err('PDF or DOCX only — <b>'+escapeHtml(f.name)+'</b> rejected.');continue;}
+      if(selected.length>=MAX_FILES){err('5 files max — remove one to add another.');break;}
+      var dup=false;for(var j=0;j<selected.length;j++){if(selected[j].name===f.name&&selected[j].size===f.size){dup=true;break;}}if(dup)continue;
+      if(totalBytes()+f.size>MAX_TOTAL){err('15MB total max — <b>'+escapeHtml(f.name)+'</b> would exceed it.');continue;}
+      selected.push(f);}
+    render();}
   function render(){
-    var html = '', last = '';
-    ITEMS.forEach(function(n, i){
-      if(n.grp !== last){ html += '<div class="np-grp">'+n.grp+'</div>'; last = n.grp; }
-      var dk = NDESK[n.desk] || { c:'#64748b', l:'', href:'/dashboard' };
-      html += '<a class="np-item'+(n.unread?' unread':'')+'" data-i="'+i+'" href="'+dk.href+'">'+
-        '<span class="np-dot" style="background:'+dk.c+'"></span>'+
-        '<div class="np-body"><div class="np-t"><span class="np-desk" style="color:'+dk.c+'">'+dk.l+'</span>'+n.t+'</div><div class="np-d">'+n.d+'</div></div>'+
-        '<span class="np-time">'+n.time+'</span>'+
-      '</a>';
-    });
-    scroll.innerHTML = html;
-    var u = ITEMS.filter(function(n){ return n.unread; }).length;
-    if(count) count.textContent = String(u);
-    if(badge){ badge.textContent = u ? String(u) : ''; badge.style.display = u===0 ? 'none' : ''; }
-    scroll.querySelectorAll('.np-item').forEach(function(a){
-      a.addEventListener('click', function(){
-        var i = +a.dataset.i;
-        if(ITEMS[i]){ ITEMS[i].unread = false; render(); }
-      });
-    });
-  }
-  render();
+    uz.classList.toggle('loaded',selected.length>0);
+    flist.innerHTML=selected.map(function(f,i){var t=detectSection(f.name);var s=SEC[t];
+      return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(f.name)+'</span><span class="fsub"><span class="sb2 '+s[1]+'">'+s[0]+'</span><span class="fsize">'+fmtSize(f.size)+'</span></span></span><span></span><button class="fx" data-i="'+i+'" type="button" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>';}).join('');
+    var present={};selected.forEach(function(f){present[detectSection(f.name)]=true;});
+    var hit=CORE.filter(function(k){return present[k];}).length;
+    if(covPct)covPct.textContent=hit+' / 4 core';
+    var cells=CORE.map(function(k){return '<span class="covcell '+(present[k]?'ok':'miss')+'"><span class="dot"></span>'+SEC[k][0]+(present[k]?'':' not detected')+'</span>';});
+    cells.push('<span class="covcell '+(present.h?'ok':'optmiss')+'"><span class="dot"></span>§H'+(present.h?'':' optional')+'</span>');
+    if(covGrid)covGrid.innerHTML=cells.join('');
+    var miss=CORE.filter(function(k){return !present[k];}).map(function(k){return SEC[k][0];});
+    if(covNote){if(miss.length){covNote.style.color='var(--warn-text)';covNote.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg><span><b style="color:var(--ink)">'+miss.join(' · ')+'</b> not detected in this set — the audit still runs, but its read on those sections is limited. Add them if you have them.</span>';}else{covNote.style.color='var(--ok-text)';covNote.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>All core sections detected — full-fidelity audit.</span>';}}
+    var mb=(totalBytes()/1048576).toFixed(1),left=MAX_FILES-selected.length;
+    if(uzCnt)uzCnt.innerHTML='<b>'+selected.length+'</b> of 5 files · '+mb+' MB · <b>'+left+'</b> slot'+(left===1?'':'s')+' left';
+    if(uzHint)uzHint.textContent=selected.length?(selected.length+' of 5 · '+mb+' MB'):'';}
+  ['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();dz.classList.add('dragover');});});
+  ['dragleave','dragend','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();dz.classList.remove('dragover');});});
+  dz.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files)addFiles(e.dataTransfer.files);});
+  fileInp.addEventListener('change',function(e){if(e.target.files)addFiles(e.target.files);e.target.value='';});
+  if(flist)flist.addEventListener('click',function(e){var b=e.target.closest('.fx');if(!b)return;selected.splice(+b.dataset.i,1);render();});
+  if(runBtn)runBtn.addEventListener('click',function(){if(!selected.length)return;submitAudit({pdfFiles:selected,btn:runBtn,onErr:err});});})();
 
-  function open(){ panel.classList.add('open'); bell.classList.add('on'); }
-  function close(){ panel.classList.remove('open'); bell.classList.remove('on'); }
-  bell.addEventListener('click', function(e){ e.stopPropagation(); panel.classList.contains('open') ? close() : open(); });
-  if(mark) mark.addEventListener('click', function(e){ e.stopPropagation(); ITEMS.forEach(function(n){ n.unread = false; }); render(); });
-  document.addEventListener('click', function(e){ if(!panel.contains(e.target) && !bell.contains(e.target)) close(); });
-  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+/* ── recently audited (real /api/audits) ── */
+(function(){
+  var list=document.querySelector('.blk-recent .ra-list'),stack=$('bodyStack');
+  var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/dashboard');
+  if(!list)return;
+  function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+  function verdictOf(a){var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
+    if(ev==='NO-BID'||ev==='NOBID')return{cls:'is-nobid',label:'NO-BID'};if(ev==='CAUTION')return{cls:'is-caution',label:'CAUTION'};if(ev==='PROCEED'||ev==='GO'||ev==='BID')return{cls:'is-proceed',label:'PROCEED'};
+    var rec=String(a.recommendation||'').toUpperCase();if(rec==='DECLINE')return{cls:'is-nobid',label:'NO-BID'};if(rec==='PROCEED')return{cls:'is-proceed',label:'PROCEED'};if(rec.indexOf('CAUTION')!==-1)return{cls:'is-caution',label:'CAUTION'};
+    var s=(typeof a.score==='number')?a.score:(typeof a.compliance_score==='number')?a.compliance_score:null;if(s!=null){if(s>=70)return{cls:'is-proceed',label:'PROCEED'};if(s<40)return{cls:'is-nobid',label:'NO-BID'};}return{cls:'is-caution',label:'CAUTION'};}
+  function insightOf(a){var s='';if(a.insight)s=String(a.insight).trim();if(!s){var w=String(a.exec_what||'').trim();if(w){var p=w.split(' — ');if(p.length>1)s=p.slice(1).join(' — ').trim();}}if(!s){s=String(a.exec_factors||'').split(',')[0].trim().replace(/\s*\([^)]*\)\s*$/,'').trim();}if(!s)return '';s=s.charAt(0).toUpperCase()+s.slice(1);return s.length>90?s.slice(0,89).replace(/\s+$/,'')+'…':s;}
+  function cell(a){var v=verdictOf(a);var sol=String(a.solicitation_number||a.notice_id||a.title||'').trim();var slug=a.id?String(a.id):encodeURIComponent(sol.toLowerCase());
+    var score=(typeof a.score==='number')?a.score:(typeof a.compliance_score==='number')?a.compliance_score:null;
+    var office=String(a.office_display||a.agency||'').trim();var when=a.ago||ago(a.completed_at||a.created_at);
+    var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title.slice(0,80):sol;
+    var ins=insightOf(a)||v.label;
+    var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
+    return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">'+escapeHtml(sol)+'</span>'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'</div><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+  function flip(n){if(stack)stack.classList.toggle('flip',n===0);}
+  function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-recent-empty"><b>No audits yet.</b> Run your first audit above — it’ll land here.</div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
+  fetch('/api/audits?limit=20',{credentials:'include'}).then(function(r){return r.ok?r.json():{audits:[]};}).then(function(d){renderCards((d&&d.audits)||[]);}).catch(function(){renderCards([]);});})();
+
+/* ── state-driven order: first-run (no audits) sees the pipeline strip first ── */
+(function(){var stack=$('bodyStack');if(stack)stack.classList.toggle('flip',document.querySelectorAll('.blk-recent .rac').length===0);})();
 })();
-
-/* ── shared HTML escape ── */
-function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 </script>
-<script>(function(){if(window.__farWatcherHydratedV2)return;window.__farWatcherHydratedV2=1;function setWatching(n){document.querySelectorAll('[data-sb-watching-count]').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}function setBell(n){document.querySelectorAll('.icon-btn .nbadge').forEach(function(e){if(n>0){e.textContent=String(n);e.style.display='';}else{e.textContent='';e.style.display='none';}});}fetch('/api/watched-notices',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setWatching((d.kpi&&d.kpi.watching)||0);}).catch(function(){});fetch('/api/notifications?limit=1',{headers:{accept:'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;setBell(d.unreadCount||0);}).catch(function(){});})();</script>
 </body>
 </html>
