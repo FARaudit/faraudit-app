@@ -164,6 +164,7 @@ button{font-family:inherit}
 .mh-id{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent-deep);letter-spacing:.01em;margin:0 0 6px}
 [data-theme="dark"] .mh-id{color:var(--accent-light)}
 .mh-title{font-family:"Fraunces","Georgia",serif;font-style:italic;font-weight:600;font-size:33px;line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:0 0 18px;text-wrap:balance;max-width:24ch}
+.mh-title:empty{display:none} /* FA-187 — no derivable subject → hide, leaving the .mh-id number alone */
 .mh-ids{display:flex;flex-wrap:wrap;gap:5px 16px;margin:0 0 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500;color:var(--ink-2)}
 .mh-ids i{font-style:normal;font-weight:700;color:var(--mute-2);letter-spacing:.05em;margin-right:6px}
 .mh-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--card-soft);margin-top:auto}
@@ -1252,7 +1253,7 @@ button{font-family:inherit}
             <span class="doc-pill" data-field="document_type"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>RFQ</span>
           </p>
           <p class="mh-id" data-field="solicitation_number">SP4701-26-Q-0942</p>
-          <h1 class="mh-title" data-field="title">Predictive Maintenance Analytics — H-60 Fleet Sustainment</h1>
+          <h1 class="mh-title" data-field="solicitation_subject">Predictive Maintenance Analytics — H-60 Fleet Sustainment</h1>
           <div class="mh-meta">
             <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span><span class="src-chip" data-field="agency_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
             <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span><span class="src-chip" data-field="naics_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
