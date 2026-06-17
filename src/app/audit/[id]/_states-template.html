@@ -167,6 +167,21 @@ button{font-family:inherit}
 /* skipped (after a failure) */
 .stage.is-skipped{opacity:.45}
 .stage.is-skipped .sg-lbl{color:var(--mute)}
+/* ── connector rail through the three dots (done leg green, ahead faint) ── */
+.stage{position:relative}
+.stage::before{content:"";position:absolute;left:54px;top:0;bottom:0;width:2px;background:var(--line);z-index:0}
+.stage:first-of-type::before{top:50%}
+.stage:last-of-type::before{bottom:50%}
+.stage.is-done::before{background:var(--green-200)}
+.stage.is-active::before{background:linear-gradient(to bottom,var(--green-200) 50%,var(--line) 50%)}
+[data-theme="dark"] .stage.is-done::before{background:rgba(16,185,129,.3)}
+[data-theme="dark"] .stage.is-active::before{background:linear-gradient(to bottom,rgba(16,185,129,.3) 50%,var(--line) 50%)}
+.stage .sg-no,.stage .sg-dot{position:relative;z-index:1}
+.stage.is-active .sg-dot{background:var(--card-soft)} /* opaque so the rail never shows through */
+/* ── sub-step chips on the combined Analysis & verdict stage ── */
+.sg-tasks{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.sg-tasks span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.03em;color:var(--ink-2);background:var(--card-soft);border:1px solid var(--line);border-radius:5px;padding:3px 7px;white-space:nowrap}
+.stage.is-pending .sg-tasks span{color:var(--mute-2)}
 
 /* ── auto-refresh strip (progress only) ── */
 .refresh-strip{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);padding:0 4px}
@@ -372,7 +387,7 @@ button{font-family:inherit}
         <div class="st-panel p-progress">
           <p class="sp-k">Engine Status</p>
           <p class="sp-word">Analyzing</p>
-          <p class="sp-tag">Stage <b id="spStageNo">2</b> of 4 — no action required.</p>
+          <p class="sp-tag">Stage <b id="spStageNo">2</b> of 3 — no action required.</p>
           <p class="sp-elapsed"><span id="spElapsed">00:00</span><small>Elapsed</small></p>
         </div>
       </header>
@@ -389,26 +404,16 @@ button{font-family:inherit}
           <span class="sg-lbl">Document retrieval<small>Solicitation package fetched and parsed</small></span>
           <span class="sg-status" data-field="stage_retrieval_time">DONE · 6S</span>
         </div>
-        <div class="stage is-active" data-stage="extraction">
+        <div class="stage is-active" data-stage="analysis">
           <span class="sg-no">02</span>
           <span class="sg-dot"></span>
-          <span class="sg-lbl">Analysis<small>Clause extraction, compliance scan, and risk register</small></span>
+          <span class="sg-lbl">Analysis &amp; verdict
+            <span class="sg-tasks" aria-label="Steps in this stage"><span>Clause extraction</span><span>Compliance scan</span><span>Risk register</span><span>Bid gates</span><span>Fit score</span><span>Recommendation</span></span>
+          </span>
           <span class="sg-status">IN PROGRESS</span>
         </div>
-        <div class="stage is-pending" data-stage="risk" style="display:none">
-          <span class="sg-no">03</span>
-          <span class="sg-dot"></span>
-          <span class="sg-lbl">Risk analysis<small>Compliance traps, execution traps, risk register</small></span>
-          <span class="sg-status">PENDING</span>
-        </div>
-        <div class="stage is-pending" data-stage="verdict">
-          <span class="sg-no">03</span>
-          <span class="sg-dot"></span>
-          <span class="sg-lbl">Verdict &amp; scoring<small>Bid gates, fit score, recommendation</small></span>
-          <span class="sg-status">PENDING</span>
-        </div>
         <div class="stage is-pending" data-stage="assembly">
-          <span class="sg-no">04</span>
+          <span class="sg-no">03</span>
           <span class="sg-dot"></span>
           <span class="sg-lbl">Report assembly<small>Compliance matrix, pre-flight checklist, KO email</small></span>
           <span class="sg-status">PENDING</span>
@@ -562,11 +567,15 @@ button{font-family:inherit}
         .then(function(d){
           lastPoll = Date.now();
           if (!d) return;
-          /* FA-160 — advance stage rows live from current_stage */
+          /* FA-160 + Phase 3 — advance the 3 collapsed stage rows live from
+             current_stage. Engine phases fold into 3: retrieval → analysis
+             (extraction/verdict/risk) → assembly. Mirrors the server map. */
           if (d.current_stage) {
-            var order = ['retrieval','extraction','verdict','assembly'];
-            var ci = d.current_stage === 'complete' ? order.length - 1 : order.indexOf(d.current_stage);
-            if (ci < 0) ci = 0;
+            var order = ['retrieval','analysis','assembly'];
+            var toDisplay = { retrieval:0, extraction:1, verdict:1, risk:1, analysis:1, assembly:2 };
+            var ci = d.current_stage === 'complete'
+              ? order.length - 1
+              : (d.current_stage in toDisplay ? toDisplay[d.current_stage] : 0);
             order.forEach(function(s, i){
               var el = document.querySelector('[data-stage="' + s + '"]');
               if (el) el.className = 'stage ' + (i < ci ? 'is-done' : i === ci ? 'is-active' : 'is-pending');
