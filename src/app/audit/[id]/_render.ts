@@ -2683,11 +2683,12 @@ export function renderAuditReportComplete(
     // single source of truth.
     html = renderTrapTally(html, vm.compliance_flags);
   } else {
-    // Phase 4 ⑤.5 — no v2_shadow → renderIngestionBanner never ran. Strip the
-    // ingestion banner placeholder so V1-only audits don't render an empty
-    // "0 of 0 files" manifest. (When v2Input exists, renderIngestionBanner
-    // owns the populate-or-strip decision per compliance_json.ingestion.)
+    // Phase 4 ⑤.5/⑤.7/⑤.4 — no v2_shadow → the V2 render fns never ran. Strip
+    // the placeholders so V1-only audits don't render empty Phase-4 surfaces.
+    // (When v2Input exists, each render fn owns its populate-or-strip decision.)
     html = stripBlockByHideField(html, "ingestion");
+    html = stripBlockByHideField(html, "capture_moves");
+    html = stripBlockByHideField(html, "eval_attachment_gap");
   }
   // Phase 4 ⑤.1 — masthead source/provenance chips (runs after the masthead is
   // populated; value-driven 3-state, independent of the V2 overlay).

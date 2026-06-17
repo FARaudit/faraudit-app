@@ -148,6 +148,12 @@ button{font-family:inherit}
 [data-theme="dark"] .cap-src{background:rgba(55,138,221,.12);border-color:transparent;color:var(--accent-light)}
 .cap-src svg{width:9px;height:9px}
 @media print{.cap-move{break-inside:avoid}}
+/* §M un-provided-attachment honesty callout (item ⑤.4) */
+.eval-gap{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;padding:11px 13px;border-radius:10px;background:var(--amber-50);border:1px solid var(--amber-200);font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.eval-gap svg{width:15px;height:15px;color:var(--amber-600);flex:none;margin-top:1px}
+.eval-gap b{color:var(--ink);font-weight:700}
+[data-theme="dark"] .eval-gap{background:rgba(214,162,60,.12);border-color:transparent;color:var(--ink-2)}
+[data-theme="dark"] .eval-gap svg{color:#fcd34d}
 .mh-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
 .mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
 .mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}
@@ -1724,6 +1730,14 @@ button{font-family:inherit}
                   <div class="sf-bar"><i class="ok" style="width:50%"></i></div>
                   <div class="sf-note">Evaluated for <b>realism &amp; reasonableness</b>, not just lowest total. A price that signals you misunderstood the scope <b>hurts the technical score</b> &mdash; hold margin and win on merit, don&rsquo;t buy the work.</div>
                 </div>
+              </div>
+
+              <!-- §M un-provided-attachment callout (⑤.4) — renderEvalGap fills/strips per
+                   eval_attachment_gap. High-precision: only fires when §M cites a scoring
+                   attachment no ingested file matches. -->
+              <div class="eval-gap" data-field="eval_attachment_gap" data-hide-when-empty="eval_attachment_gap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                <span>Section M references an evaluation attachment not in the documents provided.</span>
               </div>
 
               <div class="subsec">

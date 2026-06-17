@@ -50,6 +50,10 @@ export interface V2RenderInput {
   // own findings (v2_shadow.judgment l02Catches + high-severity risks). Every
   // move traces to a real finding; empty → section stripped.
   capture_play?: CaptureMove[] | null;
+  // ⑤.4 §M un-provided-attachment callout — pre-built honest sentence (HTML,
+  // carries <b>) or null. High-precision: only set when §M cites an attachment
+  // in a scoring context that no ingested file matches. null → callout stripped.
+  eval_attachment_gap?: string | null;
 }
 
 // ⑤.7 — one sequenced capture move. All fields derive from a real engine
@@ -71,6 +75,65 @@ export interface IngestionRender {
   files_ingested: number;
   form_name: string | null;
   files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean }>;
+}
+
+// ⑤.4 — detect a §M evaluation-criteria attachment that was referenced but
+// not ingested. HIGH PRECISION by design: we only claim a gap when (a) we have
+// an ingestion manifest to compare against, (b) §M cites an attachment in a
+// scoring context, and (c) NO ingested file plausibly matches it. Biased hard
+// toward NOT firing — a false "missing attachment" is a fabrication. Framed as
+// tool-perspective ("not in the documents provided"), never a reality claim.
+export function detectEvalAttachmentGap(comp: Record<string, unknown> | null | undefined): string | null {
+  if (!comp || typeof comp !== "object") return null;
+  const ing = comp.ingestion as Record<string, unknown> | undefined;
+  const files = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
+  if (!files || files.length === 0) return null; // no manifest → cannot claim absence
+  const fileNames = files.map((f) => String((f as { name?: unknown }).name ?? "")).join(" | ").toLowerCase();
+  const parts: string[] = [];
+  const pushStr = (v: unknown): void => {
+    if (typeof v === "string") parts.push(v);
+    else if (Array.isArray(v)) v.forEach((x) => { if (typeof x === "string") parts.push(x); });
+  };
+  pushStr(comp.eval_basis);
+  pushStr(comp.section_m_summary);
+  pushStr(comp.evaluation_factors_raw);
+  if (Array.isArray(comp.evaluation_factors)) {
+    (comp.evaluation_factors as Array<Record<string, unknown>>).forEach((ef) => {
+      if (ef && typeof ef === "object") Object.values(ef).forEach((x) => { if (typeof x === "string") parts.push(x); });
+    });
+  }
+  const mText = parts.join("  ");
+  if (mText.trim().length < 20) return null;
+  const refRe = /\b(attachment|exhibit|annex|appendix|addendum)\s+(?:no\.?\s*)?([A-Z]?-?\d{1,3}[A-Z]?|[A-Z])\b/gi;
+  const scoringRe = /criteria|rubric|scoring|score|points?|weight|sub-?factors?|evaluat|basis of award/i;
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = refRe.exec(mText)) !== null) {
+    const token = m[2];
+    const around = mText.slice(Math.max(0, m.index - 80), m.index + 80);
+    if (!scoringRe.test(around)) continue; // only attachment refs in a scoring context
+    const kind = m[1].toLowerCase();
+    const num = token.replace(/^0+/, "").toLowerCase();
+    const refLabel = `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${token.toUpperCase()}`;
+    // A filename plausibly matches when it carries the same attachment kind +
+    // number/letter (in any separator style: "Attachment_5", "attach 05",
+    // "exhibitA"). (?![0-9]) — not \b — so a trailing "_" (attachment_5_rubric)
+    // still counts as a match. Bias toward "provided": any plausible hit clears
+    // the gap, because a false "missing" is worse than a missed callout.
+    const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const provided =
+      fileNames.includes(refLabel.toLowerCase()) ||
+      new RegExp(`(attach|exhibit|annex|append|addend)\\w*[ _.-]*0*${escNum}(?![0-9])`, "i").test(fileNames) ||
+      fileNames.includes(`${kind} ${num}`) ||
+      fileNames.includes(`${kind}${num}`);
+    if (provided) continue; // a matching file WAS ingested — not a gap
+    seen.add(refLabel);
+  }
+  if (seen.size === 0) return null;
+  const refs = [...seen];
+  const phrase = refs.length === 1 ? refs[0] : `${refs.slice(0, -1).join(", ")} and ${refs[refs.length - 1]}`;
+  const plural = refs.length > 1;
+  return `Section M references <b>${phrase}</b> for scoring detail, but ${plural ? "they were" : "it was"} not in the documents provided. The factors above are read from the &sect;M body text &mdash; confirm the exact weighting in ${plural ? "those attachments" : "that attachment"} on SAM.gov before you finalize your proposal.`;
 }
 
 // ⑤.7 — synthesize the Capture Play from the engine's persisted judgment. We
@@ -343,6 +406,7 @@ export function buildV2ViewModelFromShadow(
       return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
     })(),
     capture_play: synthesizeCapturePlay(shadow),
+    eval_attachment_gap: detectEvalAttachmentGap(comp),
   };
 }
 
@@ -885,6 +949,19 @@ function renderCapturePlay(html: string, v: V2RenderInput): string {
   return out;
 }
 
+// ─── Surface 12 — §M un-provided-attachment callout (Phase 4 · ⑤.4) ───────
+
+function renderEvalGap(html: string, v: V2RenderInput): string {
+  const gap = v.eval_attachment_gap;
+  if (!gap) return stripIfEmpty(html, "eval_attachment_gap", true);
+  // Fill the .eval-gap <span> (gap is pre-built HTML, intentionally not esc'd —
+  // dynamic parts are alnum attachment tokens only). Preserve the leading svg.
+  return html.replace(
+    /(<div class="eval-gap"[^>]*data-field="eval_attachment_gap"[^>]*>[\s\S]*?<span>)[\s\S]*?(<\/span>)/,
+    `$1${gap}$2`
+  );
+}
+
 // ─── Main entrypoint ──────────────────────────────────────────────────────
 // Applies all surface renders. Pure function. Determinism contract:
 // renderV2Surfaces(template, vm) === renderV2Surfaces(template, vm) byte-by-byte.
@@ -904,5 +981,6 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   // Phase 4 — agentic report upgrade (⑤)
   out = renderIngestionBanner(out, v);
   out = renderCapturePlay(out, v);
+  out = renderEvalGap(out, v);
   return out;
 }
