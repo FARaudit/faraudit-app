@@ -385,29 +385,7 @@ export function buildV2ViewModelFromShadow(
       : null,
     recompete_signal: (surfaces.recompete_signal as RecompeteSignal | null) ?? null,
     price_anchor: (surfaces.price_anchor as PriceAnchor | null) ?? null,
-    ingestion: ((): IngestionRender | null => {
-      // compliance_json.ingestion (FA-136), NOT v2_shadow.surfaces — populated
-      // by the multi-doc assembly (assembleSam/UploadedDocumentSet). Absent on
-      // single-doc arms → null → banner stripped (honest, no fabrication).
-      const ing = comp.ingestion as Record<string, unknown> | undefined;
-      const rawFiles = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
-      if (!rawFiles || rawFiles.length === 0) return null;
-      const files = rawFiles
-        .filter((f) => f && typeof f.name === "string" && (f.name as string).trim().length > 0)
-        .map((f) => {
-          const role: "form" | "amendment" | "attachment" =
-            f.role === "form" ? "form" : f.role === "amendment" ? "amendment" : "attachment";
-          const section_roles = Array.isArray(f.section_roles)
-            ? (f.section_roles as unknown[]).filter((s): s is string => typeof s === "string" && /^[CHLM]$/.test(s))
-            : [];
-          return { name: String(f.name), role, ingested: f.ingested !== false, section_roles };
-        });
-      if (files.length === 0) return null;
-      const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
-      const filesIngested = typeof ing!.files_ingested === "number" ? (ing!.files_ingested as number) : files.filter((f) => f.ingested).length;
-      const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
-      return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
-    })(),
+    ingestion: readIngestion(comp),
     capture_play: synthesizeCapturePlay(shadow),
     eval_attachment_gap: detectEvalAttachmentGap(comp),
   };
@@ -883,6 +861,39 @@ function renderPriceAnchor(html: string, v: V2RenderInput): string {
 
 // ─── Surface 10 — Ingestion banner (Phase 4 · ⑤.5) ────────────────────────
 
+// Read the ingestion manifest from compliance_json.ingestion (FA-136 — a
+// V1-level field set by the multi-doc assembly, INDEPENDENT of v2_shadow).
+export function readIngestion(comp: Record<string, unknown> | null | undefined): IngestionRender | null {
+  if (!comp || typeof comp !== "object") return null;
+  const ing = comp.ingestion as Record<string, unknown> | undefined;
+  const rawFiles = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
+  if (!rawFiles || rawFiles.length === 0) return null;
+  const files = rawFiles
+    .filter((f) => f && typeof f.name === "string" && (f.name as string).trim().length > 0)
+    .map((f) => {
+      const role: "form" | "amendment" | "attachment" =
+        f.role === "form" ? "form" : f.role === "amendment" ? "amendment" : "attachment";
+      const section_roles = Array.isArray(f.section_roles)
+        ? (f.section_roles as unknown[]).filter((s): s is string => typeof s === "string" && /^[CHLM]$/.test(s))
+        : [];
+      return { name: String(f.name), role, ingested: f.ingested !== false, section_roles };
+    });
+  if (files.length === 0) return null;
+  const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
+  const filesIngested = typeof ing!.files_ingested === "number" ? (ing!.files_ingested as number) : files.filter((f) => f.ingested).length;
+  const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
+  return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
+}
+
+// Standalone banner render — driven by compliance_json.ingestion DIRECTLY, so
+// the banner shows on EVERY audit with a manifest, even when v2_shadow is
+// absent (V2 didn't run). Decoupled from the V2 path (was wrongly stripped on
+// V1-only renders). Strips itself when there's no manifest.
+export function renderIngestionBannerFromAudit(html: string, audit: Record<string, unknown> | null | undefined): string {
+  const comp = audit?.compliance_json as Record<string, unknown> | undefined;
+  return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput);
+}
+
 function renderIngestionBanner(html: string, v: V2RenderInput): string {
   const ing = v.ingestion;
   // No manifest → strip the banner. Always-on when files exist; never faked.
@@ -998,7 +1009,8 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   out = renderRecompeteSignal(out, v);
   out = renderPriceAnchor(out, v);
   // Phase 4 — agentic report upgrade (⑤)
-  out = renderIngestionBanner(out, v);
+  // NOTE: ingestion banner is rendered standalone (renderIngestionBannerFromAudit)
+  // in renderAuditReportComplete — it's V1-level data, not gated on v2_shadow.
   out = renderCapturePlay(out, v);
   out = renderEvalGap(out, v);
   return out;
