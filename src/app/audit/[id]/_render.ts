@@ -2645,6 +2645,12 @@ export function renderAuditReportComplete(
     // badges, which can contradict the §04 P0/P1 flag count. Re-pin to the
     // single source of truth.
     html = renderTrapTally(html, vm.compliance_flags);
+  } else {
+    // Phase 4 ⑤.5 — no v2_shadow → renderIngestionBanner never ran. Strip the
+    // ingestion banner placeholder so V1-only audits don't render an empty
+    // "0 of 0 files" manifest. (When v2Input exists, renderIngestionBanner
+    // owns the populate-or-strip decision per compliance_json.ingestion.)
+    html = stripBlockByHideField(html, "ingestion");
   }
   // §03 exactly-one contract — must run AFTER the V2 overlay so it sees both
   // V1's and V2's un-hide outcomes (see enforceSingleWorkStatementReveal).

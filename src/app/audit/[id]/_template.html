@@ -83,6 +83,32 @@ button{font-family:inherit}
 
 /* ═══════════ MASTHEAD ═══════════ */
 .masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+/* ═══════════ INGESTION BANNER — what the verdict is built on (item ⑤.5) ═══════════
+   Always-on. Every file FARaudit received + its detected role. No fabrication:
+   the reader sees exactly what was read. Bound to compliance_json.ingestion.files[]. */
+.ingest{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:13px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.ingest-lead{display:flex;align-items:center;gap:10px;flex:none}
+.ingest-ico{width:30px;height:30px;border-radius:8px;background:var(--accent-pale,rgba(55,138,221,.1));color:var(--accent);display:grid;place-items:center;border:1px solid var(--blue-200)}
+[data-theme="dark"] .ingest-ico{background:rgba(55,138,221,.16);border-color:transparent;color:var(--accent-light)}
+.ingest-ico svg{width:16px;height:16px}
+.ingest-lead .il-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:2px}
+.ingest-lead .il-v{font-size:13px;font-weight:700;color:var(--ink);line-height:1.1}
+.ingest-lead .il-v b{color:var(--accent)}
+.ingest-files{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.ifile{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft)}
+.ifile svg.fdoc{width:13px;height:13px;color:var(--mute-2);flex:none}
+.ifile .ifn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.irole{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.03em;white-space:nowrap;flex:none}
+.irole.main{background:var(--accent);color:#fff}
+.irole.sec{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+[data-theme="dark"] .irole.sec{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+.irole.other{background:var(--search-bg);color:var(--mute);border:1px solid var(--line)}
+.ingest-cov{flex:none;display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:8px;white-space:nowrap}
+.ingest-cov svg{width:13px;height:13px;flex:none}
+.ingest-cov.ok{background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)}
+[data-theme="dark"] .ingest-cov.ok{background:rgba(16,185,129,.12);color:var(--green-light,#6ee7b7);border-color:transparent}
+.ingest-cov.warn{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+[data-theme="dark"] .ingest-cov.warn{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
 .mh-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
 .mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
 .mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}
@@ -1264,6 +1290,19 @@ button{font-family:inherit}
           </div>
         </div>
       </header>
+
+      <!-- ═══════════ INGESTION BANNER (⑤.5) — every file read + its role ═══════════
+           Bound to compliance_json.ingestion.files[] (renderIngestionBanner). Always-on
+           when an ingestion manifest exists; stripped when absent (single-doc, no manifest).
+           Per-file §-section tags (.isec) deferred to FA-182; ships at form/amendment/attachment grain. -->
+      <div class="ingest" data-field="ingestion" data-hide-when-empty="ingestion">
+        <div class="ingest-lead">
+          <span class="ingest-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7l2 2h7a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></span>
+          <span><span class="il-k">Sources ingested</span><span class="il-v"><b data-field="files_ingested">0</b> of <span data-field="files_total">0</span> files · read in full</span></span>
+        </div>
+        <div class="ingest-files" data-field="ingestion_files"></div>
+        <span class="ingest-cov ok" data-field="ingest_coverage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>All sources read in full</span>
+      </div>
 
       <!-- ═══════════ KEY-DATES RIBBON ═══════════ -->
       <div class="keydates">

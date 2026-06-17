@@ -42,6 +42,19 @@ export interface V2RenderInput {
   submission_preflight?: SubmissionChecklistItem[] | null;
   recompete_signal?: RecompeteSignal | null;
   price_anchor?: PriceAnchor | null;
+  // ⑤.5 Ingestion banner — read from compliance_json.ingestion (top-level,
+  // not v2_shadow.surfaces). Per-file role at form/amendment/attachment grain;
+  // §C/§L/§M section tags deferred to FA-182. null → banner stripped.
+  ingestion?: IngestionRender | null;
+}
+
+// Render-shaped subset of lib/sam-attachments IngestionMeta (kept local to
+// avoid importing the engine module into the render path).
+export interface IngestionRender {
+  files_total: number;
+  files_ingested: number;
+  form_name: string | null;
+  files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean }>;
 }
 
 // FA-127b — single trap derivation. The trap-tally chip, the matrix TRAP
@@ -227,6 +240,26 @@ export function buildV2ViewModelFromShadow(
       : null,
     recompete_signal: (surfaces.recompete_signal as RecompeteSignal | null) ?? null,
     price_anchor: (surfaces.price_anchor as PriceAnchor | null) ?? null,
+    ingestion: ((): IngestionRender | null => {
+      // compliance_json.ingestion (FA-136), NOT v2_shadow.surfaces — populated
+      // by the multi-doc assembly (assembleSam/UploadedDocumentSet). Absent on
+      // single-doc arms → null → banner stripped (honest, no fabrication).
+      const ing = comp.ingestion as Record<string, unknown> | undefined;
+      const rawFiles = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
+      if (!rawFiles || rawFiles.length === 0) return null;
+      const files = rawFiles
+        .filter((f) => f && typeof f.name === "string" && (f.name as string).trim().length > 0)
+        .map((f) => {
+          const role: "form" | "amendment" | "attachment" =
+            f.role === "form" ? "form" : f.role === "amendment" ? "amendment" : "attachment";
+          return { name: String(f.name), role, ingested: f.ingested !== false };
+        });
+      if (files.length === 0) return null;
+      const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
+      const filesIngested = typeof ing!.files_ingested === "number" ? (ing!.files_ingested as number) : files.filter((f) => f.ingested).length;
+      const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
+      return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
+    })(),
   };
 }
 
@@ -698,8 +731,49 @@ function renderPriceAnchor(html: string, v: V2RenderInput): string {
   return out;
 }
 
+// ─── Surface 10 — Ingestion banner (Phase 4 · ⑤.5) ────────────────────────
+
+function renderIngestionBanner(html: string, v: V2RenderInput): string {
+  const ing = v.ingestion;
+  // No manifest → strip the banner. Always-on when files exist; never faked.
+  if (!ing || ing.files.length === 0) return stripIfEmpty(html, "ingestion", true);
+  let out = html;
+  // Lead counts ("<b>N</b> of <span>M</span> files").
+  out = out.replace(
+    /(<b data-field="files_ingested">)[\s\S]*?(<\/b>)/,
+    `$1${esc(String(ing.files_ingested))}$2`
+  );
+  out = setSpanByDataField(out, "files_total", String(ing.files_total));
+  // Per-file chips — role badge only (§-section tags = FA-182, deferred).
+  const ROLE: Record<string, [string, string]> = {
+    form: ["main", "FORM"],
+    amendment: ["sec", "AMENDMENT"],
+    attachment: ["other", "ATTACHMENT"],
+  };
+  const fileRows = ing.files
+    .map((f) => {
+      const [cls, label] = ROLE[f.role] ?? ROLE.attachment;
+      return `<span class="ifile"><svg class="fdoc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg><span class="ifn">${esc(f.name)}</span><span class="irole ${cls}">${label}</span></span>`;
+    })
+    .join("");
+  out = replaceInnerByDataField(out, "ingestion_files", fileRows);
+  // Coverage chip — files-based honesty (section-coverage upgrades with FA-182).
+  const allIngested = ing.files_total > 0 && ing.files_ingested >= ing.files_total;
+  const covClass = allIngested ? "ok" : "warn";
+  const covText = allIngested
+    ? "All sources read in full"
+    : `${ing.files_ingested} of ${ing.files_total} read · review the rest on SAM.gov`;
+  const okSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
+  const warnSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`;
+  out = out.replace(
+    /<span class="ingest-cov[^"]*" data-field="ingest_coverage">[\s\S]*?<\/span>/,
+    `<span class="ingest-cov ${covClass}" data-field="ingest_coverage">${allIngested ? okSvg : warnSvg}${esc(covText)}</span>`
+  );
+  return out;
+}
+
 // ─── Main entrypoint ──────────────────────────────────────────────────────
-// Applies all 9 surface renders. Pure function. Determinism contract:
+// Applies all surface renders. Pure function. Determinism contract:
 // renderV2Surfaces(template, vm) === renderV2Surfaces(template, vm) byte-by-byte.
 
 export function renderV2Surfaces(template: string, v: V2RenderInput): string {
@@ -714,5 +788,7 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   out = renderSubmissionPreflight(out, v);
   out = renderRecompeteSignal(out, v);
   out = renderPriceAnchor(out, v);
+  // Phase 4 — agentic report upgrade (⑤)
+  out = renderIngestionBanner(out, v);
   return out;
 }
