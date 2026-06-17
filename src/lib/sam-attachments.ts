@@ -61,6 +61,41 @@ export interface IngestionFileMeta {
   bytes: number | null;
   ingested: boolean;
   reason?: string;
+  // FA-182 — detected solicitation section role(s) ∈ C|H|L|M, from the file
+  // NAME (deterministic, conservative). Empty [] = unknown → stays a plain
+  // ATTACHMENT in the ingestion banner. Drives the .isec section tags + true
+  // §C/§L/§M coverage chip (upgrades the banner from form-grain).
+  section_roles?: string[];
+}
+
+// FA-182 — classify a file's solicitation section role(s) from its NAME only.
+// Conservative by design: a wrong §-tag is a fabrication, so we tag only what
+// the name clearly signals (a leading section letter, an explicit "Section X",
+// or a reliable section keyword) and leave everything else unknown ([]). This
+// under-claims (generic names → plain ATTACHMENT) rather than guessing.
+export function classifySectionRoles(name: string): string[] {
+  const n = name.toLowerCase();
+  const nspace = n.replace(/[_.\-]+/g, " "); // separator-normalized, for keywords
+  const roles = new Set<string>();
+  const add = (s: string): void => { roles.add(s.toUpperCase()); };
+  const grab = (cluster: string): void => (cluster.match(/[chlm]/gi) ?? []).forEach(add);
+  // A section-letter CLUSTER = single isolated letters (NOT the start of a
+  // word — `(?![a-z])` keeps "combined" from reading as "C") joined by real
+  // separators ("L & M", "L_M", "L and M", "L, M").
+  const C = "[chlm](?![a-z])(?:(?:[\\s_.\\-+,&\\/]|and)+[chlm](?![a-z]))*";
+  let m: RegExpExecArray | null;
+  // explicit "Section(s) <cluster>"
+  const secRe = new RegExp(`sections?\\s*[_.\\- ]?\\s*(${C})`, "gi");
+  while ((m = secRe.exec(n)) !== null) grab(m[1]);
+  // leading cluster at the filename start: "C_…", "L_M_…", "L and M …"
+  const lead = new RegExp(`^(${C})[ _.\\-]`, "i").exec(n);
+  if (lead) grab(lead[1]);
+  // reliable section keywords (matched on the separator-normalized name)
+  if (/statement of work|\bsow\b|\bpws\b|performance work statement|\bsoo\b|scope of work|statement of objectives/.test(nspace)) add("c");
+  if (/instructions? to offerors?\b/.test(nspace)) add("l");
+  if (/evaluation factors?\b|basis of award\b/.test(nspace)) add("m");
+  if (/special contract requirements?\b/.test(nspace)) add("h");
+  return ["C", "H", "L", "M"].filter((x) => roles.has(x));
 }
 
 export interface IngestionMeta {
@@ -322,7 +357,7 @@ export async function assembleSamDocumentSet(
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
-    files
+    files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
     primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer } : null,
@@ -430,7 +465,7 @@ export async function assembleUploadedDocumentSet(
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
-    files
+    files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
     primary: primary ? { name: primary.name, base64: primary.base64, buffer: primary.buffer } : null,
