@@ -746,12 +746,20 @@ function submitAudit(opts){
   var MAX_FILES=5,MAX_TOTAL=15*1024*1024,ACCEPT=/\.(pdf|docx)$/i;
   var SEC={main:['MAIN','sb-main'],c:['§C','sb-sec'],l:['§L','sb-sec'],m:['§M','sb-sec'],h:['§H','sb-opt'],amd:['AMD','sb-other'],other:['OTHER','sb-other']};
   var CORE=['main','c','l','m'];var selected=[];
-  // filename section detection — mirrors FA-182 name rules (client-side, pre-submit, honest)
-  function detectSection(name){var n=name.toLowerCase();var m=name.match(/^\s*§?\s*([chlm])[.\s)\-]/i);if(m)return m[1].toLowerCase();
+  // filename section detection — mirrors FA-182 name rules (client-side, pre-submit, honest).
+  // raw = lowercased name; n = separator-normalized (+ - _ . → space) so "+"-joined and
+  // verbose SAM names still match the phrase fallbacks.
+  function detectSection(name){var raw=name.toLowerCase();var n=raw.replace(/[+_.\-]+/g,' ');
+    // 1) delimited "X." section designator ANYWHERE (e.g. "AOCSSB - C. - Statement of Work")
+    var m=raw.match(/(?:^|[\s+_(§-])([chlm])\./);if(m)return m[1];
+    // 2) leading section letter ("C - Title", "C) ...", "C Title")
+    m=raw.match(/^\s*§?\s*([chlm])[.\s)\-]/);if(m)return m[1];
+    // 3) explicit "Section X"
+    m=n.match(/\bsection\s+([chlm])\b/);if(m)return m[1];
     if(/statement of work|performance work statement|\bpws\b|\bsoo\b|statement of objectives|scope of work|\bsow\b/.test(n))return 'c';
-    if(/instructions?\s+(to\s+)?offerors|section\s*l\b/.test(n))return 'l';
-    if(/evaluation factors|basis of award|section\s*m\b/.test(n))return 'm';
-    if(/special contract requirements|section\s*h\b/.test(n))return 'h';
+    if(/instructions?\b[\s\w]{0,40}\bofferors?\b|notices to offerors/.test(n))return 'l';
+    if(/evaluation factors|basis of award/.test(n))return 'm';
+    if(/special contract requirements/.test(n))return 'h';
     if(/amend|\bamd\b|sf[\s-]?30/.test(n))return 'amd';
     if(/sf[\s-]?1449|sf[\s-]?33|sf[\s-]?1442|sf[\s-]?18|solicitation/.test(n))return 'main';
     return 'other';}

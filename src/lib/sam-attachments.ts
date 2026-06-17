@@ -75,7 +75,7 @@ export interface IngestionFileMeta {
 // under-claims (generic names → plain ATTACHMENT) rather than guessing.
 export function classifySectionRoles(name: string): string[] {
   const n = name.toLowerCase();
-  const nspace = n.replace(/[_.\-]+/g, " "); // separator-normalized, for keywords
+  const nspace = n.replace(/[_.\-+]+/g, " "); // separator-normalized (incl. "+"), for keywords
   const roles = new Set<string>();
   const add = (s: string): void => { roles.add(s.toUpperCase()); };
   const grab = (cluster: string): void => (cluster.match(/[chlm]/gi) ?? []).forEach(add);
@@ -90,9 +90,14 @@ export function classifySectionRoles(name: string): string[] {
   // leading cluster at the filename start: "C_…", "L_M_…", "L and M …"
   const lead = new RegExp(`^(${C})[ _.\\-]`, "i").exec(n);
   if (lead) grab(lead[1]);
+  // delimited "X." section designator ANYWHERE — the common SAM filename shape
+  // "AOCSSB… - C. - Statement of Work.pdf". Sep-prefixed so it never fires inside
+  // a word ("model.pdf" is not read as L).
+  const desigRe = /(?:^|[\s+_(§-])([chlm])\./gi;
+  while ((m = desigRe.exec(n)) !== null) add(m[1]);
   // reliable section keywords (matched on the separator-normalized name)
   if (/statement of work|\bsow\b|\bpws\b|performance work statement|\bsoo\b|scope of work|statement of objectives/.test(nspace)) add("c");
-  if (/instructions? to offerors?\b/.test(nspace)) add("l");
+  if (/instructions?\b[\s\w]{0,40}\bofferors?\b|notices to offerors/.test(nspace)) add("l");
   if (/evaluation factors?\b|basis of award\b/.test(nspace)) add("m");
   if (/special contract requirements?\b/.test(nspace)) add("h");
   return ["C", "H", "L", "M"].filter((x) => roles.has(x));
