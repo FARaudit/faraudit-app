@@ -315,21 +315,23 @@ export function renderAuditTransitionalState(
     const requestedBy = str(opts.requestedBy);
     out = requestedBy ? replaceFieldText(out, "requested_by", requestedBy) : removeFactCell(out, "requested_by");
 
-    // FA-160 — drive stage rows from the persisted current_stage. 4 honest
-    // stages: retrieval → extraction (labelled "Analysis") → verdict → assembly.
-    // "risk" is hidden in the template and mirrors extraction (the engine runs
-    // extraction+risk in parallel). NULL current_stage → stage 1 active.
-    const STAGE_ORDER = ["retrieval", "extraction", "verdict", "assembly"] as const;
+    // FA-160 + Phase 3 — drive the 3 collapsed stage rows from the persisted
+    // current_stage. The engine's four internal phases (retrieval → extraction
+    // → verdict → assembly, with risk running parallel to extraction) fold into
+    // 3 display stages: retrieval → analysis (extraction+verdict+risk) →
+    // assembly. NULL current_stage → stage 1 active.
+    const DISPLAY_ORDER = ["retrieval", "analysis", "assembly"] as const;
+    const TO_DISPLAY: Record<string, number> = {
+      retrieval: 0, extraction: 1, verdict: 1, risk: 1, analysis: 1, assembly: 2,
+    };
     const cur = str(audit.current_stage) || "retrieval";
     const curIdx = cur === "complete"
-      ? STAGE_ORDER.length - 1
-      : Math.max(0, STAGE_ORDER.indexOf(cur as (typeof STAGE_ORDER)[number]));
-    STAGE_ORDER.forEach((s, i) => {
+      ? DISPLAY_ORDER.length - 1
+      : (cur in TO_DISPLAY ? TO_DISPLAY[cur] : 0);
+    DISPLAY_ORDER.forEach((s, i) => {
       const st = i < curIdx ? "is-done" : i === curIdx ? "is-active" : "is-pending";
       out = setStageRow(out, s, st, st === "is-done" ? "DONE" : st === "is-active" ? "IN PROGRESS" : "PENDING");
     });
-    const exState = curIdx < 1 ? "is-pending" : curIdx === 1 ? "is-active" : "is-done";
-    out = setStageRow(out, "risk", exState, exState === "is-done" ? "DONE" : exState === "is-active" ? "IN PROGRESS" : "PENDING");
     out = out.replace(/<b id="spStageNo">\d+<\/b>/, `<b id="spStageNo">${curIdx + 1}</b>`);
   } else {
     const errorMessage = str(audit.error_message) || "unknown error";
