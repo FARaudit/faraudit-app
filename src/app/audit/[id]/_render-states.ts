@@ -236,7 +236,25 @@ interface ErrorClass {
 }
 
 function classifyError(errorMessage: string): ErrorClass {
-  if (/sam\.gov|sam api|http 40[34]|attachment|download|retriev|fetch/i.test(errorMessage)) {
+  // Engine/Anthropic call failures ([call:extraction], [call:risks], "Claude API
+  // …", "fetch failed after N attempts") — a transient ANALYSIS-side error, NOT
+  // a SAM retrieval issue. Must be checked FIRST: "[call:risks] fetch failed"
+  // contains the word "fetch", which previously mis-matched the SAM branch and
+  // told the user (on an UPLOAD) that SAM.gov refused the download + to re-upload
+  // the PDF they already provided. (Cause of the d6240440 misclassification.)
+  if (/\[call:|claude api|anthropic|fetch failed after|model (overloaded|error)/i.test(errorMessage)) {
+    return {
+      headline: "The audit hit a transient error during analysis.",
+      explainer: "A network or service hiccup interrupted the engine mid-analysis, before a verdict was produced. This is almost always transient — <b>retrying the audit usually succeeds</b>. It is not a problem with your account or your documents.",
+      failedStage: "02 — Engine analysis",
+      tag: "Stopped during engine analysis.",
+      ledeRetrievalAccurate: false,
+    };
+  }
+  // SAM.gov retrieval failures — note: bare "fetch" removed (too broad; it caught
+  // the engine call errors above). SAM failures carry sam.gov / download /
+  // attachment / retrieval / 40x context.
+  if (/sam\.gov|sam api|http 40[34]|attachment|download|retriev/i.test(errorMessage)) {
     return {
       headline: "The solicitation package could not be retrieved from SAM.gov.",
       explainer: "SAM.gov refused the download request for this notice's attachment package. This usually means the attachments are behind a controlled-access wall (export-controlled or JCP-gated documents), or SAM.gov is rate-limiting automated retrieval. <b>It is not a problem with your account.</b>",

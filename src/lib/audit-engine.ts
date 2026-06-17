@@ -1166,27 +1166,39 @@ async function callClaude(
   };
   if (pdfFileId) headers["anthropic-beta"] = "files-api-2025-04-14";
   for (let attempt = 1; attempt <= 3; attempt++) {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        // Brain QA determinism gate (2026-06-06): empirical Anthropic API
-        // probe — claude-sonnet-4-6 accepts `temperature: 0` (200 OK);
-        // claude-opus-4-7 returns 400 "temperature is deprecated for this
-        // model". The earlier blanket removal at 1e68186 was over-broad.
-        // Model-aware gate: lock Sonnet (the default + 4 primary calls)
-        // at temperature 0 for deterministic structured extraction; let
-        // Opus retries omit it (the API rejects them otherwise). Closes
-        // the variance Brain observed across SPRRA runs (0 vs 68
-        // far_clauses, etc.).
-        ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
-        system: systemPrompt,
-        messages: [{ role: "user", content }]
-      }),
-      signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS)
-    });
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          // Brain QA determinism gate (2026-06-06): empirical Anthropic API
+          // probe — claude-sonnet-4-6 accepts `temperature: 0` (200 OK);
+          // claude-opus-4-7 returns 400 "temperature is deprecated for this
+          // model". The earlier blanket removal at 1e68186 was over-broad.
+          // Model-aware gate: lock Sonnet (the default + 4 primary calls)
+          // at temperature 0 for deterministic structured extraction; let
+          // Opus retries omit it (the API rejects them otherwise). Closes
+          // the variance Brain observed across SPRRA runs (0 vs 68
+          // far_clauses, etc.).
+          ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
+          system: systemPrompt,
+          messages: [{ role: "user", content }]
+        }),
+        signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS)
+      });
+    } catch (e) {
+      // A THROWN fetch — network-level "fetch failed" (connection/DNS/TLS blip)
+      // or a timeout-abort — never produces an HTTP status, so the 529/503 path
+      // below can't see it. These are transient; retry with the same backoff.
+      // (Cause of the d6240440 failure: one "[call:risks] fetch failed" killed
+      // the whole audit with no second try.)
+      if (attempt === 3) throw new Error(`Claude API fetch failed after ${attempt} attempts: ${e instanceof Error ? e.message : String(e)}`);
+      console.warn(`[audit-engine] Claude fetch threw attempt ${attempt} (${e instanceof Error ? e.message : e}) — backing off ${attempt * 2}s`);
+      await new Promise(r => setTimeout(r, attempt * 2000));
+      continue;
+    }
     if (res.ok) break;
     const transient = res.status === 529 || res.status === 503;
     if (!transient || attempt === 3) {
