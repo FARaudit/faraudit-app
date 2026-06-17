@@ -109,6 +109,14 @@ button{font-family:inherit}
 [data-theme="dark"] .ingest-cov.ok{background:rgba(16,185,129,.12);color:var(--green-light,#6ee7b7);border-color:transparent}
 .ingest-cov.warn{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
 [data-theme="dark"] .ingest-cov.warn{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
+/* ═══════════ HEADER SOURCE CHIPS — provenance per masthead fact (item ⑤.1) ═══════════
+   3 states: extracted (gray chip) · inferred (amber .verify chip) · not-in-documents
+   (the value <b> goes italic .notfound). Engine-driven status — never inferred from a blank. */
+.src-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:600;letter-spacing:.02em;color:var(--mute-2);background:var(--search-bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-chip svg{width:8px;height:8px;flex:none}
+.src-chip.verify{color:var(--amber-700);background:var(--amber-50);border-color:var(--amber-200)}
+[data-theme="dark"] .src-chip.verify{color:#fcd34d;background:rgba(214,162,60,.12);border-color:transparent}
+.mh-fact b.notfound{color:var(--mute-2);font-weight:600;font-style:italic}
 .mh-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
 .mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
 .mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}
@@ -1204,10 +1212,10 @@ button{font-family:inherit}
           <p class="mh-id" data-field="solicitation_number">SP4701-26-Q-0942</p>
           <h1 class="mh-title" data-field="title">Predictive Maintenance Analytics — H-60 Fleet Sustainment</h1>
           <div class="mh-meta">
-            <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span></div>
-            <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span></div>
-            <div class="mh-fact"><i>Set-Aside</i><b data-field="set_aside">Total Small Business</b><span class="sub" data-field="set_aside_detail">SBA size std · $34.0M</span></div>
-            <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span></div>
+            <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span><span class="src-chip" data-field="agency_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span><span class="src-chip" data-field="naics_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>Set-Aside</i><b data-field="set_aside">Total Small Business</b><span class="sub" data-field="set_aside_detail">SBA size std · $34.0M</span><span class="src-chip" data-field="set_aside_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span><span class="src-chip" data-field="contract_type_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
           </div>
         </div>
         <div class="mh-verdict v-caution" data-state="full" data-field="recommendation_block">

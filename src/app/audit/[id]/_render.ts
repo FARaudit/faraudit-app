@@ -2622,6 +2622,43 @@ function stripBlockByHideField(html: string, dataField: string): string {
   return html;
 }
 
+// ─── Phase 4 ⑤.1 — masthead source/provenance chips ───────────────────────
+// 3-state honesty per header fact, driven by the VALUE the engine produced —
+// never an inference from a blank (FA-185 contract). present → "Extracted";
+// contract_type present → "verify" (V1 never exposes it reliably, so we ask
+// the reader to confirm rather than assert); absent → the value goes italic
+// "Not in documents" and the chip is dropped. We intentionally do NOT claim a
+// block-level source ("SF-1449 Blk 9") we can't prove — honest-generic beats
+// plausible-but-wrong (honesty flag #3).
+export function renderHeaderSourceChips(html: string, vm: AuditViewModel): string {
+  const docSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`;
+  const infoSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>`;
+  const present = (v: unknown): boolean =>
+    typeof v === "string" && v.trim().length > 0 && v.trim() !== "—";
+  const fields: Array<{ key: "agency" | "naics" | "set_aside" | "contract_type"; verifyHint: string | null }> = [
+    { key: "agency", verifyHint: null },
+    { key: "naics", verifyHint: null },
+    { key: "set_aside", verifyHint: null },
+    { key: "contract_type", verifyHint: "Inferred · verify in &sect;B" },
+  ];
+  let out = html;
+  for (const f of fields) {
+    const chipRe = new RegExp(`<span class="src-chip[^"]*" data-field="${f.key}_source">[\\s\\S]*?</span>`);
+    if (!present(vm[f.key])) {
+      out = out.replace(
+        new RegExp(`<b([^>]*)data-field="${f.key}"([^>]*)>[\\s\\S]*?</b>`),
+        `<b class="notfound" data-field="${f.key}">Not in documents</b>`
+      );
+      out = out.replace(chipRe, "");
+    } else if (f.verifyHint) {
+      out = out.replace(chipRe, `<span class="src-chip verify" data-field="${f.key}_source">${infoSvg}${f.verifyHint}</span>`);
+    } else {
+      out = out.replace(chipRe, `<span class="src-chip" data-field="${f.key}_source">${docSvg}Extracted</span>`);
+    }
+  }
+  return out;
+}
+
 // ─── V2 cutover wrapper (B2 + B3 coupled, Jun 8 2026) ──────────────────────
 // Single source of truth for the V1 → V2 overlay → strip-pass chain. Both the
 // web route (/audit/[id]) and PDF route (/api/audit/[id]/pdf) call this so the
@@ -2652,6 +2689,9 @@ export function renderAuditReportComplete(
     // owns the populate-or-strip decision per compliance_json.ingestion.)
     html = stripBlockByHideField(html, "ingestion");
   }
+  // Phase 4 ⑤.1 — masthead source/provenance chips (runs after the masthead is
+  // populated; value-driven 3-state, independent of the V2 overlay).
+  html = renderHeaderSourceChips(html, vm);
   // §03 exactly-one contract — must run AFTER the V2 overlay so it sees both
   // V1's and V2's un-hide outcomes (see enforceSingleWorkStatementReveal).
   html = enforceSingleWorkStatementReveal(html);
