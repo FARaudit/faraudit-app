@@ -42,6 +42,164 @@ export interface V2RenderInput {
   submission_preflight?: SubmissionChecklistItem[] | null;
   recompete_signal?: RecompeteSignal | null;
   price_anchor?: PriceAnchor | null;
+  // ⑤.5 Ingestion banner — read from compliance_json.ingestion (top-level,
+  // not v2_shadow.surfaces). Per-file role at form/amendment/attachment grain;
+  // §C/§L/§M section tags deferred to FA-182. null → banner stripped.
+  ingestion?: IngestionRender | null;
+  // ⑤.7 The Capture Play — sequenced move list SYNTHESIZED from the engine's
+  // own findings (v2_shadow.judgment l02Catches + high-severity risks). Every
+  // move traces to a real finding; empty → section stripped.
+  capture_play?: CaptureMove[] | null;
+  // ⑤.4 §M un-provided-attachment callout — pre-built honest sentence (HTML,
+  // carries <b>) or null. High-precision: only set when §M cites an attachment
+  // in a scoring context that no ingested file matches. null → callout stripped.
+  eval_attachment_gap?: string | null;
+}
+
+// ⑤.7 — one sequenced capture move. All fields derive from a real engine
+// finding; nothing is invented. `when` drives the timing pill colour.
+export interface CaptureMove {
+  order: number;
+  when: "now" | "qa" | "quote";
+  when_label: string;
+  effort: string; // "" → effort chip hidden (we don't fabricate a duration)
+  do: string;
+  why: string;
+  source_label: string;
+}
+
+// Render-shaped subset of lib/sam-attachments IngestionMeta (kept local to
+// avoid importing the engine module into the render path).
+export interface IngestionRender {
+  files_total: number;
+  files_ingested: number;
+  form_name: string | null;
+  files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean }>;
+}
+
+// ⑤.4 — detect a §M evaluation-criteria attachment that was referenced but
+// not ingested. HIGH PRECISION by design: we only claim a gap when (a) we have
+// an ingestion manifest to compare against, (b) §M cites an attachment in a
+// scoring context, and (c) NO ingested file plausibly matches it. Biased hard
+// toward NOT firing — a false "missing attachment" is a fabrication. Framed as
+// tool-perspective ("not in the documents provided"), never a reality claim.
+export function detectEvalAttachmentGap(comp: Record<string, unknown> | null | undefined): string | null {
+  if (!comp || typeof comp !== "object") return null;
+  const ing = comp.ingestion as Record<string, unknown> | undefined;
+  const files = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
+  if (!files || files.length === 0) return null; // no manifest → cannot claim absence
+  const fileNames = files.map((f) => String((f as { name?: unknown }).name ?? "")).join(" | ").toLowerCase();
+  const parts: string[] = [];
+  const pushStr = (v: unknown): void => {
+    if (typeof v === "string") parts.push(v);
+    else if (Array.isArray(v)) v.forEach((x) => { if (typeof x === "string") parts.push(x); });
+  };
+  pushStr(comp.eval_basis);
+  pushStr(comp.section_m_summary);
+  pushStr(comp.evaluation_factors_raw);
+  if (Array.isArray(comp.evaluation_factors)) {
+    (comp.evaluation_factors as Array<Record<string, unknown>>).forEach((ef) => {
+      if (ef && typeof ef === "object") Object.values(ef).forEach((x) => { if (typeof x === "string") parts.push(x); });
+    });
+  }
+  const mText = parts.join("  ");
+  if (mText.trim().length < 20) return null;
+  const refRe = /\b(attachment|exhibit|annex|appendix|addendum)\s+(?:no\.?\s*)?([A-Z]?-?\d{1,3}[A-Z]?|[A-Z])\b/gi;
+  const scoringRe = /criteria|rubric|scoring|score|points?|weight|sub-?factors?|evaluat|basis of award/i;
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = refRe.exec(mText)) !== null) {
+    const token = m[2];
+    const around = mText.slice(Math.max(0, m.index - 80), m.index + 80);
+    if (!scoringRe.test(around)) continue; // only attachment refs in a scoring context
+    const kind = m[1].toLowerCase();
+    const num = token.replace(/^0+/, "").toLowerCase();
+    const refLabel = `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${token.toUpperCase()}`;
+    // A filename plausibly matches when it carries the same attachment kind +
+    // number/letter (in any separator style: "Attachment_5", "attach 05",
+    // "exhibitA"). (?![0-9]) — not \b — so a trailing "_" (attachment_5_rubric)
+    // still counts as a match. Bias toward "provided": any plausible hit clears
+    // the gap, because a false "missing" is worse than a missed callout.
+    const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const provided =
+      fileNames.includes(refLabel.toLowerCase()) ||
+      new RegExp(`(attach|exhibit|annex|append|addend)\\w*[ _.-]*0*${escNum}(?![0-9])`, "i").test(fileNames) ||
+      fileNames.includes(`${kind} ${num}`) ||
+      fileNames.includes(`${kind}${num}`);
+    if (provided) continue; // a matching file WAS ingested — not a gap
+    seen.add(refLabel);
+  }
+  if (seen.size === 0) return null;
+  const refs = [...seen];
+  const phrase = refs.length === 1 ? refs[0] : `${refs.slice(0, -1).join(", ")} and ${refs[refs.length - 1]}`;
+  const plural = refs.length > 1;
+  return `Section M references <b>${phrase}</b> for scoring detail, but ${plural ? "they were" : "it was"} not in the documents provided. The factors above are read from the &sect;M body text &mdash; confirm the exact weighting in ${plural ? "those attachments" : "that attachment"} on SAM.gov before you finalize your proposal.`;
+}
+
+// ⑤.7 — synthesize the Capture Play from the engine's persisted judgment. We
+// re-sequence + time-anchor the engine's OWN findings (l02 "invisible catches"
+// + high-severity risk mitigations); we never invent a move. Pure function,
+// exported for test. Empty judgment → []  → section stripped.
+export function synthesizeCapturePlay(shadow: Record<string, unknown> | null | undefined): CaptureMove[] {
+  if (!shadow || typeof shadow !== "object") return [];
+  const sj = (shadow.judgment as Record<string, unknown> | null) ?? null;
+  if (!sj || typeof sj !== "object") return [];
+  const l02 = Array.isArray(sj.l02Catches) ? (sj.l02Catches as Array<Record<string, unknown>>) : [];
+  const risks = Array.isArray(sj.risks) ? (sj.risks as Array<Record<string, unknown>>) : [];
+  const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+  type Cand = { do: string; why: string; source: string; severity: number };
+  const cands: Cand[] = [];
+  // L02 "invisible catches" — the Capture Play's native material (move + why).
+  for (const c of l02) {
+    const move = clean(c.move);
+    if (!move) continue;
+    const src = clean(c.category) || clean(c.title);
+    cands.push({ do: move, why: clean(c.why_invisible), source: src ? `From execution traps · ${src}` : "From execution traps", severity: 2 });
+  }
+  // High-severity risks carrying a concrete mitigation → a move.
+  const sevRank = (s: string): number => {
+    const u = s.toUpperCase();
+    return u === "P0" || u === "CRITICAL" || u === "HIGH" ? 3 : u === "P1" || u === "MEDIUM" ? 2 : 1;
+  };
+  for (const r of risks) {
+    const mit = clean(r.mitigation);
+    if (!mit) continue;
+    const sev = sevRank(clean(r.severity));
+    if (sev < 2) continue; // skip low-severity advisory risks
+    const ref = clean(r.trapClause) || clean(r.sectionReference);
+    cands.push({ do: mit, why: clean(r.description), source: ref ? `From risk register · ${ref}` : "From risk register", severity: sev });
+  }
+  // Dedup by normalized action prefix; keep the richer / higher-severity entry.
+  const seen = new Map<string, Cand>();
+  for (const c of cands) {
+    const key = c.do.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
+    const prev = seen.get(key);
+    if (!prev || c.severity > prev.severity || (c.severity === prev.severity && c.why.length > prev.why.length)) {
+      seen.set(key, c);
+    }
+  }
+  // Timing — classify WHEN each real action must happen from its own text.
+  const whenOf = (c: Cand): "now" | "qa" | "quote" => {
+    const t = `${c.do} ${c.why}`.toLowerCase();
+    if (/\bsprs\b|\bjcp\b|register|registration|sam\.gov|\bcage\b|certif|current score|lead.?time|30.?day|out of reach|structurally|start (today|now)|before anything/.test(t)) return "now";
+    if (/clarif|question|ask the|q&a|q ?and ?a|carve|data.?right|ambig|in writing|pin the|raise.*before|before award|confirm.*(before|in writing)/.test(t)) return "qa";
+    return "quote";
+  };
+  const WHEN_RANK = { now: 0, qa: 1, quote: 2 } as const;
+  const WHEN_LABEL = { now: "Start today", qa: "Before Q&A", quote: "Before quote" } as const;
+  return [...seen.values()]
+    .map((c) => ({ c, when: whenOf(c) }))
+    .sort((a, b) => WHEN_RANK[a.when] - WHEN_RANK[b.when] || b.c.severity - a.c.severity)
+    .slice(0, 6) // keep the move list scannable; top findings only
+    .map((m, i): CaptureMove => ({
+      order: i + 1,
+      when: m.when,
+      when_label: WHEN_LABEL[m.when],
+      effort: m.when === "now" ? "blocks bid" : "",
+      do: m.c.do,
+      why: m.c.why,
+      source_label: m.c.source,
+    }));
 }
 
 // FA-127b — single trap derivation. The trap-tally chip, the matrix TRAP
@@ -227,6 +385,28 @@ export function buildV2ViewModelFromShadow(
       : null,
     recompete_signal: (surfaces.recompete_signal as RecompeteSignal | null) ?? null,
     price_anchor: (surfaces.price_anchor as PriceAnchor | null) ?? null,
+    ingestion: ((): IngestionRender | null => {
+      // compliance_json.ingestion (FA-136), NOT v2_shadow.surfaces — populated
+      // by the multi-doc assembly (assembleSam/UploadedDocumentSet). Absent on
+      // single-doc arms → null → banner stripped (honest, no fabrication).
+      const ing = comp.ingestion as Record<string, unknown> | undefined;
+      const rawFiles = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
+      if (!rawFiles || rawFiles.length === 0) return null;
+      const files = rawFiles
+        .filter((f) => f && typeof f.name === "string" && (f.name as string).trim().length > 0)
+        .map((f) => {
+          const role: "form" | "amendment" | "attachment" =
+            f.role === "form" ? "form" : f.role === "amendment" ? "amendment" : "attachment";
+          return { name: String(f.name), role, ingested: f.ingested !== false };
+        });
+      if (files.length === 0) return null;
+      const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
+      const filesIngested = typeof ing!.files_ingested === "number" ? (ing!.files_ingested as number) : files.filter((f) => f.ingested).length;
+      const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
+      return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
+    })(),
+    capture_play: synthesizeCapturePlay(shadow),
+    eval_attachment_gap: detectEvalAttachmentGap(comp),
   };
 }
 
@@ -698,8 +878,92 @@ function renderPriceAnchor(html: string, v: V2RenderInput): string {
   return out;
 }
 
+// ─── Surface 10 — Ingestion banner (Phase 4 · ⑤.5) ────────────────────────
+
+function renderIngestionBanner(html: string, v: V2RenderInput): string {
+  const ing = v.ingestion;
+  // No manifest → strip the banner. Always-on when files exist; never faked.
+  if (!ing || ing.files.length === 0) return stripIfEmpty(html, "ingestion", true);
+  let out = html;
+  // Lead counts ("<b>N</b> of <span>M</span> files").
+  out = out.replace(
+    /(<b data-field="files_ingested">)[\s\S]*?(<\/b>)/,
+    `$1${esc(String(ing.files_ingested))}$2`
+  );
+  out = setSpanByDataField(out, "files_total", String(ing.files_total));
+  // Per-file chips — role badge only (§-section tags = FA-182, deferred).
+  const ROLE: Record<string, [string, string]> = {
+    form: ["main", "FORM"],
+    amendment: ["sec", "AMENDMENT"],
+    attachment: ["other", "ATTACHMENT"],
+  };
+  const fileRows = ing.files
+    .map((f) => {
+      const [cls, label] = ROLE[f.role] ?? ROLE.attachment;
+      return `<span class="ifile"><svg class="fdoc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg><span class="ifn">${esc(f.name)}</span><span class="irole ${cls}">${label}</span></span>`;
+    })
+    .join("");
+  out = replaceInnerByDataField(out, "ingestion_files", fileRows);
+  // Coverage chip — files-based honesty (section-coverage upgrades with FA-182).
+  const allIngested = ing.files_total > 0 && ing.files_ingested >= ing.files_total;
+  const covClass = allIngested ? "ok" : "warn";
+  const covText = allIngested
+    ? "All sources read in full"
+    : `${ing.files_ingested} of ${ing.files_total} read · review the rest on SAM.gov`;
+  const okSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
+  const warnSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`;
+  out = out.replace(
+    /<span class="ingest-cov[^"]*" data-field="ingest_coverage">[\s\S]*?<\/span>/,
+    `<span class="ingest-cov ${covClass}" data-field="ingest_coverage">${allIngested ? okSvg : warnSvg}${esc(covText)}</span>`
+  );
+  return out;
+}
+
+// ─── Surface 11 — The Capture Play (Phase 4 · ⑤.7) ────────────────────────
+
+function renderCapturePlay(html: string, v: V2RenderInput): string {
+  const moves = v.capture_play;
+  if (!moves || moves.length === 0) return stripIfEmpty(html, "capture_moves", true);
+  const WHEN_ICON: Record<string, string> = {
+    qa: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+    now: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>`,
+    quote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>`,
+  };
+  const docSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`;
+  const cards = moves
+    .map(
+      (m) =>
+        `<div class="cap-move"><div class="cap-rail"><span class="cap-n">${m.order}</span></div>` +
+        `<div class="cap-card"><div class="cap-top"><span class="cap-when ${m.when}">${WHEN_ICON[m.when] ?? WHEN_ICON.quote}${esc(m.when_label)}</span>${m.effort ? `<span class="cap-effort">${esc(m.effort)}</span>` : ""}</div>` +
+        `<p class="cap-do">${esc(m.do)}</p>` +
+        (m.why ? `<p class="cap-why">${esc(m.why)}</p>` : "") +
+        `<span class="cap-src">${docSvg}${esc(m.source_label)}</span></div></div>`
+    )
+    .join("");
+  let out = replaceInnerByDataField(html, "capture_moves", cards);
+  const qaCount = moves.filter((m) => m.when === "qa").length;
+  const nowCount = moves.filter((m) => m.when === "now").length;
+  const detail = qaCount > 0 ? `${qaCount} before Q&A` : nowCount > 0 ? `${nowCount} to start now` : "sequenced by cutoff";
+  const summary = `${moves.length} move${moves.length === 1 ? "" : "s"} · ${detail}`;
+  out = setSpanByDataField(out, "capture_summary", summary);
+  return out;
+}
+
+// ─── Surface 12 — §M un-provided-attachment callout (Phase 4 · ⑤.4) ───────
+
+function renderEvalGap(html: string, v: V2RenderInput): string {
+  const gap = v.eval_attachment_gap;
+  if (!gap) return stripIfEmpty(html, "eval_attachment_gap", true);
+  // Fill the .eval-gap <span> (gap is pre-built HTML, intentionally not esc'd —
+  // dynamic parts are alnum attachment tokens only). Preserve the leading svg.
+  return html.replace(
+    /(<div class="eval-gap"[^>]*data-field="eval_attachment_gap"[^>]*>[\s\S]*?<span>)[\s\S]*?(<\/span>)/,
+    `$1${gap}$2`
+  );
+}
+
 // ─── Main entrypoint ──────────────────────────────────────────────────────
-// Applies all 9 surface renders. Pure function. Determinism contract:
+// Applies all surface renders. Pure function. Determinism contract:
 // renderV2Surfaces(template, vm) === renderV2Surfaces(template, vm) byte-by-byte.
 
 export function renderV2Surfaces(template: string, v: V2RenderInput): string {
@@ -714,5 +978,9 @@ export function renderV2Surfaces(template: string, v: V2RenderInput): string {
   out = renderSubmissionPreflight(out, v);
   out = renderRecompeteSignal(out, v);
   out = renderPriceAnchor(out, v);
+  // Phase 4 — agentic report upgrade (⑤)
+  out = renderIngestionBanner(out, v);
+  out = renderCapturePlay(out, v);
+  out = renderEvalGap(out, v);
   return out;
 }

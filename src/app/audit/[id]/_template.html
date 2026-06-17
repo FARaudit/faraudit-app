@@ -83,6 +83,77 @@ button{font-family:inherit}
 
 /* ═══════════ MASTHEAD ═══════════ */
 .masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+/* ═══════════ INGESTION BANNER — what the verdict is built on (item ⑤.5) ═══════════
+   Always-on. Every file FARaudit received + its detected role. No fabrication:
+   the reader sees exactly what was read. Bound to compliance_json.ingestion.files[]. */
+.ingest{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:13px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.ingest-lead{display:flex;align-items:center;gap:10px;flex:none}
+.ingest-ico{width:30px;height:30px;border-radius:8px;background:var(--accent-pale,rgba(55,138,221,.1));color:var(--accent);display:grid;place-items:center;border:1px solid var(--blue-200)}
+[data-theme="dark"] .ingest-ico{background:rgba(55,138,221,.16);border-color:transparent;color:var(--accent-light)}
+.ingest-ico svg{width:16px;height:16px}
+.ingest-lead .il-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:2px}
+.ingest-lead .il-v{font-size:13px;font-weight:700;color:var(--ink);line-height:1.1}
+.ingest-lead .il-v b{color:var(--accent)}
+.ingest-files{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.ifile{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft)}
+.ifile svg.fdoc{width:13px;height:13px;color:var(--mute-2);flex:none}
+.ifile .ifn{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.irole{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.03em;white-space:nowrap;flex:none}
+.irole.main{background:var(--accent);color:#fff}
+.irole.sec{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+[data-theme="dark"] .irole.sec{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+.irole.other{background:var(--search-bg);color:var(--mute);border:1px solid var(--line)}
+.ingest-cov{flex:none;display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:8px;white-space:nowrap}
+.ingest-cov svg{width:13px;height:13px;flex:none}
+.ingest-cov.ok{background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)}
+[data-theme="dark"] .ingest-cov.ok{background:rgba(16,185,129,.12);color:var(--green-light,#6ee7b7);border-color:transparent}
+.ingest-cov.warn{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+[data-theme="dark"] .ingest-cov.warn{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
+/* ═══════════ HEADER SOURCE CHIPS — provenance per masthead fact (item ⑤.1) ═══════════
+   3 states: extracted (gray chip) · inferred (amber .verify chip) · not-in-documents
+   (the value <b> goes italic .notfound). Engine-driven status — never inferred from a blank. */
+.src-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:600;letter-spacing:.02em;color:var(--mute-2);background:var(--search-bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-chip svg{width:8px;height:8px;flex:none}
+.src-chip.verify{color:var(--amber-700);background:var(--amber-50);border-color:var(--amber-200)}
+[data-theme="dark"] .src-chip.verify{color:#fcd34d;background:rgba(214,162,60,.12);border-color:transparent}
+.mh-fact b.notfound{color:var(--mute-2);font-weight:600;font-style:italic}
+/* ═══════════ THE CAPTURE PLAY — findings → sequenced action plan (item ⑤.7) ═══════════
+   The differentiator: what to DO, in order, before each cutoff. Synthesized from
+   the engine's own l02 catches + high-severity risks (renderCapturePlay). */
+.capture{border:1px solid var(--accent);box-shadow:0 1px 2px rgba(15,23,42,.06),0 16px 40px -22px rgba(55,138,221,.4)}
+[data-theme="dark"] .capture{border-color:var(--accent-deep)}
+.capture .sec-num{background:var(--accent);color:#fff;border-color:var(--accent)}
+.capture .sec-num svg{width:15px;height:15px}
+.cap-list{position:relative;margin-top:4px}
+.cap-move{display:grid;grid-template-columns:34px 1fr;gap:15px;position:relative;padding-bottom:16px}
+.cap-move:last-child{padding-bottom:0}
+.cap-move::before{content:"";position:absolute;left:16px;top:30px;bottom:-2px;width:2px;background:var(--line);z-index:0}
+.cap-move:last-child::before{display:none}
+.cap-n{width:34px;height:34px;border-radius:9px;background:var(--card);border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:700;position:relative;z-index:1}
+.cap-card{background:var(--card-soft);border:1px solid var(--line);border-radius:12px;padding:13px 16px}
+.cap-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.cap-when{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.cap-when svg{width:11px;height:11px}
+.cap-when.qa{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+[data-theme="dark"] .cap-when.qa{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
+.cap-when.quote{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+[data-theme="dark"] .cap-when.quote{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+.cap-when.now{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+[data-theme="dark"] .cap-when.now{background:rgba(224,88,75,.14);color:#fca5a5;border-color:transparent}
+.cap-effort{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--mute-2);white-space:nowrap}
+.cap-do{margin:0 0 6px;font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.4;letter-spacing:-.01em}
+.cap-why{margin:0 0 9px;font-size:12.5px;color:var(--mute);line-height:1.55}
+.cap-why b{color:var(--ink-2);font-weight:600}
+.cap-src{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;color:var(--accent);text-decoration:none;background:var(--blue-50);border:1px solid var(--blue-200);border-radius:5px;padding:2px 7px}
+[data-theme="dark"] .cap-src{background:rgba(55,138,221,.12);border-color:transparent;color:var(--accent-light)}
+.cap-src svg{width:9px;height:9px}
+@media print{.cap-move{break-inside:avoid}}
+/* §M un-provided-attachment honesty callout (item ⑤.4) */
+.eval-gap{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;padding:11px 13px;border-radius:10px;background:var(--amber-50);border:1px solid var(--amber-200);font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.eval-gap svg{width:15px;height:15px;color:var(--amber-600);flex:none;margin-top:1px}
+.eval-gap b{color:var(--ink);font-weight:700}
+[data-theme="dark"] .eval-gap{background:rgba(214,162,60,.12);border-color:transparent;color:var(--ink-2)}
+[data-theme="dark"] .eval-gap svg{color:#fcd34d}
 .mh-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
 .mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
 .mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}
@@ -581,6 +652,8 @@ button{font-family:inherit}
 /* ── verdict benchmark chips ── */
 .mhv-bench{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.01em;color:rgba(255,255,255,.92);margin-top:7px;display:inline-flex;align-items:center;gap:4px;line-height:1}
 .mhv-bench svg{width:9px;height:9px}
+.mhv-metric .n.is-unscored{color:rgba(255,255,255,.45);font-weight:600}
+.mhv-unscored{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.01em;color:rgba(255,255,255,.6);margin-top:7px;line-height:1.3;max-width:17ch}
 
 /* ═══════════ KEY-DATES RIBBON ═══════════ */
 .keydates{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:3px 4px;overflow:hidden;flex-wrap:wrap}
@@ -1178,10 +1251,10 @@ button{font-family:inherit}
           <p class="mh-id" data-field="solicitation_number">SP4701-26-Q-0942</p>
           <h1 class="mh-title" data-field="title">Predictive Maintenance Analytics — H-60 Fleet Sustainment</h1>
           <div class="mh-meta">
-            <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span></div>
-            <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span></div>
-            <div class="mh-fact"><i>Set-Aside</i><b data-field="set_aside">Total Small Business</b><span class="sub" data-field="set_aside_detail">SBA size std · $34.0M</span></div>
-            <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span></div>
+            <div class="mh-fact"><i>Agency</i><b data-field="agency">DLA Aviation</b><span class="sub" data-field="agency_detail">Defense Logistics Agency · Richmond, VA</span><span class="src-chip" data-field="agency_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>NAICS</i><b class="mono" data-field="naics">541512</b><span class="sub" data-field="naics_label">Computer Systems Design Svcs</span><span class="src-chip" data-field="naics_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>Set-Aside</i><b data-field="set_aside">Total Small Business</b><span class="sub" data-field="set_aside_detail">SBA size std · $34.0M</span><span class="src-chip" data-field="set_aside_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
+            <div class="mh-fact"><i>Contract Type</i><b data-field="contract_type">FFP · IDIQ</b><span class="sub" data-field="contract_term">1 base + 4 option years</span><span class="src-chip" data-field="contract_type_source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Extracted</span></div>
           </div>
         </div>
         <div class="mh-verdict v-caution" data-state="full" data-field="recommendation_block">
@@ -1193,13 +1266,16 @@ button{font-family:inherit}
               <div class="n"><span data-field="score">76</span><span class="u">/100</span></div>
               <div class="k">Fit Score</div>
               <div class="mhv-bar"><i style="width:76%"></i></div>
-              <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="score_benchmark">Top quartile of your audits</span></div>
+              <!-- score_benchmark SUPPRESSED (PR#20 honesty fix): a score-derived heuristic with NO
+                   category dataset behind it reads as a benchmark but isn't one. Raw Fit + bar only. -->
             </div>
             <div class="mhv-metric">
-              <div class="n"><span data-field="win_probability">41</span><span class="u">%</span></div>
+              <!-- Win Probability default = UNSCORED (PR#20 honesty fix): basis-gated, null pre-revenue
+                   (no outcome calibration exists). Code swaps .n for a real BAND only when an outcome-
+                   calibrated basis exists — "comparable audits" is NOT win/loss data. No benchmark. -->
+              <div class="n is-unscored" data-field="win_probability_band">&mdash;</div>
               <div class="k">Win Probability</div>
-              <div class="mhv-bar"><i style="width:41%"></i></div>
-              <div class="mhv-bench"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 14l5-5 5 5"/></svg><span data-field="win_probability_benchmark">+23 vs 18% category avg</span></div>
+              <div class="mhv-unscored" data-field="win_probability_note">Unscored &mdash; calibrates once outcomes are on file</div>
             </div>
           </div>
           <p class="mhv-foot" data-field="metrics_legend"><b>Fit Score</b> rates how winnable this is for a small business — a go/no-go signal, not a grade on the audit. The <b>Doc-type</b> figure in &sect;01 is a separate measure: how sure we are what the document is.</p>
@@ -1264,6 +1340,19 @@ button{font-family:inherit}
           </div>
         </div>
       </header>
+
+      <!-- ═══════════ INGESTION BANNER (⑤.5) — every file read + its role ═══════════
+           Bound to compliance_json.ingestion.files[] (renderIngestionBanner). Always-on
+           when an ingestion manifest exists; stripped when absent (single-doc, no manifest).
+           Per-file §-section tags (.isec) deferred to FA-182; ships at form/amendment/attachment grain. -->
+      <div class="ingest" data-field="ingestion" data-hide-when-empty="ingestion">
+        <div class="ingest-lead">
+          <span class="ingest-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7l2 2h7a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></span>
+          <span><span class="il-k">Sources ingested</span><span class="il-v"><b data-field="files_ingested">0</b> of <span data-field="files_total">0</span> files · read in full</span></span>
+        </div>
+        <div class="ingest-files" data-field="ingestion_files"></div>
+        <span class="ingest-cov ok" data-field="ingest_coverage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>All sources read in full</span>
+      </div>
 
       <!-- ═══════════ KEY-DATES RIBBON ═══════════ -->
       <div class="keydates">
@@ -1339,6 +1428,21 @@ button{font-family:inherit}
               <div class="es-act"><span class="es-when">By Jun 18</span><span>Lock the wage determination before the Q&amp;A deadline.</span></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ THE CAPTURE PLAY (⑤.7) — findings → sequenced action plan ═══════════
+           renderCapturePlay fills .cap-list from v2_shadow.judgment (l02 catches + high-severity
+           risks), time-anchored now|qa|quote. Stripped when empty (metadata-only / un-scored).
+           PLACEMENT: after the executive summary — flag to Design for 1:1 confirmation. -->
+      <section class="sec capture" id="sec-capture" data-field="capture_play" data-hide-when-empty="capture_moves">
+        <div class="sec-head">
+          <span class="sec-num"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 3l14 9-14 9z"/></svg></span>
+          <div class="sec-title">The Capture Play<span class="st-sub">Your move list &mdash; sequenced from the findings, ordered by cutoff</span></div>
+          <div class="sh-right"><span class="sh-pill warn" data-field="capture_summary">&mdash; moves</span></div>
+        </div>
+        <div class="sec-body">
+          <div class="cap-list" data-field="capture_moves"></div>
         </div>
       </section>
 
@@ -1631,6 +1735,14 @@ button{font-family:inherit}
                   <div class="sf-bar"><i class="ok" style="width:50%"></i></div>
                   <div class="sf-note">Evaluated for <b>realism &amp; reasonableness</b>, not just lowest total. A price that signals you misunderstood the scope <b>hurts the technical score</b> &mdash; hold margin and win on merit, don&rsquo;t buy the work.</div>
                 </div>
+              </div>
+
+              <!-- §M un-provided-attachment callout (⑤.4) — renderEvalGap fills/strips per
+                   eval_attachment_gap. High-precision: only fires when §M cites a scoring
+                   attachment no ingested file matches. -->
+              <div class="eval-gap" data-field="eval_attachment_gap" data-hide-when-empty="eval_attachment_gap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                <span>Section M references an evaluation attachment not in the documents provided.</span>
               </div>
 
               <div class="subsec">
