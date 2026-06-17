@@ -74,7 +74,7 @@ export interface IngestionRender {
   files_total: number;
   files_ingested: number;
   form_name: string | null;
-  files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean }>;
+  files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean; section_roles: string[] }>;
 }
 
 // ⑤.4 — detect a §M evaluation-criteria attachment that was referenced but
@@ -397,7 +397,10 @@ export function buildV2ViewModelFromShadow(
         .map((f) => {
           const role: "form" | "amendment" | "attachment" =
             f.role === "form" ? "form" : f.role === "amendment" ? "amendment" : "attachment";
-          return { name: String(f.name), role, ingested: f.ingested !== false };
+          const section_roles = Array.isArray(f.section_roles)
+            ? (f.section_roles as unknown[]).filter((s): s is string => typeof s === "string" && /^[CHLM]$/.test(s))
+            : [];
+          return { name: String(f.name), role, ingested: f.ingested !== false, section_roles };
         });
       if (files.length === 0) return null;
       const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
@@ -900,16 +903,32 @@ function renderIngestionBanner(html: string, v: V2RenderInput): string {
   const fileRows = ing.files
     .map((f) => {
       const [cls, label] = ROLE[f.role] ?? ROLE.attachment;
-      return `<span class="ifile"><svg class="fdoc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg><span class="ifn">${esc(f.name)}</span><span class="irole ${cls}">${label}</span></span>`;
+      // FA-182 — per-file §-section tags after the role badge (e.g. §L §M).
+      const secTags = (f.section_roles ?? []).map((s) => `<span class="isec">&sect;${esc(s)}</span>`).join("");
+      return `<span class="ifile"><svg class="fdoc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg><span class="ifn">${esc(f.name)}</span><span class="irole ${cls}">${label}</span>${secTags}</span>`;
     })
     .join("");
   out = replaceInnerByDataField(out, "ingestion_files", fileRows);
-  // Coverage chip — files-based honesty (section-coverage upgrades with FA-182).
+  // Coverage chip. FA-182 upgrades this from form-grain to TRUE section
+  // coverage when any §-role was detected: core = §C/§L/§M. Honest layering —
+  // a file-ingestion gap trumps; with no §-roles detected (generic names) we
+  // do NOT claim a section is "missing", we fall back to file-level coverage.
   const allIngested = ing.files_total > 0 && ing.files_ingested >= ing.files_total;
-  const covClass = allIngested ? "ok" : "warn";
-  const covText = allIngested
-    ? "All sources read in full"
-    : `${ing.files_ingested} of ${ing.files_total} read · review the rest on SAM.gov`;
+  const detected = new Set<string>();
+  ing.files.forEach((f) => (f.section_roles ?? []).forEach((s) => detected.add(s)));
+  let covClass: string;
+  let covText: string;
+  if (!allIngested) {
+    covClass = "warn";
+    covText = `${ing.files_ingested} of ${ing.files_total} read · review the rest on SAM.gov`;
+  } else if (detected.size > 0) {
+    const missing = ["C", "L", "M"].filter((c) => !detected.has(c));
+    covClass = missing.length === 0 ? "ok" : "warn";
+    covText = missing.length === 0 ? "Core sections present" : `${missing.map((c) => `§${c}`).join(" · ")} not detected`;
+  } else {
+    covClass = "ok";
+    covText = "All sources read in full";
+  }
   const okSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
   const warnSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`;
   out = out.replace(
