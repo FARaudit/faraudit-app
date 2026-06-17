@@ -16,7 +16,7 @@ import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/
 import { isAnthropicTransient } from "@/lib/anthropic-files";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, type AssembledDocumentSet } from "@/lib/sam-attachments";
+import { assembleSamDocumentSet, assembleUploadedDocumentSet, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import type { PdfSource } from "@/lib/audit-engine";
 
@@ -68,6 +68,9 @@ interface UserPendingRow {
   pdf_filename: string | null;
   // FA-132 — Supabase Storage key for the worker's V2 bytes (upload arm).
   pdf_path: string | null;
+  // FA-178 — full multi-file upload set; the worker downloads every member and
+  // re-assembles the form-first document set. Null on single-doc / SAM rows.
+  upload_docs: Array<{ path: string; filename: string }> | null;
   created_at: string;
   // FA-149 — present once migration 20260612210000 is applied.
   heartbeat_at?: string | null;
@@ -342,9 +345,14 @@ async function processOne(row: UserPendingRow): Promise<void> {
     // FA-132 — storage hygiene: the stashed bytes served their purpose once
     // the run completes. Best-effort delete on SUCCESS only — failed rows
     // keep their bytes (forensics + a released claim's re-run needs them).
-    if (row.pdf_path) {
-      const { error: rmErr } = await supabase.storage.from("audit-pdfs").remove([row.pdf_path]);
-      if (rmErr) console.warn(`[audit-worker] FA-132: storage cleanup failed for ${row.pdf_path}: ${rmErr.message}`);
+    // FA-178 — the multi-doc set lives under upload_docs (one key per member);
+    // single-doc V2 bytes live under pdf_path. Clean up whichever applies.
+    const stashedKeys = row.upload_docs && row.upload_docs.length > 0
+      ? row.upload_docs.map((d) => d.path)
+      : row.pdf_path ? [row.pdf_path] : [];
+    if (stashedKeys.length > 0) {
+      const { error: rmErr } = await supabase.storage.from("audit-pdfs").remove(stashedKeys);
+      if (rmErr) console.warn(`[audit-worker] storage cleanup failed for ${stashedKeys.join(", ")}: ${rmErr.message}`);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
@@ -390,8 +398,20 @@ async function processOne(row: UserPendingRow): Promise<void> {
 // wall, so fail terminally. Exported for the FA-147 gate suite.
 export function decideRunFailureMode(err: unknown): "release" | "fail" {
   if (err instanceof DegradedRunError) return "release";
+  if (err instanceof TransientInputError) return "release";
   if (isAnthropicTransient(err)) return "release";
   return "fail";
+}
+
+// FA-178 — a transient failure assembling the run input (e.g. a Storage read
+// blip on a multi-doc member). The stashed bytes are NOT deleted until the run
+// succeeds, so re-running is safe; release the claim instead of failing the
+// paid run terminally. Bounded by the FA-149 attempt cap like any release.
+export class TransientInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TransientInputError";
+  }
 }
 
 async function markFailed(id: string, message: string): Promise<void> {
@@ -435,7 +455,39 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   let primaryDocName: string | null = null;
   let ingestion: import("@/lib/sam-attachments").IngestionMeta | null = null;
 
-  if (row.anthropic_file_id) {
+  if (row.upload_docs && row.upload_docs.length > 0) {
+    // FA-178 — multi-file upload set. Download every member from Storage and
+    // run the IDENTICAL form-first assembly the sync route runs
+    // (assembleUploadedDocumentSet) — same primary, same attachments, same
+    // ingestion-completeness meta — so the async path matches sync byte-for-
+    // byte. These bytes ARE the audit input (not a best-effort V2 shadow), so
+    // a missing member is fatal: a partial set would silently drop documents.
+    const localFiles: { name: string; buffer: Buffer }[] = [];
+    for (const doc of row.upload_docs) {
+      const { data: blob, error: dlErr } = await supabase.storage.from("audit-pdfs").download(doc.path);
+      if (dlErr || !blob) {
+        throw new TransientInputError(`FA-178: upload-set member unreadable from storage (${doc.path}): ${dlErr?.message ?? "empty blob"}`);
+      }
+      localFiles.push({ name: doc.filename, buffer: Buffer.from(await blob.arrayBuffer()) });
+    }
+    const assembled = await assembleUploadedDocumentSet(localFiles, row.solicitation_number);
+    ingestion = assembled.ingestion;
+    if (assembled.primary) {
+      pdfBase64 = assembled.primary.base64;
+      pdfBuffer = assembled.primary.buffer;
+      pdfSource = "uploaded";
+      attachmentPdfs = assembled.attachments;
+      primaryDocName = assembled.primary.name;
+      console.log(`[audit-worker] FA-178: upload set assembled · ${ingestion.files_ingested}/${ingestion.files_total} ingested · primary=${primaryDocName} · form_identified=${ingestion.form_identified}`);
+    } else {
+      // Defensive: nothing ingestible (every member dropped by the page
+      // ceiling) — proceed single-doc on the first member rather than fail,
+      // mirroring the sync path's fallback.
+      pdfBuffer = localFiles[0].buffer;
+      pdfBase64 = pdfBuffer.toString("base64");
+      pdfSource = "uploaded";
+    }
+  } else if (row.anthropic_file_id) {
     pdfFileId = row.anthropic_file_id;
     pdfSource = "uploaded_pdf_via_files_api";
     // FA-132 — closes the FA-130 residual class: the V2 shadow needs local
