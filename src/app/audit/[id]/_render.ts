@@ -2053,6 +2053,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // the demo captions ("Computer Systems Design Svcs" etc.) can't leak.
   html = replaceFieldInner(html, "document_type", `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>${escapeHtml(vm.document_type)}`);
   html = replaceFieldText(html, "title", vm.title);
+  // FA-187 — masthead subject line (.mh-title). Empty subject → the element is
+  // left empty and .mh-title:empty hides it, so the .mh-id number stands alone.
+  html = replaceFieldText(html, "solicitation_subject", vm.solicitation_subject);
   html = replaceFieldText(html, "agency", vm.agency);
   html = replaceFieldText(html, "naics", vm.naics);
   html = replaceFieldText(html, "set_aside", vm.set_aside);

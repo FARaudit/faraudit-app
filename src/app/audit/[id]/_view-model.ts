@@ -102,6 +102,7 @@ export interface AuditViewModel {
 
   // header
   title: string;
+  solicitation_subject: string; // FA-187 masthead subject (.mh-title); "" → hidden
   agency: string;
   agency_sub: string;
   naics: string;
@@ -768,6 +769,24 @@ function verdictTagline(verdict: "GO" | "CAUTION" | "DECLINE", bidRecommendation
 // Correct a title token only when (a) the token is absent from the audit
 // corpus AND (b) a single adjacent-letter transposition of it IS present —
 // unusual-but-correct words fail (b) and pass through untouched.
+// FA-187 — derive a concise masthead subject from the engine's overview prose.
+// Strips the "<Agency> is soliciting proposals for …" boilerplate, keeps the
+// first clause, caps length. Honesty guards: returns "" (→ title hides) when
+// the result is empty, too short, or just the solicitation number — never a
+// fabricated or number-duplicating title.
+function deriveSolicitationSubject(raw: string, displayId: string): string {
+  if (!raw || typeof raw !== "string") return "";
+  let s = raw.trim();
+  const m = s.match(/\b(?:soliciting|seeking|requesting|will\s+award\s+a\s+contract|intends?\s+to\s+(?:award|procure|acquire)|to\s+(?:provide|procure|acquire|obtain))\b[^.]*?\b(?:for|to\s+(?:provide|procure|acquire|obtain)|:)\s+(.+)/i);
+  if (m && m[1]) s = m[1].trim();
+  // first clause; drop trailing location / period-of-performance tails
+  s = s.split(/[.;]|,?\s+located\s+|,?\s+for\s+(?:the\s+)?(?:period|base|a\s+\d)/i)[0].trim().replace(/[,;:\s]+$/, "");
+  if (s.length > 88) s = s.slice(0, 85).replace(/\s+\S*$/, "") + "…";
+  const norm = (x: string): string => x.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  if (s.length < 10 || norm(s).length < 6 || norm(s) === norm(displayId)) return "";
+  return s;
+}
+
 function spellGuardTitle(title: string, corpusSources: unknown[]): string {
   let corpus = "";
   try {
@@ -2455,8 +2474,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const officeLeaf = sanitizeDisplayText(audit.office_leaf as string) || "";
   const topHierarchyAgency = validatedAgency(audit.agency, v2Meta?.agency);
 
+  // FA-187 — masthead subject line: a concise human description distinct from
+  // the .mh-id number. Derived from the engine's overview summary / primary
+  // objective; "" when no honest subject (then .mh-title:empty hides it and
+  // the number stands alone — never the redundant number-as-title).
+  const solicitationSubjectRaw =
+    (typeof overviewJson.summary === "string" ? overviewJson.summary : "") ||
+    (typeof overviewJson.primary_objective === "string" ? overviewJson.primary_objective : "");
+  const solicitation_subject = deriveSolicitationSubject(solicitationSubjectRaw, displayId);
+
   return {
     solicitation_number: displayId,
+    solicitation_subject,
     audit_id_short: String(audit.id ?? "").slice(0, 8),
     audit_id_full: String(audit.id ?? ""),
     generated_at: fmtStamp(parseDate(audit.completed_at ?? audit.created_at)),
