@@ -344,11 +344,28 @@ export async function executeAudit(
       };
       // FA-136 — V2 sees the same assembled document set as V1 (attachment
       // text appended to the form's text layer before section detection).
-      const v2Result = await runAuditV2(
-        v2Buffer,
-        v2External,
-        attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
-      );
+      // RELIABILITY: the multi-file V2 call is heavy (5 full docs) and can hit
+      // the Claude timeout / a transient overload. Without a retry, a single
+      // slow response silently dropped the ENTIRE agentic layer (agency,
+      // work-statement, Capture Play). Retry once, then surface loudly.
+      let v2Result: Awaited<ReturnType<typeof runAuditV2>> | null = null;
+      let v2LastErr: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          v2Result = await runAuditV2(
+            v2Buffer,
+            v2External,
+            attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
+          );
+          if (attempt > 1) console.warn(`[V2-SHADOW] runAuditV2 recovered on retry (attempt ${attempt}) for ${auditId}`);
+          break;
+        } catch (e) {
+          v2LastErr = e;
+          console.warn(`[V2-SHADOW] runAuditV2 attempt ${attempt}/2 failed for ${auditId}: ${e instanceof Error ? e.message : e}`);
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
+      if (!v2Result) throw v2LastErr ?? new Error("runAuditV2 failed after retry");
       const v2Shadow = {
         path: "pdf",
         judgment: v2Result.judgment,
@@ -384,7 +401,10 @@ export async function executeAudit(
         console.log("[V2-SHADOW] stored for audit", auditId, "engine_ms=", v2Shadow.engine_ms);
       }
     } catch (err) {
-      console.error("[V2-SHADOW] runAuditV2 failed (non-fatal):", err instanceof Error ? err.message : err);
+      // Loud: this is non-fatal to the V1 audit, but it DEGRADES the report —
+      // no agentic surfaces (agency / work-statement / Capture Play) for this
+      // run. Surfaced so a recurring V2 failure can't hide behind "non-fatal".
+      console.error(`[V2-SHADOW] runAuditV2 FAILED AFTER RETRY for ${auditId} — report degraded (no agentic surfaces):`, err instanceof Error ? err.message : err);
     }
   } else if (AUDIT_V2_ENABLED && pdfSource === "sam_unavailable" && solicitation.description && solicitation.description.length > 50) {
     // ━━ Fix 8 — V2 metadata-only shadow path ━━
