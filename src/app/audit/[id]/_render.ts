@@ -2126,29 +2126,19 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     const scoreNum = vm.score ?? 0;
     const scoreText = vm.score === null ? vm.score_display : String(Math.round(scoreNum));
     html = replaceFieldText(html, "score", scoreText);
-    html = replaceFieldText(html, "win_probability_benchmark", vm.win_probability_benchmark);
-    // Score benchmark — when engine emitted a phrase (score ≥60), replace
-    // the static design demo text. When null (score <60), strip the entire
-    // .mhv-bench element so "Top quartile of your audits" can never leak
-    // onto a 25/100 DECLINE.
-    if (vm.score_benchmark) {
-      html = replaceFieldText(html, "score_benchmark", vm.score_benchmark);
-    } else {
-      html = removeMhvBench(html);
-    }
-    if (vm.win_probability == null) {
-      html = setWinProbabilityNull(html);
-    } else {
-      html = replaceFieldText(html, "win_probability", String(vm.win_probability));
-      html = setMetricBars(html, scoreNum, vm.win_probability);
-    }
-    // Score bar is always real even when win_prob is null.
-    if (vm.win_probability == null) {
-      html = html.replace(
-        /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
-        `$1${Math.max(0, Math.min(100, scoreNum))}%$2`
-      );
-    }
+    // PR#20 / Phase-4 honesty: the masthead Fit/Win tiles ship HONEST DEFAULTS in
+    // the template — score_benchmark is SUPPRESSED (score-derived heuristic with no
+    // category dataset behind it) and Win Probability defaults to UNSCORED "—"
+    // (basis-gated, null pre-revenue; "comparable audits" is not win/loss outcome
+    // data). We fill only the real Fit Score + its bar here; the Win tile keeps its
+    // unscored default until a genuine outcome-calibrated basis exists. (Engine does
+    // not populate win_probability today, so no win number is ever shown.)
+    html = html.replace(
+      /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
+      `$1${Math.max(0, Math.min(100, scoreNum))}%$2`
+    );
+    // FUTURE (outcome calibration): when vm carries a real win BAND, fill
+    // win_probability_band + win_probability_note and drop .is-unscored here.
   }
 
   // Key dates ribbon — Phase 2 #4 (Jun 8 2026). Hide-not-fabricate: render
