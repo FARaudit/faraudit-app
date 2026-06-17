@@ -1994,6 +1994,26 @@ function deriveWorkStatementReveal(audit: AuditRow): {
   work_statement: AuditViewModel["work_statement"];
   work_statement_unknown: AuditViewModel["work_statement_unknown"];
 } {
+  // FA-184 — prefer the V2 work-statement classification when present. V1's
+  // `document_type` is the WHOLE-document type (RFP/RFQ/IFB/SF-33), NOT the
+  // work-statement type embedded within it, so it falls to "unknown / upload
+  // the SOW" even when the SOW/PWS was ingested — a self-contradiction with the
+  // "N/N ingested" banner. V2 classifies the actual work-statement type from the
+  // parsed body + ingested attachments (e.g. AOCSSB26R0039 5-file upload →
+  // "combined", high confidence; Section C detected). When V2 produced a verdict
+  // it is authoritative here. The V2 surfaces objects are already built in this
+  // function's exact return shape (_v2WorkStatement), so pass them through; the
+  // V2 render overlay then re-fills the same block idempotently. Falls through to
+  // the V1 document_type logic only when no V2 shadow exists (legacy/metadata
+  // audits) — that path is unchanged.
+  const v2Surfaces = ((audit.compliance_json as Record<string, unknown> | null)?.v2_shadow as Record<string, unknown> | null)?.surfaces as Record<string, unknown> | undefined;
+  if (v2Surfaces) {
+    const v2Known = (v2Surfaces.work_statement as AuditViewModel["work_statement"]) ?? null;
+    const v2Unknown = (v2Surfaces.work_statement_unknown as AuditViewModel["work_statement_unknown"]) ?? null;
+    if (v2Known) return { work_statement: v2Known, work_statement_unknown: null };
+    if (v2Unknown) return { work_statement: null, work_statement_unknown: v2Unknown };
+  }
+
   const docType = String(audit.document_type ?? "").trim();
   const confRaw = String(audit.document_type_confidence ?? "low").toLowerCase();
   const rationale = String(audit.document_type_rationale ?? "").trim();
