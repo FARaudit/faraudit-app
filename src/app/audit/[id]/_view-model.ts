@@ -639,12 +639,29 @@ function validatedSetAside(...candidates: Array<unknown>): string {
 // OCSG: MS: S84-OCSG, 7500 GEOINT DRIVE, SPRINGFIELD VA 22150"). The masthead
 // wants the org name only — cut at the ATTN / mail-stop / street-address tail.
 function cleanAgencyDisplay(raw: unknown): string {
-  const s = typeof raw === "string" ? raw.trim() : "";
+  let s = typeof raw === "string" ? raw.trim() : "";
   if (!s) return "";
-  return s
+  // FA-179: cut the ATTN / mail-stop / street-number tail.
+  s = s
     .split(/,?\s*(?:ATTN\b|MS:|MAIL\s*STOP\b|\d{3,}\s+[A-Z])/i)[0]
     .trim()
     .replace(/[,;]\s*$/, "");
+  // FA-185: SF-33 issuer blocks carry a building/room/street/city-state-zip tail
+  // with NO ATTN/MS marker — e.g. "Architect of the Capitol, Supplies, Services,
+  // and Material Management Division, Ford House Building Room H2-263, 2nd and D
+  // Streets SW, Washington, DC 20515". The FA-179 cut leaves it whole, so it blows
+  // past looksLikeOrgName's 80-char cap and the masthead falls to "—". Drop
+  // comma-segments from the first address-like line onward, keeping the agency +
+  // buying division. Comma-splitting tolerates the division's internal commas
+  // (each is its own segment, all kept until the first address segment).
+  const ADDR_SEG = /\b(?:Building|Bldg\.?|Room|Rm\.?|Suite|Ste\.?|Floor|Fl\.?|P\.?\s*O\.?\s*Box|\d{3,}\s+[A-Za-z]|[A-Za-z]+\s+(?:Streets?|St\.?|Avenue|Ave\.?|Drive|Dr\.?|Road|Rd\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Circle|Cir\.?|Court|Ct\.?)|[A-Z]{2}\s+\d{5})\b/;
+  const segs = s.split(/\s*,\s*/);
+  const kept: string[] = [];
+  for (const seg of segs) {
+    if (ADDR_SEG.test(seg)) break;
+    kept.push(seg);
+  }
+  return (kept.length ? kept.join(", ") : segs[0] || s).trim().replace(/[,;]\s*$/, "");
 }
 
 // FA-172 header redo: set-aside often arrives as a full sentence ("SET ASIDE:
