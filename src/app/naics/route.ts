@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,10 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in?next=/naics");
 
-  const html = await readFile(path.join(process.cwd(), "public", "naics.html"), "utf8");
+  let html = await readFile(path.join(process.cwd(), "public", "naics.html"), "utf8");
+
+  html = injectRail(html, "naics");
+
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
