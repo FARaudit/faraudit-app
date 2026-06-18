@@ -332,6 +332,12 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .sec-head .k{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
 .sec-head .all{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;color:var(--accent-on);text-decoration:none}
 .ra-list{display:flex;flex-direction:column;gap:9px}
+.ra-region{position:relative}
+.ra-scroll{max-height:22rem;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin;padding-right:4px}
+.ra-scroll::-webkit-scrollbar{width:7px}
+.ra-scroll::-webkit-scrollbar-thumb{background:#cfd8e3;border-radius:4px}
+.ra-region.is-overflowing .ra-scroll{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent)}
+@media (prefers-reduced-motion: reduce){.ra-scroll{scroll-behavior:auto}}
 .rac{--v:#c2861a;--vt:#fbf1dc;--vl:#ecd5a3;--vi:#8a5d11;display:grid;grid-template-columns:54px 1fr auto;gap:15px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;text-decoration:none;position:relative;box-shadow:var(--shadow)}
 .rac::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:3px;border-radius:0 3px 3px 0;background:var(--v)}
 .rac.is-proceed{--v:#1f8a5b;--vt:#e7f4ed;--vl:#bfe3cf;--vi:#15623f}
@@ -639,12 +645,16 @@ details[open]>summary .chev{transform:rotate(180deg)}
         </details>
         <div class="body-stack" id="bodyStack">
           <section class="blk blk-recent">
-            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="#">View all 20 →</a></div>
-            <div class="ra-list">
+            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/audit">View all → Past Audits</a></div>
+            <div class="ra-region">
+              <div class="ra-scroll">
+                <div class="ra-list">
               <a class="rac is-nobid" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">HM047626R0039</span><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span></div><div class="rac-title">HM047626R0039 — Solicitation</div><div class="rac-insight"><span class="rac-spark"></span>No-bid unless SPRS is current today.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>NO-BID</span><span class="rac-ago">29m ago</span></div></a>
               <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">69</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA460026Q0047</span><span class="rac-office">AIR FORCE · 55 CONS · OFFUTT AFB NE</span></div><div class="rac-title">Attachment 1 — PWS — 04.15.26 final</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
               <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">1232SA26R0020</span><span class="rac-office">USDA FOREST SERVICE · ALBUQUERQUE NM</span></div><div class="rac-title">Solicitation — Sol_1232SA26R0020_Amd_0001</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
               <a class="rac is-proceed" href="#"><div class="rac-badge"><span class="rac-score">75</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA487726B00010002</span><span class="rac-office">AIR FORCE · AFLCMC · WPAFB OH</span></div><div class="rac-title">Attachment 3 — Statement of Work</div><div class="rac-insight"><span class="rac-spark"></span>Strong fit — file the clarifications below before quoting.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>PROCEED</span><span class="rac-ago">13h ago</span></div></a>
+                </div>
+              </div>
             </div>
           </section>
           <section class="blk blk-stages">
@@ -798,7 +808,7 @@ function submitAudit(opts){
 /* ── recently audited (real /api/audits) ── */
 (function(){
   var list=document.querySelector('.blk-recent .ra-list'),stack=$('bodyStack');
-  var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/dashboard');
+  var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/audit');
   if(!list)return;
   function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
   function verdictOf(a){var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
@@ -819,6 +829,8 @@ function submitAudit(opts){
 
 /* ── state-driven order: first-run (no audits) sees the pipeline strip first ── */
 (function(){var stack=$('bodyStack');if(stack)stack.classList.toggle('flip',document.querySelectorAll('.blk-recent .rac').length===0);})();
+/* ── recently-audited overflow fade toggle (Phase 6) ── */
+(function(){var region=document.querySelector('.blk-recent .ra-region');if(!region)return;var sc=region.querySelector('.ra-scroll');if(!sc)return;function sync(){region.classList.toggle('is-overflowing',sc.scrollHeight>sc.clientHeight+1);}sync();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(sync).observe(sc);}})();
 })();
 </script>
 </body>
