@@ -1334,6 +1334,28 @@ export function derivePriorityFromFinding(category: RiskFinding["category"], cit
   return citation ? "P1" : "P2";
 }
 
+// FA-E2E Fix 1 (2026-06-18) - parity mirror of src/lib/audit-engine.ts.
+// Derive an AI-driven severity score (0-10) from the structured risks the model
+// already returns, instead of the frozen constant 5. Formula:
+//   + 4 per Disqualification / P0 risk
+//   + 2 per detected DFARS trap
+//   + 1 per P1 risk
+//   + 0.5 per P2 risk   -> clamp 0..10.
+export function deriveSeverityScore(
+  prioritized: PrioritizedRisk[],
+  dfarsFlags: DFARSFlag[] | undefined
+): number {
+  const risks = Array.isArray(prioritized) ? prioritized : [];
+  const isDisqualifier = (r: PrioritizedRisk) =>
+    r.priority === "P0" || /disqualif|no[-\s]?bid|sole[-\s]?source/i.test(r.category || "");
+  const p0Count = risks.filter(isDisqualifier).length;
+  const p1Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P1").length;
+  const p2Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P2").length;
+  const trapCount = (dfarsFlags ?? []).filter((f) => f.detected).length;
+  const raw = p0Count * 4 + trapCount * 2 + p1Count * 1 + p2Count * 0.5;
+  return Math.max(0, Math.min(10, Math.round(raw)));
+}
+
 export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
   const hasAnchor = DOCUMENT_ANCHOR_RE.test(f.text);
   return {
@@ -1783,12 +1805,20 @@ JSON only — one key: risk_findings.`;
   risksJson.risk_findings = prioritized.map(mapPrioritizedToFinding);
 
   // Composite scoring
+  // FA-E2E Fix 1 (2026-06-18) - parity mirror of src/lib/audit-engine.ts. The
+  // score is now AI-DRIVEN: severity is DERIVED from the structured risks the
+  // model already returns (deriveSeverityScore) rather than frozen at the
+  // constant 5, and the complexity penalty counts MATERIAL items (detected
+  // DFARS traps + required certs) instead of raw boilerplate clause counts.
+  // farCount / dfarsCount remain declared for later use (summary line + guard).
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
   const certCount = complianceJson.required_certifications?.length || 0;
-  const severity = typeof risksJson.severity_score === "number" ? risksJson.severity_score : 5;
+  const severity = deriveSeverityScore(prioritized, complianceJson.dfars_flags);
 
-  const complexityPenalty = Math.min(40, (farCount + dfarsCount + certCount) * 1.5);
+  const dfarsTrapCount = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).length;
+  const materialCount = dfarsTrapCount + certCount;
+  const complexityPenalty = Math.min(25, materialCount * 1.0);
   const riskPenalty = severity * 5;
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
   // Ruling 1 supersedes the prior cap — parity mirror.

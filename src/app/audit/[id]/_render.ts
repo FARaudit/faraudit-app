@@ -848,6 +848,22 @@ function stripHandoffComment(html: string): string {
   );
 }
 
+// FA-E2E Fix 5 (2026-06-18): strip leaked DEVELOPER / IMPLEMENTATION HTML
+// comments from the shipped report. The design template documents the renderer
+// wiring inline ("renderIncumbentBranch() in _render.ts", ".cmx-row repeater",
+// "← matrix_rollup.reference_count", "for harness probing", "Repeater: …",
+// "Renderer rebuilds inner."). These don't render visibly but ship in every
+// response and leak the internal schema + code structure via View-Source / the
+// PDF source. We remove only comments that reference code internals so genuine
+// content comments (and the PRELIMINARY-READ anchor consumed earlier in the
+// pipeline) are untouched. Runs AFTER all comment-anchored passes.
+function stripDevComments(html: string): string {
+  // Marker tokens that identify a comment as developer-only implementation
+  // detail rather than customer-facing content.
+  const devMarkers = /_render\.ts|repeater|Renderer\b|matrix_rollup|harness\s+prob|data-field|data-bucket|reviewer aid|data-state=|post hero-dedup|Renderer rebuilds/i;
+  return html.replace(/<!--[\s\S]*?-->/g, (m) => (devMarkers.test(m) ? "" : m));
+}
+
 // ─── breadcrumb + page <title> ──────────────────────────────────────────────
 
 function setPageTitle(html: string, title: string): string {
@@ -2128,7 +2144,36 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // Defect 3 (2026-06-05): reveal the locked-card stand-ins for §04 / §05
     // so the metadata-only audit never renders bare section headers. SPE
     // (SPE4A526T213S) was the canonical repro.
-    html = revealLockedSectionsForUnscored(html);
+    //
+    // FA-E2E Fix 2 (2026-06-18): GATE the locked-reveal on is_metadata_only.
+    // Previously this fired on ANY null compliance_score, so a FULLY-INGESTED
+    // audit that merely lacked a score hijacked the metadata-only presentation
+    // — un-hiding "metadata only / Fetch from SAM / N clauses Locked / N traps
+    // Locked" teasers ON TOP of real §04/§05 analysis. Only reveal the teasers
+    // when the audit is TRULY metadata-only (no PDF retrieved). For a full audit
+    // that lacks a score, keep the real §04/§05 content — the prelim verdict
+    // block already renders an honest "not yet scored" state above it.
+    if (vm.is_metadata_only) {
+      html = revealLockedSectionsForUnscored(html);
+      // FA-E2E Fix 2: populate the locked-teaser counts from REAL clause/trap
+      // data (they were hardcoded "4 DFARS traps / 9 clauses" literals that
+      // appeared identically on a Legislative-Branch sol and a USDA buy with
+      // zero DFARS clauses). Strip the data-rights sentence unless a real
+      // data-rights finding exists. Counts of 0 leave an honest "0".
+      html = replaceFieldText(html, "moment_dfars_trap_count", String(vm.dfars_trap_count));
+      html = replaceFieldText(html, "moment_far_clause_count", String(vm.far_clause_count));
+      html = replaceFieldText(html, "locked_far_clause_count", String(vm.far_clause_count));
+      html = replaceFieldText(html, "locked_dfars_trap_count", String(vm.dfars_trap_count));
+      if (vm.has_data_rights_finding) {
+        html = replaceFieldText(
+          html,
+          "moment_datarights_sentence",
+          " The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read."
+        );
+      } else {
+        html = removeFieldElement(html, "moment_datarights_sentence");
+      }
+    }
   } else {
     html = pickVerdictBlock(html, "scored");
     html = setVerdictClass(html, vm.recommendation_class);
@@ -2397,6 +2442,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   // Dev-only HANDOFF block — not for the wire.
   html = stripHandoffComment(html);
+  // FA-E2E Fix 5: strip leaked developer/implementation comments (code-internal
+  // references, repeater notes, "for harness probing") so they never ship.
+  html = stripDevComments(html);
 
   // Reviewer-only controls (Preview State toggle + Metadata case cycler) —
   // bottom-left of the design template, must not ship to prod.
@@ -2672,6 +2720,13 @@ export function renderHeaderSourceChips(html: string, vm: AuditViewModel): strin
       out = out.replace(chipRe, "");
     } else if (f.verifyHint) {
       out = out.replace(chipRe, `<span class="src-chip verify" data-field="${f.key}_source">${infoSvg}${f.verifyHint}</span>`);
+    } else if (f.key === "naics" && !vm.naics_from_source) {
+      // FA-E2E Fix 5 (2026-06-18): the NAICS is present but came from SAM
+      // metadata, NOT the source document. Badging it "Extracted" is a
+      // fabrication (AOCSSB: "561210 — Extracted" on a Legislative-Branch sol
+      // that states no NAICS). Show an honest "SAM metadata · verify" chip so
+      // the reader knows it wasn't read from the document.
+      out = out.replace(chipRe, `<span class="src-chip verify" data-field="${f.key}_source">${infoSvg}SAM metadata &middot; verify</span>`);
     } else {
       out = out.replace(chipRe, `<span class="src-chip" data-field="${f.key}_source">${docSvg}Extracted</span>`);
     }

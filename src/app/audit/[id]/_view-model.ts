@@ -107,6 +107,12 @@ export interface AuditViewModel {
   agency_sub: string;
   naics: string;
   naics_sub: string;
+  // FA-E2E Fix 5 (2026-06-18): true only when the NAICS was read from the SOURCE
+  // document (v2Meta.naics_code / extractNaicsFromText), false when it came only
+  // from SAM metadata. Drives the masthead provenance chip so a SAM-injected
+  // code is never falsely badged "Extracted" (AOCSSB: "561210 — Extracted" on a
+  // Legislative-Branch sol that states no NAICS).
+  naics_from_source: boolean;
   set_aside: string;
   set_aside_sub: string;
   contract_type: string;
@@ -432,6 +438,18 @@ export interface AuditViewModel {
 
   // misc
   is_metadata_only: boolean;
+  // FA-E2E Fix 2 (2026-06-18): REAL clause/trap counts so the metadata-only
+  // locked teasers stop rendering hardcoded "4 DFARS traps / 9 clauses"
+  // literals. Populated from compliance_json; the renderer strips the teaser
+  // band entirely when a count is 0.
+  far_clause_count: number;
+  dfars_clause_count: number;
+  dfars_trap_count: number;
+  // FA-E2E Fix 2: true only when a REAL data-rights finding exists (a
+  // 252.227-70xx clause cited or a risk naming data/restricted/limited rights).
+  // The metadata-only teaser's "data-rights exposure on the deliverable CLINs"
+  // sentence is stripped when this is false (was a hardcoded fabrication).
+  has_data_rights_finding: boolean;
   is_watching: boolean;
   pdf_export_url: string;
   conf_ring_pct: number;
@@ -452,6 +470,43 @@ function parseDate(v: unknown): Date | null {
 function fmtDayMonYear(d: Date | null): string {
   if (!d) return "—";
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// FA-E2E Fix 3 (2026-06-18): the SOURCE-extracted offer-due date must win over
+// SAM metadata when they conflict. SAM's responseDeadLine is frequently stale
+// or wrong (FA487726: SAM said 18 Jun while the SF-1442 said 11 Jun -> the
+// report contradicted itself, showing "closed" AND "submit by 18 Jun"). The
+// engine extracts the real offer-due date into compJson.deadlines[]; this
+// mirrors the engine's parseDocDeadline offer-due selection (drop interim
+// milestones, prefer true submission entries, take the LATEST such date) so the
+// VM can resolve the CONTROLLING deadline rather than trusting SAM blindly.
+const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|amendment|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)/i;
+const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+function parseSourceOfferDue(deadlines: unknown): Date | null {
+  if (!Array.isArray(deadlines)) return null;
+  const entries = deadlines
+    .map((e) =>
+      typeof e === "string"
+        ? { label: "", date: e }
+        : e && typeof e === "object"
+        ? { label: String((e as Record<string, unknown>).label ?? ""), date: String((e as Record<string, unknown>).date ?? "") }
+        : { label: "", date: "" }
+    )
+    .filter((e) => e.date);
+  const tryParse = (str: string): Date | null => {
+    const cleaned = str.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    const d = new Date(cleaned);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const valid = entries
+    .map((e) => ({ ...e, d: tryParse(e.date) }))
+    .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
+  if (valid.length === 0) return null;
+  const eligible = valid.filter((e) => !DEADLINE_EXCLUDE_RE.test(e.label));
+  const submission = eligible.filter((e) => DEADLINE_SUBMISSION_RE.test(e.label) || DEADLINE_SUBMISSION_RE.test(e.date));
+  const pool = submission.length > 0 ? submission : eligible;
+  if (pool.length === 0) return null; // only interim/post-award dates -> never close on those
+  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
 }
 
 function fmtMonYear(d: Date | null): string {
@@ -2127,6 +2182,22 @@ function deriveWorkStatementReveal(audit: AuditRow): {
     };
   }
 
+  // FA-E2E Fix 4 (2026-06-18): never tell the user to "upload the SOW/PWS
+  // attachment" when ingestion meta shows a SOW / §C attachment WAS ALREADY
+  // ingested. Doing so contradicts the "N/N files ingested" banner and reads as
+  // a bug. Detect from compliance_json.ingestion.files[]: an ingested file whose
+  // section_roles include "C" or whose name matches a work-statement pattern.
+  const ingestion = (audit.compliance_json as Record<string, unknown> | null)?.ingestion as
+    | { files?: Array<{ name?: string; ingested?: boolean; section_roles?: string[] }> }
+    | null
+    | undefined;
+  const WS_FILE_RE = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|scope\s*of\s*work/i;
+  const sowOrSectionCIngested = Array.isArray(ingestion?.files) &&
+    ingestion.files.some((f) =>
+      f && f.ingested !== false &&
+      ((Array.isArray(f.section_roles) && f.section_roles.includes("C")) ||
+       (typeof f.name === "string" && WS_FILE_RE.test(f.name))));
+
   // Unknown amber variant — fires on RFP/RFQ/IFB/Other/null. Reads as rigor.
   return {
     work_statement: null,
@@ -2134,7 +2205,11 @@ function deriveWorkStatementReveal(audit: AuditRow): {
       head: "Work-statement type not classified from the parsed body",
       reason:
         "The governing work statement (SOW / PWS / SOO) wasn't located in the body FARaudit parsed for this notice. It likely lives in an <b>attachment</b> — a separate SOW PDF, a §C narrative document, or a CDRL/DID supplement that isn't part of the main solicitation file. SOW vs PWS changes your entire bid posture (method-led vs outcome-led), so FARaudit reports this as <b>tentative</b> rather than guessing.",
-      action: "<b>Upload the SOW/PWS attachment to classify it.</b> The work-statement type is the single highest-leverage call in your bid strategy — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
+      // When the SOW/§C was already ingested, the document is present — the type
+      // just couldn't be auto-classified — so the move is to review, not upload.
+      action: sowOrSectionCIngested
+        ? "<b>Confirm the work-statement type against the ingested §C / SOW document.</b> SOW vs PWS decides your bid posture (method-led vs outcome-led); the document is on file — FARaudit reports the type as tentative rather than guessing it."
+        : "<b>Upload the SOW/PWS attachment to classify it.</b> The work-statement type is the single highest-leverage call in your bid strategy — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
     },
   };
 }
@@ -2332,9 +2407,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // lines 1194/1209). Renderer drops each .kd-item when its has_* is false;
   // .urgent + award_quarter computed off one fixed `now` for determinism.
   const now = new Date();
-  const responseDeadline = parseDate(audit.response_deadline);
+  // FA-E2E Fix 3 (2026-06-18): the CONTROLLING response deadline is the
+  // SOURCE-extracted offer-due date when available; SAM's audit.response_deadline
+  // is only the fallback. SAM metadata is frequently stale/wrong and was
+  // overriding the document, producing self-contradicting reports ("closed" AND
+  // "submit by <future SAM date>"). open/closed is recomputed from whichever
+  // date controls. When the source carries no offer-due date we keep the SAM
+  // value (a missing source date must not erase a real SAM deadline).
+  const samResponseDeadline = parseDate(audit.response_deadline);
+  const sourceOfferDue = parseSourceOfferDue(compJson.deadlines);
+  const responseDeadline = sourceOfferDue ?? samResponseDeadline;
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
-  // FA-107: solicitation is closed when offer-due deadline is in the past
+  // FA-107: solicitation is closed when the CONTROLLING offer-due deadline is
+  // in the past (now recomputed from the source date when it wins over SAM).
   const is_expired: boolean = responseDays !== null && responseDays < 0;
   // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
   // scope by the time `score` is computed.)
@@ -2577,10 +2662,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code "(AO)") across 5 independent runs while SAM's hierarchy says
     // "DLA AVIATION AT OKLAHOMA CITY". Doc-read strings may appear only via
     // the labeled issuing·end-user pair or when SAM has nothing.
-    agency: officeLeaf || (formatIssuingEndUser(cleanAgencyDisplay(v2Meta?.agency), audit.agency) ?? validatedAgency(cleanAgencyDisplay(v2Meta?.agency), audit.agency, v2Meta?.agency)),
+    // FA-E2E Fix 5 (2026-06-18): the masthead must never read "—" / "Not in
+    // documents" while the body names the agency. The engine extracts the
+    // buying agency deterministically into v2Meta.agency (facts.issuingOffice
+    // via extractAgencyFromText / SF face-page) AND the overview's `customer`
+    // field carries the printed agency name. Add overviewJson.customer as the
+    // last deterministic fallback so a SAM-provenance gap can't blank a name the
+    // document plainly states (HM047626: masthead blank while body said NGA).
+    agency: officeLeaf || (formatIssuingEndUser(cleanAgencyDisplay(v2Meta?.agency), audit.agency) ?? validatedAgency(cleanAgencyDisplay(v2Meta?.agency), audit.agency, v2Meta?.agency, cleanAgencyDisplay(overviewJson.customer))),
     agency_sub: officeLeaf ? topHierarchyAgency : "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
+    naics_from_source: typeof v2Meta?.naics_code === "string" && (v2Meta.naics_code as string).trim().length > 0,
     // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
     // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
     // column. Doc text overrides metadata — masthead must show what the
@@ -2710,10 +2803,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         const year = yearTok ?? new Date().getUTCFullYear();
         return new Date(Date.UTC(year, mon, day));
       };
+      // FA-E2E Fix 3 (2026-06-18): strike action dates that are already PAST
+      // (before today) in addition to those beyond the response deadline.
+      // Presenting a past site-visit / registration / EAL / RFI date as a "By
+      // <date>" action item is a customer liability - observed on audits 2/4/5
+      // where passed windows were shown as still actionable. Dropping the prefix
+      // leaves the action text standing alone (the renderer omits the date chip).
+      const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const clampWhen = (when: string): string => {
-        if (!when || !responseDeadline) return when;
+        if (!when) return when;
         const d = parseWhen(when);
-        return d && d > responseDeadline ? "" : when;
+        if (!d) return when;
+        if (responseDeadline && d > responseDeadline) return ""; // past the deadline
+        if (d < todayUtc) return ""; // already past today - not actionable
+        return when;
       };
       const eng = compJson.executive_summary as { actions?: unknown } | undefined;
       if (Array.isArray(eng?.actions)) {
@@ -2865,6 +2968,22 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     ko_email_body: koBody,
 
     is_metadata_only: !!isMetadataOnly,
+    // FA-E2E Fix 2: real counts for the locked-teaser placeholders.
+    far_clause_count: farCount,
+    dfars_clause_count: dfarsCount,
+    dfars_trap_count: Array.isArray(compJson.dfars_flags)
+      ? (compJson.dfars_flags as RawDfarsFlag[]).filter((f) => f && f.detected).length
+      : 0,
+    has_data_rights_finding: (() => {
+      const dataRightsRe = /\b252\.227-70\d{2}\b|data\s+rights|restricted\s+rights|limited\s+rights/i;
+      const inRisks = risks.some((r) =>
+        dataRightsRe.test(r.citation || "") || dataRightsRe.test(r.description || "") || dataRightsRe.test(r.title || ""));
+      const inFar = Array.isArray(compJson.far_clauses)
+        && (compJson.far_clauses as string[]).some((c) => /252\.227-70\d{2}/.test(String(c)));
+      const inDfars = Array.isArray(compJson.dfars_clauses)
+        && (compJson.dfars_clauses as string[]).some((c) => /252\.227-70\d{2}/.test(String(c)));
+      return inRisks || inFar || inDfars;
+    })(),
     is_watching: !!opts?.isWatching,
     pdf_export_url: `/api/audit/${audit.id}/pdf`,
 

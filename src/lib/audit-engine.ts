@@ -2214,6 +2214,41 @@ export function derivePriorityFromFinding(category: RiskFinding["category"], cit
 // always re-derived from text content (DOCUMENT_ANCHOR_RE) — the model's
 // self-tag was removed from the Cycle-2 prompt entirely, so this is the
 // only authoritative source.
+// FA-E2E Fix 1 (2026-06-18) - derive an AI-driven severity score (0-10) from
+// the structured risks the model already returns, instead of the frozen
+// constant 5 that made the composite score track clause count, not substance.
+//
+// FORMULA (calibrated, documented):
+//   start at 0
+//   + 4 per Disqualification / P0 risk   (these gate or near-gate award)
+//   + 2 per detected DFARS trap          (well-known trap clauses w/ real cost)
+//   + 1 per P1 risk                      (material but non-gating obligations)
+//   + 0.5 per P2 risk                    (context/awareness items)
+//   clamp to 0..10, round to nearest integer.
+//
+// Calibration intent (severity x 5 is the score's risk penalty downstream):
+//   - clean set-aside, no traps, only a couple P2 context items -> severity 0-2
+//     -> riskPenalty 0-10 -> high score (PROCEED).
+//   - several P0 disqualifiers + multiple traps -> severity 8-10
+//     -> riskPenalty 40-50 -> low score (DECLINE).
+// P0 and P1 are deduped from the same risk list, so a disqualifier counts as a
+// P0 (4) not also a P1 - the priority buckets are mutually exclusive per risk.
+export function deriveSeverityScore(
+  prioritized: PrioritizedRisk[],
+  dfarsFlags: DFARSFlag[] | undefined
+): number {
+  const risks = Array.isArray(prioritized) ? prioritized : [];
+  const isDisqualifier = (r: PrioritizedRisk) =>
+    r.priority === "P0" || /disqualif|no[-\s]?bid|sole[-\s]?source/i.test(r.category || "");
+  const p0Count = risks.filter(isDisqualifier).length;
+  const p1Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P1").length;
+  const p2Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P2").length;
+  const trapCount = (dfarsFlags ?? []).filter((f) => f.detected).length;
+
+  const raw = p0Count * 4 + trapCount * 2 + p1Count * 1 + p2Count * 0.5;
+  return Math.max(0, Math.min(10, Math.round(raw)));
+}
+
 export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
   const hasAnchor = DOCUMENT_ANCHOR_RE.test(f.text);
   return {
@@ -2825,19 +2860,31 @@ JSON only — one key: risk_findings.`;
   //   penalty at 40 and call-3's modal severity is 5 → score 35 recurs.
   //   The number is computed, not fabricated; on DECISION_GATE audits every
   //   surface suppresses it ("—") because gates, not the score, decide.
+  // farCount / dfarsCount remain declared for later use (summary line + the
+  // "real solicitation always cites some clauses" not-a-solicitation guard).
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
   const certCount = complianceJson.required_certifications?.length || 0;
-  const severity = typeof risksJson.severity_score === "number" ? risksJson.severity_score : 5;
 
-  // Gap 3 (FA-119) recalibration: min(40, …×1.5) pinned every clause-heavy DoD
-  // solicitation at the 40 cap (most cited clauses are universal boilerplate,
-  // not real complexity), which — with the modal severity of 5 — forced the
-  // recurring 35 and punished clean set-asides as hard as genuinely hard ones.
-  // Soften to min(25, …×1.0) so a clean small-business set-aside with no
-  // disqualifiers baselines ~50-70, while severity × 5 still pulls genuinely
-  // risky pursuits down (e.g. severity 8 → −40).
-  const complexityPenalty = Math.min(25, (farCount + dfarsCount + certCount) * 1.0);
+  // FA-E2E Fix 1 (2026-06-18): the score is now AI-DRIVEN. Previously
+  // `severity` was frozen at the constant 5 (the risks prompt forbids the model
+  // from emitting severity_score and nothing else set it), so the formula
+  // collapsed to 75 - min(25, clauseCount) - the number tracked clause count,
+  // not risk substance. We DERIVE severity (0-10) from the structured risks the
+  // model already returns (`prioritized`, each carrying a P0/P1/P2 priority and
+  // a category) plus the detected DFARS traps. No prompt/schema change, so the
+  // excellent analysis engine is untouched - we only stop discarding its output.
+  const severity = deriveSeverityScore(prioritized, complianceJson.dfars_flags);
+
+  // FA-E2E Fix 1: the complexity penalty previously used the raw FAR+DFARS+cert
+  // clause COUNT, which rewarded citing FEWER boilerplate clauses (most cited
+  // FAR clauses are universal boilerplate, not real complexity - 52.212-1 etc).
+  // Replace the raw clause count with a count of MATERIAL items: detected DFARS
+  // traps + required certifications. Universal boilerplate FAR clauses no longer
+  // move the number; genuine compliance burden does.
+  const dfarsTrapCount = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).length;
+  const materialCount = dfarsTrapCount + certCount;
+  const complexityPenalty = Math.min(25, materialCount * 1.0);
   const riskPenalty = severity * 5;
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
@@ -4075,15 +4122,47 @@ export async function runAuditV2(
       // Strong work-statement name signals only (full phrases + boundaried
       // abbreviations) — never anchor on a stray "SOW"/"PWS" clause reference.
       const WS_NAME = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|project\s*description|scope\s*of\s*work/i;
+      // FA-E2E Fix 4 (2026-06-18): also detect a work statement by its BODY
+      // STRUCTURE, not only the attachment filename. A §C SOW inside the main
+      // form, or a SOW/PWS/SOO attachment with an off-pattern name (e.g.
+      // "Attachment 1.pdf"), was never promoted → classifier returned UNKNOWN
+      // while the SOW was ingested and quoted. The body of a real work statement
+      // carries dense imperative/structural signals: "the contractor shall",
+      // titled SOW/PWS/SOO headings, "scope of work", numbered task sections.
+      // We require MULTIPLE distinct signals so a stray mention can't promote a
+      // non-work-statement attachment.
+      const wsBodySignals = (body: string): number => {
+        let n = 0;
+        if (/\b(the\s+)?contractor\s+shall\b/i.test(body)) n++;
+        if (/(performance\s*work\s*statement|statement\s*of\s*work|statement\s*of\s*objectives?|scope\s*of\s*work)/i.test(body)) n++;
+        if (/\b(?:1\.0|2\.0|3\.0|section\s+[1-9])\b[\s\S]{0,80}(scope|background|requirements?|tasks?|objectives?|performance)/i.test(body)) n++;
+        if (/\b(tasks?|deliverables?|period\s+of\s+performance|place\s+of\s+performance)\b/i.test(body) && /\bshall\b/i.test(body)) n++;
+        return n;
+      };
+      const hasWsBody = (body: string): boolean => wsBodySignals(body) >= 2;
+
       // split → [formText, name1, body1, name2, body2, ...]
       const parts = doc.rawText.split(/\n\n=== ATTACHMENT DOCUMENT: (.+?) \(sam_attachment\) ===\n\n/);
       for (let i = 1; i + 1 < parts.length; i += 2) {
-        if (WS_NAME.test(parts[i])) {
-          const body = parts[i + 1].trim();
-          if (body.length >= 100) {
-            facts.workStatementText = body.slice(0, 4000);
-            break;
-          }
+        const body = parts[i + 1].trim();
+        // Promote when EITHER the filename matches a WS pattern OR the body
+        // itself reads as a work statement. (Filename match keeps the original
+        // 100-char floor; body match needs more substance to avoid false hits.)
+        const byName = WS_NAME.test(parts[i]) && body.length >= 100;
+        const byBody = body.length >= 400 && hasWsBody(body);
+        if (byName || byBody) {
+          facts.workStatementText = body.slice(0, 4000);
+          break;
+        }
+      }
+
+      // FA-E2E Fix 4: §C SOW inside the main form. extractScope reads §C but
+      // returns short on dense/odd layouts; if §C still carries a structural
+      // work statement, use it directly rather than leaving the type UNKNOWN.
+      if (!facts.workStatementText || facts.workStatementText.length < 200) {
+        const sectionCText = sectionBag.sections["C"]?.text ?? "";
+        if (sectionCText.length >= 400 && hasWsBody(sectionCText)) {
+          facts.workStatementText = sectionCText.slice(0, 4000);
         }
       }
     }
