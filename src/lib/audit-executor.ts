@@ -228,7 +228,23 @@ export async function executeAudit(
     // null = single-doc/upload arm (no manifest — pre-FA-136 semantics).
     // The view-model renders the loud partial-ingestion banner when
     // files_ingested < files_total or !form_identified.
-    ingestion: input.ingestion ?? null
+    ingestion: input.ingestion ?? null,
+    // Progressive-render flag. "finalizing" tells the report page the V2 agentic
+    // layer (agency / work-statement / Capture Play) is still running, so it
+    // renders those sections in a "finalizing analysis…" state and auto-refreshes
+    // until v2_shadow lands (a streaming render — the core report shows in ~3 min,
+    // the deep-analysis sections fill in live). Set "finalizing" ONLY when V2 will
+    // actually run on this arm; "done" otherwise (image/text/no-buffer arms have
+    // no agentic layer to wait for, so their absence is genuine, not pending).
+    analysis_phase:
+      AUDIT_V2_ENABLED &&
+      (pdfBuffer ||
+        pdfBase64 ||
+        (pdfSource === "sam_unavailable" &&
+          typeof solicitation.description === "string" &&
+          solicitation.description.length > 50))
+        ? "finalizing"
+        : "done"
   };
 
   // FA-166: PDF uploads carry no SAM solicitation number, but the engine often
@@ -256,15 +272,17 @@ export async function executeAudit(
     document_type: result.classification.document_type,
     document_type_rationale: result.classification.rationale,
     document_type_confidence: result.classification.confidence,
-    // FA — do NOT mark complete here. V2 (the user-facing agentic layer: agency,
-    // work-statement, the Capture Play) runs AFTER this for ~2-3 min. Marking
-    // complete now surfaces a DEGRADED V1-only report for that window — the root
-    // cause behind the AOCSSB "blank agency / unknown work-statement" reviews.
-    // V2 was originally a throwaway shadow; Phase 4 made it user-facing, so
-    // completion must wait for it. Stay processing/assembly; the final complete
-    // write happens AFTER the V2 block below.
-    status: "processing",
-    current_stage: "assembly",
+    // Mark complete the moment the core audit (V1) is ready — the user sees the
+    // board-room report in ~3 min instead of waiting ~6 for everything. The V2
+    // agentic layer (agency, work-statement, the Capture Play) runs right after
+    // and merges into compliance_json.v2_shadow. The report page renders those
+    // sections in a "finalizing analysis…" state and refreshes itself the moment
+    // they land — a progressive, streaming render (like a live AI response),
+    // never the degraded blank-agency view that gating-on-V2 traded a long wait
+    // to avoid. `analysis_phase` tells the renderer V2 is still in flight.
+    status: "complete",
+    current_stage: "complete",
+    completed_at: new Date().toISOString(),
     stage_updated_at: new Date().toISOString()
   };
 
@@ -409,7 +427,7 @@ export async function executeAudit(
       };
       const { error: shadowError } = await supabase
         .from("audits")
-        .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
+        .update({ compliance_json: { ...persistedComplianceJson, analysis_phase: "done", v2_shadow: v2Shadow } })
         .eq("id", auditId);
       if (shadowError) {
         console.error("[V2-SHADOW] db update failed (non-fatal):", shadowError.message);
@@ -429,7 +447,7 @@ export async function executeAudit(
       try {
         await supabase
           .from("audits")
-          .update({ compliance_json: { ...persistedComplianceJson, v2_error: v2ErrMsg, v2_error_at: new Date().toISOString() } })
+          .update({ compliance_json: { ...persistedComplianceJson, analysis_phase: "done", v2_error: v2ErrMsg, v2_error_at: new Date().toISOString() } })
           .eq("id", auditId);
       } catch { /* diagnostic write is best-effort */ }
     }
@@ -479,7 +497,7 @@ export async function executeAudit(
       };
       const { error: shadowError } = await supabase
         .from("audits")
-        .update({ compliance_json: { ...persistedComplianceJson, v2_shadow: v2Shadow } })
+        .update({ compliance_json: { ...persistedComplianceJson, analysis_phase: "done", v2_shadow: v2Shadow } })
         .eq("id", auditId);
       if (shadowError) {
         console.error("[V2-SHADOW-META] db update failed (non-fatal):", shadowError.message);
@@ -491,20 +509,11 @@ export async function executeAudit(
     }
   }
 
-  // FA — NOW mark the audit complete. V1 + the V2 agentic layer (or its honest
-  // failure / skip) are both done, so the report the user sees is the FULL
-  // board-room version — never the half-finished V1-only one. compliance_json
-  // is untouched here (V2 already merged v2_shadow into it); we flip only the
-  // status fields. This is the fix for the "complete before analysis finished"
-  // window. Runs for ALL arms (V2-bearing or not — the V2 chain above is
-  // skipped on image/text/no-buffer arms, and we still complete here).
-  {
-    const { error: doneErr } = await supabase
-      .from("audits")
-      .update({ status: "complete", current_stage: "complete", completed_at: new Date().toISOString(), stage_updated_at: new Date().toISOString() })
-      .eq("id", auditId);
-    if (doneErr) console.error("[audit] final complete write failed (non-fatal):", doneErr.message);
-  }
+  // (The audit was already marked complete after V1 above — the user has had the
+  // core board-room report for the ~2-3 min the V2 layer took. The V2 merge
+  // writes above flipped compliance_json.analysis_phase to "done" and added
+  // v2_shadow, so the report page's next auto-refresh swaps the "finalizing"
+  // sections for the full agentic surfaces. No second status write needed.)
 
   // Best-effort intelligence-corpus write — every audit teaches the engine
   // what trap clauses fire on what document types. Failure here doesn't

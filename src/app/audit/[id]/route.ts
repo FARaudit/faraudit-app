@@ -44,6 +44,48 @@ async function transitionalStatePage(
 // fuzzed UUID can't escape the user-scoped path.
 const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 
+// ── Progressive render: the "finalizing" window ──────────────────────────────
+// The executor marks an audit complete as soon as the core (V1) report is ready,
+// then runs the V2 agentic layer for ~2-3 min and merges it into
+// compliance_json.v2_shadow (flipping analysis_phase → "done"). During that
+// window the report is shown immediately with a banner + auto-refresh so the
+// deep-analysis sections stream in, instead of gating the whole report on V2.
+const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop refreshing if V2 stalls
+
+function isV2Finalizing(audit: Record<string, unknown>): boolean {
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  if (comp.v2_shadow) return false; // agentic layer already landed → full report
+  if (comp.analysis_phase !== "finalizing") return false; // arm with no V2 to wait for
+  const completedRaw = audit.completed_at ? String(audit.completed_at) : "";
+  const completedMs = completedRaw ? Date.parse(completedRaw) : NaN;
+  if (!Number.isFinite(completedMs)) return false;
+  return Date.now() - completedMs < V2_FINALIZING_MAX_MS; // within the live window
+}
+
+// Injects the auto-refresh + a slim board-room "finalizing" banner. Web-only:
+// the PDF route never calls this, so exported PDFs stay clean. Styles are inline
+// so the banner is independent of the report template's CSS.
+function injectFinalizingState(html: string): string {
+  const meta = `<meta http-equiv="refresh" content="12">`;
+  const banner =
+    `<div role="status" aria-live="polite" style="position:sticky;top:0;z-index:9999;` +
+    `display:flex;align-items:center;gap:10px;justify-content:center;` +
+    `padding:9px 16px;font:600 13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;` +
+    `color:#0b3a66;background:linear-gradient(180deg,#eaf3fc,#dcebfa);` +
+    `border-bottom:1px solid #b9d4f0;letter-spacing:.01em;">` +
+    `<span style="display:inline-block;width:13px;height:13px;border:2px solid #7fb0e3;` +
+    `border-top-color:#0b3a66;border-radius:50%;animation:faSpin .8s linear infinite;"></span>` +
+    `<span>Finalizing the deep analysis — agency, work statement, and capture play are being ` +
+    `generated. This page updates automatically.</span>` +
+    `<style>@keyframes faSpin{to{transform:rotate(360deg)}}</style></div>`;
+  let out = html;
+  out = out.includes("</head>") ? out.replace("</head>", `${meta}</head>`) : `${meta}${out}`;
+  out = /<body[^>]*>/i.test(out)
+    ? out.replace(/(<body[^>]*>)/i, `$1${banner}`)
+    : `${banner}${out}`;
+  return out;
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -131,7 +173,20 @@ export async function GET(
 
   const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");
-  const html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
+  let html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
+
+  // Progressive render. The audit is marked complete the moment the core (V1)
+  // report is ready (~3 min); the V2 agentic layer (agency / work-statement /
+  // Capture Play) finishes ~2-3 min later and merges into
+  // compliance_json.v2_shadow. While it's still running we show the core report
+  // immediately with a "finalizing" banner and auto-refresh, so the deep-analysis
+  // sections fill in live rather than the user staring at a spinner — a streaming
+  // render. Keyed off analysis_phase==="finalizing" + v2_shadow absent. A 6-min
+  // backstop on completed_at stops the refresh loop if V2 ever stalls/fails, so
+  // the report is never stuck refreshing.
+  if (isV2Finalizing(audit)) {
+    html = injectFinalizingState(html);
+  }
 
   return new Response(html, {
     status: 200,

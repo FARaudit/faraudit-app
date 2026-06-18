@@ -36,7 +36,15 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // that needs to retry — trades ~2% Opus retries for the cheap-by-default base.
 const CLAUDE_MODEL = "claude-sonnet-4-6";
 const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
-const CLAUDE_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS) || 90000;
+// Hard ceiling: a single model call may never hang longer than 3 min, regardless
+// of what CLAUDE_TIMEOUT_MS is set to in the environment. A hung call fails fast
+// and the retry loop (callWithRetry) re-issues it — far better than a 10-min
+// stall. Healthy calls finish in <60s, so 180s leaves generous headroom.
+const CLAUDE_TIMEOUT_CEILING_MS = 180000;
+const CLAUDE_TIMEOUT_MS = Math.min(
+  Number(process.env.CLAUDE_TIMEOUT_MS) || 90000,
+  CLAUDE_TIMEOUT_CEILING_MS,
+);
 
 // Quality-gate hook: scripts/quality-gate/sonnet-vs-opus.mjs uses these to
 // swap the model and capture per-call token usage without touching the engine
