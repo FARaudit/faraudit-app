@@ -229,7 +229,19 @@ export async function POST(req: NextRequest) {
   // partial-ingestion banner on the upload path (previously always null).
   let uploadAssembled: AssembledDocumentSet | null = null;
   if (uploadedDocs.length > 0) {
-    uploadAssembled = await assembleUploadedDocumentSet(uploadedDocs, null);
+    // FA-E2E re-verify Fix C (2026-06-18): derive a sol-number token from the
+    // uploaded filenames so the solNorm branch of isForm can fire on uploads.
+    // Without it, an amendment-named primary solicitation never resolved to a
+    // FORM and the "no primary solicitation" banner stuck. Sol numbers are
+    // letter+digit dense tokens (e.g. HM047626R0039, FA460026Q0047,
+    // W912DY-26-R-0001); take the longest such token across all upload names.
+    const SOLNUM_RE = /\b[0-9A-Z]{2,}[-_ ]?[0-9A-Z]{0,}(?:[-_ ]?[0-9A-Z]+){1,}\b/gi;
+    const uploadSolToken = uploadedDocs
+      .flatMap((d) => (d.name.match(SOLNUM_RE) ?? []))
+      .map((t) => t.trim())
+      .filter((t) => /[0-9]/.test(t) && /[A-Z]/i.test(t) && t.replace(/[^0-9A-Z]/gi, "").length >= 8)
+      .sort((a, b) => b.replace(/[^0-9A-Z]/gi, "").length - a.replace(/[^0-9A-Z]/gi, "").length)[0] ?? null;
+    uploadAssembled = await assembleUploadedDocumentSet(uploadedDocs, uploadSolToken);
     if (uploadAssembled.primary) {
       safeName = sanitizeFilename(uploadAssembled.primary.name);
     }
