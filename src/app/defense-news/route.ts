@@ -13,6 +13,7 @@ import { headers } from "next/headers";
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
 import { injectRail } from "@/lib/nav/rail";
+import { injectDefenseTabs } from "@/lib/nav/defense-intel";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,7 @@ export async function GET() {
   // (Defense News lives under the new "Defense Intel" group, so it highlights
   // that item.) Proof page for Design's 1:1 before propagating to all routes.
   html = injectRail(html, "defense-intel");
+  html = injectDefenseTabs(html, "news"); // Phase 5 item 2 — News/Spending tab strip
 
   return new Response(html, {
     headers: {
