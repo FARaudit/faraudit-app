@@ -432,6 +432,18 @@ export interface AuditViewModel {
 
   // misc
   is_metadata_only: boolean;
+  // FA-E2E Fix 2 (2026-06-18): REAL clause/trap counts so the metadata-only
+  // locked teasers stop rendering hardcoded "4 DFARS traps / 9 clauses"
+  // literals. Populated from compliance_json; the renderer strips the teaser
+  // band entirely when a count is 0.
+  far_clause_count: number;
+  dfars_clause_count: number;
+  dfars_trap_count: number;
+  // FA-E2E Fix 2: true only when a REAL data-rights finding exists (a
+  // 252.227-70xx clause cited or a risk naming data/restricted/limited rights).
+  // The metadata-only teaser's "data-rights exposure on the deliverable CLINs"
+  // sentence is stripped when this is false (was a hardcoded fabrication).
+  has_data_rights_finding: boolean;
   is_watching: boolean;
   pdf_export_url: string;
   conf_ring_pct: number;
@@ -2865,6 +2877,22 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     ko_email_body: koBody,
 
     is_metadata_only: !!isMetadataOnly,
+    // FA-E2E Fix 2: real counts for the locked-teaser placeholders.
+    far_clause_count: farCount,
+    dfars_clause_count: dfarsCount,
+    dfars_trap_count: Array.isArray(compJson.dfars_flags)
+      ? (compJson.dfars_flags as RawDfarsFlag[]).filter((f) => f && f.detected).length
+      : 0,
+    has_data_rights_finding: (() => {
+      const dataRightsRe = /\b252\.227-70\d{2}\b|data\s+rights|restricted\s+rights|limited\s+rights/i;
+      const inRisks = risks.some((r) =>
+        dataRightsRe.test(r.citation || "") || dataRightsRe.test(r.description || "") || dataRightsRe.test(r.title || ""));
+      const inFar = Array.isArray(compJson.far_clauses)
+        && (compJson.far_clauses as string[]).some((c) => /252\.227-70\d{2}/.test(String(c)));
+      const inDfars = Array.isArray(compJson.dfars_clauses)
+        && (compJson.dfars_clauses as string[]).some((c) => /252\.227-70\d{2}/.test(String(c)));
+      return inRisks || inFar || inDfars;
+    })(),
     is_watching: !!opts?.isWatching,
     pdf_export_url: `/api/audit/${audit.id}/pdf`,
 

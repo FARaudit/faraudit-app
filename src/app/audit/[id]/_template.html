@@ -1397,8 +1397,8 @@ button{font-family:inherit}
       <section class="moment" data-state="locked" style="display:none">
         <div class="moment-main">
           <div class="moment-flag"><span class="pulse"></span>Intelligence detected · Not yet unlocked</div>
-          <h2 class="moment-headline"><em>4 DFARS traps</em> and <em>9 compliance clauses</em> were flagged in this notice's metadata.</h2>
-          <p class="moment-detail">FARaudit scored this solicitation from SAM.gov metadata alone. The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read. <b class="band-unlock">Upload it to unlock the catch.</b></p>
+          <h2 class="moment-headline"><em><span data-field="moment_dfars_trap_count">0</span> DFARS traps</em> and <em><span data-field="moment_far_clause_count">0</span> compliance clauses</em> were flagged in this notice's metadata.</h2>
+          <p class="moment-detail">FARaudit scored this solicitation from SAM.gov metadata alone.<span data-field="moment_datarights_sentence"> The clause-level traps — including a data-rights exposure on the deliverable CLINs — are extracted only when the full solicitation PDF is read.</span> <b class="band-unlock">Upload it to unlock the catch.</b></p>
         </div>
         <div class="moment-aside">
           <span class="ma-k band-k">Unlocks with PDF</span>
@@ -1843,7 +1843,7 @@ button{font-family:inherit}
                 <div class="locked-ghost"><div class="lg-row"></div><div class="lg-row"></div><div class="lg-row"></div></div>
                 <div class="locked-veil">
                   <div class="lk-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
-                  <div class="lk-stat">9 clauses detected · Locked</div>
+                  <div class="lk-stat"><span data-field="locked_far_clause_count">0</span> clauses detected · Locked</div>
                   <div class="lk-h">Clause-level compliance is read <em>from the solicitation PDF</em>.</div>
                   <p class="lk-sub">This audit ran on SAM.gov metadata only. With the full solicitation, FARaudit returns every offeror-action clause with severity and the exact step to clear it.</p>
                   <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg><span data-pm-btn>Upload the PDF to unlock</span></button>
@@ -1914,7 +1914,7 @@ button{font-family:inherit}
                 <div class="locked-ghost"><div class="lg-row"></div><div class="lg-row"></div><div class="lg-row"></div></div>
                 <div class="locked-veil">
                   <div class="lk-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
-                  <div class="lk-stat">4 traps detected · Locked</div>
+                  <div class="lk-stat"><span data-field="locked_dfars_trap_count">0</span> traps detected · Locked</div>
                   <div class="lk-h">The risk register needs the <em>full document</em> to extract citations.</div>
                   <p class="lk-sub">FARaudit flagged risks in the metadata but can only cite clause, severity, and the neutralizing move once it reads the solicitation. This is the difference between knowing a trap exists and knowing how to clear it.</p>
                   <button class="lk-btn" data-upload><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg><span data-pm-btn>Upload the PDF to unlock</span></button>
