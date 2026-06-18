@@ -904,7 +904,10 @@ interface RawDfarsFlag {
   required_action?: string;
 }
 
-function mapComplianceFlags(compJson: Record<string, unknown>): ComplianceFlag[] {
+function mapComplianceFlags(
+  compJson: Record<string, unknown>,
+  risksJson: Record<string, unknown> | null | undefined
+): ComplianceFlag[] {
   // Prefer dfars_flags[] when present — that's the structured analyst output.
   const flags = Array.isArray(compJson.dfars_flags) ? (compJson.dfars_flags as RawDfarsFlag[]) : [];
   const detected = flags.filter((f) => f && f.detected);
@@ -928,10 +931,30 @@ function mapComplianceFlags(compJson: Record<string, unknown>): ComplianceFlag[]
       // Drop flags with no real content — fail-loud rather than fallback.
       .filter((f) => f.description.length > 0 || f.required_action.length > 0);
   }
-  // FA-127 — no generic-advisory fallback. Synthesizing first-6 raw clauses
-  // as boilerplate "Offeror-action clause" rows printed fabricated counts
-  // that contradicted the real detection state. Zero detected flags renders
-  // the truthful §04 empty-state instead.
+  // §04 fallback — no DETECTED DFARS trap (the norm on non-DoD solicitations like
+  // AOC, where dfars_flags exist but are all detected:false), yet the solicitation
+  // still carries real offeror-action compliance items. Source them from the risk
+  // register's offerorActionRequired === true findings (key-personnel resumes,
+  // licenses, certs, registrations, insurance) so §04 shows genuine obligations
+  // instead of the empty "clause-level detail not available" state. This is REAL
+  // engine output (not the FA-127 raw-clause boilerplate that printed fabricated
+  // counts) — each row carries the finding's own text + faraudit action.
+  const findings = Array.isArray(risksJson?.risk_findings)
+    ? (risksJson!.risk_findings as Array<Record<string, unknown>>)
+    : [];
+  const oar = findings.filter((f) => f && f.offerorActionRequired === true);
+  if (oar.length > 0) {
+    return oar
+      .slice(0, 12)
+      .map((f) => ({
+        clause: String(f.citation ?? "").trim() || "—",
+        title: String(f.title ?? "").trim() || "Compliance flag",
+        severity: pickSeverity(/disqualif|dfars/i.test(String(f.category ?? "")) ? "HIGH" : "MED"),
+        description: String(f.text ?? "").trim(),
+        required_action: String(f.faraudit_action ?? "").trim(),
+      }))
+      .filter((f) => f.description.length > 0 || f.required_action.length > 0);
+  }
   return [];
 }
 
@@ -2372,7 +2395,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const conf = confidenceLabel(audit.document_type_confidence);
 
   // Compliance + risks
-  const complianceFlags = mapComplianceFlags(compJson);
+  const complianceFlags = mapComplianceFlags(compJson, risksJson);
   // FA-153 — appeal-flavored actions get their deadline math re-anchored to
   // original issuance (or an honest "verify on SAM.gov" when unknown).
   const naicsAppealBinding = deriveNaicsAppealBinding(audit, compJson);
@@ -2716,7 +2739,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     has_incumbent: incumbentHasData,
     incumbent_none_head: "No incumbent identified",
-    incumbent_none_note: "No prior award was found for this NSN / solicitation pattern. Either this is a first-time procurement, or the historical record isn't in our corpus yet. Confirm the recompete cycle directly with the contracting officer.",
+    incumbent_none_note: "No prior award was found for this solicitation. Either this is a first-time procurement, or the historical record isn't in our corpus yet. Confirm the recompete cycle directly with the contracting officer.",
 
     // Canonicalization layer (Brain ruling 2026-06-06) — single-source verdict
     // + canonical gate prose tied to actual gate count + days-to-deadline.
