@@ -144,6 +144,25 @@ function sniffSolicitationNumber(
   return m[0] || null;
 }
 
+// SAM's fullParentPathName is a dot-joined org path that frequently repeats a
+// segment (e.g. "ARCHITECT OF THE CAPITOL.ARCHITECT OF THE CAPITOL.ACQUISITION &
+// MATERIAL MAN DIV"). Written raw to audits.agency it shows the duplicate in the
+// masthead. Drop duplicate segments (case-insensitive), preserving order and the
+// dot separator the customer-hierarchy split still relies on.
+function dedupeAgencyPath(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const seg of raw.split(".").map((s) => s.trim()).filter(Boolean)) {
+    const key = seg.toUpperCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(seg);
+    }
+  }
+  return out.join(".") || null;
+}
+
 export async function executeAudit(
   supabase: SupabaseClient,
   auditId: string,
@@ -199,7 +218,7 @@ export async function executeAudit(
         // A SAM record with no set-aside is DEFINITIVELY full & open — record that
         // as a known fact, never leave it blank/unknown.
         const resolvedSetAside = solicitation.typeOfSetAside || samFacts.typeOfSetAside || "Full & Open";
-        const samAgency = samFacts.fullParentPathName || samFacts.department || null;
+        const samAgency = dedupeAgencyPath(samFacts.fullParentPathName) || samFacts.department || null;
         solicitation = {
           ...solicitation,
           solicitationNumber: solicitation.solicitationNumber || samFacts.solicitationNumber,
