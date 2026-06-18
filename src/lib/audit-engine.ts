@@ -2238,15 +2238,36 @@ export function deriveSeverityScore(
   dfarsFlags: DFARSFlag[] | undefined
 ): number {
   const risks = Array.isArray(prioritized) ? prioritized : [];
+  // Genuine disqualifier = category-level no-go (NOT mere P0 priority).
   const isDisqualifier = (r: PrioritizedRisk) =>
-    r.priority === "P0" || /disqualif|no[-\s]?bid|sole[-\s]?source/i.test(r.category || "");
-  const p0Count = risks.filter(isDisqualifier).length;
+    /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "");
+  const dqCount = risks.filter(isDisqualifier).length;
+  // Graded P0-priority risks that are NOT genuine disqualifiers (P0 traps).
+  const p0Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P0").length;
   const p1Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P1").length;
   const p2Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P2").length;
   const trapCount = (dfarsFlags ?? []).filter((f) => f.detected).length;
 
-  const raw = p0Count * 4 + trapCount * 2 + p1Count * 1 + p2Count * 0.5;
-  return Math.max(0, Math.min(10, Math.round(raw)));
+  // Smooth per-category saturation: capValue scaled by (1 - exp(-n/k)).
+  // Diminishing returns within a category.
+  const cat = (capValue: number, n: number, k: number) =>
+    n > 0 ? capValue * (1 - Math.exp(-n / k)) : 0;
+
+  // Graded load: bounded so volume alone never exceeds the CAUTION band (8.5).
+  const graded =
+    cat(3.0, p0Count, 1.5) +
+    cat(2.5, trapCount, 1.2) +
+    cat(2.0, p1Count, 2.5) +
+    cat(1.0, p2Count, 3.0);
+  let severity = Math.min(8.5, graded);
+
+  // Hard disqualifier floor: a genuine fired disqualifier dominates.
+  if (dqCount > 0) {
+    severity = Math.max(severity, Math.min(10, 9 + (dqCount - 1) * 0.7));
+  }
+
+  // Keep one decimal of resolution so the downstream score spreads.
+  return Math.max(0, Math.min(10, Math.round(severity * 10) / 10));
 }
 
 export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
@@ -2850,14 +2871,18 @@ JSON only — one key: risk_findings.`;
   // set, not just what the model emitted on a given run.
   risksJson.risk_findings = prioritized.map(mapPrioritizedToFinding);
 
-  // Composite scoring (FA-126 — deterministic, documented):
-  //   score = clamp(0..100, 100 − min(25, (FAR + DFARS + certs) × 1.0) − severity × 5)  [FA-119 recal]
+  // Composite scoring (score-recalibration 2026-06-18 — deterministic):
+  //   score = clamp(0..100, 100 − min(12, material×0.8) − severity×4.6);
+  //           then if a genuine disqualifier fired, cap into the NO-BID band (≤25).
   //   rec   = score ≥ 70 → PROCEED · 40-69 → PROCEED_WITH_CAUTION · < 40 → DECLINE
   //           (null score → PROCEED_WITH_CAUTION; fired gates SUPERSEDE the
   //           scored tier via aggregateGateRecommendation — this is why a
   //           35 can carry CAUTION and a 71 can carry DECLINE.)
-  //   Known saturation: clause-heavy DoD solicitations pin the complexity
-  //   penalty at 40 and call-3's modal severity is 5 → score 35 recurs.
+  //   SATURATION FIXED: the prior +4/P0 +2/trap formula clamped severity to 10
+  //   on virtually every DoD register → riskPenalty 50 → score ≤25 → NO-BID for
+  //   EVERYTHING. deriveSeverityScore now spreads via per-category diminishing
+  //   returns + a graded ceiling (8.5) for "many risks", separated from a hard
+  //   floor for genuine disqualifiers. See deriveSeverityScore header.
   //   The number is computed, not fabricated; on DECISION_GATE audits every
   //   surface suppresses it ("—") because gates, not the score, decide.
   // farCount / dfarsCount remain declared for later use (summary line + the
@@ -2884,9 +2909,24 @@ JSON only — one key: risk_findings.`;
   // move the number; genuine compliance burden does.
   const dfarsTrapCount = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).length;
   const materialCount = dfarsTrapCount + certCount;
-  const complexityPenalty = Math.min(25, materialCount * 1.0);
-  const riskPenalty = severity * 5;
-  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // score-recalibration (2026-06-18): rebalance complexity vs risk so the two
+  // no longer both crush the score. Complexity capped at 12 (was 25) and scaled
+  // 0.8/item — a heavy compliance burden costs at most 12 points, not 25.
+  const complexityPenalty = Math.min(12, materialCount * 0.8);
+  // riskPenalty multiplier 4.6 (was 5): severity 8.5 (graded ceiling) -> 39 pts,
+  // keeping a maxed-out NON-disqualifier pursuit in the CAUTION band, not auto-
+  // DECLINE. Genuine disqualifiers get the hard floor below instead.
+  const riskPenalty = severity * 4.6;
+  let rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // HARD DISQUALIFIER FLOOR: when a genuine category-level disqualifier fired
+  // (Disqualification / sole-source / no-bid / market-structure), the score is
+  // capped into the NO-BID band (<=25) so the NUMBER reads DECLINE on its own —
+  // mirroring the gate-supersede + clampScoreForSoleSource doctrine in the score
+  // itself, not only in the recommendation tier.
+  const disqualifierFired = prioritized.some((r) =>
+    /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "")
+  );
+  if (disqualifierFired) rawScore = Math.min(rawScore, 25);
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
   // now drive the recommendation tier; the score reflects the underlying fit
   // without artificial flooring. The cap helper remains exported for callers

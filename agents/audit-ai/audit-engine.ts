@@ -1346,14 +1346,36 @@ export function deriveSeverityScore(
   dfarsFlags: DFARSFlag[] | undefined
 ): number {
   const risks = Array.isArray(prioritized) ? prioritized : [];
+  // Genuine disqualifier = category-level no-go (NOT mere P0 priority).
   const isDisqualifier = (r: PrioritizedRisk) =>
-    r.priority === "P0" || /disqualif|no[-\s]?bid|sole[-\s]?source/i.test(r.category || "");
-  const p0Count = risks.filter(isDisqualifier).length;
+    /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "");
+  const dqCount = risks.filter(isDisqualifier).length;
+  // Graded P0-priority risks that are NOT genuine disqualifiers (P0 traps).
+  const p0Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P0").length;
   const p1Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P1").length;
   const p2Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P2").length;
   const trapCount = (dfarsFlags ?? []).filter((f) => f.detected).length;
-  const raw = p0Count * 4 + trapCount * 2 + p1Count * 1 + p2Count * 0.5;
-  return Math.max(0, Math.min(10, Math.round(raw)));
+
+  // Smooth per-category saturation: capValue scaled by (1 - exp(-n/k)).
+  // Diminishing returns within a category.
+  const cat = (capValue: number, n: number, k: number) =>
+    n > 0 ? capValue * (1 - Math.exp(-n / k)) : 0;
+
+  // Graded load: bounded so volume alone never exceeds the CAUTION band (8.5).
+  const graded =
+    cat(3.0, p0Count, 1.5) +
+    cat(2.5, trapCount, 1.2) +
+    cat(2.0, p1Count, 2.5) +
+    cat(1.0, p2Count, 3.0);
+  let severity = Math.min(8.5, graded);
+
+  // Hard disqualifier floor: a genuine fired disqualifier dominates.
+  if (dqCount > 0) {
+    severity = Math.max(severity, Math.min(10, 9 + (dqCount - 1) * 0.7));
+  }
+
+  // Keep one decimal of resolution so the downstream score spreads.
+  return Math.max(0, Math.min(10, Math.round(severity * 10) / 10));
 }
 
 export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
@@ -1818,9 +1840,15 @@ JSON only — one key: risk_findings.`;
 
   const dfarsTrapCount = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).length;
   const materialCount = dfarsTrapCount + certCount;
-  const complexityPenalty = Math.min(25, materialCount * 1.0);
-  const riskPenalty = severity * 5;
-  const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // score-recalibration (2026-06-18) parity mirror: rebalance complexity vs risk.
+  const complexityPenalty = Math.min(12, materialCount * 0.8);
+  const riskPenalty = severity * 4.6;
+  let rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // Hard disqualifier floor: a fired genuine disqualifier caps into NO-BID band.
+  const disqualifierFired = prioritized.some((r) =>
+    /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "")
+  );
+  if (disqualifierFired) rawScore = Math.min(rawScore, 25);
   // Ruling 1 supersedes the prior cap — parity mirror.
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
