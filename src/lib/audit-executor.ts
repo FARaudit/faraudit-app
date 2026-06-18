@@ -256,10 +256,16 @@ export async function executeAudit(
     document_type: result.classification.document_type,
     document_type_rationale: result.classification.rationale,
     document_type_confidence: result.classification.confidence,
-    status: "complete",
-    current_stage: "complete",
-    stage_updated_at: new Date().toISOString(),
-    completed_at: new Date().toISOString()
+    // FA — do NOT mark complete here. V2 (the user-facing agentic layer: agency,
+    // work-statement, the Capture Play) runs AFTER this for ~2-3 min. Marking
+    // complete now surfaces a DEGRADED V1-only report for that window — the root
+    // cause behind the AOCSSB "blank agency / unknown work-statement" reviews.
+    // V2 was originally a throwaway shadow; Phase 4 made it user-facing, so
+    // completion must wait for it. Stay processing/assembly; the final complete
+    // write happens AFTER the V2 block below.
+    status: "processing",
+    current_stage: "assembly",
+    stage_updated_at: new Date().toISOString()
   };
 
   let { error: updateError } = await supabase
@@ -483,6 +489,21 @@ export async function executeAudit(
     } catch (err) {
       console.error("[V2-SHADOW-META] runAuditV2Metadata failed (non-fatal):", err instanceof Error ? err.message : err);
     }
+  }
+
+  // FA — NOW mark the audit complete. V1 + the V2 agentic layer (or its honest
+  // failure / skip) are both done, so the report the user sees is the FULL
+  // board-room version — never the half-finished V1-only one. compliance_json
+  // is untouched here (V2 already merged v2_shadow into it); we flip only the
+  // status fields. This is the fix for the "complete before analysis finished"
+  // window. Runs for ALL arms (V2-bearing or not — the V2 chain above is
+  // skipped on image/text/no-buffer arms, and we still complete here).
+  {
+    const { error: doneErr } = await supabase
+      .from("audits")
+      .update({ status: "complete", current_stage: "complete", completed_at: new Date().toISOString(), stage_updated_at: new Date().toISOString() })
+      .eq("id", auditId);
+    if (doneErr) console.error("[audit] final complete write failed (non-fatal):", doneErr.message);
   }
 
   // Best-effort intelligence-corpus write — every audit teaches the engine
