@@ -16,7 +16,7 @@
 //   - V2 shadow + corpus failures are swallowed (parity with route).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Solicitation } from "@/lib/sam";
+import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import {
   runAudit,
   runAuditV2,
@@ -120,6 +120,30 @@ async function markStage(
   }
 }
 
+// Deterministic solicitation-number sniff for uploads. FACTS (agency / NAICS /
+// set-aside / deadline) must auto-populate from the system of record, not be
+// inferred by the AI (CEO architectural law). Federal sol numbers carry an
+// embedded FY+type signature (…26R…, …16Q…), so a filename token is accepted
+// ONLY when it matches that shape — never a random alphanumeric run. An existing
+// solicitation number (already on the row) always wins.
+function sniffSolicitationNumber(
+  filename: string | null | undefined,
+  existing: string | null | undefined
+): string | null {
+  const fromExisting = typeof existing === "string" && existing.trim().length >= 6 ? existing.trim() : null;
+  if (fromExisting) return fromExisting;
+  if (!filename) return null;
+  const base = filename.replace(/\.[a-z0-9]+$/i, "").toUpperCase();
+  // Federal sol-number shape: prefix(2-8) + 2-digit FY + 1-2 type letters +
+  // 3-5 digit serial, optional internal hyphens (W912DY-24-R-0012). Lookarounds
+  // (not \b) so a trailing "_sectionM" / "-attachment" is excluded — underscore
+  // is a \w char and would defeat \b. Verified against AOCSSB26R0039,
+  // FA301626Q0068, W912DY-24-R-0012, SPRRA126Q0034, N0001925R0123, 36C24625R0099;
+  // rejects "RFP final draft", GSA schedule prefixes (47QTCA).
+  const m = base.match(/(?<![A-Z0-9])[A-Z0-9]{2,8}-?\d{2}-?[A-Z]{1,2}-?\d{3,5}(?![A-Z0-9])/g) || [];
+  return m[0] || null;
+}
+
 export async function executeAudit(
   supabase: SupabaseClient,
   auditId: string,
@@ -153,6 +177,54 @@ export async function executeAudit(
       solicitation = { ...solicitation, description: resolvedDescription.text };
     } else {
       console.warn(`[FA-148] description fetch failed for ${solicitation.noticeId} — proceeding URL-only: ${resolvedDescription.reason}`);
+    }
+  }
+
+  // ━━ FACTS-FIRST — authoritative facts from SAM.gov, never the AI ━━
+  // Architectural law (CEO directive): agency / NAICS / set-aside / deadline are
+  // FACTS, not analysis. On uploads (synthetic pdf-… notice, no SAM record behind
+  // it) these arrived null and the masthead blanked. But the solicitation number
+  // is printed on the doc — usually in the filename. When we can read it, pull the
+  // authoritative facts from the system of record and write them to the columns
+  // the masthead already reads (audit.naics_code / set_aside / response_deadline /
+  // agency — all pre-existing, no migration). The view-model uses those columns as
+  // the deterministic fallback when the AI metadata_brief is empty, so this fills
+  // the blanks WITHOUT touching the analysis layer. Best-effort: one ~15s SAM call,
+  // gated to runs that are actually missing a fact; never blocks the audit.
+  if (!solicitation.naicsCode || !solicitation.typeOfSetAside || !(input.agency && String(input.agency).trim())) {
+    const solNum = sniffSolicitationNumber(input.primaryDocName, solicitation.solicitationNumber);
+    if (solNum) {
+      const samFacts = await fetchSolicitationByNoticeId(solNum).catch(() => null);
+      if (samFacts) {
+        // A SAM record with no set-aside is DEFINITIVELY full & open — record that
+        // as a known fact, never leave it blank/unknown.
+        const resolvedSetAside = solicitation.typeOfSetAside || samFacts.typeOfSetAside || "Full & Open";
+        const samAgency = samFacts.fullParentPathName || samFacts.department || null;
+        solicitation = {
+          ...solicitation,
+          solicitationNumber: solicitation.solicitationNumber || samFacts.solicitationNumber,
+          naicsCode: solicitation.naicsCode || samFacts.naicsCode,
+          typeOfSetAside: resolvedSetAside,
+          responseDeadLine: solicitation.responseDeadLine || samFacts.responseDeadLine,
+          fullParentPathName: solicitation.fullParentPathName || samFacts.fullParentPathName,
+          department: solicitation.department || samFacts.department,
+          subTier: solicitation.subTier || samFacts.subTier,
+        };
+        const factCols: Record<string, unknown> = { set_aside: resolvedSetAside };
+        if (samFacts.naicsCode) factCols.naics_code = samFacts.naicsCode;
+        if (samFacts.responseDeadLine) factCols.response_deadline = samFacts.responseDeadLine;
+        if ((!input.agency || !String(input.agency).trim() || /^unknown$/i.test(String(input.agency).trim())) && samAgency) {
+          factCols.agency = samAgency;
+        }
+        try {
+          await supabase.from("audits").update(factCols).eq("id", auditId);
+          console.log(`[FACTS] SAM cross-ref ${solNum} → naics=${samFacts.naicsCode ?? "-"} set_aside="${resolvedSetAside}" agency=${samAgency ?? "(kept)"}`);
+        } catch (e) {
+          console.warn("[FACTS] column write failed (non-fatal):", e instanceof Error ? e.message : e);
+        }
+      } else {
+        console.log(`[FACTS] no SAM record for ${solNum} — leaving facts to extraction / honest-unknown`);
+      }
     }
   }
 
