@@ -176,17 +176,33 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   const solNorm = solicitationNumber ? norm(solicitationNumber) : "";
   const isAmendment = (n: string) => /\bamd\b|amendment|_amd_|-amd-/i.test(n);
   const isForm = (n: string) => {
-    if (isAmendment(n)) return false;
-    // An attachment/exhibit/wage/drawing/spec is never the form even if its
-    // name contains "solicitation" (e.g. "Attachment 12 Solicitation RFIs.pdf").
+    // The attachment/exhibit/wage/drawing/spec veto wins FIRST — never the form
+    // even if its name contains "solicitation" (e.g. "Attachment 12 Solicitation
+    // RFIs.pdf").
     if (/attach|attch|exhibit|wage|drawing|\bspec\b/i.test(n)) return false;
     const nn = norm(n);
-    if (solNorm && nn.includes(solNorm)) return true;
-    // \bsolicitation\b (unanchored) catches the common upload shapes the old
-    // anchored patterns missed: "1. HM047626R0039 - Solicitation.pdf" and
-    // "Solicitation - FA460026Q0047.pdf". SF cover-form numbers cover the rest,
-    // incl. SF-1442 (construction) which the prior list omitted.
-    return /\bsolicitation\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?0?18\b|sf[\s-]?33\b/i.test(n.trim());
+    // FA-E2E re-verify Fix C (2026-06-18): strong FORM signals win over the
+    // amendment veto. A primary solicitation is frequently delivered with an
+    // amendment-shaped name (SF-30 "Amendment of Solicitation") or carries an
+    // amendment token alongside the sol number. Previously `if (isAmendment(n))
+    // return false` short-circuited BEFORE these signals, so the whole set had
+    // no FORM → the "no primary solicitation" banner stuck. A file is FORM when
+    // it clears the exclusion veto above AND matches a strong form signal, EVEN
+    // IF it also carries an amendment marker.
+    const strongForm =
+      (solNorm && nn.includes(solNorm)) ||
+      // \bsolicitation\b (unanchored) catches "1. HM047626R0039 - Solicitation.pdf"
+      // and "Solicitation - FA460026Q0047.pdf".
+      /\bsolicitation\b/i.test(n) ||
+      // SF-30 amendment-of-solicitation marker — the SF-30 IS the governing form
+      // for an amended buy.
+      /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract/i.test(n);
+    if (strongForm) return true;
+    // No strong signal → the amendment veto applies (a bare "Amendment 2.pdf" is
+    // not the primary form).
+    if (isAmendment(n)) return false;
+    // SF cover-form numbers cover the rest, incl. SF-1442 (construction).
+    return /sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?0?18\b|sf[\s-]?33\b/i.test(n.trim());
   };
   const planned: DocumentPlanEntry[] = entries.map((e) => ({
     ...e,
@@ -194,8 +210,19 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   }));
   // FA-119: tier primary (work statement promoted above generic attachments),
   // size-ascending tie-break within tier, name last for determinism.
+  // FA-E2E re-verify Fix C: within the form tier, prefer the file whose name
+  // contains the sol number or "Solicitation" as THE form, so a strong primary
+  // wins over an incidental SF-30 amendment that also cleared isForm.
+  const formStrength = (e: DocumentPlanEntry): number => {
+    if (e.role !== "form") return 0;
+    const nn = norm(e.name);
+    if (solNorm && nn.includes(solNorm)) return 2;
+    if (/\bsolicitation\b/i.test(e.name)) return 1;
+    return 0;
+  };
   return planned.sort((a, b) =>
     documentTier(a) - documentTier(b) ||
+    formStrength(b) - formStrength(a) ||
     (a.sizeBytes ?? Infinity) - (b.sizeBytes ?? Infinity) ||
     a.name.localeCompare(b.name)
   );
