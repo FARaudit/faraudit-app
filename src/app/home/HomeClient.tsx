@@ -77,7 +77,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // FA-89 Opportunities tab filters
   const [oppSearch, setOppSearch] = useState("");
   const [oppSetAside, setOppSetAside] = useState<string>("All");
-  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "watched">("active");
+  const [oppDeadline, setOppDeadline] = useState<"active" | "all" | "<=3" | "<=7" | "<=30" | "expired" | "saved">("active");
   const [oppValue, setOppValue] = useState<string>("all");
   const [oppSort, setOppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "signal", dir: "asc" });
   // FA-89i: collapsible filter bar + per-row hover state for action overflow.
@@ -88,6 +88,12 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // in Pipeline →" link for ~2s after a successful pin, then revert to the
   // normal "Pinned" label.
   const [pinConfirmedAt, setPinConfirmedAt] = useState<Record<string, number>>({});
+  // Phase 5 item 3: one-shot flag set by the hash-apply effect when arriving via
+  // the /watching → /home#opportunities=saved redirect (or a #saved deep link).
+  // The Opportunities reset-on-tab effect consumes it once to land on the Saved
+  // filter instead of the default "active" filter, then clears it so subsequent
+  // tab visits behave normally.
+  const savedDeepLinkRef = useRef(false);
   // Mount-gate: SSR + first client paint both render null, then hydration completes
   // and the real UI mounts. Eliminates React hydration mismatch from bare `new Date()`
   // / `Date.now()` calls in render path (enrichRow, hoursUntilNextSamIngest, and the
@@ -113,7 +119,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // prior visit (which often hid the seeded demo rows behind a forgotten chip).
   useEffect(() => {
     if (tab === "opportunities") {
-      setOppDeadline("active");
+      setOppDeadline(savedDeepLinkRef.current ? "saved" : "active");
+      savedDeepLinkRef.current = false;
       setOppSearch("");
       setOppSetAside("All");
       setOppValue("all");
@@ -141,6 +148,14 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (typeof window === "undefined") return;
     const apply = () => {
       const raw = window.location.hash.replace("#", "");
+      // Phase 5 item 3: /watching redirects here. "opportunities=saved" (and the
+      // bare "saved" alias) open the Opportunities tab pre-filtered to Saved.
+      if (raw === "opportunities=saved" || raw === "saved") {
+        savedDeepLinkRef.current = true;
+        window.history.replaceState(null, "", "#opportunities=saved");
+        setTabState("opportunities");
+        return;
+      }
       // Legacy hash → new hash (silent rewrite, preserves bookmarks).
       if (raw && raw in LEGACY_HASH_MAP) {
         const next = LEGACY_HASH_MAP[raw];
@@ -295,7 +310,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
     if (oppDeadline === "<=7")     rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 7);
     if (oppDeadline === "<=30")    rows = rows.filter((r) => r.daysNum != null && r.daysNum >= 0 && r.daysNum <= 30);
     if (oppDeadline === "expired") rows = rows.filter((r) => r.daysNum != null && r.daysNum < 0);
-    if (oppDeadline === "watched") rows = rows.filter((r) => r.row.watched === true);
+    if (oppDeadline === "saved")   rows = rows.filter((r) => r.row.watched === true);
     if (oppValue === "<100k")     rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling < 100000);
     if (oppValue === "100k-500k") rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling >= 100000 && r.row.award_ceiling <= 500000);
     if (oppValue === "500k-1m")   rows = rows.filter((r) => r.row.award_ceiling != null && r.row.award_ceiling > 500000 && r.row.award_ceiling <= 1000000);
@@ -865,7 +880,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         ["<=7", "≤ 7 Days"],
                         ["<=30", "≤ 30 Days"],
                         ["expired", "Expired"],
-                        ["watched", "Watched"]
+                        ["saved", "Saved"]
                       ] as const).map(([val, lbl]) => {
                         const active = oppDeadline === val;
                         return (
@@ -998,7 +1013,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                         setTab("audit");
                       };
 
-                      const togglePatch = async (field: "in_pipeline" | "watched") => {
+                      const togglePatch = async (field: "in_pipeline" | "watched"): Promise<boolean> => {
                         const next = !r.row[field];
                         updateOpportunity(r.row.notice_id, { [field]: next });
                         // FA-89h: in_pipeline now routes through dedicated pin/unpin
@@ -1034,7 +1049,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                               }
                             }
                             updateOpportunity(r.row.notice_id, { [field]: !next });
-                            return;
+                            return false;
                           }
                           // FA-89i FIX 5: refresh page Server Component so the
                           // Pipeline Kanban picks up the new/removed stub audit
@@ -1056,8 +1071,24 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                               });
                             }, 2000);
                           }
+                          return true;
                         } catch {
                           updateOpportunity(r.row.notice_id, { [field]: !next });
+                          return false;
+                        }
+                      };
+                      // Phase 5 item 3 — "Move to Pipeline" for a Saved row. Reuses the
+                      // EXISTING pin saga (togglePatch("in_pipeline") → POST /api/opportunities/
+                      // [notice_id]/pin, which flips pending_audits.in_pipeline and creates the
+                      // stub audits row the Pipeline Kanban renders), then drops the Saved flag
+                      // so the item "moves" out of Saved into the Pipeline. Only un-saves if the
+                      // pin actually stuck; on a failed pin togglePatch rolls its own optimistic
+                      // state back and we leave the row in Saved untouched.
+                      const moveSavedToPipeline = async () => {
+                        if (r.row.in_pipeline === true) return;
+                        const pinned = await togglePatch("in_pipeline");
+                        if (pinned && r.row.watched === true) {
+                          await togglePatch("watched");
                         }
                       };
                       const isJustPinned = pinConfirmedAt[r.row.notice_id] != null && Date.now() - pinConfirmedAt[r.row.notice_id] < 2000;
@@ -1125,8 +1156,18 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                   onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
                                   style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: watched ? "rgba(245,158,11,.14)" : "transparent", color: watched ? "var(--amber)" : "var(--t60)", border: `1px solid ${watched ? "rgba(245,158,11,.5)" : "var(--border2)"}`, opacity: showWatch ? 1 : 0, pointerEvents: showWatch ? "auto" : "none", transition: "opacity .15s" }}
                                 >
-                                  {watched ? "Watching" : "Watch"}
+                                  {watched ? "Saved" : "Save"}
                                 </button>
+                                {watched && !pinned && !isJustPinned && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); moveSavedToPipeline(); }}
+                                    style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: "transparent", color: "var(--blue)", border: "1px solid rgba(96,165,250,.5)", opacity: isHovered || watched ? 1 : 0, pointerEvents: isHovered || watched ? "auto" : "none", transition: "opacity .15s", whiteSpace: "nowrap" }}
+                                    title="Move this saved opportunity into the Pipeline"
+                                  >
+                                    → Pipeline
+                                  </button>
+                                )}
                                 {isJustPinned ? (
                                   <a
                                     href="/home#pipeline"
