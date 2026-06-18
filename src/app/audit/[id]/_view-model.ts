@@ -107,6 +107,12 @@ export interface AuditViewModel {
   agency_sub: string;
   naics: string;
   naics_sub: string;
+  // FA-E2E Fix 5 (2026-06-18): true only when the NAICS was read from the SOURCE
+  // document (v2Meta.naics_code / extractNaicsFromText), false when it came only
+  // from SAM metadata. Drives the masthead provenance chip so a SAM-injected
+  // code is never falsely badged "Extracted" (AOCSSB: "561210 — Extracted" on a
+  // Legislative-Branch sol that states no NAICS).
+  naics_from_source: boolean;
   set_aside: string;
   set_aside_sub: string;
   contract_type: string;
@@ -2656,10 +2662,18 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code "(AO)") across 5 independent runs while SAM's hierarchy says
     // "DLA AVIATION AT OKLAHOMA CITY". Doc-read strings may appear only via
     // the labeled issuing·end-user pair or when SAM has nothing.
-    agency: officeLeaf || (formatIssuingEndUser(cleanAgencyDisplay(v2Meta?.agency), audit.agency) ?? validatedAgency(cleanAgencyDisplay(v2Meta?.agency), audit.agency, v2Meta?.agency)),
+    // FA-E2E Fix 5 (2026-06-18): the masthead must never read "—" / "Not in
+    // documents" while the body names the agency. The engine extracts the
+    // buying agency deterministically into v2Meta.agency (facts.issuingOffice
+    // via extractAgencyFromText / SF face-page) AND the overview's `customer`
+    // field carries the printed agency name. Add overviewJson.customer as the
+    // last deterministic fallback so a SAM-provenance gap can't blank a name the
+    // document plainly states (HM047626: masthead blank while body said NGA).
+    agency: officeLeaf || (formatIssuingEndUser(cleanAgencyDisplay(v2Meta?.agency), audit.agency) ?? validatedAgency(cleanAgencyDisplay(v2Meta?.agency), audit.agency, v2Meta?.agency, cleanAgencyDisplay(overviewJson.customer))),
     agency_sub: officeLeaf ? topHierarchyAgency : "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
+    naics_from_source: typeof v2Meta?.naics_code === "string" && (v2Meta.naics_code as string).trim().length > 0,
     // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
     // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
     // column. Doc text overrides metadata — masthead must show what the

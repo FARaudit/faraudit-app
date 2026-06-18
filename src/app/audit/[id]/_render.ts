@@ -848,6 +848,22 @@ function stripHandoffComment(html: string): string {
   );
 }
 
+// FA-E2E Fix 5 (2026-06-18): strip leaked DEVELOPER / IMPLEMENTATION HTML
+// comments from the shipped report. The design template documents the renderer
+// wiring inline ("renderIncumbentBranch() in _render.ts", ".cmx-row repeater",
+// "← matrix_rollup.reference_count", "for harness probing", "Repeater: …",
+// "Renderer rebuilds inner."). These don't render visibly but ship in every
+// response and leak the internal schema + code structure via View-Source / the
+// PDF source. We remove only comments that reference code internals so genuine
+// content comments (and the PRELIMINARY-READ anchor consumed earlier in the
+// pipeline) are untouched. Runs AFTER all comment-anchored passes.
+function stripDevComments(html: string): string {
+  // Marker tokens that identify a comment as developer-only implementation
+  // detail rather than customer-facing content.
+  const devMarkers = /_render\.ts|repeater|Renderer\b|matrix_rollup|harness\s+prob|data-field|data-bucket|reviewer aid|data-state=|post hero-dedup|Renderer rebuilds/i;
+  return html.replace(/<!--[\s\S]*?-->/g, (m) => (devMarkers.test(m) ? "" : m));
+}
+
 // ─── breadcrumb + page <title> ──────────────────────────────────────────────
 
 function setPageTitle(html: string, title: string): string {
@@ -2426,6 +2442,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
 
   // Dev-only HANDOFF block — not for the wire.
   html = stripHandoffComment(html);
+  // FA-E2E Fix 5: strip leaked developer/implementation comments (code-internal
+  // references, repeater notes, "for harness probing") so they never ship.
+  html = stripDevComments(html);
 
   // Reviewer-only controls (Preview State toggle + Metadata case cycler) —
   // bottom-left of the design template, must not ship to prod.
@@ -2701,6 +2720,13 @@ export function renderHeaderSourceChips(html: string, vm: AuditViewModel): strin
       out = out.replace(chipRe, "");
     } else if (f.verifyHint) {
       out = out.replace(chipRe, `<span class="src-chip verify" data-field="${f.key}_source">${infoSvg}${f.verifyHint}</span>`);
+    } else if (f.key === "naics" && !vm.naics_from_source) {
+      // FA-E2E Fix 5 (2026-06-18): the NAICS is present but came from SAM
+      // metadata, NOT the source document. Badging it "Extracted" is a
+      // fabrication (AOCSSB: "561210 — Extracted" on a Legislative-Branch sol
+      // that states no NAICS). Show an honest "SAM metadata · verify" chip so
+      // the reader knows it wasn't read from the document.
+      out = out.replace(chipRe, `<span class="src-chip verify" data-field="${f.key}_source">${infoSvg}SAM metadata &middot; verify</span>`);
     } else {
       out = out.replace(chipRe, `<span class="src-chip" data-field="${f.key}_source">${docSvg}Extracted</span>`);
     }
