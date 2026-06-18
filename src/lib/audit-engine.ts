@@ -4122,15 +4122,47 @@ export async function runAuditV2(
       // Strong work-statement name signals only (full phrases + boundaried
       // abbreviations) — never anchor on a stray "SOW"/"PWS" clause reference.
       const WS_NAME = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|project\s*description|scope\s*of\s*work/i;
+      // FA-E2E Fix 4 (2026-06-18): also detect a work statement by its BODY
+      // STRUCTURE, not only the attachment filename. A §C SOW inside the main
+      // form, or a SOW/PWS/SOO attachment with an off-pattern name (e.g.
+      // "Attachment 1.pdf"), was never promoted → classifier returned UNKNOWN
+      // while the SOW was ingested and quoted. The body of a real work statement
+      // carries dense imperative/structural signals: "the contractor shall",
+      // titled SOW/PWS/SOO headings, "scope of work", numbered task sections.
+      // We require MULTIPLE distinct signals so a stray mention can't promote a
+      // non-work-statement attachment.
+      const wsBodySignals = (body: string): number => {
+        let n = 0;
+        if (/\b(the\s+)?contractor\s+shall\b/i.test(body)) n++;
+        if (/(performance\s*work\s*statement|statement\s*of\s*work|statement\s*of\s*objectives?|scope\s*of\s*work)/i.test(body)) n++;
+        if (/\b(?:1\.0|2\.0|3\.0|section\s+[1-9])\b[\s\S]{0,80}(scope|background|requirements?|tasks?|objectives?|performance)/i.test(body)) n++;
+        if (/\b(tasks?|deliverables?|period\s+of\s+performance|place\s+of\s+performance)\b/i.test(body) && /\bshall\b/i.test(body)) n++;
+        return n;
+      };
+      const hasWsBody = (body: string): boolean => wsBodySignals(body) >= 2;
+
       // split → [formText, name1, body1, name2, body2, ...]
       const parts = doc.rawText.split(/\n\n=== ATTACHMENT DOCUMENT: (.+?) \(sam_attachment\) ===\n\n/);
       for (let i = 1; i + 1 < parts.length; i += 2) {
-        if (WS_NAME.test(parts[i])) {
-          const body = parts[i + 1].trim();
-          if (body.length >= 100) {
-            facts.workStatementText = body.slice(0, 4000);
-            break;
-          }
+        const body = parts[i + 1].trim();
+        // Promote when EITHER the filename matches a WS pattern OR the body
+        // itself reads as a work statement. (Filename match keeps the original
+        // 100-char floor; body match needs more substance to avoid false hits.)
+        const byName = WS_NAME.test(parts[i]) && body.length >= 100;
+        const byBody = body.length >= 400 && hasWsBody(body);
+        if (byName || byBody) {
+          facts.workStatementText = body.slice(0, 4000);
+          break;
+        }
+      }
+
+      // FA-E2E Fix 4: §C SOW inside the main form. extractScope reads §C but
+      // returns short on dense/odd layouts; if §C still carries a structural
+      // work statement, use it directly rather than leaving the type UNKNOWN.
+      if (!facts.workStatementText || facts.workStatementText.length < 200) {
+        const sectionCText = sectionBag.sections["C"]?.text ?? "";
+        if (sectionCText.length >= 400 && hasWsBody(sectionCText)) {
+          facts.workStatementText = sectionCText.slice(0, 4000);
         }
       }
     }

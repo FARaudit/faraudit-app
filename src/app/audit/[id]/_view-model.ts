@@ -2176,6 +2176,22 @@ function deriveWorkStatementReveal(audit: AuditRow): {
     };
   }
 
+  // FA-E2E Fix 4 (2026-06-18): never tell the user to "upload the SOW/PWS
+  // attachment" when ingestion meta shows a SOW / §C attachment WAS ALREADY
+  // ingested. Doing so contradicts the "N/N files ingested" banner and reads as
+  // a bug. Detect from compliance_json.ingestion.files[]: an ingested file whose
+  // section_roles include "C" or whose name matches a work-statement pattern.
+  const ingestion = (audit.compliance_json as Record<string, unknown> | null)?.ingestion as
+    | { files?: Array<{ name?: string; ingested?: boolean; section_roles?: string[] }> }
+    | null
+    | undefined;
+  const WS_FILE_RE = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|scope\s*of\s*work/i;
+  const sowOrSectionCIngested = Array.isArray(ingestion?.files) &&
+    ingestion.files.some((f) =>
+      f && f.ingested !== false &&
+      ((Array.isArray(f.section_roles) && f.section_roles.includes("C")) ||
+       (typeof f.name === "string" && WS_FILE_RE.test(f.name))));
+
   // Unknown amber variant — fires on RFP/RFQ/IFB/Other/null. Reads as rigor.
   return {
     work_statement: null,
@@ -2183,7 +2199,11 @@ function deriveWorkStatementReveal(audit: AuditRow): {
       head: "Work-statement type not classified from the parsed body",
       reason:
         "The governing work statement (SOW / PWS / SOO) wasn't located in the body FARaudit parsed for this notice. It likely lives in an <b>attachment</b> — a separate SOW PDF, a §C narrative document, or a CDRL/DID supplement that isn't part of the main solicitation file. SOW vs PWS changes your entire bid posture (method-led vs outcome-led), so FARaudit reports this as <b>tentative</b> rather than guessing.",
-      action: "<b>Upload the SOW/PWS attachment to classify it.</b> The work-statement type is the single highest-leverage call in your bid strategy — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
+      // When the SOW/§C was already ingested, the document is present — the type
+      // just couldn't be auto-classified — so the move is to review, not upload.
+      action: sowOrSectionCIngested
+        ? "<b>Confirm the work-statement type against the ingested §C / SOW document.</b> SOW vs PWS decides your bid posture (method-led vs outcome-led); the document is on file — FARaudit reports the type as tentative rather than guessing it."
+        : "<b>Upload the SOW/PWS attachment to classify it.</b> The work-statement type is the single highest-leverage call in your bid strategy — it decides whether you propose a method (SOW) or propose to outcomes (PWS/SOO).",
     },
   };
 }
