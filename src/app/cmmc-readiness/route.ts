@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export async function GET() {
   if (!user) redirect("/sign-in?next=/cmmc-readiness");
 
   const filePath = path.join(process.cwd(), "public", "cmmc-readiness.html");
-  const html = await readFile(filePath, "utf8");
+  let html = await readFile(filePath, "utf8");
+
+  html = injectRail(html, "cmmc");
 
   return new Response(html, {
     headers: {

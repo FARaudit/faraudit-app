@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,9 @@ export async function GET() {
     "public",
     "defense-spending.html"
   );
-  const html = await readFile(filePath, "utf8");
+  let html = await readFile(filePath, "utf8");
+
+  html = injectRail(html, "defense-intel");
 
   return new Response(html, {
     headers: {

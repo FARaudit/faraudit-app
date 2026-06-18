@@ -15,6 +15,7 @@ import { redirect } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export async function GET() {
     "public",
     "run-audit.html"
   );
-  const html = await readFile(filePath, "utf8");
+  let html = await readFile(filePath, "utf8");
+
+  html = injectRail(html, "run-audit");
 
   return new Response(html, {
     headers: {
