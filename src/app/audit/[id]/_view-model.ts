@@ -2159,12 +2159,38 @@ function deriveWorkStatementReveal(audit: AuditRow): {
   // V2 render overlay then re-fills the same block idempotently. Falls through to
   // the V1 document_type logic only when no V2 shadow exists (legacy/metadata
   // audits) — that path is unchanged.
+  // FA-E2E re-verify Fix B (2026-06-18): compute the ingestion-aware suppression
+  // signal BEFORE the V2 branch. Fix 4 (the V1-only version below) lived AFTER
+  // the early V2 return, so V2 audits that classified the work-statement as
+  // "unknown" still told the user to "Upload the SOW" even when a §C / SOW / PWS
+  // was already ingested — contradicting the "N/N ingested" banner.
+  const ingestion = (audit.compliance_json as Record<string, unknown> | null)?.ingestion as
+    | { files?: Array<{ name?: string; ingested?: boolean; section_roles?: string[] }> }
+    | null
+    | undefined;
+  const WS_FILE_RE = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|scope\s*of\s*work/i;
+  const sowOrSectionCIngested = Array.isArray(ingestion?.files) &&
+    ingestion.files.some((f) =>
+      f && f.ingested !== false &&
+      ((Array.isArray(f.section_roles) && f.section_roles.includes("C")) ||
+       (typeof f.name === "string" && WS_FILE_RE.test(f.name))));
+
   const v2Surfaces = ((audit.compliance_json as Record<string, unknown> | null)?.v2_shadow as Record<string, unknown> | null)?.surfaces as Record<string, unknown> | undefined;
   if (v2Surfaces) {
     const v2Known = (v2Surfaces.work_statement as AuditViewModel["work_statement"]) ?? null;
     const v2Unknown = (v2Surfaces.work_statement_unknown as AuditViewModel["work_statement_unknown"]) ?? null;
     if (v2Known) return { work_statement: v2Known, work_statement_unknown: null };
-    if (v2Unknown) return { work_statement: null, work_statement_unknown: v2Unknown };
+    if (v2Unknown)
+      return {
+        work_statement: null,
+        work_statement_unknown: sowOrSectionCIngested
+          ? {
+              ...v2Unknown,
+              head: "Work-statement type not classified from the parsed body",
+              action: "<b>Confirm the work-statement type against the ingested §C / SOW document.</b>",
+            }
+          : v2Unknown,
+      };
   }
 
   const docType = String(audit.document_type ?? "").trim();
@@ -2187,21 +2213,10 @@ function deriveWorkStatementReveal(audit: AuditRow): {
     };
   }
 
-  // FA-E2E Fix 4 (2026-06-18): never tell the user to "upload the SOW/PWS
-  // attachment" when ingestion meta shows a SOW / §C attachment WAS ALREADY
-  // ingested. Doing so contradicts the "N/N files ingested" banner and reads as
-  // a bug. Detect from compliance_json.ingestion.files[]: an ingested file whose
-  // section_roles include "C" or whose name matches a work-statement pattern.
-  const ingestion = (audit.compliance_json as Record<string, unknown> | null)?.ingestion as
-    | { files?: Array<{ name?: string; ingested?: boolean; section_roles?: string[] }> }
-    | null
-    | undefined;
-  const WS_FILE_RE = /performance\s*work\s*statement|statement\s*of\s*(work|objectives?|need)|\bPWS\b|\bSOW\b|\bSOO\b|scope\s*of\s*work/i;
-  const sowOrSectionCIngested = Array.isArray(ingestion?.files) &&
-    ingestion.files.some((f) =>
-      f && f.ingested !== false &&
-      ((Array.isArray(f.section_roles) && f.section_roles.includes("C")) ||
-       (typeof f.name === "string" && WS_FILE_RE.test(f.name))));
+  // FA-E2E Fix 4 (2026-06-18) + re-verify Fix B: ingestion-aware suppression
+  // signal (ingestion / WS_FILE_RE / sowOrSectionCIngested) is now hoisted above
+  // the V2 branch so both paths share it. Never tell the user to "upload the
+  // SOW/PWS attachment" when a SOW / §C attachment was ALREADY ingested.
 
   // Unknown amber variant — fires on RFP/RFQ/IFB/Other/null. Reads as rigor.
   return {

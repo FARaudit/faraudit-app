@@ -4156,7 +4156,18 @@ export async function runAuditV2(
   // "PWS"-named attachment would mis-classify it. naicsCode is read AFTER
   // bindExternalFacts (SAM-filled), so the guard is reliable. Protects the
   // gyroscope (336413) and every similar supply buy → they stay honestly UNKNOWN.
-  if (!facts.workStatementText || facts.workStatementText.length < 200) {
+  // FA-E2E re-verify Fix B (2026-06-18): the promotion guard formerly skipped the
+  // whole block when workStatementText was a short-but-nonempty stub (>=200 chars
+  // but not a real work statement). Also enter the block when the ingested §C body
+  // itself reads as a work statement, so a real §C SOW is promoted over a stub.
+  const _sectionCBody = sectionBag.sections["C"]?.text ?? "";
+  const _sectionCLooksLikeWs = _sectionCBody.length >= 400 &&
+    [
+      /\b(the\s+)?contractor\s+shall\b/i,
+      /(performance\s*work\s*statement|statement\s*of\s*work|statement\s*of\s*objectives?|scope\s*of\s*work)/i,
+      /\b(?:1\.0|2\.0|3\.0|section\s+[1-9])\b[\s\S]{0,80}(scope|background|requirements?|tasks?|objectives?|performance)/i,
+    ].filter((re) => re.test(_sectionCBody)).length >= 2;
+  if (!facts.workStatementText || facts.workStatementText.length < 200 || _sectionCLooksLikeWs) {
     const isManufacturingSupply = /^3[123]/.test(facts.naicsCode ?? "");
     if (!isManufacturingSupply) {
       // Strong work-statement name signals only (full phrases + boundaried
@@ -4199,8 +4210,12 @@ export async function runAuditV2(
       // FA-E2E Fix 4: §C SOW inside the main form. extractScope reads §C but
       // returns short on dense/odd layouts; if §C still carries a structural
       // work statement, use it directly rather than leaving the type UNKNOWN.
-      if (!facts.workStatementText || facts.workStatementText.length < 200) {
-        const sectionCText = sectionBag.sections["C"]?.text ?? "";
+      // Promote when §C still carries a structural work statement — including the
+      // case where workStatementText is a short-but-nonempty stub the body scan
+      // above did not replace (re-verify Fix B).
+      const sectionCText = sectionBag.sections["C"]?.text ?? "";
+      if ((!facts.workStatementText || facts.workStatementText.length < 200) ||
+          (sectionCText.length >= 400 && hasWsBody(sectionCText))) {
         if (sectionCText.length >= 400 && hasWsBody(sectionCText)) {
           facts.workStatementText = sectionCText.slice(0, 4000);
         }
