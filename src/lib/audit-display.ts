@@ -115,3 +115,21 @@ export function auditHref(a: { id: string; solicitation_number?: string | null }
   }
   return `/audit/${a.id}`;
 }
+
+// ── V2 "finalizing" window (FA-E2E re-verify Fix D, 2026-06-18) ──────────────
+// The executor marks an audit complete as soon as the core (V1) report is ready,
+// then runs the V2 agentic layer for ~2-3 min and merges it into
+// compliance_json.v2_shadow (flipping analysis_phase → "done"). Shared so the
+// page route, the PDF proxy, and the export-disable logic all agree on the same
+// finalizing window. Factored out of src/app/audit/[id]/route.ts.
+export const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop waiting if V2 stalls
+
+export function isV2Finalizing(audit: Record<string, unknown>): boolean {
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  if (comp.v2_shadow) return false; // agentic layer already landed → full report
+  if (comp.analysis_phase !== "finalizing") return false; // arm with no V2 to wait for
+  const completedRaw = audit.completed_at ? String(audit.completed_at) : "";
+  const completedMs = completedRaw ? Date.parse(completedRaw) : NaN;
+  if (!Number.isFinite(completedMs)) return false;
+  return Date.now() - completedMs < V2_FINALIZING_MAX_MS; // within the live window
+}

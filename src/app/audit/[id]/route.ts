@@ -13,6 +13,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
 import { renderAuditTransitionalState } from "./_render-states";
+import { isV2Finalizing } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,17 +51,9 @@ const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 // compliance_json.v2_shadow (flipping analysis_phase → "done"). During that
 // window the report is shown immediately with a banner + auto-refresh so the
 // deep-analysis sections stream in, instead of gating the whole report on V2.
-const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop refreshing if V2 stalls
-
-function isV2Finalizing(audit: Record<string, unknown>): boolean {
-  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
-  if (comp.v2_shadow) return false; // agentic layer already landed → full report
-  if (comp.analysis_phase !== "finalizing") return false; // arm with no V2 to wait for
-  const completedRaw = audit.completed_at ? String(audit.completed_at) : "";
-  const completedMs = completedRaw ? Date.parse(completedRaw) : NaN;
-  if (!Number.isFinite(completedMs)) return false;
-  return Date.now() - completedMs < V2_FINALIZING_MAX_MS; // within the live window
-}
+// isV2Finalizing + V2_FINALIZING_MAX_MS now live in @/lib/audit-display so the
+// page route, the PDF proxy, and the export-disable logic share one definition
+// (FA-E2E re-verify Fix D).
 
 // Injects the auto-refresh + a slim board-room "finalizing" banner. Web-only:
 // the PDF route never calls this, so exported PDFs stay clean. Styles are inline
@@ -83,6 +76,36 @@ function injectFinalizingState(html: string): string {
   out = /<body[^>]*>/i.test(out)
     ? out.replace(/(<body[^>]*>)/i, `$1${banner}`)
     : `${banner}${out}`;
+  return out;
+}
+
+// FA-E2E re-verify Fix D (2026-06-18): while the report is still finalizing,
+// disable the Export action so the user can't pull a half-complete PDF. We
+// transform the existing Export anchor in place — strip its href, mark it
+// aria-disabled, swap the sub-label to "Finalizing analysis…", and inject a
+// style so it reads + behaves as not-yet-ready. Web-only (the PDF route never
+// calls this), so exported PDFs are unaffected.
+function disableExportWhileFinalizing(html: string): string {
+  let out = html;
+  out = out.replace(
+    /(<a\b[^>]*\bdata-field=["']pdf_export_url["'][^>]*>)/i,
+    (tag) => {
+      let t = tag;
+      t = t.replace(/\shref=("[^"]*"|'[^']*')/i, "");
+      if (!/aria-disabled=/i.test(t)) t = t.replace(/>$/, ' aria-disabled="true">');
+      return t;
+    }
+  );
+  // Swap the Export control's sub-label (.a-s) to the finalizing copy, leaving
+  // the .a-t title ("Export PDF") intact.
+  out = out.replace(
+    /(<a\b[^>]*\bdata-field=["']pdf_export_url["'][\s\S]*?<span class="a-s">)([\s\S]*?)(<\/span>)/i,
+    (_m, pre, _label, close) => `${pre}Finalizing analysis…${close}`
+  );
+  const style =
+    `<style>[data-field="pdf_export_url"][aria-disabled="true"]` +
+    `{pointer-events:none;opacity:.55;cursor:not-allowed}</style>`;
+  out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
   return out;
 }
 
@@ -186,6 +209,7 @@ export async function GET(
   // the report is never stuck refreshing.
   if (isV2Finalizing(audit)) {
     html = injectFinalizingState(html);
+    html = disableExportWhileFinalizing(html);
   }
 
   return new Response(html, {
