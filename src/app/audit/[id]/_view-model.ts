@@ -505,8 +505,13 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
   const eligible = valid.filter((e) => !DEADLINE_EXCLUDE_RE.test(e.label));
   const submission = eligible.filter((e) => DEADLINE_SUBMISSION_RE.test(e.label) || DEADLINE_SUBMISSION_RE.test(e.date));
   const pool = submission.length > 0 ? submission : eligible;
-  if (pool.length === 0) return null; // only interim/post-award dates -> never close on those
-  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
+  // FA-E2E re-verify Fix A (2026-06-18): when the exclude-filter empties the
+  // pool (every parsed date matched an interim/post-award label), do NOT return
+  // null — falling back to null lets the stale SAM date take over and flip an
+  // OPEN sol to closed (HM047626R0039). Instead fall back to the LATEST of all
+  // valid parsed dates so the source still controls open/closed.
+  const resolvePool = pool.length > 0 ? pool : valid;
+  return resolvePool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), resolvePool[0].d);
 }
 
 function fmtMonYear(d: Date | null): string {
@@ -2418,9 +2423,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const sourceOfferDue = parseSourceOfferDue(compJson.deadlines);
   const responseDeadline = sourceOfferDue ?? samResponseDeadline;
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
-  // FA-107: solicitation is closed when the CONTROLLING offer-due deadline is
-  // in the past (now recomputed from the source date when it wins over SAM).
-  const is_expired: boolean = responseDays !== null && responseDays < 0;
+  // FA-107 + FA-E2E re-verify Fix A (2026-06-18): solicitation is closed when
+  // the CONTROLLING offer-due deadline is in the past. When the SOURCE carries
+  // an offer-due date, it governs open/closed. When it does NOT (parse returned
+  // null), a BARE stale SAM date must not be allowed to close an OPEN sol —
+  // only let SAM close it when SAM has no structured deadlines[] to contradict
+  // it. False-open is the safe failure mode.
+  const is_expired: boolean = sourceOfferDue != null
+    ? daysBetween(now, sourceOfferDue) < 0
+    : (samResponseDeadline != null && daysBetween(now, samResponseDeadline) < 0 && !Array.isArray(compJson.deadlines));
   // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
   // scope by the time `score` is computed.)
   const qaDeadlineDate = parseDate(audit.qa_deadline) ?? parseDate(compJson.qa_deadline);
