@@ -1503,7 +1503,19 @@ function renderGateConditions(
   conditions: Array<{ title: string; context: string; citation: string; blocker_note: string }>,
   gateModeActive: boolean
 ): string {
-  if (!gateModeActive || conditions.length === 0) return html;
+  if (!gateModeActive || conditions.length === 0) {
+    // No real gate applies to THIS solicitation. The template ships the gate
+    // shells with HARDCODED DoD demo tiles (SPRS / JCP / CAGE / an H-60 part
+    // number) as design mock content. If we leave them and the client reveals
+    // the gate (score_locked → applyVerdictMode('gate')), that fabricated
+    // defense content ships on a non-defense report. The prior element-removal
+    // (removeElementByOpenRe) missed the nested .mhv-gates, so the demo leaked.
+    // CLEARING the inner content is nesting-proof and guarantees nothing fake
+    // can render — empty containers show nothing.
+    let cleared = setInnerByClass(html, "mhv-gates", "div", "");
+    cleared = setInnerByClass(cleared, "g-rows", "div", "");
+    return cleared;
+  }
   // Masthead .mhv-gates — preserves the cap "<p class='mhv-gates-cap'>" prelude.
   const mhvCap = `<p class="mhv-gates-cap">Bid only if — all true today</p>`;
   const mhvRows = conditions
@@ -2435,10 +2447,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeElementByOpenRe(html, /<div class="gate-card"[^>]*>/, "div");
     html = removeElementByOpenRe(html, /<div class="mhv-gates"[^>]*>/, "div");
   }
-  // FA-108: also trigger gate-mode suppression when score_locked (no capability
-  // statement on file). The numeric tile gets hidden the same way as DECISION_GATE
-  // verdicts; CTA tile-replacement copy lands in a follow-up commit.
-  if (gateModeActive) {
+  // Reveal gate-mode (applyVerdictMode('gate') → adds .is-gate, swaps the score
+  // tiles for the gate) ONLY when there are real gate conditions to show. Without
+  // this guard a score_locked report with zero gates would reveal an EMPTY gate
+  // box AND hide the score — and, before the clear above, leak the hardcoded DoD
+  // demo tiles. With no real gates we keep the score tiles (their unscored
+  // win-probability honesty markers already handle the score_locked case).
+  if (gateModeActive && vm.gate_conditions.length > 0) {
     html = injectVerdictModeCall(html);
   }
   // FA-129 — CEO ruling: a NO-BID verdict is final. The interactive bid-gate

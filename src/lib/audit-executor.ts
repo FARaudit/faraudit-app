@@ -212,6 +212,12 @@ export async function executeAudit(
         };
         const factCols: Record<string, unknown> = { set_aside: resolvedSetAside };
         if (samFacts.naicsCode) factCols.naics_code = samFacts.naicsCode;
+        // The masthead subject is a FACT too — SAM's official title (e.g.
+        // "Facilities Management, Maintenance and Support Services") beats both the
+        // upload filename and the AI's summary sentence. Only overwrites the
+        // filename-derived upload title (this whole block is gated to fact-missing
+        // upload runs), so a real SAM-fetched title is never disturbed.
+        if (samFacts.title && samFacts.title.trim()) factCols.title = samFacts.title.trim();
         if (samFacts.responseDeadLine) factCols.response_deadline = samFacts.responseDeadLine;
         if ((!input.agency || !String(input.agency).trim() || /^unknown$/i.test(String(input.agency).trim())) && samAgency) {
           factCols.agency = samAgency;
