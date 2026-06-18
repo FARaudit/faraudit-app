@@ -2214,6 +2214,41 @@ export function derivePriorityFromFinding(category: RiskFinding["category"], cit
 // always re-derived from text content (DOCUMENT_ANCHOR_RE) — the model's
 // self-tag was removed from the Cycle-2 prompt entirely, so this is the
 // only authoritative source.
+// FA-E2E Fix 1 (2026-06-18) - derive an AI-driven severity score (0-10) from
+// the structured risks the model already returns, instead of the frozen
+// constant 5 that made the composite score track clause count, not substance.
+//
+// FORMULA (calibrated, documented):
+//   start at 0
+//   + 4 per Disqualification / P0 risk   (these gate or near-gate award)
+//   + 2 per detected DFARS trap          (well-known trap clauses w/ real cost)
+//   + 1 per P1 risk                      (material but non-gating obligations)
+//   + 0.5 per P2 risk                    (context/awareness items)
+//   clamp to 0..10, round to nearest integer.
+//
+// Calibration intent (severity x 5 is the score's risk penalty downstream):
+//   - clean set-aside, no traps, only a couple P2 context items -> severity 0-2
+//     -> riskPenalty 0-10 -> high score (PROCEED).
+//   - several P0 disqualifiers + multiple traps -> severity 8-10
+//     -> riskPenalty 40-50 -> low score (DECLINE).
+// P0 and P1 are deduped from the same risk list, so a disqualifier counts as a
+// P0 (4) not also a P1 - the priority buckets are mutually exclusive per risk.
+export function deriveSeverityScore(
+  prioritized: PrioritizedRisk[],
+  dfarsFlags: DFARSFlag[] | undefined
+): number {
+  const risks = Array.isArray(prioritized) ? prioritized : [];
+  const isDisqualifier = (r: PrioritizedRisk) =>
+    r.priority === "P0" || /disqualif|no[-\s]?bid|sole[-\s]?source/i.test(r.category || "");
+  const p0Count = risks.filter(isDisqualifier).length;
+  const p1Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P1").length;
+  const p2Count = risks.filter((r) => !isDisqualifier(r) && r.priority === "P2").length;
+  const trapCount = (dfarsFlags ?? []).filter((f) => f.detected).length;
+
+  const raw = p0Count * 4 + trapCount * 2 + p1Count * 1 + p2Count * 0.5;
+  return Math.max(0, Math.min(10, Math.round(raw)));
+}
+
 export function mapFindingToPrioritized(f: RiskFinding): PrioritizedRisk {
   const hasAnchor = DOCUMENT_ANCHOR_RE.test(f.text);
   return {
@@ -2825,19 +2860,31 @@ JSON only — one key: risk_findings.`;
   //   penalty at 40 and call-3's modal severity is 5 → score 35 recurs.
   //   The number is computed, not fabricated; on DECISION_GATE audits every
   //   surface suppresses it ("—") because gates, not the score, decide.
+  // farCount / dfarsCount remain declared for later use (summary line + the
+  // "real solicitation always cites some clauses" not-a-solicitation guard).
   const farCount = complianceJson.far_clauses?.length || 0;
   const dfarsCount = complianceJson.dfars_clauses?.length || 0;
   const certCount = complianceJson.required_certifications?.length || 0;
-  const severity = typeof risksJson.severity_score === "number" ? risksJson.severity_score : 5;
 
-  // Gap 3 (FA-119) recalibration: min(40, …×1.5) pinned every clause-heavy DoD
-  // solicitation at the 40 cap (most cited clauses are universal boilerplate,
-  // not real complexity), which — with the modal severity of 5 — forced the
-  // recurring 35 and punished clean set-asides as hard as genuinely hard ones.
-  // Soften to min(25, …×1.0) so a clean small-business set-aside with no
-  // disqualifiers baselines ~50-70, while severity × 5 still pulls genuinely
-  // risky pursuits down (e.g. severity 8 → −40).
-  const complexityPenalty = Math.min(25, (farCount + dfarsCount + certCount) * 1.0);
+  // FA-E2E Fix 1 (2026-06-18): the score is now AI-DRIVEN. Previously
+  // `severity` was frozen at the constant 5 (the risks prompt forbids the model
+  // from emitting severity_score and nothing else set it), so the formula
+  // collapsed to 75 - min(25, clauseCount) - the number tracked clause count,
+  // not risk substance. We DERIVE severity (0-10) from the structured risks the
+  // model already returns (`prioritized`, each carrying a P0/P1/P2 priority and
+  // a category) plus the detected DFARS traps. No prompt/schema change, so the
+  // excellent analysis engine is untouched - we only stop discarding its output.
+  const severity = deriveSeverityScore(prioritized, complianceJson.dfars_flags);
+
+  // FA-E2E Fix 1: the complexity penalty previously used the raw FAR+DFARS+cert
+  // clause COUNT, which rewarded citing FEWER boilerplate clauses (most cited
+  // FAR clauses are universal boilerplate, not real complexity - 52.212-1 etc).
+  // Replace the raw clause count with a count of MATERIAL items: detected DFARS
+  // traps + required certifications. Universal boilerplate FAR clauses no longer
+  // move the number; genuine compliance burden does.
+  const dfarsTrapCount = (complianceJson.dfars_flags ?? []).filter((f) => f.detected).length;
+  const materialCount = dfarsTrapCount + certCount;
+  const complexityPenalty = Math.min(25, materialCount * 1.0);
   const riskPenalty = severity * 5;
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
