@@ -645,7 +645,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
         </details>
         <div class="body-stack" id="bodyStack">
           <section class="blk blk-recent">
-            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/audit">View all → Past Audits</a></div>
+            <div class="sec-head"><span class="k">Recently Audited</span><a class="all" href="/dashboard">View all → Past Audits</a></div>
             <div class="ra-region">
               <div class="ra-scroll">
                 <div class="ra-list">
@@ -808,7 +808,7 @@ function submitAudit(opts){
 /* ── recently audited (real /api/audits) ── */
 (function(){
   var list=document.querySelector('.blk-recent .ra-list'),stack=$('bodyStack');
-  var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/audit');
+  var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/dashboard');
   if(!list)return;
   function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
   function verdictOf(a){var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
