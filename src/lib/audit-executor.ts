@@ -296,6 +296,16 @@ export async function executeAudit(
   // API at claim time (see worker buildInput). Still out-of-scope: image and
   // text arms (no PDF bytes exist).
   const v2Buffer: Buffer | null = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
+  // DIAGNOSTIC (why no agentic surfaces?): record the V2 gate decision when V2
+  // won't run on a doc-bearing audit — distinguishes "skipped" (no buffer /
+  // disabled) from "failed" (v2_error, set in the catch). Best-effort.
+  if (!(AUDIT_V2_ENABLED && v2Buffer) && pdfSource !== "sam_unavailable") {
+    const why = !AUDIT_V2_ENABLED ? "disabled" : !v2Buffer ? `no_v2_buffer (pdfBuffer=${!!pdfBuffer} pdfBase64=${!!pdfBase64} pdfFileId=${!!pdfFileId} src=${pdfSource})` : "unknown";
+    console.warn(`[V2-SHADOW] SKIPPED for ${auditId}: ${why}`);
+    try {
+      await supabase.from("audits").update({ compliance_json: { ...persistedComplianceJson, v2_skipped: why, v2_skipped_at: new Date().toISOString() } }).eq("id", auditId);
+    } catch { /* diagnostic write best-effort */ }
+  }
   if (AUDIT_V2_ENABLED && v2Buffer) {
     const v2Start = Date.now();
     try {
@@ -404,7 +414,18 @@ export async function executeAudit(
       // Loud: this is non-fatal to the V1 audit, but it DEGRADES the report —
       // no agentic surfaces (agency / work-statement / Capture Play) for this
       // run. Surfaced so a recurring V2 failure can't hide behind "non-fatal".
-      console.error(`[V2-SHADOW] runAuditV2 FAILED AFTER RETRY for ${auditId} — report degraded (no agentic surfaces):`, err instanceof Error ? err.message : err);
+      const v2ErrMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      console.error(`[V2-SHADOW] runAuditV2 FAILED AFTER RETRY for ${auditId} — report degraded (no agentic surfaces):`, v2ErrMsg);
+      // INSTRUMENT (diagnostic): persist the failure reason onto the audit row so
+      // the cause is diagnosable from the record itself — the worker logs aren't
+      // reachable. Best-effort; never blocks. compliance_json.v2_error = why V2
+      // produced no agentic surfaces this run.
+      try {
+        await supabase
+          .from("audits")
+          .update({ compliance_json: { ...persistedComplianceJson, v2_error: v2ErrMsg, v2_error_at: new Date().toISOString() } })
+          .eq("id", auditId);
+      } catch { /* diagnostic write is best-effort */ }
     }
   } else if (AUDIT_V2_ENABLED && pdfSource === "sam_unavailable" && solicitation.description && solicitation.description.length > 50) {
     // ━━ Fix 8 — V2 metadata-only shadow path ━━
