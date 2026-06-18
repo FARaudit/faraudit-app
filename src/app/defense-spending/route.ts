@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createServerClient } from "@/lib/supabase-server";
 import { injectRail } from "@/lib/nav/rail";
+import { injectDefenseTabs } from "@/lib/nav/defense-intel";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function GET() {
   let html = await readFile(filePath, "utf8");
 
   html = injectRail(html, "defense-intel");
+  html = injectDefenseTabs(html, "spending"); // Phase 5 item 2 — News/Spending tab strip
 
   return new Response(html, {
     headers: {
