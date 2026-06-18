@@ -2329,6 +2329,18 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // locked/metadata-only or zero flags.
   html = replaceFieldOrRemove(html, "compliance_summary", vm.is_metadata_only ? "" : vm.compliance_pill_text);
 
+  // Sticky-rail "Work the checklist" action ships a hardcoded demo subtitle
+  // ("4 compliance items") with no data-field — bind it to the real §04 flag
+  // count so the rail can't contradict the section (the count-mismatch defect).
+  {
+    const n = vm.compliance_flags.length;
+    const sub = n === 0 ? "none flagged" : `${n} compliance item${n === 1 ? "" : "s"}`;
+    html = html.replace(
+      /(<a class="act" href="#sec-compliance">[\s\S]*?<span class="a-s">)[^<]*(<\/span>)/,
+      `$1${sub}$2`
+    );
+  }
+
   // §05 Risks — same wire-or-empty-state pattern.
   if (vm.risks.length > 0) {
     const blocks = vm.risks.map((r, i) => renderRisk(r, i === 0)).join("\n                ");
