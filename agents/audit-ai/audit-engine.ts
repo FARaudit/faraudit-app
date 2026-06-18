@@ -36,11 +36,15 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // that needs to retry — trades ~2% Opus retries for the cheap-by-default base.
 const CLAUDE_MODEL = "claude-sonnet-4-6";
 const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
-// Hard ceiling: a single model call may never hang longer than 3 min, regardless
-// of what CLAUDE_TIMEOUT_MS is set to in the environment. A hung call fails fast
-// and the retry loop (callWithRetry) re-issues it — far better than a 10-min
-// stall. Healthy calls finish in <60s, so 180s leaves generous headroom.
-const CLAUDE_TIMEOUT_CEILING_MS = 180000;
+// Per-call timeout ceiling. 180s was too tight: a legitimate multi-file
+// extraction/risks call (5 full PDFs, large output budget) genuinely runs >3 min,
+// so it timed out → retried → timed out → FAILED the whole audit ([call:risks]
+// aborted after 3 attempts). 300s (5 min) is the safe ceiling once the multi-file
+// payload ships via the Files API (handles, not 20 MB of inline base64) and V1/V2
+// run in parallel — healthy calls finish well under it, and a true hang still
+// fails fast instead of the old 10-min stall. Defends against any over-large
+// CLAUDE_TIMEOUT_MS env value.
+const CLAUDE_TIMEOUT_CEILING_MS = 420000;
 const CLAUDE_TIMEOUT_MS = Math.min(
   Number(process.env.CLAUDE_TIMEOUT_MS) || 90000,
   CLAUDE_TIMEOUT_CEILING_MS,
