@@ -383,3 +383,28 @@
 .bd-home .nav-avatar-menu{position:absolute;bottom:calc(100% + 6px);left:0;right:0;background:#0f2138;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px}
 .bd-home .nav-am-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 9px;border:0;background:transparent;border-radius:7px;color:rgba(255,255,255,.78);font-size:11.5px;cursor:pointer;text-align:left}
 .bd-home .nav-am-item:hover{background:rgba(255,255,255,.06)}
+
+/* ━━ Phase 7 · Opportunities Save = always-visible quiet ☆ bookmark ━━━━━━
+   Treatment 2 (CEO-approved). Replaces the old hover-gated text Save button.
+   Always rendered (no opacity:0 at rest) so it's discoverable + touch-safe.
+   Colors use --data-theme tokens (dark palette today; resolves per-theme),
+   subordinate to the solid gold "Audit →" primary. Saved = persistent
+   filled-green bookmark; aria-pressed reflects state on the element. */
+.bd-home .opp-save{
+  display:inline-grid;place-items:center;
+  width:26px;height:26px;border-radius:3px;
+  background:transparent;border:1px solid var(--border2);color:var(--t60);
+  cursor:pointer;flex:none;transition:all .14s;padding:0;
+}
+.bd-home .opp-save svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;}
+/* strengthen on hover + keyboard focus — discoverable, focus-visible-safe */
+.bd-home .opp-save:hover,
+.bd-home .opp-save:focus-visible{
+  border-color:var(--gold);color:var(--gold2);background:rgba(201,168,76,.1);
+  outline:none;
+}
+/* persistent saved state — filled-green bookmark, survives mouse-leave */
+.bd-home .opp-save.is-saved{
+  border-color:rgba(74,222,128,.5);color:var(--green);background:rgba(74,222,128,.12);
+}
+.bd-home .opp-save.is-saved svg{fill:currentColor;}

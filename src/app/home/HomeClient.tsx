@@ -1133,17 +1133,18 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                             <span style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 2, background: rb, color: rc, border: `1px solid ${rc}40`, lineHeight: 1, letterSpacing: ".06em" }}>{r.riskLabel || "—"}</span>
                           </div>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: auC.bg, color: auC.fg, textAlign: "center", justifySelf: "center", display: "inline-flex", justifyContent: "center", alignItems: "center" }}>{r.auditStatusLabel}</span>
-                          {/* FA-89i CHANGE 3: Audit always-visible primary; Watch + Pipeline reveal on hover.
-                              Pinned ✓ flash + already-pinned/watched states stay visible so user can see active state at a glance. */}
+                          {/* FA-89i CHANGE 3 + Phase 7: Audit always-visible primary. Save is now an
+                              always-visible quiet star bookmark (Treatment 2) — hover-gating removed so it's
+                              discoverable at rest + on touch. Pipeline still reveals on hover but stays
+                              visible when active so the row reflects state. */}
                           {(() => {
                             const watched = r.row.watched === true;
                             const pinned  = r.row.in_pipeline === true;
-                            // Hover-conditioned visibility on the secondary actions —
-                            // but keep them visible when active so the row reflects state.
-                            const showWatch = isHovered || watched;
+                            // Hover-conditioned visibility on the Pipeline action only —
+                            // kept visible when active so the row reflects state.
                             const showPipe  = isHovered || pinned || isJustPinned;
                             return (
-                              <div style={{ display: "flex", gap: 4 }}>
+                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); onOpenAudit(); }}
@@ -1151,12 +1152,17 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                                 >
                                   Audit →
                                 </button>
+                                {/* Phase 7 — Save = always-visible quiet star bookmark. Presentation only;
+                                    the togglePatch("watched") mutation (#55) is unchanged. */}
                                 <button
                                   type="button"
+                                  className={`opp-save${watched ? " is-saved" : ""}`}
                                   onClick={(e) => { e.stopPropagation(); togglePatch("watched"); }}
-                                  style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".06em", padding: "3px 8px", borderRadius: 2, cursor: "pointer", background: watched ? "rgba(245,158,11,.14)" : "transparent", color: watched ? "var(--amber)" : "var(--t60)", border: `1px solid ${watched ? "rgba(245,158,11,.5)" : "var(--border2)"}`, opacity: showWatch ? 1 : 0, pointerEvents: showWatch ? "auto" : "none", transition: "opacity .15s" }}
+                                  aria-label="Save opportunity"
+                                  aria-pressed={watched}
+                                  title="Save — still deciding"
                                 >
-                                  {watched ? "Saved" : "Save"}
+                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" /></svg>
                                 </button>
                                 {watched && !pinned && !isJustPinned && (
                                   <button
