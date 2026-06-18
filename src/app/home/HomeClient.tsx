@@ -105,6 +105,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
   // PastAuditsPanel's "p0" filter both use compliance_score < 40 so the math
   // is identical · numbers stay consistent across the click.
   const [pastAuditsFilter, setPastAuditsFilter] = useState<"all" | "p0" | "user">("all");
+  // Phase 5 1c: avatar account-menu popover (replaces the old Account nav group).
+  const [acctMenuOpen, setAcctMenuOpen] = useState(false);
 
   // FA-89i FIX 4: reset Opportunities filters whenever the tab becomes active —
   // returning to a clean default view instead of stale filter state from a
@@ -390,7 +392,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
 
         {/* SIDEBAR */}
         <div className="sidebar">
-          <div className="nav-label">Workspace</div>
+          {/* GROUP 1 — Daily */}
+          <div className="nav-label">Daily</div>
           <button className={`nav-item ${tab === "home" ? "active" : ""}`} onClick={() => setTab("home")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -425,6 +428,17 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             Pipeline
             {pipelineCount > 0 && <span className="nav-ct ct-red">{pipelineCount}</span>}
           </button>
+
+          {/* GROUP 2 — Find & Track */}
+          <div className="nav-label">Find &amp; Track</div>
+          <button className={`nav-item ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Opportunities
+            <span className="nav-ct ct-green">Live</span>
+          </button>
           <button className={`nav-item ${tab === "capability" ? "active" : ""}`} onClick={() => setTab("capability")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
@@ -435,29 +449,21 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             Capability Statement
           </button>
 
-          <div className="nav-label">Intelligence</div>
-          <button className={`nav-item ${tab === "opportunities" ? "active" : ""}`} onClick={() => setTab("opportunities")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Opportunities
-            <span className="nav-ct ct-green">Live</span>
-          </button>
-          <button className={`nav-item ${tab === "defense-spending" ? "active" : ""}`} onClick={() => setTab("defense-spending")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="8" width="3" height="6" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="6.5" y="5" width="3" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-              <rect x="11" y="2" width="3" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-            </svg>
-            Defense Spending
-          </button>
+          {/* GROUP 3 — Market Intel */}
+          <div className="nav-label">Market Intel</div>
           <button className={`nav-item ${tab === "news" ? "active" : ""}`} onClick={() => setTab("news")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M2 2h12v2L8 10 2 4V2z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
               <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            Defense News
+            Defense Intel
+          </button>
+          <button className={`nav-item ${tab === "agencies" ? "active" : ""}`} onClick={() => setTab("agencies")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Defense Agencies
+            {agencies.length > 0 && <span className="nav-ct ct-gold">{agencies.length}</span>}
           </button>
           <button className={`nav-item ${tab === "contracting-officers" ? "active" : ""}`} onClick={() => setTab("contracting-officers")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -467,40 +473,15 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             Contracting Officers
             {kos.length > 0 && <span className="nav-ct ct-gold">{kos.length}</span>}
           </button>
-          <button className={`nav-item ${tab === "agencies" ? "active" : ""}`} onClick={() => setTab("agencies")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M2 14h12M3 14V6l5-3 5 3v8M6 14V9h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Agencies
-            {agencies.length > 0 && <span className="nav-ct ct-gold">{agencies.length}</span>}
-          </button>
-          <button className={`nav-item ${tab === "protests" ? "active" : ""}`} onClick={() => setTab("protests")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-            </svg>
-            GAO Protests
-          </button>
-          <button className={`nav-item ${tab === "regulatory" ? "active" : ""}`} onClick={() => setTab("regulatory")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-              <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            FAR/DFARS Updates
-          </button>
+
+          {/* GROUP 4 — Compliance */}
+          <div className="nav-label">Compliance</div>
           <button className={`nav-item ${tab === "cmmc" ? "active" : ""}`} onClick={() => setTab("cmmc")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
               <path d="M8 2L13 4V8C13 11 11 13 8 14C5 13 3 11 3 8V4L8 2Z" stroke="currentColor" strokeWidth="1.2"/>
               <path d="M6 8l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             CMMC Readiness
-          </button>
-          <button className={`nav-item ${tab === "wages" ? "active" : ""}`} onClick={() => setTab("wages")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            Wage Benchmarks
           </button>
           <button className={`nav-item ${tab === "teaming" ? "active" : ""}`} onClick={() => setTab("teaming")}>
             <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
@@ -511,15 +492,41 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
             Teaming Partners
           </button>
 
-          <div className="nav-label">Account</div>
-          <button className="nav-item" onClick={() => router.push("/settings")}>
-            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          {/* GROUP 5 — Reference */}
+          <div className="nav-label">Reference</div>
+          <button className="nav-item" onClick={() => router.push("/naics")}>
+            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 6h16M4 12h16M4 18h10"/>
             </svg>
-            Profile &amp; Settings
+            NAICS Codes
           </button>
-          <SignOutButton />
+          <button className={`nav-item ${tab === "regulatory" ? "active" : ""}`} onClick={() => setTab("regulatory")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <line x1="6" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            FAR/DFARS Updates
+          </button>
+          <button className={`nav-item ${tab === "wages" ? "active" : ""}`} onClick={() => setTab("wages")}>
+            <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
+              <path d="M2 13h12M3 13V8h2v5M7 13V5h2v8M11 13v-3h2v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            Wage Benchmarks
+          </button>
+
+          {/* ACCOUNT — avatar menu (replaces old Account nav group) */}
+          <div className="nav-avatar-wrap">
+            <button className="nav-avatar-btn" onClick={() => setAcctMenuOpen(v => !v)} aria-haspopup="true" aria-expanded={acctMenuOpen}>
+              <span className="nav-avatar">JR</span><span className="nav-avatar-name">Jose Rodriguez</span>
+            </button>
+            {acctMenuOpen && (
+              <div className="nav-avatar-menu">
+                <button className="nav-am-item" onClick={() => router.push("/settings")}>Profile &amp; Settings</button>
+                <SignOutButton />
+              </div>
+            )}
+          </div>
 
           <div className="sb-footer">
             <div className="sb-plan">Design Partner · $1,250/mo</div>
