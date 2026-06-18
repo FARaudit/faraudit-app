@@ -33,7 +33,13 @@ const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
 // CLAUDE_TIMEOUT_MS env value.
 const CLAUDE_TIMEOUT_CEILING_MS = 420000;
 const CLAUDE_TIMEOUT_MS = Math.min(
-  Number(process.env.CLAUDE_TIMEOUT_MS) || 90000,
+  // FA-E2E re-verify Fix E (2026-06-18): default was 90s but the comment above
+  // (and multi-file reality) require 300s — a legitimate 5-PDF extraction/risks
+  // call genuinely runs >90s, so the old default timed out -> retried -> FAILED
+  // the whole audit and the report spun in "finalizing" forever. 300s aligns the
+  // default with the documented ceiling; healthy calls still finish well under
+  // it and a true hang fails fast at the 420s ceiling.
+  Number(process.env.CLAUDE_TIMEOUT_MS) || 300000,
   CLAUDE_TIMEOUT_CEILING_MS,
 );
 

@@ -481,19 +481,48 @@ export async function executeAudit(
       // work-statement, Capture Play). Retry once, then surface loudly.
       let v2Result: Awaited<ReturnType<typeof runAuditV2>> | null = null;
       let v2LastErr: unknown = null;
+      // FA-E2E re-verify Fix E (2026-06-18): HARD overall budget on the V2
+      // agentic layer. The 5-doc audit could hang for ~10 min (two retries x a
+      // long per-call timeout), leaving the report stuck in "finalizing" forever.
+      // Race each runAuditV2 attempt against a 4-minute deadline measured from
+      // v2Start; a blown deadline rejects → flows into the existing retry/degrade
+      // machinery (catch below writes analysis_phase:"done" + v2_error), so the
+      // report renders degraded-but-complete instead of spinning.
+      const V2_OVERALL_BUDGET_MS = 4 * 60 * 1000;
       for (let attempt = 1; attempt <= 2; attempt++) {
+        const remainingMs = V2_OVERALL_BUDGET_MS - (Date.now() - v2Start);
+        if (remainingMs <= 0) {
+          v2LastErr = new Error(`V2 overall budget (${V2_OVERALL_BUDGET_MS / 1000}s) exhausted before attempt ${attempt}`);
+          break;
+        }
+        let budgetTimer: ReturnType<typeof setTimeout> | undefined;
         try {
-          v2Result = await runAuditV2(
-            v2Buffer,
-            v2External,
-            attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
-          );
+          v2Result = await Promise.race([
+            runAuditV2(
+              v2Buffer,
+              v2External,
+              attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
+            ),
+            new Promise<never>((_, reject) => {
+              budgetTimer = setTimeout(
+                () => reject(new Error(`V2 overall budget (${V2_OVERALL_BUDGET_MS / 1000}s) exceeded`)),
+                remainingMs
+              );
+            }),
+          ]);
           if (attempt > 1) console.warn(`[V2-SHADOW] runAuditV2 recovered on retry (attempt ${attempt}) for ${auditId}`);
           break;
         } catch (e) {
           v2LastErr = e;
           console.warn(`[V2-SHADOW] runAuditV2 attempt ${attempt}/2 failed for ${auditId}: ${e instanceof Error ? e.message : e}`);
-          if (attempt < 2) await new Promise((r) => setTimeout(r, 3000));
+          // Don't sleep+retry past the overall budget — degrade promptly.
+          if (attempt < 2 && V2_OVERALL_BUDGET_MS - (Date.now() - v2Start) > 3000) {
+            await new Promise((r) => setTimeout(r, 3000));
+          } else if (attempt < 2) {
+            break;
+          }
+        } finally {
+          if (budgetTimer) clearTimeout(budgetTimer);
         }
       }
       if (!v2Result) throw v2LastErr ?? new Error("runAuditV2 failed after retry");
