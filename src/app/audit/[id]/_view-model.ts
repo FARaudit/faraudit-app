@@ -466,6 +466,43 @@ function fmtDayMonYear(d: Date | null): string {
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+// FA-E2E Fix 3 (2026-06-18): the SOURCE-extracted offer-due date must win over
+// SAM metadata when they conflict. SAM's responseDeadLine is frequently stale
+// or wrong (FA487726: SAM said 18 Jun while the SF-1442 said 11 Jun -> the
+// report contradicted itself, showing "closed" AND "submit by 18 Jun"). The
+// engine extracts the real offer-due date into compJson.deadlines[]; this
+// mirrors the engine's parseDocDeadline offer-due selection (drop interim
+// milestones, prefer true submission entries, take the LATEST such date) so the
+// VM can resolve the CONTROLLING deadline rather than trusting SAM blindly.
+const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|amendment|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)/i;
+const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+function parseSourceOfferDue(deadlines: unknown): Date | null {
+  if (!Array.isArray(deadlines)) return null;
+  const entries = deadlines
+    .map((e) =>
+      typeof e === "string"
+        ? { label: "", date: e }
+        : e && typeof e === "object"
+        ? { label: String((e as Record<string, unknown>).label ?? ""), date: String((e as Record<string, unknown>).date ?? "") }
+        : { label: "", date: "" }
+    )
+    .filter((e) => e.date);
+  const tryParse = (str: string): Date | null => {
+    const cleaned = str.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    const d = new Date(cleaned);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const valid = entries
+    .map((e) => ({ ...e, d: tryParse(e.date) }))
+    .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
+  if (valid.length === 0) return null;
+  const eligible = valid.filter((e) => !DEADLINE_EXCLUDE_RE.test(e.label));
+  const submission = eligible.filter((e) => DEADLINE_SUBMISSION_RE.test(e.label) || DEADLINE_SUBMISSION_RE.test(e.date));
+  const pool = submission.length > 0 ? submission : eligible;
+  if (pool.length === 0) return null; // only interim/post-award dates -> never close on those
+  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
+}
+
 function fmtMonYear(d: Date | null): string {
   if (!d) return "—";
   return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
@@ -2344,9 +2381,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // lines 1194/1209). Renderer drops each .kd-item when its has_* is false;
   // .urgent + award_quarter computed off one fixed `now` for determinism.
   const now = new Date();
-  const responseDeadline = parseDate(audit.response_deadline);
+  // FA-E2E Fix 3 (2026-06-18): the CONTROLLING response deadline is the
+  // SOURCE-extracted offer-due date when available; SAM's audit.response_deadline
+  // is only the fallback. SAM metadata is frequently stale/wrong and was
+  // overriding the document, producing self-contradicting reports ("closed" AND
+  // "submit by <future SAM date>"). open/closed is recomputed from whichever
+  // date controls. When the source carries no offer-due date we keep the SAM
+  // value (a missing source date must not erase a real SAM deadline).
+  const samResponseDeadline = parseDate(audit.response_deadline);
+  const sourceOfferDue = parseSourceOfferDue(compJson.deadlines);
+  const responseDeadline = sourceOfferDue ?? samResponseDeadline;
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
-  // FA-107: solicitation is closed when offer-due deadline is in the past
+  // FA-107: solicitation is closed when the CONTROLLING offer-due deadline is
+  // in the past (now recomputed from the source date when it wins over SAM).
   const is_expired: boolean = responseDays !== null && responseDays < 0;
   // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
   // scope by the time `score` is computed.)
@@ -2722,10 +2769,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         const year = yearTok ?? new Date().getUTCFullYear();
         return new Date(Date.UTC(year, mon, day));
       };
+      // FA-E2E Fix 3 (2026-06-18): strike action dates that are already PAST
+      // (before today) in addition to those beyond the response deadline.
+      // Presenting a past site-visit / registration / EAL / RFI date as a "By
+      // <date>" action item is a customer liability - observed on audits 2/4/5
+      // where passed windows were shown as still actionable. Dropping the prefix
+      // leaves the action text standing alone (the renderer omits the date chip).
+      const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       const clampWhen = (when: string): string => {
-        if (!when || !responseDeadline) return when;
+        if (!when) return when;
         const d = parseWhen(when);
-        return d && d > responseDeadline ? "" : when;
+        if (!d) return when;
+        if (responseDeadline && d > responseDeadline) return ""; // past the deadline
+        if (d < todayUtc) return ""; // already past today - not actionable
+        return when;
       };
       const eng = compJson.executive_summary as { actions?: unknown } | undefined;
       if (Array.isArray(eng?.actions)) {
