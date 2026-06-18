@@ -12,6 +12,7 @@ import path from "node:path";
 import { headers } from "next/headers";
 import Anthropic from "@anthropic-ai/sdk";
 import { createServerClient } from "@/lib/supabase-server";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +133,11 @@ export async function GET() {
     "const LIVE_ARTICLES = /*LIVE_ARTICLES_PLACEHOLDER*/[];",
     `const LIVE_ARTICLES = ${JSON.stringify(liveArticles)};`
   );
+
+  // Phase 5 — swap the page's stale copy-pasted rail for the single shared rail.
+  // (Defense News lives under the new "Defense Intel" group, so it highlights
+  // that item.) Proof page for Design's 1:1 before propagating to all routes.
+  html = injectRail(html, "defense-intel");
 
   return new Response(html, {
     headers: {
