@@ -781,7 +781,13 @@ function deriveSolicitationSubject(raw: string, displayId: string): string {
   if (m && m[1]) s = m[1].trim();
   // first clause; drop trailing location / period-of-performance tails
   s = s.split(/[.;]|,?\s+located\s+|,?\s+for\s+(?:the\s+)?(?:period|base|a\s+\d)/i)[0].trim().replace(/[,;:\s]+$/, "");
-  if (s.length > 88) s = s.slice(0, 85).replace(/\s+\S*$/, "") + "…";
+  // Phase 5 (Design ruling): the masthead .mh-title uses -webkit-line-clamp:3 as
+  // the visual governor — it ellipses cleanly at the line boundary and caps height
+  // so it can't push .mh-meta. A low char cap (was 88) chopped the string before
+  // the clamp engaged → truncated mid-word at ~2.x lines. Keep only a high
+  // DB-sanity ceiling (180 ≥ the ~150 Design floor) so the clamp is always what
+  // the user sees; a pathological multi-KB title still can't bloat the DOM.
+  if (s.length > 180) s = s.slice(0, 177).replace(/\s+\S*$/, "") + "…";
   const norm = (x: string): string => x.replace(/[^a-z0-9]/gi, "").toLowerCase();
   if (s.length < 10 || norm(s).length < 6 || norm(s) === norm(displayId)) return "";
   return s;
