@@ -1461,6 +1461,34 @@ function deriveGateConditions(
   });
 }
 
+// Data-driven gates from the solicitation's OWN deal-breakers. The DoD gate
+// library (detectGatesCanonical) only knows SPRS/JCP/FAA/etc.; on a non-defense
+// solicitation it finds nothing, leaving the gate empty. But the engine already
+// categorizes the real disqualifiers as risk_findings.category === "Disqualification"
+// (e.g. "missing key-personnel resumes → bars award"). Those ARE the true "bid
+// only if" conditions, so surface up to 4 as gate rows — facts from this
+// solicitation, never a hardcoded demo. Used only as the final fallback, after
+// the engine emission and the canonical detector.
+function deriveGatesFromRiskFindings(
+  risksJson: Record<string, unknown> | null | undefined,
+  _daysToDeadline: number | null
+): AuditViewModel["gate_conditions"] {
+  const findings = Array.isArray(risksJson?.risk_findings)
+    ? (risksJson!.risk_findings as Array<Record<string, unknown>>)
+    : [];
+  const disq = findings.filter((f) => /disqualif/i.test(String(f?.category ?? "")));
+  const out: AuditViewModel["gate_conditions"] = [];
+  for (const f of disq.slice(0, 4)) {
+    const title = sanitizeDisplayText(f.title);
+    if (!title) continue;
+    const textFirst = typeof f.text === "string" ? f.text.split(/[.!?](?:\s|$)/)[0] : "";
+    const context = sanitizeDisplayText(textFirst.length > 110 ? textFirst.slice(0, 108) + "…" : textFirst) || "";
+    const citation = sanitizeDisplayText(f.citation) || "—";
+    out.push({ title, context, citation, blocker_note: "" });
+  }
+  return out;
+}
+
 // FA-144: read the engine-persisted gate_conditions[] (written by
 // projectGateConditions at audit time). Shape-validated + sanitized — rows
 // missing a usable title are dropped rather than rendered blank.
@@ -2314,9 +2342,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // the row, so byte-stable — and fall back to the VM canonical re-detection
   // for rows written before the engine emitted the field.
   const engineGateConditions = readEngineGateConditions(compJson);
+  const canonicalDerivedGates = deriveGateConditions(canonicalGates, canonicalDaysToDeadline);
+  // Gate source priority: (1) engine-persisted emission, (2) canonical DoD-library
+  // detection, (3) data-driven from THIS solicitation's disqualifying risks. The
+  // third source means a non-defense gate shows real deal-breakers (key-personnel
+  // resumes, mandatory certs) instead of nothing — and, with the render's
+  // erase-when-empty fix, the masthead never falls back to the hardcoded DoD demo.
   const gateConditions = engineGateConditions.length > 0
     ? engineGateConditions
-    : deriveGateConditions(canonicalGates, canonicalDaysToDeadline);
+    : canonicalDerivedGates.length > 0
+      ? canonicalDerivedGates
+      : deriveGatesFromRiskFindings(risksJson, canonicalDaysToDeadline);
 
   // Incumbent
   const incumbentExpiry = parseDate(audit.incumbent_expiry);
