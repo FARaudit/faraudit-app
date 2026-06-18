@@ -2478,7 +2478,21 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // the .mh-id number. Derived from the engine's overview summary / primary
   // objective; "" when no honest subject (then .mh-title:empty hides it and
   // the number stands alone — never the redundant number-as-title).
+  // FA: the masthead subject is a FACT, not analysis. Prefer SAM's official title
+  // (the executor's SAM cross-ref writes it to audit.title) over the AI summary
+  // sentence — the AI route produced lowercase mid-sentence fragments ("a Firm
+  // Fixed Price contract…"). Fall back to the AI summary only when there's no
+  // clean title (e.g. an upload whose sol number didn't resolve on SAM). A clean
+  // title is not the upload filename ("2. … .pdf"), not just "… Solicitation",
+  // and not merely the sol number (deriveSolicitationSubject's guards enforce the last).
+  const rawTitle = typeof audit.title === "string" ? audit.title.trim() : "";
+  const titleLooksClean =
+    rawTitle.length >= 10 &&
+    !/\.(pdf|docx?|xlsx?|txt)$/i.test(rawTitle) &&
+    !/^\d+[.)]\s/.test(rawTitle) &&
+    !/\bsolicitation\s*$/i.test(rawTitle);
   const solicitationSubjectRaw =
+    (titleLooksClean ? rawTitle : "") ||
     (typeof overviewJson.summary === "string" ? overviewJson.summary : "") ||
     (typeof overviewJson.primary_objective === "string" ? overviewJson.primary_objective : "");
   const solicitation_subject = deriveSolicitationSubject(solicitationSubjectRaw, displayId);
