@@ -23,11 +23,15 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // that needs to retry — trades ~2% Opus retries for the cheap-by-default base.
 const CLAUDE_MODEL = "claude-sonnet-4-6";
 const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
-// Hard ceiling: a single model call may never hang longer than 3 min, regardless
-// of what CLAUDE_TIMEOUT_MS is set to in the environment. A hung call fails fast
-// and the retry loop (callWithRetry) re-issues it — far better than a 10-min
-// stall. Healthy calls finish in <60s, so 180s leaves generous headroom.
-const CLAUDE_TIMEOUT_CEILING_MS = 180000;
+// Per-call timeout ceiling. 180s was too tight: a legitimate multi-file
+// extraction/risks call (5 full PDFs, large output budget) genuinely runs >3 min,
+// so it timed out → retried → timed out → FAILED the whole audit ([call:risks]
+// aborted after 3 attempts). 300s (5 min) is the safe ceiling once the multi-file
+// payload ships via the Files API (handles, not 20 MB of inline base64) and V1/V2
+// run in parallel — healthy calls finish well under it, and a true hang still
+// fails fast instead of the old 10-min stall. Defends against any over-large
+// CLAUDE_TIMEOUT_MS env value.
+const CLAUDE_TIMEOUT_CEILING_MS = 420000;
 const CLAUDE_TIMEOUT_MS = Math.min(
   Number(process.env.CLAUDE_TIMEOUT_MS) || 90000,
   CLAUDE_TIMEOUT_CEILING_MS,
@@ -1197,13 +1201,27 @@ async function callClaude(
         signal: AbortSignal.timeout(CLAUDE_TIMEOUT_MS)
       });
     } catch (e) {
-      // A THROWN fetch — network-level "fetch failed" (connection/DNS/TLS blip)
-      // or a timeout-abort — never produces an HTTP status, so the 529/503 path
-      // below can't see it. These are transient; retry with the same backoff.
-      // (Cause of the d6240440 failure: one "[call:risks] fetch failed" killed
-      // the whole audit with no second try.)
-      if (attempt === 3) throw new Error(`Claude API fetch failed after ${attempt} attempts: ${e instanceof Error ? e.message : String(e)}`);
-      console.warn(`[audit-engine] Claude fetch threw attempt ${attempt} (${e instanceof Error ? e.message : e}) — backing off ${attempt * 2}s`);
+      // A THROWN fetch never produces an HTTP status, so the 529/503 path below
+      // can't see it. Two distinct causes, handled differently:
+      //   • NETWORK blip ("fetch failed" — connection/DNS/TLS reset): transient,
+      //     retry with backoff (the d6240440 fix — one blip must not kill a run).
+      //   • TIMEOUT-abort (AbortSignal.timeout fired): the call is genuinely too
+      //     slow (oversized payload + large output budget). Re-issuing the SAME
+      //     heavy call just times out again and burns another full ceiling — the
+      //     3×-timeout amplification that turned one slow [call:risks] into a
+      //     ~21-min stall before it finally failed. So FAIL FAST on timeout: throw
+      //     immediately and let the caller decide (V1 → DegradedRunError → worker
+      //     reclaim; V2 → its own single retry). A generous ceiling means a real,
+      //     healthy multi-file call never reaches this branch.
+      const msg = e instanceof Error ? e.message : String(e);
+      const isTimeout =
+        (e instanceof Error && e.name === "TimeoutError") ||
+        /aborted due to timeout|operation was aborted|timed out/i.test(msg);
+      if (isTimeout) {
+        throw new Error(`Claude API call timed out after ${Math.round(CLAUDE_TIMEOUT_MS / 1000)}s (payload likely too large): ${msg}`);
+      }
+      if (attempt === 3) throw new Error(`Claude API fetch failed after ${attempt} attempts: ${msg}`);
+      console.warn(`[audit-engine] Claude fetch threw attempt ${attempt} (${msg}) — backing off ${attempt * 2}s`);
       await new Promise(r => setTimeout(r, attempt * 2000));
       continue;
     }
