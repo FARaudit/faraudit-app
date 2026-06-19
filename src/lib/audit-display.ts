@@ -124,9 +124,34 @@ export function auditHref(a: { id: string; solicitation_number?: string | null }
 // finalizing window. Factored out of src/app/audit/[id]/route.ts.
 export const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop waiting if V2 stalls
 
+// FIX 5 — EXPORT GATE (single source of truth for the Export button + the PDF
+// proxy). The report may export ONLY when it is genuinely COMPLETE. Complete =
+// the V2 deep-analysis layer has landed (v2_shadow present), OR this arm never
+// ran V2 at all (a plain V1 report that was always the finished product:
+// analysis_phase !== "finalizing" with no v2_error). EVERY incomplete state —
+// live finalizing, errored/timed-out, or silently stalled past the backstop —
+// keeps export GATED so a half/degraded PDF can never leave the building. This
+// is the rule the CEO expects: greyed until the report is 100% complete.
+export function shouldGateExport(audit: Record<string, unknown>): boolean {
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  if (comp.v2_shadow) return false; // deep layer landed → complete → export ON
+  if (comp.v2_error) return true; // errored/timed-out → incomplete → gate
+  if (comp.analysis_phase !== "finalizing") return false; // no V2 arm → plain V1 done → export ON
+  return true; // phase "finalizing" but no shadow yet → live OR stalled → gate until complete
+}
+
+// FIX 5 — LIVE-finalizing predicate. True ONLY while a V2 run is genuinely in
+// flight: phase "finalizing", no shadow yet, no error, AND within the time
+// window. Drives the auto-refresh + spinner banner ONLY. A stalled run (window
+// expired) or an errored run returns false, so the page never loops a spinner
+// that will never resolve — it shows the (incomplete) core report with export
+// gated (via shouldGateExport) and no refresh. Note: export-gating and
+// spinner-driving are deliberately SEPARATE questions — a stalled run is gated
+// (no export) but NOT live (no spinner).
 export function isV2Finalizing(audit: Record<string, unknown>): boolean {
   const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
-  if (comp.v2_shadow) return false; // agentic layer already landed → full report
+  if (comp.v2_shadow) return false; // landed → not finalizing
+  if (comp.v2_error) return false; // errored → not live (no spinner)
   if (comp.analysis_phase !== "finalizing") return false; // arm with no V2 to wait for
   const completedRaw = audit.completed_at ? String(audit.completed_at) : "";
   const completedMs = completedRaw ? Date.parse(completedRaw) : NaN;

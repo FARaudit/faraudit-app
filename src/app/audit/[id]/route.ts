@@ -13,7 +13,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
 import { renderAuditTransitionalState } from "./_render-states";
-import { isV2Finalizing } from "@/lib/audit-display";
+import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -207,9 +207,16 @@ export async function GET(
   // render. Keyed off analysis_phase==="finalizing" + v2_shadow absent. A 6-min
   // backstop on completed_at stops the refresh loop if V2 ever stalls/fails, so
   // the report is never stuck refreshing.
+  // FIX 5 — two SEPARATE questions. (1) Export stays gated in EVERY incomplete
+  // state (finalizing, errored, or stalled) so a half/degraded PDF can never
+  // leave. (2) The spinner + auto-refresh runs ONLY while a V2 run is genuinely
+  // live — an errored or stalled run shows its core report as-is, export
+  // disabled, with no refresh that would loop forever.
+  if (shouldGateExport(audit)) {
+    html = disableExportWhileFinalizing(html);
+  }
   if (isV2Finalizing(audit)) {
     html = injectFinalizingState(html);
-    html = disableExportWhileFinalizing(html);
   }
 
   return new Response(html, {

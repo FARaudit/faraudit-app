@@ -16,7 +16,7 @@ import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/
 import { isAnthropicTransient } from "@/lib/anthropic-files";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, assembleUploadedDocumentSet, type AssembledDocumentSet } from "@/lib/sam-attachments";
+import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import type { PdfSource } from "@/lib/audit-engine";
 
@@ -470,7 +470,12 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
       }
       localFiles.push({ name: doc.filename, buffer: Buffer.from(await blob.arrayBuffer()) });
     }
-    const assembled = await assembleUploadedDocumentSet(localFiles, row.solicitation_number);
+    // FA-E2E Fix 4 — the DB solicitation_number column is null on uploads, so
+    // derive a sol token from the uploaded filenames (mirroring the sync route)
+    // and prefer it; without it the solNorm rescue in isForm is dead on the
+    // async path and an amendment-named primary never resolves to a FORM.
+    const solTok = row.solicitation_number || deriveSolTokenFromFilenames(localFiles.map((f) => f.name));
+    const assembled = await assembleUploadedDocumentSet(localFiles, solTok);
     ingestion = assembled.ingestion;
     if (assembled.primary) {
       pdfBase64 = assembled.primary.base64;

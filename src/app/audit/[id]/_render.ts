@@ -1972,6 +1972,48 @@ function applyClosedBidGate(html: string): string {
   return out;
 }
 
+// (6) Inverse of the FA-114 closed passes: when vm.is_expired === false the
+// solicitation is OPEN, but a report PERSISTED while its deadline read as past
+// (e.g. the 2031-PoP-end VM bug, or a passed interim-milestone date) carries
+// engine-emitted closed-state prose in exec_what / exec_actions / verdict
+// strings — see audit-engine.ts emitting "this solicitation has closed …",
+// "Response deadline has passed. …" into complianceJson.executive_summary.
+// On an open sol those assertions are flatly wrong (audit-3: OPEN chip but
+// "has closed" prose). Neutralize ONLY the clauses that ASSERT closure/expiry,
+// rewriting to forward/neutral language. Conservative by design: leaves all
+// legitimate forward-looking copy ("submit by", "due", "deadline: <date>") and
+// the recompete-TIMELINE copy (incumbent/expiry section) untouched — those
+// never contain a "has closed"/"has passed" assertion. Mirrors the apply*
+// string-transform style above.
+function scrubStaleClosedLanguage(html: string): string {
+  let out = html;
+  // exec_what (engine: deadlineClosed branch) — full sentence, neutral rewrite.
+  out = out.replace(
+    /this solicitation has closed (?:—|&mdash;) use this analysis for recompete preparation and incumbent benchmarking\./gi,
+    "the solicitation is open — use this analysis to prepare a competitive response."
+  );
+  // exec_actions[0] "Closed" note (engine: execActionsFinal closed branch).
+  out = out.replace(
+    /Response deadline has passed\. Use this audit for recompete preparation and incumbent benchmarking ahead of the next cycle\./gi,
+    "Response deadline is still open. Use this audit to drive the bid decision and shape a compliant response."
+  );
+  // metadata-only bidStrategy closed branch.
+  out = out.replace(
+    /Response deadline has passed\. Confirm whether the opportunity is still active before pursuing\./gi,
+    "Confirm the response deadline against the live SAM.gov posting before committing resources."
+  );
+  // Generic backstops — ONLY for assertions anchored to the SOLICITATION or the
+  // OFFER SUBMISSION window (the overall open/closed state we positively know is
+  // OPEN here). Deliberately NOT scrubbing bare "deadline has passed" / "has
+  // closed": those can legitimately describe a passed SUB-window (Q&A, site
+  // visit, registration) that is genuinely closed even on an open sol — a false
+  // rewrite there would invent a fact (conservative: under-scrub > lie).
+  out = out.replace(/the submission window has closed/gi, "the submission window is open");
+  out = out.replace(/submission window has closed/gi, "submission window is open");
+  out = out.replace(/this solicitation has closed/gi, "this solicitation is open");
+  return out;
+}
+
 // FA-112: gate_pearl ("catch worth the subscription") render. When VM supplies
 // pearl content, replace inner; otherwise strip the entire <div class="g-pearl">
 // element from the output so the template's demo procurex/reverse-auction copy
@@ -2788,6 +2830,11 @@ export function renderAuditReportComplete(
     html = removeNext48HoursBlock(html);
     html = applyClosedChecklistHeader(html);
     html = applyClosedBidGate(html);
+  } else {
+    // OPEN sol: scrub any persisted closed-state prose (exec/verdict strings
+    // written when the report's deadline read as past). Inverse of the passes
+    // above — see scrubStaleClosedLanguage.
+    html = scrubStaleClosedLanguage(html);
   }
   // §08 empty-guard — after the closed-mode passes so it sees the post-
   // removeKoEmailCard shape (the trigger case). Mirrors the template IIFE.
