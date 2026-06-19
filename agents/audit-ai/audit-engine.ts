@@ -122,6 +122,11 @@ export interface OverviewJSON {
   solicitation_number_canonical?: string | null;
   // Brain QA (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   bottom_line_item?: string | null;
+  // score-ai-driven (2026-06-18) — parity mirror. AI-reasoned 0-100 fit score
+  // + one-line rationale emitted by the overview LLM call, replacing the TS
+  // formula. See src/lib/audit-engine.ts.
+  fit_score?: number | null;
+  fit_score_rationale?: string | null;
 }
 
 // Cycle 2 facts-only shape — parity with src/lib/audit-engine.ts.
@@ -253,6 +258,9 @@ export interface ComplianceJSON {
   naics_size_standard?: string;
   sole_source_vendor?: { name: string; cage?: string | null };
   piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
+  // score-ai-driven (2026-06-18) — parity mirror. Model's one-line fit_score
+  // justification hoisted from overviewJson. See src/lib/audit-engine.ts.
+  fit_score_rationale?: string;
   // Fix 2 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
   verdict?: AuditVerdict;
   // Fork 3 (2026-06-05) — parity mirror. See src/lib/audit-engine.ts.
@@ -1618,6 +1626,16 @@ You are extracting FACTS from a federal solicitation. Output ONLY a JSON object 
   Bad: "Deliver 8 each Housing Assembly Actuator NSN:1680-01-137-3534" · "Predictive maintenance" (too vague).
   Null when no clean phrase is extractable.
 
+BID/FIT SCORE — YOUR REASONED JUDGMENT (this is the one field where you DO judge, not transcribe):
+
+- fit_score (integer 0-100 or null): your CALIBRATED bid/fit score for THIS pursuit, reasoned as a capture manager weighing genuine pursuit fit against real risk — NOT a checklist tally. Score the opportunity a small/mid defense subcontractor actually faces. Anchor to this rubric:
+  • 80-100 — STRONG FIT, PROCEED. Open, winnable, clean path: clear requirement, achievable terms, normal-for-DoD compliance, no structural blocker. A routine, far-deadline set-aside or commercial-item buy with ordinary FAR/DFARS clauses lives HERE — do NOT mark it down for boilerplate every DoD solicitation carries.
+  • 55-79 — WORKABLE, CAUTION. Real but clearable friction: a heavy compliance burden (CMMC/SPRS/NIST), an aggressive schedule, an LPTA with no discussions, or several material obligations to manage. Bid-able with work.
+  • 30-54 — HARD. Stacked friction or a near-gating condition: multiple traps, a tight clearance/qualification barrier, or evaluation terms that strongly favor an incumbent. A specialized shop might still pursue.
+  • below 30 — TRUE NO-GO ONLY. Reserve this band for a genuine structural blocker the offeror cannot cure in time: a sole-source named to another vendor, an ITAR/TDP wall with no path to access, a qualification the offeror provably cannot meet by the deadline. Do NOT put an ordinary open competition here just because it carries normal DoD risk.
+  CRITICAL FAIRNESS RULE: an OPEN solicitation with a comfortable deadline and NO genuine disqualifier must NOT receive a reflexive low/NO-BID score. Normal DoD compliance is not a no-go. When the path is open, score the real fit — most open competitions land 55-90, not below 40. null ONLY for metadata-only / not-a-solicitation inputs.
+- fit_score_rationale (string or null): ONE plain-English sentence (≤ 240 chars) a BD director would say justifying the score — name the single biggest fit driver and the single biggest risk. No clause-number soup, no verdict word. null when fit_score is null.
+
 §M / §L — RAW FACTS ONLY (status, meta, coverage, tone, fit-score are TS-derived):
 
 - eval_basis_text (string or null): VERBATIM 1-2 sentence award-method statement from Section M as printed in the document (e.g. "Award will be made on a best-value tradeoff basis under FAR 15.101-1"). null if Section M is absent or this is metadata-only. (TS derives the rule citation + label from this text.)
@@ -1843,12 +1861,33 @@ JSON only — one key: risk_findings.`;
   // score-recalibration (2026-06-18) parity mirror: rebalance complexity vs risk.
   const complexityPenalty = Math.min(12, materialCount * 0.8);
   const riskPenalty = severity * 4.6;
-  let rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // formulaScore = the OLD deterministic number, RETAINED as a FALLBACK only.
+  const formulaScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+
+  // score-ai-driven (2026-06-18) — parity mirror. the SCORE IS NOW THE MODEL'S
+  // REASONED JUDGMENT: the overview LLM call emits a calibrated 0-100 fit_score
+  // against an explicit band rubric; we take THAT as rawScore. Formula survives
+  // ONLY as a fallback when the model returns no number. See src/lib/audit-engine.ts.
+  const aiScoreRaw = overviewJson.fit_score;
+  const aiScore =
+    typeof aiScoreRaw === "number" && Number.isFinite(aiScoreRaw)
+      ? Math.max(0, Math.min(100, Math.round(aiScoreRaw)))
+      : null;
+  let rawScore = aiScore ?? formulaScore;
   // Hard disqualifier floor: a fired genuine disqualifier caps into NO-BID band.
   const disqualifierFired = prioritized.some((r) =>
     /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "")
   );
   if (disqualifierFired) rawScore = Math.min(rawScore, 25);
+  // FAIRNESS GUARD (score-ai-driven) — parity mirror. Never reflexively NO-BID a
+  // winnable OPEN sol: no disqualifier + comfortable deadline (>= 10 days /
+  // unknown) -> floor into low-CAUTION (40). Never lifts a real disqualifier or
+  // a closed/imminent deadline. See src/lib/audit-engine.ts.
+  const deadlineDays = daysUntil(responseDeadline);
+  const deadlineComfortable = deadlineDays == null || deadlineDays >= 10;
+  if (!disqualifierFired && deadlineComfortable && rawScore < 40) {
+    rawScore = 40;
+  }
   // Ruling 1 supersedes the prior cap — parity mirror.
   // Score honesty: when no source was retrieved (sam_unavailable) we emit
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
@@ -1857,6 +1896,10 @@ JSON only — one key: risk_findings.`;
   const isRetrieved = pdfSource !== "sam_unavailable";
   const compliance_score: number | null = isRetrieved ? rawScore : null;
   const score_confidence: "verified" | "unscored" = isRetrieved ? "verified" : "unscored";
+  // score-ai-driven — parity mirror: persist the model's one-line score rationale.
+  if (isRetrieved && typeof overviewJson.fit_score_rationale === "string" && overviewJson.fit_score_rationale.trim()) {
+    complianceJson.fit_score_rationale = overviewJson.fit_score_rationale.trim();
+  }
 
   // is_not_solicitation: the classifier landed on a non-solicitation bucket
   // (Award Notice / attachment / unknown — all coerced to "Other" by

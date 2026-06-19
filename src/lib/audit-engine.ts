@@ -125,6 +125,17 @@ export interface OverviewJSON {
   // target ~50 chars, hard max 80 chars. NEVER emit ellipsis — return null if phrase cannot fit cleanly.
   // synthesizer drops the "is buying" clause entirely in that case.
   bottom_line_item?: string | null;
+  // ─── score-ai-driven (2026-06-18): the AI-reasoned bid/fit score ────────
+  // The model emits a calibrated 0-100 pursuit-fit score + a one-line
+  // rationale through a capture-manager lens, REPLACING the deterministic
+  // TS formula that saturated every DoD register into NO-BID. The model is
+  // told the band rubric explicitly (80-100 PROCEED · 55-79 CAUTION ·
+  // 30-54 hard · <30 true no-go). TS only (a) floors a fired genuine
+  // disqualifier into the NO-BID band and (b) guards an OPEN, far-deadline,
+  // no-disqualifier solicitation against an unfair reflexive NO-BID. See the
+  // composite-score block in runAudit for the wiring.
+  fit_score?: number | null;
+  fit_score_rationale?: string | null;
 }
 
 // Cycle 2 facts-only shape — the model emits ONLY rank + name +
@@ -285,6 +296,10 @@ export interface ComplianceJSON {
   // FA-144: renderable gate rows (projectGateConditions output) for the
   // masthead .mhv-gates / §06 .g-rows binding. Empty array on scored audits.
   gate_conditions?: Array<{ title: string; context: string; citation: string; blocker_note: string }>;
+  // score-ai-driven (2026-06-18): the model's one-line justification for the
+  // AI-reasoned fit_score, hoisted from overviewJson so the renderer can show
+  // WHY the number is what it is. Absent on unscored / metadata-only audits.
+  fit_score_rationale?: string;
   // Fork 3 (2026-06-05): engine-emitted executive summary feeding the
   // .exec-sum surface in the redesigned template. Composed deterministically
   // from existing extraction (overview summary + top 3 prioritized risks +
@@ -2585,6 +2600,16 @@ Output ONLY a JSON object with these keys. The §M/§L structured arrays below s
   Bad: "Deliver 8 each Housing Assembly Actuator NSN:1680-01-137-3534" · "Predictive maintenance" (too vague).
   Null when no clean phrase is extractable.
 
+BID/FIT SCORE — YOUR REASONED JUDGMENT (this is the one field where you DO judge, not transcribe):
+
+- fit_score (integer 0-100 or null): your CALIBRATED bid/fit score for THIS pursuit, reasoned as a capture manager weighing genuine pursuit fit against real risk — NOT a checklist tally. Score the opportunity a small/mid defense subcontractor actually faces. Anchor to this rubric:
+  • 80-100 — STRONG FIT, PROCEED. Open, winnable, clean path: clear requirement, achievable terms, normal-for-DoD compliance, no structural blocker. A routine, far-deadline set-aside or commercial-item buy with ordinary FAR/DFARS clauses lives HERE — do NOT mark it down for boilerplate every DoD solicitation carries.
+  • 55-79 — WORKABLE, CAUTION. Real but clearable friction: a heavy compliance burden (CMMC/SPRS/NIST), an aggressive schedule, an LPTA with no discussions, or several material obligations to manage. Bid-able with work.
+  • 30-54 — HARD. Stacked friction or a near-gating condition: multiple traps, a tight clearance/qualification barrier, or evaluation terms that strongly favor an incumbent. A specialized shop might still pursue.
+  • below 30 — TRUE NO-GO ONLY. Reserve this band for a genuine structural blocker the offeror cannot cure in time: a sole-source named to another vendor, an ITAR/TDP wall with no path to access, a qualification the offeror provably cannot meet by the deadline. Do NOT put an ordinary open competition here just because it carries normal DoD risk.
+  CRITICAL FAIRNESS RULE: an OPEN solicitation with a comfortable deadline and NO genuine disqualifier must NOT receive a reflexive low/NO-BID score. Normal DoD compliance is not a no-go. When the path is open, score the real fit — most open competitions land 55-90, not below 40. null ONLY for metadata-only / not-a-solicitation inputs.
+- fit_score_rationale (string or null): ONE plain-English sentence (≤ 240 chars) a BD director would say justifying the score — name the single biggest fit driver and the single biggest risk. No clause-number soup, no verdict word. null when fit_score is null.
+
 §M / §L — RAW FACTS ONLY (status, meta, coverage, tone, fit-score are TS-derived):
 
 - eval_basis_text (string or null): VERBATIM 1-2 sentence award-method statement from Section M as printed in the document (e.g. "Award will be made on a best-value tradeoff basis under FAR 15.101-1"). null if Section M is absent or this is metadata-only. (TS derives the rule citation + label from this text.)
@@ -2923,7 +2948,24 @@ JSON only — one key: risk_findings.`;
   // keeping a maxed-out NON-disqualifier pursuit in the CAUTION band, not auto-
   // DECLINE. Genuine disqualifiers get the hard floor below instead.
   const riskPenalty = severity * 4.6;
-  let rawScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+  // formulaScore = the OLD deterministic number. RETAINED as a FALLBACK only —
+  // used when the model returns no usable fit_score (parse failure / thin doc).
+  const formulaScore = Math.max(0, Math.min(100, Math.round(100 - complexityPenalty - riskPenalty)));
+
+  // score-ai-driven (2026-06-18): the SCORE IS NOW THE MODEL'S REASONED JUDGMENT.
+  // DIAGNOSIS: the graded severity formula over-weighted normal-for-DoD risk —
+  // nearly every real sol carries disqualifier-tagged P0s + detected traps +
+  // certs, so severity pinned near the ceiling and crushed the score (five sols
+  // all 25-42 / NO-BID). A formula cannot tell "open but heavy" from
+  // "structurally blocked"; only judgment can. FIX: the overview LLM call
+  // (BD-Director framing) emits a calibrated 0-100 fit_score against an explicit
+  // band rubric; we take THAT as rawScore. Formula survives ONLY as a fallback.
+  const aiScoreRaw = overviewJson.fit_score;
+  const aiScore =
+    typeof aiScoreRaw === "number" && Number.isFinite(aiScoreRaw)
+      ? Math.max(0, Math.min(100, Math.round(aiScoreRaw)))
+      : null;
+  let rawScore = aiScore ?? formulaScore;
   // HARD DISQUALIFIER FLOOR: when a genuine category-level disqualifier fired
   // (Disqualification / sole-source / no-bid / market-structure), the score is
   // capped into the NO-BID band (<=25) so the NUMBER reads DECLINE on its own —
@@ -2933,6 +2975,17 @@ JSON only — one key: risk_findings.`;
     /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "")
   );
   if (disqualifierFired) rawScore = Math.min(rawScore, 25);
+  // FAIRNESS GUARD (score-ai-driven): never reflexively NO-BID a winnable open
+  // sol. When NO genuine disqualifier fired and the deadline is comfortable
+  // (>= 10 days out, or unknown/not-yet-passed), the score must not auto-DECLINE
+  // on risk-volume alone — floor it into the low-CAUTION band (40). This NEVER
+  // lifts a real disqualifier or a closed/imminent deadline; the gate-supersede
+  // aggregator below still has final say on the recommendation tier.
+  const deadlineDays = daysUntil(responseDeadline);
+  const deadlineComfortable = deadlineDays == null || deadlineDays >= 10;
+  if (!disqualifierFired && deadlineComfortable && rawScore < 40) {
+    rawScore = 40;
+  }
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
   // now drive the recommendation tier; the score reflects the underlying fit
   // without artificial flooring. The cap helper remains exported for callers
@@ -2944,6 +2997,12 @@ JSON only — one key: risk_findings.`;
   const isRetrieved = pdfSource !== "sam_unavailable";
   const compliance_score: number | null = isRetrieved ? rawScore : null;
   const score_confidence: "verified" | "unscored" = isRetrieved ? "verified" : "unscored";
+  // score-ai-driven: persist the model's one-line score rationale (capture-
+  // manager justification) alongside the score so the renderer can surface
+  // WHY the number is what it is. Suppressed on unscored audits.
+  if (isRetrieved && typeof overviewJson.fit_score_rationale === "string" && overviewJson.fit_score_rationale.trim()) {
+    complianceJson.fit_score_rationale = overviewJson.fit_score_rationale.trim();
+  }
 
   // is_not_solicitation: the classifier landed on a non-solicitation bucket
   // (Award Notice / attachment / unknown — all coerced to "Other" by
