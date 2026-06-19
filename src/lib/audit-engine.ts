@@ -1651,6 +1651,23 @@ function shouldSuppressDFARS(
 
 // Fix 5 — set-aside deterministic regex post-processor. Document text overrides
 // SAM metadata + model output. First pattern match in priority order wins.
+//
+// SF-1449 Block 10 is a checkbox grid: pdftotext renders the CHECKED option as
+// "X <category>" while the LABELS of UNCHECKED options (incl. "SERVICE-DISABLED
+// (SDVOSB)") also appear as plain text. Matching a bare label mislabels the
+// set-aside — on HM047626R0039 the unchecked "SDVOSB" label beat the checked
+// "X 8(A)" under first-match-wins, producing an SDVOSB verdict + Capture Play on
+// an 8(a)-only buy. So we check X-MARKED boxes FIRST (high precision); only if no
+// checkbox is detected do we fall back to the prose patterns (which catch
+// solicitations that state the set-aside in narrative text rather than a form).
+const SET_ASIDE_CHECKBOX_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
+  { pattern: /\bX\s*8\s*\(?\s*a\s*\)?/i,                              value: "8(a)" },
+  { pattern: /\bX\s*HUBZone/i,                                        value: "HUBZone" },
+  { pattern: /\bX\s*(?:EDWOSB|economically\s*disadvantaged)/i,        value: "EDWOSB" },
+  { pattern: /\bX\s*(?:WOSB|women[\s-]owned)/i,                       value: "WOSB" },
+  { pattern: /\bX\s*(?:SDVOSB|service[\s-]disabled)/i,                value: "SDVOSB" },
+  { pattern: /\bX\s*(?:total\s*)?small\s*business/i,                  value: "Total Small Business Set-Aside" },
+];
 const SET_ASIDE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
   { pattern: /100\s*%\s*small\s*business\s*set[\s-]?aside/i,                value: "Total Small Business Set-Aside" },
   { pattern: /set[\s-]?aside.{0,40}8\s*\(a\)|8\s*\(a\).{0,40}set[\s-]?aside/i, value: "8(a)" },
@@ -1663,6 +1680,11 @@ const SET_ASIDE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
 ];
 export function applySetAsideRegex(docText: string, fallback: string | undefined): string | undefined {
   if (!docText) return fallback;
+  // High-precision pass: an X-marked SF-1449 checkbox is authoritative.
+  for (const { pattern, value } of SET_ASIDE_CHECKBOX_PATTERNS) {
+    if (pattern.test(docText)) return value;
+  }
+  // Fallback pass: prose-stated set-asides (no form checkbox present).
   for (const { pattern, value } of SET_ASIDE_PATTERNS) {
     if (pattern.test(docText)) return value;
   }
