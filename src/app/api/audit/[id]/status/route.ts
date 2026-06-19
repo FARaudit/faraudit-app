@@ -3,12 +3,24 @@
 // session, so a user can only see status for audits they own. Returns the
 // minimum the HomeClient poller needs: status to branch on, error_message
 // for the failed state, solicitationNumber for the redirect slug.
+//
+// RC6 FIX A (2026-06-18) — also serves the report page's progressive-render
+// poller. The /audit/[id] report previously used a full-page
+// <meta http-equiv="refresh"> during the V2 "finalizing" window (up to ~13
+// min of hard reloads → flicker + lost scroll/state). That meta tag is gone;
+// the page now JS-polls THIS endpoint and reloads exactly once when V2 lands
+// (has_v2_shadow) or terminally errors (v2_error). So this route additionally
+// returns the finalizing-window fields derived from compliance_json. The
+// existing FA-116 fields are unchanged (additive — HomeClient is unaffected).
+// Accepts a UUID or a solicitation_number slug, mirroring /audit/[id].
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   _req: NextRequest,
@@ -21,19 +33,43 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: audit, error } = await supabase
-    .from("audits")
-    .select("id, status, current_stage, stage_updated_at, error_message, solicitation_number")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+  // UUID path: direct lookup. Slug path: case-insensitive solicitation_number
+  // match, most-recent first — same resolution the /audit/[id] page uses, so a
+  // slug-URL'd report can poll without first resolving the UUID. Lightweight:
+  // only id + status fields + compliance_json (the finalizing flags live there).
+  const cols =
+    "id, status, current_stage, stage_updated_at, error_message, solicitation_number, compliance_json";
+  let audit: Record<string, unknown> | null = null;
+  if (UUID_RE.test(id)) {
+    const { data, error } = await supabase.from("audits").select(cols).eq("id", id).maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+    audit = data as Record<string, unknown> | null;
+  } else {
+    const { data, error } = await supabase
+      .from("audits")
+      .select(cols)
+      .ilike("solicitation_number", id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+    audit = data && data.length > 0 ? (data[0] as Record<string, unknown>) : null;
+  }
   if (!audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
 
-  return NextResponse.json({
-    auditId: audit.id,
-    status: audit.status,
-    current_stage: audit.current_stage ?? null,
-    error_message: audit.error_message ?? null,
-    solicitationNumber: audit.solicitation_number ?? null
-  });
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+
+  return NextResponse.json(
+    {
+      auditId: audit.id,
+      status: audit.status ?? null,
+      current_stage: audit.current_stage ?? null,
+      error_message: audit.error_message ?? null,
+      solicitationNumber: audit.solicitation_number ?? null,
+      // RC6 FIX A — progressive-render finalizing flags.
+      analysis_phase: (comp.analysis_phase as string | undefined) ?? null,
+      has_v2_shadow: !!comp.v2_shadow,
+      v2_error: !!comp.v2_error
+    },
+    { headers: { "cache-control": "no-store" } }
+  );
 }

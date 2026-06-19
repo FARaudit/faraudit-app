@@ -300,6 +300,10 @@ export interface ComplianceJSON {
   // AI-reasoned fit_score, hoisted from overviewJson so the renderer can show
   // WHY the number is what it is. Absent on unscored / metadata-only audits.
   fit_score_rationale?: string;
+  // RC1 (2026-06-19): the raw AI fit_score (0-100) the overview call returned,
+  // persisted for observability (null when the model returned no usable number).
+  // The composite compliance_score may differ (gate cap / fairness floor).
+  ai_fit_score?: number | null;
   // Fork 3 (2026-06-05): engine-emitted executive summary feeding the
   // .exec-sum surface in the redesigned template. Composed deterministically
   // from existing extraction (overview summary + top 3 prioritized risks +
@@ -1943,6 +1947,62 @@ function daysUntil(d: Date | null): number | null {
   return Math.floor((d.getTime() - Date.now()) / 86_400_000);
 }
 
+// RC4 (2026-06-19) — deadline-string normalizer. `new Date()` returns Invalid
+// Date on the real formats SAM/SF-1449/SF-1442 actually print, so the WRONG
+// entry won the max() pick and the report flipped open/closed:
+//   • "06/29/2026 1700 CT" (military HHMM) → Invalid → fell back to issue date
+//     → FALSE CLOSED (true OPEN 6/29).
+//   • "11 June 2026 10:00 AM Arizona Local Time" ("Arizona" not stripped) →
+//     Invalid → null → FALSE OPEN (true CLOSED 6/11).
+//   • "1:00 p.m. … on June 16, 2026" (prose) → Invalid → dropped → stale pick.
+// This normalizer makes those parseable WITHOUT changing the meaning of any
+// already-working format (ISO / MM/DD/YYYY / "Month D, YYYY" pass through
+// unchanged). MUST stay byte-identical to the copy in _view-model.ts.
+const _DL_MONTHS: Record<string, number> = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6,
+  august: 7, september: 8, october: 9, november: 10, december: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8,
+  oct: 9, nov: 10, dec: 11,
+};
+export function normalizeDeadlineString(input: string): string {
+  let s = String(input ?? "");
+  // (ii) prose "h:mm a.m./p.m. … on Month D, YYYY" → ISO-ish "YYYY-MM-DDThh:mm:00".
+  // Rebuilt explicitly because new Date() chokes on the interleaved prose.
+  const proseMonth = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i);
+  const proseTime = s.match(/\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m\.?\b/i);
+  if (proseMonth) {
+    let hh = 0, mm = 0, haveTime = false;
+    if (proseTime) {
+      hh = parseInt(proseTime[1], 10) % 12;
+      if (/p/i.test(proseTime[3])) hh += 12;
+      mm = proseTime[2] ? parseInt(proseTime[2], 10) : 0;
+      haveTime = true;
+    }
+    const monthIdx = _DL_MONTHS[proseMonth[1].toLowerCase()];
+    const day = parseInt(proseMonth[2], 10);
+    const year = parseInt(proseMonth[3], 10);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${year}-${pad(monthIdx + 1)}-${pad(day)}T${haveTime ? `${pad(hh)}:${pad(mm)}` : "00:00"}:00`;
+  }
+  // (iii) strip trailing place/zone phrases — named zones, "<Place> Local Time",
+  // tz abbreviations, bare "local time", and "hrs".
+  s = s.replace(/\b(Arizona|Hawaii|Alaska|Mountain|Eastern|Central|Pacific|Atlantic|Aleutian|Samoa|Chamorro)\s+(?:Standard\s+|Daylight\s+)?(?:Time|Local\s+Time)\b/gi, " ");
+  s = s.replace(/\b[A-Z][a-z]+\s+Local\s+Time\b/g, " ");
+  s = s.replace(/\blocal\s+time\b/gi, " ");
+  s = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|A[KS]?T|HST|UTC|GMT|Z)\b/g, " ");
+  s = s.replace(/\bhrs?\b/gi, " ");
+  // (i) military "HHMM" time token immediately after a date → "HH:MM". Guarded:
+  // the 4-digit run must be a valid 24h time (HH≤23, MM≤59), else left as-is so
+  // a year or other number is never mangled.
+  s = s.replace(/(\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s+(\d{2})(\d{2})\b/g,
+    (m: string, datePart: string, h: string, mn: string) => {
+      const H = parseInt(h, 10), M = parseInt(mn, 10);
+      if (H > 23 || M > 59) return m;
+      return `${datePart} ${h}:${mn}`;
+    });
+  return s.replace(/\s+/g, " ").trim();
+}
+
 // FA-172: uploaded audits carry no SAM `responseDeadLine`; the real offer-due
 // date is extracted into complianceJson.deadlines ({label,date}[] | string[]).
 // Parse it so gate curability (SPRS/JCP) + posting-lag math are correct for
@@ -1959,8 +2019,9 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
     )
     .filter((e) => e.date);
   const tryParse = (s: string): Date | null => {
-    // Strip trailing tz/time-word tokens new Date() can't parse (e.g. "1700 CT").
-    const cleaned = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    // RC4 — normalize military time / prose / named-zone formats new Date()
+    // can't parse before handing it to Date(). MUST mirror _view-model.ts.
+    const cleaned = normalizeDeadlineString(s);
     const d = new Date(cleaned);
     return isNaN(d.getTime()) ? null : d;
   };
@@ -1977,8 +2038,16 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
   // selects it even when interim dates are unlabeled. A false "open" (keeps
   // action-now copy) is far safer than a false "closed" (tells a customer to
   // abandon a winnable bid), so when only interim dates exist we return null.
-  const excludeRe = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|amendment|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)/i;
+  // RC4(b) — added issue|posted|effective so an issuance date can never enter
+  // the submission pool. NOTE: "amendment" was REMOVED from the exclude set —
+  // an "Amendment … updated deadline" is the CONTROLLING submission date and
+  // must NOT be blanket-dropped (RC4c handles supersede below).
+  const excludeRe = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)|issue|posted|effective/i;
   const submissionRe = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+  // RC4(d) — SF-1449/1442 "Offer due" / "Block 8" submission date.
+  const block8Re = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
+  // RC4(c) — amendment-updated controlling deadline markers.
+  const amendUpdatedRe = /amendment|amended|revised|updated|supersed/i;
   const valid = entries
     .map((e) => ({ ...e, d: tryParse(e.date) }))
     .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
@@ -1987,7 +2056,21 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
   const submission = eligible.filter((e) => submissionRe.test(e.label) || submissionRe.test(e.date));
   const pool = submission.length > 0 ? submission : eligible;
   if (pool.length === 0) return null; // only interim/post-award dates → never close on those
-  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
+  const latest = (xs: { d: Date }[]) => xs.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), xs[0].d);
+  // RC4(c) — amendment SUPERSEDE must run FIRST. When BOTH an amendment-updated
+  // and an original offer-due exist, narrow to the amendment-updated entries (an
+  // amendment can move a deadline EARLIER — 1232SA: Jun 22 → Jun 16). Guard
+  // `< pool.length` so a no-amendment case (HM047626) is untouched. This MUST
+  // precede the Block-8 pick: both "Offer due" labels match block8Re, so a
+  // Block-8-first selection would latest() the superseded original (the bug the
+  // regression test caught).
+  const amended = pool.filter((e) => amendUpdatedRe.test(e.label));
+  const controllingPool = amended.length > 0 && amended.length < pool.length ? amended : pool;
+  // RC4(d) — Block-8/offer-due labeled entry is the controlling offer-due; prefer
+  // it WITHIN the (possibly amendment-narrowed) pool.
+  const block8 = controllingPool.filter((e) => block8Re.test(e.label));
+  if (block8.length > 0) return latest(block8);
+  return latest(controllingPool);
 }
 
 // FA-172: extract a 6-digit NAICS from SF-1449 cover-form text when SAM metadata
@@ -3069,32 +3152,62 @@ JSON only — one key: risk_findings.`;
   // "structurally blocked"; only judgment can. FIX: the overview LLM call
   // (BD-Director framing) emits a calibrated 0-100 fit_score against an explicit
   // band rubric; we take THAT as rawScore. Formula survives ONLY as a fallback.
-  const aiScoreRaw = overviewJson.fit_score;
-  const aiScore =
-    typeof aiScoreRaw === "number" && Number.isFinite(aiScoreRaw)
-      ? Math.max(0, Math.min(100, Math.round(aiScoreRaw)))
-      : null;
+  // RC1 robustness (2026-06-19 panel): accept a numeric OR numeric-string
+  // fit_score — a model that emits "85" must NOT silently fall back to the
+  // formula. Coerce, then clamp 0-100.
+  const aiScoreRaw: unknown = overviewJson.fit_score; // parsed-JSON cast: may be number|string|null at runtime
+  const aiScoreNum =
+    typeof aiScoreRaw === "number"
+      ? aiScoreRaw
+      : typeof aiScoreRaw === "string" && aiScoreRaw.trim() !== "" && Number.isFinite(Number(aiScoreRaw))
+        ? Number(aiScoreRaw)
+        : NaN;
+  const aiScore = Number.isFinite(aiScoreNum)
+    ? Math.max(0, Math.min(100, Math.round(aiScoreNum)))
+    : null;
   let rawScore = aiScore ?? formulaScore;
-  // HARD DISQUALIFIER FLOOR: when a genuine category-level disqualifier fired
-  // (Disqualification / sole-source / no-bid / market-structure), the score is
-  // capped into the NO-BID band (<=25) so the NUMBER reads DECLINE on its own —
-  // mirroring the gate-supersede + clampScoreForSoleSource doctrine in the score
-  // itself, not only in the recommendation tier.
-  const disqualifierFired = prioritized.some((r) =>
-    /disqualif|no[-\s]?bid|sole[-\s]?source|market[-\s]?structure/i.test(r.category || "")
-  );
-  if (disqualifierFired) rawScore = Math.min(rawScore, 25);
-  // FAIRNESS GUARD (score-ai-driven): never reflexively NO-BID a winnable open
-  // sol. When NO genuine disqualifier fired and the deadline is comfortable
-  // (>= 10 days out, or unknown/not-yet-passed), the score must not auto-DECLINE
-  // on risk-volume alone — floor it into the low-CAUTION band (40). This NEVER
-  // lifts a real disqualifier or a closed/imminent deadline; the gate-supersede
-  // aggregator below still has final say on the recommendation tier.
+  const isRetrieved = pdfSource !== "sam_unavailable";
+  // RC1 — the NO-BID score cap fires ONLY on a genuine, detector-backed NAMED
+  // hard gate. Build the gates here (moved up from the recommendation block) and
+  // cap on the SAME aggregated verdict the recommendation uses: DECLINE only when
+  // gates fire AND all are uncurable (aggregateGateRecommendation). The OLD cap
+  // keyed off the model's routine "Disqualification" risk CATEGORY text
+  // (/disqualif|no-bid|sole-source|market-structure/ on r.category) — a label the
+  // capture-manager emits on nearly every DoD/8(a) sol (clearance / ITAR-TDP /
+  // registration) — which capped EVERY audit to 25 and skipped the fairness
+  // floor. That was the dominant bug behind the uniform 25/NO-BID. The loose
+  // category regex still (correctly) feeds the GRADED severity floor in
+  // deriveSeverityScore; it is no longer a hard score cap.
+  const gates: DecisionGate[] = [];
+  if (isRetrieved) {
+    if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
+    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText);
+    if (sprsG) gates.push(sprsG);
+    const jcpG = detectJcpGate(solText, responseDeadline);
+    if (jcpG) gates.push(jcpG);
+    const faaG = detectFaa145Gate(solText);
+    if (faaG) gates.push(faaG);
+    const jigG = detectTestJigGate(solText);
+    if (jigG) gates.push(jigG);
+    const aftoG = detectAftoGate(solText);
+    if (aftoG) gates.push(aftoG);
+  }
+  const gateDecline = gates.length > 0 && aggregateGateRecommendation(gates) === "DECLINE";
+  if (gateDecline) rawScore = Math.min(rawScore, 25);
+  // FAIRNESS GUARD: never reflexively NO-BID a winnable open sol. When NO hard
+  // gate forces DECLINE and the deadline is comfortable (>= 10 days out, or
+  // unknown/not-yet-passed), the score must not auto-DECLINE on risk-volume
+  // alone — floor it into the low-CAUTION band (40). Keyed off the same gate
+  // verdict, so the number and the recommendation tier never disagree.
   const deadlineDays = daysUntil(responseDeadline);
   const deadlineComfortable = deadlineDays == null || deadlineDays >= 10;
-  if (!disqualifierFired && deadlineComfortable && rawScore < 40) {
+  if (!gateDecline && deadlineComfortable && rawScore < 40) {
     rawScore = 40;
   }
+  // RC1 observability: persist the raw AI score (the number itself was never
+  // stored before — only its rationale — which is why the prior regression was
+  // undiagnosable from the row). null when the model returned no usable number.
+  complianceJson.ai_fit_score = aiScore;
   // Ruling 1 (2026-06-05) supersedes the prior sole-source score cap: gates
   // now drive the recommendation tier; the score reflects the underlying fit
   // without artificial flooring. The cap helper remains exported for callers
@@ -3103,7 +3216,7 @@ JSON only — one key: risk_findings.`;
   // null + "unscored" confidence — the renderer surfaces "—" and suppresses
   // the verdict block. Replaces the old "Math.min(rawScore, 60)" cap which
   // showed a fabricated 60/100 on metadata-only audits.
-  const isRetrieved = pdfSource !== "sam_unavailable";
+  // (isRetrieved is computed above, alongside the gate-build + score cap.)
   const compliance_score: number | null = isRetrieved ? rawScore : null;
   const score_confidence: "verified" | "unscored" = isRetrieved ? "verified" : "unscored";
   // score-ai-driven: persist the model's one-line score rationale (capture-
@@ -3142,24 +3255,9 @@ JSON only — one key: risk_findings.`;
       (isRetrieved && farCount === 0 && dfarsCount === 0)
     );
 
-  // Ruling 1 (2026-06-05): build the decision-gate list. Each detector emits
-  // a DecisionGate when its underlying signal is present, null otherwise.
-  // Detection runs only on retrieved sources — metadata-only audits can't see
-  // enough doc text to fire gates safely.
-  const gates: DecisionGate[] = [];
-  if (isRetrieved) {
-    if (soleSourceVendor) gates.push(buildSoleSourceGate(soleSourceVendor));
-    const sprsG = detectSprsGate(complianceJson.dfars_clauses, responseDeadline, solText);
-    if (sprsG) gates.push(sprsG);
-    const jcpG = detectJcpGate(solText, responseDeadline);
-    if (jcpG) gates.push(jcpG);
-    const faaG = detectFaa145Gate(solText);
-    if (faaG) gates.push(faaG);
-    const jigG = detectTestJigGate(solText);
-    if (jigG) gates.push(jigG);
-    const aftoG = detectAftoGate(solText);
-    if (aftoG) gates.push(aftoG);
-  }
+  // Ruling 1 (2026-06-05): the decision-gate list is built ABOVE (alongside the
+  // score cap, RC1 2026-06-19) so the cap + fairness floor + recommendation tier
+  // all key off ONE gate verdict. `gates` is in scope here.
 
   let recommendation: AuditResult["recommendation"];
   if (compliance_score == null) {
@@ -3453,6 +3551,7 @@ import {
   type AuditL02Catch as _v2AuditL02Catch,
   type AuditConfidenceNote as _v2AuditConfidenceNote,
   type BoundFactSources as _v2BoundFactSources,
+  type FactBindingSource,
 } from "./audit-judgment";
 import {
   matrixRollup as _v2MatrixRollup,
@@ -3590,6 +3689,13 @@ export interface MetadataBrief {
   set_aside: string | null;
   agency: string | null;
   naics_code: string | null;
+  // RC3 (2026-06-19) — provenance for the masthead facts so the renderer can
+  // honestly badge "Extracted" (from the document) vs "SAM metadata · verify"
+  // (notice-only). Driven by boundSources, NOT value-presence: a SAM-only NAICS
+  // (e.g. AOCSSB/LoC 561210 absent from the source) must read "sam_metadata".
+  // null when the fact is absent entirely.
+  naics_provenance: FactBindingSource | null;
+  set_aside_provenance: FactBindingSource | null;
   solicitor_number: string | null;
   timeline_gates: {
     offer_due: string | null;
@@ -3853,6 +3959,10 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     set_aside: input.typeOfSetAside ?? null,
     agency: null,
     naics_code: input.naicsCode ?? null,
+    // RC3 — metadata-only path: both facts are notice-sourced by construction
+    // (no PDF was read), so provenance is honestly "sam_metadata" when present.
+    naics_provenance: input.naicsCode ? "sam_metadata" : null,
+    set_aside_provenance: input.typeOfSetAside ? "sam_metadata" : null,
     solicitor_number: input.noticeId ?? null,
     timeline_gates: {
       offer_due: deadline.iso,
@@ -4598,6 +4708,11 @@ export async function runAuditV2(
       set_aside: facts.setAside ?? null,
       agency: facts.issuingOffice ?? null,
       naics_code: facts.naicsCode ?? null,
+      // RC3 — provenance carried from bindExternalFacts. "document" => read
+      // from the source PDF body; "sam_metadata" => notice-only (verify);
+      // "v1_vision" => vision read of the doc. null when the fact is absent.
+      naics_provenance: facts.naicsCode ? (boundSources.naicsCode ?? null) : null,
+      set_aside_provenance: facts.setAside ? (boundSources.setAside ?? null) : null,
       solicitor_number: facts.solicitorNumber ?? null,
       timeline_gates: {
         offer_due: facts.offerDueDate ?? null,

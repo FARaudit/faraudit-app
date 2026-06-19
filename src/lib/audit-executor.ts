@@ -551,9 +551,46 @@ export async function executeAudit(
         rendered_at: new Date().toISOString(),
         engine_ms: Date.now() - v2Start,
       };
+      // RC2 (2026-06-19) — SET-ASIDE backfill. On all PDF-source arms, the V1
+      // set-aside post-processor scans only `solText` (≈4KB SAM-metadata JSON +
+      // attachment manifest); the PDF body rides on the vision/Files-API
+      // document block, so "8(A)" / "100% set-aside under the 8(a) program"
+      // printed in the form body is never seen → top-level set_aside_type stays
+      // empty when SAM metadata carries none. V2 DOES read the real PDF text and
+      // binds set-aside via applySetAsideRegex over doc.rawText. When V1 came up
+      // empty AND V2 read a set-aside FROM THE DOCUMENT (provenance "document" /
+      // "v1_vision" — never "sam_metadata", which would just echo the same SAM
+      // blank), backfill the deterministic top-level value. Honesty preserved:
+      // positive regex match only; absent set-aside (AOCSSB/LoC) stays null.
+      const v1SetAside =
+        typeof persistedComplianceJson.set_aside_type === "string"
+          ? persistedComplianceJson.set_aside_type.trim()
+          : "";
+      const v2Brief = v2Result.metadata_brief ?? null;
+      const v2SetAside =
+        v2Brief && typeof v2Brief.set_aside === "string" ? v2Brief.set_aside.trim() : "";
+      const v2SetAsideProvenance = v2Brief?.set_aside_provenance ?? null;
+      const setAsideBackfill =
+        !v1SetAside &&
+        v2SetAside &&
+        (v2SetAsideProvenance === "document" || v2SetAsideProvenance === "v1_vision")
+          ? v2SetAside
+          : null;
+      if (setAsideBackfill) {
+        console.log(
+          `[V2-SHADOW] RC2 set-aside backfill for ${auditId}: "${setAsideBackfill}" (provenance=${v2SetAsideProvenance})`
+        );
+      }
       const { error: shadowError } = await supabase
         .from("audits")
-        .update({ compliance_json: { ...persistedComplianceJson, analysis_phase: "done", v2_shadow: v2Shadow } })
+        .update({
+          compliance_json: {
+            ...persistedComplianceJson,
+            ...(setAsideBackfill ? { set_aside_type: setAsideBackfill } : {}),
+            analysis_phase: "done",
+            v2_shadow: v2Shadow,
+          },
+        })
         .eq("id", auditId);
       if (shadowError) {
         console.error("[V2-SHADOW] db update failed (non-fatal):", shadowError.message);
