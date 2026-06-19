@@ -510,6 +510,16 @@ function normalizeDeadlineString(input: string): string {
       if (/p/i.test(proseTime[3])) hh += 12;
       mm = proseTime[2] ? parseInt(proseTime[2], 10) : 0;
       haveTime = true;
+    } else {
+      // RC4 follow-up (pre-deploy review): month-name-first date + MILITARY time
+      // ("June 16, 2026 1700 CT") the a.m./p.m. matcher misses → don't drop it to
+      // midnight (same-day FALSE CLOSED). Scan AFTER the matched date for a valid
+      // HHMM. MUST mirror engine normalizeDeadlineString.
+      const mil = s.slice((proseMonth.index ?? 0) + proseMonth[0].length).match(/\b(\d{2})(\d{2})\b/);
+      if (mil) {
+        const H = parseInt(mil[1], 10), M = parseInt(mil[2], 10);
+        if (H <= 23 && M <= 59) { hh = H; mm = M; haveTime = true; }
+      }
     }
     const monthIdx = _DL_MONTHS[proseMonth[1].toLowerCase()];
     const day = parseInt(proseMonth[2], 10);

@@ -25,6 +25,9 @@ console.log("── RC4 · normalizeDeadlineString makes real formats parseable 
 t("military '06/29/2026 1700 CT' → valid Date", Number.isFinite(new Date(normalizeDeadlineString("06/29/2026 1700 CT")).getTime()), true);
 t("'11 June 2026 10:00 AM Arizona Local Time' → valid Date", Number.isFinite(new Date(normalizeDeadlineString("11 June 2026 10:00 AM Arizona Local Time")).getTime()), true);
 t("prose '1:00 p.m. Eastern Time on June 16, 2026' → valid Date", Number.isFinite(new Date(normalizeDeadlineString("1:00 p.m. Eastern Time on June 16, 2026")).getTime()), true);
+// Pre-deploy review catch: month-name-first date + MILITARY time was dropped to midnight (same-day false-closed).
+t("month-first + military 'June 16, 2026 1700 CT' → 17:00 kept (not midnight)", /T17:00/.test(normalizeDeadlineString("June 16, 2026 1700 CT")), true);
+t("month-first, NO time 'June 16, 2026' → midnight (year never grabbed as a time)", /T00:00/.test(normalizeDeadlineString("June 16, 2026")), true);
 
 console.log("\n── RC4 · controlling offer-due picks the RIGHT entry (open/closed) ──");
 // HM047626: offer-due 6/29 (future) must win over the 5/29 issue date → OPEN.

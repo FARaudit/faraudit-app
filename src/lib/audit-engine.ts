@@ -1977,6 +1977,17 @@ export function normalizeDeadlineString(input: string): string {
       if (/p/i.test(proseTime[3])) hh += 12;
       mm = proseTime[2] ? parseInt(proseTime[2], 10) : 0;
       haveTime = true;
+    } else {
+      // RC4 follow-up (pre-deploy review): a month-name-first date can carry a
+      // MILITARY time ("June 16, 2026 1700 CT") the a.m./p.m. matcher misses —
+      // and the early return below would drop it to midnight (a same-day FALSE
+      // CLOSED). Scan the text AFTER the matched date for a valid HHMM (so the
+      // year/day are never grabbed).
+      const mil = s.slice((proseMonth.index ?? 0) + proseMonth[0].length).match(/\b(\d{2})(\d{2})\b/);
+      if (mil) {
+        const H = parseInt(mil[1], 10), M = parseInt(mil[2], 10);
+        if (H <= 23 && M <= 59) { hh = H; mm = M; haveTime = true; }
+      }
     }
     const monthIdx = _DL_MONTHS[proseMonth[1].toLowerCase()];
     const day = parseInt(proseMonth[2], 10);
