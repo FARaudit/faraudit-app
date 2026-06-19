@@ -77,7 +77,7 @@ input{font-family:inherit}
 .ribbon .mono{color:var(--ink-2)}
 .page-h{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
 .page-sub{font-size:13.5px;color:var(--mute);margin:0 0 24px;line-height:1.5;max-width:none}
-.ra-cols{max-width:1080px;margin-inline:auto}
+.ra-cols{max-width:1080px}
 .ra-modes{display:inline-flex;gap:3px;padding:3px;background:var(--card-soft);border:1px solid var(--line);border-radius:9px;margin-bottom:14px}
 .ra-mode-btn{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--mute);font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:6px}
 .ra-mode-btn svg{width:14px;height:14px}
@@ -321,7 +321,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .nx-foot .note{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mute-2)}
 .nx-empty{padding:30px 16px;text-align:center;color:var(--mute);font-size:13px;display:none}
 /* ── page body sections + order flip ── */
-.body-stack{display:flex;flex-direction:column;gap:30px;margin-top:30px;max-width:1080px;margin-inline:auto}
+.body-stack{display:flex;flex-direction:column;gap:30px;margin-top:30px;max-width:1080px}
 #view-audit.on{display:flex;flex-direction:column}
 #view-audit .ra-cols{order:1}
 #view-audit .body-stack{order:2}
@@ -367,7 +367,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .stg.deliver{background:#0c1b30;border-color:#0c1b30}
 .stg.deliver .stg-h{color:#e8eef6}.stg.deliver .stg-d{color:#9fb0c4}
 .stg-badge{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.06em;color:#6ee7b7;border:1px solid rgba(110,231,183,.4);border-radius:5px;padding:2px 6px;margin-bottom:7px}
-.prep-wrap{max-width:1080px;margin-top:30px;margin-inline:auto}
+.prep-wrap{max-width:1080px;margin-top:30px}
 .prep-wrap>summary{list-style:none;cursor:pointer}
 .prep-wrap>summary::-webkit-details-marker{display:none}
 .prep-wrap .all{display:inline-flex;align-items:center}
@@ -499,6 +499,69 @@ details[open]>summary .chev{transform:rotate(180deg)}
 [data-sb="open"] .sb-bottom{align-items:flex-start;width:100%;padding:0 4px}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#64748b,#334155);display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;border:1.5px solid rgba(255,255,255,.06)}
 /* ── /canonical toggle sidebar ── */
+
+/* ===== PHASE 9 — Run Audit content redesign (builds on Phases 6/8) ===== */
+/* 1 · one consistent 1080 width — center via the CONTAINER, not per-block auto-margins */
+#view-audit.on{ align-items:center; }
+.page-h, .page-sub, .ra-cols, .body-stack, .prep-wrap{ width:100%; max-width:1080px; }
+.ra-cols{ display:block; }
+.ra-cols > div:first-child{ width:100%; }
+.uz.card{ width:100%; }
+/* 2 · uploaded file rows — single line (use the available width) */
+.frow .fmeta{ display:flex; align-items:center; gap:11px; }
+.frow .fmeta .fname{ flex:0 1 auto; min-width:0; }
+.frow .fsub{ margin-top:0; flex:none; }
+/* 3a · Recently Audited — 2-row card: title on its own line, office · insight below */
+.rac{ grid-template-columns:54px 1fr 116px auto; padding:10px 16px; }
+.rac-title{ font-size:14px; }
+.rac-sub{ display:flex; align-items:center; gap:8px; margin-top:3px; min-width:0; }
+.rac-sub .rac-office{ padding-left:0; flex:0 0 auto; }
+.rac-sub .rac-office::before{ display:none; }
+.rac-sub .rac-insight{ margin-top:0; min-width:0; }
+/* 3b · Due-in column (bound to close date, computed live in JS) */
+.rac-dl{ display:flex; flex-direction:column; gap:2px; border-left:1px solid var(--line-2); padding-left:15px; }
+.rac-dl .lbl{ font-family:"IBM Plex Mono",monospace; font-size:8px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--mute-2); }
+.rac-dl .val{ font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:700; color:var(--ink); }
+.rac-dl .val.warn{ color:#b45309; }
+.rac-dl .val.due{ color:var(--bad,#c0352b); }
+.rac-dl .val.closed{ color:var(--mute); }
+/* 3d · Score box — pastel / tinted (decided) */
+.rac-badge{ background:var(--vt); border:1px solid var(--vl); color:var(--vi); }
+.rac-score{ color:var(--vi); }
+.rac-of{ opacity:.7; }
+/* 5 · first-run / empty state — "No audits yet" card pointing back to the upload */
+.ra-empty{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:36px 20px; border:1px dashed var(--line); border-radius:14px; background:var(--card-soft); }
+.ra-empty .ic{ width:44px; height:44px; border-radius:11px; background:var(--accent-soft); color:var(--accent-on); display:grid; place-items:center; }
+.ra-empty .ic svg{ width:22px; height:22px; }
+.ra-empty .h{ font-size:15px; font-weight:800; color:var(--ink); }
+.ra-empty .s{ font-size:12.5px; color:var(--mute); max-width:54ch; line-height:1.5; }
+/* first-run order: upload -> What runs (teaching) -> empty Recently Audited */
+.body-stack.flip .blk-recent{ order:2; }
+.body-stack.flip .blk-stages{ order:1; }
+/* 4 · "What runs when you submit" — connected pipeline (exactly 2 chips per step) */
+.pipe{display:flex;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px}
+.pipe .pstep{flex:1;display:flex;flex-direction:column;gap:7px;padding:14px 16px 15px;position:relative;border:0;grid-template-columns:none;align-items:stretch}
+.pipe .pstep:not(:last-child)::after{content:"";position:absolute;right:-7px;top:50%;transform:translateY(-50%) rotate(45deg);width:13px;height:13px;border-top:2px solid var(--line);border-right:2px solid var(--line);background:var(--card);z-index:2}
+.pipe .pstep + .pstep{border-left:1px solid var(--line-2)}
+.pipe .pstep:last-child{border-bottom:0}
+.ptop{display:flex;align-items:center;gap:8px}
+.pipe .pn{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent-on);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;flex:none}
+.ph{font-size:13px;font-weight:700;color:var(--ink)}
+.pchips{display:flex;gap:5px}
+.pchip{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line);border-radius:5px;padding:2px 7px;white-space:nowrap}
+.pipe .pstep.pdeliver{background:#0A1628;border-radius:12px;margin:-6px -6px -6px 0;flex:1.05;justify-content:center}
+.pipe .pstep.pdeliver::after{display:none}
+.pipe .pstep.pdeliver .ph{color:#fff}
+.pbadge{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;color:#6ee7b7;margin-bottom:2px}
+.pipe .pstep.pdeliver .pchip{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#cdd8e6}
+/* 4 · responsive fallback — below ~800px the 4-across pipeline stacks vertically */
+@media(max-width:800px){
+  .pipe{flex-direction:column;gap:6px}
+  .pipe .pstep:not(:last-child)::after{display:none}
+  .pipe .pstep + .pstep{border-left:0;border-top:1px solid var(--line-2)}
+  .pipe .pstep.pdeliver{margin:0;border-radius:12px}
+}
+/* ===== /PHASE 9 ===== */
 </style>
 </head>
 <body>
@@ -575,7 +638,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
       <div class="scroll">
       <div class="view on" id="view-audit">
         <h1 class="page-h">Run a New Audit</h1>
-        <p class="page-sub">Drop the solicitation package and FARaudit runs three sequential intelligence calls — returning a ranked report with a KO clarification email drafted and ready.</p>
+        <p class="page-sub">Upload a solicitation — get a ranked bid / no-bid call with a KO email drafted.</p>
         <div class="ra-cols">
           <div>
             <div class="ra-modes">
@@ -649,23 +712,23 @@ details[open]>summary .chev{transform:rotate(180deg)}
             <div class="ra-region">
               <div class="ra-scroll">
                 <div class="ra-list">
-              <a class="rac is-nobid" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">HM047626R0039</span><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span></div><div class="rac-title">HM047626R0039 — Solicitation</div><div class="rac-insight"><span class="rac-spark"></span>No-bid unless SPRS is current today.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>NO-BID</span><span class="rac-ago">29m ago</span></div></a>
-              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">69</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA460026Q0047</span><span class="rac-office">AIR FORCE · 55 CONS · OFFUTT AFB NE</span></div><div class="rac-title">Attachment 1 — PWS — 04.15.26 final</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
-              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">1232SA26R0020</span><span class="rac-office">USDA FOREST SERVICE · ALBUQUERQUE NM</span></div><div class="rac-title">Solicitation — Sol_1232SA26R0020_Amd_0001</div><div class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
-              <a class="rac is-proceed" href="#"><div class="rac-badge"><span class="rac-score">75</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">FA487726B00010002</span><span class="rac-office">AIR FORCE · AFLCMC · WPAFB OH</span></div><div class="rac-title">Attachment 3 — Statement of Work</div><div class="rac-insight"><span class="rac-spark"></span>Strong fit — file the clarifications below before quoting.</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>PROCEED</span><span class="rac-ago">13h ago</span></div></a>
+              <a class="rac is-nobid" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">HM047626R0039 — Solicitation</div><div class="rac-sub"><span class="rac-office">DLA TROOP SUPPORT · PHILADELPHIA PA</span><span class="rac-insight"><span class="rac-spark"></span>No-bid unless SPRS is current today.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val closed">—</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>NO-BID</span><span class="rac-ago">29m ago</span></div></a>
+              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">69</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Attachment 1 — PWS — 04.15.26 final</div><div class="rac-sub"><span class="rac-office">AIR FORCE · 55 CONS · OFFUTT AFB NE</span><span class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val">14 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
+              <a class="rac is-caution" href="#"><div class="rac-badge"><span class="rac-score">50</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Solicitation — Sol_1232SA26R0020_Amd_0001</div><div class="rac-sub"><span class="rac-office">USDA FOREST SERVICE · ALBUQUERQUE NM</span><span class="rac-insight"><span class="rac-spark"></span>Bid with caution — close disqualification first.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val warn">6 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>CAUTION</span><span class="rac-ago">13h ago</span></div></a>
+              <a class="rac is-proceed" href="#"><div class="rac-badge"><span class="rac-score">75</span><span class="rac-of">/ 100</span></div><div class="rac-main"><div class="rac-title">Attachment 3 — Statement of Work</div><div class="rac-sub"><span class="rac-office">AIR FORCE · AFLCMC · WPAFB OH</span><span class="rac-insight"><span class="rac-spark"></span>Strong fit — file the clarifications below before quoting.</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val">20 days</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>PROCEED</span><span class="rac-ago">13h ago</span></div></a>
                 </div>
               </div>
             </div>
           </section>
-          <section class="blk blk-stages">
-            <div class="sec-head"><span class="k">What runs when you submit</span></div>
-            <div class="stages-strip">
-              <div class="stg"><span class="stg-n">01</span><div><div class="stg-h">Overview</div><div class="stg-d">CLIN ambiguities · FOB / delivery conflicts · pricing traps</div></div></div>
-              <div class="stg"><span class="stg-n">02</span><div><div class="stg-h">FAR / DFARS Compliance</div><div class="stg-d">Every clause vs. current regs · offeror-action flags · set-aside eligibility</div></div></div>
-              <div class="stg"><span class="stg-n">03</span><div><div class="stg-h">Risk Extraction</div><div class="stg-d">High-DQ DFARS traps · severity P0–P2 · citations attached</div></div></div>
-              <div class="stg deliver"><div><span class="stg-badge">DELIVERS</span><div class="stg-h">Ranked report</div><div class="stg-d">Go / caution / decline · KO email drafted · one-click export</div></div></div>
+          <details class="blk blk-stages prep-wrap">
+            <summary class="sec-head"><span class="k">What runs when you submit</span><span class="all" style="color:var(--mute);text-decoration:none">how it works<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+            <div class="pipe" style="margin-top:13px">
+              <div class="pstep"><div class="ptop"><span class="pn">01</span><span class="ph">Overview</span></div><div class="pchips"><span class="pchip">CLIN gaps</span><span class="pchip">Pricing traps</span></div></div>
+              <div class="pstep"><div class="ptop"><span class="pn">02</span><span class="ph">FAR / DFARS</span></div><div class="pchips"><span class="pchip">Clause vs. reg</span><span class="pchip">Set-aside</span></div></div>
+              <div class="pstep"><div class="ptop"><span class="pn">03</span><span class="ph">Risk Extraction</span></div><div class="pchips"><span class="pchip">High-DQ traps</span><span class="pchip">P0–P2</span></div></div>
+              <div class="pstep pdeliver"><div><div class="pbadge">DELIVERS</div><span class="ph">Ranked report</span></div><div class="pchips"><span class="pchip">Verdict</span><span class="pchip">KO email</span></div></div>
             </div>
-          </section>
+          </details>
         </div>
       </div>
 
@@ -811,6 +874,18 @@ function submitAudit(opts){
   var allLink=document.querySelector('.blk-recent .all');if(allLink)allLink.setAttribute('href','/dashboard');
   if(!list)return;
   function ago(iso){if(!iso)return '';var d=new Date(iso),s=(Date.now()-d.getTime())/1000;if(isNaN(s))return '';if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+  // Phase 9 — live "Due in" off the solicitation close date (response_deadline).
+  // Recomputed every render; NO-BID suppresses the countdown to "—" (decided, no action).
+  function dueIn(a,verdictLabel){
+    if(verdictLabel==='NO-BID')return{cls:'closed',txt:'—'};
+    var raw=a.response_deadline||a.close_date||a.deadline||'';if(!raw)return{cls:'closed',txt:'—'};
+    var d=new Date(raw);if(isNaN(d.getTime()))return{cls:'closed',txt:'—'};
+    var days=Math.ceil((d.getTime()-Date.now())/86400000);
+    if(days>7)return{cls:'',txt:days+' days'};
+    if(days>=1)return{cls:'warn',txt:days+' day'+(days===1?'':'s')};
+    if(days===0)return{cls:'due',txt:'Due today'};
+    return{cls:'closed',txt:'Closed'};
+  }
   function verdictOf(a){var ev=String(a.exec_verdict||'').toUpperCase().replace(/[\s_]+/g,'-');
     if(ev==='NO-BID'||ev==='NOBID')return{cls:'is-nobid',label:'NO-BID'};if(ev==='CAUTION')return{cls:'is-caution',label:'CAUTION'};if(ev==='PROCEED'||ev==='GO'||ev==='BID')return{cls:'is-proceed',label:'PROCEED'};
     var rec=String(a.recommendation||'').toUpperCase();if(rec==='DECLINE')return{cls:'is-nobid',label:'NO-BID'};if(rec==='PROCEED')return{cls:'is-proceed',label:'PROCEED'};if(rec.indexOf('CAUTION')!==-1)return{cls:'is-caution',label:'CAUTION'};
@@ -822,13 +897,15 @@ function submitAudit(opts){
     var title=String(a.title||'').trim();if(title.toLowerCase()==='untitled solicitation')title='';var titleLine=(title&&title.toUpperCase()!==sol.toUpperCase())?title.slice(0,80):sol;
     var ins=insightOf(a)||v.label;
     var badge=(score!=null)?'<span class="rac-score">'+escapeHtml(String(score))+'</span><span class="rac-of">/ 100</span>':'<span class="rac-score">—</span>';
-    return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-metarow"><span class="rac-id">'+escapeHtml(sol)+'</span>'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'</div><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</div></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
-  function flip(n){if(stack)stack.classList.toggle('flip',n===0);}
-  function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-recent-empty"><b>No audits yet.</b> Run your first audit above — it’ll land here.</div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
+    var dl=dueIn(a,v.label);
+    return '<a class="rac '+v.cls+'" href="/audit/'+slug+'"><div class="rac-badge">'+badge+'</div><div class="rac-main"><div class="rac-title">'+escapeHtml(titleLine)+'</div><div class="rac-sub">'+(office?'<span class="rac-office">'+escapeHtml(office)+'</span>':'')+'<span class="rac-insight"><span class="rac-spark"></span>'+escapeHtml(ins)+'</span></div></div><div class="rac-dl"><span class="lbl">Due in</span><span class="val '+dl.cls+'">'+escapeHtml(dl.txt)+'</span></div><div class="rac-right"><span class="rac-pill"><span class="rac-pill-dot"></span>'+escapeHtml(v.label)+'</span><span class="rac-ago">'+escapeHtml(when)+'</span><span class="rac-chev">→</span></div></a>';}
+  // Phase 9 — first-run vs returning: flip section order + expand the "what runs" teaching pipeline for first-run.
+  function flip(n){var firstRun=(n===0);if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'){if(firstRun)stages.setAttribute('open','');else stages.removeAttribute('open');}}
+  function renderCards(audits){if(!audits||!audits.length){list.innerHTML='<div class="ra-empty"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/></svg></div><div class="h">No audits yet</div><div class="s">Upload a solicitation above and your first ranked report lands here — a bid / no-bid call with the KO clarification email drafted and ready.</div></div>';flip(0);return;}list.innerHTML=audits.map(cell).join('');flip(audits.length);}
   fetch('/api/audits?limit=20',{credentials:'include'}).then(function(r){return r.ok?r.json():{audits:[]};}).then(function(d){renderCards((d&&d.audits)||[]);}).catch(function(){renderCards([]);});})();
 
 /* ── state-driven order: first-run (no audits) sees the pipeline strip first ── */
-(function(){var stack=$('bodyStack');if(stack)stack.classList.toggle('flip',document.querySelectorAll('.blk-recent .rac').length===0);})();
+(function(){var stack=$('bodyStack');var firstRun=document.querySelectorAll('.blk-recent .rac').length===0;if(stack)stack.classList.toggle('flip',firstRun);var stages=document.querySelector('.blk-stages');if(stages&&stages.tagName==='DETAILS'&&firstRun)stages.setAttribute('open','');})();
 /* ── recently-audited overflow fade toggle (Phase 6) ── */
 (function(){var region=document.querySelector('.blk-recent .ra-region');if(!region)return;var sc=region.querySelector('.ra-scroll');if(!sc)return;function sync(){region.classList.toggle('is-overflowing',sc.scrollHeight>sc.clientHeight+1);}sync();if(typeof ResizeObserver!=='undefined'){new ResizeObserver(sync).observe(sc);}})();
 })();
