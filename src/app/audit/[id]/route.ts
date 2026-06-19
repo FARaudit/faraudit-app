@@ -217,20 +217,32 @@ function injectExportSpinner(html: string): string {
     `<script>(function(){` +
     `var a=document.querySelector('[data-field="pdf_export_url"]');` +
     `if(!a)return;` +
+    // Design ruling (PR #65): a single isGenerating guard so the control CANNOT
+    // fire a second export during the 10-60s generation window (dimmed-but-
+    // clickable is a defect, not a state). Belt-and-suspenders with the busy
+    // class + pointer-events:none.
+    `var isGenerating=false;` +
     `a.addEventListener('click',function(e){` +
     // Respect the FIX 5 export gate: a gated control is aria-disabled (and has
     // no href) — do nothing and let the existing pointer-events:none stand.
     `if(a.getAttribute('aria-disabled')==='true')return;` +
-    `if(a.classList.contains('fa-pdf-busy'))return;` +
+    `if(isGenerating||a.classList.contains('fa-pdf-busy'))return;` +
     `var href=a.getAttribute('href');if(!href)return;` +
     `e.preventDefault();` +
+    `isGenerating=true;` +
     `var sub=a.querySelector('.a-s');` +
     `var prevLabel=sub?sub.textContent:null;` +
-    `function restore(){a.classList.remove('fa-pdf-busy');a.removeAttribute('aria-busy');` +
+    // Restore: clear the guard, busy class, aria-busy, spinner, and the a11y
+    // live-region attributes (the sub-label had none originally).
+    `function restore(){isGenerating=false;a.classList.remove('fa-pdf-busy');a.removeAttribute('aria-busy');` +
     `var sp=a.querySelector('.fa-pdf-spin');if(sp)sp.remove();` +
-    `if(sub&&prevLabel!==null)sub.textContent=prevLabel;}` +
+    `if(sub){sub.removeAttribute('role');sub.removeAttribute('aria-live');if(prevLabel!==null)sub.textContent=prevLabel;}}` +
     `a.classList.add('fa-pdf-busy');a.setAttribute('aria-busy','true');` +
-    `if(sub){sub.textContent='Generating PDF…';` +
+    // Design ruling (PR #65, matches the PR #63 a11y bar): announce the 10-60s
+    // wait — aria-busy on the control + the sub-label as a polite live region so
+    // assistive tech speaks "Generating PDF…" (set role/aria-live BEFORE the text
+    // so the change is announced).
+    `if(sub){sub.setAttribute('role','status');sub.setAttribute('aria-live','polite');sub.textContent='Generating PDF…';` +
     `var sp=document.createElement('span');sp.className='fa-pdf-spin';sp.setAttribute('aria-hidden','true');` +
     `sub.parentNode.insertBefore(sp,sub);}` +
     `fetch(href,{cache:'no-store'}).then(function(r){` +
