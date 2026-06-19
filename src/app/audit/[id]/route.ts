@@ -14,6 +14,7 @@ import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
 import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
+import { injectRail } from "@/lib/nav/rail";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +33,14 @@ async function transitionalStatePage(
   const template = await readFile(templatePath, "utf8");
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const requestedBy = String(meta.full_name || meta.name || user.email || "").trim() || null;
-  const html = renderAuditTransitionalState(template, audit, { state, requestedBy });
+  // FA-RAIL — swap this page's pre-Phase-5 hardcoded sidebar for the shared
+  // NAV_GROUPS rail (Design route-audit: /audit/[id] both states were the
+  // straggler missed in PR #50). Same one-liner the ~22 other routes use;
+  // active item = Past Audits (per Design's checklist acceptance).
+  const html = injectRail(
+    renderAuditTransitionalState(template, audit, { state, requestedBy }),
+    "past-audits"
+  );
   return new Response(html, {
     status: 200,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
@@ -240,6 +248,11 @@ export async function GET(
   const templatePath = path.join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
   const template = await readFile(templatePath, "utf8");
   let html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
+  // FA-RAIL — swap the pre-Phase-5 hardcoded sidebar for the shared NAV_GROUPS
+  // rail (the /audit/[id] straggler from the PR #50 propagation). Active item =
+  // Past Audits (per Design). The PDF route deliberately does NOT do this — the
+  // sidebar is hidden in print, so exported PDFs stay clean.
+  html = injectRail(html, "past-audits");
 
   // Progressive render. The audit is marked complete the moment the core (V1)
   // report is ready (~3 min); the V2 agentic layer (agency / work-statement /
