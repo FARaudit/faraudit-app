@@ -37,14 +37,45 @@ async function transitionalStatePage(
   // NAV_GROUPS rail (Design route-audit: /audit/[id] both states were the
   // straggler missed in PR #50). Same one-liner the ~22 other routes use;
   // active item = Past Audits (per Design's checklist acceptance).
-  const html = injectRail(
+  let html = injectRail(
     renderAuditTransitionalState(template, audit, { state, requestedBy }),
     "past-audits"
   );
+  // RC7 PART A (2026-06-19) — the PROCESSING page (the V1+ingestion window — the
+  // long part of a big multi-doc audit like AOCSSB) was STATIC after the old
+  // fake-poll was removed: it rendered the stage at load and then sat frozen
+  // until manual reload, so a 10+ min run looked dead. Add a non-flickering poll
+  // (mirrors injectFinalizingState): every ~10s check status; reload ONCE when
+  // the stage advances (to re-render the stage list) or the audit leaves the
+  // processing state (to land on the finished report / failed page). Only on the
+  // live "progress" state — "failed" is terminal.
+  if (state === "progress") {
+    html = injectProcessingPoll(html, String(audit.id ?? ""), String(audit.current_stage ?? ""));
+  }
   return new Response(html, {
     status: 200,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
   });
+}
+
+// RC7 PART A — processing-page progress poll (see transitionalStatePage). Reloads
+// once when the stage advances or the run leaves processing; cap ~60 ticks (the
+// V1 wall-clock budget terminates a genuinely stuck run, flipping status).
+function injectProcessingPoll(html: string, auditId: string, initialStage: string): string {
+  const script =
+    `<script>(function(){` +
+    `var id=${JSON.stringify(auditId)};var s0=${JSON.stringify(initialStage)};var n=0,max=60,done=false;` +
+    `function tick(){if(done)return;n++;` +
+    `fetch('/api/audit/'+encodeURIComponent(id)+'/status',{cache:'no-store'})` +
+    `.then(function(r){return r.ok?r.json():null;})` +
+    `.then(function(j){if(done||!j)return;` +
+    `var st=typeof j.current_stage==='string'?j.current_stage:'';` +
+    `var left=(j.has_v2_shadow===true)||(j.v2_error===true)||(j.status&&j.status!=='processing'&&j.status!=='pending'&&j.status!=='analyzing');` +
+    `if(left||(st&&s0&&st!==s0)){done=true;clearInterval(t);location.reload();}})` +
+    `.catch(function(){});` +
+    `if(n>=max){done=true;clearInterval(t);}}` +
+    `var t=setInterval(tick,10000);})();</script>`;
+  return html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : html + script;
 }
 
 // Curated demo audit for the "View a sample audit report" link on /audit.
@@ -86,19 +117,41 @@ function injectFinalizingState(html: string, auditId: string): string {
     `border-bottom:1px solid #b9d4f0;letter-spacing:.01em;">` +
     `<span style="display:inline-block;width:13px;height:13px;border:2px solid #7fb0e3;` +
     `border-top-color:#0b3a66;border-radius:50%;animation:faSpin .8s linear infinite;"></span>` +
-    `<span>Finalizing the deep analysis — agency, work statement, and capture play are being ` +
+    // RC7 PART A (2026-06-19) — give the message span a stable id so the poller
+    // can swap in the human-readable current stage as the run progresses. The
+    // initial copy is the prior static text (no behavior change if the poll
+    // never returns a stage). Stays within the existing Code-owned operational
+    // banner styling — no new Design component.
+    `<span id="fa-finalizing-msg">Finalizing the deep analysis — agency, work statement, and capture play are being ` +
     `generated. This page updates automatically.</span>` +
     `<style>@keyframes faSpin{to{transform:rotate(360deg)}}</style></div>`;
   // Non-reloading poll. JSON.stringify on the id keeps it injection-safe (it's a
-  // UUID/slug from the DB, but treat it as untrusted). reloadedOnce guards the
-  // single location.reload(); the interval clears on terminal state or the cap.
+  // UUID/slug from the DB, but treat it as untrusted). `done` guards the single
+  // location.reload(); the interval clears on terminal state or the cap.
+  //
+  // RC7 PART A — on each tick we ALSO update the banner copy to the executor's
+  // current_stage so a long-but-succeeding run shows forward motion ("Extracting
+  // documents…", "Running verdict…") instead of one frozen sentence. The raw
+  // stage keys (written by markStage in audit-executor.ts) are mapped to
+  // friendly copy client-side. The single-reload-when-v2_shadow-lands /
+  // terminal-error logic below is preserved EXACTLY — the stage swap is purely
+  // additive and never short-circuits the reload.
   const script =
     `<script>(function(){` +
     `var id=${JSON.stringify(auditId)};var n=0;var max=40;var done=false;` +
+    `var COPY={retrieval:"Retrieving the solicitation and attachments\\u2026",` +
+    `extraction:"Extracting clauses and requirements from the documents\\u2026",` +
+    `risk:"Assessing risks and trap clauses\\u2026",` +
+    `verdict:"Forming the bid verdict and compliance score\\u2026",` +
+    `assembly:"Assembling the board-room report\\u2026",` +
+    `complete:"Finalizing the deep analysis \\u2014 agency, work statement, and capture play\\u2026"};` +
+    `function setMsg(stage){var el=document.getElementById('fa-finalizing-msg');if(!el)return;` +
+    `var t=COPY[stage];if(t&&el.textContent!==t)el.textContent=t;}` +
     `function tick(){if(done)return;n++;` +
     `fetch('/api/audit/'+encodeURIComponent(id)+'/status',{cache:'no-store'})` +
     `.then(function(r){return r.ok?r.json():null;})` +
     `.then(function(j){if(done||!j)return;` +
+    `if(typeof j.current_stage==='string')setMsg(j.current_stage);` +
     `if(j.has_v2_shadow===true||j.v2_error===true){done=true;clearInterval(t);location.reload();}})` +
     `.catch(function(){});` +
     `if(n>=max){done=true;clearInterval(t);}}` +

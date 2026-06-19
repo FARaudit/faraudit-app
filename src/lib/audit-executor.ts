@@ -120,6 +120,85 @@ async function markStage(
   }
 }
 
+// ━━ RC7 PART B (2026-06-19) — WALL-CLOCK BUDGETS for the pre-V2 phases ━━
+//
+// PROBLEM (panel-diagnosed): audit #2 (AOCSSB26R0039, the most-attachment run)
+// took ~13-14 min and FELT broken. The V2 agentic layer already has a hard
+// 4-min Promise.race budget (V2_OVERALL_BUDGET_MS, below). But total wall-clock
+// also includes the PRE-V2 phases — and those had NO ceiling:
+//   • the FACTS SAM cross-ref call (fetchSolicitationByNoticeId) — one network
+//     round-trip with no timeout; a hung SAM endpoint stalls the whole run.
+//   • the V1 three-call engine (runAudit) — the three calls run in PARALLEL
+//     (Promise.all), each AbortSignal.timeout(CLAUDE_TIMEOUT_MS≈300s) with a
+//     Sonnet→Opus retry, so the realistic worst case is ~one timeout + one
+//     retry ≈ up to ~600s for the slowest call. Pathological (overloaded API +
+//     full retries) it can sit near that ceiling, contributing the bulk of the
+//     "feels dead" wait with only a frozen spinner on screen.
+//
+// FIX: mirror the existing V2 Promise.race pattern and put a sane ceiling on
+// each pre-V2 phase. Budgets are deliberately set ABOVE the normal success
+// envelope so a currently-succeeding audit can NEVER be made to fail — they cap
+// only the pathological long tail. What's dropped is LOGGED + flagged, never
+// silent.
+//
+//   FACTS_SAM_BUDGET_MS — one SAM call. Normal latency is ~1-15s; 30s is a
+//     generous ceiling. On breach we degrade EXACTLY like the pre-existing
+//     `.catch(() => null)` path already does (proceed without SAM facts → leave
+//     them to extraction / honest-unknown). Pure win: a hang now degrades
+//     gracefully instead of stalling.
+//
+//   V1_OVERALL_BUDGET_MS — the parallel three-call runAudit. A clean run lands
+//     in ~1-3 min; with one slow call + Opus retry it can reach ~9-10 min. 11
+//     min is above even that retry-heavy envelope, so a normal/slow-but-
+//     succeeding run never trips it. A run still in V1 past 11 min is genuinely
+//     pathological (stuck/abandoned upstream call), NOT "succeeding" — so a
+//     breach throws a plain Error → the worker's decideRunFailureMode routes it
+//     to terminal 'fail' (NOT DegradedRunError, which would RE-RUN the same
+//     pathological hang up to the 3-attempt cap). This converts a silent
+//     multi-minute (effectively forever) stall into a prompt, diagnosable
+//     terminal failure the report page can exit to.
+//
+// NOTE / HONEST SCOPE LIMIT: the heavy multi-file INGESTION
+// (assembleSamDocumentSet — many fetch + Files-API uploads, genuinely
+// unbounded) runs UPSTREAM of executeAudit, in src/app/api/audit/route.ts and
+// agents/audit-worker/worker.ts — neither in this task's edit scope. By the
+// time bytes reach executeAudit they are already in input.attachmentPdfs. What
+// executeAudit CAN bound is the cost those already-fetched attachments impose
+// on the phases it owns (V1 + V2 each process every attachment): see the
+// ATTACHMENT_SET degrade below. The true network-ingestion ceiling must be
+// added at those two upstream call sites (flagged for follow-up).
+const FACTS_SAM_BUDGET_MS = 30 * 1000;
+const V1_OVERALL_BUDGET_MS = 11 * 60 * 1000;
+
+// Attachment-set degrade ceiling. The V1 engine + V2 shadow each ingest EVERY
+// member of input.attachmentPdfs; an abnormally large set is the in-executor
+// half of the long-tail cost. assembleSamDocumentSet already applies a doc /
+// byte / page budget upstream (MAX_DOCS etc.), so under normal operation the
+// set is already small and this NEVER trips. It's a defensive backstop against
+// a pathological set slipping through: keep the first N (deterministic order is
+// preserved upstream — form first, then tier order), drop the rest, and flag it
+// LOUDLY on compliance_json.ingestion (no silent truncation).
+const ATTACHMENT_SET_MAX = 8;
+
+// Race a promise against a wall-clock budget. On breach the returned promise
+// REJECTS with `new Error(label)` — callers decide whether that degrades
+// (catch → fallback) or fails (propagate). Mirrors the inline V2 race already
+// in this file; factored out so all three budget sites share one timer-cleanup-
+// correct implementation (the timer is always cleared, win or lose).
+async function withBudget<T>(work: Promise<T>, budgetMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(label)), budgetMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // Deterministic solicitation-number sniff for uploads. FACTS (agency / NAICS /
 // set-aside / deadline) must auto-populate from the system of record, not be
 // inferred by the AI (CEO architectural law). Federal sol numbers carry an
@@ -213,7 +292,19 @@ export async function executeAudit(
   if (!solicitation.naicsCode || !solicitation.typeOfSetAside || !(input.agency && String(input.agency).trim())) {
     const solNum = sniffSolicitationNumber(input.primaryDocName, solicitation.solicitationNumber);
     if (solNum) {
-      const samFacts = await fetchSolicitationByNoticeId(solNum).catch(() => null);
+      // RC7 PART B — bound the single SAM cross-ref call. A hung SAM endpoint
+      // previously stalled the whole audit here with no ceiling; on timeout we
+      // degrade to the SAME path the pre-existing .catch already takes (null →
+      // "leave facts to extraction / honest-unknown" below). Best-effort fact
+      // enrichment, never a blocker.
+      const samFacts = await withBudget(
+        fetchSolicitationByNoticeId(solNum),
+        FACTS_SAM_BUDGET_MS,
+        `FACTS SAM cross-ref budget (${FACTS_SAM_BUDGET_MS / 1000}s) exceeded`
+      ).catch((e) => {
+        console.warn(`[FACTS] SAM cross-ref for ${solNum} failed/timed out (non-fatal): ${e instanceof Error ? e.message : e}`);
+        return null;
+      });
       if (samFacts) {
         // A SAM record with no set-aside is DEFINITIVELY full & open — record that
         // as a known fact, never leave it blank/unknown.
@@ -254,13 +345,49 @@ export async function executeAudit(
   }
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
-  const attachmentPdfs = input.attachmentPdfs ?? null;
+  // RC7 PART B — attachment-set degrade. The V1 engine AND the V2 shadow each
+  // ingest EVERY member of attachmentPdfs; an abnormally large set is the
+  // in-executor half of the long-tail cost. Upstream assembly already enforces
+  // doc/byte/page budgets so under normal operation this is a no-op, but if a
+  // pathological set slips through we keep the first ATTACHMENT_SET_MAX (the
+  // upstream order is deterministic — primary already split out, attachments in
+  // tier order) and DROP the rest, flagged loudly (no silent truncation). This
+  // is intentionally a complete-but-fewer-docs DEGRADE, never a hard fail.
+  const inputAttachments = input.attachmentPdfs ?? null;
+  let attachmentSetDegrade: { kept: number; dropped: number; dropped_names: string[] } | null = null;
+  let attachmentPdfs = inputAttachments;
+  if (inputAttachments && inputAttachments.length > ATTACHMENT_SET_MAX) {
+    const kept = inputAttachments.slice(0, ATTACHMENT_SET_MAX);
+    const droppedDocs = inputAttachments.slice(ATTACHMENT_SET_MAX);
+    attachmentSetDegrade = {
+      kept: kept.length,
+      dropped: droppedDocs.length,
+      dropped_names: droppedDocs.map((d) => d.name),
+    };
+    attachmentPdfs = kept;
+    console.warn(
+      `[RC7] attachment-set degrade for ${auditId}: ${inputAttachments.length} attachments > cap ${ATTACHMENT_SET_MAX} — kept ${kept.length}, dropped ${droppedDocs.length} [${attachmentSetDegrade.dropped_names.join(", ")}]`
+    );
+  }
+
   await markStage(supabase, auditId, "extraction");
-  const result = await runAudit({
-    solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
-    attachmentPdfs: attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
-    primaryDocName: input.primaryDocName ?? null
-  });
+  // RC7 PART B — overall wall-clock ceiling on the parallel three-call V1
+  // engine. Mirrors the V2 Promise.race pattern below. Set ABOVE the realistic
+  // success envelope (incl. a slow call + Opus retry), so a normal/slow-but-
+  // succeeding run never trips it; a breach is a genuinely-pathological stall
+  // and rejects → propagates as a plain Error → terminal 'fail' in the worker
+  // (NOT a re-runnable DegradedRunError, which would replay the same hang up to
+  // the attempt cap). Converts a silent multi-minute stall into a prompt,
+  // diagnosable terminal failure the report page can exit to.
+  const result = await withBudget(
+    runAudit({
+      solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
+      attachmentPdfs: attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
+      primaryDocName: input.primaryDocName ?? null
+    }),
+    V1_OVERALL_BUDGET_MS,
+    `V1 engine overall budget (${V1_OVERALL_BUDGET_MS / 60000}min) exceeded — pre-V2 phase stalled`
+  );
 
   await markStage(supabase, auditId, "verdict");
 
@@ -325,7 +452,27 @@ export async function executeAudit(
     // null = single-doc/upload arm (no manifest — pre-FA-136 semantics).
     // The view-model renders the loud partial-ingestion banner when
     // files_ingested < files_total or !form_identified.
-    ingestion: input.ingestion ?? null,
+    // RC7 PART B — if the attachment-set degrade dropped members, reflect it in
+    // the SAME ingestion meta the partial-ingestion banner already reads, so the
+    // drop is surfaced (never silent). attachment_set_degrade carries the detail;
+    // overflow gets an appended note so the existing banner copy fires too. When
+    // no degrade occurred, this is exactly the prior `input.ingestion ?? null`.
+    ingestion: attachmentSetDegrade
+      ? ({
+          // A degrade implies a multi-file (SAM/upload) arm, which always
+          // carries an IngestionMeta; fall back to a complete minimal shape if
+          // it were somehow absent, so the persisted object is always valid.
+          ...(input.ingestion ?? {
+            files_total: attachmentSetDegrade.kept + attachmentSetDegrade.dropped + 1,
+            files_ingested: attachmentSetDegrade.kept + 1,
+            form_identified: false,
+            form_name: null,
+            files: [],
+          }),
+          attachment_set_degrade: attachmentSetDegrade,
+          overflow: `${(input.ingestion?.overflow ? input.ingestion.overflow + " · " : "")}RC7 attachment cap: dropped ${attachmentSetDegrade.dropped} of ${attachmentSetDegrade.kept + attachmentSetDegrade.dropped} attachment(s) over the ${ATTACHMENT_SET_MAX}-doc executor ceiling [${attachmentSetDegrade.dropped_names.join(", ")}]`,
+        } as IngestionMeta & { attachment_set_degrade: typeof attachmentSetDegrade })
+      : (input.ingestion ?? null),
     // Progressive-render flag. "finalizing" tells the report page the V2 agentic
     // layer (agency / work-statement / Capture Play) is still running, so it
     // renders those sections in a "finalizing analysis…" state and auto-refreshes

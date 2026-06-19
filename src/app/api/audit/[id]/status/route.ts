@@ -62,7 +62,16 @@ export async function GET(
     {
       auditId: audit.id,
       status: audit.status ?? null,
-      current_stage: audit.current_stage ?? null,
+      // RC7 PART A (2026-06-19) — surface the executor's staged progress so the
+      // report page's finalizing poller can show FORWARD MOTION instead of a
+      // frozen "Finalizing…" spinner. Prefer the dedicated column; fall back to
+      // compliance_json.current_stage so a row written before the FA-160 column
+      // migration still reports a stage. stage_updated_at lets the client detect
+      // a genuinely-stalled run (no stage change for a long time) vs. live work.
+      current_stage:
+        (audit.current_stage as string | null) ??
+        ((comp.current_stage as string | undefined) ?? null),
+      stage_updated_at: audit.stage_updated_at ?? null,
       error_message: audit.error_message ?? null,
       solicitationNumber: audit.solicitation_number ?? null,
       // RC6 FIX A — progressive-render finalizing flags.
