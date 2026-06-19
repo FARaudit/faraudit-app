@@ -495,15 +495,25 @@ export async function executeAudit(
   // extracts the canonical one from the document text. Backfill it (only when
   // the input had none, so a real SAM number is never overwritten) so the
   // masthead + ledger show a real ID instead of blank / "pdf-<ts>".
+  // The canonical solicitation number the engine extracted from the document can
+  // land in EITHER overview_json or compliance_json. On HM047626R0039 it sat in
+  // overview_json only, so the compliance_json-only lookup missed it and
+  // audits.solicitation_number stayed null — breaking list/search and the SAM
+  // cross-ref that keys off the printed number. Check both blobs.
+  const overviewJsonForSol = (result.overview?.json ?? {}) as Record<string, unknown>;
   const solCanonical =
-    typeof persistedComplianceJson.solicitation_number_canonical === "string" &&
-    persistedComplianceJson.solicitation_number_canonical.trim()
-      ? persistedComplianceJson.solicitation_number_canonical.trim()
-      : null;
-  const backfillSol = !solicitation.solicitationNumber && solCanonical ? solCanonical : null;
+    (typeof persistedComplianceJson.solicitation_number_canonical === "string" &&
+      persistedComplianceJson.solicitation_number_canonical.trim()) ||
+    (typeof overviewJsonForSol.solicitation_number_canonical === "string" &&
+      (overviewJsonForSol.solicitation_number_canonical as string).trim()) ||
+    null;
+  // Persist the best resolved number whenever the input lacked one. Prefer the
+  // authoritative SAM/input number (already on solicitation), else the canonical
+  // the engine read off the page. Guarded so a real input number is never lost.
+  const resolvedSolNumber = solicitation.solicitationNumber || solCanonical || null;
 
   const completeUpdate = {
-    ...(backfillSol ? { solicitation_number: backfillSol } : {}),
+    ...(resolvedSolNumber ? { solicitation_number: resolvedSolNumber } : {}),
     overview_summary: result.overview.summary,
     overview_json: result.overview.json,
     compliance_summary: result.compliance.summary,

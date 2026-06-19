@@ -2784,15 +2784,21 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       typeof v2Meta?.naics_code === "string" &&
       (v2Meta.naics_code as string).trim().length > 0 &&
       (v2Meta?.naics_provenance === "document" || v2Meta?.naics_provenance === "v1_vision"),
-    // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
-    // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
-    // column. Doc text overrides metadata — masthead must show what the
-    // solicitation actually says.
+    // FACTS-VS-ANALYSIS LAW (CEO architectural directive): set-aside is a FACT,
+    // populated deterministically by the SAM cross-ref (audit-executor FACTS-FIRST
+    // block writes audit.set_aside) — it is authoritative and MUST win over the
+    // AI's doc-text reading. The prior "doc text overrides metadata" precedence
+    // (Defect 2, 2026-06-05) misfired on HM047626R0039: applySetAsideRegex matched
+    // the UNCHECKED "SERVICE-DISABLED (SDVOSB)" label in SF-1449 Block 10 while the
+    // X was on 8(A), so the wrong AI value overrode the correct SAM "8A" and drove
+    // an SDVOSB Capture Play on an 8(a)-only buy. The deterministic column is tried
+    // first; doc-text extraction is the fallback only when SAM has no record (pure
+    // upload → audit.set_aside empty).
     set_aside: validatedSetAside(
-      extractSetAsideToken(v2Meta?.set_aside ?? compJson.set_aside_text),
+      audit.set_aside,
       v2Meta?.set_aside,
       compJson.set_aside_type,
-      audit.set_aside
+      extractSetAsideToken(v2Meta?.set_aside ?? compJson.set_aside_text)
     ),
     set_aside_sub: "",
     contract_type: sanitizeDisplayText(overviewJson.contract_type) || "—",
@@ -2957,8 +2963,8 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     ...deriveWorkStatementReveal(audit),
 
     has_incumbent: incumbentHasData,
-    incumbent_none_head: "No incumbent identified",
-    incumbent_none_note: "No prior award was found for this solicitation. Either this is a first-time procurement, or the historical record isn't in our corpus yet. Confirm the recompete cycle directly with the contracting officer.",
+    incumbent_none_head: "Incumbent not identified from these documents",
+    incumbent_none_note: "An award-history lookup needs a live SAM.gov notice, which an uploaded PDF doesn't carry — so we couldn't name the incumbent here. This is frequently a recompete of an in-place operation: scan the SOW/PWS for current program names, already-installed government equipment, or transition / phase-in language, then confirm the incumbent and recompete cycle directly with the contracting officer.",
 
     // Canonicalization layer (Brain ruling 2026-06-06) — single-source verdict
     // + canonical gate prose tied to actual gate count + days-to-deadline.
