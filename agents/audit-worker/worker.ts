@@ -18,7 +18,7 @@ import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet } from "@/lib/sam-attachments";
 import { MAX_PDF_BYTES } from "@/lib/validators";
-import type { PdfSource } from "@/lib/audit-engine";
+import { type PdfSource, CLAUDE_MODEL } from "@/lib/audit-engine";
 
 const POLL_MS = Number(process.env.WORKER_POLL_MS || 10_000);
 const STALE_PROCESSING_MS = 30 * 60 * 1000;
@@ -157,6 +157,11 @@ export async function runWorker(): Promise<never> {
   process.once("SIGINT", () => { void drainAndExit("SIGINT"); });
   await probeFa149Columns();
   console.log(`[audit-worker] up · poll=${POLL_MS}ms · stale_cutoff=${STALE_PROCESSING_MS / 60000}min · drain handler registered · reclaim=${fa149Columns ? `ACTIVE (stale>${RECLAIM_STALE_MS / 1000}s, cap ${MAX_ATTEMPTS})` : "inactive (migration pending)"}`);
+  // Deploy self-verification (2026-06-19): print the live engine model at startup
+  // so a deploy proves which model it runs from the logs alone — no audit run, no
+  // metered tokens, no guessing from the DB default placeholder. V2 judgment is
+  // threaded from this same constant (MI-1), so this one line covers both layers.
+  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} (V1 extraction + V2 judgment)`);
   // Boot reclaim pass — a redeploy replaced a container that may have died
   // holding a claim; reclaim it before the first poll.
   await reclaimOrphans().catch((err) => console.error("[audit-worker] boot reclaim error:", err instanceof Error ? err.message : err));

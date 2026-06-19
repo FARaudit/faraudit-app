@@ -24,7 +24,7 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // features (crons, RFI, support, etc.) keep their own models; this swap is Run-
 // Audit-only. Opus rejects `temperature:0`, so the model-aware gate in callClaude
 // omits it automatically. Retry model stays Opus (same family, same pricing).
-const CLAUDE_MODEL = "claude-opus-4-8";
+export const CLAUDE_MODEL = "claude-opus-4-8";
 const CLAUDE_RETRY_MODEL = "claude-opus-4-8";
 // Per-call timeout ceiling. 180s was too tight: a legitimate multi-file
 // extraction/risks call (5 full PDFs, large output budget) genuinely runs >3 min,
@@ -1671,13 +1671,22 @@ function shouldSuppressDFARS(
 // an 8(a)-only buy. So we check X-MARKED boxes FIRST (high precision); only if no
 // checkbox is detected do we fall back to the prose patterns (which catch
 // solicitations that state the set-aside in narrative text rather than a form).
+// FA176-1 (2026-06-19): a "checked box" renders many ways — a bare X (pdftotext
+// of an SF-1449 form field), a [X]/[x] or (X) bracket, or a unicode ballot/check
+// glyph (☒ ☑ ✔ ✓). The bare-X-only version missed "[X] 8(A)" and "☒ 8(A)", which
+// fell through to the prose pass where the UNCHECKED "SDVOSB" label won — re-
+// mislabeling 8(a) buys as SDVOSB (FAR 19.8 vs 19.14, legally distinct). CHECK_MARK
+// covers every rendering; the tight `\s*<category>` adjacency keeps an unchecked
+// label elsewhere on the form from matching (it has no check mark beside it).
+const CHECK_MARK = String.raw`(?:\bX|\[\s*[Xx]\s*\]|\(\s*[Xx]\s*\)|[☑☒✔✓])`;
+const mkCheckbox = (cat: string, value: string) => ({ pattern: new RegExp(`${CHECK_MARK}\\s*${cat}`, "i"), value });
 const SET_ASIDE_CHECKBOX_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
-  { pattern: /\bX\s*8\s*\(?\s*a\s*\)?/i,                              value: "8(a)" },
-  { pattern: /\bX\s*HUBZone/i,                                        value: "HUBZone" },
-  { pattern: /\bX\s*(?:EDWOSB|economically\s*disadvantaged)/i,        value: "EDWOSB" },
-  { pattern: /\bX\s*(?:WOSB|women[\s-]owned)/i,                       value: "WOSB" },
-  { pattern: /\bX\s*(?:SDVOSB|service[\s-]disabled)/i,                value: "SDVOSB" },
-  { pattern: /\bX\s*(?:total\s*)?small\s*business/i,                  value: "Total Small Business Set-Aside" },
+  mkCheckbox(String.raw`8\s*\(?\s*a\s*\)?`,                        "8(a)"),
+  mkCheckbox(String.raw`HUBZone`,                                 "HUBZone"),
+  mkCheckbox(String.raw`(?:EDWOSB|economically\s*disadvantaged)`, "EDWOSB"),
+  mkCheckbox(String.raw`(?:WOSB|women[\s-]owned)`,                "WOSB"),
+  mkCheckbox(String.raw`(?:SDVOSB|service[\s-]disabled)`,         "SDVOSB"),
+  mkCheckbox(String.raw`(?:total\s*)?small\s*business`,           "Total Small Business Set-Aside"),
 ];
 const SET_ASIDE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
   { pattern: /100\s*%\s*small\s*business\s*set[\s-]?aside/i,                value: "Total Small Business Set-Aside" },
@@ -4602,7 +4611,9 @@ export async function runAuditV2(
     }
   }
 
-  const judgment = await _v2RunJudgment(facts, boundSources);
+  // MI-1: thread the engine model so V2 judgment runs on the SAME model as V1
+  // (opus-4-8) — not the old Sonnet default. Single source of truth.
+  const judgment = await _v2RunJudgment(facts, boundSources, CLAUDE_MODEL);
 
   // FA-E2E Fix 3.3 (2026-06-18) — tentative document-type fallback. When the
   // judgment returned "unknown" BUT a work statement WAS in fact promoted above
