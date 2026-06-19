@@ -12,17 +12,20 @@
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-// Default model swap May 4 2026 · Opus 4.7 → Sonnet 4.6 · 82% cost reduction
-// validated via scripts/quality-gate/sonnet-vs-opus.mjs:
-//   - 3/3 baseline trap parity on FA301626Q0068 (hex-chrome, FOB conflict, CLIN ambiguity)
-//   - DFARS engine-flag arrays IDENTICAL between models
-//   - Bid-recommendation agreement 4/5 · classification 3/5 exact + 2/5 adjacent
-//   - Compliance score ±5 points on every case · zero JSON retries
-//   - Cost: $0.35/audit measured (was $1.96 Opus)
-// Escalation router (callWithRetry, below) swaps to Opus for any single call
-// that needs to retry — trades ~2% Opus retries for the cheap-by-default base.
-const CLAUDE_MODEL = "claude-sonnet-4-6";
-const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
+// Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
+// Quality is the moat: board-room-grade audits must beat every competitor, and on
+// the HM047626R0039 live re-run Sonnet 4.6 MISSED a real catch (the HM157526 eval-
+// attachment sol mismatch the prior Opus run found) and leaked an SDVOSB risk on an
+// 8(a) buy. The cost delta is immaterial at our price points — measured A/B
+// (scripts/quality-gate/sonnet-vs-opus.mjs, FA301626Q0068) was $0.35/audit Sonnet
+// vs $1.96/audit Opus; even at the Standard cap (100 audits) that's ~92% margin.
+// Full cost/margin analysis: ceo/ENGINE-COST-MODEL-DECISION.html.
+// NOTE: this constant is LOCAL to the audit engine (not exported) — other AI
+// features (crons, RFI, support, etc.) keep their own models; this swap is Run-
+// Audit-only. Opus rejects `temperature:0`, so the model-aware gate in callClaude
+// omits it automatically. Retry model stays Opus (same family, same pricing).
+const CLAUDE_MODEL = "claude-opus-4-8";
+const CLAUDE_RETRY_MODEL = "claude-opus-4-8";
 // Per-call timeout ceiling. 180s was too tight: a legitimate multi-file
 // extraction/risks call (5 full PDFs, large output budget) genuinely runs >3 min,
 // so it timed out → retried → timed out → FAILED the whole audit ([call:risks]
