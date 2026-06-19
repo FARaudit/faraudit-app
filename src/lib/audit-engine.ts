@@ -475,7 +475,15 @@ export function buildV1FactsDigest(
   const naics = pick("naicsCode") || pick("naics_code");
   if (naics) lines.push(`- NAICS: ${naics}`);
   const setAside = pick("typeOfSetAside") || pick("set_aside");
-  if (setAside) lines.push(`- set_aside: ${setAside}`);
+  if (setAside)
+    // FA-176: anchor the model on the authoritative set-aside. The model otherwise
+    // mis-reads SF-1449 Block 10 — the UNCHECKED "SERVICE-DISABLED (SDVOSB)" label
+    // printed next to the checked "X 8(A)" box — and the FAR 52.212-3 representation
+    // menu (which lists every category an offeror could certify) and writes an SDVOSB
+    // eligibility/Capture risk on a 100% 8(a) buy (HM047626R0039 R10).
+    lines.push(
+      `- set_aside: ${setAside}  [AUTHORITATIVE — system of record. THIS is the set-aside in effect. Do NOT infer a different set-aside from SF-1449 Block 10 unchecked option labels or the FAR 52.212-3 representations menu (both list categories that are NOT the one set aside). Every eligibility, risk, and Capture-Play analysis must use THIS set-aside only.]`
+    );
   const agency = pick("agency");
   if (agency) lines.push(`- agency: ${agency}`);
   const title = pick("title");
@@ -2824,7 +2832,7 @@ BID/FIT SCORE — YOUR REASONED JUDGMENT (this is the one field where you DO jud
 §M / §L — RAW FACTS ONLY (status, meta, coverage, tone, fit-score are TS-derived):
 
 - eval_basis_text (string or null): VERBATIM 1-2 sentence award-method statement from Section M as printed in the document (e.g. "Award will be made on a best-value tradeoff basis under FAR 15.101-1"). null if Section M is absent or this is metadata-only. (TS derives the rule citation + label from this text.)
-- evaluation_factors_raw (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance_text: string}. The importance_text is whatever the document literally says about the factor's weight or rank ("Most important", "Equal weight", "Least important · tradeoff lever", "30 points", or just the rank position if no weight is stated). NO coverage / coverage_pct / tone / note fields — those are TS-derived from the user's capability profile downstream. Empty array if §M is absent or metadata-only.
+- evaluation_factors_raw (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance_text: string}. The importance_text is whatever the document literally says about the factor's weight or rank ("Most important", "Equal weight", "Least important · tradeoff lever", "30 points", or just the rank position if no weight is stated). FA-177 — NEVER invent relative weight: state "equal weight"/"equal importance" ONLY if the document literally says so; if the source is silent on how factors or sub-factors weigh against each other, importance_text MUST read "relative weight not stated by the source" (do NOT assume equal). If a factor or sub-factor carries a PASS/FAIL ineligibility gate (e.g. "proposals failing to adequately address [SOW sections] will not be eligible for award"), prefix importance_text with "GATE (pass/fail): " — a disqualifier outranks any scored weight and must NEVER be presented as a co-equal scored bullet. NO coverage / coverage_pct / tone / note fields — those are TS-derived from the user's capability profile downstream. Empty array if §M is absent or metadata-only.
 - submission_requirements_raw (string[]): EXHAUSTIVELY enumerate every concrete Section L requirement as a clean, self-contained imperative (one discrete offeror action per entry; never copy raw §L clause text, mid-sentence fragments, or boilerplate — restate each requirement in plain action language). Include all of: page limits, submission portal + deadline, required volumes, format/font rules, reps & certs, oral presentation rules, demo requirements, past performance reference count, security clearance requirements, any "the offeror shall" / "the offeror must" statement that imposes a discrete submission action. This array is the SOLE source feeding the §09 Pre-flight Checklist surface — completeness is the acceptance gate. Empty array ONLY if §L is absent. NO status / meta fields — those are TS-derived via 6 regex buckets + a catch-all default.
 - section_l_summary (string): verbatim 2-3 sentence summary of Section L proposal preparation instructions, or empty string "" if no §L.
 - section_m_summary (string): verbatim 2-3 sentence summary of Section M evaluation criteria with weights/factors, or empty string "" if no §M.
