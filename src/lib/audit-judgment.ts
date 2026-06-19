@@ -273,11 +273,16 @@ Never name a specific weapon system, aircraft, ship, or vehicle platform (e.g. "
 
 // ── Main judgment function ────────────────────────────────────────────────
 
-export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFactSources): Promise<AuditJudgment> {
+export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFactSources, modelOverride?: string): Promise<AuditJudgment> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — judgment call cannot proceed");
 
-  const model = process.env.AUDIT_MODEL ?? "claude-sonnet-4-6";
+  // MI-1 (2026-06-19): single-source the judgment model from the engine's
+  // CLAUDE_MODEL (threaded via modelOverride) so the V2 verdict/score/catches
+  // layer — the user-visible product — can never silently diverge from the V1
+  // model again. AUDIT_MODEL stays as an explicit override hook; the literal
+  // default tracks the engine decision (opus-4-8), no longer Sonnet.
+  const model = modelOverride ?? process.env.AUDIT_MODEL ?? "claude-opus-4-8";
   const timeoutMs = Number(process.env.CLAUDE_TIMEOUT_MS) || 240000;
 
   const body = {
@@ -288,7 +293,10 @@ export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFac
     // for 20+ risks · 10+ L02 catches · 8 confidence notes without truncation.
     model,
     max_tokens: 10000,
-    temperature: 0,
+    // MI-1: temperature:0 is a Sonnet-only determinism lock — Opus 4.8 rejects
+    // it with HTTP 400 ("temperature is deprecated for this model"). Gate it to
+    // Sonnet, mirroring callClaude's /^claude-sonnet-/i gate in audit-engine.ts.
+    ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
     system:
       "You are a defense contract compliance expert. Respond only with the structured JSON requested. Be thorough on risks — do not cap the list.",
     messages: [{ role: "user", content: buildJudgmentPrompt(facts, boundSources) }],

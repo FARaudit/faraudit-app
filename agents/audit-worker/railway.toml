@@ -18,6 +18,12 @@
 
 [build]
 buildCommand = ""
+# 2026-06-19 root-cause: the Opus engine edit (src/lib/audit-engine.ts) did NOT
+# auto-deploy because this service had no src/lib watch path — a stale pre-Opus
+# image kept claiming audits and ran Sonnet. Watch the whole tree the worker
+# bundles so ANY engine/executor/judgment change triggers a rebuild. Broad by
+# design: deploying more is safe; the prior gap shipped a stale model silently.
+watchPatterns = ["src/**", "agents/audit-worker/**", "package.json", "package-lock.json", "nixpacks.toml", "tsconfig.json"]
 
 [deploy]
 # FA-149/FA-147 production finding (deploy 8999d4b4 replacing e81c53c6):
