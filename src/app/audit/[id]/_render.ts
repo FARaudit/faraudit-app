@@ -2011,6 +2011,17 @@ function scrubStaleClosedLanguage(html: string): string {
   out = out.replace(/the submission window has closed/gi, "the submission window is open");
   out = out.replace(/submission window has closed/gi, "submission window is open");
   out = out.replace(/this solicitation has closed/gi, "this solicitation is open");
+  // RC4(e) (2026-06-19) — extend the backstops to model-emitted closure
+  // ASSERTIONS anchored to the overall opportunity/offer state, which we
+  // positively know is OPEN here (is_expired === false). These were leaking
+  // through the verdict/recommendation tagline (model-authored) when the engine
+  // had mis-read the deadline as past. STILL deliberately NOT scrubbing bare
+  // "deadline has passed" / "has expired" / "recompete" — those legitimately
+  // describe a genuinely-passed SUB-window (Q&A, site visit) or forward-looking
+  // recompete guidance; a blanket rewrite there would invent a fact.
+  out = out.replace(/this (?:opportunity|solicitation|procurement) has (?:closed|expired)/gi, (m) => m.replace(/has (?:closed|expired)/i, "is open"));
+  out = out.replace(/the (?:offer|proposal|quote|response|submission) deadline has (?:passed|expired|closed)/gi, (m) => m.replace(/^the/i, "the").replace(/has (?:passed|expired|closed)/i, "is still open"));
+  out = out.replace(/no longer accepting (?:offers|proposals|quotes|responses|submissions)/gi, (m) => "still accepting" + m.slice("no longer accepting".length));
   return out;
 }
 

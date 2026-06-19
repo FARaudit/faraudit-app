@@ -107,11 +107,12 @@ export interface AuditViewModel {
   agency_sub: string;
   naics: string;
   naics_sub: string;
-  // FA-E2E Fix 5 (2026-06-18): true only when the NAICS was read from the SOURCE
-  // document (v2Meta.naics_code / extractNaicsFromText), false when it came only
-  // from SAM metadata. Drives the masthead provenance chip so a SAM-injected
-  // code is never falsely badged "Extracted" (AOCSSB: "561210 — Extracted" on a
-  // Legislative-Branch sol that states no NAICS).
+  // FA-E2E Fix 5 (2026-06-18) / RC3 (2026-06-19): true only when the NAICS was
+  // read from the SOURCE document. As of RC3 this is PROVENANCE-driven
+  // (v2Meta.naics_provenance ∈ {document, v1_vision}), NOT value-presence — so a
+  // SAM-metadata-only code is never falsely badged "Extracted" (AOCSSB: "561210
+  // — Extracted" on a Legislative-Branch sol that states no NAICS). false ⇒ the
+  // masthead renders the honest "SAM metadata · verify" chip.
   naics_from_source: boolean;
   set_aside: string;
   set_aside_sub: string;
@@ -480,8 +481,65 @@ function fmtDayMonYear(d: Date | null): string {
 // mirrors the engine's parseDocDeadline offer-due selection (drop interim
 // milestones, prefer true submission entries, take the LATEST such date) so the
 // VM can resolve the CONTROLLING deadline rather than trusting SAM blindly.
-const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|amendment|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)/i;
+// RC4(b) — added issue|posted|effective; REMOVED blanket "amendment" (RC4c
+// supersede handles it). MUST mirror engine parseDocDeadline's excludeRe.
+const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|award)|conference|registr|question|inquir|\bRF[IPQ]\b|clarification|sources?\s+sought|industry\s+day|q\s*&\s*a|notice\s+of\s+intent|period\s+of\s+performance|option\s+year|delivery|completion|award\s+date|contract\s+(start|award)|issue|posted|effective/i;
 const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
+const DEADLINE_BLOCK8_RE = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
+const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
+// RC4 (2026-06-19) — deadline-string normalizer. Byte-identical to the copy in
+// src/lib/audit-engine.ts (normalizeDeadlineString). `new Date()` returns
+// Invalid Date on the real SAM/SF-1449/SF-1442 formats (military "1700 CT";
+// "10:00 AM Arizona Local Time"; prose "1:00 p.m. … on June 16, 2026"), which
+// flipped the report open↔closed. This makes them parseable WITHOUT changing
+// any already-working format (ISO / MM/DD/YYYY / "Month D, YYYY" pass through).
+const _DL_MONTHS: Record<string, number> = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6,
+  august: 7, september: 8, october: 9, november: 10, december: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8,
+  oct: 9, nov: 10, dec: 11,
+};
+function normalizeDeadlineString(input: string): string {
+  let s = String(input ?? "");
+  const proseMonth = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i);
+  const proseTime = s.match(/\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m\.?\b/i);
+  if (proseMonth) {
+    let hh = 0, mm = 0, haveTime = false;
+    if (proseTime) {
+      hh = parseInt(proseTime[1], 10) % 12;
+      if (/p/i.test(proseTime[3])) hh += 12;
+      mm = proseTime[2] ? parseInt(proseTime[2], 10) : 0;
+      haveTime = true;
+    } else {
+      // RC4 follow-up (pre-deploy review): month-name-first date + MILITARY time
+      // ("June 16, 2026 1700 CT") the a.m./p.m. matcher misses → don't drop it to
+      // midnight (same-day FALSE CLOSED). Scan AFTER the matched date for a valid
+      // HHMM. MUST mirror engine normalizeDeadlineString.
+      const mil = s.slice((proseMonth.index ?? 0) + proseMonth[0].length).match(/\b(\d{2})(\d{2})\b/);
+      if (mil) {
+        const H = parseInt(mil[1], 10), M = parseInt(mil[2], 10);
+        if (H <= 23 && M <= 59) { hh = H; mm = M; haveTime = true; }
+      }
+    }
+    const monthIdx = _DL_MONTHS[proseMonth[1].toLowerCase()];
+    const day = parseInt(proseMonth[2], 10);
+    const year = parseInt(proseMonth[3], 10);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${year}-${pad(monthIdx + 1)}-${pad(day)}T${haveTime ? `${pad(hh)}:${pad(mm)}` : "00:00"}:00`;
+  }
+  s = s.replace(/\b(Arizona|Hawaii|Alaska|Mountain|Eastern|Central|Pacific|Atlantic|Aleutian|Samoa|Chamorro)\s+(?:Standard\s+|Daylight\s+)?(?:Time|Local\s+Time)\b/gi, " ");
+  s = s.replace(/\b[A-Z][a-z]+\s+Local\s+Time\b/g, " ");
+  s = s.replace(/\blocal\s+time\b/gi, " ");
+  s = s.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|A[KS]?T|HST|UTC|GMT|Z)\b/g, " ");
+  s = s.replace(/\bhrs?\b/gi, " ");
+  s = s.replace(/(\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s+(\d{2})(\d{2})\b/g,
+    (m: string, datePart: string, h: string, mn: string) => {
+      const H = parseInt(h, 10), M = parseInt(mn, 10);
+      if (H > 23 || M > 59) return m;
+      return `${datePart} ${h}:${mn}`;
+    });
+  return s.replace(/\s+/g, " ").trim();
+}
 function parseSourceOfferDue(deadlines: unknown): Date | null {
   if (!Array.isArray(deadlines)) return null;
   const entries = deadlines
@@ -494,7 +552,9 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
     )
     .filter((e) => e.date);
   const tryParse = (str: string): Date | null => {
-    const cleaned = str.replace(/\b(C[DS]?T|E[DS]?T|M[DS]?T|P[DS]?T|UTC|GMT|local\s+time|hrs?)\b/gi, "").trim();
+    // RC4 — normalize military/prose/named-zone formats before Date(). MUST
+    // mirror engine parseDocDeadline's tryParse.
+    const cleaned = normalizeDeadlineString(str);
     const d = new Date(cleaned);
     return Number.isNaN(d.getTime()) ? null : d;
   };
@@ -510,7 +570,19 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
   // producing "quote due 30 Jun 2031". Mirror engine parseDocDeadline instead:
   // return null on empty pool (only interim/post-award dates → never close on those).
   if (pool.length === 0) return null;
-  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
+  const latest = (xs: { d: Date }[]) => xs.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), xs[0].d);
+  // RC4(c) — amendment SUPERSEDE runs FIRST (must precede the Block-8 pick: both
+  // an "Offer due" and an "Offer due (Amendment … updated)" match block8Re, so a
+  // Block-8-first selection would latest() the superseded original — 1232SA would
+  // wrongly stay Jun 22 instead of the amended Jun 16). Narrow to amendment-updated
+  // entries when both exist; guard `< pool.length` leaves no-amendment cases alone.
+  const amended = pool.filter((e) => DEADLINE_AMEND_UPDATED_RE.test(e.label));
+  const controllingPool = amended.length > 0 && amended.length < pool.length ? amended : pool;
+  // RC4(d) — SF-1449/1442 "Offer due"/"Block 8" is the controlling offer-due,
+  // chosen WITHIN the (possibly amendment-narrowed) pool.
+  const block8 = controllingPool.filter((e) => DEADLINE_BLOCK8_RE.test(e.label));
+  if (block8.length > 0) return latest(block8);
+  return latest(controllingPool);
 }
 
 function fmtMonYear(d: Date | null): string {
@@ -2698,7 +2770,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     agency_sub: officeLeaf ? topHierarchyAgency : "",
     naics: (v2Meta?.naics_code as string | undefined) || (audit.naics_code as string) || "—",
     naics_sub: "",
-    naics_from_source: typeof v2Meta?.naics_code === "string" && (v2Meta.naics_code as string).trim().length > 0,
+    // RC3 (2026-06-19) — PROVENANCE-driven, not value-presence. The old test
+    // (typeof v2Meta.naics_code === "string" && length>0) flagged a SAM-only
+    // NAICS as "Extracted" (e.g. AOCSSB/Library of Congress 561210 appears
+    // NOWHERE in the source — SAM metadata only), fabricating a from-document
+    // badge. Now: from-source ONLY when the engine bound the code from the
+    // document body ("document") or a vision read of the document ("v1_vision").
+    // "sam_metadata" / absent / SAM-column fallback → false, so the existing
+    // _render.ts "SAM metadata · verify" branch fires honestly. The deterministic
+    // NAICS extraction itself is UNCHANGED (HM047626 541611 + FA487726 237310 ARE
+    // in source → provenance "document" → still "Extracted").
+    naics_from_source:
+      typeof v2Meta?.naics_code === "string" &&
+      (v2Meta.naics_code as string).trim().length > 0 &&
+      (v2Meta?.naics_provenance === "document" || v2Meta?.naics_provenance === "v1_vision"),
     // Defect 2 (2026-06-05): prefer the engine-computed set-aside (derived
     // from doc text via applySetAsideRegex) over the SAM-sourced audits.set_aside
     // column. Doc text overrides metadata — masthead must show what the

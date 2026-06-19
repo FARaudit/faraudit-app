@@ -96,7 +96,7 @@ export function classifySectionRoles(name: string): string[] {
   const desigRe = /(?:^|[\s+_(§-])([chlm])\./gi;
   while ((m = desigRe.exec(n)) !== null) add(m[1]);
   // reliable section keywords (matched on the separator-normalized name)
-  if (/statement of work|\bsow\b|\bpws\b|performance work statement|\bsoo\b|scope of work|statement of objectives/.test(nspace)) add("c");
+  if (/statement of work|\bsow\b|\bpws\b|performance work statement|\bsoo\b|scope of work|statement of objectives|project description|bid description/.test(nspace)) add("c");
   if (/instructions?\b[\s\w]{0,40}\bofferors?\b|notices to offerors/.test(nspace)) add("l");
   if (/evaluation factors?\b|basis of award\b/.test(nspace)) add("m");
   if (/special contract requirements?\b/.test(nspace)) add("h");
@@ -112,7 +112,14 @@ export function classifySectionRoles(name: string): string[] {
 // shared by both the sync route and the async worker so they behave identically.
 export function deriveSolTokenFromFilenames(names: string[]): string | null {
   const SOLNUM_RE = /\b[0-9A-Z]{2,}[-_ ]?[0-9A-Z]{0,}(?:[-_ ]?[0-9A-Z]+){1,}\b/gi;
+  // RC5 Fix 2 — strip a trailing amendment/modification suffix so the derived
+  // token is the TRUE sol number, not the amendment-stamped filename token.
+  // "Sol_1232SA26R0020_Amd_0001" → "Sol_1232SA26R0020" (then SOLNUM_RE yields
+  // 1232SA26R0020). Case-insensitive; no-op for non-amendment names.
+  // Tolerates an optional file extension after the suffix ("…_Amd_0001.pdf").
+  const AMD_SUFFIX_RE = /[-_ ]?(?:amd|amendment|mod|modification)[-_ ]?\d*(\.[a-z0-9]+)?$/i;
   return names
+    .map((name) => name.replace(AMD_SUFFIX_RE, "$1"))
     .flatMap((name) => (name.match(SOLNUM_RE) ?? []))
     .map((t) => t.trim())
     .filter((t) => /[0-9]/.test(t) && /[A-Z]/i.test(t) && t.replace(/[^0-9A-Z]/gi, "").length >= 8)
@@ -242,6 +249,50 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
     (a.sizeBytes ?? Infinity) - (b.sizeBytes ?? Infinity) ||
     a.name.localeCompare(b.name)
   );
+}
+
+// RC5 Fix 1 — content-aware form substantiveness, by NAME (deterministic).
+//
+// Root cause (audit #4, 1232SA26R0020): the user uploaded ONLY an SF-30
+// amendment cover ("Sol_1232SA26R0020_Amd_0001.pdf") + an image-heavy scope
+// deck — the base solicitation was NOT uploaded. isForm() correctly classifies
+// the amendment-named primary as FORM (so the set has SOMETHING to anchor on),
+// but emitting form_identified=true on a content-empty SF-30 cover MASKS the
+// honest "upload the solicitation" banner.
+//
+// formIsSubstantive(formName) answers: does the identified form look like a real
+// solicitation body, or only an amendment/SF-30 cover that resolved via the sol
+// number? It returns FALSE only for the narrow, conservative case:
+//   - the file carries an amendment marker (_Amd_ / SF-30 / "amendment of
+//     solicitation"), AND
+//   - it has NO real solicitation-cover signal (no SF-1442/1449/33/18, no bare
+//     \bsolicitation\b token).
+// In that case its ONLY claim to FORM-hood is the solNorm substring match — i.e.
+// an amendment cover that happens to carry the sol number. Everything else
+// (a real SF-1442/1449/33 cover, even when amendment-named; a file literally
+// named "…Solicitation…") returns TRUE so a genuine amended solicitation still
+// counts as the form. null/empty → false (no form at all).
+//
+// Consumed by form_identified in both assembly arms. The view-model
+// (_view-model.ts ~2755) reads `ingestion.form_identified !== true` as
+// `formless` and fires the no-primary banner — so flipping this to false makes
+// the honest "upload the solicitation" banner fire with NO view-model change.
+export function formIsSubstantive(formName: string | null | undefined): boolean {
+  if (!formName) return false;
+  const n = formName;
+  // A genuine SF cover form is substantive even if amendment-named.
+  if (/sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?0?18\b|sf[\s-]?33\b/i.test(n)) return true;
+  // A file literally named "…Solicitation…" is the solicitation body, not an
+  // amendment cover — substantive. (SF-30's full title is "Amendment of
+  // Solicitation", which we exclude below before this could false-positive.)
+  const isAmendmentCover = /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract|\bamd\b|amendment|_amd_|-amd-/i.test(n);
+  if (/\bsolicitation\b/i.test(n) && !isAmendmentCover) return true;
+  // Otherwise: if it's an amendment/SF-30 cover, its only FORM claim is the
+  // solNorm match → NOT substantive. The honest no-primary banner must fire.
+  if (isAmendmentCover) return false;
+  // No amendment marker and it still got classified as form (e.g. an SF cover
+  // matched above would have returned true already) → treat as substantive.
+  return true;
 }
 
 // Budget application — pure, exported for the gate suite. Decides which plan
@@ -401,7 +452,10 @@ export async function assembleSamDocumentSet(
   const ingestion: IngestionMeta = {
     files_total: plan.length,
     files_ingested: ingestedCount,
-    form_identified: !!formEntry && downloaded.some((d) => d.role === "form"),
+    // RC5 Fix 1 — only honest if a SUBSTANTIVE form was identified. An
+    // amendment-only / SF-30-cover primary (form claim is just the sol-number
+    // match) → false, so the no-primary "upload the solicitation" banner fires.
+    form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
@@ -509,7 +563,9 @@ export async function assembleUploadedDocumentSet(
   const ingestion: IngestionMeta = {
     files_total: plan.length,
     files_ingested: ingested.length,
-    form_identified: !!formEntry && ingested.some((d) => d.role === "form"),
+    // RC5 Fix 1 — see assembleSamDocumentSet: substantive-form gate so an
+    // amendment-only upload (audit #4) honestly fires the no-primary banner.
+    form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
     ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
