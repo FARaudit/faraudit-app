@@ -13,7 +13,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
 import { renderAuditTransitionalState } from "./_render-states";
-import { isV2Finalizing } from "@/lib/audit-display";
+import { isV2Finalizing, isV2Degraded } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -208,8 +208,15 @@ export async function GET(
   // backstop on completed_at stops the refresh loop if V2 ever stalls/fails, so
   // the report is never stuck refreshing.
   if (isV2Finalizing(audit)) {
-    html = injectFinalizingState(html);
+    // Export stays gated in BOTH the live and degraded cases (never ship a
+    // half/degraded PDF). But only a LIVE finalizing run gets the spinner +
+    // auto-refresh — a TERMINAL degraded run (v2_error, no v2_shadow) has nothing
+    // left to stream, so refreshing would loop forever (FIX 5). Show its
+    // (degraded) core report as-is, export disabled, no refresh.
     html = disableExportWhileFinalizing(html);
+    if (!isV2Degraded(audit)) {
+      html = injectFinalizingState(html);
+    }
   }
 
   return new Response(html, {

@@ -103,6 +103,22 @@ export function classifySectionRoles(name: string): string[] {
   return ["C", "H", "L", "M"].filter((x) => roles.has(x));
 }
 
+// FA-E2E Fix 4 — derive a sol-number token from a set of raw upload filenames
+// so the solNorm branch of isForm can fire on uploads. Without it, an
+// amendment-named primary solicitation (e.g. "Sol_HM047626R0039_Amd_0001.pdf")
+// never resolves to a FORM and the "no primary solicitation" banner sticks. Sol
+// numbers are letter+digit dense tokens (e.g. HM047626R0039, FA460026Q0047,
+// W912DY-26-R-0001); take the longest such token across all filenames. Pure —
+// shared by both the sync route and the async worker so they behave identically.
+export function deriveSolTokenFromFilenames(names: string[]): string | null {
+  const SOLNUM_RE = /\b[0-9A-Z]{2,}[-_ ]?[0-9A-Z]{0,}(?:[-_ ]?[0-9A-Z]+){1,}\b/gi;
+  return names
+    .flatMap((name) => (name.match(SOLNUM_RE) ?? []))
+    .map((t) => t.trim())
+    .filter((t) => /[0-9]/.test(t) && /[A-Z]/i.test(t) && t.replace(/[^0-9A-Z]/gi, "").length >= 8)
+    .sort((a, b) => b.replace(/[^0-9A-Z]/gi, "").length - a.replace(/[^0-9A-Z]/gi, "").length)[0] ?? null;
+}
+
 export interface IngestionMeta {
   files_total: number;
   files_ingested: number;

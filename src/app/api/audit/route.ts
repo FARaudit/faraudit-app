@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, assembleUploadedDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
+import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -235,12 +235,7 @@ export async function POST(req: NextRequest) {
     // FORM and the "no primary solicitation" banner stuck. Sol numbers are
     // letter+digit dense tokens (e.g. HM047626R0039, FA460026Q0047,
     // W912DY-26-R-0001); take the longest such token across all upload names.
-    const SOLNUM_RE = /\b[0-9A-Z]{2,}[-_ ]?[0-9A-Z]{0,}(?:[-_ ]?[0-9A-Z]+){1,}\b/gi;
-    const uploadSolToken = uploadedDocs
-      .flatMap((d) => (d.name.match(SOLNUM_RE) ?? []))
-      .map((t) => t.trim())
-      .filter((t) => /[0-9]/.test(t) && /[A-Z]/i.test(t) && t.replace(/[^0-9A-Z]/gi, "").length >= 8)
-      .sort((a, b) => b.replace(/[^0-9A-Z]/gi, "").length - a.replace(/[^0-9A-Z]/gi, "").length)[0] ?? null;
+    const uploadSolToken = deriveSolTokenFromFilenames(uploadedDocs.map((d) => d.name));
     uploadAssembled = await assembleUploadedDocumentSet(uploadedDocs, uploadSolToken);
     if (uploadAssembled.primary) {
       safeName = sanitizeFilename(uploadAssembled.primary.name);

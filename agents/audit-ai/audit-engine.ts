@@ -256,6 +256,10 @@ export interface ComplianceJSON {
   solicitation_number_canonical?: string | null;
   // Fork 1 (2026-06-05): parity mirror — see src/lib/audit-engine.ts.
   naics_size_standard?: string;
+  // FA-E2E Fix 6.2 (2026-06-18) — parity mirror of src/lib. Deterministic NAICS
+  // (SAM naicsCode → extractNaicsFromText(solText) → null). Facts-from-source,
+  // never routed through the AI.
+  naics?: string;
   sole_source_vendor?: { name: string; cage?: string | null };
   piid_decoded?: { activity: string | null; fiscalYear: string | null; procurementType: string | null };
   // score-ai-driven (2026-06-18) — parity mirror. Model's one-line fit_score
@@ -325,6 +329,51 @@ export interface RisksJSON {
   executive_risk_summary?: string;
 }
 
+// FA-E2E Fix 6.1 (2026-06-18) — DETERMINISTIC DoD-vs-civilian agency-branch
+// classifier (parity with src/lib/audit-engine.ts). DFARS (48 CFR Ch.2 —
+// 252.* / 5352.*) binds ONLY DoD components. On a positively-identified civilian
+// agency, parseDFARSTraps force-suppresses every 252./5352. trap (e.g. a USDA
+// buy that fabricated 252.204-7018). CONSERVATIVE: an unclassifiable agency
+// returns "unknown" and is NEVER suppressed (never hide a real DFARS trap on a
+// DoD buy we failed to recognize). NASA(1852)/USCG use DFARS-adjacent
+// supplements → treated as DoD-equivalent (not suppressed). Facts-from-source,
+// never routed through the AI.
+export function classifyAgencyBranch(
+  agencyPath: string | null | undefined,
+  solicitationNumber: string | null | undefined
+): "dod" | "civilian" | "unknown" {
+  const path = (agencyPath ?? "").toUpperCase();
+  const piid = (solicitationNumber ?? "").toUpperCase().trim();
+
+  const DOD_PATH = /DEPT?\.?\s*OF\s*DEFENSE|DEPARTMENT\s*OF\s*DEFENSE|\bDEFENSE\b|\bDOD\b|\bARMY\b|\bNAVY\b|MARINE\s*CORPS|\bUSMC\b|AIR\s*FORCE|SPACE\s*FORCE|\bUSAF\b|\bUSSF\b|DEFENSE\s*LOGISTICS|\bDLA\b|\bDISA\b|\bDARPA\b|MISSILE\s*DEFENSE|\bDCMA\b|\bDTRA\b|\bDFAS\b|\bDHA\b|\bDLSA\b|\bSOCOM\b|SPECIAL\s*OPERATIONS|\bCENTCOM\b|\bTRANSCOM\b|CORPS\s*OF\s*ENGINEERS|\bUSACE\b/;
+  const ADJACENT_PATH = /\bNASA\b|NATIONAL\s*AERONAUTICS|COAST\s*GUARD|\bUSCG\b/;
+  const CIVILIAN_PATH = /AGRICULTURE|\bUSDA\b|GENERAL\s*SERVICES|\bGSA\b|HEALTH\s*AND\s*HUMAN|\bHHS\b|HOMELAND\s*SECURITY|\bDHS\b|VETERANS\s*AFFAIRS|DEPARTMENT\s*OF\s*VETERANS|INTERIOR|\bDOI\b|\bTREASURY\b|\bJUSTICE\b|\bDOJ\b|COMMERCE|\bDOC\b|\bLABOR\b|\bDOL\b|TRANSPORTATION(?!\s*COMMAND)|EDUCATION|\bENERGY\b|\bDOE\b|STATE\s*DEPARTMENT|DEPARTMENT\s*OF\s*STATE|ENVIRONMENTAL\s*PROTECTION|\bEPA\b|SOCIAL\s*SECURITY|SMALL\s*BUSINESS\s*ADMIN|NUCLEAR\s*REGULATORY|LEGISLATIVE|JUDICIAL|CONGRESS|GOVERNMENT\s*ACCOUNTABILITY|\bGAO\b|LIBRARY\s*OF\s*CONGRESS|GOVERNMENT\s*PUBLISHING|ARCHITECT\s*OF\s*THE\s*CAPITOL/;
+
+  if (path) {
+    if (DOD_PATH.test(path) || ADJACENT_PATH.test(path)) return "dod";
+    if (CIVILIAN_PATH.test(path)) return "civilian";
+  }
+
+  if (piid) {
+    if (/^(W|N|M|F|FA|SP|HQ|HR|HT|HM|HC|HS|H9|H4|H6|H7|H8|HDEC)/.test(piid)) return "dod";
+    if (/^70Z/.test(piid)) return "dod";
+    if (/^(80|NNX|NNG|NNJ|NNK|NNL|NNM|NNS)/.test(piid)) return "dod";
+    if (/^(GS|47Q|AG|12[A-Z0-9]|36C|VA|75[A-Z0-9]|140|20[A-Z0-9]|TIRNO|DJ|15[A-Z0-9]|SB|13[A-Z0-9]|DOL|16[A-Z0-9]|DTF|693|DE|89[A-Z0-9]|SAQ|19[A-Z0-9]|EP|68[A-Z0-9])/.test(piid)) {
+      return "civilian";
+    }
+    if (/^70(?!Z)/.test(piid)) return "civilian";
+  }
+
+  return "unknown";
+}
+
+function shouldSuppressDFARS(
+  agencyPath: string | null | undefined,
+  solicitationNumber: string | null | undefined
+): boolean {
+  return classifyAgencyBranch(agencyPath, solicitationNumber) === "civilian";
+}
+
 const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" | "P2" }> = [
   { clause: "252.223-7008", title: "Hexavalent Chromium", severity: "P0" },
   { clause: "252.204-7018", title: "Covered Telecom", severity: "P0" },
@@ -337,14 +386,32 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.247-7023", title: "Transportation by Sea", severity: "P2" }
 ];
 
-export function parseDFARSTraps(complianceJson: ComplianceJSON): DFARSFlag[] {
+export function parseDFARSTraps(
+  complianceJson: ComplianceJSON,
+  // FA-E2E Fix 6.1 — deterministic agency-branch context (parity with src/lib).
+  // Positively-civilian agency → every 252./5352. trap force-suppressed.
+  // Omitted/unknown → no suppression (conservative).
+  agencyContext?: { agencyPath?: string | null; solicitationNumber?: string | null }
+): DFARSFlag[] {
   const clauses = complianceJson.dfars_clauses ?? [];
-  return DFARS_TRAPS.map((trap) => ({
-    clause: trap.clause,
-    title: trap.title,
-    detected: clauses.some((c) => typeof c === "string" && c.includes(trap.clause)),
-    severity: trap.severity
-  }));
+  const suppressDFARS = agencyContext
+    ? shouldSuppressDFARS(agencyContext.agencyPath, agencyContext.solicitationNumber)
+    : false;
+  return DFARS_TRAPS.map((trap) => {
+    let detected = clauses.some((c) => typeof c === "string" && c.includes(trap.clause));
+    // FA-E2E Fix 6.1 — civilian-agency gate. Every DFARS_TRAPS clause is 252.*
+    // or 5352. (48 CFR Ch.2, DoD-only). On a positively-civilian agency, clear
+    // the detection so a hallucinated 252.* clause never surfaces as a trap.
+    if (detected && suppressDFARS && /^(252\.|5352\.)/.test(trap.clause)) {
+      detected = false;
+    }
+    return {
+      clause: trap.clause,
+      title: trap.title,
+      detected,
+      severity: trap.severity
+    };
+  });
 }
 
 function extractCitation(text: string): string | undefined {
@@ -957,6 +1024,27 @@ export function getNaicsSizeStandard(naicsCode: string | null | undefined): stri
   if (entry.employees) return `${entry.employees.toLocaleString()} employees`;
   if (entry.revenue) return `${entry.revenue} avg annual receipts`;
   return "See SBA Table of Size Standards";
+}
+
+// FA-E2E Fix 6.2 (2026-06-18) — DETERMINISTIC NAICS extraction (parity copy of
+// src/lib/audit-engine.ts). Reads the document text layer when SAM carries no
+// naicsCode. Never guesses: returns a code only when labeled, or when exactly
+// ONE valid-sector 6-digit token exists alongside a NAICS reference. Facts-from-
+// source, never routed through the AI.
+function extractNaicsFromText(text: string): string | null {
+  if (!text) return null;
+  // 1) NAICS label adjacent to the value (clean / linear text layouts).
+  const labeled = text.match(/NAICS[^\d]{0,40}(\d{6})\b/i);
+  if (labeled) return labeled[1];
+  // 2) FA-180 — SF-1449 grids scatter the value far from the "(NAICS):" label.
+  //    If the doc references NAICS and there is exactly ONE 6-digit token with a
+  //    valid sector prefix, that is the code. More than one → null (never guess).
+  if (!/NAICS|NORTH AMERICAN INDUSTRY CLASSIFICATION/i.test(text)) return null;
+  const VALID_NAICS = /^(?:11|21|22|23|31|32|33|42|44|45|48|49|51|52|53|54|55|56|61|62|71|72|81|92)\d{4}$/;
+  const cands = Array.from(
+    new Set(Array.from(text.matchAll(/\b(\d{6})\b/g), (m) => m[1]))
+  ).filter((c) => VALID_NAICS.test(c));
+  return cands.length === 1 ? cands[0] : null;
 }
 
 const DLA_ACTIVITY_MAP: Record<string, string> = {
@@ -1665,7 +1753,7 @@ Output ONLY a JSON object with these keys — facts only, no severities or risk 
 - required_certifications (string[]): EVERY certification / registration / compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
 - key_compliance_actions (string[]): verbatim required-action language for items a small business must complete to bid (e.g. "Submit past performance for similar contract value within last 3 years", "Complete representations 52.204-24 + 52.204-26").
 - set_aside_text (string or null): VERBATIM citation if the document explicitly states a set-aside — quote the literal sentence or clause reference (e.g. "100% small business set-aside" / "FAR 52.219-6 notice present" / "Block 10 box X checked"). null if no document text triggers a set-aside. (TS derives the enum value via regex on the full solText; this raw signal preserves the document's literal wording.)
-- deadlines (object[]): array of {label: string, date: string} — verbatim date strings as printed (e.g. {label: "Proposal due", date: "25 June 2026 4:00 PM CST"}). Do not canonicalize dates here; TS parses + canonicalizes downstream.
+- deadlines (object[]): array of {label: string, date: string} — verbatim date strings as printed (e.g. {label: "Offer due", date: "25 June 2026 4:00 PM CST"}). The CONTROLLING offer-due date is the SF-1449 Block 8 / SF-1442 "OFFER DUE DATE/LOCAL TIME" field when present — extract that as the offer-due entry. Label entries explicitly so downstream filtering is reliable: use label "Offer due" for the submission/offer/quote/proposal due date, "Period of performance" for PoP/option/delivery dates, and an otherwise descriptive label for anything else. Do not canonicalize dates here; TS parses + canonicalizes downstream.
 - clins (object[]): array of {clin: "0001", description, quantity, pricing_arrangement, fob} for EVERY CLIN in Section B. Use raw strings; TS normalizes units and FOB enum downstream.
 - section_l_summary (string): 2-3 sentence verbatim summary of Section L, or empty string "" if no §L.
 - section_m_summary (string): 2-3 sentence verbatim summary of Section M, or empty string "" if no §M.
@@ -1761,7 +1849,24 @@ JSON only — one key: risk_findings.`;
   }
 
   // Engine post-processing
-  complianceJson.dfars_flags = parseDFARSTraps(complianceJson);
+  // FA-E2E Fix 6.1 — deterministic agency-branch context (parity with src/lib).
+  // DFARS 252./5352. traps gated to DoD (incl. NASA/USCG supplements); a civilian
+  // agency (e.g. USDA) force-suppresses fabricated 252.* clauses. Source signals:
+  // SAM fullParentPathName/agency + the solicitation/PIID number.
+  const _dfarsAgencyPath = String(
+    (solicitation as Record<string, unknown> | null)?.["fullParentPathName"]
+      ?? (solicitation as Record<string, unknown> | null)?.["agency"]
+      ?? ""
+  );
+  const _dfarsSolNum = String(
+    (solicitation as Record<string, unknown> | null)?.["solicitationNumber"]
+      ?? (solicitation as Record<string, unknown> | null)?.["noticeId"]
+      ?? ""
+  );
+  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, {
+    agencyPath: _dfarsAgencyPath || null,
+    solicitationNumber: _dfarsSolNum || null,
+  });
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
@@ -1824,10 +1929,17 @@ JSON only — one key: risk_findings.`;
   const reverseAuctionRisk = buildReverseAuctionRisk(complianceJson.far_clauses, complianceJson.section_l_summary);
   if (reverseAuctionRisk) prioritized = [reverseAuctionRisk, ...prioritized];
 
+  // FA-E2E Fix 6.2 — deterministic NAICS (parity with src/lib): SAM naicsCode →
+  // document-text extraction → null. Persist the structured value so the header
+  // can bind it; never route NAICS through the AI.
   const naicsCode =
     (typeof (solicitation as Record<string, unknown> | null)?.["naicsCode"] === "string" ? String((solicitation as Record<string, unknown>)["naicsCode"]) : null)
+    ?? extractNaicsFromText(solText)
     ?? null;
-  if (naicsCode) complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  if (naicsCode) {
+    complianceJson.naics = naicsCode;
+    complianceJson.naics_size_standard = getNaicsSizeStandard(naicsCode);
+  }
 
   const piidSource =
     overviewJson.solicitation_number_canonical

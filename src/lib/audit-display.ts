@@ -126,10 +126,30 @@ export const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop waiting if 
 
 export function isV2Finalizing(audit: Record<string, unknown>): boolean {
   const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  // Doctrine: the export gate is OPEN (this returns false) only when the V2
+  // agentic layer has fully landed — i.e. v2_shadow is present. Any other state
+  // where the deep layer is missing keeps the gate CLOSED so we never ship a
+  // half/degraded report (no agency / work-statement / capture-play).
   if (comp.v2_shadow) return false; // agentic layer already landed → full report
+  // FIX 5: V2 errored/timed-out (no v2_shadow) → degraded; keep export gated, never ship a half report.
+  // The executor writes analysis_phase:"done" + v2_error on an errored finish, so
+  // the phase==="finalizing" check below would otherwise fall through and open the
+  // gate on a shadow-less degraded report. Treat a shadow-less error as still-gated.
+  if (comp.v2_error) return true;
   if (comp.analysis_phase !== "finalizing") return false; // arm with no V2 to wait for
   const completedRaw = audit.completed_at ? String(audit.completed_at) : "";
   const completedMs = completedRaw ? Date.parse(completedRaw) : NaN;
   if (!Number.isFinite(completedMs)) return false;
   return Date.now() - completedMs < V2_FINALIZING_MAX_MS; // within the live window
+}
+
+// FIX 5 companion — TERMINAL degraded state: the V2 agentic layer errored/timed
+// out (v2_error written, NO v2_shadow). isV2Finalizing() returns true for this
+// (export must stay gated), but the page must NOT treat it like a LIVE finalizing
+// run — there is nothing left to stream in, so the auto-refresh + spinner would
+// loop forever. Callers use this to keep export disabled while showing the
+// (degraded) report as-is, with no infinite refresh.
+export function isV2Degraded(audit: Record<string, unknown>): boolean {
+  const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  return !comp.v2_shadow && Boolean(comp.v2_error);
 }

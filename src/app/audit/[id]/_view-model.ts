@@ -505,13 +505,12 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
   const eligible = valid.filter((e) => !DEADLINE_EXCLUDE_RE.test(e.label));
   const submission = eligible.filter((e) => DEADLINE_SUBMISSION_RE.test(e.label) || DEADLINE_SUBMISSION_RE.test(e.date));
   const pool = submission.length > 0 ? submission : eligible;
-  // FA-E2E re-verify Fix A (2026-06-18): when the exclude-filter empties the
-  // pool (every parsed date matched an interim/post-award label), do NOT return
-  // null — falling back to null lets the stale SAM date take over and flip an
-  // OPEN sol to closed (HM047626R0039). Instead fall back to the LATEST of all
-  // valid parsed dates so the source still controls open/closed.
-  const resolvePool = pool.length > 0 ? pool : valid;
-  return resolvePool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), resolvePool[0].d);
+  // Reverts the FA-E2E Fix-A regression (2031 PoP-end bug): the `valid` fallback
+  // grabbed the LATEST of ALL parsed dates incl. period-of-performance end dates,
+  // producing "quote due 30 Jun 2031". Mirror engine parseDocDeadline instead:
+  // return null on empty pool (only interim/post-award dates → never close on those).
+  if (pool.length === 0) return null;
+  return pool.reduce((max, e) => (e.d.getTime() > max.getTime() ? e.d : max), pool[0].d);
 }
 
 function fmtMonYear(d: Date | null): string {

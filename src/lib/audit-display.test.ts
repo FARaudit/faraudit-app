@@ -3,7 +3,7 @@
 // synthetic-ID edge case so future refactors can't silently re-introduce
 // UUID/hex/pdf-timestamp leaks across Pipeline / Recent Audits / Past Audits.
 
-import { auditDisplayName, auditHref, displaySolicitationId } from "./audit-display";
+import { auditDisplayName, auditHref, displaySolicitationId, isV2Finalizing, isV2Degraded } from "./audit-display";
 
 interface Case<T = string | RegExp> { label: string; input: any; expected: T }
 
@@ -128,6 +128,41 @@ for (const c of pscLeakDisplayCases) {
   if (c.label.startsWith("T21")) run(c.label, auditDisplayName(c.input), c.expected);
   else run(c.label, displaySolicitationId(c.input), c.expected);
 }
+
+// FIX 5 — export-gate state machine. Export opens (isV2Finalizing false) ONLY
+// when v2_shadow has landed; a degraded errored finish (v2_error, no shadow)
+// stays gated AND is flagged degraded so the page shows it static (no infinite
+// refresh) rather than as a live finalizing run.
+const runBool = (label: string, got: boolean, expected: boolean) => {
+  const ok = got === expected;
+  if (ok) pass++; else fail++;
+  console.log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${label}`);
+  if (!ok) console.log(`        expected: ${expected} · got: ${got}`);
+};
+const nowIso = new Date().toISOString();
+const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+console.log("\n── FIX 5 export gate ──");
+// Full report landed → export OPEN.
+runBool("T22 · v2_shadow present → not finalizing (export open)",
+  isV2Finalizing({ compliance_json: { v2_shadow: { x: 1 }, analysis_phase: "done" } }), false);
+runBool("T22b · v2_shadow present → not degraded",
+  isV2Degraded({ compliance_json: { v2_shadow: { x: 1 }, v2_error: "late err" } }), false);
+// Degraded errored finish (no shadow) → gated + degraded.
+runBool("T23 · v2_error, no shadow, phase done → still finalizing (export GATED)",
+  isV2Finalizing({ compliance_json: { v2_error: "timeout", analysis_phase: "done" }, completed_at: nowIso }), true);
+runBool("T23b · v2_error, no shadow → degraded (static, no refresh)",
+  isV2Degraded({ compliance_json: { v2_error: "timeout", analysis_phase: "done" } }), true);
+// Live finalizing within window → gated but NOT degraded (gets spinner+refresh).
+runBool("T24 · live finalizing in window → gated",
+  isV2Finalizing({ compliance_json: { analysis_phase: "finalizing" }, completed_at: nowIso }), true);
+runBool("T24b · live finalizing → NOT degraded",
+  isV2Degraded({ compliance_json: { analysis_phase: "finalizing" } }), false);
+// No V2 arm at all (done, no shadow, no error) → export OPEN.
+runBool("T25 · phase done, no shadow, no error → not finalizing (export open)",
+  isV2Finalizing({ compliance_json: { analysis_phase: "done" } }), false);
+// Stalled live finalizing past the 6-min backstop → export OPEN (give up waiting).
+runBool("T26 · finalizing past backstop window → not finalizing",
+  isV2Finalizing({ compliance_json: { analysis_phase: "finalizing" }, completed_at: tenMinAgo }), false);
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

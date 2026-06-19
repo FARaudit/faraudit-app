@@ -590,8 +590,22 @@ const DFARS_TRAPS: Array<{ clause: string; title: string; severity: "P0" | "P1" 
   { clause: "252.211-7003", title: "IUID — Unique Item Identification", severity: "P1" }
 ];
 
-export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: RisksJSON, docText?: string): DFARSFlag[] {
+export function parseDFARSTraps(
+  complianceJson: ComplianceJSON,
+  risksJson?: RisksJSON,
+  docText?: string,
+  // FA-E2E Fix 6.1 — deterministic agency-branch context. When the agency is
+  // POSITIVELY a civilian (non-DoD) agency, every 252.*/5352. DFARS trap is
+  // force-suppressed (detected=false) because DFARS does not bind civilian
+  // buys. Omitted/unknown agency → no suppression (conservative; never hide a
+  // real trap on a DoD buy we couldn't classify). Sourced facts, not AI.
+  agencyContext?: { agencyPath?: string | null; solicitationNumber?: string | null }
+): DFARSFlag[] {
   const clauses = complianceJson.dfars_clauses ?? [];
+  // FA-E2E Fix 6.1 — branch gate. true only on a positively-civilian agency.
+  const suppressDFARS = agencyContext
+    ? shouldSuppressDFARS(agencyContext.agencyPath, agencyContext.solicitationNumber)
+    : false;
   // W4 — index DFARS_Trap risk_findings by clause number so detected traps
   // inherit description + required_action prose. §04 then renders real flag
   // rows instead of firing the W2b soften empty-state. Zero new LLM calls —
@@ -609,6 +623,14 @@ export function parseDFARSTraps(complianceJson: ComplianceJSON, risksJson?: Risk
     if (!detected && docText) {
       if (trap.clause === "252.204-7020" && SPRS_TEXT_RE.test(docText)) detected = true;
       else if (trap.clause === "252.227-7025" && JCP_RE.test(docText)) detected = true;
+    }
+    // FA-E2E Fix 6.1 — civilian-agency gate. Every DFARS_TRAPS clause is a
+    // 252.* or 5352. clause (48 CFR Ch.2), which binds DoD only. On a positively
+    // -identified civilian agency, force-clear the detection so a hallucinated
+    // 252.* clause (e.g. the USDA 252.204-7018 fabrication) never surfaces as a
+    // detected trap. DoD/unknown agencies are untouched (suppressDFARS=false).
+    if (detected && suppressDFARS && /^(252\.|5352\.)/.test(trap.clause)) {
+      detected = false;
     }
     const finding = detected ? findingByClause.get(trap.clause) : undefined;
     return {
@@ -1551,6 +1573,76 @@ export function decodePIID(solicitationNumber: string | null | undefined): { act
     procurementType = typeChar ? PROCUREMENT_TYPE_MAP[typeChar] ?? null : null;
   }
   return { activity, fiscalYear, procurementType };
+}
+
+// FA-E2E Fix 6.1 (2026-06-18) — DETERMINISTIC DoD-vs-civilian agency-branch
+// classifier (facts-from-source, NEVER routed through the AI). DFARS (48 CFR
+// Ch.2 — 252.* / 5352.*) binds ONLY DoD components (Army/Navy/USMC/AF/Space
+// Force/DLA/DISA/DARPA/MDA/DCMA/DTRA/etc.). A civilian buy (USDA, GSA, civilian
+// VA, Legislative/Judicial) that the model hallucinated a 252.* clause onto was
+// being marked "detected" by parseDFARSTraps with NO branch gate — e.g. the
+// USDA buy that fabricated DFARS 252.204-7018. This classifier lets the gate
+// suppress 252.*/5352. traps ONLY when the agency is POSITIVELY a non-DoD
+// civilian agency. CONSERVATIVE: an agency we cannot classify returns "unknown"
+// and is NEVER suppressed (we will not hide a real DFARS trap on a DoD buy we
+// failed to recognize). NASA(1852)/USCG use DFARS-adjacent supplements
+// (NFS/CG-DFARS) — treated as DoD-equivalent here (i.e. NOT suppressed) so we
+// never strip a legitimately-applicable supplement clause.
+//
+// Returns: "dod" (DoD or DFARS-adjacent → never suppress), "civilian"
+// (positively non-DoD → suppress 252./5352.), or "unknown" (never suppress).
+export function classifyAgencyBranch(
+  agencyPath: string | null | undefined,
+  solicitationNumber: string | null | undefined
+): "dod" | "civilian" | "unknown" {
+  const path = (agencyPath ?? "").toUpperCase();
+  const piid = (solicitationNumber ?? "").toUpperCase().trim();
+
+  // ── Signal 1: SAM agency-path name (most authoritative when present). ──
+  // DoD / DFARS-adjacent department or component names.
+  const DOD_PATH = /DEPT?\.?\s*OF\s*DEFENSE|DEPARTMENT\s*OF\s*DEFENSE|\bDEFENSE\b|\bDOD\b|\bARMY\b|\bNAVY\b|MARINE\s*CORPS|\bUSMC\b|AIR\s*FORCE|SPACE\s*FORCE|\bUSAF\b|\bUSSF\b|DEFENSE\s*LOGISTICS|\bDLA\b|\bDISA\b|\bDARPA\b|MISSILE\s*DEFENSE|\bDCMA\b|\bDTRA\b|\bDFAS\b|\bDHA\b|\bDLSA\b|\bSOCOM\b|SPECIAL\s*OPERATIONS|\bCENTCOM\b|\bTRANSCOM\b|CORPS\s*OF\s*ENGINEERS|\bUSACE\b/;
+  // DFARS-adjacent (own supplement, treat as non-suppress): NASA, Coast Guard.
+  const ADJACENT_PATH = /\bNASA\b|NATIONAL\s*AERONAUTICS|COAST\s*GUARD|\bUSCG\b/;
+  // Positively-civilian departments / branches (DFARS does NOT apply).
+  const CIVILIAN_PATH = /AGRICULTURE|\bUSDA\b|GENERAL\s*SERVICES|\bGSA\b|HEALTH\s*AND\s*HUMAN|\bHHS\b|HOMELAND\s*SECURITY|\bDHS\b|VETERANS\s*AFFAIRS|DEPARTMENT\s*OF\s*VETERANS|INTERIOR|\bDOI\b|\bTREASURY\b|\bJUSTICE\b|\bDOJ\b|COMMERCE|\bDOC\b|\bLABOR\b|\bDOL\b|TRANSPORTATION(?!\s*COMMAND)|EDUCATION|\bENERGY\b|\bDOE\b|STATE\s*DEPARTMENT|DEPARTMENT\s*OF\s*STATE|ENVIRONMENTAL\s*PROTECTION|\bEPA\b|SOCIAL\s*SECURITY|SMALL\s*BUSINESS\s*ADMIN|NUCLEAR\s*REGULATORY|LEGISLATIVE|JUDICIAL|CONGRESS|GOVERNMENT\s*ACCOUNTABILITY|\bGAO\b|LIBRARY\s*OF\s*CONGRESS|GOVERNMENT\s*PUBLISHING|ARCHITECT\s*OF\s*THE\s*CAPITOL/;
+
+  if (path) {
+    if (DOD_PATH.test(path) || ADJACENT_PATH.test(path)) return "dod";
+    if (CIVILIAN_PATH.test(path)) return "civilian";
+  }
+
+  // ── Signal 2: PIID agency-code prefix (FPDS/PIID convention). ──
+  // DoD PIID first chars: Army=W, Navy/USMC=N/M, Air/Space Force=F (incl FA),
+  // DLA/DoD-wide=SP*/H. These are reliable DoD markers.
+  if (piid) {
+    if (/^(W|N|M|F|FA|SP|HQ|HR|HT|HM|HC|HS|H9|H4|H6|H7|H8|HDEC)/.test(piid)) return "dod";
+    // USCG legacy code (DFARS-adjacent) — do not suppress.
+    if (/^70Z/.test(piid)) return "dod";
+    // NASA PIID codes (80*, NNX) — DFARS-adjacent. Do not suppress.
+    if (/^(80|NNX|NNG|NNJ|NNK|NNL|NNM|NNS)/.test(piid)) return "dod";
+    // Common civilian agency PIID prefixes (positively non-DoD):
+    //   GSA=GS/47Q, USDA=AG/12*, VA=36C/VA, HHS=75*, DHS=70 (excl 70Z),
+    //   DOI=140/D, Treasury=20*/TIRNO, DOJ=DJ/15*, Commerce=SB/13*,
+    //   DOL=DOL/16*, DOT=DTF/693, DOE=DE/89, State=SAQ/19*, EPA=EP/68*.
+    if (/^(GS|47Q|AG|12[A-Z0-9]|36C|VA|75[A-Z0-9]|140|20[A-Z0-9]|TIRNO|DJ|15[A-Z0-9]|SB|13[A-Z0-9]|DOL|16[A-Z0-9]|DTF|693|DE|89[A-Z0-9]|SAQ|19[A-Z0-9]|EP|68[A-Z0-9])/.test(piid)) {
+      // 70 (DHS) handled above only as 70Z=USCG; a bare 70-prefix that is NOT
+      // 70Z is civilian DHS. Guard so 70Z (already returned "dod") never reaches
+      // here, but a generic 70-prefix is treated below.
+      return "civilian";
+    }
+    if (/^70(?!Z)/.test(piid)) return "civilian"; // DHS civilian components.
+  }
+
+  return "unknown";
+}
+
+// Convenience: should 252.*/5352. DFARS clauses be suppressed for this agency?
+// True ONLY when positively civilian. Unknown/DoD → false (never suppress).
+function shouldSuppressDFARS(
+  agencyPath: string | null | undefined,
+  solicitationNumber: string | null | undefined
+): boolean {
+  return classifyAgencyBranch(agencyPath, solicitationNumber) === "civilian";
 }
 
 // Fix 5 — set-aside deterministic regex post-processor. Document text overrides
@@ -2639,7 +2731,7 @@ Output ONLY a JSON object with these keys — facts only, no severities or risk 
 - required_certifications (string[]): EVERY certification / registration / compliance requirement (SAM.gov registration, UEI, CMMC level, NIST SP 800-171, ITAR, security clearance, OSHA, ISO, AS9100, etc.).
 - key_compliance_actions (string[]): for EVERY clause or requirement that imposes an offeror action BEFORE or AT submission, one imperative string stating (a) what the contractor must DO, (b) by WHEN — cite the deadline; if it cannot be determined from the document write "deadline unknown — confirm with CO" rather than omitting the item, and (c) the consequence of missing it (price rejection / technically unacceptable / post-award default). Do NOT list reference-only clauses here. e.g. "Submit past performance for similar contract value within last 3 years by the proposal due date — or be rated technically unacceptable", "Complete representations 52.204-24 + 52.204-26 in SAM before submission — or the quote is non-conforming".
 - set_aside_text (string or null): VERBATIM citation if the document explicitly states a set-aside — quote the literal sentence or clause reference (e.g. "100% small business set-aside" / "FAR 52.219-6 notice present" / "Block 10 box X checked"). null if no document text triggers a set-aside. (TS derives the enum value via regex on the full solText; this raw signal preserves the document's literal wording.)
-- deadlines (object[]): array of {label: string, date: string} — verbatim date strings as printed (e.g. {label: "Proposal due", date: "25 June 2026 4:00 PM CST"}). Do not canonicalize dates here; TS parses + canonicalizes downstream.
+- deadlines (object[]): array of {label: string, date: string} — verbatim date strings as printed (e.g. {label: "Offer due", date: "25 June 2026 4:00 PM CST"}). The CONTROLLING offer-due date is the SF-1449 Block 8 / SF-1442 "OFFER DUE DATE/LOCAL TIME" field when present — extract that as the offer-due entry. Label entries explicitly so downstream filtering is reliable: use label "Offer due" for the submission/offer/quote/proposal due date, "Period of performance" for PoP/option/delivery dates, and an otherwise descriptive label for anything else. Do not canonicalize dates here; TS parses + canonicalizes downstream.
 - clins (object[]): array of {clin: "0001", description, quantity, pricing_arrangement, fob} for EVERY CLIN in Section B. Use raw strings; TS normalizes units and FOB enum downstream.
 - section_l_summary (string): 2-3 sentence verbatim summary of Section L, or empty string "" if no §L.
 - section_m_summary (string): 2-3 sentence verbatim summary of Section M, or empty string "" if no §M.
@@ -2771,7 +2863,24 @@ JSON only — one key: risk_findings.`;
     );
   }
 
-  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson, solText);
+  // FA-E2E Fix 6.1 — pass deterministic agency-branch context so DFARS 252./5352.
+  // traps are gated to DoD (incl. NASA/USCG supplements). Civilian agency
+  // (e.g. USDA) → fabricated 252.* clauses are force-suppressed. Source signals:
+  // SAM fullParentPathName/agency + the solicitation/PIID number.
+  const _dfarsAgencyPath = String(
+    (solicitation as Record<string, unknown> | null)?.["fullParentPathName"]
+      ?? (solicitation as Record<string, unknown> | null)?.["agency"]
+      ?? ""
+  );
+  const _dfarsSolNum = String(
+    (solicitation as Record<string, unknown> | null)?.["solicitationNumber"]
+      ?? (solicitation as Record<string, unknown> | null)?.["noticeId"]
+      ?? ""
+  );
+  complianceJson.dfars_flags = parseDFARSTraps(complianceJson, risksJson, solText, {
+    agencyPath: _dfarsAgencyPath || null,
+    solicitationNumber: _dfarsSolNum || null,
+  });
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
@@ -3322,6 +3431,15 @@ JSON only — one key: risk_findings.`;
 
 import { extractText as _v2ExtractText } from "./pdf-text-extractor";
 import { detectSections as _v2DetectSections } from "./section-boundary-detector";
+// FA-E2E Fix 3.2 (2026-06-18) — deterministic section-role classifier reused
+// from the ingestion manifest. The manifest's per-file `section_roles` is
+// computed by exactly this function (sam-attachments classifySectionRoles), so
+// promoting an attachment whose NAME classifies to the §C (SOW/PWS/SOO) role is
+// equivalent to "the manifest tagged it §C" — without threading the manifest
+// object into runAuditV2 (extraDocs only carries {name, buffer}). Name-based,
+// conservative (under-claims), and pure → no circular import (sam-attachments
+// does not import audit-engine).
+import { classifySectionRoles as _v2ClassifySectionRoles } from "./sam-attachments";
 import {
   extractAllFacts as _v2ExtractAllFacts,
   DFARS_TRAPS_MAP as _v2DfarsTrapsMap,
@@ -3345,6 +3463,31 @@ import {
   type WorkStatementKnown as _v2WorkStatementKnown,
   type WorkStatementUnknown as _v2WorkStatementUnknown,
 } from "../app/audit/[id]/_normalizers";
+
+// FA-E2E Fix 3.1 (2026-06-18) — single source of truth for the attachment
+// provenance separator. The append literal (runAuditV2) and the split RegExp
+// (work-statement promotion) were two independent string literals that could
+// silently drift; if they diverged the split would stop recovering attachment
+// bodies and every work statement would go UNKNOWN. Both the append string and
+// the derived split RegExp are now built from these SAME constants so they
+// cannot drift. The marker prefix/suffix are wrapped in "\n\n…\n\n" exactly as
+// the original literals were.
+const ATTACHMENT_SEP_PREFIX = "=== ATTACHMENT DOCUMENT: ";
+const ATTACHMENT_SEP_SUFFIX = " (sam_attachment) ===";
+// Escape regex metacharacters so the constants can seed a RegExp source safely.
+const _escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Build the full append marker for a given document name.
+const buildAttachmentSep = (name: string): string =>
+  `\n\n${ATTACHMENT_SEP_PREFIX}${name}${ATTACHMENT_SEP_SUFFIX}\n\n`;
+// Derived split RegExp: captures the document name between the prefix/suffix.
+// (.+?) is the name capture group; the surrounding "\n\n" framing matches the
+// append marker exactly. Round-trip verified: buildAttachmentSep("Attach 1.pdf")
+// → "\n\n=== ATTACHMENT DOCUMENT: Attach 1.pdf (sam_attachment) ===\n\n", which
+// split() against this RegExp yields [pre, "Attach 1.pdf", post] — identical to
+// the prior hand-written /\n\n=== ATTACHMENT DOCUMENT: (.+?) \(sam_attachment\) ===\n\n/.
+const ATTACHMENT_SEP_SPLIT_RE = new RegExp(
+  `\\n\\n${_escapeRegExp(ATTACHMENT_SEP_PREFIX)}(.+?)${_escapeRegExp(ATTACHMENT_SEP_SUFFIX)}\\n\\n`
+);
 
 export interface AuditV2Result {
   sectionBag: ReturnType<typeof _v2DetectSections>;
@@ -4169,7 +4312,7 @@ export async function runAuditV2(
     for (const d of extraDocs) {
       try {
         const extra = await _v2ExtractText(d.buffer);
-        doc.rawText += `\n\n=== ATTACHMENT DOCUMENT: ${d.name} (sam_attachment) ===\n\n${extra.rawText}`;
+        doc.rawText += `${buildAttachmentSep(d.name)}${extra.rawText}`;
       } catch (err) {
         console.warn(`[audit-v2] FA-136: attachment text extraction failed for ${d.name}: ${err instanceof Error ? err.message : err}`);
       }
@@ -4225,6 +4368,11 @@ export async function runAuditV2(
   // whole block when workStatementText was a short-but-nonempty stub (>=200 chars
   // but not a real work statement). Also enter the block when the ingested §C body
   // itself reads as a work statement, so a real §C SOW is promoted over a stub.
+  // FA-E2E Fix 3.3: name/role of the attachment that promoted the work
+  // statement (if any), used after judgment to derive a tentative document type
+  // when the model returns "unknown". null = promoted from §C body / not from a
+  // named attachment.
+  let _wsPromotedName: string | null = null;
   const _sectionCBody = sectionBag.sections["C"]?.text ?? "";
   const _sectionCLooksLikeWs = _sectionCBody.length >= 400 &&
     [
@@ -4258,16 +4406,26 @@ export async function runAuditV2(
       const hasWsBody = (body: string): boolean => wsBodySignals(body) >= 2;
 
       // split → [formText, name1, body1, name2, body2, ...]
-      const parts = doc.rawText.split(/\n\n=== ATTACHMENT DOCUMENT: (.+?) \(sam_attachment\) ===\n\n/);
+      const parts = doc.rawText.split(ATTACHMENT_SEP_SPLIT_RE);
       for (let i = 1; i + 1 < parts.length; i += 2) {
         const body = parts[i + 1].trim();
-        // Promote when EITHER the filename matches a WS pattern OR the body
-        // itself reads as a work statement. (Filename match keeps the original
-        // 100-char floor; body match needs more substance to avoid false hits.)
+        // Promote when ANY of:
+        //  - filename matches a WS pattern (keeps the original 100-char floor);
+        //  - body itself reads as a work statement (needs more substance);
+        //  - FA-E2E Fix 3.2: the manifest section-role classifier tags the
+        //    filename as §C (the SOW/PWS/SOO role). classifySectionRoles is the
+        //    SAME deterministic function the ingestion manifest uses, so a "C"
+        //    here means the manifest tagged this attachment §C regardless of the
+        //    WS_NAME regex / body-signal count. Conservative name floor (100)
+        //    mirrors the byName path so an empty/near-empty body can't promote.
         const byName = WS_NAME.test(parts[i]) && body.length >= 100;
         const byBody = body.length >= 400 && hasWsBody(body);
-        if (byName || byBody) {
+        const byRole = _v2ClassifySectionRoles(parts[i]).includes("C") && body.length >= 100;
+        if (byName || byBody || byRole) {
           facts.workStatementText = body.slice(0, 4000);
+          // FA-E2E Fix 3.3: remember the promoting filename so a tentative
+          // document type can be derived when the judgment returns "unknown".
+          _wsPromotedName = parts[i];
           break;
         }
       }
@@ -4289,6 +4447,37 @@ export async function runAuditV2(
   }
 
   const judgment = await _v2RunJudgment(facts, boundSources);
+
+  // FA-E2E Fix 3.3 (2026-06-18) — tentative document-type fallback. When the
+  // judgment returned "unknown" BUT a work statement WAS in fact promoted above
+  // (facts.workStatementText populated), the §03 surface would render the full
+  // "couldn't confirm — upload the attachment" empty state even though we DID
+  // ingest a SOW/PWS/SOO. Derive a tentative type from the promoting filename
+  // (or §C body) and mark it Tentative via confidence="low" — the downstream
+  // workStatement() normalizer maps "low" to the "Tentative" chip, so the report
+  // reads e.g. "SOW · Tentative" (confirm) instead of a hard UNKNOWN. We only
+  // touch the genuinely-unknown case; a confident non-unknown type is never
+  // overwritten. Conservative type pick: SOO/PWS only on an explicit keyword,
+  // else default SOW (the most common, lowest-risk default).
+  if (
+    judgment.documentClassification.type === "unknown" &&
+    facts.workStatementText &&
+    facts.workStatementText.length >= 100
+  ) {
+    const _wsSrc = `${_wsPromotedName ?? ""} ${facts.workStatementText.slice(0, 600)}`;
+    const _tentativeType: "SOW" | "PWS" | "SOO" =
+      /\bsoo\b|statement\s*of\s*objectives?/i.test(_wsSrc) ? "SOO"
+      : /\bpws\b|performance\s*work\s*statement/i.test(_wsSrc) ? "PWS"
+      : "SOW";
+    judgment.documentClassification = {
+      ...judgment.documentClassification,
+      type: _tentativeType,
+      confidence: "low",
+      evidence:
+        judgment.documentClassification.evidence ||
+        `Tentative: a work statement was ingested${_wsPromotedName ? ` from "${_wsPromotedName}"` : " from the §C body"} but the type could not be confirmed from the parsed text — confirm SOW vs PWS vs SOO against the source.`,
+    };
+  }
 
   // FA-113: contradiction filter on V2 surfaces — drop judgment.risks,
   // confidenceNotes, and l02Catches that claim a fact is missing when the V2
