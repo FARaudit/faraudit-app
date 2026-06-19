@@ -727,8 +727,18 @@ export async function executeAudit(
       const v2SetAside =
         v2Brief && typeof v2Brief.set_aside === "string" ? v2Brief.set_aside.trim() : "";
       const v2SetAsideProvenance = v2Brief?.set_aside_provenance ?? null;
+      // FA-176: the V2 model can mis-read SF-1449 Block 10 — the UNCHECKED
+      // "SERVICE-DISABLED (SDVOSB)" label — as the set-aside on a 100% 8(a) buy
+      // (HM047626R0039: backfilled "SDVOSB", provenance=document, over a real 8(a)).
+      // The deterministic SAM-sourced value (solicitation.typeOfSetAside, e.g. "8A")
+      // is authoritative — the V2 doc-reading must NEVER override or backfill over it
+      // (facts-vs-analysis law, same as the masthead precedence fix). Backfill from
+      // V2 ONLY when neither V1 nor the SAM cross-ref produced a set-aside at all.
+      const deterministicSetAside =
+        typeof solicitation.typeOfSetAside === "string" ? solicitation.typeOfSetAside.trim() : "";
       const setAsideBackfill =
         !v1SetAside &&
+        !deterministicSetAside &&
         v2SetAside &&
         (v2SetAsideProvenance === "document" || v2SetAsideProvenance === "v1_vision")
           ? v2SetAside

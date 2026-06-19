@@ -12,17 +12,20 @@
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-// Default model swap May 4 2026 · Opus 4.7 → Sonnet 4.6 · 82% cost reduction
-// validated via scripts/quality-gate/sonnet-vs-opus.mjs:
-//   - 3/3 baseline trap parity on FA301626Q0068 (hex-chrome, FOB conflict, CLIN ambiguity)
-//   - DFARS engine-flag arrays IDENTICAL between models
-//   - Bid-recommendation agreement 4/5 · classification 3/5 exact + 2/5 adjacent
-//   - Compliance score ±5 points on every case · zero JSON retries
-//   - Cost: $0.35/audit measured (was $1.96 Opus)
-// Escalation router (callWithRetry, below) swaps to Opus for any single call
-// that needs to retry — trades ~2% Opus retries for the cheap-by-default base.
-const CLAUDE_MODEL = "claude-sonnet-4-6";
-const CLAUDE_RETRY_MODEL = "claude-opus-4-7";
+// Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
+// Quality is the moat: board-room-grade audits must beat every competitor, and on
+// the HM047626R0039 live re-run Sonnet 4.6 MISSED a real catch (the HM157526 eval-
+// attachment sol mismatch the prior Opus run found) and leaked an SDVOSB risk on an
+// 8(a) buy. The cost delta is immaterial at our price points — measured A/B
+// (scripts/quality-gate/sonnet-vs-opus.mjs, FA301626Q0068) was $0.35/audit Sonnet
+// vs $1.96/audit Opus; even at the Standard cap (100 audits) that's ~92% margin.
+// Full cost/margin analysis: ceo/ENGINE-COST-MODEL-DECISION.html.
+// NOTE: this constant is LOCAL to the audit engine (not exported) — other AI
+// features (crons, RFI, support, etc.) keep their own models; this swap is Run-
+// Audit-only. Opus rejects `temperature:0`, so the model-aware gate in callClaude
+// omits it automatically. Retry model stays Opus (same family, same pricing).
+const CLAUDE_MODEL = "claude-opus-4-8";
+const CLAUDE_RETRY_MODEL = "claude-opus-4-8";
 // Per-call timeout ceiling. 180s was too tight: a legitimate multi-file
 // extraction/risks call (5 full PDFs, large output budget) genuinely runs >3 min,
 // so it timed out → retried → timed out → FAILED the whole audit ([call:risks]
@@ -472,7 +475,15 @@ export function buildV1FactsDigest(
   const naics = pick("naicsCode") || pick("naics_code");
   if (naics) lines.push(`- NAICS: ${naics}`);
   const setAside = pick("typeOfSetAside") || pick("set_aside");
-  if (setAside) lines.push(`- set_aside: ${setAside}`);
+  if (setAside)
+    // FA-176: anchor the model on the authoritative set-aside. The model otherwise
+    // mis-reads SF-1449 Block 10 — the UNCHECKED "SERVICE-DISABLED (SDVOSB)" label
+    // printed next to the checked "X 8(A)" box — and the FAR 52.212-3 representation
+    // menu (which lists every category an offeror could certify) and writes an SDVOSB
+    // eligibility/Capture risk on a 100% 8(a) buy (HM047626R0039 R10).
+    lines.push(
+      `- set_aside: ${setAside}  [AUTHORITATIVE — system of record. THIS is the set-aside in effect. Do NOT infer a different set-aside from SF-1449 Block 10 unchecked option labels or the FAR 52.212-3 representations menu (both list categories that are NOT the one set aside). Every eligibility, risk, and Capture-Play analysis must use THIS set-aside only.]`
+    );
   const agency = pick("agency");
   if (agency) lines.push(`- agency: ${agency}`);
   const title = pick("title");
@@ -2821,7 +2832,7 @@ BID/FIT SCORE — YOUR REASONED JUDGMENT (this is the one field where you DO jud
 §M / §L — RAW FACTS ONLY (status, meta, coverage, tone, fit-score are TS-derived):
 
 - eval_basis_text (string or null): VERBATIM 1-2 sentence award-method statement from Section M as printed in the document (e.g. "Award will be made on a best-value tradeoff basis under FAR 15.101-1"). null if Section M is absent or this is metadata-only. (TS derives the rule citation + label from this text.)
-- evaluation_factors_raw (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance_text: string}. The importance_text is whatever the document literally says about the factor's weight or rank ("Most important", "Equal weight", "Least important · tradeoff lever", "30 points", or just the rank position if no weight is stated). NO coverage / coverage_pct / tone / note fields — those are TS-derived from the user's capability profile downstream. Empty array if §M is absent or metadata-only.
+- evaluation_factors_raw (object[]): one entry per evaluation factor stated in Section M, in stated order. Shape per entry: {rank: 1-indexed int, name: string, importance_text: string}. The importance_text is whatever the document literally says about the factor's weight or rank ("Most important", "Equal weight", "Least important · tradeoff lever", "30 points", or just the rank position if no weight is stated). FA-177 — NEVER invent relative weight: state "equal weight"/"equal importance" ONLY if the document literally says so; if the source is silent on how factors or sub-factors weigh against each other, importance_text MUST read "relative weight not stated by the source" (do NOT assume equal). If a factor or sub-factor carries a PASS/FAIL ineligibility gate (e.g. "proposals failing to adequately address [SOW sections] will not be eligible for award"), prefix importance_text with "GATE (pass/fail): " — a disqualifier outranks any scored weight and must NEVER be presented as a co-equal scored bullet. NO coverage / coverage_pct / tone / note fields — those are TS-derived from the user's capability profile downstream. Empty array if §M is absent or metadata-only.
 - submission_requirements_raw (string[]): EXHAUSTIVELY enumerate every concrete Section L requirement as a clean, self-contained imperative (one discrete offeror action per entry; never copy raw §L clause text, mid-sentence fragments, or boilerplate — restate each requirement in plain action language). Include all of: page limits, submission portal + deadline, required volumes, format/font rules, reps & certs, oral presentation rules, demo requirements, past performance reference count, security clearance requirements, any "the offeror shall" / "the offeror must" statement that imposes a discrete submission action. This array is the SOLE source feeding the §09 Pre-flight Checklist surface — completeness is the acceptance gate. Empty array ONLY if §L is absent. NO status / meta fields — those are TS-derived via 6 regex buckets + a catch-all default.
 - section_l_summary (string): verbatim 2-3 sentence summary of Section L proposal preparation instructions, or empty string "" if no §L.
 - section_m_summary (string): verbatim 2-3 sentence summary of Section M evaluation criteria with weights/factors, or empty string "" if no §M.
@@ -2871,6 +2882,8 @@ PRINCIPLES:
 - Specific FARaudit move per risk. Each finding carries a SPECIFIC neutralizing action the customer can take this week (verify JCP at dla.mil/JCP, calendar a 15-day DPAS notify window, price CLIN with breakout, etc.). NEVER canned filler ("Address this risk before submission" / "see KO email"). If no distinct move exists beyond the KO email, emit faraudit_action="" — the renderer hides the action chip rather than show filler.
 - Short titles. Each finding has an 8-word-or-fewer title. NO "RISK N (DISQUALIFICATION):" / "P0 —" / "[DEAL-BREAKER]" prefixes — TS handles severity tagging. Good titles: "JCP certification gap — TDP access blocked", "LPTA with no discussions allowed", "Container price must be broken out from CLIN".
 - offerorActionRequired discipline (Gap 5). Every risk a contractor must actively address before or at submission — certification, representation, registration, product-data/TDP access, Buy-American cert, cure step — MUST carry offerorActionRequired: true. Do NOT omit this field. When you are unsure, default to true. This field is the SOLE source feeding the §04 Compliance Flags surface, which collapses to empty if the flag is wrongly false.
+- SPRS / cybersecurity precision (FA-184). Do NOT present a posted SPRS score, SSP, or POA&M as a bid action or bid-blocker unless DFARS 252.204-7019 or 252.204-7020 (or an explicit SPRS submission instruction) appears in THIS solicitation. 252.204-7012 ALONE requires implementing NIST SP 800-171 and rapid incident reporting — a performance obligation — but does NOT by itself mandate a posted SPRS score. Cite the actual clause present; do not escalate 7012 into an SPRS-posting gate.
+- Cross-document consistency (FA-184). If an attachment's printed solicitation number differs from the cover-page (SF-18 / SF-1449) solicitation number — e.g. the Section M evaluation-factors attachment is headed with a DIFFERENT solicitation number — emit a finding flagging it: the evaluation rubric or terms may be from a different or stale solicitation, and a proposal written to it could target the wrong criteria. Do not silently trust the mismatched attachment as authoritative §M.
 
 Output ONLY a JSON object with ONE key:
 
