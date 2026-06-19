@@ -22,7 +22,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
 import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
-import { displaySolicitationId, isV2Finalizing } from "@/lib/audit-display";
+import { displaySolicitationId, shouldGateExport } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -86,12 +86,14 @@ export async function GET(
   }
   if (!audit) return NextResponse.json({ error: "audit not found" }, { status: 404 });
 
-  // FA-E2E re-verify Fix D (2026-06-18): refuse to export while the V2 agentic
-  // layer is still finalizing — a half-complete PDF (no agency / work statement /
-  // capture play) must never be pulled. The web route disables the Export action
-  // for the same window; this 409 is the server-side guard for a direct hit.
-  if (isV2Finalizing(audit)) {
-    return NextResponse.json({ error: "report finalizing" }, { status: 409 });
+  // FA-E2E re-verify Fix D + FIX 5 (2026-06-18): refuse to export unless the
+  // report is genuinely COMPLETE — a half-complete PDF (no agency / work
+  // statement / capture play) must never be pulled, whether the V2 layer is
+  // still finalizing, errored/timed-out, or silently stalled. The web route
+  // disables the Export action for the same states; this 409 is the server-side
+  // guard for a direct hit.
+  if (shouldGateExport(audit)) {
+    return NextResponse.json({ error: "report not complete" }, { status: 409 });
   }
 
   // FA-108: capability_statement presence — same signal the page route uses
