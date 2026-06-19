@@ -79,13 +79,15 @@ function injectFinalizingState(html: string): string {
   return out;
 }
 
-// FA-E2E re-verify Fix D (2026-06-18): while the report is still finalizing,
-// disable the Export action so the user can't pull a half-complete PDF. We
-// transform the existing Export anchor in place — strip its href, mark it
-// aria-disabled, swap the sub-label to "Finalizing analysis…", and inject a
-// style so it reads + behaves as not-yet-ready. Web-only (the PDF route never
-// calls this), so exported PDFs are unaffected.
-function disableExportWhileFinalizing(html: string): string {
+// FA-E2E Fix D + FIX 5 (2026-06-18): disable the Export action while the report
+// is not exportable, so the user can't pull a half/degraded PDF. Transforms the
+// existing Export anchor in place — strip href, mark aria-disabled, swap the
+// sub-label, inject a not-allowed style. The sub-label is TWO-STATE (Design
+// honesty rule): "Finalizing analysis…" only while genuinely still processing;
+// "Export disabled" on a true error/degraded run (don't imply it's still
+// working when it isn't). Web-only (the PDF route never calls this), so exported
+// PDFs are unaffected.
+function disableExport(html: string, subLabel: string): string {
   let out = html;
   out = out.replace(
     /(<a\b[^>]*\bdata-field=["']pdf_export_url["'][^>]*>)/i,
@@ -96,16 +98,57 @@ function disableExportWhileFinalizing(html: string): string {
       return t;
     }
   );
-  // Swap the Export control's sub-label (.a-s) to the finalizing copy, leaving
-  // the .a-t title ("Export PDF") intact.
+  // Swap the Export control's sub-label (.a-s), leaving the .a-t title intact.
   out = out.replace(
     /(<a\b[^>]*\bdata-field=["']pdf_export_url["'][\s\S]*?<span class="a-s">)([\s\S]*?)(<\/span>)/i,
-    (_m, pre, _label, close) => `${pre}Finalizing analysis…${close}`
+    (_m, pre, _label, close) => `${pre}${subLabel}${close}`
   );
   const style =
     `<style>[data-field="pdf_export_url"][aria-disabled="true"]` +
     `{pointer-events:none;opacity:.55;cursor:not-allowed}</style>`;
   out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
+  return out;
+}
+
+// FIX 5 + Design spec (2026-06-18): the in-report DEGRADED banner. When the V2
+// deep-analysis layer errored / timed out / stalled (export gated but NOT a live
+// finalizing run), surface a quiet amber heads-up at the top of the report
+// content so the greyed Export is self-explanatory. Design decision: ports the
+// existing .eval-gap §M honesty-callout treatment 1:1 — same --amber-50/200/600
+// tokens + the existing dark rule — placed inside the report frame at the top of
+// .rpt-main (under the masthead, content-width), NOT a sticky bar. Persistent
+// while degraded; no auto-refresh (nothing left to stream). Self-contained
+// inject (no _template.html edit); references the report's own tokens so light
+// + dark both resolve correctly.
+function injectDegradedBanner(html: string): string {
+  const style =
+    `<style>` +
+    `.fa-degraded-banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 18px;` +
+    `padding:12px 15px;border-radius:10px;background:var(--amber-50);` +
+    `border:1px solid var(--amber-200);font-size:13px;line-height:1.5;color:var(--ink-2)}` +
+    `.fa-degraded-banner svg{width:16px;height:16px;color:var(--amber-600);flex:none;margin-top:1px}` +
+    `.fa-degraded-banner b{display:block;color:var(--ink);font-weight:800;margin-bottom:2px}` +
+    `.fa-degraded-banner a{color:var(--amber-700);font-weight:600;text-decoration:none}` +
+    `.fa-degraded-banner a:hover{text-decoration:underline}` +
+    `[data-theme="dark"] .fa-degraded-banner{background:rgba(214,162,60,.12);border-color:transparent}` +
+    `[data-theme="dark"] .fa-degraded-banner svg{color:#fcd34d}` +
+    `</style>`;
+  const banner =
+    `<div class="fa-degraded-banner" role="status">` +
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ` +
+    `stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M10.3 4 2 18.2A1.6 1.6 0 0 0 3.4 20.6h17.2A1.6 1.6 0 0 0 22 18.2L13.7 4a1.6 1.6 0 0 0-2.7 0z"/>` +
+    `<path d="M12 9.5v4M12 17h.01"/></svg>` +
+    `<span><b>Deep analysis unavailable for this run</b>The core report below is complete ` +
+    `and accurate. Export is disabled until a full analysis succeeds — ` +
+    `<a href="/audit">re-run</a> to try again.</span></div>`;
+  let out = html;
+  out = out.includes("</head>") ? out.replace("</head>", `${style}</head>`) : `${style}${out}`;
+  // Top of the report content column, under the masthead (Design placement).
+  // If the anchor is absent, skip rather than misplace the banner.
+  if (out.includes('<div class="rpt-main">')) {
+    out = out.replace('<div class="rpt-main">', `<div class="rpt-main">${banner}`);
+  }
   return out;
 }
 
@@ -209,14 +252,19 @@ export async function GET(
   // the report is never stuck refreshing.
   // FIX 5 — two SEPARATE questions. (1) Export stays gated in EVERY incomplete
   // state (finalizing, errored, or stalled) so a half/degraded PDF can never
-  // leave. (2) The spinner + auto-refresh runs ONLY while a V2 run is genuinely
-  // live — an errored or stalled run shows its core report as-is, export
-  // disabled, with no refresh that would loop forever.
-  if (shouldGateExport(audit)) {
-    html = disableExportWhileFinalizing(html);
+  // leave. (2) Live vs degraded get different treatments: a genuinely-live run
+  // gets the spinner + auto-refresh; an errored/stalled run gets the static
+  // amber degraded banner (no refresh that would loop forever). The Export
+  // sub-label is two-state to match (Design honesty rule).
+  const gateExport = shouldGateExport(audit);
+  const liveFinalizing = isV2Finalizing(audit);
+  if (gateExport) {
+    html = disableExport(html, liveFinalizing ? "Finalizing analysis…" : "Export disabled");
   }
-  if (isV2Finalizing(audit)) {
+  if (liveFinalizing) {
     html = injectFinalizingState(html);
+  } else if (gateExport) {
+    html = injectDegradedBanner(html);
   }
 
   return new Response(html, {
