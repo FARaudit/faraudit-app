@@ -4673,6 +4673,46 @@ export function _v2SetAsideClauseFlag(
   return `Verify set-aside: SAM lists ${selfLabel}, but Section I incorporates the ${otherLabel} set-aside clause — confirm before bidding.`;
 }
 
+// Clause-citation fidelity (Polish B, 2026-06-20). The judgment model is told to
+// null trapClause when the document lacks the clause, but it doesn't always —
+// e.g. it attached "AFARS 5152.242-9000" to a base-access requirement that the
+// PWS states only as prose, the number appearing nowhere in the solicitation.
+// Per FAR 52.252-2, a clause's binding force flows from being LISTED by number;
+// a number absent from the package is not incorporated and must not be cited as
+// if extracted. This deterministic pass de-attributes any risk trapClause whose
+// clause number is found NEITHER in the extracted clause set NOR in the
+// normalized source — the underlying requirement (description) is retained, only
+// the ungrounded clause citation is dropped. Dual check (known-list OR raw text,
+// incl. 52.252-2 by-reference lists where the number IS in the text) + dash/line-
+// wrap normalization keep false positives near zero. Returns the count de-attributed.
+const _V2_CLAUSE_TOKEN_RE = /\b(?:5152|5352|5X52|252|52)\.\d{2,4}(?:-\d{1,4})?\b/gi;
+export function _v2GroundRiskClauses(
+  risks: Array<{ trapClause: string | null; isDfarsTrap?: boolean }>,
+  rawText: string,
+  knownClauses: Iterable<string>
+): number {
+  const known = new Set<string>();
+  for (const c of knownClauses) known.add(String(c).toUpperCase());
+  const norm = (rawText || "")
+    .replace(/[‐-―−]/g, "-") // unicode dashes → hyphen
+    .replace(/-\s*\n\s*/g, "-") // de-hyphenate line-wraps (52.222-\n50)
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+  let nulled = 0;
+  for (const r of risks) {
+    if (!r || !r.trapClause) continue;
+    const toks = r.trapClause.toUpperCase().match(_V2_CLAUSE_TOKEN_RE) || [];
+    if (toks.length === 0) continue; // not a clause-number citation — leave as-is
+    const grounded = toks.some((t) => known.has(t) || norm.includes(t));
+    if (!grounded) {
+      r.trapClause = null;
+      if ("isDfarsTrap" in r) r.isDfarsTrap = false;
+      nulled++;
+    }
+  }
+  return nulled;
+}
+
 function _v2BuildDeterministicClauses(
   factClauses: Array<{ number: string }>,
   rawText: string
@@ -4986,6 +5026,19 @@ export async function runAuditV2(
     /VETERANS AFFAIRS|\bVA\b|VAAR/i.test(facts.issuingOffice ?? "")
   );
   if (setAsideVerify) warnings.push(setAsideVerify);
+
+  // Clause-citation fidelity (Polish B): de-attribute any risk trapClause whose
+  // clause number isn't grounded in the extracted clause set or the source text.
+  const _ungroundedClauses = _v2GroundRiskClauses(judgment.risks, doc.rawText, [
+    ...farClausesDet,
+    ...dfarsClausesDet,
+    ...agencyClausesDet,
+  ]);
+  if (_ungroundedClauses > 0) {
+    warnings.push(
+      `Clause-citation fidelity: ${_ungroundedClauses} risk clause citation(s) not found in the ingested source were de-attributed (requirement text retained).`
+    );
+  }
 
   return {
     sectionBag,
