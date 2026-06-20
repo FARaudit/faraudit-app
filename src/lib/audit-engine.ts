@@ -3792,6 +3792,11 @@ export interface MetadataBrief {
   // null when the fact is absent entirely.
   naics_provenance: FactBindingSource | null;
   set_aside_provenance: FactBindingSource | null;
+  // Set-aside clause-evidence reconciliation (2026-06-20). A short "verify" note
+  // when the SAM-declared set-aside is contradicted by a DIFFERENT set-aside
+  // program's indicator clause affirmatively present in Section I (e.g. metadata
+  // 8(a) but §I carries 52.219-6 Total Small Business). null = no conflict.
+  set_aside_verify: string | null;
   solicitor_number: string | null;
   timeline_gates: {
     offer_due: string | null;
@@ -4079,6 +4084,8 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     // (no PDF was read), so provenance is honestly "sam_metadata" when present.
     naics_provenance: input.naicsCode ? "sam_metadata" : null,
     set_aside_provenance: input.typeOfSetAside ? "sam_metadata" : null,
+    // metadata-only path has no ingested §I to reconcile against.
+    set_aside_verify: null,
     solicitor_number: input.noticeId ?? null,
     timeline_gates: {
       offer_due: deadline.iso,
@@ -4595,6 +4602,77 @@ export function bindExternalFacts(
 //   FAR    /^52\./    DFARS  /^252\./    agency  /^(5352|5X52)\./
 // Returns numbers only (the persisted far_clauses/dfars_clauses are string arrays).
 // Pure + deterministic: same input → same output.
+// Set-aside ↔ Section I clause reconciliation (research-backed, FAR-cited
+// 2026-06-20). Only DISCRIMINATING indicator clauses are mapped; the cross-
+// program clauses (52.219-14 Limitations on Subcontracting, -28 Rerep, -4
+// HUBZone price preference, -8/-9 subcontracting plans, -11/-12 Special 8(a))
+// are deliberately ABSENT so they never drive the signal. Sources: FAR 19.5 /
+// 19.8 / 19.13 / 19.14 / 19.15 (acquisition.gov).
+const SET_ASIDE_INDICATOR_CLAUSE: Record<string, string> = {
+  "52.219-6": "total_sb", // Notice of Total Small Business Set-Aside
+  "52.219-7": "partial_sb", // Notice of Partial Small Business Set-Aside
+  "52.219-3": "hubzone", // Notice of HUBZone Set-Aside or Sole-Source Award
+  "52.219-27": "sdvosb", // SDVOSB Set-Aside / Sole Source
+  "52.219-30": "wosb", // WOSB Set-Aside / Sole Source
+  "52.219-29": "edwosb", // EDWOSB Set-Aside / Sole Source
+  "52.219-18": "8a", // Notification of Competition Limited to 8(a) (competitive)
+  "52.219-17": "8a", // Section 8(a) Award (8(a) program, competitive or sole-source)
+};
+const SET_ASIDE_PROGRAM_LABEL: Record<string, string> = {
+  total_sb: "Total Small Business",
+  partial_sb: "Partial Small Business",
+  "8a": "8(a)",
+  hubzone: "HUBZone",
+  sdvosb: "SDVOSB",
+  wosb: "WOSB",
+  edwosb: "EDWOSB",
+  vosb: "VOSB",
+  unrestricted: "Unrestricted",
+};
+// Map the resolved set-aside (SAM typeOfSetAside code or label) → program key.
+export function _v2SetAsideProgram(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").toUpperCase();
+  if (!s) return null;
+  if (/\bEDWOSB\b/.test(s)) return "edwosb";
+  if (/\bWOSB\b|WOMEN-?OWNED/.test(s)) return "wosb";
+  if (/\bSDVOSB\b|SERVICE-?DISABLED/.test(s)) return "sdvosb";
+  if (/\bHUBZ|\bHZC\b|\bHZS\b|HUB ?ZONE/.test(s)) return "hubzone";
+  if (/8\s*\(?\s*A\s*\)?|\b8AN?\b/.test(s)) return "8a";
+  if (/PARTIAL/.test(s)) return "partial_sb";
+  if (/\bSBA\b|TOTAL SMALL|SMALL BUSINESS SET|^SB$|^SBP$/.test(s)) return "total_sb";
+  if (/UNRESTRICTED|FULL AND OPEN|FULL & OPEN/.test(s)) return "unrestricted";
+  if (/\bVSA\b|\bVSS\b|VETERAN-?OWNED|\bVOSB\b/.test(s)) return "vosb";
+  return null; // unknown / unmapped — never flag
+}
+// HARD-flag-only reconciliation: emit a "verify" note ONLY when a DIFFERENT
+// program's indicator clause is affirmatively present in §I (the high-signal,
+// GAO-relevant case). A merely-missing indicator is NOT flagged (avoids false
+// positives when §I wasn't fully ingested). VA solicitations use VAAR 852.219,
+// not FAR 52.219, so they are never FAR-flagged. EDWOSB/WOSB are cross-eligible.
+export function _v2SetAsideClauseFlag(
+  setAside: string | null | undefined,
+  farClauseNumbers: string[],
+  isVA: boolean
+): string | null {
+  const program = _v2SetAsideProgram(setAside);
+  if (!program || program === "unrestricted" || program === "vosb" || isVA) return null;
+  const present = new Set(farClauseNumbers.map((c) => c.trim()));
+  const indicated = new Set<string>();
+  for (const [clause, prog] of Object.entries(SET_ASIDE_INDICATOR_CLAUSE)) {
+    if (present.has(clause)) indicated.add(prog);
+  }
+  const confirmed =
+    indicated.has(program) ||
+    (program === "edwosb" && indicated.has("wosb")) ||
+    (program === "wosb" && indicated.has("edwosb"));
+  if (confirmed) return null;
+  const others = [...indicated].filter((p) => p !== program);
+  if (others.length === 0) return null; // no competing evidence → no flag
+  const otherLabel = others.map((p) => SET_ASIDE_PROGRAM_LABEL[p] ?? p).join(", ");
+  const selfLabel = SET_ASIDE_PROGRAM_LABEL[program] ?? program;
+  return `Verify set-aside: SAM lists ${selfLabel}, but Section I incorporates the ${otherLabel} set-aside clause — confirm before bidding.`;
+}
+
 function _v2BuildDeterministicClauses(
   factClauses: Array<{ number: string }>,
   rawText: string
@@ -4900,6 +4978,15 @@ export async function runAuditV2(
   const { farClausesDet, dfarsClausesDet, agencyClausesDet } =
     _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
 
+  // Set-aside ↔ §I clause reconciliation (research-backed). HARD-flag only when a
+  // competing program's indicator clause is affirmatively present in §I.
+  const setAsideVerify = _v2SetAsideClauseFlag(
+    facts.setAside,
+    farClausesDet,
+    /VETERANS AFFAIRS|\bVA\b|VAAR/i.test(facts.issuingOffice ?? "")
+  );
+  if (setAsideVerify) warnings.push(setAsideVerify);
+
   return {
     sectionBag,
     facts,
@@ -4943,6 +5030,7 @@ export async function runAuditV2(
       // "v1_vision" => vision read of the doc. null when the fact is absent.
       naics_provenance: facts.naicsCode ? (boundSources.naicsCode ?? null) : null,
       set_aside_provenance: facts.setAside ? (boundSources.setAside ?? null) : null,
+      set_aside_verify: setAsideVerify,
       solicitor_number: facts.solicitorNumber ?? null,
       timeline_gates: {
         offer_due: facts.offerDueDate ?? null,
