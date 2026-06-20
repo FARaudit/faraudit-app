@@ -161,7 +161,7 @@ export async function runWorker(): Promise<never> {
   // so a deploy proves which model it runs from the logs alone — no audit run, no
   // metered tokens, no guessing from the DB default placeholder. V2 judgment is
   // threaded from this same constant (MI-1), so this one line covers both layers.
-  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} (V1 extraction + V2 judgment)`);
+  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} · deploy=${process.env.RAILWAY_DEPLOYMENT_ID?.slice(0, 8) ?? "?"} · sha=${process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"} (V1 extraction + V2 judgment)`);
   // Boot reclaim pass — a redeploy replaced a container that may have died
   // holding a claim; reclaim it before the first poll.
   await reclaimOrphans().catch((err) => console.error("[audit-worker] boot reclaim error:", err instanceof Error ? err.message : err));
