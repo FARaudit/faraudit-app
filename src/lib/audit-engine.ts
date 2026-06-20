@@ -4413,7 +4413,7 @@ function normalizeContractType(raw: string | null | undefined): ExtractedFacts["
   return "other";
 }
 
-function bindExternalFacts(
+export function bindExternalFacts(
   facts: ExtractedFacts,
   external: ExternalBoundFacts | undefined,
   docText: string = ""
@@ -4466,6 +4466,41 @@ function bindExternalFacts(
   if (samSetAside && samSetAside !== facts.setAside) {
     facts.setAside = samSetAside;
     boundSources.setAside = "sam_metadata";
+  }
+
+  // FACTS law (project_facts_vs_analysis): the issuing agency is a DETERMINISTIC
+  // fact from the SAM notice cross-ref by solicitation number — never the model's
+  // vision read or a keyword scan of the document body. On 70B01C26R00000080
+  // (CBP/DHS "Tucson Tactical Infrastructure Maintenance") the doc-text extractor
+  // extractAgencyFromText matched a single passing "geospatial" mention via its
+  // canonical-name table and bound facts.issuingOffice="National Geospatial-
+  // Intelligence Agency", which then rendered on the masthead badged "Extracted"
+  // while audits.agency correctly read CBP/DHS — an internal contradiction and the
+  // FA-151/172 masthead-agency class resurfacing. SAM wins for agency; document/v1
+  // fill only when SAM is silent (FA-172 uploads with no notice match).
+  const samAgency = external?.sam?.issuingOffice?.trim();
+  if (samAgency && samAgency !== facts.issuingOffice) {
+    facts.issuingOffice = samAgency;
+    boundSources.issuingOffice = "sam_metadata";
+  }
+
+  // FACTS law (project_facts_vs_analysis): NAICS is a DETERMINISTIC fact — the
+  // SAM notice carries the single PRINCIPAL/governing NAICS for the solicitation,
+  // which sets the size standard and 8(a)/SB eligibility. The doc-text extractor
+  // (section-extractors naicsPattern / extractNaicsFromText) grabs the FIRST
+  // 6-digit NAICS by position with no principal-vs-CLIN awareness, so on
+  // W15QKN-26-Q-A119 (roof RFQ) it bound the CLIN line-item 238150 (Roofing
+  // Contractors) over the governing 236220 (Commercial Bldg Construction, $45M
+  // std) — wrong size standard → wrong eligibility math. SAM principal wins on
+  // CONFLICT; document/v1 fill only when SAM is silent (FA-172/180 uploads with
+  // no notice match), and a matching doc value never triggers the override (so
+  // HM047626 541611 / FA487726 237310, present in source, keep "document"
+  // provenance). naics_provenance follows boundSources so the masthead badge stays
+  // honest ("SAM metadata · verify" when SAM supplied it).
+  const samNaics = external?.sam?.naicsCode?.trim();
+  if (samNaics && samNaics !== facts.naicsCode) {
+    facts.naicsCode = samNaics;
+    boundSources.naicsCode = "sam_metadata";
   }
 
   if (facts.contractType) {

@@ -2757,8 +2757,26 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // service top-2 hierarchy drops to the agency_detail subnote. No leaf →
   // prior behavior unchanged (identity = issuing/end-user or validated
   // agency, empty subnote).
-  const officeLeaf = sanitizeDisplayText(audit.office_leaf as string) || "";
-  const topHierarchyAgency = validatedAgency(audit.agency, v2Meta?.agency);
+  // FA-151 + agency-FACTS fix (2026-06-20): prefer the persisted SAM office leaf;
+  // when it wasn't persisted (null) but a genuine multi-level SAM hierarchy is
+  // present, derive the buying-office leaf from it (the same `hierarchy` the body
+  // renders) so the masthead shows the office the body already names — never
+  // "Not in documents". This is the render half of the agency fix: the engine now
+  // binds the authoritative SAM agency (a dotted DEPT.SUBTIER.OFFICE hierarchy)
+  // into metadata_brief, which cleanAgencyDisplay/validatedAgency reject as a
+  // single org name. A single-segment hierarchy (doc-extracted upload name) is
+  // left to the cleanAgency chain below, which strips ATTN/address tails.
+  const officeLeaf =
+    sanitizeDisplayText(audit.office_leaf as string) ||
+    (hierarchy.length >= 2 ? sanitizeDisplayText(hierarchy[hierarchy.length - 1]?.text as string) : "") ||
+    "";
+  // Subnote = the parent levels above the leaf. validatedAgency rejects the dotted
+  // form, so for a multi-level hierarchy join the parents directly; otherwise fall
+  // back to the validated single agency name.
+  const topHierarchyAgency =
+    hierarchy.length >= 2
+      ? hierarchy.slice(0, -1).map((h) => sanitizeDisplayText(h.text as string)).filter(Boolean).join(" · ")
+      : validatedAgency(audit.agency, v2Meta?.agency);
 
   // FA-187 — masthead subject line: a concise human description distinct from
   // the .mh-id number. Derived from the engine's overview summary / primary
