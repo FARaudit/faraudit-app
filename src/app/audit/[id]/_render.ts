@@ -2760,7 +2760,7 @@ export function renderHeaderSourceChips(html: string, vm: AuditViewModel): strin
     { key: "agency", verifyHint: null },
     { key: "naics", verifyHint: null },
     { key: "set_aside", verifyHint: null },
-    { key: "contract_type", verifyHint: "Inferred · verify in &sect;B" },
+    { key: "contract_type", verifyHint: null },
   ];
   let out = html;
   for (const f of fields) {
