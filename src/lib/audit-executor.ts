@@ -624,10 +624,16 @@ export async function executeAudit(
         // report and §09 collapses to the 1-item due-date fallback.
         v1Structured: {
           clins: Array.isArray(persistedComplianceJson.clins) ? persistedComplianceJson.clins : [],
-          clauses: [
-            ...(Array.isArray(persistedComplianceJson.dfars_clauses) ? persistedComplianceJson.dfars_clauses : []),
-            ...(Array.isArray(persistedComplianceJson.far_clauses) ? persistedComplianceJson.far_clauses : []),
-          ],
+          // ROOT FIX (2026-06-20): do NOT feed the V1 AI clause list back into V2.
+          // The AI vision call ("be EXHAUSTIVE") hallucinates clauses, drifts
+          // run-to-run, and over-sweeps the whole PDF. Threading it into
+          // v1Structured.clauses let it RE-CONTAMINATE V2's deterministic facts
+          // (bindExternalFacts fills facts.clauses from v1s.clauses when the
+          // deterministic parse is empty). V2 now derives clauses deterministically
+          // (extractClauses §I UNION full-text sweep) and that list is the source
+          // of truth for the persisted far_clauses/dfars_clauses below. The AI list
+          // survives only as the persistence-time fallback when V2's is empty.
+          clauses: [],
           submissionRequirements: Array.isArray(result.overview.json.submission_requirements_raw)
             ? result.overview.json.submission_requirements_raw
             : [],
@@ -754,12 +760,34 @@ export async function executeAudit(
           `[V2-SHADOW] RC2 set-aside backfill for ${auditId}: "${setAsideBackfill}" (provenance=${v2SetAsideProvenance})`
         );
       }
+      // ROOT FIX (2026-06-20) — DETERMINISTIC clause list is the SOURCE OF TRUTH.
+      // V2's farClausesDet/dfarsClausesDet come from extractClauses (§I) UNION a
+      // full-text sweep of the assembled document — same input → same output, no
+      // hallucination/drift/over-sweep. Overwrite the rendered far_clauses /
+      // dfars_clauses with the deterministic lists WHEN non-empty; otherwise keep
+      // the V1 AI list as the fallback (image-scan/no-text-layer arms). Agency-
+      // local clauses (NGA 5X52.*, AFFARS 5352.*) — which the renderer would
+      // otherwise drop — are folded into the FAR bucket the view-model iterates,
+      // appended after the FAR clauses so they surface instead of vanishing.
+      const farDet = Array.isArray(v2Result.farClausesDet) ? v2Result.farClausesDet : [];
+      const dfarsDet = Array.isArray(v2Result.dfarsClausesDet) ? v2Result.dfarsClausesDet : [];
+      const agencyDet = Array.isArray(v2Result.agencyClausesDet) ? v2Result.agencyClausesDet : [];
+      const farForRender = [...farDet, ...agencyDet];
+      const clauseOverride: { far_clauses?: string[]; dfars_clauses?: string[] } = {};
+      if (farForRender.length > 0) clauseOverride.far_clauses = farForRender;
+      if (dfarsDet.length > 0) clauseOverride.dfars_clauses = dfarsDet;
+      if (farForRender.length > 0 || dfarsDet.length > 0) {
+        console.log(
+          `[V2-SHADOW] deterministic clause override for ${auditId}: far=${farForRender.length} (incl ${agencyDet.length} agency-local) dfars=${dfarsDet.length}`
+        );
+      }
       const { error: shadowError } = await supabase
         .from("audits")
         .update({
           compliance_json: {
             ...persistedComplianceJson,
             ...(setAsideBackfill ? { set_aside_type: setAsideBackfill } : {}),
+            ...clauseOverride,
             analysis_phase: "done",
             v2_shadow: v2Shadow,
           },

@@ -444,6 +444,44 @@ function revealLockedSectionsForUnscored(html: string): string {
   return out;
 }
 
+// FA-195-v2 (inverse of revealLockedSectionsForUnscored): when the report
+// actually read its documents in full (vm.report_has_real_content), PHYSICALLY
+// REMOVE the static "metadata-only / Locked / Fetch from SAM.gov / scored from
+// SAM metadata alone / Not yet unlocked" scaffolding from the markup — entire
+// element, open tag through matching close — so it can never render regardless
+// of JS or CSS state. These blocks ship display:none + data-state="locked" but
+// the 5-sol sweep proved they leaked visible on fully-ingested reports.
+//
+// Blocks removed:
+//   1. preliminary masthead  <div class="mh-verdict v-unscored" data-state="locked" data-prelim-mode=... data-field="preliminary_block">
+//   2. "moment" locked teaser <section class="moment" data-state="locked">
+//   3. §04 locked card        <div class="locked" data-state="locked"> (first)
+//   4. §05 locked card        <div class="locked" data-state="locked"> (second)
+function stripLockedScaffoldingForRealContent(html: string): string {
+  let out = html;
+  // 1. Preliminary masthead — uniquely identified by data-field="preliminary_block".
+  out = removeElementByOpenRe(
+    out,
+    /<div\b[^>]*\bdata-field="preliminary_block"[^>]*>/,
+    "div"
+  );
+  // 2. "moment" locked teaser — <section class="moment" data-state="locked">.
+  out = removeElementByOpenRe(
+    out,
+    /<section\b[^>]*\bclass="moment"[^>]*\bdata-state="locked"[^>]*>/,
+    "section"
+  );
+  // 3 + 4. §04 and §05 locked cards — <div class="locked" data-state="locked">.
+  // removeElementByOpenRe removes the first match each call; loop to clear all.
+  const lockedCardRe = /<div\b[^>]*\bclass="locked"[^>]*\bdata-state="locked"[^>]*>/;
+  let prev: string;
+  do {
+    prev = out;
+    out = removeElementByOpenRe(out, lockedCardRe, "div");
+  } while (out !== prev);
+  return out;
+}
+
 function removeNotSolicitationSections(html: string): string {
   const sectionIds = ["sec-scope", "sec-compliance", "sec-risks", "sec-reco"];
   let out = html;
@@ -2174,7 +2212,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // web + PDF in lockstep (no need for [data-state="locked"] CSS gymnastics
     // since the sections are physically gone).
     html = removeNotSolicitationSections(html);
-  } else if (vm.is_unscored) {
+  } else if (vm.is_unscored && !vm.report_has_real_content) {
+    // FA-195-v2: a scored-null report that nevertheless read its documents in
+    // full (report_has_real_content) must NOT take the "Preliminary · SAM
+    // metadata" masthead path — that path renders the locked/fetch scaffolding.
+    // Fall through to the normal scored masthead so the AI fit_score + rationale
+    // render (handled below); the honest "not yet scored" copy lives in the
+    // scored block's score area, not the prelim teaser.
     // DESIGN dual-block spec: keep the prelim .v-unscored block, drop the
     // scored block. data-prelim-mode is the classifier output mapped through
     // the watch→upload fallback (until the watcher ships). The matching
@@ -2237,19 +2281,39 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // vm.score=null (suppressed in the view-model). Show the score_display
     // string ("—") rather than the scoreNum fallback which would render "0".
     const scoreNum = vm.score ?? 0;
-    const scoreText = vm.score === null ? vm.score_display : String(Math.round(scoreNum));
-    html = replaceFieldText(html, "score", scoreText);
-    // PR#20 / Phase-4 honesty: the masthead Fit/Win tiles ship HONEST DEFAULTS in
-    // the template — score_benchmark is SUPPRESSED (score-derived heuristic with no
-    // category dataset behind it) and Win Probability defaults to UNSCORED "—"
-    // (basis-gated, null pre-revenue; "comparable audits" is not win/loss outcome
-    // data). We fill only the real Fit Score + its bar here; the Win tile keeps its
-    // unscored default until a genuine outcome-calibrated basis exists. (Engine does
-    // not populate win_probability today, so no win number is ever shown.)
-    html = html.replace(
-      /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
-      `$1${Math.max(0, Math.min(100, scoreNum))}%$2`
-    );
+    // FA-195-v2 Fix 2: a NON-gate scored audit can also arrive with score=null
+    // (e.g. the primary doc was mis-detected, so the engine emitted no numeric
+    // fit_score) while the report still read its documents in full. The default
+    // template then renders a bare "—/100" with a 0%-width bar — false precision
+    // that reads as a broken/blank score. Render an HONEST unscored Fit tile
+    // instead: drop the "/100" unit + the bar, mark the number .is-unscored, and
+    // add a note (mirroring the Win Probability unscored treatment). A genuine
+    // pass/fail GATE verdict (verdict_mode === "gate") is a separate signal — its
+    // masthead variant hides .mhv-metrics entirely, so it never reaches here.
+    const scoreUnscored = vm.score === null && vm.verdict_mode !== "gate";
+    if (scoreUnscored) {
+      // Replace the whole Fit Score tile body: "—" (no "/100"), no bar, honest note.
+      html = html.replace(
+        /(<div class="mhv-metric">\s*)<div class="n"><span data-field="score">[\s\S]*?<\/span><span class="u">\/100<\/span><\/div>\s*<div class="k">Fit Score<\/div>\s*<div class="mhv-bar">[\s\S]*?<\/div>(\s*(?:<!--[\s\S]*?-->\s*)?<\/div>)/,
+        `$1<div class="n is-unscored"><span data-field="score">&mdash;</span></div>` +
+        `<div class="k">Fit Score</div>` +
+        `<div class="mhv-unscored">Not scored &mdash; primary document not yet resolved</div>$2`
+      );
+    } else {
+      const scoreText = vm.score === null ? vm.score_display : String(Math.round(scoreNum));
+      html = replaceFieldText(html, "score", scoreText);
+      // PR#20 / Phase-4 honesty: the masthead Fit/Win tiles ship HONEST DEFAULTS in
+      // the template — score_benchmark is SUPPRESSED (score-derived heuristic with no
+      // category dataset behind it) and Win Probability defaults to UNSCORED "—"
+      // (basis-gated, null pre-revenue; "comparable audits" is not win/loss outcome
+      // data). We fill only the real Fit Score + its bar here; the Win tile keeps its
+      // unscored default until a genuine outcome-calibrated basis exists. (Engine does
+      // not populate win_probability today, so no win number is ever shown.)
+      html = html.replace(
+        /(<div class="mhv-metric">[\s\S]*?<span data-field="score">[\s\S]*?<div class="mhv-bar"><i style="width:)\d+%(")/,
+        `$1${Math.max(0, Math.min(100, scoreNum))}%$2`
+      );
+    }
     // FUTURE (outcome calibration): when vm carries a real win BAND, fill
     // win_probability_band + win_probability_note and drop .is-unscored here.
   }
@@ -2646,6 +2710,15 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   html = replaceFieldText(html, "incumbent_none_head", vm.incumbent_none_head);
   html = replaceFieldText(html, "incumbent_none_note", vm.incumbent_none_note);
   // ─────────────────────────────────────────────────────────────────────────
+
+  // FA-195-v2: when the report read its documents in full, PHYSICALLY strip
+  // the static locked/metadata-only scaffolding (prelim masthead, "moment"
+  // teaser, §04/§05 locked cards). These ship display:none but the 5-sol sweep
+  // proved they leaked visible on fully-ingested reports. Stripping the markup
+  // here guarantees web + PDF + no-JS readers can never surface them.
+  if (vm.report_has_real_content) {
+    html = stripLockedScaffoldingForRealContent(html);
+  }
 
   // V2 cutover B2+B3 (Jun 8 2026): strip pass moved OUT of renderAuditReport.
   // The route handlers now call renderAuditReportComplete (below) which runs

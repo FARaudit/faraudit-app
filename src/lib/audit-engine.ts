@@ -3625,6 +3625,7 @@ import { detectSections as _v2DetectSections } from "./section-boundary-detector
 import { classifySectionRoles as _v2ClassifySectionRoles } from "./sam-attachments";
 import {
   extractAllFacts as _v2ExtractAllFacts,
+  extractClauseNumbers as _v2ExtractClauseNumbers,
   DFARS_TRAPS_MAP as _v2DfarsTrapsMap,
   bucketizeSubmissionLine as _v2BucketizeSubmissionLine,
   type ExtractedFacts
@@ -3717,6 +3718,16 @@ export interface AuditV2Result {
   // on normal runAuditV2 (every audit gets an evaluation_type read). null
   // on wrong-doc / metadata-only paths.
   price_anchor?: PriceAnchor | null;
+  // Deterministic clause lists (root fix, 2026-06-20) — DETERMINISTIC PARSE is
+  // the source of truth for the rendered far_clauses / dfars_clauses, replacing
+  // the V1 AI "be EXHAUSTIVE" vision list (which hallucinated, drifted run-to-run,
+  // and over-swept the whole PDF). Computed from facts.clauses UNION a full-text
+  // sweep of doc.rawText (so clauses cited in C/H/L/M aren't dropped when §I is
+  // thin), split by prefix: FAR /^52\./, DFARS /^252\./, agency /^(5352|5X52)\./.
+  // Empty arrays => caller falls back to the AI list. Same input → same output.
+  farClausesDet: string[];
+  dfarsClausesDet: string[];
+  agencyClausesDet: string[];
 }
 
 // Fix 12 — §06 submission preflight surface.
@@ -3918,6 +3929,10 @@ function _v2BuildWrongDocResult(signal: _v2WrongDocSignal): AuditV2Result {
     submission_preflight: null,
     recompete_signal: null,
     price_anchor: null,
+    // Deterministic clause lists — none on the wrong-doc short-circuit.
+    farClausesDet: [],
+    dfarsClausesDet: [],
+    agencyClausesDet: [],
   };
 }
 
@@ -4129,6 +4144,10 @@ export async function runAuditV2Metadata(input: MetadataOnlyInput): Promise<Audi
     submission_preflight: null,
     recompete_signal: null,
     price_anchor: null,
+    // Deterministic clause lists — none on the metadata-only path (no PDF).
+    farClausesDet: [],
+    dfarsClausesDet: [],
+    agencyClausesDet: [],
   };
 }
 
@@ -4517,6 +4536,42 @@ function bindExternalFacts(
   return boundSources;
 }
 
+// Deterministic clause-list builder (root fix, 2026-06-20). UNION the §I-scoped
+// extractClauses() output (facts.clauses) with a full-text sweep of the assembled
+// document (extractClauseNumbers over rawText) so the list is COMPLETE even when
+// §I detection is thin or a clause is cited in C/H/L/M. Dedup by normalized
+// (uppercased, trimmed) number, then split by prefix:
+//   FAR    /^52\./    DFARS  /^252\./    agency  /^(5352|5X52)\./
+// Returns numbers only (the persisted far_clauses/dfars_clauses are string arrays).
+// Pure + deterministic: same input → same output.
+function _v2BuildDeterministicClauses(
+  factClauses: Array<{ number: string }>,
+  rawText: string
+): { farClausesDet: string[]; dfarsClausesDet: string[]; agencyClausesDet: string[] } {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  const add = (raw: string) => {
+    const num = (raw ?? "").trim();
+    if (!num) return;
+    const norm = num.toUpperCase();
+    if (seen.has(norm)) return;
+    seen.add(norm);
+    ordered.push(num);
+  };
+  for (const c of factClauses) add(c.number);
+  for (const n of _v2ExtractClauseNumbers(rawText)) add(n);
+
+  const farClausesDet: string[] = [];
+  const dfarsClausesDet: string[] = [];
+  const agencyClausesDet: string[] = [];
+  for (const n of ordered) {
+    if (/^252\./.test(n)) dfarsClausesDet.push(n);
+    else if (/^52\./.test(n)) farClausesDet.push(n);
+    else if (/^(?:5352|5X52)\./i.test(n)) agencyClausesDet.push(n);
+  }
+  return { farClausesDet, dfarsClausesDet, agencyClausesDet };
+}
+
 export async function runAuditV2(
   pdfBuffer: Buffer,
   external?: ExternalBoundFacts,
@@ -4785,10 +4840,22 @@ export async function runAuditV2(
   // (lpta_guidance + ige_note) populate when §M evaluation factors flag LPTA.
   const price_anchor = _v2BuildPriceAnchor(facts);
 
+  // Deterministic clause lists (root fix, 2026-06-20). extractClauses() runs
+  // over §I ONLY, so a thin/missing §I (or clauses cited in C/H/L/M) would yield
+  // an incomplete list. UNION the §I-scoped facts.clauses with a full-text sweep
+  // of the assembled doc.rawText (same pattern, single source of truth), dedup by
+  // normalized clause number, then split by prefix. This becomes the persisted
+  // far_clauses / dfars_clauses (AI list kept only as fallback when empty).
+  const { farClausesDet, dfarsClausesDet, agencyClausesDet } =
+    _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
+
   return {
     sectionBag,
     facts,
     judgment,
+    farClausesDet,
+    dfarsClausesDet,
+    agencyClausesDet,
     work_statement: ws.work_statement,
     work_statement_unknown: ws.work_statement_unknown,
     matrix_rollup: matrix,

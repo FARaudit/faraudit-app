@@ -439,6 +439,11 @@ export interface AuditViewModel {
 
   // misc
   is_metadata_only: boolean;
+  // FA-195-v2: single source of truth — the report read its documents in full
+  // (full PDF read, complete upload/SAM set, or extracted clauses/CLINs). When
+  // true, ALL "metadata-only / Locked / Fetch from SAM.gov" scaffolding must be
+  // suppressed/stripped regardless of is_unscored or per-section counts.
+  report_has_real_content: boolean;
   // FA-E2E Fix 2 (2026-06-18): REAL clause/trap counts so the metadata-only
   // locked teasers stop rendering hardcoded "4 DFARS traps / 9 clauses"
   // literals. Populated from compliance_json; the renderer strips the teaser
@@ -1587,6 +1592,17 @@ function deriveGateCardProse(
 // citation is the canonical clause reference for each gate (engine doesn't
 // store one explicitly, so map by gate_id). blocker_note is shown only when
 // the gate is structurally uncurable in the response window.
+// FA-195-v2 Fix 3: clamp a string to `max` chars on a WORD boundary so gate
+// context never truncates mid-word ("…Maintenanc", "physical …"). Returns the
+// string untouched when already short enough; otherwise cuts at `max`, drops the
+// dangling partial word, trims trailing punctuation, and appends an ellipsis.
+function truncateOnWord(s: string, max: number): string {
+  const str = String(s);
+  if (str.length <= max) return str;
+  const cut = str.slice(0, max).replace(/\s+\S*$/, "").replace(/[\s,;:.–—-]+$/, "");
+  return `${cut}…`;
+}
+
 function deriveGateConditions(
   gates: Array<{ gate_id?: string; gate_label?: string; cure_possible_in_window?: boolean; verification_action?: string; verification_url?: string; named_entity?: string }>,
   daysToDeadline: number | null
@@ -1609,7 +1625,9 @@ function deriveGateConditions(
       context = sanitizeDisplayText(g.named_entity);
     } else if (g.verification_action) {
       const firstSentence = String(g.verification_action).split(/[.!?](?:\s|$)/)[0];
-      context = sanitizeDisplayText(firstSentence.length > 110 ? firstSentence.slice(0, 108) + "…" : firstSentence);
+      // FA-195-v2 Fix 3: clamp on a WORD boundary, never mid-word ("…Maintenanc",
+      // "physical …"). truncateOnWord strips the dangling partial word.
+      context = sanitizeDisplayText(truncateOnWord(firstSentence, 110));
     }
     const citation = CITATIONS[id] || "—";
     const blockerNote = g.cure_possible_in_window === false
@@ -1642,7 +1660,8 @@ function deriveGatesFromRiskFindings(
     const title = sanitizeDisplayText(f.title);
     if (!title) continue;
     const textFirst = typeof f.text === "string" ? f.text.split(/[.!?](?:\s|$)/)[0] : "";
-    const context = sanitizeDisplayText(textFirst.length > 110 ? textFirst.slice(0, 108) + "…" : textFirst) || "";
+    // FA-195-v2 Fix 3: clamp on a WORD boundary, never mid-word.
+    const context = sanitizeDisplayText(truncateOnWord(textFirst, 110)) || "";
     const citation = sanitizeDisplayText(f.citation) || "—";
     out.push({ title, context, citation, blocker_note: "" });
   }
@@ -2441,10 +2460,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // or a complete upload set (files_ingested >= files_total) means the report
   // is real, not a metadata-only shell — suppress the locked state.
   const _ing = (compJson.ingestion ?? {}) as { files_total?: number; files_ingested?: number };
-  const _fullyIngested =
+  const _ingFar = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as unknown[]).length : 0;
+  const _ingDfars = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as unknown[]).length : 0;
+  const _clinCount = Array.isArray(compJson.clin_line_items) ? (compJson.clin_line_items as unknown[]).length : 0;
+  // FA-195-v2 (single source of truth): the report has REAL content — a full PDF
+  // read, a complete upload/SAM set, or any extracted clauses/CLINs. ALL
+  // "metadata-only / Locked / Fetch from SAM.gov / scored from metadata alone"
+  // scaffolding must be driven off this one flag (NOT is_unscored, NOT per-section
+  // counts, NOT pdf_source alone) — those disagreed and leaked the contradiction
+  // (the 5-sol sweep found it visible on #2/#3/#5 while files were read in full).
+  const reportHasRealContent =
     v2Shadow?.path === "pdf" ||
-    ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0));
-  const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !_fullyIngested;
+    ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0)) ||
+    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0;
+  const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !reportHasRealContent;
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
   // both populated and missing-flag rows.
@@ -3098,6 +3127,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     ko_email_body: koBody,
 
     is_metadata_only: !!isMetadataOnly,
+    report_has_real_content: !!reportHasRealContent,
     // FA-E2E Fix 2: real counts for the locked-teaser placeholders.
     far_clause_count: farCount,
     dfars_clause_count: dfarsCount,
