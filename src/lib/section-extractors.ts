@@ -62,6 +62,9 @@ export interface ExtractedFacts {
   extractionWarnings: string[];
   /** Section C / attached PWS body — input for the SOW/PWS/SOO classifier (§03, FA-119). */
   workStatementText?: string;
+  /** Verbatim PoP / base+option term (e.g. "12-mo base + 4 option years"). V1-bound,
+   *  threaded into V2 so the judgment doesn't flatten the term to a single CLIN's base. */
+  periodOfPerformance?: string | null;
 }
 
 // ── DFARS trap clause list (matches engine DFARS_TRAPS) ───────────────────

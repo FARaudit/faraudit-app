@@ -523,6 +523,11 @@ export async function executeAudit(
     compliance_score: result.compliance_score,
     recommendation: result.recommendation,
     bid_recommendation: result.bid_recommendation,
+    // 2026-06-19: persist the REAL model the engine ran. Previously this column
+    // was never written by the worker path, so it sat on the migration-012 DB
+    // default ('claude-sonnet-4-6') for every audit — a telemetry lie that made
+    // an Opus run look like Sonnet. Now it reflects the engine's actual model.
+    model_used: result.model_used,
     document_type: result.classification.document_type,
     document_type_rationale: result.classification.rationale,
     document_type_confidence: result.classification.confidence,
@@ -603,6 +608,7 @@ export async function executeAudit(
             (typeof persistedComplianceJson.set_aside_type === "string" && persistedComplianceJson.set_aside_type
               ? persistedComplianceJson.set_aside_type
               : null) ?? persistedComplianceJson.set_aside_text ?? null,
+          periodOfPerformance: result.overview.json.period_of_performance ?? null,
         },
         sam: {
           title: solicitation.title,
