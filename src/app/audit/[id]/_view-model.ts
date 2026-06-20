@@ -2441,10 +2441,20 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // or a complete upload set (files_ingested >= files_total) means the report
   // is real, not a metadata-only shell — suppress the locked state.
   const _ing = (compJson.ingestion ?? {}) as { files_total?: number; files_ingested?: number };
-  const _fullyIngested =
+  const _ingFar = Array.isArray(compJson.far_clauses) ? (compJson.far_clauses as unknown[]).length : 0;
+  const _ingDfars = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as unknown[]).length : 0;
+  const _clinCount = Array.isArray(compJson.clin_line_items) ? (compJson.clin_line_items as unknown[]).length : 0;
+  // FA-195-v2 (single source of truth): the report has REAL content — a full PDF
+  // read, a complete upload/SAM set, or any extracted clauses/CLINs. ALL
+  // "metadata-only / Locked / Fetch from SAM.gov / scored from metadata alone"
+  // scaffolding must be driven off this one flag (NOT is_unscored, NOT per-section
+  // counts, NOT pdf_source alone) — those disagreed and leaked the contradiction
+  // (the 5-sol sweep found it visible on #2/#3/#5 while files were read in full).
+  const reportHasRealContent =
     v2Shadow?.path === "pdf" ||
-    ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0));
-  const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !_fullyIngested;
+    ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0)) ||
+    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0;
+  const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !reportHasRealContent;
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
   // both populated and missing-flag rows.
