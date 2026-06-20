@@ -725,8 +725,8 @@ const SET_ASIDE_LABEL: Record<string, string> = {
   "VOSB":                        "Veteran-Owned Small Business (VOSB)",
   "HUBZONE":                     "HUBZone Small Business",
   "HUB ZONE":                    "HUBZone Small Business",
-  "8(A)":                        "8(a) Sole-Source / Competitive",
-  "8A":                          "8(a) Sole-Source / Competitive",
+  "8(A)":                        "8(a) Set-Aside (competitive)",
+  "8A":                          "8(a) Set-Aside (competitive)",
   "8A_COMPETED":                 "8(a) Competitive",
   "8A_SOLE_SOURCE":              "8(a) Sole-Source",
 };
@@ -2434,7 +2434,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // The unscored branch only fires when the engine literally couldn't score
   // (metadata-only, no PDF).
   const isUnscored = verdictMode !== "gate" && (rawScore === null || scoreConfidenceRaw === "unscored");
-  const isMetadataOnly = compJson.pdf_source === "sam_unavailable";
+  // FA-195: never render the "Locked / metadata-only / Fetch from SAM.gov"
+  // teasers on an audit that actually read its documents in full. pdf_source
+  // alone over-fires (39 Locked badges + "0 clauses" surfaced on a fully
+  // ingested audit citing 88 clauses). A full PDF read (v2_shadow.path==="pdf")
+  // or a complete upload set (files_ingested >= files_total) means the report
+  // is real, not a metadata-only shell — suppress the locked state.
+  const _ing = (compJson.ingestion ?? {}) as { files_total?: number; files_ingested?: number };
+  const _fullyIngested =
+    v2Shadow?.path === "pdf" ||
+    ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0));
+  const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !_fullyIngested;
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
   // both populated and missing-flag rows.
@@ -3046,7 +3056,11 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     clin_summary: sanitizeDisplayText(overviewJson.summary) || "Scope summary not available — upload the full PDF to extract scope detail.",
     primary_objective: sanitizeDisplayText(overviewJson.primary_objective) || "Primary objective not extracted.",
     period_of_performance: ((): string => {
-      const pop = sanitizeDisplayText(overviewJson.period_of_performance);
+      // FA-195: fall back to the deterministic top-level column when the
+      // overview JSON lacks PoP, so a populated fact never renders blank.
+      const pop =
+        sanitizeDisplayText(overviewJson.period_of_performance) ||
+        sanitizeDisplayText(audit.period_of_performance);
       if (!pop) return "Period of performance not extracted.";
       // P2 polish: a vnote-declared assumption must show at the value itself.
       return popAssumed && !/assum/i.test(pop) ? `${pop} (assumed)` : pop;
