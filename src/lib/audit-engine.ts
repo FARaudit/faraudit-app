@@ -4416,6 +4416,23 @@ function bindExternalFacts(
       boundSources[key] = "sam_metadata";
     }
   }
+
+  // FACTS law (project_facts_vs_analysis): set-aside is a DETERMINISTIC fact
+  // from the SAM notice cross-ref by solicitation number — never the model's
+  // vision read of the SF-1449 Block 10 checkboxes. On HM047626R0039 (an 8(a)
+  // competitive notice) the vision read mistook the UNCHECKED "SDVOSB" label
+  // for the set-aside, so the document-wins precedence above bound
+  // facts.setAside="SDVOSB" and never consulted SAM ("8A") — polluting
+  // metadata_brief AND the judgment bottomLine while audits.set_aside (FA-176
+  // executor guard) correctly read "8A", an internal contradiction. SAM wins
+  // for set-aside; document/v1 fill only when SAM is silent (FA-172 uploads
+  // with no notice match).
+  const samSetAside = external?.sam?.setAside?.trim();
+  if (samSetAside && samSetAside !== facts.setAside) {
+    facts.setAside = samSetAside;
+    boundSources.setAside = "sam_metadata";
+  }
+
   if (facts.contractType) {
     boundSources.contractType = "document";
   } else {
