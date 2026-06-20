@@ -3071,7 +3071,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // NAICS match check is the obvious next step). Empty → renderer hides the
     // .mhv-note line per Design.
     prelim_has_deadline: !!responseDeadline,
-    set_aside_eligibility: "",
+    // Set-aside clause-evidence reconciliation note (engine: metadata_brief
+    // .set_aside_verify). Empty → renderer hides the .mhv-note line.
+    set_aside_eligibility: sanitizeDisplayText(v2Meta?.set_aside_verify as string) || "",
     prelim_mode: prelimMode,
     rendered_prelim_mode: renderedPrelimMode,
 

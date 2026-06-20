@@ -5,7 +5,7 @@
 // Intelligence Agency" while SAM said CBP/DHS — rendering NGA on the masthead.
 // This asserts the REAL exported bindExternalFacts, not a mirror. No SAM/Opus.
 // Run: npx tsx scripts/audit-ai/test-agency-fix.ts
-import { bindExternalFacts, type ExternalBoundFacts } from "@/lib/audit-engine";
+import { bindExternalFacts, _v2SetAsideClauseFlag, type ExternalBoundFacts } from "@/lib/audit-engine";
 
 type Facts = Parameters<typeof bindExternalFacts>[0];
 const CBP =
@@ -72,6 +72,43 @@ function check(name: string, cond: boolean, detail: string) {
   const external = { sam: { naicsCode: "541611" } } as unknown as ExternalBoundFacts;
   const sources = bindExternalFacts(facts, external, "");
   check("matching NAICS keeps document provenance (no false 'verify')", sources.naicsCode === "document", JSON.stringify(sources.naicsCode));
+}
+
+// ── Set-aside ↔ §I clause reconciliation (HARD-flag-only) ──────────────────
+// 7) THE DTS CASE: SAM says 8(a) but §I carries 52.219-6 (Total SB) → HARD flag.
+{
+  const note = _v2SetAsideClauseFlag("8A", ["52.219-6", "52.219-14", "52.219-28"], false);
+  check("8(a) vs Total-SB clause → flags", !!note && /Total Small Business/.test(note ?? ""), JSON.stringify(note));
+}
+// 8) CONFIRM: SAM 8(a) + 52.219-18 present → no flag.
+{
+  const note = _v2SetAsideClauseFlag("8A", ["52.219-18", "52.219-17", "52.219-14"], false);
+  check("8(a) + 52.219-18 present → no flag", note === null, JSON.stringify(note));
+}
+// 9) CONFIRM Total SB: SAM Total SB + 52.219-6 → no flag.
+{
+  const note = _v2SetAsideClauseFlag("Total Small Business", ["52.219-6"], false);
+  check("Total-SB + 52.219-6 → no flag", note === null, JSON.stringify(note));
+}
+// 10) NO false positive: only cross-program clauses (-14/-28) present → no flag.
+{
+  const note = _v2SetAsideClauseFlag("8A", ["52.219-14", "52.219-28"], false);
+  check("only -14/-28 (non-indicators) → no false flag", note === null, JSON.stringify(note));
+}
+// 11) VA guard: SDVOSB on a VA sol → no FAR-based flag (VA uses VAAR).
+{
+  const note = _v2SetAsideClauseFlag("SDVOSBC", ["52.219-6"], true);
+  check("VA jurisdiction → no FAR flag", note === null, JSON.stringify(note));
+}
+// 12) EDWOSB/WOSB cross-eligible: EDWOSB sol + 52.219-30 (WOSB) → no flag.
+{
+  const note = _v2SetAsideClauseFlag("EDWOSB", ["52.219-30"], false);
+  check("EDWOSB + WOSB clause (cross-eligible) → no flag", note === null, JSON.stringify(note));
+}
+// 13) HARD conflict across programs: HUBZone declared, §I carries SDVOSB clause.
+{
+  const note = _v2SetAsideClauseFlag("HZC", ["52.219-27"], false);
+  check("HUBZone vs SDVOSB clause → flags", !!note && /SDVOSB/.test(note ?? ""), JSON.stringify(note));
 }
 
 console.log(failures === 0 ? "\nALL PASS ✓" : `\n${failures} FAILED ✗`);
