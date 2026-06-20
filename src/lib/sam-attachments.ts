@@ -28,12 +28,18 @@
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
 
-// Budget rationale: 5 docs × inline base64 keeps the request under the API's
-// 600-page / 32MB PDF ceiling for real solicitation sets (forms are
-// 100KB-600KB; specs/amendments similar); 15MB total leaves headroom for
-// prompt + metadata. Members above the single-file Files-API threshold are
-// never inlined in a multi-set.
-export const MAX_DOCS = 5;
+// Budget rationale: docs × inline base64 must stay under the API's 600-page /
+// 32MB PDF ceiling for real solicitation sets (forms are 100KB-600KB;
+// specs/amendments similar); 15MB total leaves headroom for prompt + metadata.
+// Members above the single-file Files-API threshold are never inlined in a
+// multi-set.
+// DTS W51H7226 fix (2026-06-20): the 5-doc cap EVICTED decision-critical docs
+// (the clause/provisions list, QASP, wage determination) while KEEPING two
+// near-duplicate "RFQ CLIN Structure" copies. Raised to 8 so distinct
+// high-value docs survive; MAX_TOTAL_INLINE_BYTES + MAX_TOTAL_PAGES (550)
+// remain the REAL ceilings, so we ingest more docs but stay under page/byte
+// limits. Near-duplicate files are deduped before the budget (below).
+export const MAX_DOCS = 8;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
@@ -183,14 +189,28 @@ function workStatementSignal(name: string): 0 | 1 | 2 {
   if (WS_WEAK.test(name)) return 1; // weak: spec / requirements / scope doc
   return 0;
 }
+// DTS W51H7226 fix (2026-06-20): a clause / §I / provisions document is
+// decision-critical — it lists the binding FAR/DFARS clauses + provisions — and
+// must NEVER be evicted as a "generic attachment". The DTS run dropped "Clauses
+// and Provisions DTS Recompete.pdf" while keeping duplicate CLIN-structure
+// copies. Detect by NAME (deterministic, conservative) and tier it just above
+// generic attachments (alongside the work-statement tier) so the budget keeps it
+// over checklist/duplicate docs.
+const CLAUSE_DOC = /\bclauses?\b|provisions?|\bsection\s*i\b|incorporated by reference/i;
+function isClauseDoc(name: string): boolean {
+  return CLAUSE_DOC.test(name);
+}
 // Single ordering key shared by planDocumentOrder + applyBudget so the budget is
-// consumed in the same priority both compute: form → amendment → strong work
-// statement → weak spec → generic attachment. Size is only the tie-break.
+// consumed in the same priority both compute: form → amendment → clause/§I →
+// strong work statement → weak spec → generic attachment. Size is only the
+// tie-break.
 function documentTier(e: DocumentPlanEntry): number {
   if (e.role === "form") return 0;
   if (e.role === "amendment") return 1;
+  // Clause/§I/provisions doc — high priority, never a generic attachment.
+  if (isClauseDoc(e.name)) return 2;
   const sig = workStatementSignal(e.name);
-  return sig === 2 ? 2 : sig === 1 ? 3 : 4;
+  return sig === 2 ? 3 : sig === 1 ? 4 : 5;
 }
 
 // Deterministic role assignment + ordering. Pure — exported for the gate
@@ -236,12 +256,24 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   // FA-E2E re-verify Fix C: within the form tier, prefer the file whose name
   // contains the sol number or "Solicitation" as THE form, so a strong primary
   // wins over an incidental SF-30 amendment that also cleared isForm.
+  // W15QKN roof RFQ fix (2026-06-20): a real solicitation/RFQ doc must OUTRANK an
+  // SF-30 amendment for primary. An SF-30's only form-signal is "amendment of
+  // solicitation"/SF-30; a doc that names itself a solicitation/RFQ or a real
+  // cover form (SF-1449/1442/33/18) is the true primary and must win. The SF-30
+  // becomes primary ONLY when no real solicitation/RFQ doc exists in the set.
+  const REAL_SOL_FORM = /\bsolicitation\b|\brf[qp]\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?33\b|sf[\s-]?0?18\b/i;
+  const isSf30Only = (n: string): boolean =>
+    /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract/i.test(n) &&
+    !REAL_SOL_FORM.test(n);
   const formStrength = (e: DocumentPlanEntry): number => {
     if (e.role !== "form") return 0;
     const nn = norm(e.name);
-    if (solNorm && nn.includes(solNorm)) return 2;
-    if (/\bsolicitation\b/i.test(e.name)) return 1;
-    return 0;
+    // An SF-30-only amendment is the WEAKEST form (loses to any real sol/RFQ).
+    if (isSf30Only(e.name)) return 0;
+    if (solNorm && nn.includes(solNorm)) return 4;
+    if (/\bsolicitation\b/i.test(e.name)) return 3;
+    if (REAL_SOL_FORM.test(e.name)) return 2; // RFQ/RFP or SF cover form
+    return 1; // some other form signal, still above SF-30-only (0)
   };
   return planned.sort((a, b) =>
     documentTier(a) - documentTier(b) ||
@@ -295,10 +327,61 @@ export function formIsSubstantive(formName: string | null | undefined): boolean 
   return true;
 }
 
+// DTS W51H7226 fix (2026-06-20): near-duplicate detection so two copies of the
+// same doc don't both consume budget slots (the DTS set kept TWO "RFQ … CLIN
+// Structure" copies, one base + one amendment, evicting distinct critical docs).
+// Normalize a filename for similarity: drop extension, amendment/version tokens,
+// punctuation, and collapse whitespace. Two entries collide ONLY when their
+// normalized names are identical — conservative, so only CLEAR duplicates merge.
+function dedupeKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, "") // strip extension
+    // amendment / version / revision tokens (and any trailing number)
+    .replace(/\b(?:amendment|amend|amd|modification|mod|revision|rev|version|ver|v|final|draft|copy|conformed|updated?)\b[\s_.\-]*\d*/gi, " ")
+    .replace(/[^a-z0-9]+/gi, " ") // punctuation → space
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Drop near-identical files BEFORE the budget. Among entries sharing a dedupeKey
+// keep ONE — prefer the larger (an amendment supersedes its base and is usually
+// bigger); size-unknown sorts last; name as the final deterministic tie-break.
+// Dropped duplicates are returned so the caller can record the loud overflow.
+// Pure + exported for the gate suite.
+export function dedupeNearDuplicates(plan: DocumentPlanEntry[]): {
+  kept: DocumentPlanEntry[];
+  dropped: Array<{ entry: DocumentPlanEntry; reason: string }>;
+} {
+  const groups = new Map<string, DocumentPlanEntry[]>();
+  for (const e of plan) {
+    const k = dedupeKey(e.name);
+    // Empty key (name had no alphanumerics after normalization) → never group.
+    if (!k) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+  }
+  const kept: DocumentPlanEntry[] = [];
+  const dropped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
+  for (const g of groups.values()) {
+    if (g.length === 1) { kept.push(g[0]); continue; }
+    const ranked = [...g].sort((a, b) =>
+      (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) || a.name.localeCompare(b.name)
+    );
+    kept.push(ranked[0]);
+    for (const d of ranked.slice(1)) {
+      dropped.push({ entry: d, reason: `near-duplicate of "${ranked[0].name}" — kept the larger/most-recent copy` });
+    }
+  }
+  // Preserve the incoming plan order for the kept set (tiering happens later).
+  const keptIds = new Set(kept.map((k) => k.resourceId));
+  return { kept: plan.filter((e) => keptIds.has(e.resourceId)), dropped };
+}
+
 // Budget application — pure, exported for the gate suite. Decides which plan
 // entries get downloaded BEFORE any bytes move. Only .pdf members are
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
-// budget on an unsized file beyond the form).
+// budget on an unsized file beyond the form). Near-duplicate files are deduped
+// first so duplicate copies never consume slots that distinct docs need.
 export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_TOTAL_INLINE_BYTES): {
   ingest: DocumentPlanEntry[];
   skipped: Array<{ entry: DocumentPlanEntry; reason: string }>;
@@ -306,6 +389,10 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
   const ingest: DocumentPlanEntry[] = [];
   const skipped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
   let total = 0;
+  // DTS W51H7226 fix — collapse near-duplicates before filling; dropped copies
+  // are carried into `skipped` so the overflow record stays loud.
+  const { kept: dedupedPlan, dropped } = dedupeNearDuplicates(plan);
+  skipped.push(...dropped);
   // Fill order (FA-119): documentTier primary — form → amendment → strong work
   // statement → weak spec → generic attachment — with size-ASCENDING as the
   // tie-break WITHIN each tier (a compact 540KB PWS beats a 40MB drawing dump,
@@ -314,7 +401,7 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
   // ingesting trivial small files (sign-in sheets, tiny DID forms) and dropping
   // the governing work statement. Everything skipped is named in the overflow
   // flag.
-  const fillOrder = [...plan].sort((a, b) =>
+  const fillOrder = [...dedupedPlan].sort((a, b) =>
     documentTier(a) - documentTier(b) ||
     (a.sizeBytes ?? Infinity) - (b.sizeBytes ?? Infinity) ||
     a.name.localeCompare(b.name)

@@ -3831,7 +3831,23 @@ function _v2ExtractPiid(text: string): string | null {
   return m ? `${m[1]}-${m[2]}-${m[3]}-${m[4]}` : null;
 }
 
+// W15QKN roof RFQ fix (2026-06-20): does the ASSEMBLED text (form + all
+// attachments) contain a clear solicitation/RFQ signal anywhere? If so, the
+// wrong-doc short-circuit must NOT fire — even if the (mis-picked) primary's
+// cover page looks like an SF-30 amendment. The detector judged off the primary's
+// text alone and nuked a real roof RFQ (engine_ms 482, 0 risks) because an SF-30
+// amendment was picked as primary. Conservative: scan the WHOLE assembled text
+// (not just the cover) for an unambiguous solicitation/RFQ marker.
+function _v2HasSolicitationSignal(rawText: string): boolean {
+  const t = rawText.toUpperCase();
+  return /REQUEST FOR (QUOTE|QUOTATION|PROPOSAL)|\bSOLICITATION\b|\bRFQ\b|\bRFP\b|\bIFB\b|COMBINED SYNOPSIS|SF[-\s]?1449|SF[-\s]?1442|SF[-\s]?33\b|SF[-\s]?0?18\b/.test(t);
+}
+
 function _v2DetectWrongDocument(rawText: string): _v2WrongDocSignal {
+  // W15QKN fix — if the broader assembled set clearly contains a solicitation/
+  // RFQ, never short-circuit. A mis-picked SF-30 primary must not empty an audit
+  // when the real solicitation is right there in the doc set.
+  if (_v2HasSolicitationSignal(rawText)) return { isWrongDoc: false };
   // Scan only the cover page — solicitation type markers live in the header.
   // Going deeper risks false positives (e.g. "MODIFICATION OF CONTRACT" text
   // inside §I clauses on a real solicitation).
