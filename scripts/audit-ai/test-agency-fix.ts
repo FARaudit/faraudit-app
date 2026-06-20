@@ -5,7 +5,7 @@
 // Intelligence Agency" while SAM said CBP/DHS — rendering NGA on the masthead.
 // This asserts the REAL exported bindExternalFacts, not a mirror. No SAM/Opus.
 // Run: npx tsx scripts/audit-ai/test-agency-fix.ts
-import { bindExternalFacts, _v2SetAsideClauseFlag, type ExternalBoundFacts } from "@/lib/audit-engine";
+import { bindExternalFacts, _v2SetAsideClauseFlag, _v2GroundRiskClauses, type ExternalBoundFacts } from "@/lib/audit-engine";
 
 type Facts = Parameters<typeof bindExternalFacts>[0];
 const CBP =
@@ -109,6 +109,44 @@ function check(name: string, cond: boolean, detail: string) {
 {
   const note = _v2SetAsideClauseFlag("HZC", ["52.219-27"], false);
   check("HUBZone vs SDVOSB clause → flags", !!note && /SDVOSB/.test(note ?? ""), JSON.stringify(note));
+}
+
+// ── Clause-citation fidelity (Polish B) ────────────────────────────────────
+// 14) THE AFARS CASE: clause number absent from source + not in known list → de-attributed.
+{
+  const risks = [{ trapClause: "AFARS 5152.242-9000", isDfarsTrap: true }];
+  const n = _v2GroundRiskClauses(risks, "PWS: contractor personnel require NCIC-III and Real ID for base access.", []);
+  check("ungrounded AFARS clause de-attributed", n === 1 && risks[0].trapClause === null && risks[0].isDfarsTrap === false, JSON.stringify(risks[0]));
+}
+// 15) Grounded by extracted clause list → kept.
+{
+  const risks = [{ trapClause: "52.219-6", isDfarsTrap: false }];
+  const n = _v2GroundRiskClauses(risks, "no clauses in text here", ["52.219-6"]);
+  check("clause in known list kept", n === 0 && risks[0].trapClause === "52.219-6", JSON.stringify(risks[0]));
+}
+// 16) Grounded by source text (52.252-2 by-reference: number present, no full text) → kept.
+{
+  const risks = [{ trapClause: "252.204-7012", isDfarsTrap: true }];
+  const n = _v2GroundRiskClauses(risks, "Section I incorporates by reference: 252.204-7012, 252.204-7020.", []);
+  check("clause present in source (by-reference) kept", n === 0 && risks[0].trapClause === "252.204-7012", JSON.stringify(risks[0]));
+}
+// 17) Line-wrapped clause number in source still grounds → kept.
+{
+  const risks = [{ trapClause: "52.222-50", isDfarsTrap: false }];
+  const n = _v2GroundRiskClauses(risks, "...clause 52.222-\n50 Combating Trafficking...", []);
+  check("line-wrapped clause in source kept", n === 0 && risks[0].trapClause === "52.222-50", JSON.stringify(risks[0]));
+}
+// 18) Non-clause trapClause (e.g. a section ref) is left untouched.
+{
+  const risks = [{ trapClause: "Section H special requirements", isDfarsTrap: false }];
+  const n = _v2GroundRiskClauses(risks, "irrelevant", []);
+  check("non-clause trapClause untouched", n === 0 && risks[0].trapClause === "Section H special requirements", JSON.stringify(risks[0]));
+}
+// 19) null trapClause untouched.
+{
+  const risks = [{ trapClause: null as string | null, isDfarsTrap: false }];
+  const n = _v2GroundRiskClauses(risks, "x", []);
+  check("null trapClause untouched", n === 0 && risks[0].trapClause === null, JSON.stringify(risks[0]));
 }
 
 console.log(failures === 0 ? "\nALL PASS ✓" : `\n${failures} FAILED ✗`);
