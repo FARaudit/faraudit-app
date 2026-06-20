@@ -3256,15 +3256,25 @@ JSON only — one key: risk_findings.`;
     // correctly-gated CAUTION verdict look ungrounded. Promote each into a
     // DecisionGate. cure_possible_in_window=true (addressable in the proposal) →
     // gates the verdict to CAUTION, never an auto-DECLINE.
+    // Match the "GATE (pass/fail)" marker ANYWHERE in the factor's importance
+    // text — the model emits it mid-sentence (often on a sub-factor), not as a
+    // leading prefix, so the old ^-anchored test never fired (gate_conditions
+    // stayed empty on a genuinely gated buy). Extract the gate text from the
+    // marker onward for the verification_action.
+    const GATE_RE = /GATE\s*\(pass\s*\/\s*fail\)\s*:?\s*/i;
     const evalGates: DecisionGate[] = ((overviewJson as { evaluation_factors_raw?: Array<{ name?: string; importance_text?: string }> }).evaluation_factors_raw ?? [])
-      .filter((f) => /^\s*GATE\s*\(pass\/fail\)\s*:/i.test(String(f?.importance_text ?? "")))
-      .map((f, i): DecisionGate => ({
-        gate_id: `EVAL_PASS_FAIL_${i + 1}`,
-        gate_label: `Pass/Fail: ${String(f?.name ?? "evaluation factor").trim()}`.slice(0, 120),
-        status: "UNKNOWN",
-        cure_possible_in_window: true,
-        verification_action: String(f?.importance_text ?? "").replace(/^\s*GATE\s*\(pass\/fail\)\s*:\s*/i, "").trim(),
-      }));
+      .filter((f) => GATE_RE.test(String(f?.importance_text ?? "")))
+      .map((f, i): DecisionGate => {
+        const it = String(f?.importance_text ?? "");
+        const after = it.slice(it.search(GATE_RE)).replace(GATE_RE, "").trim();
+        return {
+          gate_id: `EVAL_PASS_FAIL_${i + 1}`,
+          gate_label: `Pass/Fail: ${String(f?.name ?? "evaluation factor").trim()}`.slice(0, 120),
+          status: "UNKNOWN",
+          cure_possible_in_window: true,
+          verification_action: (after || it).slice(0, 400),
+        };
+      });
     for (const g of evalGates) gates.push(g);
   }
   const gateDecline = gates.length > 0 && aggregateGateRecommendation(gates) === "DECLINE";
