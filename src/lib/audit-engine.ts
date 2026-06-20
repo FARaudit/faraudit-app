@@ -1219,6 +1219,7 @@ async function callClaude(
 
   // modelOverride takes priority (escalation router) · then test harness override · then default
   const model = modelOverride || _activeModel || CLAUDE_MODEL;
+  console.log(`[audit-engine] V1 call · model=${model}`);
   const t0 = Date.now();
   // 529/503 transient overload — 3-attempt retry with exponential backoff (2s, 4s).
   // Stops Anthropic capacity dips from surfacing as Railway "Deployment crashed"
@@ -3246,6 +3247,25 @@ JSON only — one key: risk_findings.`;
     if (jigG) gates.push(jigG);
     const aftoG = detectAftoGate(solText);
     if (aftoG) gates.push(aftoG);
+    // 2026-06-19 (HM047626R0039): the 6 detectors above only catch credential/
+    // structural gates. A solicitation-specific PASS/FAIL eligibility gate that
+    // the model flags in §M (the "GATE (pass/fail): " prefix on
+    // evaluation_factors_raw.importance_text, per FA-177) is a real award-
+    // eligibility barrier but was never promoted into `gates`, so it surfaced in
+    // evaluation_factors/exec_summary yet left gate_conditions EMPTY — making a
+    // correctly-gated CAUTION verdict look ungrounded. Promote each into a
+    // DecisionGate. cure_possible_in_window=true (addressable in the proposal) →
+    // gates the verdict to CAUTION, never an auto-DECLINE.
+    const evalGates: DecisionGate[] = ((overviewJson as { evaluation_factors_raw?: Array<{ name?: string; importance_text?: string }> }).evaluation_factors_raw ?? [])
+      .filter((f) => /^\s*GATE\s*\(pass\/fail\)\s*:/i.test(String(f?.importance_text ?? "")))
+      .map((f, i): DecisionGate => ({
+        gate_id: `EVAL_PASS_FAIL_${i + 1}`,
+        gate_label: `Pass/Fail: ${String(f?.name ?? "evaluation factor").trim()}`.slice(0, 120),
+        status: "UNKNOWN",
+        cure_possible_in_window: true,
+        verification_action: String(f?.importance_text ?? "").replace(/^\s*GATE\s*\(pass\/fail\)\s*:\s*/i, "").trim(),
+      }));
+    for (const g of evalGates) gates.push(g);
   }
   const gateDecline = gates.length > 0 && aggregateGateRecommendation(gates) === "DECLINE";
   if (gateDecline) rawScore = Math.min(rawScore, 25);
@@ -4317,6 +4337,7 @@ export interface ExternalScalarFacts {
   offerDueDate?: string | null;
   contractType?: string | null;
   issuingOffice?: string | null;
+  periodOfPerformance?: string | null;
 }
 
 // FA-139 — V1 vision's STRUCTURED lists, shaped loosely so the executor can
@@ -4402,6 +4423,13 @@ function bindExternalFacts(
   // FA-139 — structured-list gap fill. Scanned/flattened PDFs can defeat the
   // deterministic extractors while V1 vision read the same lists fine. Fill
   // ONLY when V2's own list is empty so document-extracted lists always win.
+  // PoP thread (2026-06-19, HM047626R0039): bind V1's verbatim base+option term
+  // so the V2 judgment reasons about the FULL contract term, not a single CLIN's
+  // 12-month base period (which it was flattening into the whole-contract term).
+  if (!facts.periodOfPerformance) {
+    facts.periodOfPerformance =
+      external?.v1?.periodOfPerformance?.trim() || external?.sam?.periodOfPerformance?.trim() || null;
+  }
   const v1s = external?.v1Structured;
   if (v1s) {
     if (facts.clins.length === 0 && Array.isArray(v1s.clins) && v1s.clins.length > 0) {

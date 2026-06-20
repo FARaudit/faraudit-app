@@ -214,6 +214,11 @@ A value marked [bound: …] was confirmed from that source. Every non-"unknown" 
 **Offer due:** ${facts.offerDueDate ?? "unknown"}${facts.offerDueDate ? lbl("offerDueDate") : ""}
 **Contract type:** ${facts.contractType ?? "unknown"}${facts.contractType ? lbl("contractType") : ""}
 **Issuing office:** ${facts.issuingOffice ?? "unknown"}${facts.issuingOffice ? lbl("issuingOffice") : ""}
+${facts.setAside ? `
+**⚠ SET-ASIDE IS AUTHORITATIVE — DO NOT CONTRADICT (FA-176).** The bound Set-aside above (${facts.setAside}) is the system-of-record value; the procurement IS this set-aside. NEVER state, imply, or build any risk, l02Catch, confidenceNote, verdict, or bottomLine around a DIFFERENT set-aside, even if the solicitation document text mentions other categories. SF-1449 Block 10 is a checkbox grid whose UNCHECKED option labels (e.g. "SERVICE-DISABLED VETERAN-OWNED (SDVOSB)", "HUBZone", "WOSB") print as plain text beside the single CHECKED box, and the FAR 52.212-3 representations menu lists every category — reading any of those labels as the set-aside is a known error class. If the bound value is "8A" or "8(a)", this is an 8(a) procurement; do NOT call it SDVOSB / HUBZone / WOSB / VOSB / EDWOSB.
+` : ""}
+**Period of performance:** ${facts.periodOfPerformance ?? "unknown"}
+_The CLIN list below is the full base + option ladder. A duration stated inside any single CLIN (e.g. a 12-month base) is that CLIN's period, NOT the total contract term. When option CLINs are present (e.g. 1000/2000/3000/4000-series line items), the contract spans the base PLUS every option period — never describe the base period as the whole contract term._
 
 **CLINs (${facts.clins.length} found):**${facts.clins.length > 0 ? lbl("clins") : ""}
 ${facts.clins.map((c) => `- ${c.lineItem}: ${c.description.slice(0, 150)}${c.ambiguityFlag ? ` ⚠ ${c.ambiguityFlag}` : ""}`).join("\n") || "(none extracted)"}
@@ -283,6 +288,7 @@ export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFac
   // model again. AUDIT_MODEL stays as an explicit override hook; the literal
   // default tracks the engine decision (opus-4-8), no longer Sonnet.
   const model = modelOverride ?? process.env.AUDIT_MODEL ?? "claude-opus-4-8";
+  console.log(`[audit-judgment] V2 judgment call · model=${model}`);
   const timeoutMs = Number(process.env.CLAUDE_TIMEOUT_MS) || 240000;
 
   const body = {
