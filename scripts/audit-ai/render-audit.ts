@@ -21,7 +21,7 @@ async function main() {
   const html = renderAuditReportComplete(template, vm as never, audit as Record<string, unknown>);
   const out = `/tmp/audit-${id}.html`;
   writeFileSync(out, html, "utf8");
-  const v = vm as Record<string, unknown>;
+  const v = vm as unknown as Record<string, unknown>;
   console.log("rendered →", out, "·", html.length, "bytes");
   console.log("vm.set_aside:", v.set_aside);
   console.log("vm.contract_type:", v.contract_type);
