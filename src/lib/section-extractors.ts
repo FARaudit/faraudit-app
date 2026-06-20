@@ -253,13 +253,45 @@ export function extractDelivery(section: DetectedSection | null): DeliveryItem[]
 const FULL_TEXT_HEADER_RE = /CLAUSES?\s+INCORPORATED\s+BY\s+FULL\s+TEXT/i;
 const BY_REF_HEADER_RE = /CLAUSES?\s+INCORPORATED\s+BY\s+REFERENCE/i;
 
+// FAR: 52.x-x · DFARS: 252.x-x · AFFARS / DAF: 5352.x-x · NGA agency-local: 5X52.x-x
+// NGA (and other agency supplements) cite a literal "5X52." prefix, e.g.
+// 5X52.204-7000-90, 5X52.209-9003, 5X52.227-9000. These were being dropped by
+// the prior regex. The 5X52 branch requires the literal "5X52." prefix then
+// {3 digits}-{4 digits} with an OPTIONAL "-{1,2 digit}" local suffix (the
+// "-90" tail above) — narrow enough not to over-match prose. Ordered most-
+// specific-first (5X52|5352|252|52) so the alternation binds the longest prefix.
+// Exported so the full-text deterministic sweep in audit-engine reuses the EXACT
+// same pattern (single source of truth — no drift between §I and full-doc scans).
+export const CLAUSE_NUMBER_RE_SOURCE =
+  "(?:5X52\\.\\d{3}-\\d{4}(?:-\\d{1,2})?|(?:5352|252|52)\\.\\d{3}-\\d{1,4}(?:[A-Z](?![A-Z]))?)";
+const makeClauseRegex = (): RegExp => new RegExp(`\\b${CLAUSE_NUMBER_RE_SOURCE}\\b`, "g");
+
+/**
+ * Deterministic sweep of all clause numbers in arbitrary text (no LLM, no
+ * incorporation-type / title resolution). Used by audit-engine to UNION
+ * full-document clause hits with the §I-scoped extractClauses() output, so the
+ * deterministic list is COMPLETE (clauses cited in C/H/L/M are not dropped when
+ * §I detection is thin/missing). Returns deduped clause numbers in first-seen
+ * order. Same input → same output.
+ */
+export function extractClauseNumbers(text: string): string[] {
+  if (!text) return [];
+  const re = makeClauseRegex();
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (!seen.has(m[0])) seen.add(m[0]);
+  }
+  return Array.from(seen);
+}
+
 export function extractClauses(section: DetectedSection | null): ClauseItem[] {
   if (!section) return [];
   const clauses: ClauseItem[] = [];
   const text = section.text;
 
-  // FAR: 52.x-x · DFARS: 252.x-x · AFFARS / DAF: 5352.x-x
-  const clausePattern = /\b(?:5352|252|52)\.\d{3}-\d{1,4}(?:[A-Z](?![A-Z]))?\b/g;
+  // FAR: 52.x-x · DFARS: 252.x-x · AFFARS / DAF: 5352.x-x · NGA: 5X52.x-x
+  const clausePattern = makeClauseRegex();
 
   // Pre-scan: index every header occurrence to build a header-position table.
   // For each clause hit, lookup the most-recent header BEFORE the clause's
