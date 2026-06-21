@@ -20,6 +20,25 @@ export interface ExtractedDocument {
   warnings: string[];
 }
 
+// SINGLE SOURCE OF TRUTH for the text-vs-vision delivery decision (2026-06-21).
+// A doc with at least this many MEANINGFUL extracted chars rides as a TEXT block
+// (~text cost); below it it's treated as image-only and delivered as base64-PDF
+// VISION. Both the engine (textForDocOrNull) and the assembly page budget
+// (isTextDeliverable) MUST use these so the two decisions can never drift — a doc
+// page-exempted in one place but delivered as vision in the other would silently
+// re-break the FA-INGEST page-budget fix.
+export const MIN_TEXT_CHARS_FOR_TEXT_BLOCK = 200;
+
+// Meaningful-char measure: strip page-separator padding lines ("-- 3 of 50 --")
+// that an image scan emits but carry no content.
+export function meaningfulCharCount(text: string): number {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^[\s\-–—=_·.*]*(?:page\s*)?\d+\s*(?:of|\/)\s*\d+[\s\-–—=_·.*]*$/i.test(l))
+    .join("\n").length;
+}
+
 export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument> {
   const warnings: string[] = [];
 

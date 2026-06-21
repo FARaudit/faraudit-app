@@ -1187,9 +1187,9 @@ const DEFAULT_CONTEXT_LIMIT = 1_000_000;
 // safety pad for tokenizer drift between our count_tokens pre-flight and the
 // actual request (system text, tool schemas, role framing, count skew).
 const TOKEN_SAFETY_PAD = 40_000;
-// A doc with at least this many meaningful extracted chars rides as TEXT (~text
-// cost). Below it the doc is treated as image-only and stays base64-PDF (vision).
-const MIN_TEXT_CHARS_FOR_TEXT_BLOCK = 200;
+// MIN_TEXT_CHARS_FOR_TEXT_BLOCK + meaningfulCharCount now imported from
+// pdf-text-extractor (single source of truth shared with sam-attachments'
+// page-budget text/vision decision — see that import below).
 
 function modelContextLimit(model: string): number {
   return MODEL_CONTEXT_LIMIT[model] ?? DEFAULT_CONTEXT_LIMIT;
@@ -1228,16 +1228,6 @@ async function getExtractText(): Promise<ExtractTextFn> {
   const mod = await import("./pdf-text-extractor");
   _extractTextFn = mod.extractText as unknown as ExtractTextFn;
   return _extractTextFn;
-}
-
-// Meaningful-char measure for the text-vs-vision decision: strip page-separator
-// padding lines ("-- 3 of 50 --") that an image scan emits but carry no content.
-function meaningfulCharCount(text: string): number {
-  return text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !/^[\s\-–—=_·.*]*(?:page\s*)?\d+\s*(?:of|\/)\s*\d+[\s\-–—=_·.*]*$/i.test(l))
-    .join("\n").length;
 }
 
 // Decide, per base64 PDF, whether to deliver it as a TEXT block (substantial
@@ -3844,7 +3834,7 @@ JSON only — one key: risk_findings.`;
 // and remains the default path until V2 sign-off + paired Design ship.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { extractText as _v2ExtractText } from "./pdf-text-extractor";
+import { extractText as _v2ExtractText, MIN_TEXT_CHARS_FOR_TEXT_BLOCK, meaningfulCharCount } from "./pdf-text-extractor";
 import { detectSections as _v2DetectSections } from "./section-boundary-detector";
 // FA-E2E Fix 3.2 (2026-06-18) — deterministic section-role classifier reused
 // from the ingestion manifest. The manifest's per-file `section_roles` is
@@ -5261,43 +5251,17 @@ export async function runAuditV2(
   // badge) MUST be the post-dedup band count.
   const l02_catches = judgment.l02Catches.length > 0 ? judgment.l02Catches.slice(1) : [];
 
-  // Incumbent — root-class fix (2026-06-21). The hardcoded `false` made §02 read
-  // "no incumbent identified" while the risk narrative named a specific incumbent
-  // (e.g. Titan Facility Services, read from the CBA) — a self-contradiction. We
-  // now extract the incumbent from the SAME source the narrative reads. INVARIANT:
-  // has_incumbent ⟺ we confidently parsed a NAME, so the boolean and the name can
-  // never disagree (no name → §02 honestly shows the empty state, no contradiction).
-  const _incNameOk = (s: string): boolean => {
-    const t = s.trim();
-    if (t.length < 3 || t.length > 60) return false;
-    if (/^(the|a|an|this|that|contractor|government|offeror|all|each|any|such|its|their|employees?|parties|agreement|prime|subcontractor|company)\b/i.test(t)) return false;
-    return /[A-Za-z]{3,}/.test(t);
-  };
-  const _cleanName = (s: string): string => {
-    let t = s.replace(/\s+/g, " ").trim();
-    // Cut at the first clause-boundary word that signals the company name has
-    // ended (so "ABC Services Inc, currently holds the contract" → "ABC Services
-    // Inc" and "Delta Group under contract N1" → "Delta Group"). Conservative
-    // list — excludes short prepositions that legitimately appear in names.
-    t = t.replace(/\s+(?:currently|under|who|whose|which|holds?|pursuant|since|that|will|shall|has|have|had|is|are|was|were)\b.*$/i, "");
-    return t.replace(/[,.;:]+$/, "").trim();
-  };
-  const _extractIncumbentName = (raw: string): string | null => {
-    if (!raw) return null;
-    const text = raw.slice(0, 600_000);
-    const UNION_RE = /\b(?:Union|Local\s*\d*|LIUNA|SEIU|IBEW|AFGE|IAM|UAW|Teamsters|Laborers'?\s+International|International\s+Union|AFL[- ]?CIO)\b/;
-    // 1) CBA "(by and) between <CONTRACTOR> and <…union…>"
-    const cba = text.match(/(?:by\s+and\s+)?between\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60}?)\s+and\s+(?:the\s+)?([A-Z][A-Za-z0-9.,&'’\- ]{2,80})/);
-    if (cba && UNION_RE.test(cba[2]) && _incNameOk(cba[1])) return _cleanName(cba[1]);
-    // 2) "incumbent (prime )(contractor)(is|,) <NAME>"
-    const inc = text.match(/incumbent(?:\s+(?:prime\s+)?contractor)?(?:\s+is|,)?\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60})/);
-    if (inc && _incNameOk(inc[1])) return _cleanName(inc[1]);
-    // 3) "currently (being) performed by <NAME>"
-    const cur = text.match(/currently\s+(?:being\s+)?performed\s+by\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60})/);
-    if (cur && _incNameOk(cur[1])) return _cleanName(cur[1]);
-    return null;
-  };
-  const incumbent_name = _extractIncumbentName(doc.rawText);
+  // Incumbent — TEXT-REGEX EXTRACTOR DISABLED (2026-06-21, ground-truth verdict).
+  // A text-regex over doc.rawText cannot reliably name the incumbent: on the live
+  // N4008526R0065 set the CBA is an IMAGE-ONLY/scanned PDF (no text layer), so the
+  // name only exists in the page-image the VISION model reads — not in rawText —
+  // and unanchored "between X and Y" matching false-positived on measurement text
+  // ("Inventory list shows 5,050,072 sq…"). The correct fix is an AI-EMITTED
+  // incumbent_name field (the model already names it from text+vision in its risk
+  // narrative); the surfaces.incumbent_name wiring + view-model fallback are kept
+  // so that field drops straight in. Until then: emit null (honest "not identified",
+  // never a fabricated name). Tracked as the real P0#2 fix.
+  const incumbent_name: string | null = null;
   const has_incumbent = incumbent_name != null;
 
   // Fix 12 — §06 deterministic submission preflight (8 fixed items resolved
