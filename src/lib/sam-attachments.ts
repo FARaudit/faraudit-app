@@ -26,6 +26,7 @@
 // know nothing about the set), logged loudly.
 
 import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extractor";
+import { extractText } from "./pdf-text-extractor";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
@@ -58,6 +59,29 @@ export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // under 600. Enforced post-download (page count needs the bytes), in tier
 // order, with the form exempt — so generic attachments drop first.
 export const MAX_TOTAL_PAGES = 550;
+// Token budget (regression fix 2026-06-21, N4008526R0065): the byte (15MB) and
+// page (550pp) ceilings do NOT bound TOKENS. A dense Section C plus the ingested
+// ELINS inventory .xlsx produced ~1.14M tokens of assembled prompt — over the
+// 1,000,000 model context max — so the audit HARD-FAILED with
+// `Claude API 400: prompt is too long`. Bytes don't bound tokens (page-dense
+// text is small in MB) and pages don't either (a wrapped .xlsx is one "page" of
+// huge text). MAX_TOTAL_TOKENS caps the assembled DOCUMENT text at ~700k,
+// leaving headroom under the 1M model max for the system/prompt template, the
+// multi-call structure, and the output. Enforced post-download in tier order
+// (the primary solicitation + §C/§L/§M survive first); overflow is FLAGGED in
+// the same honest ingestion banner, never silent.
+export const MAX_TOTAL_TOKENS = 700_000;
+// Per-doc cap: a single giant file (e.g. the ELINS inventory .xlsx) must not
+// consume the whole budget and starve the primary solicitation. Any one doc is
+// truncated to at most this many tokens (with an honest "(truncated)" note), so
+// one huge member can never evict §C/§L/§M.
+export const MAX_DOC_TOKENS = 250_000;
+// Cheap token estimate — ~3.5 chars/token (no tokenizer dependency; deliberately
+// conservative so we under-fill rather than overflow). Exported for the gate suite.
+export const CHARS_PER_TOKEN = 3.5;
+export function estimateTokensFromChars(chars: number): number {
+  return Math.ceil(chars / CHARS_PER_TOKEN);
+}
 
 export interface AttachmentManifestEntry {
   name: string;
@@ -577,6 +601,42 @@ async function countPdfPages(buf: Buffer): Promise<number> {
   }
 }
 
+// Token estimate for a (PDF) buffer: extract the text and estimate via
+// CHARS_PER_TOKEN. This mirrors what Anthropic actually charges for an inline
+// PDF (the text content dominates), and it's the same text the section/clause
+// extractors already read — so the estimate tracks the real prompt cost. An
+// extraction failure yields a conservative non-zero estimate from the raw byte
+// length so an unreadable doc never silently counts as 0 tokens.
+async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string }> {
+  try {
+    const extracted = await extractText(buf);
+    const text = extracted.rawText ?? "";
+    if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text };
+  } catch {
+    /* fall through to the byte-length estimate */
+  }
+  // No usable text (scanned/image PDF, parse failure): a vision-rendered page is
+  // far cheaper than its base64 byte length, but we still want a non-zero, safe
+  // figure. Use raw bytes / CHARS_PER_TOKEN as a conservative ceiling.
+  return { tokens: estimateTokensFromChars(buf.length), text: "" };
+}
+
+// Truncate a doc to a token budget. We have the extracted `text`; keep the
+// leading portion that fits `maxDocTokens` (the head of a solicitation doc holds
+// the binding terms — schedule, clauses, scope — far more than the tail of a
+// long inventory table), append an honest truncation note, and re-wrap to a PDF
+// buffer so it rides the same inline-PDF ingestion path. If we have no text
+// (image PDF), we cannot safely truncate the bytes — return the original so the
+// page budget remains the only bound on it.
+function truncateDocToTokens(name: string, buf: Buffer, text: string, maxDocTokens: number): Buffer {
+  if (!text) return buf;
+  const maxChars = Math.floor(maxDocTokens * CHARS_PER_TOKEN);
+  if (text.length <= maxChars) return buf;
+  const note = `\n\n[… document truncated to fit the analysis token budget — full file on SAM.gov …]`;
+  const head = text.slice(0, Math.max(0, maxChars - note.length));
+  return textToPdfBuffer(head + note, `${name} (truncated)`);
+}
+
 // FA-119 Phase 2B — page budget. Pure + exported for the gate suite. Runs AFTER
 // download (page count needs the bytes) over the byte/doc-budgeted set, in tier
 // order (planDocumentOrder output). The form is EXEMPT — it is the solicitation
@@ -600,6 +660,46 @@ export function applyPageBudget<T extends { role: DocumentPlanEntry["role"]; pag
   return { ingest, skipped };
 }
 
+// Token budget — pure + exported for the gate suite. Runs AFTER download/extract
+// (token count needs the document text) over the byte/doc/page-budgeted set, in
+// tier order (planDocumentOrder output, so the primary solicitation + §C/§L/§M
+// are evaluated first and survive). Two guards:
+//   1. Per-doc cap (maxDocTokens): a single oversized doc (e.g. the ELINS
+//      inventory .xlsx) is TRUNCATED to its token cap so it can't consume the
+//      whole budget and starve the core solicitation. The kept entry reports
+//      `truncatedToTokens` (and `truncated: true`) so the caller can trim the
+//      actual text + note "(truncated)" in the banner.
+//   2. Cumulative cap (maxTotalTokens): once the running total (using each doc's
+//      possibly-truncated contribution) would exceed the ceiling, later (lower-
+//      tier) docs are SKIPPED — flagged loudly, never silent.
+// The form/primary is EXEMPT from the cumulative cap (it is the solicitation and
+// must never be dropped) but is STILL subject to the per-doc truncation guard so
+// a pathologically huge primary can't by itself blow the model context.
+export function applyTokenBudget<T extends { role: DocumentPlanEntry["role"]; tokens: number; name?: string }>(
+  docs: T[],
+  maxTotalTokens = MAX_TOTAL_TOKENS,
+  maxDocTokens = MAX_DOC_TOKENS
+): {
+  ingest: Array<T & { truncated: boolean; truncatedToTokens?: number }>;
+  skipped: Array<{ entry: T; reason: string }>;
+} {
+  const ingest: Array<T & { truncated: boolean; truncatedToTokens?: number }> = [];
+  const skipped: Array<{ entry: T; reason: string }> = [];
+  let total = 0;
+  for (const d of docs) {
+    const truncated = d.tokens > maxDocTokens;
+    const contribution = truncated ? maxDocTokens : d.tokens;
+    const isForm = d.role === "form";
+    if (!isForm && total + contribution > maxTotalTokens) {
+      skipped.push({ entry: d, reason: `token budget (${Math.round(maxTotalTokens / 1000)}k tokens) exceeded` });
+      continue;
+    }
+    total += contribution;
+    ingest.push(truncated ? { ...d, truncated: true, truncatedToTokens: maxDocTokens } : { ...d, truncated: false });
+  }
+  return { ingest, skipped };
+}
+
 export async function assembleSamDocumentSet(
   noticeId: string,
   solicitationNumber: string | null
@@ -612,9 +712,10 @@ export async function assembleSamDocumentSet(
   const { ingest, skipped } = applyBudget(plan);
 
   // FA-119 Phase 2B — page budget runs AFTER download (page count needs bytes).
-  // Pass 1: download + page-count every byte/doc-budgeted member, in tier order.
+  // Pass 1: download + page-count + token-estimate every byte/doc-budgeted
+  // member, in tier order.
   const files: IngestionFileMeta[] = [];
-  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number }> = [];
+  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -627,7 +728,8 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "download failed or not a PDF" });
       continue;
     }
-    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
+    const { tokens, text } = await estimateDocTokens(buf);
+    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
   }
   // Pass 2: trim by the page ceiling (pure, tier order, form exempt → generics
   // drop first; the work statement, evaluated first, is never the one dropped).
@@ -635,13 +737,34 @@ export async function assembleSamDocumentSet(
     fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: f.pages })),
     MAX_TOTAL_PAGES
   );
-  const keptIds = new Set(pageKept.map((k) => k.resourceId));
+  const pageKeptIds = new Set(pageKept.map((k) => k.resourceId));
+  // Pass 2b — TOKEN ceiling (regression fix 2026-06-21): the byte + page budgets
+  // do NOT bound tokens, so a dense set could still exceed the 1M model context
+  // (N4008526R0065 hit 1.14M → hard 400). Over the page-kept set, in tier order
+  // (primary first, form exempt), cap the assembled DOCUMENT text at ~700k and
+  // truncate any single oversized doc to ~250k so one huge file can't starve the
+  // core solicitation.
+  const tokenInputs = fetched.filter((f) => pageKeptIds.has(f.entry.resourceId));
+  const { ingest: tokenKept, skipped: tokenSkipped } = applyTokenBudget(
+    tokenInputs.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, tokens: f.tokens })),
+    MAX_TOTAL_TOKENS,
+    MAX_DOC_TOKENS
+  );
+  const tokenKeptById = new Map(tokenKept.map((k) => [k.resourceId, k]));
+  const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
   const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
   for (const f of fetched) {
-    if (keptIds.has(f.entry.resourceId)) {
-      downloaded.push({ name: f.entry.name, base64: f.base64, buffer: f.buffer, role: f.entry.role });
-      files.push({ name: f.entry.name, role: f.entry.role, bytes: f.buffer.length, ingested: true });
+    const kept = tokenKeptById.get(f.entry.resourceId);
+    if (kept) {
+      // Apply per-doc truncation when the token budget flagged this doc.
+      const buf = kept.truncated ? truncateDocToTokens(f.entry.name, f.buffer, f.text, MAX_DOC_TOKENS) : f.buffer;
+      const base64 = buf === f.buffer ? f.base64 : buf.toString("base64");
+      const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
+      downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+    } else if (tokenSkippedIds.has(f.entry.resourceId)) {
+      files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `page budget (${MAX_TOTAL_PAGES}pp) exceeded` });
     }
@@ -660,7 +783,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
@@ -725,9 +848,10 @@ export async function assembleUploadedDocumentSet(
   const formEntry = plan.find((e) => e.role === "form") ?? null;
   const { ingest, skipped } = applyBudget(plan);
 
-  // Pass 1: page-count every byte/doc-budgeted member (bytes already local).
+  // Pass 1: page-count + token-estimate every byte/doc-budgeted member (bytes
+  // already local).
   const files: IngestionFileMeta[] = [];
-  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number }> = [];
+  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -743,20 +867,36 @@ export async function assembleUploadedDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "not a valid PDF (magic-byte check)" });
       continue;
     }
-    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
+    const { tokens, text } = await estimateDocTokens(buf);
+    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
   }
   // Pass 2: trim by the page ceiling (form exempt → generics drop first).
   const { ingest: pageKept } = applyPageBudget(
     counted.map((c) => ({ resourceId: c.entry.resourceId, role: c.entry.role, name: c.entry.name, pages: c.pages })),
     MAX_TOTAL_PAGES
   );
-  const keptIds = new Set(pageKept.map((k) => k.resourceId));
+  const pageKeptIds = new Set(pageKept.map((k) => k.resourceId));
+  // Pass 2b — TOKEN ceiling (regression fix 2026-06-21): see assembleSamDocumentSet.
+  const tokenInputs = counted.filter((c) => pageKeptIds.has(c.entry.resourceId));
+  const { ingest: tokenKept, skipped: tokenSkipped } = applyTokenBudget(
+    tokenInputs.map((c) => ({ resourceId: c.entry.resourceId, role: c.entry.role, name: c.entry.name, tokens: c.tokens })),
+    MAX_TOTAL_TOKENS,
+    MAX_DOC_TOKENS
+  );
+  const tokenKeptById = new Map(tokenKept.map((k) => [k.resourceId, k]));
+  const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
   const ingested: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
   for (const c of counted) {
-    if (keptIds.has(c.entry.resourceId)) {
-      ingested.push({ name: c.entry.name, base64: c.base64, buffer: c.buffer, role: c.entry.role });
-      files.push({ name: c.entry.name, role: c.entry.role, bytes: c.buffer.length, ingested: true });
+    const kept = tokenKeptById.get(c.entry.resourceId);
+    if (kept) {
+      const buf = kept.truncated ? truncateDocToTokens(c.entry.name, c.buffer, c.text, MAX_DOC_TOKENS) : c.buffer;
+      const base64 = buf === c.buffer ? c.base64 : buf.toString("base64");
+      const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
+      ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+    } else if (tokenSkippedIds.has(c.entry.resourceId)) {
+      files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `page budget (${MAX_TOTAL_PAGES}pp) exceeded` });
     }
@@ -773,7 +913,7 @@ export async function assembleUploadedDocumentSet(
     form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
