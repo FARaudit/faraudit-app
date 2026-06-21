@@ -188,6 +188,13 @@ export function synthesizeCapturePlay(shadow: Record<string, unknown> | null | u
   };
   const WHEN_RANK = { now: 0, qa: 1, quote: 2 } as const;
   const WHEN_LABEL = { now: "Start today", qa: "Before Q&A", quote: "Before quote" } as const;
+  // P1-c severity calibration (2026-06-21): "blocks bid" implies DISQUALIFICATION
+  // and was applied to EVERY "now" move — including curable pre-bid setup like SPRS
+  // posting, SAM/CAGE registration, and reps/certs. On a CONUS custodial contract
+  // that read as "you're ineligible" when the offeror just has paperwork to do.
+  // Reserve "blocks bid" for genuinely STRUCTURAL disqualifiers; label the rest
+  // "pre-bid setup" (accurate urgency without the false ineligibility signal).
+  const STRUCTURAL_RE = /out of reach|structurally|sole.?source|only (?:known )?source|ineligible|cannot (?:bid|compete)|disqualif|not eligible/i;
   return [...seen.values()]
     .map((c) => ({ c, when: whenOf(c) }))
     .sort((a, b) => WHEN_RANK[a.when] - WHEN_RANK[b.when] || b.c.severity - a.c.severity)
@@ -196,7 +203,9 @@ export function synthesizeCapturePlay(shadow: Record<string, unknown> | null | u
       order: i + 1,
       when: m.when,
       when_label: WHEN_LABEL[m.when],
-      effort: m.when === "now" ? "blocks bid" : "",
+      effort: m.when === "now"
+        ? (STRUCTURAL_RE.test(`${m.c.do} ${m.c.why}`) ? "blocks bid" : "pre-bid setup")
+        : "",
       do: m.c.do,
       why: m.c.why,
       source_label: m.c.source,
