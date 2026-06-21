@@ -817,7 +817,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
                     </div>
                   </div>
                 </div>
-                <!-- COMPLETE → auto-runs (backend gap: requires synchronous resolve+manifest endpoint; not yet wired) -->
+                <!-- COMPLETE → driven by GET /api/audit/resolve (real §-coverage), then auto-runs submitAudit -->
                 <div class="fdstate fd-complete">
                   <div class="fdres">
                     <div class="fdr-head">
@@ -829,7 +829,7 @@ details[open]>summary .chev{transform:rotate(180deg)}
                     <details class="fd-man"><summary>View all documents<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fd-man-scroll" id="fdCompleteDocs"></div></details>
                   </div>
                 </div>
-                <!-- PARTIAL → pause (backend gap: requires synchronous resolve+manifest endpoint; not yet wired) -->
+                <!-- PARTIAL → driven by GET /api/audit/resolve (real missing core §); pauses for run-anyway / upload-the-gap -->
                 <div class="fdstate fd-partial">
                   <div class="fdres">
                     <div class="fdr-head">
@@ -1008,11 +1008,11 @@ function submitAudit(opts){
 
 /* ── mode tabs (smart / upload) + state machine for the front door ──
    smart (default): the live-resolving command bar (#solz / #fd). upload: the file zone (#uz).
-   Subtitle swaps SUB_SMART/SUB_UPLOAD. fd[data-state] drives empty/fetching/error inline.
-   complete/partial states exist in the DOM (ported 1:1) but are NOT auto-driven here —
-   they require a synchronous "resolve sol# → SAM manifest → §-coverage" backend that does
-   not exist yet (see report). The real Fetch wires straight to submitAudit (async enqueue +
-   redirect to /audit/[id]); no fabricated coverage is shown. */
+   Subtitle swaps SUB_SMART/SUB_UPLOAD. fd[data-state] drives empty/fetching/complete/partial/error.
+   complete/partial are now driven by REAL data from GET /api/audit/resolve (resolves the
+   ref → SAM manifest → §-coverage BEFORE enqueue). No fabricated coverage — every field
+   shown comes from SAM. On complete we auto-run submitAudit; on partial we pause for the
+   user; on error we show the real reason. */
 var __fd=$('fd');
 function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
 (function(){
@@ -1055,23 +1055,76 @@ function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
   lvInput.addEventListener('input',update);
 })();
 
-/* ── smart-detect Fetch (paste a SAM URL or Notice ID) — wires to the REAL async submit ── */
+/* ── smart-detect Fetch (paste a SAM URL, sol#, or Notice ID) ──
+   Two real backend hops: (1) GET /api/audit/resolve?ref=<input> resolves the ref →
+   SAM manifest → §-coverage BEFORE enqueue, then (2) submitAudit POSTs the canonical
+   notice id to /api/audit. complete auto-runs; partial pauses; error shows the reason.
+   Every value rendered (sol#, agency, doc list, missing sections) is from SAM — no
+   fabrication. */
+var __fdPartialNoticeId=null;
 (function(){
-  var URL_RE=/^https?:\/\/[^\s]+/i,SAMOPP=/\/opp\/([A-Za-z0-9][A-Za-z0-9-]*)/i,ID_RE=/^[A-Za-z0-9][A-Za-z0-9-]{6,}$/;
-  function detect(raw){var v=(raw||'').trim();if(!v)return{kind:'empty'};if(URL_RE.test(v)){var m=v.match(SAMOPP);return (m&&m[1])?{kind:'id',noticeId:m[1]}:{kind:'bad'};}if(ID_RE.test(v.replace(/\s+/g,'')))return{kind:'id',noticeId:v.replace(/\s+/g,'')};return{kind:'bad'};}
   var field=document.querySelector('.ev-d .sm-field input'),go=document.querySelector('.ev-d .sm-go'),errMsg=$('fdErrMsg');
   if(!field||!go)return;
+  // map resolve { ok:false, reason } → honest, human copy.
+  var REASONS={
+    missing_ref:'Paste a SAM.gov link, solicitation number, or notice ID first.',
+    unrecognized_sam_url:'That SAM.gov link doesn’t point to a single opportunity. Paste the opportunity URL (sam.gov/opp/…/view), the solicitation number, or the notice ID.',
+    not_found:'We couldn’t find that solicitation on SAM.gov. Double-check the number, or upload the files directly.',
+    no_documents:'SAM.gov has no posted documents for that opportunity yet. Upload the files directly to run the audit.',
+    sam_unavailable:'SAM.gov didn’t respond. Try again in a moment, or upload the files directly.',
+    sam_not_configured:'Document fetch is temporarily unavailable. Upload the files directly to run the audit.',
+    unauthorized:'Please sign in again to run an audit.'
+  };
+  function showError(msg){if(errMsg)errMsg.textContent=msg;setState('error');}
+  // drive the COMPLETE state from real resolve data, then auto-run the audit.
+  function driveComplete(data){
+    var sub=$('fdCompleteSub'),docsBox=$('fdCompleteDocs');
+    var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' ingested. <b>§C, §L and §M</b> all present.';
+    if(docsBox)docsBox.innerHTML=(data.docs||[]).map(function(d){
+      var roles=(d.sectionRoles&&d.sectionRoles.length)?d.sectionRoles.map(function(r){return '<span class="sb2 sb-sec">§'+escapeHtml(r)+'</span>';}).join(''):'';
+      return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(d.name)+'</span><span class="fsub">'+roles+(d.sizeBytes?('<span class="fsize">'+fmtSize(d.sizeBytes)+'</span>'):'')+'</span></span></div>';
+    }).join('');
+    setState('complete');
+    // set complete → start the audit automatically (the COMPLETE card says so).
+    submitAudit({noticeId:data.noticeId,btn:go,onErr:function(m){showError(m);}});
+  }
+  // drive the PARTIAL state from the REAL missing core sections.
+  function drivePartial(data){
+    var sub=$('fdPartialSub'),missBox=$('fdPartialMiss');
+    var LBL={MAIN:'Main solicitation (SF-1449 / 1442)',C:'§C — Statement of Work / PWS',L:'§L — Instructions to offerors',M:'§M — Evaluation factors'};
+    var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
+    var missNames=(data.missingCore||[]).map(function(k){return (k==='MAIN'?'the main solicitation':('§'+k));});
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' retrieved, but '+missNames.join(', ')+' '+(missNames.length===1?'is':'are')+' not in the posted package.';
+    if(missBox)missBox.innerHTML='<div class="fd-miss-h">Core sections not in the posted package</div>'+
+      (data.missingCore||[]).map(function(k){
+        return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(LBL[k]||k)+'</span><span class="fsub"><span class="sb2 sb-sec">'+(k==='MAIN'?'MAIN':('§'+escapeHtml(k)))+'</span><span class="fsize">not in posted package</span></span></span></div>';
+      }).join('');
+    // stash the canonical notice id so "Proceed on what we have" enqueues the right thing.
+    __fdPartialNoticeId=data.noticeId;
+    setState('partial');
+  }
   function run(){
-    var d=detect(field.value);
-    if(d.kind!=='id'){
-      var lv=$('lvChip');if(lv){lv.className='lvchip wait show';lv.innerHTML='<span class="lv-res">Paste a SAM.gov solicitation URL or a Notice ID.</span>';}
-      return;
-    }
+    var v=(field.value||'').trim();
+    if(!v){var lv=$('lvChip');if(lv){lv.className='lvchip wait show';lv.innerHTML='<span class="lv-res">Paste a SAM.gov link, solicitation #, or notice ID.</span>';}return;}
     setState('fetching');
-    submitAudit({noticeId:d.noticeId,btn:go,onErr:function(m){if(errMsg)errMsg.textContent=m;setState('error');}});
+    fetch('/api/audit/resolve?ref='+encodeURIComponent(v),{credentials:'include',headers:{accept:'application/json'}})
+      .then(function(r){return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,status:r.status,data:d};});})
+      .then(function(out){
+        var d=out.data||{};
+        if(!d.ok){showError(REASONS[d.reason]||'We couldn’t resolve that on SAM.gov. Check the number, or upload the files directly.');return;}
+        if(d.complete){driveComplete(d);}else{drivePartial(d);}
+      })
+      .catch(function(err){showError('Network error reaching SAM.gov — '+(err&&err.message?err.message:String(err))+'. Try again, or upload the files directly.');});
   }
   go.addEventListener('click',run);
-  field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});})();
+  field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});
+  // PARTIAL → "Proceed on what we have": enqueue the resolved package as-is.
+  var proceed=$('proceedPartial');
+  if(proceed)proceed.addEventListener('click',function(){
+    if(!__fdPartialNoticeId)return;
+    submitAudit({noticeId:__fdPartialNoticeId,btn:proceed,onErr:function(m){showError(m);}});
+  });})();
 
 /* ── upload zone: real files + coverage strip (filename detection) ── */
 (function(){
