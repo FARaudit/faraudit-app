@@ -5,7 +5,7 @@
 // Intelligence Agency" while SAM said CBP/DHS — rendering NGA on the masthead.
 // This asserts the REAL exported bindExternalFacts, not a mirror. No SAM/Opus.
 // Run: npx tsx scripts/audit-ai/test-agency-fix.ts
-import { bindExternalFacts, _v2SetAsideClauseFlag, _v2GroundRiskClauses, type ExternalBoundFacts } from "@/lib/audit-engine";
+import { bindExternalFacts, _v2SetAsideClauseFlag, _v2GroundRiskClauses, _v2GroundClauseList, type ExternalBoundFacts } from "@/lib/audit-engine";
 
 type Facts = Parameters<typeof bindExternalFacts>[0];
 const CBP =
@@ -147,6 +147,51 @@ function check(name: string, cond: boolean, detail: string) {
   const risks = [{ trapClause: null as string | null, isDfarsTrap: false }];
   const n = _v2GroundRiskClauses(risks, "x", []);
   check("null trapClause untouched", n === 0 && risks[0].trapClause === null, JSON.stringify(risks[0]));
+}
+
+// ── Clause-list fabrication guard (Fix #3, zero-fabrication law) ────────────
+// THE N4008526R0065 CASE: rendered list cited FAR clauses absent from §I
+// (52.203-19, 52.246-11, 52.232-2, 52.232-3). Every final clause MUST be in source.
+// 20) Ungrounded clauses dropped, grounded ones kept.
+{
+  const src = "Section I incorporates by reference: 52.212-1, 52.212-4, 52.222-50.";
+  const out = _v2GroundClauseList(["52.212-1", "52.203-19", "52.212-4", "52.246-11", "52.222-50"], src);
+  check(
+    "fabricated clauses dropped, source clauses kept",
+    out.length === 3 && out.includes("52.212-1") && out.includes("52.212-4") && out.includes("52.222-50") &&
+      !out.includes("52.203-19") && !out.includes("52.246-11"),
+    JSON.stringify(out)
+  );
+}
+// 21) By-reference listing (number present, no full clause text) → kept.
+{
+  const out = _v2GroundClauseList(["252.204-7012", "252.999-9999"], "I-listing: 252.204-7012 NIST SP 800-171.");
+  check("by-reference clause grounded, bogus dropped", out.length === 1 && out[0] === "252.204-7012", JSON.stringify(out));
+}
+// 22) Line-wrapped clause number in source still grounds → kept.
+{
+  const out = _v2GroundClauseList(["52.222-50"], "...clause 52.222-\n50 Combating Trafficking...");
+  check("line-wrapped clause grounded (no false drop)", out.length === 1 && out[0] === "52.222-50", JSON.stringify(out));
+}
+// 23) Unicode-dash in source still grounds → kept.
+{
+  const out = _v2GroundClauseList(["252.204-7020"], "incorporates 252.204‑7020 by reference");
+  check("unicode-dash clause grounded", out.length === 1 && out[0] === "252.204-7020", JSON.stringify(out));
+}
+// 24) HONEST DEGRADATION: source has no clause token (image-only) → no mass-drop.
+{
+  const out = _v2GroundClauseList(["52.212-1", "52.212-4"], "scanned image, no text layer extracted here");
+  check("degraded source → list kept (no mass-drop)", out.length === 2, JSON.stringify(out));
+}
+// 25) Empty source → no mass-drop.
+{
+  const out = _v2GroundClauseList(["52.212-1"], "");
+  check("empty source → list kept (no mass-drop)", out.length === 1, JSON.stringify(out));
+}
+// 26) Empty list → returned as-is (no throw).
+{
+  const out = _v2GroundClauseList([], "52.212-1 present");
+  check("empty clause list → empty out", out.length === 0, JSON.stringify(out));
 }
 
 console.log(failures === 0 ? "\nALL PASS ✓" : `\n${failures} FAILED ✗`);

@@ -4748,6 +4748,39 @@ function _v2BuildDeterministicClauses(
   return { farClausesDet, dfarsClausesDet, agencyClausesDet };
 }
 
+// Clause-list fabrication guard (Fix #3, zero-fabrication law, 2026-06-21). Panel
+// review of N4008526R0065 found the rendered audit cited FAR clauses NOT present in
+// the source §I (52.203-19, 52.246-11, 52.232-2, 52.232-3 — ~30% invented). Every
+// clause number in the FINAL rendered far_clauses / dfars_clauses / agency_clauses
+// list MUST appear in the normalized full source text (the assembled doc.rawText).
+// Any clause number NOT found in source is DROPPED so the list is 100% source-
+// grounded. Reuses the SAME normalization as _v2GroundRiskClauses (unicode-dash →
+// hyphen + line-wrap de-hyphenation), so a wrapped "52.222-\n50" and a by-reference
+// listing (52.252-2, where the NUMBER is in the text) both ground.
+//
+// HONEST-DEGRADATION GUARD: if the normalized source carries no extractable clause
+// signal (image-only / degraded extraction — rawText empty or no clause token at
+// all), do NOT mass-drop. Return the list unchanged (same spirit as the risk guard)
+// and rely on Fix #2 having ingested readable docs. Mass-dropping a degraded scan
+// would hide every real clause — worse than an un-pruned list.
+export function _v2GroundClauseList(clauses: string[], rawText: string): string[] {
+  if (!Array.isArray(clauses) || clauses.length === 0) return clauses;
+  const norm = (rawText || "")
+    .replace(/[‐-―−]/g, "-") // unicode dashes → hyphen
+    .replace(/-\s*\n\s*/g, "-") // de-hyphenate line-wraps (52.222-\n50)
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+  // Degraded-source fallback: if the source has NO clause token at all, the text
+  // layer is missing/unreadable — keep the list rather than blanking everything.
+  // (.test() on a /g regex is stateful; use .match() which resets lastIndex.)
+  if (!norm || !(norm.match(_V2_CLAUSE_TOKEN_RE) || []).length) return clauses;
+  return clauses.filter((c) => {
+    const toks = String(c).toUpperCase().match(_V2_CLAUSE_TOKEN_RE) || [];
+    if (toks.length === 0) return true; // not a clause-number form — leave as-is
+    return toks.some((t) => norm.includes(t));
+  });
+}
+
 export async function runAuditV2(
   pdfBuffer: Buffer,
   external?: ExternalBoundFacts,
@@ -5022,8 +5055,23 @@ export async function runAuditV2(
   // of the assembled doc.rawText (same pattern, single source of truth), dedup by
   // normalized clause number, then split by prefix. This becomes the persisted
   // far_clauses / dfars_clauses (AI list kept only as fallback when empty).
-  const { farClausesDet, dfarsClausesDet, agencyClausesDet } =
-    _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
+  const _detClauses = _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
+  // Fix #3 — fabrication guard. Drop any clause number not grounded in the
+  // normalized source text so the rendered list is 100% source-backed (zero-
+  // fabrication law). Honest-degradation fallback keeps the list when the text
+  // layer is missing. Same normalization as the risk-clause guard below.
+  const farClausesDet = _v2GroundClauseList(_detClauses.farClausesDet, doc.rawText);
+  const dfarsClausesDet = _v2GroundClauseList(_detClauses.dfarsClausesDet, doc.rawText);
+  const agencyClausesDet = _v2GroundClauseList(_detClauses.agencyClausesDet, doc.rawText);
+  const _droppedClauses =
+    (_detClauses.farClausesDet.length - farClausesDet.length) +
+    (_detClauses.dfarsClausesDet.length - dfarsClausesDet.length) +
+    (_detClauses.agencyClausesDet.length - agencyClausesDet.length);
+  if (_droppedClauses > 0) {
+    warnings.push(
+      `Clause fabrication guard: ${_droppedClauses} clause number(s) not found in the ingested source were dropped from the clause list.`
+    );
+  }
 
   // Set-aside ↔ §I clause reconciliation (research-backed). HARD-flag only when a
   // competing program's indicator clause is affirmatively present in §I.

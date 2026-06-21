@@ -19,6 +19,7 @@ import type {
   ClauseMatrixRow,
   MatrixBadge,
 } from "./_normalizers";
+import { resolveClauseTitle } from "../../../lib/clause-titles";
 import { dropSelfContradictedNotes, type AuditL02Catch, type AuditConfidenceNote } from "../../../lib/audit-judgment";
 import type {
   MetadataBrief,
@@ -318,6 +319,17 @@ export function buildV2ViewModelFromShadow(
       if (dfars.length === 0 && far.length === 0 && flags.length === 0) {
         return { required: [], reference: [], reference_count: 0 };
       }
+      // Fix #4 (2026-06-21) — blank cmx-title rows. The V1-fallback branch built
+      // rows straight from the bare far_clauses / dfars_clauses number arrays with
+      // title:"" — so FA301626R0018 rendered ~58 of 65 rows with an empty
+      // cmx-title ("Standard · present", no clause name); only the ~7 curated
+      // dfars_flags carried titles. Resolve each clause number against the static
+      // clause-title map; fall back to the SAME honest placeholder the deterministic
+      // normalizer uses so no row is ever title-blank. Never fabricates a title —
+      // the clause NUMBER always renders, and unknown titles read "(title not
+      // extracted)" rather than nothing.
+      const titleFor = (num: string, given?: string): string =>
+        (given && given.trim()) || resolveClauseTitle(num) || "(title not extracted)";
       const required: ClauseMatrixRow[] = flags.map((f) => {
         // FA-127b: severity alone is not enough — badge TRAP only when the
         // clause survives the §04 content filter, so every "See §04 trap"
@@ -326,7 +338,7 @@ export function buildV2ViewModelFromShadow(
         const trap = trapMap.get(num);
         return {
           number: f.clause ?? "",
-          title: f.title ?? "",
+          title: titleFor(num, f.title),
           badge: (trap ? "trap" : "required") as MatrixBadge,
           trapReason: trap ? (trap.reason ?? f.title ?? null) : null,
         };
@@ -335,15 +347,19 @@ export function buildV2ViewModelFromShadow(
       dfars.forEach((c) => {
         const num = typeof c === "string" ? c : ((c as { number?: string }).number ?? "");
         if (num && !flagNums.has(num)) {
-          required.push({ number: num, title: "", badge: "required" as MatrixBadge, trapReason: null });
+          required.push({ number: num, title: titleFor(num), badge: "required" as MatrixBadge, trapReason: null });
         }
       });
-      const reference: ClauseMatrixRow[] = far.map((c) => ({
-        number: typeof c === "string" ? c : ((c as { number?: string }).number ?? ""),
-        title: typeof c === "string" ? "" : ((c as { title?: string }).title ?? ""),
-        badge: "reference" as MatrixBadge,
-        trapReason: null,
-      }));
+      const reference: ClauseMatrixRow[] = far.map((c) => {
+        const num = typeof c === "string" ? c : ((c as { number?: string }).number ?? "");
+        const given = typeof c === "string" ? "" : ((c as { title?: string }).title ?? "");
+        return {
+          number: num,
+          title: titleFor(num, given),
+          badge: "reference" as MatrixBadge,
+          trapReason: null,
+        };
+      });
       return { required, reference, reference_count: reference.length };
     })(),
     submission_checklist_filtered: ((): ChecklistBucketGroup[] => {
