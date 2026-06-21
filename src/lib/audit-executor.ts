@@ -22,12 +22,13 @@ import {
   runAuditV2,
   runAuditV2Metadata,
   AUDIT_V2_ENABLED,
+  isOversizeError,
   type PdfSource,
   type ExternalBoundFacts
 } from "@/lib/audit-engine";
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
-import { MAX_DOCS, type IngestionMeta } from "@/lib/sam-attachments";
+import { MAX_DOCS, classifySectionRoles, type IngestionMeta } from "@/lib/sam-attachments";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -379,23 +380,66 @@ export async function executeAudit(
   }
 
   await markStage(supabase, auditId, "extraction");
-  // RC7 PART B — overall wall-clock ceiling on the parallel three-call V1
-  // engine. Mirrors the V2 Promise.race pattern below. Set ABOVE the realistic
-  // success envelope (incl. a slow call + Opus retry), so a normal/slow-but-
-  // succeeding run never trips it; a breach is a genuinely-pathological stall
-  // and rejects → propagates as a plain Error → terminal 'fail' in the worker
-  // (NOT a re-runnable DegradedRunError, which would replay the same hang up to
-  // the attempt cap). Converts a silent multi-minute stall into a prompt,
-  // diagnosable terminal failure the report page can exit to.
-  const result = await withBudget(
-    runAudit({
-      solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
-      attachmentPdfs: attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
-      primaryDocName: input.primaryDocName ?? null
-    }),
-    V1_OVERALL_BUDGET_MS,
-    `V1 engine overall budget (${V1_OVERALL_BUDGET_MS / 60000}min) exceeded — pre-V2 phase stalled`
-  );
+
+  // ━━ Fix 3 — TRIM-AND-RUN ladder (never hard-fail a PAID audit) ━━━━━━━━━━━━
+  // N4008526R0065 hard-failed with "[call:compliance] prompt is too long" —
+  // a terminal fail on a paid audit. The engine's per-call token guard (Fix 2)
+  // now keeps each request under the model context, so this ladder should rarely
+  // fire, but it is the customer-first safety net: if an oversize error still
+  // surfaces (e.g. an image-only PDF whose vision tokens alone overflow), step
+  // DOWN the document set deterministically rather than failing —
+  //   rung 0: full set
+  //   rung 1: primary + §C/§L/§M attachments only (drop the rest)
+  //   rung 2: primary only
+  // Each step is recorded in compliance_json.ingestion.overflow (honest, never
+  // silent). The §C/§L/§M tiering reuses the deterministic name classifier.
+  const baseAttachments = attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null;
+  const coreAttachments = baseAttachments
+    ? baseAttachments.filter((a) => classifySectionRoles(a.name).length > 0)
+    : null;
+  type Rung = { label: string; attachments: typeof baseAttachments };
+  const ladder: Rung[] = [{ label: "full set", attachments: baseAttachments }];
+  if (coreAttachments && baseAttachments && coreAttachments.length < baseAttachments.length) {
+    ladder.push({ label: "primary + §C/§L/§M attachments only", attachments: coreAttachments });
+  }
+  if (baseAttachments && baseAttachments.length > 0) {
+    ladder.push({ label: "primary only", attachments: null });
+  }
+
+  let result: Awaited<ReturnType<typeof runAudit>> | null = null;
+  const oversizeLadder: string[] = [];
+  for (let rung = 0; rung < ladder.length; rung++) {
+    const step = ladder[rung];
+    try {
+      // RC7 PART B — overall wall-clock ceiling on the parallel three-call V1
+      // engine. Mirrors the V2 Promise.race pattern below. Set ABOVE the realistic
+      // success envelope (incl. a slow call + Opus retry), so a normal/slow-but-
+      // succeeding run never trips it; a breach is a genuinely-pathological stall
+      // and rejects → propagates as a plain Error → terminal 'fail' in the worker
+      // (NOT a re-runnable DegradedRunError, which would replay the same hang up to
+      // the attempt cap). Converts a silent multi-minute stall into a prompt,
+      // diagnosable terminal failure the report page can exit to.
+      result = await withBudget(
+        runAudit({
+          solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
+          attachmentPdfs: step.attachments,
+          primaryDocName: input.primaryDocName ?? null
+        }),
+        V1_OVERALL_BUDGET_MS,
+        `V1 engine overall budget (${V1_OVERALL_BUDGET_MS / 60000}min) exceeded — pre-V2 phase stalled`
+      );
+      break; // succeeded at this rung
+    } catch (err) {
+      // Only an OVERSIZE failure steps the ladder; every other error (timeout,
+      // 5xx, collapse) propagates unchanged so the existing worker paths handle it.
+      if (!isOversizeError(err) || rung === ladder.length - 1) throw err;
+      const next = ladder[rung + 1];
+      const note = `oversize at "${step.label}" — retrying "${next.label}"`;
+      oversizeLadder.push(note);
+      console.warn(`[token-ladder] ${auditId}: ${note} (${err instanceof Error ? err.message : err})`);
+    }
+  }
+  if (!result) throw new Error("trim-and-run ladder exhausted without a result");
 
   await markStage(supabase, auditId, "verdict");
 
@@ -465,22 +509,40 @@ export async function executeAudit(
     // drop is surfaced (never silent). attachment_set_degrade carries the detail;
     // overflow gets an appended note so the existing banner copy fires too. When
     // no degrade occurred, this is exactly the prior `input.ingestion ?? null`.
-    ingestion: attachmentSetDegrade
-      ? ({
-          // A degrade implies a multi-file (SAM/upload) arm, which always
-          // carries an IngestionMeta; fall back to a complete minimal shape if
-          // it were somehow absent, so the persisted object is always valid.
-          ...(input.ingestion ?? {
-            files_total: attachmentSetDegrade.kept + attachmentSetDegrade.dropped + 1,
-            files_ingested: attachmentSetDegrade.kept + 1,
-            form_identified: false,
-            form_name: null,
-            files: [],
-          }),
-          attachment_set_degrade: attachmentSetDegrade,
-          overflow: `${(input.ingestion?.overflow ? input.ingestion.overflow + " · " : "")}RC7 attachment cap: dropped ${attachmentSetDegrade.dropped} of ${attachmentSetDegrade.kept + attachmentSetDegrade.dropped} attachment(s) over the ${ATTACHMENT_SET_MAX}-doc executor ceiling [${attachmentSetDegrade.dropped_names.join(", ")}]`,
-        } as IngestionMeta & { attachment_set_degrade: typeof attachmentSetDegrade })
-      : (input.ingestion ?? null),
+    // Fix 3 — the trim-and-run ladder note (honest, never silent): if an
+    // oversize error stepped us down to fewer docs, fold the rungs that fired
+    // into the SAME overflow string the partial-ingestion banner reads.
+    ingestion: (() => {
+      const ladderNote = oversizeLadder.length > 0
+        ? `Token-safety ladder fired: ${oversizeLadder.join(" → ")} (some lower-priority documents dropped to fit the model context — full files on SAM.gov)`
+        : null;
+      if (attachmentSetDegrade) {
+        // A degrade implies a multi-file (SAM/upload) arm, which always
+        // carries an IngestionMeta; fall back to a complete minimal shape if
+        // it were somehow absent, so the persisted object is always valid.
+        const base = input.ingestion ?? {
+          files_total: attachmentSetDegrade.kept + attachmentSetDegrade.dropped + 1,
+          files_ingested: attachmentSetDegrade.kept + 1,
+          form_identified: false,
+          form_name: null,
+          files: [],
+        };
+        const rc7 = `RC7 attachment cap: dropped ${attachmentSetDegrade.dropped} of ${attachmentSetDegrade.kept + attachmentSetDegrade.dropped} attachment(s) over the ${ATTACHMENT_SET_MAX}-doc executor ceiling [${attachmentSetDegrade.dropped_names.join(", ")}]`;
+        const overflow = [base.overflow, rc7, ladderNote].filter(Boolean).join(" · ");
+        return { ...base, attachment_set_degrade: attachmentSetDegrade, overflow } as IngestionMeta & { attachment_set_degrade: typeof attachmentSetDegrade };
+      }
+      if (ladderNote) {
+        const base = input.ingestion ?? {
+          files_total: (baseAttachments?.length ?? 0) + 1,
+          files_ingested: (result.compliance ? (baseAttachments?.length ?? 0) + 1 : 0),
+          form_identified: false,
+          form_name: input.primaryDocName ?? null,
+          files: [],
+        };
+        return { ...base, overflow: [base.overflow, ladderNote].filter(Boolean).join(" · ") } as IngestionMeta;
+      }
+      return input.ingestion ?? null;
+    })(),
     // Progressive-render flag. "finalizing" tells the report page the V2 agentic
     // layer (agency / work-statement / Capture Play) is still running, so it
     // renders those sections in a "finalizing analysis…" state and auto-refreshes

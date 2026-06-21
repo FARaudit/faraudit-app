@@ -1146,13 +1146,149 @@ function tryParse(s: string): Record<string, unknown> | null {
   }
 }
 
+type CacheControl = { type: "ephemeral" };
 type ContentBlock =
-  | { type: "text"; text: string }
+  | { type: "text"; text: string; cache_control?: CacheControl }
   | { type: "document"; source:
       | { type: "base64"; media_type: string; data: string }
       | { type: "file"; file_id: string }
+    ; cache_control?: CacheControl }
+  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png"; data: string }; cache_control?: CacheControl };
+
+// ━━ ROOT TOKEN-SAFETY FIX (fix/text-first-token-safe, 2026-06-21) ━━━━━━━━━━━
+// N4008526R0065 hard-failed: "[call:compliance] prompt is too long: 1,140,674
+// tokens > 1,000,000". Root cause: every doc rode as an INLINE BASE64 PDF block,
+// which Anthropic bills as page-IMAGE vision tokens (~1.5–3k/page) + text — and
+// the whole set is re-sent across the 3–4 parallel calls. The prior text-char
+// "token budget" (applyTokenBudget) measured EXTRACTED TEXT chars, the wrong
+// metric, so a set the budget passed billed at 1.14M on the wire.
+//
+// Fix 1 (the lever): docs with substantial extractable text ride as TEXT blocks
+//   (~chars/3.5) instead of base64-PDF vision blocks. Only genuinely image-only
+//   (scanned, ~0 extractable text) docs stay base64-PDF — vision is the only way
+//   to read those. Same content reaches the model; only the CHANNEL changes.
+// Fix 2 (the guarantee): a per-call hard guard pre-flights the REAL token count
+//   via /v1/messages/count_tokens and deterministically trims the lowest-priority
+//   text blocks until input_tokens <= INPUT_BUDGET, so a request can never exceed
+//   the model context. Stable doc/system prefix is cache_control'd for ~90%
+//   cheaper repeats across the parallel calls.
+
+// Per-model context window (input+output). Opus 4.8 = 1M. Keyed by model so the
+// guard is model-agnostic (Sonnet/Haiku route through here too on quality gates).
+const MODEL_CONTEXT_LIMIT: Record<string, number> = {
+  "claude-opus-4-8": 1_000_000,
+  "claude-opus-4-7": 1_000_000,
+  "claude-opus-4-6": 1_000_000,
+  "claude-sonnet-4-6": 1_000_000,
+  "claude-haiku-4-5": 200_000,
+};
+const DEFAULT_CONTEXT_LIMIT = 1_000_000;
+// Headroom reserved below the context limit for the output (max_tokens) plus a
+// safety pad for tokenizer drift between our count_tokens pre-flight and the
+// actual request (system text, tool schemas, role framing, count skew).
+const TOKEN_SAFETY_PAD = 40_000;
+// A doc with at least this many meaningful extracted chars rides as TEXT (~text
+// cost). Below it the doc is treated as image-only and stays base64-PDF (vision).
+const MIN_TEXT_CHARS_FOR_TEXT_BLOCK = 200;
+
+function modelContextLimit(model: string): number {
+  return MODEL_CONTEXT_LIMIT[model] ?? DEFAULT_CONTEXT_LIMIT;
+}
+
+// Thrown when a request cannot be made to fit the model context even after the
+// deterministic per-call trim. Detected by executeAudit's trim-and-run ladder.
+// Also matches the API's own "prompt is too long" 400 (see isOversizeError).
+export class OversizeInputError extends Error {
+  readonly inputTokens?: number;
+  readonly budget?: number;
+  constructor(message: string, inputTokens?: number, budget?: number) {
+    super(message);
+    this.name = "OversizeInputError";
+    this.inputTokens = inputTokens;
+    this.budget = budget;
+  }
+}
+
+// Detect an oversize-input failure from ANY source: our own OversizeInputError,
+// or Anthropic's 400 "prompt is too long: N tokens > M" (which surfaces through
+// callClaude as `Claude API 400: ...`). Used by the executor ladder so the
+// fallback fires whether the guard trims-and-throws or the API rejects first.
+export function isOversizeError(err: unknown): boolean {
+  if (err instanceof OversizeInputError) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /prompt is too long|input length and `max_tokens` exceed|exceeds the maximum|too many tokens|context.{0,12}(window|length).{0,20}exceed/i.test(msg);
+}
+
+// Lazy text extractor (avoids a circular static import; pdf-text-extractor is
+// otherwise pulled in only by the V2 path lower in this file).
+type ExtractTextFn = (buf: Buffer) => Promise<{ rawText: string; warnings: string[] }>;
+let _extractTextFn: ExtractTextFn | null = null;
+async function getExtractText(): Promise<ExtractTextFn> {
+  if (_extractTextFn) return _extractTextFn;
+  const mod = await import("./pdf-text-extractor");
+  _extractTextFn = mod.extractText as unknown as ExtractTextFn;
+  return _extractTextFn;
+}
+
+// Meaningful-char measure for the text-vs-vision decision: strip page-separator
+// padding lines ("-- 3 of 50 --") that an image scan emits but carry no content.
+function meaningfulCharCount(text: string): number {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^[\s\-–—=_·.*]*(?:page\s*)?\d+\s*(?:of|\/)\s*\d+[\s\-–—=_·.*]*$/i.test(l))
+    .join("\n").length;
+}
+
+// Decide, per base64 PDF, whether to deliver it as a TEXT block (substantial
+// extractable text) or keep it as a base64-PDF VISION block (image-only).
+// Returns the extracted text when text-first, or null to keep it as vision.
+async function textForDocOrNull(name: string, base64: string): Promise<string | null> {
+  try {
+    const buf = Buffer.from(base64, "base64");
+    const extract = await getExtractText();
+    const { rawText } = await extract(buf);
+    if (rawText && meaningfulCharCount(rawText) >= MIN_TEXT_CHARS_FOR_TEXT_BLOCK
+        && !rawText.startsWith("[PDF_EXTRACTION_FAILED")) {
+      return rawText;
     }
-  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png"; data: string } };
+  } catch {
+    // Extraction failed → fall back to vision so the doc is still readable.
+  }
+  return null;
+}
+
+// Anthropic /v1/messages/count_tokens — the REAL pre-flight count for the exact
+// model + assembled messages/system. Returns null if the endpoint is
+// unreachable (network/transient) so the guard degrades to "send as assembled"
+// rather than blocking a healthy audit on a counting blip; the API's own 400 +
+// the executor ladder remain the backstop.
+async function countInputTokens(
+  model: string,
+  systemPrompt: string,
+  content: ContentBlock[]
+): Promise<number | null> {
+  if (!ANTHROPIC_KEY) return null;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages/count_tokens", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "token-counting-2024-11-01",
+      },
+      body: JSON.stringify({ model, system: systemPrompt, messages: [{ role: "user", content }] }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const n = data?.input_tokens;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 // SECURITY NOTE (FA-1 · image arm bypasses prompt-text sanitization):
 // SECURITY_DIRECTIVE + sanitizePdfText/INJECTION_PATTERNS run on the userPrompt
@@ -1185,6 +1321,19 @@ async function callClaude(
   // is preserved for the hypothetical "both attached" case.
   // FA-2: pdfFileId takes precedence over pdfBase64 when both are set (they
   // shouldn't be, per the mutually-exclusive contract, but file_id wins).
+  // modelOverride takes priority (escalation router) · then test harness override · then default
+  const model = modelOverride || _activeModel || CLAUDE_MODEL;
+
+  // ━━ Fix 1 — TEXT-FIRST document delivery ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // For each PDF (primary + each attachment), if it has substantial extractable
+  // text, send a TEXT block (~chars/3.5 cost) instead of a base64-PDF VISION
+  // block (~1.5–3k tokens/page). Only image-only docs (no extractable text) stay
+  // base64-PDF — vision is the only way to read those. This collapses the
+  // dominant cost while preserving every doc's substantive content.
+  //
+  // Block order: image → primary doc → attachment docs → userPrompt. The stable
+  // doc/system prefix carries a cache_control breakpoint (Fix 2) so the doc
+  // payload is cached across the 3–4 parallel/sequential calls.
   const content: ContentBlock[] = [];
   if (imageBase64 && imageMediaType) {
     content.push({
@@ -1193,32 +1342,108 @@ async function callClaude(
     });
   }
   if (pdfFileId) {
+    // Files-API handle: text is not in hand here (the file lives server-side),
+    // so keep the document block. It is a single handle, not inline page-images,
+    // and is not the 1.14M driver (that was inline base64 sets).
     content.push({
       type: "document",
       source: { type: "file", file_id: pdfFileId }
     });
   } else if (pdfBase64) {
-    content.push({
-      type: "document",
-      source: { type: "base64", media_type: "application/pdf", data: pdfBase64 }
-    });
+    const primaryName = extraDocs && extraDocs.length > 0
+      ? "PRIMARY (solicitation form)"
+      : "SOLICITATION";
+    const text = await textForDocOrNull(primaryName, pdfBase64);
+    if (text !== null) {
+      content.push({ type: "text", text: `--- ${primaryName} ---\n${text}` });
+    } else {
+      content.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: pdfBase64 }
+      });
+    }
   }
   // FA-136 — attachment documents ride after the primary, in the
   // deterministic plan order. The prompt's DOCUMENT SET manifest (assembled
   // in runAudit) tells the model which block is the form and which are
-  // attachments, so claims stay provenance-traceable.
+  // attachments, so claims stay provenance-traceable. Each is delivered
+  // text-first when it carries extractable text; image-only ones stay vision.
   if (extraDocs) {
     for (const d of extraDocs) {
-      content.push({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: d.base64 }
-      });
+      const text = await textForDocOrNull(d.name, d.base64);
+      if (text !== null) {
+        content.push({ type: "text", text: `--- ${d.name} ---\n${text}` });
+      } else {
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: d.base64 }
+        });
+      }
     }
+  }
+  // Cache the stable doc/system prefix: place the breakpoint on the LAST doc
+  // block (everything before userPrompt). Render order is tools → system →
+  // messages, so the cached prefix = system + all doc blocks; only userPrompt
+  // (volatile per call) sits after it. ~90% cheaper on the repeat calls.
+  if (content.length > 0) {
+    const last = content[content.length - 1];
+    last.cache_control = { type: "ephemeral" };
   }
   content.push({ type: "text", text: userPrompt });
 
-  // modelOverride takes priority (escalation router) · then test harness override · then default
-  const model = modelOverride || _activeModel || CLAUDE_MODEL;
+  // ━━ Fix 2 — per-call HARD guard ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Pre-flight the REAL token count and deterministically trim until it fits, so
+  // the request can NEVER exceed the model context. INPUT_BUDGET leaves room for
+  // the output (maxTokens) + a safety pad. Trim drops/truncates the LOWEST-
+  // priority text blocks first (attachments before primary); the primary doc and
+  // the userPrompt (which carries §C/§L/§M analysis instructions) are kept.
+  const inputBudget = modelContextLimit(model) - maxTokens - TOKEN_SAFETY_PAD;
+  if (inputBudget > 0) {
+    let count = await countInputTokens(model, systemPrompt, content);
+    if (count !== null && count > inputBudget) {
+      console.warn(`[audit-engine] token guard: ${count.toLocaleString()} input tokens > budget ${inputBudget.toLocaleString()} (model=${model}, out=${maxTokens}) — trimming text blocks deterministically`);
+      // Indices of trimmable text DOC blocks (the labelled "--- name ---" text
+      // blocks), in priority order: LAST doc first (lowest tier, since attachments
+      // ride after the primary), primary doc last. The final userPrompt block and
+      // any image/document(vision) blocks are never trimmed here.
+      const docTextIdx = content
+        .map((b, i) => ({ b, i }))
+        .filter(({ b, i }) => b.type === "text" && i < content.length - 1 && (b as { text: string }).text.startsWith("--- "))
+        .map(({ i }) => i)
+        .reverse(); // last (lowest-priority) first
+      // Pass 1: hard-truncate each doc text block to a shrinking share until it
+      // fits; drop entirely as a last resort. Re-count after each step.
+      for (const idx of docTextIdx) {
+        if (count === null || count <= inputBudget) break;
+        const block = content[idx] as { type: "text"; text: string; cache_control?: CacheControl };
+        const overflowTokens = count - inputBudget;
+        const overflowChars = Math.ceil(overflowTokens * 3.5) + 2000; // pad
+        if (block.text.length > overflowChars + 500) {
+          const keep = Math.max(500, block.text.length - overflowChars);
+          block.text = block.text.slice(0, keep) +
+            `\n\n[… truncated by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+        } else {
+          // Block is smaller than the overflow — drop its content wholesale.
+          const label = (block.text.split("\n", 1)[0] || "--- document ---");
+          block.text = `${label}\n[… omitted by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+        }
+        count = await countInputTokens(model, systemPrompt, content);
+      }
+      if (count !== null && count > inputBudget) {
+        // Even after trimming every attachment + the primary doc text we still
+        // don't fit (pathological: a single image-only PDF's vision tokens, or a
+        // giant userPrompt). Throw so the executor's trim-and-run ladder takes
+        // over with a lower-budget / primary-only assembly.
+        throw new OversizeInputError(
+          `assembled request is ${count.toLocaleString()} tokens after trim > budget ${inputBudget.toLocaleString()} (model=${model})`,
+          count,
+          inputBudget
+        );
+      }
+      console.log(`[audit-engine] token guard: trimmed to ${count?.toLocaleString() ?? "?"} input tokens (<= ${inputBudget.toLocaleString()})`);
+    }
+  }
+
   console.log(`[audit-engine] V1 call · model=${model}`);
   const t0 = Date.now();
   // 529/503 transient overload — 3-attempt retry with exponential backoff (2s, 4s).
