@@ -27,7 +27,7 @@ import {
 } from "@/lib/audit-engine";
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
-import type { IngestionMeta } from "@/lib/sam-attachments";
+import { MAX_DOCS, type IngestionMeta } from "@/lib/sam-attachments";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -178,7 +178,15 @@ const V1_OVERALL_BUDGET_MS = 11 * 60 * 1000;
 // a pathological set slipping through: keep the first N (deterministic order is
 // preserved upstream — form first, then tier order), drop the rest, and flag it
 // LOUDLY on compliance_json.ingestion (no silent truncation).
-const ATTACHMENT_SET_MAX = 8;
+//
+// P0 fix (2026-06-20): MUST stay AT/ABOVE the upstream attachment count so this
+// backstop never re-truncates a normal set. Upstream MAX_DOCS bounds TOTAL docs
+// (primary + attachments); the primary is split out before this runs, so a
+// normal set carries up to MAX_DOCS-1 attachments. Pinning the backstop to
+// MAX_DOCS keeps it strictly above that (was hardcoded 8 — which, after MAX_DOCS
+// rose to 12, would have silently dropped the very ELIN/SOW/SLS docs the upstream
+// ranking fix just promoted).
+const ATTACHMENT_SET_MAX = MAX_DOCS;
 
 // Race a promise against a wall-clock budget. On breach the returned promise
 // REJECTS with `new Error(label)` — callers decide whether that degrades
