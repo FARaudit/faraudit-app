@@ -17,20 +17,52 @@ import type {
 } from "./_view-model";
 import { buildV2ViewModelFromShadow, renderV2Surfaces, renderIngestionBannerFromAudit } from "./_v2-render-surfaces";
 import type { ChecklistBucketGroup } from "./_normalizers";
+import { isActionableSubmissionItem } from "@/lib/section-extractors";
 
-// P0 deadline single-source (2026-06-21): the V2 checklist overlay rebuilds the
-// submission checklist from engine-extracted text, which surfaced a STALE base-doc
-// deadline ("17 February 2026") and a garbage parse ("…Attn: Sarah Bradshaw…")
-// contradicting the masthead's SAM-authoritative deadline by six months. Drop every
-// deadline-bucket item and inject the ONE canonical deadline (the same value the
-// masthead/timeline use) so the checklist can never disagree. Mirrors the V1 fix in
-// _view-model.deriveSubmissionChecklistFiltered.
-function pinChecklistDeadline(
+// P1-b raw-fragment guard (2026-06-21, strengthened after panel re-review). The V2
+// checklist surfaced raw extraction debris the canonical action gate didn't catch.
+// Each test below targets a NON-actionable fragment shape a bidder can't work from;
+// the action-verb escape hatch keeps any line that states a real obligation.
+const ACTION_VERB_RE = /\b(shall|must|submit|provide|include|complete|sign|register|acknowledge|ensure|certify|furnish|deliver|identify|mark|upload|return|address)\b/i;
+function looksGarbledFragment(t: string): boolean {
+  const s = t.trim();
+  // Unambiguous OCR/extraction garbage — drop regardless of content.
+  if (/\s\.\s/.test(s)) return true;                       // stray mid-sentence period ("go . This")
+  if (/\b[a-z]{2,}- [a-z]/.test(s)) return true;           // hyphen-space OCR break ("non- price")
+  if (/\t/.test(s)) return true;                            // embedded tab = table column scramble
+  if (/^\d{2,3}\.\d{3}-\d+\b/.test(s)) return true;        // FAR/DFARS clause-number header debris ("52.204-7 …")
+  if (/^["“][^"”]+["”]\s+means\b/i.test(s)) return true;   // FAR definition line ("\"Relevant sales data\" means …")
+  if (/^NOTE\b/i.test(s)) return true;                      // dangling NOTE header
+  if (/\b(?:and|or|the|to|of|for|with|including|that|a|an|in|on|by)$/i.test(s)) return true; // truncated trailing conjunction/prep
+  // Orphaned sub-clause enumerator with NO real obligation verb anywhere
+  // ("(1) Data other than certified cost or pricing data"). Keep "(a) … shall submit …".
+  if (/^\(?\s*(?:\d{1,2}|[ivxlc]{1,4}|[a-e])\s*\)\s*:?/i.test(s) && !ACTION_VERB_RE.test(s)) return true;
+  return false;
+}
+
+// P0 deadline single-source + P1-b fragment cleanup (2026-06-21). The V2 checklist
+// overlay rebuilds the submission checklist from engine-extracted text. Two defects:
+//   (1) the deadline bucket surfaced a STALE base-doc date + a garbage parse
+//       ("…Attn: Sarah Bradshaw…") contradicting the masthead's SAM deadline; and
+//   (2) other buckets rendered raw OCR fragments the V1 path's quality gate
+//       (isActionableSubmissionItem) would have dropped.
+// Fix: run every item through the SAME canonical quality gate + the artifact guard,
+// drop all doc-derived deadline items, inject the ONE canonical deadline, and drop
+// now-empty buckets. Mirrors _view-model.deriveSubmissionChecklistFiltered.
+function sanitizeAndPinChecklist(
   groups: ChecklistBucketGroup[],
   canonicalDeadline: string | null
 ): ChecklistBucketGroup[] {
-  const nonDeadline = groups.filter((g) => g.bucket !== "deadline");
-  if (!canonicalDeadline) return nonDeadline;
+  const cleaned: ChecklistBucketGroup[] = groups
+    .filter((g) => g.bucket !== "deadline")
+    .map((g) => ({
+      ...g,
+      items: g.items.filter(
+        (it) => isActionableSubmissionItem(it.text, g.bucket) && !looksGarbledFragment(it.text)
+      ),
+    }))
+    .filter((g) => g.items.length > 0);
+  if (!canonicalDeadline) return cleaned;
   return [
     {
       bucket: "deadline",
@@ -43,7 +75,7 @@ function pinChecklistDeadline(
         complete: false,
       }],
     },
-    ...nonDeadline,
+    ...cleaned,
   ];
 }
 
@@ -2908,10 +2940,17 @@ export function renderAuditReportComplete(
   let html = renderAuditReport(template, vm);
   const v2Input = buildV2ViewModelFromShadow(audit);
   if (v2Input) {
-    // P0 deadline single-source: pin the V2 checklist's deadline to the same
-    // SAM-authoritative value the masthead shows (vm.response_deadline).
-    v2Input.submission_checklist_filtered = pinChecklistDeadline(
-      v2Input.submission_checklist_filtered,
+    // P1-b root fix (2026-06-21): render §09 from the CLEAN view-model checklist
+    // (built from the engine's polished submission_requirements) rather than the V2
+    // overlay's raw, OCR-fragment source. Prefer vm.submission_checklist_filtered
+    // when it has content; fall back to the (sanitized) V2 list otherwise. Then run
+    // the result through the same quality gate + canonical-deadline pin.
+    const cleanChecklist =
+      vm.submission_checklist_filtered && vm.submission_checklist_filtered.length > 0
+        ? (vm.submission_checklist_filtered as unknown as ChecklistBucketGroup[])
+        : v2Input.submission_checklist_filtered;
+    v2Input.submission_checklist_filtered = sanitizeAndPinChecklist(
+      cleanChecklist,
       vm.has_response_deadline ? vm.response_deadline : null
     );
     html = renderV2Surfaces(html, v2Input);

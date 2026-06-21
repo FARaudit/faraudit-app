@@ -1978,6 +1978,30 @@ function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>):
   pushRowStrings(compJson.dfars_flags);
   const exec = compJson.executive_summary as Record<string, unknown> | undefined;
   if (exec && typeof exec === "object") pushRowStrings(exec.actions);
+  // FA-P1a (2026-06-21): the CO email often lives ONLY in the V2 risk narratives
+  // (N4008526R0065: sarah.m.bradshaw2.civ@us.navy.mil sits in
+  // v2_shadow.judgment.risks[].description), which the V1 `risks` arg doesn't
+  // surface — so a real CO was lost to a false "not found". Scan the V2 risk text
+  // too. Still .mil/.gov-restricted + denylisted below, so this can't bind a vendor.
+  const v2judg = ((compJson.v2_shadow as Record<string, unknown> | undefined)?.judgment) as Record<string, unknown> | undefined;
+  if (Array.isArray(v2judg?.risks)) {
+    for (const r of v2judg.risks as Array<Record<string, unknown>>) {
+      if (!r || typeof r !== "object") continue;
+      for (const k of ["title", "description", "why_invisible", "detail"]) {
+        const val = r[k];
+        if (typeof val === "string") parts.push(val);
+      }
+    }
+  }
+  // FA-P1a (2026-06-21): the full CO email frequently lands in key_compliance_actions
+  // (N4008526R0065: "…questions in writing to sarah.m.bradshaw2.civ@us.navy.mil…" is
+  // in key_compliance_actions[16], while every other surface holds only a TRUNCATED
+  // "…Attn: Sarah Bradshaw, sarah." copy). Scan it so the CO resolves.
+  if (Array.isArray(compJson.key_compliance_actions)) {
+    for (const a of compJson.key_compliance_actions as unknown[]) {
+      if (typeof a === "string") parts.push(a);
+    }
+  }
   const corpus = parts.join(" \n ");
   // First .mil/.gov address that is not a known non-CO mailbox.
   const matches = corpus.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:MIL|GOV)\b/gi) || [];
@@ -2348,14 +2372,17 @@ function deriveSubmissionChecklistFiltered(
   // one fact instead of re-deriving it from doc text (see drop+inject below).
   canonicalDeadline: string | null
 ): AuditViewModel["submission_checklist_filtered"] {
-  // Source: prefer raw[] (engine emits this), fall back to objects[].
+  // Source: prefer the CLEAN objects[] (submission_requirements — the engine's
+  // polished Call-1 imperatives), fall back to raw[]. P1-b root fix (2026-06-21):
+  // the prior order preferred raw[], and an EMPTY raw array shadowed the clean
+  // objects, so §09 rendered raw OCR fragments (mid-sentence truncations, clause
+  // debris) while the clean 25-item list sat unused. raw[] only when objects[] is
+  // genuinely absent/empty.
   const reqsRaw = Array.isArray(compJson.submission_requirements_raw) ? (compJson.submission_requirements_raw as unknown[]) : null;
   const reqsObj = Array.isArray(compJson.submission_requirements) ? (compJson.submission_requirements as SubmissionRequirementVM[]) : null;
-  const lines: string[] = reqsRaw
-    ? reqsRaw.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-    : reqsObj
-    ? reqsObj.map((r) => (r.requirement || "").trim()).filter((s) => s.length > 0)
-    : [];
+  const objLines = reqsObj ? reqsObj.map((r) => (r.requirement || "").trim()).filter((s) => s.length > 0) : [];
+  const rawLines = reqsRaw ? reqsRaw.filter((s): s is string => typeof s === "string" && s.trim().length > 0) : [];
+  const lines: string[] = objLines.length > 0 ? objLines : rawLines;
 
   // Dedup by punctuation-stripped fingerprint — kills the "duplicated run-on"
   // F1 symptom where the same risk title appears twice.
@@ -2705,8 +2732,24 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         note: sanitizeDisplayText(f.note)
       }))
     : [];
+  // P1 deadline reconciliation (2026-06-21): drop any §L requirement line that
+  // states a CONCRETE offer-due DATE. The deadline is a SAM fact shown once in the
+  // masthead/timeline/checklist; a base-doc line ("…no later than 2:00 PM on 17
+  // February 2026 per SF33 Block 9") is frequently STALE (superseded by amendment)
+  // and reads as a second, contradicting deadline. Generic timing instructions with
+  // no concrete date ("submit via PIEE before the response deadline") are kept.
+  const _MONTHS_RE = "(?:January|February|March|April|May|June|July|August|September|October|November|December)";
+  const _statesConcreteDeadline = (s: string): boolean =>
+    /\b(?:no later than|due (?:date|no later|by)|deadline|submit(?:ted)?\s+(?:by|before))/i.test(s) &&
+    new RegExp(
+      // "Month D, YYYY"  OR  "D Month YYYY"  OR  "MM/DD/YYYY"
+      `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`,
+      "i"
+    ).test(s);
   const submissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
-    ? (compJson.submission_requirements as SubmissionRequirementVM[]).map((r) => ({
+    ? (compJson.submission_requirements as SubmissionRequirementVM[])
+        .filter((r) => !_statesConcreteDeadline(String(r?.requirement ?? "")))
+        .map((r) => ({
         ...r,
         requirement: sanitizeDisplayText(r.requirement)
       }))
@@ -3090,13 +3133,33 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     days_to_deadline: canonicalDaysToDeadline,
     // Cycle-1 canonical gate card — composed from canonicalGates (VM-detected),
     // not compJson.verdict.gates. Byte-stable across extraction-variant runs.
-    gate_card: deriveGateCardProse(canonicalGates, verdict.word, canonicalDaysToDeadline, evalFraming),
+    // P1 gate-tally fix (2026-06-21): the card prose + count MUST use the SAME gate
+    // set that the masthead and §06 rows render (gateConditions), not the VM-only
+    // canonicalGates (DoD-library detection) — which held 1 (SPRS) while the rendered
+    // set held 5, producing "close the single gate / 0 of 1" against 5 visible gates.
+    // Curability comes from blocker_note (non-empty = UNFIXABLE = not curable).
+    gate_card: deriveGateCardProse(
+      gateConditions.map((g) => ({ cure_possible_in_window: !g.blocker_note })),
+      verdict.word,
+      canonicalDaysToDeadline,
+      evalFraming
+    ),
     // ─────────────────────────────────────────────────────────────────────
     win_probability: wp,
     win_probability_benchmark: wpBenchmark,
     // Engine-computed (null when score <60) — drives the renderer's
     // hide-when-null gate on .mhv-bench.
-    score_benchmark: (compJson.score_benchmark as string | null | undefined) ?? null,
+    // P1-d (2026-06-21): don't present a confident score standing when the audit
+    // only read part of the package. On a partial ingestion the benchmark
+    // ("Above average") + "verified" confidence overclaim a score computed on an
+    // incomplete document set, so suppress the benchmark chip (the partial-ingestion
+    // banner already tells the customer findings may change). Full sets are unaffected.
+    score_benchmark: ((): string | null => {
+      const ing = (compJson.ingestion ?? {}) as { files_total?: number; files_ingested?: number };
+      const partial = (ing.files_total ?? 0) > 0 && (ing.files_ingested ?? 0) < (ing.files_total ?? 0);
+      const bench = (compJson.score_benchmark as string | null | undefined) ?? null;
+      return partial ? null : bench;
+    })(),
 
     qa_deadline: qaDeadlineDate ? fmtDayMonYear(qaDeadlineDate) : "",
     qa_days: fmtKdCountdown(qaDays),

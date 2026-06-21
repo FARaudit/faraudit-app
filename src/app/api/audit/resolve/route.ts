@@ -48,7 +48,13 @@ function fail(reason: string, status: number): NextResponse {
 // whole resolve stays within a few seconds. On ANY failure (cap / timeout /
 // not-a-PDF / image-only / parse failure) we return null and the caller falls
 // back to the prior, honest name-based coverage — never hang, never error.
-const PRIMARY_DOWNLOAD_TIMEOUT_MS = 8000;
+// P1-e (2026-06-21): raised 8s → 13s. On N4008526R0065 the §L/§M sections live
+// INLINE in the 2.57MB conformed-solicitation body; if the download+extract of a
+// large combined RFP exceeds the timeout, content-detection returns null and we
+// fall back to name-based coverage — which can't see inline sections, so the front
+// door falsely reported "§L/§M not in posted package." 13s gives a real combined
+// body time to download+parse while still bounding the synchronous resolve wait.
+const PRIMARY_DOWNLOAD_TIMEOUT_MS = 13000;
 const PRIMARY_MAX_BYTES = 15 * 1024 * 1024; // ~15MB — skip text-extraction above this.
 
 // Sections we can credit from the primary doc TEXT (real, not name-based).
