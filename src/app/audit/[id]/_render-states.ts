@@ -236,6 +236,25 @@ interface ErrorClass {
 }
 
 function classifyError(errorMessage: string): ErrorClass {
+  // Prompt-too-large / token-max (HTTP 400 invalid_request_error) — a HARD,
+  // DETERMINISTIC size error, NOT transient: the assembled document set exceeded
+  // the model's context window, so re-running with the SAME inputs fails
+  // identically (retry is NOT the move). Must be checked BEFORE the engine-call
+  // branch below, which would otherwise mis-classify this 400 (it also contains
+  // "[call:…]" + "Claude API") as a transient hiccup and falsely tell the user
+  // "retrying usually succeeds". (Regression 2026-06-21, N4008526R0065:
+  // 1,140,674 tokens > 1,000,000 max → "[call:compliance] Claude API 400:
+  // prompt is too long".) The token budget in sam-attachments now prevents this,
+  // but the classification stays honest for any residual case.
+  if (/prompt is too long|too many tokens|maximum context|context (?:window|length) (?:exceeded|limit)|\btokens?\b[^.]{0,40}\bmaximum\b|invalid_request_error/i.test(errorMessage)) {
+    return {
+      headline: "The document set was too large to analyze in one pass.",
+      explainer: "This solicitation's attachments added up to more text than the engine can analyze in a single pass. The engine trims to the core solicitation automatically, so this is rare — but if it persists, upload the key documents (the solicitation and Sections C/L/M) directly so the engine focuses on them. <b>This is not a transient error — re-running the same full package will hit the same limit.</b>",
+      failedStage: "02 — Engine analysis",
+      tag: "Document set exceeded the analysis size limit.",
+      ledeRetrievalAccurate: false,
+    };
+  }
   // Engine/Anthropic call failures ([call:extraction], [call:risks], "Claude API
   // …", "fetch failed after N attempts") — a transient ANALYSIS-side error, NOT
   // a SAM retrieval issue. Must be checked FIRST: "[call:risks] fetch failed"
