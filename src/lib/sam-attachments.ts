@@ -25,6 +25,8 @@
 // back to the legacy single-URL path exactly as pre-FA-136 (no flag — we
 // know nothing about the set), logged loudly.
 
+import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extractor";
+
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
 
@@ -39,7 +41,14 @@ const FETCH_TIMEOUT_MS = 30000;
 // high-value docs survive; MAX_TOTAL_INLINE_BYTES + MAX_TOTAL_PAGES (550)
 // remain the REAL ceilings, so we ingest more docs but stay under page/byte
 // limits. Near-duplicate files are deduped before the budget (below).
-export const MAX_DOCS = 8;
+// P0 fix (2026-06-20): large multi-section sets (N4008526R0065: 33 files;
+// FA301626R0018: 40) carry MORE than 8 genuinely-distinct high-value docs —
+// SOW + §C + §L + §M + price + wage + CBA + SLS + ELIN. With the ranking fixed
+// (cover sheets last), 8 still starved the SOW / ELIN / SLS. Raised to 12: the
+// 15MB byte budget + 550-page budget remain the REAL ceilings (the top-12 of
+// both live sets stay well under both), so this admits the distinct content
+// docs without risking the API payload limits.
+export const MAX_DOCS = 12;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
@@ -200,17 +209,74 @@ const CLAUSE_DOC = /\bclauses?\b|provisions?|\bsection\s*i\b|incorporated by ref
 function isClauseDoc(name: string): boolean {
   return CLAUSE_DOC.test(name);
 }
+
+// CORE_CONTENT: the highest-value substantive documents — the ones the audit
+//   reasons over directly and must NEVER lose a budget slot to a small secondary
+//   doc. Section C/L/M, SOW/PWS/SOO, §M Evaluation, §L Instructions, Price
+//   Schedule, Wage Determination, CBA, Service-Level Standards, CONFORMED RFP,
+//   Section C ANNEXES. (N4008526R0065: the CBA + SLS were being starved by tiny
+//   GFP/inventory files; FA301626R0018: the SOW + §M Evaluation likewise.)
+const CORE_CONTENT =
+  /\bstatement of work\b|\bsow\b|\bpws\b|\bsoo\b|performance work statement|statement of (?:work|need|objectives?)|scope of work|project description|bid description|specsintact|\bsection\s*[clmf]\b|\b[clmf]-\d|management and administration|evaluation factors?|\bevaluation\b|basis of award|instructions? (?:to|conditions).{0,30}offerors?|instruction to offerors|notices? to offerors|special contract requirements?|price (?:schedule|list)|wage determination|\bcba\b|collective bargaining|service[\s-]?level|service level standards?|\bconformed\b|custodial/i;
+// SECONDARY_CONTENT: real but supporting content — kept above generic
+//   attachments but below the core docs (ELIN/CLIN pricing tables, inventory,
+//   GFP, specs, annexes, appendix lists).
+const SECONDARY_CONTENT =
+  /\bclin\b|\belins?\b|inventory|government furnished|\bspec(?:ification)?s?\b|\bannexe?s?\b|appendix|\bschedule\b/i;
+const CONTENT_DOC = new RegExp(`${CORE_CONTENT.source}|${SECONDARY_CONTENT.source}`, "i");
+function isContentDoc(name: string): boolean {
+  return CONTENT_DOC.test(name);
+}
+function isCoreContent(name: string): boolean { return CORE_CONTENT.test(name); }
+function isSecondaryContent(name: string): boolean { return SECONDARY_CONTENT.test(name); }
+
+// P0 fix (2026-06-20, N4008526R0065 + FA301626R0018): the cap RANKED bare SF-30
+// amendment COVER sheets above real content docs, so the budget ingested 8 of 33
+// = ALL SF-30 covers and DROPPED Section C, the CBA wage table, service-level
+// standards, §M Evaluation, the SOW, and the price schedule.
+//
+// isCoverSheet(name): a BARE amendment cover with NO real content signal. Two
+//   shapes seen in the live set: the SF-30 "Amendment of Solicitation" title
+//   ("…SF 30.pdf") AND the bare "Solicitation Amendment <solnum>NNNN.pdf" /
+//   "Amendment 0004.pdf" form (no "SF 30" token). Both are the LOWEST-value
+//   members — their substance is re-published in the CONFORMED solicitation /
+//   the base solicitation — so they drop FIRST under the cap, not last. A file
+//   that also names real core content (CONFORMED RFP, "Revised Section C") is
+//   NOT a bare cover and keeps its content tier.
+const SF30_MARK = /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract/i;
+// "Solicitation Amendment …", "Amendment 0004", "Amendment_0001", "Amd 2", etc.
+const BARE_AMD_MARK = /(?:solicitation\s+amendment\b|^amendment\b|^\d+\.\s*amendment\b|\bamendment[\s_]*\d|\bamd[\s_]*\d|_amd_|-amd-)/i;
+function isCoverSheet(name: string): boolean {
+  if (!SF30_MARK.test(name) && !BARE_AMD_MARK.test(name)) return false;
+  // A cover that ALSO names real content (CONFORMED RFP, Revised Section C, a
+  // wage/price/CBA table delivered under an amendment) is NOT a bare cover.
+  return !isContentDoc(name) && !isClauseDoc(name);
+}
+
 // Single ordering key shared by planDocumentOrder + applyBudget so the budget is
-// consumed in the same priority both compute: form → amendment → clause/§I →
-// strong work statement → weak spec → generic attachment. Size is only the
-// tie-break.
+// consumed in the same priority both compute. P0 ranking (2026-06-20):
+//   0 form (the chosen primary) → 1 clause/§I → 2 CORE content (§C/§L/§M / SOW /
+//   price / wage / CBA / SLS / CONFORMED) → 3 secondary content (ELIN/CLIN /
+//   inventory / GFP / specs / annexes / appendix) → 4 weak spec → 5 generic
+//   attachment → 6 bare amendment/SF-30 cover sheet (FIRST to drop under the
+//   cap). Size is only the within-tier tie-break. Core content sits ABOVE
+//   secondary so a 3.5MB SOW / 674KB CBA never loses a slot to a tiny GFP or
+//   appendix-list file (the exact starvation that dropped the CBA + SLS + SOW).
 function documentTier(e: DocumentPlanEntry): number {
   if (e.role === "form") return 0;
-  if (e.role === "amendment") return 1;
+  // Bare amendment / SF-30 cover with no real content → lowest value, drop first.
+  if (isCoverSheet(e.name)) return 7;
+  // The governing work statement (SOW/PWS/SOO/§C) is the single highest-value
+  // attachment — it must outrank every other content doc so it NEVER loses a
+  // budget slot (FA301626R0018: the 3.5MB SOW_SpecsIntact dropped under the
+  // size tie-break against smaller core docs). Tier 1, ahead of clause lists.
+  if (workStatementSignal(e.name) === 2) return 1;
   // Clause/§I/provisions doc — high priority, never a generic attachment.
   if (isClauseDoc(e.name)) return 2;
-  const sig = workStatementSignal(e.name);
-  return sig === 2 ? 3 : sig === 1 ? 4 : 5;
+  if (isCoreContent(e.name)) return 3;        // §L/§M / price / wage / CBA / SLS / CONFORMED
+  if (isSecondaryContent(e.name)) return 4;   // ELIN/CLIN / inventory / GFP / specs / annexes
+  if (workStatementSignal(e.name) === 1) return 5; // weak: spec/requirements/scope keyword
+  return 6;                                   // generic attachment
 }
 
 // Deterministic role assignment + ordering. Pure — exported for the gate
@@ -268,6 +334,13 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
   const formStrength = (e: DocumentPlanEntry): number => {
     if (e.role !== "form") return 0;
     const nn = norm(e.name);
+    // P0 fix (2026-06-20): a bare SF-30 amendment cover is the WEAKEST form even
+    // when it carries the sol number (it is "Solicitation Amendment …SF 30.pdf",
+    // so it matches \bsolicitation\b AND nn.includes(solNorm)). Without this,
+    // the N4008526R0065 SF-30 covers tied the real solicitation at strength 4
+    // and the smallest cover won the size tie-break as primary. isCoverSheet
+    // (no real content) demotes it below every genuine solicitation body.
+    if (isCoverSheet(e.name)) return 0;
     // An SF-30-only amendment is the WEAKEST form (loses to any real sol/RFQ).
     if (isSf30Only(e.name)) return 0;
     if (solNorm && nn.includes(solNorm)) return 4;
@@ -275,6 +348,26 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
     if (REAL_SOL_FORM.test(e.name)) return 2; // RFQ/RFP or SF cover form
     return 1; // some other form signal, still above SF-30-only (0)
   };
+  // P0 fix (2026-06-20): keep ONLY the single strongest form-classified entry as
+  // the FORM; demote every other form-tier candidate (the 8 SF-30 covers in the
+  // N4008526R0065 set all clear isForm via the sol-number substring) back to its
+  // natural role so documentTier ranks them as cover sheets — first to drop, not
+  // hogging tier-0 above Section C / CBA / SLS / ELIN. The winner is the highest
+  // formStrength, size-ascending then name as deterministic tie-breaks.
+  const formCandidates = planned.filter((e) => e.role === "form");
+  if (formCandidates.length > 1) {
+    const winner = [...formCandidates].sort((a, b) =>
+      formStrength(b) - formStrength(a) ||
+      (a.sizeBytes ?? Infinity) - (b.sizeBytes ?? Infinity) ||
+      a.name.localeCompare(b.name)
+    )[0];
+    for (const e of planned) {
+      if (e.role === "form" && e !== winner) {
+        // Restore the natural role so cover/amendment tiering applies.
+        e.role = isAmendment(e.name) ? "amendment" : "attachment";
+      }
+    }
+  }
   return planned.sort((a, b) =>
     documentTier(a) - documentTier(b) ||
     formStrength(b) - formStrength(a) ||
@@ -377,8 +470,16 @@ export function dedupeNearDuplicates(plan: DocumentPlanEntry[]): {
   return { kept: plan.filter((e) => keptIds.has(e.resourceId)), dropped };
 }
 
+// P0 fix (2026-06-20): .docx/.xlsx members are now INGESTIBLE — they are
+// extracted to text and wrapped into a PDF buffer downstream (see
+// extractNonPdfText + textToPdfBuffer), so §M evaluation addenda, price
+// schedules, ELIN/CLIN pricing and wage tables (frequently delivered as
+// .docx/.xlsx) reach the section/clause/fact extractors. Other non-PDF types
+// (.zip drawing dumps, images) stay non-ingestible.
+const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
+
 // Budget application — pure, exported for the gate suite. Decides which plan
-// entries get downloaded BEFORE any bytes move. Only .pdf members are
+// entries get downloaded BEFORE any bytes move. PDF + .docx/.xlsx members are
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
 // budget on an unsized file beyond the form). Near-duplicate files are deduped
 // first so duplicate copies never consume slots that distinct docs need.
@@ -407,7 +508,7 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
     a.name.localeCompare(b.name)
   );
   for (const e of fillOrder) {
-    if (!/\.pdf$/i.test(e.name)) { skipped.push({ entry: e, reason: "non-PDF attachment (not inlineable)" }); continue; }
+    if (!INGESTIBLE_EXT.test(e.name)) { skipped.push({ entry: e, reason: "unsupported attachment type (not PDF/DOCX/XLSX)" }); continue; }
     if (e.sizeBytes == null) { skipped.push({ entry: e, reason: "size unknown — excluded from budget" }); continue; }
     if (ingest.length >= maxDocs) { skipped.push({ entry: e, reason: `document cap (${maxDocs}) reached` }); continue; }
     if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `inline budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
@@ -424,14 +525,28 @@ export function isPdfPortfolio(buffer: Buffer): boolean {
   return buffer.includes("/EmbeddedFiles") || buffer.includes("/Collection");
 }
 
-async function downloadPdf(url: string): Promise<Buffer | null> {
+// Convert a downloaded/local member to an inline-ready PDF Buffer. A native PDF
+// passes the %PDF magic-byte check and is returned as-is. A .docx/.xlsx is
+// extracted to text and wrapped into a PDF (P0 fix 2026-06-20) so it rides the
+// same inline-PDF + pdf-parse ingestion path. Anything else → null (honest
+// fallback; the caller flags it, never fabricates).
+async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null> {
+  if (raw.subarray(0, 4).toString("latin1") === "%PDF") return raw;
+  if (nonPdfKind(name)) {
+    const text = await extractNonPdfText(name, raw);
+    if (text) return textToPdfBuffer(text, name);
+  }
+  return null;
+}
+
+async function downloadPdf(url: string, name = ""): Promise<Buffer | null> {
   try {
     const u = url.includes("api_key=") ? url : `${url}${url.includes("?") ? "&" : "?"}api_key=${SAM_API_KEY}`;
     const res = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
-    // magic-byte check — manifest said .pdf, verify before inlining
-    return buf.subarray(0, 4).toString("latin1") === "%PDF" ? buf : null;
+    // %PDF magic byte → native PDF; else route .docx/.xlsx through extraction.
+    return await normalizeToPdf(name, buf);
   } catch {
     return null;
   }
@@ -507,9 +622,9 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
-    const buf = await downloadPdf(e.url);
+    const buf = await downloadPdf(e.url, e.name);
     if (!buf) {
-      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: "download failed or not a PDF" });
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "download failed or not a PDF" });
       continue;
     }
     fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
@@ -545,7 +660,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; PDF + .docx/.xlsx inlined, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
@@ -620,9 +735,12 @@ export async function assembleUploadedDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
-    const buf = bufById.get(e.resourceId);
-    if (!buf || buf.subarray(0, 4).toString("latin1") !== "%PDF") {
-      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: "not a valid PDF (magic-byte check)" });
+    const raw = bufById.get(e.resourceId);
+    // P0 fix (2026-06-20): a native PDF passes the %PDF check; a .docx/.xlsx is
+    // extracted to text + wrapped into a PDF so it ingests like the SAM arm.
+    const buf = raw ? await normalizeToPdf(e.name, raw) : null;
+    if (!buf) {
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "not a valid PDF (magic-byte check)" });
       continue;
     }
     counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf) });
@@ -655,7 +773,7 @@ export async function assembleUploadedDocumentSet(
     form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; non-PDF members never inlined)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp; PDF + .docx/.xlsx inlined, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
