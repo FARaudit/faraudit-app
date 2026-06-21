@@ -384,6 +384,150 @@ details[open]>summary .chev{transform:rotate(180deg)}
 .samp-h .t span{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;color:var(--mute)}
 .samp .ct-vs{margin-top:0}
 
+/* ════ FRONT DOOR — Option D · Live (solicitation-first) ════ */
+.ra-kick{display:flex;align-items:center;gap:10px;width:100%;max-width:1080px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-on);margin:0 0 13px}
+.ra-kick .kick-dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18);animation:kickpulse 1.9s ease-out infinite;flex:none}
+.ra-kick .kick-rule{flex:1;height:1px;background:linear-gradient(90deg,var(--accent-hair),transparent)}
+@keyframes kickpulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.4)}100%{box-shadow:0 0 0 7px rgba(16,185,129,0)}}
+@media (prefers-reduced-motion:reduce){.ra-kick .kick-dot{animation:none}}
+:root,[data-theme="light"]{--warn-soft:#fffbeb;--warn-hair:#fde68a}
+[data-theme="dark"]{--warn-soft:rgba(245,158,11,.10);--warn-hair:rgba(245,158,11,.28)}
+.solz{width:100%;max-width:1080px}
+.fd-note{display:flex;align-items:flex-start;gap:9px;margin-top:15px;font-family:"Manrope",sans-serif;font-size:13px;color:var(--mute);line-height:1.55}
+.fd-note svg{width:15px;height:15px;color:var(--accent-on);flex:none;margin-top:1px}
+.fd-note b{color:var(--ink-2);font-weight:600}
+.fdstate{display:none}
+.fd[data-state="empty"] .fd-empty,
+.fd[data-state="fetching"] .fd-fetching,
+.fd[data-state="complete"] .fd-complete,
+.fd[data-state="partial"] .fd-partial,
+.fd[data-state="error"] .fd-error{display:block}
+.fd-hero{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:22px}
+.fd-eyebrow{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-on)}
+.fd-eyebrow svg{width:14px;height:14px}
+.fd-h2{font-size:18px;font-weight:800;letter-spacing:-.015em;margin:13px 0 4px;color:var(--ink)}
+.fd-lead{font-size:13px;color:var(--mute);margin:0 0 16px;line-height:1.5}
+.sm{display:flex;align-items:center;gap:11px}
+.sm-field{flex:1;display:flex;align-items:center;gap:13px;height:64px;padding:0 20px;border-radius:15px;background:var(--card);border:1.5px solid var(--line);box-shadow:0 1px 2px rgba(15,23,42,.05),0 16px 34px -22px rgba(15,23,42,.22);transition:border-color .15s,box-shadow .15s}
+.sm-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.sm-field>svg{width:19px;height:19px;color:var(--mute-2);flex:none}
+.sm-field input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:var(--ink);font-size:15px;font-weight:600}
+.sm-field input::placeholder{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;color:var(--mute-2)}
+.sm-go{height:64px;padding:0 24px;border-radius:15px;border:0;background:linear-gradient(180deg,#4a97e3,var(--accent-deep));color:#fff;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:9px;flex:none;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 8px 18px -9px rgba(55,138,221,.5);transition:transform .14s,box-shadow .14s}
+.sm-go svg{width:16px;height:16px}
+.sm-go:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 12px 24px -9px rgba(55,138,221,.58)}
+.sm-go:disabled{opacity:.65;cursor:default;transform:none}
+.fd-fmt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
+.fd-fmt .lab{font-size:11.5px;color:var(--mute-2)}
+.fd-fmt .fmt{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;color:var(--chip-text);background:var(--chip-bg);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.fd-moat{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:13px 15px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent-hair)}
+.fd-moat svg{width:16px;height:16px;color:var(--accent-on);flex:none;margin-top:1px}
+.fd-moat p{margin:0;font-size:12.5px;color:var(--accent-on);line-height:1.5}
+.fd-moat b{font-weight:800}
+/* result card */
+.fdres{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.fdr-head{display:flex;align-items:flex-start;gap:14px;padding:20px 22px 16px;border-bottom:1px solid var(--line-2)}
+.fdr-badge{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;flex:none}
+.fdr-badge svg{width:23px;height:23px}
+.fd-complete .fdr-badge{background:var(--ok-soft);border:1px solid var(--ok-hair);color:var(--ok-text)}
+.fd-partial .fdr-badge{background:var(--warn-soft);border:1px solid var(--warn-hair);color:var(--warn-text)}
+.fdr-h-tx{flex:1;min-width:0}
+.fdr-count{font-size:20px;font-weight:800;letter-spacing:-.01em;color:var(--ink);line-height:1.15}
+.fdr-count b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.fd-complete .fdr-count b{color:var(--ok-text)}
+.fd-partial .fdr-count b{color:var(--warn-text)}
+.fdr-sub{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);margin-top:6px;line-height:1.6}
+.fdr-sub .sol{color:var(--ink-2);font-weight:600}
+.fdr-sub b{color:var(--ink-2)}
+.fdr-src{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);background:var(--card-soft);border:1px solid var(--line);border-radius:7px;padding:5px 9px;white-space:nowrap;flex:none}
+.fdr-src svg{width:12px;height:12px;color:var(--ok-text)}
+.fd-fetch{display:flex;align-items:center;gap:15px;padding:24px 22px}
+.fd-spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:fdspin .8s linear infinite;flex:none}
+.fd-spin.sm-spin{width:18px;height:18px;border-width:2.5px;border-color:var(--ok-hair);border-top-color:var(--ok-text)}
+@keyframes fdspin{to{transform:rotate(360deg)}}
+.fd-fetch-t{font-family:"Manrope";font-weight:800;font-size:14.5px;color:var(--ink);letter-spacing:-.01em}
+.fd-fetch-s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--mute);margin-top:3px}
+.fd-steps{padding:2px 22px 20px;display:flex;flex-direction:column;gap:1px}
+.fd-step{display:flex;align-items:center;gap:11px;padding:8px 0;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute-2)}
+.fd-step .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center}
+.fd-step.done{color:var(--ink-2)}
+.fd-step.done .dot{border-color:var(--ok-hair);background:var(--ok-soft);color:var(--ok-text)}
+.fd-step.done .dot svg{width:9px;height:9px}
+.fd-step.active{color:var(--ink)}
+.fd-step.active .dot{border-color:var(--accent);border-top-color:transparent;animation:fdspin .8s linear infinite}
+.fd-autorun{display:flex;align-items:center;gap:12px;margin:16px 22px 6px;padding:13px 15px;border-radius:11px;background:var(--ok-soft);border:1px solid var(--ok-hair)}
+.fd-autorun-tx{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.55;color:var(--ink-2)}
+.fd-autorun-tx b{color:var(--ok-text);font-weight:700}
+.fd-man{margin:6px 14px 14px}
+.fd-man>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border-radius:8px}
+.fd-man>summary::-webkit-details-marker{display:none}
+.fd-man>summary:hover{background:var(--card-soft)}
+.fd-man .chev{width:13px;height:13px;transition:transform .18s;margin-left:auto}
+.fd-man[open] .chev{transform:rotate(180deg)}
+.fd-man-scroll{max-height:230px;overflow-y:auto;padding:0 4px}
+.fd-doc{display:grid;grid-template-columns:24px 1fr auto auto;gap:12px;align-items:center;padding:9px 8px;border-top:1px solid var(--line-3)}
+.fd-doc:first-child{border-top:0}
+.fd-doc-st{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
+.fd-doc-st svg{width:12px;height:12px}
+.fd-doc-st.ok{background:var(--ok-soft);border:1px solid var(--ok-hair);color:var(--ok-text)}
+.fd-doc-st.miss{background:var(--miss-soft);border:1px solid var(--miss-hair);color:var(--miss-text)}
+.fd-doc-nm{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fd-doc-nm .fn{display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);font-weight:500;margin-top:1px}
+.fd-secs{display:flex;gap:4px}
+.fd-stag{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.fd-stag.c{color:var(--accent-on);background:var(--accent-soft);border:1px solid var(--accent-hair)}
+.fd-stag.l{color:var(--ink-2);background:var(--chip-bg);border:1px solid var(--line)}
+.fd-stag.m{color:var(--warn-text);background:var(--warn-soft);border:1px solid var(--warn-hair)}
+.fd-doc-sz{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);white-space:nowrap}
+.fd-man-more{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);padding:11px 8px;border-top:1px solid var(--line-3);line-height:1.5}
+.fd-man-more b{color:var(--ink-2)}
+.fd-flag{display:flex;gap:11px;margin:16px 22px 8px;padding:13px 15px;border-radius:11px;background:var(--warn-soft);border:1px solid var(--warn-hair)}
+.fd-flag>svg{width:17px;height:17px;color:var(--warn-text);flex:none;margin-top:1px}
+.fd-flag-tx{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.6;color:var(--ink-2)}
+.fd-flag-tx b{color:var(--warn-text);font-weight:700}
+.fd-miss{margin:4px 14px}
+.fd-miss-h{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2);padding:8px}
+.fd-doc-reason{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:var(--miss-text);background:var(--miss-soft);border:1px solid var(--miss-hair);border-radius:6px;padding:3px 8px;white-space:nowrap}
+.fdr-foot{display:flex;align-items:center;gap:12px;padding:15px 22px 18px;border-top:1px solid var(--line-2);flex-wrap:wrap}
+.fdr-info{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);line-height:1.5}
+.fdr-info b{color:var(--ink-2);font-weight:700}
+.fdr-foot .sp{flex:1}
+.fd-btn{height:42px;padding:0 18px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:800;font-size:12.5px;display:inline-flex;align-items:center;gap:8px}
+.fd-btn svg{width:14px;height:14px}
+.fd-btn:hover{background:var(--accent-deep)}
+.fd-btn-ghost{height:42px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);font-weight:700;font-size:12.5px;display:inline-flex;align-items:center;gap:7px}
+.fd-btn-ghost svg{width:13px;height:13px}
+.fd-btn-ghost:hover{border-color:var(--mute-2)}
+.fd-err{padding:24px}
+.fd-err-head{display:flex;gap:14px}
+.fd-err-badge{width:46px;height:46px;border-radius:12px;background:var(--miss-soft);border:1px solid var(--miss-hair);color:var(--miss-text);display:grid;place-items:center;flex:none}
+.fd-err-badge svg{width:22px;height:22px}
+.fd-err-h{margin:0 0 5px;font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.fd-err-p{margin:0;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute);line-height:1.65}
+.fd-err-p .sol{color:var(--ink-2);font-weight:600}
+.fd-err-acts{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.ra-piee{margin-top:16px;display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);box-shadow:0 1px 2px rgba(15,23,42,.04),0 14px 30px -24px rgba(15,23,42,.18)}
+.ra-piee-ic{width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;color:var(--mute-2);flex:none}
+.ra-piee-ic svg{width:16px;height:16px}
+.ra-piee-tx{flex:1;min-width:0}
+.ra-piee-t{font-size:12.5px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+.ra-piee-soon{font-family:"IBM Plex Mono",monospace;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
+.ra-piee-s{font-family:"Manrope",sans-serif;font-size:12px;color:var(--mute);margin-top:3px;line-height:1.45}
+.ra-piee-btn{flex:none;height:36px;padding:0 15px;border-radius:9px;border:1px solid var(--accent-hair);background:var(--accent-soft);color:var(--accent-on);font-weight:800;font-size:12px}
+.ra-piee-btn:hover{filter:brightness(.97)}
+@media (prefers-reduced-motion:reduce){.fd-spin,.fd-step.active .dot{animation:none}}
+.ev{display:block}
+.lvchip{display:none;align-items:center;gap:10px;margin-top:12px;padding:11px 14px;border-radius:11px;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.4}
+.lvchip.show{display:flex}
+.lvchip.ok{background:var(--ok-soft);border:1px solid var(--ok-hair);color:var(--ok-text)}
+.lvchip.wait{background:var(--card-soft);border:1px solid var(--line);color:var(--mute)}
+.lvchip>svg{width:14px;height:14px;flex:none}
+.lvchip .lk{font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:9.5px;padding:3px 7px;border-radius:5px;flex:none;white-space:nowrap}
+.lvchip.ok .lk{background:var(--ok-hair);color:var(--ok-text)}
+.lvchip .lv-res{flex:1;min-width:0}
+.lvchip .lv-spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:fdspin .7s linear infinite;flex:none}
+.lvchip .lv-res b{color:var(--ink-2);font-weight:700}
+
 /* ── FA-PHASE1: production chrome grafted onto design base (overrides design's simpler chrome via cascade) ── */
 .frame{grid-template-columns:var(--sb-width) 1fr}
 /* topbar (canonical) */
@@ -637,28 +781,92 @@ details[open]>summary .chev{transform:rotate(180deg)}
 
       <div class="scroll">
       <div class="view on" id="view-audit">
+        <div class="ra-kick"><span class="kick-dot"></span>The audit engine<span class="kick-rule"></span></div>
         <h1 class="page-h">Run a New Audit</h1>
-        <p class="page-sub">Upload a solicitation — get a ranked bid / no-bid call with a KO email drafted.</p>
+        <p class="page-sub" id="pageSub">Paste a SAM.gov link or solicitation number. FARaudit pulls the agency’s complete document set itself — <b>so nothing gets missed</b>.</p>
         <div class="ra-cols">
           <div>
             <div class="ra-modes">
-              <button class="ra-mode-btn" data-mode="paste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>Paste link or ID</button>
-              <button class="ra-mode-btn on" data-mode="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload</button>
+              <button class="ra-mode-btn on" data-mode="smart" id="modeSmart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>Paste link or ID</button>
+              <button class="ra-mode-btn" data-mode="upload" id="modeUpload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload</button>
             </div>
-            <div class="uz card" id="uz">
+
+            <!-- ════ SMART (default) — solicitation-first · Option D · Live ════ -->
+            <div class="solz" id="solz">
+              <div class="fd" id="fd" data-state="empty">
+                <!-- EMPTY -->
+                <div class="fdstate fd-empty">
+                  <div class="ev ev-d">
+                    <div class="sm">
+                      <label class="sm-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><input class="sm-input" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a SAM.gov link, solicitation #, or notice ID…" /></label>
+                      <button class="sm-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Fetch documents</button>
+                    </div>
+                    <div class="lvchip" id="lvChip"></div>
+                    <div class="fd-note ev-d-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span>We resolve it live, then fetch every posted document from SAM.gov — nothing to download first.</span></div>
+                  </div>
+                </div>
+                <!-- FETCHING -->
+                <div class="fdstate fd-fetching">
+                  <div class="fdres">
+                    <div class="fd-fetch"><div class="fd-spin"></div><div><div class="fd-fetch-t">Retrieving the official document set from SAM.gov…</div><div class="fd-fetch-s">We wait for the complete package — usually a few seconds.</div></div></div>
+                    <div class="fd-steps">
+                      <div class="fd-step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>Located opportunity on SAM.gov</div>
+                      <div class="fd-step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span>Read the posted attachment list</div>
+                      <div class="fd-step active"><span class="dot"></span>Downloading &amp; ingesting the package…</div>
+                      <div class="fd-step"><span class="dot"></span>Verifying completeness</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- COMPLETE → driven by GET /api/audit/resolve (real §-coverage), then auto-runs submitAudit -->
+                <div class="fdstate fd-complete">
+                  <div class="fdres">
+                    <div class="fdr-head">
+                      <span class="fdr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+                      <div class="fdr-h-tx"><div class="fdr-count">Complete package retrieved</div><div class="fdr-sub" id="fdCompleteSub">All posted documents ingested. <b>§C, §L and §M</b> all present.</div></div>
+                      <span class="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
+                    </div>
+                    <div class="fd-autorun"><div class="fd-spin sm-spin"></div><div class="fd-autorun-tx"><b>Set complete — starting your audit automatically.</b> No action needed.</div></div>
+                    <details class="fd-man"><summary>View all documents<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fd-man-scroll" id="fdCompleteDocs"></div></details>
+                  </div>
+                </div>
+                <!-- PARTIAL → driven by GET /api/audit/resolve (real missing core §); pauses for run-anyway / upload-the-gap -->
+                <div class="fdstate fd-partial">
+                  <div class="fdres">
+                    <div class="fdr-head">
+                      <span class="fdr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+                      <div class="fdr-h-tx"><div class="fdr-count">Package partially retrieved</div><div class="fdr-sub" id="fdPartialSub">Some posted documents couldn’t be retrieved.</div></div>
+                      <span class="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
+                    </div>
+                    <div class="fd-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><div class="fd-flag-tx">Some documents couldn’t be pulled — <b>listed below.</b> Add them for a complete audit, or proceed on what was retrieved. <b>We never run a partial audit silently.</b></div></div>
+                    <div class="fd-miss" id="fdPartialMiss">
+                      <div class="fd-miss-h">Documents not ingested</div>
+                    </div>
+                    <div class="fdr-foot"><div class="fdr-info">Completing the package keeps the audit airtight.</div><div class="sp"></div><button class="fd-btn-ghost" id="addMissing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Add the missing files</button><button class="fd-btn" id="proceedPartial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 3l14 9-14 9z"/></svg>Proceed on what we have</button></div>
+                  </div>
+                </div>
+                <!-- ERROR -->
+                <div class="fdstate fd-error">
+                  <div class="fdres">
+                    <div class="fd-err">
+                      <div class="fd-err-head"><span class="fd-err-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg></span><div><h3 class="fd-err-h">We couldn’t start that audit</h3><p class="fd-err-p" id="fdErrMsg">Something went wrong reaching SAM.gov. Check the number, or upload the files directly.</p></div></div>
+                      <div class="fd-err-acts"><button class="fd-btn" id="raRetry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>Check &amp; retry</button><button class="fd-btn-ghost" id="errUpload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the files instead</button></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ra-piee">
+                <span class="ra-piee-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>
+                <div class="ra-piee-tx"><div class="ra-piee-t">Connect PIEE / eBuy <span class="ra-piee-soon">Not yet live</span></div><div class="ra-piee-s">Direct pull for CAC-walled DLA / eBuy postings. We’re building approved access — join the waitlist.</div></div>
+                <button class="ra-piee-btn" id="pieeBtn">Request access</button>
+              </div>
+            </div>
+            <div class="uz card" id="uz" hidden>
               <div class="uz-head"><span class="lbl">Upload solicitation</span><span class="uz-hint" id="uzHint"></span></div>
               <label class="dz"><input type="file" id="fileInput" hidden multiple accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <span class="dz-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></span>
                 <span class="dz-tx"><span class="t">Drop files or <span class="br">browse</span></span><span class="s">PDF · DOCX · 5 files · 15MB max</span></span>
                 <button class="dz-cta" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add</button>
               </label>
-              <div class="dz-paste">
-                <div class="dzp-row">
-                  <span class="dzp-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><input type="text" placeholder="Paste a SAM.gov link or solicitation number — e.g. FA4600-26-Q-0047" /></span>
-                  <button class="dzp-go" type="button">Fetch</button>
-                </div>
-                <div class="dzp-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>FARaudit pulls the full package straight from SAM.gov — nothing to download first.</div>
-              </div>
               <div class="uz-tease"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z"/></svg><span>FARaudit auto-detects <b>§C</b>, <b>§L</b> and <b>§M</b> on upload — and flags what’s missing before you bid.</span></div>
               <div class="uz-files">
                 <div class="cov"><div class="cov-h"><span class="k">Section coverage</span><span class="pct" id="covPct"></span></div><div class="cov-grid" id="covGrid"></div><div class="cov-note" id="covNote"></div></div>
@@ -798,19 +1006,125 @@ function submitAudit(opts){
     .catch(function(err){__submitting=false;setRunning(btn,false);onErr('Network error — '+(err&&err.message?err.message:String(err))+'. Nothing was charged.');});
 }
 
-/* ── mode tabs (paste / upload) ── */
-(function(){var modes=document.querySelector('.ra-modes'),uz=$('uz');if(!modes||!uz)return;
-  modes.addEventListener('click',function(e){var b=e.target.closest('.ra-mode-btn');if(!b)return;[].forEach.call(this.children,function(c){c.classList.toggle('on',c===b);});uz.classList.toggle('paste',b.dataset.mode==='paste');});})();
-
-/* ── smart-detect (paste a SAM URL or Notice ID) ── */
+/* ── mode tabs (smart / upload) + state machine for the front door ──
+   smart (default): the live-resolving command bar (#solz / #fd). upload: the file zone (#uz).
+   Subtitle swaps SUB_SMART/SUB_UPLOAD. fd[data-state] drives empty/fetching/complete/partial/error.
+   complete/partial are now driven by REAL data from GET /api/audit/resolve (resolves the
+   ref → SAM manifest → §-coverage BEFORE enqueue). No fabricated coverage — every field
+   shown comes from SAM. On complete we auto-run submitAudit; on partial we pause for the
+   user; on error we show the real reason. */
+var __fd=$('fd');
+function setState(s){if(__fd)__fd.dataset.state=s||'empty';}
 (function(){
-  var URL_RE=/^https?:\/\/[^\s]+/i,SAMOPP=/\/opp\/([A-Za-z0-9][A-Za-z0-9-]*)/i,ID_RE=/^[A-Za-z0-9][A-Za-z0-9-]{6,}$/;
-  function detect(raw){var v=(raw||'').trim();if(!v)return{kind:'empty'};if(URL_RE.test(v)){var m=v.match(SAMOPP);return (m&&m[1])?{kind:'id',noticeId:m[1]}:{kind:'bad'};}if(ID_RE.test(v))return{kind:'id',noticeId:v};return{kind:'bad'};}
-  var field=document.querySelector('.dz-paste .dzp-field input'),go=document.querySelector('.dz-paste .dzp-go'),note=document.querySelector('.dz-paste .dzp-note');
+  var modeSmart=$('modeSmart'),modeUpload=$('modeUpload'),solz=$('solz'),uz=$('uz'),pageSub=$('pageSub');
+  var SUB_SMART='Paste a SAM.gov link or solicitation number. FARaudit pulls the agency’s complete document set itself — <b>so nothing gets missed</b>.';
+  var SUB_UPLOAD='Already have the documents? Drop the solicitation files and we’ll check section coverage — <b>then run the full audit</b>.';
+  function showSmart(){if(modeSmart)modeSmart.classList.add('on');if(modeUpload)modeUpload.classList.remove('on');if(solz)solz.hidden=false;if(uz)uz.hidden=true;if(pageSub)pageSub.innerHTML=SUB_SMART;}
+  function showUpload(){if(modeUpload)modeUpload.classList.add('on');if(modeSmart)modeSmart.classList.remove('on');if(solz)solz.hidden=true;if(uz)uz.hidden=false;if(pageSub)pageSub.innerHTML=SUB_UPLOAD;}
+  if(modeSmart)modeSmart.addEventListener('click',function(e){e.preventDefault();showSmart();});
+  if(modeUpload)modeUpload.addEventListener('click',function(e){e.preventDefault();showUpload();});
+  // error/retry recovery actions (real)
+  var retry=$('raRetry');if(retry)retry.addEventListener('click',function(){setState('empty');var i=document.querySelector('.ev-d .sm-input');if(i)i.value='';var lv=$('lvChip');if(lv){lv.className='lvchip';lv.innerHTML='';}});
+  ['errUpload','addMissing'].forEach(function(id){var b=$(id);if(b)b.addEventListener('click',function(){setState('empty');showUpload();});});
+  // PIEE / eBuy waitlist (quiet secondary)
+  var piee=$('pieeBtn');if(piee)piee.addEventListener('click',function(){alert('Joins the PIEE / eBuy early-access waitlist. We’ll email you when approved access is live.');});
+})();
+
+/* ── live-resolve chip — CLIENT-SIDE FORMAT DETECTION ONLY (no fabricated coverage) ──
+   Honesty: we only tell the user whether what they typed LOOKS like a SAM link / sol# / notice ID.
+   We do NOT claim "resolves to <sol> · <agency> · N documents" — that needs a real synchronous
+   resolve+manifest endpoint that does not exist yet. */
+(function(){
+  var lvInput=document.querySelector('.ev-d .sm-input'),lvChip=$('lvChip'),lvTimer;
+  if(!lvInput||!lvChip)return;
+  var URL_RE=/(sam\.gov|https?:\/\/)/i,ID_RE=/^[A-Za-z0-9][A-Za-z0-9-]{5,}$/;
+  function resolved(v){
+    var isLink=URL_RE.test(v),looksId=ID_RE.test(v.replace(/\s+/g,''));
+    if(isLink||looksId){
+      lvChip.className='lvchip ok show';
+      lvChip.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg><span class="lk">'+(isLink?'SAM.gov link':'Solicitation #')+'</span><span class="lv-res">Recognized — press <b>Fetch documents</b> and we’ll pull the full package from SAM.gov.</span>';
+    }else{
+      lvChip.className='lvchip wait show';
+      lvChip.innerHTML='<span class="lv-res">Keep typing — paste a SAM.gov link or solicitation number.</span>';
+    }
+  }
+  function update(){var v=(lvInput.value||'').trim();clearTimeout(lvTimer);
+    if(!v){lvChip.className='lvchip';lvChip.innerHTML='';return;}
+    lvChip.className='lvchip wait show';lvChip.innerHTML='<span class="lv-spin"></span><span class="lv-res">Checking format…</span>';
+    lvTimer=setTimeout(function(){resolved(v);},450);}
+  lvInput.addEventListener('input',update);
+})();
+
+/* ── smart-detect Fetch (paste a SAM URL, sol#, or Notice ID) ──
+   Two real backend hops: (1) GET /api/audit/resolve?ref=<input> resolves the ref →
+   SAM manifest → §-coverage BEFORE enqueue, then (2) submitAudit POSTs the canonical
+   notice id to /api/audit. complete auto-runs; partial pauses; error shows the reason.
+   Every value rendered (sol#, agency, doc list, missing sections) is from SAM — no
+   fabrication. */
+var __fdPartialNoticeId=null;
+(function(){
+  var field=document.querySelector('.ev-d .sm-field input'),go=document.querySelector('.ev-d .sm-go'),errMsg=$('fdErrMsg');
   if(!field||!go)return;
-  function run(){var d=detect(field.value);if(d.kind!=='id'){if(note){note.style.color='var(--miss-text)';note.textContent='Paste a SAM.gov solicitation URL or a Notice ID.';}return;}submitAudit({noticeId:d.noticeId,btn:go,onErr:function(m){if(note){note.style.color='var(--miss-text)';note.textContent=m;}}});}
+  // map resolve { ok:false, reason } → honest, human copy.
+  var REASONS={
+    missing_ref:'Paste a SAM.gov link, solicitation number, or notice ID first.',
+    unrecognized_sam_url:'That SAM.gov link doesn’t point to a single opportunity. Paste the opportunity URL (sam.gov/opp/…/view), the solicitation number, or the notice ID.',
+    not_found:'We couldn’t find that solicitation on SAM.gov. Double-check the number, or upload the files directly.',
+    no_documents:'SAM.gov has no posted documents for that opportunity yet. Upload the files directly to run the audit.',
+    sam_unavailable:'SAM.gov didn’t respond. Try again in a moment, or upload the files directly.',
+    sam_not_configured:'Document fetch is temporarily unavailable. Upload the files directly to run the audit.',
+    unauthorized:'Please sign in again to run an audit.'
+  };
+  function showError(msg){if(errMsg)errMsg.textContent=msg;setState('error');}
+  // drive the COMPLETE state from real resolve data, then auto-run the audit.
+  function driveComplete(data){
+    var sub=$('fdCompleteSub'),docsBox=$('fdCompleteDocs');
+    var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' ingested. <b>§C, §L and §M</b> all present.';
+    if(docsBox)docsBox.innerHTML=(data.docs||[]).map(function(d){
+      var roles=(d.sectionRoles&&d.sectionRoles.length)?d.sectionRoles.map(function(r){return '<span class="sb2 sb-sec">§'+escapeHtml(r)+'</span>';}).join(''):'';
+      return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(d.name)+'</span><span class="fsub">'+roles+(d.sizeBytes?('<span class="fsize">'+fmtSize(d.sizeBytes)+'</span>'):'')+'</span></span></div>';
+    }).join('');
+    setState('complete');
+    // set complete → start the audit automatically (the COMPLETE card says so).
+    submitAudit({noticeId:data.noticeId,btn:go,onErr:function(m){showError(m);}});
+  }
+  // drive the PARTIAL state from the REAL missing core sections.
+  function drivePartial(data){
+    var sub=$('fdPartialSub'),missBox=$('fdPartialMiss');
+    var LBL={MAIN:'Main solicitation (SF-1449 / 1442)',C:'§C — Statement of Work / PWS',L:'§L — Instructions to offerors',M:'§M — Evaluation factors'};
+    var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
+    var missNames=(data.missingCore||[]).map(function(k){return (k==='MAIN'?'the main solicitation':('§'+k));});
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' retrieved, but '+missNames.join(', ')+' '+(missNames.length===1?'is':'are')+' not in the posted package.';
+    if(missBox)missBox.innerHTML='<div class="fd-miss-h">Core sections not in the posted package</div>'+
+      (data.missingCore||[]).map(function(k){
+        return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(LBL[k]||k)+'</span><span class="fsub"><span class="sb2 sb-sec">'+(k==='MAIN'?'MAIN':('§'+escapeHtml(k)))+'</span><span class="fsize">not in posted package</span></span></span></div>';
+      }).join('');
+    // stash the canonical notice id so "Proceed on what we have" enqueues the right thing.
+    __fdPartialNoticeId=data.noticeId;
+    setState('partial');
+  }
+  function run(){
+    var v=(field.value||'').trim();
+    if(!v){var lv=$('lvChip');if(lv){lv.className='lvchip wait show';lv.innerHTML='<span class="lv-res">Paste a SAM.gov link, solicitation #, or notice ID.</span>';}return;}
+    setState('fetching');
+    fetch('/api/audit/resolve?ref='+encodeURIComponent(v),{credentials:'include',headers:{accept:'application/json'}})
+      .then(function(r){return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,status:r.status,data:d};});})
+      .then(function(out){
+        var d=out.data||{};
+        if(!d.ok){showError(REASONS[d.reason]||'We couldn’t resolve that on SAM.gov. Check the number, or upload the files directly.');return;}
+        if(d.complete){driveComplete(d);}else{drivePartial(d);}
+      })
+      .catch(function(err){showError('Network error reaching SAM.gov — '+(err&&err.message?err.message:String(err))+'. Try again, or upload the files directly.');});
+  }
   go.addEventListener('click',run);
-  field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});})();
+  field.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run();}});
+  // PARTIAL → "Proceed on what we have": enqueue the resolved package as-is.
+  var proceed=$('proceedPartial');
+  if(proceed)proceed.addEventListener('click',function(){
+    if(!__fdPartialNoticeId)return;
+    submitAudit({noticeId:__fdPartialNoticeId,btn:proceed,onErr:function(m){showError(m);}});
+  });})();
 
 /* ── upload zone: real files + coverage strip (filename detection) ── */
 (function(){
