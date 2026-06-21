@@ -51,6 +51,31 @@ t("issue-date-only pool → null (never elects an issue date)", parseDocDeadline
   { label: "Solicitation issue date", date: "05/29/2026" },
 ]), null);
 
+console.log("\n── FA-deadline-SAM-authoritative · 'superseded' DEAD dates never win ──");
+// N4008526R0065: a CANCELLED "(superseded by Amendment ...)" date matched the
+// amendment regex and — as the lone parseable survivor (others had un-spaced
+// "2:00pm EST" that new Date() rejects) — closed a live (July 9) solicitation.
+// The dead-date exclusion must drop ALL the "superseded"/"Prior proposal"
+// entries so the live offer-due (July 9) wins → OPEN.
+t("N4008526R0065 → live offer-due wins (superseded dates dropped)", parseDocDeadline([
+  { label: "Offer due", date: "22 Jan 2026" },
+  { label: "Proposal submission due (Offer due)", date: "July 9, 2026 2:00 PM EST" },
+  { label: "Prior proposal due date (superseded by Amendment 0010)", date: "27 May 2026 2:00pm EST" },
+  { label: "Prior proposal due date (superseded by Amendment 0005)", date: "17 February 2026 2:00 PM local time" },
+  { label: "Site visit", date: "Tuesday, 10 February 2026 at 9:00am" },
+])?.toISOString(), new Date("July 9, 2026 2:00 PM EST").toISOString()); // July 9, the live offer-due (not 17 Feb)
+t("N4008526R0065 → OPEN (was false-CLOSED on the 17-Feb dead date)", isOpen(parseDocDeadline([
+  { label: "Proposal submission due (Offer due)", date: "July 9, 2026 2:00 PM EST" },
+  { label: "Prior proposal due date (superseded by Amendment 0005)", date: "17 February 2026 2:00 PM local time" },
+])), true);
+// Guard: a LIVE amendment that legitimately moved the deadline EARLIER must
+// still be honored (1232SA Jun 22 → Jun 16) — the dead-date exclusion must NOT
+// over-reach onto live "Amendment ... updated" labels.
+t("1232SA → CLOSED still honored (live amendment moved earlier)", isOpen(parseDocDeadline([
+  { label: "Offer due (Amendment 0001 updated deadline)", date: "1:00 p.m. Eastern Time on June 16, 2026" },
+  { label: "Offer due", date: "2026-06-22T12:01:00-04:00" },
+])), false);
+
 console.log("\n── RC1 · score cap keys off a genuine gate, not category text ──");
 const curable = (id: string): DecisionGate => ({ gate_id: id, gate_label: id, status: "OPEN", cure_possible_in_window: true, verification_action: "x" });
 const uncurable = (id: string): DecisionGate => ({ gate_id: id, gate_label: id, status: "CLOSED", cure_possible_in_window: false, verification_action: "x" });

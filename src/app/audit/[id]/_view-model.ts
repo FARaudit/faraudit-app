@@ -492,6 +492,13 @@ const DEADLINE_EXCLUDE_RE = /site\s*visit|walk\W?through|pre[\s-]?(proposal|bid|
 const DEADLINE_SUBMISSION_RE = /offer|proposal|quote|\bbid\b|response|receipt|submi|clos(e|ing)|due\s+date/i;
 const DEADLINE_BLOCK8_RE = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
 const DEADLINE_AMEND_UPDATED_RE = /amendment|amended|revised|updated|supersed/i;
+// FA-deadline-SAM-authoritative (2026-06-20 P0): a label like
+// "Prior proposal due date (superseded by Amendment 0005)" describes a DEAD,
+// CANCELLED date — yet it matches DEADLINE_AMEND_UPDATED_RE on "superseded".
+// Treating it as the controlling "amended" date narrowed the pool to a stale
+// 17-Feb date and reported a live (Aug-27) solicitation CLOSED. These labels
+// must NEVER be allowed to drive open/closed or the masthead deadline.
+const DEADLINE_DEAD_DATE_RE = /superseded|prior\s+proposal|previous|cancell?ed|replaced\s+by/i;
 // RC4 (2026-06-19) — deadline-string normalizer. Byte-identical to the copy in
 // src/lib/audit-engine.ts (normalizeDeadlineString). `new Date()` returns
 // Invalid Date on the real SAM/SF-1449/SF-1442 formats (military "1700 CT";
@@ -567,7 +574,12 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
     .map((e) => ({ ...e, d: tryParse(e.date) }))
     .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
   if (valid.length === 0) return null;
-  const eligible = valid.filter((e) => !DEADLINE_EXCLUDE_RE.test(e.label));
+  // FA-deadline-SAM-authoritative: drop DEAD dates (superseded/prior/cancelled)
+  // from the candidate pool entirely — they are never the operative deadline and
+  // (parsing as the lone survivor) were closing live solicitations.
+  const eligible = valid.filter(
+    (e) => !DEADLINE_EXCLUDE_RE.test(e.label) && !DEADLINE_DEAD_DATE_RE.test(e.label)
+  );
   const submission = eligible.filter((e) => DEADLINE_SUBMISSION_RE.test(e.label) || DEADLINE_SUBMISSION_RE.test(e.date));
   const pool = submission.length > 0 ? submission : eligible;
   // Reverts the FA-E2E Fix-A regression (2031 PoP-end bug): the `valid` fallback
@@ -581,6 +593,10 @@ function parseSourceOfferDue(deadlines: unknown): Date | null {
   // Block-8-first selection would latest() the superseded original — 1232SA would
   // wrongly stay Jun 22 instead of the amended Jun 16). Narrow to amendment-updated
   // entries when both exist; guard `< pool.length` leaves no-amendment cases alone.
+  // FA-deadline-SAM-authoritative: DEAD dates (superseded/prior/cancelled) are
+  // already excluded from `pool` above, so the remaining amendment-updated
+  // entries are all LIVE. (We deliberately do NOT require amended >= base: a
+  // valid amendment can move a deadline EARLIER, e.g. 1232SA Jun 22 → Jun 16.)
   const amended = pool.filter((e) => DEADLINE_AMEND_UPDATED_RE.test(e.label));
   const controllingPool = amended.length > 0 && amended.length < pool.length ? amended : pool;
   // RC4(d) — SF-1449/1442 "Offer due"/"Block 8" is the controlling offer-due,
@@ -2537,26 +2553,27 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // lines 1194/1209). Renderer drops each .kd-item when its has_* is false;
   // .urgent + award_quarter computed off one fixed `now` for determinism.
   const now = new Date();
-  // FA-E2E Fix 3 (2026-06-18): the CONTROLLING response deadline is the
-  // SOURCE-extracted offer-due date when available; SAM's audit.response_deadline
-  // is only the fallback. SAM metadata is frequently stale/wrong and was
-  // overriding the document, producing self-contradicting reports ("closed" AND
-  // "submit by <future SAM date>"). open/closed is recomputed from whichever
-  // date controls. When the source carries no offer-due date we keep the SAM
-  // value (a missing source date must not erase a real SAM deadline).
+  // FA-deadline-SAM-authoritative (2026-06-20 P0) — FACTS-vs-analysis law:
+  // the deadline is a SAM FACT (cross-referenced by the printed sol #), just
+  // like agency / NAICS / set-aside. SAM's audit.response_deadline is the
+  // AUTHORITATIVE controlling deadline AND the open/closed determinant. The
+  // doc-parsed offer-due date only FILLS when SAM has none (e.g. manual
+  // uploads with no SAM cross-ref).
+  //
+  // This reverses the earlier "FA-E2E Fix 3" priority, which let the doc-parsed
+  // date override SAM. That mis-parsed a CANCELLED "superseded by Amendment"
+  // date (17 Feb) and reported a live solicitation (SAM Aug-27) CLOSED — a
+  // customer-fatal false negative on a winnable opportunity. SAM is correct
+  // here; a doc parse can never be allowed to close a sol SAM says is open.
   const samResponseDeadline = parseDate(audit.response_deadline);
   const sourceOfferDue = parseSourceOfferDue(compJson.deadlines);
-  const responseDeadline = sourceOfferDue ?? samResponseDeadline;
+  const responseDeadline = samResponseDeadline ?? sourceOfferDue;
   const responseDays = responseDeadline ? daysBetween(now, responseDeadline) : null;
-  // FA-107 + FA-E2E re-verify Fix A (2026-06-18): solicitation is closed when
-  // the CONTROLLING offer-due deadline is in the past. When the SOURCE carries
-  // an offer-due date, it governs open/closed. When it does NOT (parse returned
-  // null), a BARE stale SAM date must not be allowed to close an OPEN sol —
-  // only let SAM close it when SAM has no structured deadlines[] to contradict
-  // it. False-open is the safe failure mode.
-  const is_expired: boolean = sourceOfferDue != null
-    ? daysBetween(now, sourceOfferDue) < 0
-    : (samResponseDeadline != null && daysBetween(now, samResponseDeadline) < 0 && !Array.isArray(compJson.deadlines));
+  // open/closed derives from the SAME controlling deadline that drives the
+  // masthead, the §03 timeline, and the §L operative deadline — one date, in
+  // lockstep across all three. False-open is the safe failure mode.
+  const is_expired: boolean =
+    responseDeadline != null && daysBetween(now, responseDeadline) < 0;
   // (FA-108 score_locked is declared earlier near verdictMode — needs to be in
   // scope by the time `score` is computed.)
   const qaDeadlineDate = parseDate(audit.qa_deadline) ?? parseDate(compJson.qa_deadline);

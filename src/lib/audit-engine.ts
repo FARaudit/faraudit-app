@@ -2102,11 +2102,18 @@ export function parseDocDeadline(deadlines: unknown): Date | null {
   const block8Re = /block\s*8|offers?\s+due|sf[\s-]?1449|sf[\s-]?1442/i;
   // RC4(c) — amendment-updated controlling deadline markers.
   const amendUpdatedRe = /amendment|amended|revised|updated|supersed/i;
+  // FA-deadline-SAM-authoritative (2026-06-20 P0): a label like "Prior proposal
+  // due date (superseded by Amendment 0005)" is a DEAD, CANCELLED date — yet it
+  // matches amendUpdatedRe on "superseded". Left in, it polluted the "amended"
+  // pool and (as the lone parseable survivor) reported a live solicitation
+  // CLOSED. Drop these labels entirely — they are never the operative deadline.
+  // MUST mirror _view-model.ts DEADLINE_DEAD_DATE_RE.
+  const deadDateRe = /superseded|prior\s+proposal|previous|cancell?ed|replaced\s+by/i;
   const valid = entries
     .map((e) => ({ ...e, d: tryParse(e.date) }))
     .filter((e): e is { label: string; date: string; d: Date } => e.d !== null);
   if (valid.length === 0) return null;
-  const eligible = valid.filter((e) => !excludeRe.test(e.label));
+  const eligible = valid.filter((e) => !excludeRe.test(e.label) && !deadDateRe.test(e.label));
   const submission = eligible.filter((e) => submissionRe.test(e.label) || submissionRe.test(e.date));
   const pool = submission.length > 0 ? submission : eligible;
   if (pool.length === 0) return null; // only interim/post-award dates → never close on those
