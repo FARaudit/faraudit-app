@@ -3926,8 +3926,12 @@ export interface AuditV2Result {
   // confidence_notes: footnote panel at report end. data-hide-when-empty.
   confidence_notes: _v2AuditConfidenceNote[];
   // has_incumbent: §02 inc-none render gate. Renderer shows empty-state
-  // when false (does NOT strip §02 — see Part E fix).
+  // when false (does NOT strip §02 — see Part E fix). INVARIANT: true ⟺
+  // incumbent_name != null (both derived from one source extractor).
   has_incumbent: boolean;
+  // Source-extracted incumbent name (CBA/"incumbent contractor"/"performed by"),
+  // or null. View-model uses it as the §02 fallback when the FPDS/DB column is empty.
+  incumbent_name?: string | null;
   // Legacy flat shape kept for the existing render path during transition.
   normalizedClauses: ReturnType<typeof _v2MatrixRollup>;
   normalizedRisks: ReturnType<typeof _v2DedupRisks>;
@@ -5257,10 +5261,44 @@ export async function runAuditV2(
   // badge) MUST be the post-dedup band count.
   const l02_catches = judgment.l02Catches.length > 0 ? judgment.l02Catches.slice(1) : [];
 
-  // has_incumbent: until an incumbent extractor lands, default false so the
-  // §02 .inc-none empty-state renders (Part E fix). Engine writes a real
-  // signal once incumbent extraction is wired.
-  const has_incumbent = false;
+  // Incumbent — root-class fix (2026-06-21). The hardcoded `false` made §02 read
+  // "no incumbent identified" while the risk narrative named a specific incumbent
+  // (e.g. Titan Facility Services, read from the CBA) — a self-contradiction. We
+  // now extract the incumbent from the SAME source the narrative reads. INVARIANT:
+  // has_incumbent ⟺ we confidently parsed a NAME, so the boolean and the name can
+  // never disagree (no name → §02 honestly shows the empty state, no contradiction).
+  const _incNameOk = (s: string): boolean => {
+    const t = s.trim();
+    if (t.length < 3 || t.length > 60) return false;
+    if (/^(the|a|an|this|that|contractor|government|offeror|all|each|any|such|its|their|employees?|parties|agreement|prime|subcontractor|company)\b/i.test(t)) return false;
+    return /[A-Za-z]{3,}/.test(t);
+  };
+  const _cleanName = (s: string): string => {
+    let t = s.replace(/\s+/g, " ").trim();
+    // Cut at the first clause-boundary word that signals the company name has
+    // ended (so "ABC Services Inc, currently holds the contract" → "ABC Services
+    // Inc" and "Delta Group under contract N1" → "Delta Group"). Conservative
+    // list — excludes short prepositions that legitimately appear in names.
+    t = t.replace(/\s+(?:currently|under|who|whose|which|holds?|pursuant|since|that|will|shall|has|have|had|is|are|was|were)\b.*$/i, "");
+    return t.replace(/[,.;:]+$/, "").trim();
+  };
+  const _extractIncumbentName = (raw: string): string | null => {
+    if (!raw) return null;
+    const text = raw.slice(0, 600_000);
+    const UNION_RE = /\b(?:Union|Local\s*\d*|LIUNA|SEIU|IBEW|AFGE|IAM|UAW|Teamsters|Laborers'?\s+International|International\s+Union|AFL[- ]?CIO)\b/;
+    // 1) CBA "(by and) between <CONTRACTOR> and <…union…>"
+    const cba = text.match(/(?:by\s+and\s+)?between\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60}?)\s+and\s+(?:the\s+)?([A-Z][A-Za-z0-9.,&'’\- ]{2,80})/);
+    if (cba && UNION_RE.test(cba[2]) && _incNameOk(cba[1])) return _cleanName(cba[1]);
+    // 2) "incumbent (prime )(contractor)(is|,) <NAME>"
+    const inc = text.match(/incumbent(?:\s+(?:prime\s+)?contractor)?(?:\s+is|,)?\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60})/);
+    if (inc && _incNameOk(inc[1])) return _cleanName(inc[1]);
+    // 3) "currently (being) performed by <NAME>"
+    const cur = text.match(/currently\s+(?:being\s+)?performed\s+by\s+([A-Z][A-Za-z0-9.,&'’\- ]{2,60})/);
+    if (cur && _incNameOk(cur[1])) return _cleanName(cur[1]);
+    return null;
+  };
+  const incumbent_name = _extractIncumbentName(doc.rawText);
+  const has_incumbent = incumbent_name != null;
 
   // Fix 12 — §06 deterministic submission preflight (8 fixed items resolved
   // against clauses + offer-due-date + §L requirements).
@@ -5334,6 +5372,7 @@ export async function runAuditV2(
     l02_catches,
     confidence_notes: judgment.confidenceNotes,
     has_incumbent,
+    incumbent_name,
     normalizedClauses: _v2MatrixRollup(facts.clauses),
     normalizedRisks: _v2DedupRisks(judgment.risks),
     submissionChecklist: checklist,

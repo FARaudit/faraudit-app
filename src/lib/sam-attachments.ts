@@ -49,7 +49,14 @@ const FETCH_TIMEOUT_MS = 30000;
 // 15MB byte budget + 550-page budget remain the REAL ceilings (the top-12 of
 // both live sets stay well under both), so this admits the distinct content
 // docs without risking the API payload limits.
-export const MAX_DOCS = 12;
+// FA-INGEST2 (2026-06-21): raised 12 → 18. FA-INGEST1 made docs ride as cheap
+// TEXT blocks (~chars/3.5) instead of base64-PDF vision (~1.5–3k tokens/page),
+// and added a per-call count_tokens hard guard that trims to fit the model
+// context — so the 12-doc cap is now over-conservative (N4008526R0065 read only
+// 12 of 33, dropping the Inventory). 18 admits the long-tail content of large
+// multi-section sets; the token budget below + the per-call guard remain the
+// real ceilings, so this never risks the API payload limit.
+export const MAX_DOCS = 18;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
@@ -70,7 +77,13 @@ export const MAX_TOTAL_PAGES = 550;
 // multi-call structure, and the output. Enforced post-download in tier order
 // (the primary solicitation + §C/§L/§M survive first); overflow is FLAGGED in
 // the same honest ingestion banner, never silent.
-export const MAX_TOTAL_TOKENS = 700_000;
+// FA-INGEST2 (2026-06-21): raised 700k → 850k. With FA-INGEST1 text-first delivery
+// the assembled document text is the dominant (and now far smaller) cost, and the
+// per-call token guard trims deterministically to keep each request under the 1M
+// context — so 850k of document text + system/template/output stays safely under
+// the guard's budget while ingesting more of large packages. The guard, not this
+// constant, is the hard ceiling.
+export const MAX_TOTAL_TOKENS = 850_000;
 // Per-doc cap: a single giant file (e.g. the ELINS inventory .xlsx) must not
 // consume the whole budget and starve the primary solicitation. Any one doc is
 // truncated to at most this many tokens (with an honest "(truncated)" note), so
@@ -240,13 +253,19 @@ function isClauseDoc(name: string): boolean {
 //   Schedule, Wage Determination, CBA, Service-Level Standards, CONFORMED RFP,
 //   Section C ANNEXES. (N4008526R0065: the CBA + SLS were being starved by tiny
 //   GFP/inventory files; FA301626R0018: the SOW + §M Evaluation likewise.)
+// FA-INGEST2 (2026-06-21): the INVENTORY / workload / basis-of-estimate master is
+//   the pricing BASIS for a services/custodial bid (square footage, room counts,
+//   frequencies) — it prices the whole contract. On N4008526R0065 it sat in
+//   SECONDARY (tier 4) tied with the ELIN copies, so the size tie-break dropped it
+//   while keeping smaller duplicate ELINs. Promoted to CORE so it never loses a
+//   slot to a duplicate line-item sheet or a GFP form.
 const CORE_CONTENT =
-  /\bstatement of work\b|\bsow\b|\bpws\b|\bsoo\b|performance work statement|statement of (?:work|need|objectives?)|scope of work|project description|bid description|specsintact|\bsection\s*[clmf]\b|\b[clmf]-\d|management and administration|evaluation factors?|\bevaluation\b|basis of award|instructions? (?:to|conditions).{0,30}offerors?|instruction to offerors|notices? to offerors|special contract requirements?|price (?:schedule|list)|wage determination|\bcba\b|collective bargaining|service[\s-]?level|service level standards?|\bconformed\b|custodial/i;
+  /\bstatement of work\b|\bsow\b|\bpws\b|\bsoo\b|performance work statement|statement of (?:work|need|objectives?)|scope of work|project description|bid description|specsintact|\bsection\s*[clmf]\b|\b[clmf]-\d|management and administration|evaluation factors?|\bevaluation\b|basis of award|instructions? (?:to|conditions).{0,30}offerors?|instruction to offerors|notices? to offerors|special contract requirements?|price (?:schedule|list)|wage determination|\bcba\b|collective bargaining|service[\s-]?level|service level standards?|\bconformed\b|custodial|inventory|workload|basis of estimate|\bboe\b|square\s*foot/i;
 // SECONDARY_CONTENT: real but supporting content — kept above generic
-//   attachments but below the core docs (ELIN/CLIN pricing tables, inventory,
-//   GFP, specs, annexes, appendix lists).
+//   attachments but below the core docs (ELIN/CLIN pricing tables, GFP, specs,
+//   annexes, appendix lists). NOTE: inventory/workload moved to CORE (FA-INGEST2).
 const SECONDARY_CONTENT =
-  /\bclin\b|\belins?\b|inventory|government furnished|\bspec(?:ification)?s?\b|\bannexe?s?\b|appendix|\bschedule\b/i;
+  /\bclin\b|\belins?\b|government furnished|\bspec(?:ification)?s?\b|\bannexe?s?\b|appendix|\bschedule\b/i;
 const CONTENT_DOC = new RegExp(`${CORE_CONTENT.source}|${SECONDARY_CONTENT.source}`, "i");
 function isContentDoc(name: string): boolean {
   return CONTENT_DOC.test(name);

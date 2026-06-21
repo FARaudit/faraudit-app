@@ -16,6 +16,36 @@ import type {
   SubmissionRequirementVM
 } from "./_view-model";
 import { buildV2ViewModelFromShadow, renderV2Surfaces, renderIngestionBannerFromAudit } from "./_v2-render-surfaces";
+import type { ChecklistBucketGroup } from "./_normalizers";
+
+// P0 deadline single-source (2026-06-21): the V2 checklist overlay rebuilds the
+// submission checklist from engine-extracted text, which surfaced a STALE base-doc
+// deadline ("17 February 2026") and a garbage parse ("…Attn: Sarah Bradshaw…")
+// contradicting the masthead's SAM-authoritative deadline by six months. Drop every
+// deadline-bucket item and inject the ONE canonical deadline (the same value the
+// masthead/timeline use) so the checklist can never disagree. Mirrors the V1 fix in
+// _view-model.deriveSubmissionChecklistFiltered.
+function pinChecklistDeadline(
+  groups: ChecklistBucketGroup[],
+  canonicalDeadline: string | null
+): ChecklistBucketGroup[] {
+  const nonDeadline = groups.filter((g) => g.bucket !== "deadline");
+  if (!canonicalDeadline) return nonDeadline;
+  return [
+    {
+      bucket: "deadline",
+      label: "Submission deadline",
+      critical: true,
+      items: [{
+        bucket: "deadline",
+        text: `Submit your complete offer before ${canonicalDeadline} (response deadline per SAM.gov).`,
+        isCritical: true,
+        complete: false,
+      }],
+    },
+    ...nonDeadline,
+  ];
+}
 
 // ─── safe text helpers ──────────────────────────────────────────────────────
 
@@ -2878,6 +2908,12 @@ export function renderAuditReportComplete(
   let html = renderAuditReport(template, vm);
   const v2Input = buildV2ViewModelFromShadow(audit);
   if (v2Input) {
+    // P0 deadline single-source: pin the V2 checklist's deadline to the same
+    // SAM-authoritative value the masthead shows (vm.response_deadline).
+    v2Input.submission_checklist_filtered = pinChecklistDeadline(
+      v2Input.submission_checklist_filtered,
+      vm.has_response_deadline ? vm.response_deadline : null
+    );
     html = renderV2Surfaces(html, v2Input);
     // FA-115 Item 3: V2's matrix rollup derives the trap tally from matrix
     // badges, which can contradict the §04 P0/P1 flag count. Re-pin to the
