@@ -1525,6 +1525,34 @@ interface RunAuditPrefill {
 
 type RunAuditMode = "notice" | "pdf";
 
+// FA-182 (client mirror) — classify a file's solicitation section role(s) from
+// its NAME only, conservatively. Kept IDENTICAL to the canonical
+// classifySectionRoles() in src/lib/sam-attachments.ts; inlined here so the
+// client bundle never pulls the server-only SAM module (it references
+// process.env.SAM_API_KEY at module load). Drives the real §C/§L/§M upload
+// coverage strip — never fabricated coverage. If the canonical function
+// changes, update both (the lib has the regression tests).
+function classifySectionRolesClient(name: string): string[] {
+  const n = name.toLowerCase();
+  const nspace = n.replace(/[_.\-+]+/g, " ");
+  const roles = new Set<string>();
+  const add = (s: string): void => { roles.add(s.toUpperCase()); };
+  const grab = (cluster: string): void => (cluster.match(/[chlm]/gi) ?? []).forEach(add);
+  const C = "[chlm](?![a-z])(?:(?:[\\s_.\\-+,&\\/]|and)+[chlm](?![a-z]))*";
+  let m: RegExpExecArray | null;
+  const secRe = new RegExp(`sections?\\s*[_.\\- ]?\\s*(${C})`, "gi");
+  while ((m = secRe.exec(n)) !== null) grab(m[1]);
+  const lead = new RegExp(`^(${C})[ _.\\-]`, "i").exec(n);
+  if (lead) grab(lead[1]);
+  const desigRe = /(?:^|[\s+_(§-])([chlm])\./gi;
+  while ((m = desigRe.exec(n)) !== null) add(m[1]);
+  if (/statement of work|\bsow\b|\bpws\b|performance work statement|\bsoo\b|scope of work|statement of objectives|project description|bid description/.test(nspace)) add("c");
+  if (/instructions?\b[\s\w]{0,40}\bofferors?\b|notices to offerors/.test(nspace)) add("l");
+  if (/evaluation factors?\b|basis of award\b/.test(nspace)) add("m");
+  if (/special contract requirements?\b/.test(nspace)) add("h");
+  return ["C", "H", "L", "M"].filter((x) => roles.has(x));
+}
+
 // FA-118 — classify an audit fetch failure into one of three customer-facing
 // states instead of surfacing one generic error for everything:
 //   • piee     — the attempted document is PIEE-gated (badge + manual-upload
@@ -1575,6 +1603,19 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   // the UI now.
   const [mode, setMode] = useState<RunAuditMode>("notice");
   const [noticeId, setNoticeId] = useState("");
+  // Front-door (Option D · Live) fetch-state machine. Wired to the REAL audit
+  // lifecycle where one exists:
+  //   empty    — resting command bar (live-resolve chip on input)
+  //   fetching — submit fired; /api/audit enqueues + we poll (real)
+  //   error    — resolve/fetch failed (real — driven by applyAuditError)
+  //   complete — full package retrieved + §C/§L/§M present (NO pre-audit
+  //              coverage endpoint exists yet — render present, NOT auto-driven)
+  //   partial  — a core section missing (same gap — needs a backend resolver)
+  // The honest gap: the current backend is submit→202→poll→navigate-to-report.
+  // There is no synchronous "resolve sol# → fetch SAM manifest → return
+  // coverage BEFORE running the audit" endpoint. So `complete`/`partial` are
+  // NOT fabricated here — they are reachable only once that endpoint ships.
+  const [fetchState, setFetchState] = useState<"empty" | "fetching" | "complete" | "partial" | "error">("empty");
   // FA-170 — group uploads: a solicitation set is multiple files (form + SOW +
   // Section L/M). Was a single File; now a list so the server can ingest all
   // of them form-first instead of silently auditing the first attachment.
@@ -1587,6 +1628,8 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   const [result, setResult] = useState<{ auditId?: string; recommendation?: string; score?: number } | null>(null);
   // FA-116 — progress copy while an async-enqueued audit (202) is polled.
   const [queuedNote, setQueuedNote] = useState<string | null>(null);
+  // PIEE / eBuy waitlist — quiet secondary CTA (intentionally subordinate).
+  const [pieeWaitlisted, setPieeWaitlisted] = useState(false);
   const unmountedRef = useRef(false);
   useEffect(() => () => { unmountedRef.current = true; }, []);
   const noticeInputRef = useRef<HTMLInputElement | null>(null);
@@ -1627,6 +1670,7 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     setError(null);
     setPieeGated(false);
     setResult(null);
+    setFetchState("empty");
     setMode(next);
   }
 
@@ -1635,12 +1679,17 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
   // single, specific error string.
   const applyAuditError = (reason: string, httpStatus?: number) => {
     const cls = classifyAuditError(reason, httpStatus, mode);
+    // Front-door error state: a real resolve/fetch failure drops the command
+    // bar into the `error` view (retry + "upload instead"). PIEE keeps its own
+    // badge surface below and stays on the empty bar.
     if (cls.kind === "piee") {
       setPieeGated(true);
       setError(null);
+      setFetchState("empty");
     } else {
       setPieeGated(false);
       setError(cls.message);
+      if (mode === "notice") setFetchState("error");
     }
   };
 
@@ -1696,6 +1745,10 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       return;
     }
     setSubmitting(true);
+    // Front-door: paste/Fetch enters the `fetching` view (real lifecycle —
+    // /api/audit enqueues, pollUntilDone polls). On success the poll navigates
+    // to the report; on failure applyAuditError flips to the `error` view.
+    if (mode === "notice") setFetchState("fetching");
     try {
       // FA-122 — a SINGLE PDF at/above the Vercel request-body limit (~4.5MB)
       // can't go through multipart /api/audit; upload it straight to Supabase
@@ -1765,24 +1818,33 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
     }
   }
 
-  const submitLabel = submitting
-    ? "Auditing…"
-    : mode === "notice"
-      ? "Run Audit · Notice ID →"
-      : "Run Audit · PDF →";
   const submitDisabled = submitting || (mode === "notice" ? !noticeId : pdfs.length === 0);
+
+  // Live-resolve chip (ev-d). Honest, client-side only: we parse the typed
+  // input into a format confirmation (SAM link vs solicitation #) — we do NOT
+  // claim a document count or §C/§L/§M presence here, because nothing has been
+  // fetched yet. The real resolve happens server-side on Fetch.
+  const smartTrim = noticeId.trim();
+  const looksLikeLink = /sam\.gov|https?:/i.test(smartTrim);
+  const looksLikeId = /^[A-Za-z0-9][A-Za-z0-9-]{5,}$/.test(smartTrim);
+  const resolveKind = looksLikeLink ? "SAM.gov link" : looksLikeId ? "Solicitation" : null;
+
+  // Page subtitle swaps with the mode (SUB_SMART / SUB_UPLOAD).
+  const SUB_SMART = (
+    <>Paste a SAM.gov link or solicitation number. FARaudit pulls the agency&rsquo;s complete document set itself — <b>so nothing gets missed</b>.</>
+  );
+  const SUB_UPLOAD = (
+    <>Already have the documents? Drop the solicitation files and we&rsquo;ll check section coverage — <b>then run the full audit</b>.</>
+  );
 
   return (
     <div className="audit-tab">
-      <form className="audit-center" onSubmit={submit}>
-        <div className="audit-hero-icon">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" strokeWidth="1.2" fill="rgba(201,168,76,.08)"/>
-            <polyline points="9,14 12.5,17.5 19,11" stroke="#C9A84C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-          </svg>
-        </div>
-        <div className="audit-hero-title">Run a New Audit</div>
-        <div className="audit-hero-sub">Upload any federal solicitation PDF. FARaudit runs three sequential intelligence calls — Overview · FAR/DFARS Compliance · Risk Extraction — and delivers a ranked report with a KO clarification email drafted and ready to send.</div>
+      <form className="audit-center ra-frontdoor" onSubmit={submit}>
+        {/* Masthead — kicker · Fraunces headline · supporting line (left-aligned) */}
+        <div className="ra-kick"><span className="kick-dot" aria-hidden="true"></span>The audit engine<span className="kick-rule" aria-hidden="true"></span></div>
+        <h1 className="ra-page-h">Run a New Audit</h1>
+        <p className="ra-page-sub">{mode === "notice" ? SUB_SMART : SUB_UPLOAD}</p>
+
         {prefill?.notice_id && (
           <div style={{
             background: "rgba(201,168,76,0.06)",
@@ -1808,88 +1870,261 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
             </div>
           </div>
         )}
-        <div className="audit-mode-pills" role="tablist" aria-label="Run Audit input mode">
+
+        {/* Mode toggle — Paste link/ID (default) · Upload */}
+        <div className="ra-modes" role="tablist" aria-label="Run Audit input mode">
           <button
             type="button"
             role="tab"
             aria-selected={mode === "notice"}
-            className={`audit-mode-pill ${mode === "notice" ? "active" : ""}`}
+            className={`ra-mode-btn ${mode === "notice" ? "on" : ""}`}
             onClick={() => switchMode("notice")}
           >
-            <span className="amp-glyph" aria-hidden="true">⌖</span>
-            <span>SAM Notice ID</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
+            Paste link or ID
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={mode === "pdf"}
-            className={`audit-mode-pill ${mode === "pdf" ? "active" : ""}`}
+            className={`ra-mode-btn ${mode === "pdf" ? "on" : ""}`}
             onClick={() => switchMode("pdf")}
           >
-            <span className="amp-glyph" aria-hidden="true">▤</span>
-            <span>Upload PDF</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+            Upload
           </button>
         </div>
 
         {mode === "notice" ? (
-          <div className="audit-input">
-            <input
-              ref={noticeInputRef}
-              type="text"
-              value={noticeId}
-              onChange={(e) => {
-                const next = e.target.value.trim();
-                setNoticeId(next);
-                // Drop the prefill banner the moment the user diverges from the
-                // pre-populated notice_id. Sticky clear: once cleared, retyping
-                // the original value does NOT bring the banner back — the only
-                // way back is a fresh row click that re-sets auditPrefill.
-                if (prefill?.notice_id && next !== prefill.notice_id && onPrefillClear) {
-                  onPrefillClear();
-                }
-              }}
-              placeholder="Paste a SAM.gov Notice ID — e.g. FA301626Q0068"
-              autoFocus
-            />
-            <button type="submit" className="adz-btn" style={{ marginTop: 0 }} disabled={submitDisabled}>
-              {submitLabel}
-            </button>
+          <div className="solz">
+            <div className="fd" data-state={fetchState}>
+              {/* EMPTY — resting command bar (ev-d) */}
+              <div className="fdstate fd-empty">
+                <div className="sm">
+                  <label className="sm-field">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
+                    <input
+                      ref={noticeInputRef}
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={noticeId}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setNoticeId(next.trim());
+                        // Drop the prefill banner the moment the user diverges from the
+                        // pre-populated notice_id. Sticky clear (FA-prefill).
+                        if (prefill?.notice_id && next.trim() !== prefill.notice_id && onPrefillClear) {
+                          onPrefillClear();
+                        }
+                      }}
+                      placeholder="Paste a SAM.gov link, solicitation #, or notice ID…"
+                      aria-label="SAM.gov link, solicitation number, or notice ID"
+                    />
+                  </label>
+                  <button type="submit" className="sm-go" disabled={submitDisabled}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    {submitting ? "Fetching…" : "Fetch documents"}
+                  </button>
+                </div>
+                {/* Live-resolve chip — appears as the user types */}
+                {smartTrim && (
+                  resolveKind ? (
+                    <div className="lvchip ok show">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                      <span className="lk">{resolveKind}</span>
+                      <span className="lv-res">Recognized — press <b>Fetch documents</b> to resolve it on SAM.gov and pull the package.</span>
+                    </div>
+                  ) : (
+                    <div className="lvchip wait show">
+                      <span className="lv-res">Keep typing — paste a SAM.gov link or solicitation number</span>
+                    </div>
+                  )
+                )}
+                <div className="fd-note">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                  <span>We resolve it live, then fetch every posted document from SAM.gov — nothing to download first.</span>
+                </div>
+              </div>
+
+              {/* FETCHING — wired to the real submit→enqueue→poll lifecycle */}
+              <div className="fdstate fd-fetching">
+                <div className="fdres">
+                  <div className="fd-fetch">
+                    <div className="fd-spin" aria-hidden="true"></div>
+                    <div>
+                      <div className="fd-fetch-t">Retrieving the official document set from SAM.gov…</div>
+                      <div className="fd-fetch-s">{queuedNote || "We wait for the complete package — usually a few seconds."}</div>
+                    </div>
+                  </div>
+                  <div className="fd-steps">
+                    <div className="fd-step done"><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Located opportunity on SAM.gov</div>
+                    <div className="fd-step done"><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Read the posted attachment list</div>
+                    <div className="fd-step active"><span className="dot"></span>Downloading &amp; ingesting the package…</div>
+                    <div className="fd-step"><span className="dot"></span>Verifying completeness</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* COMPLETE — needs a backend resolve+coverage endpoint (see report).
+                  Renders 1:1; not auto-driven until that endpoint ships. */}
+              <div className="fdstate fd-complete">
+                <div className="fdres">
+                  <div className="fdr-head">
+                    <span className="fdr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+                    <div className="fdr-h-tx">
+                      <div className="fdr-count">Complete package retrieved</div>
+                      <div className="fdr-sub"><b>§C, §L and §M</b> all present — starting your audit.</div>
+                    </div>
+                    <span className="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
+                  </div>
+                  <div className="fd-autorun"><div className="fd-spin sm-spin" aria-hidden="true"></div><div className="fd-autorun-tx"><b>Set complete — starting your audit automatically.</b> No action needed.</div></div>
+                </div>
+              </div>
+
+              {/* PARTIAL — honest missing-section treatment. Needs the real
+                  coverage endpoint to populate the doc list from section_roles
+                  (FA-182); never fabricated coverage. */}
+              <div className="fdstate fd-partial">
+                <div className="fdres">
+                  <div className="fdr-head">
+                    <span className="fdr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+                    <div className="fdr-h-tx">
+                      <div className="fdr-count">Some documents couldn&rsquo;t be retrieved</div>
+                      <div className="fdr-sub">We pulled the package but a core section is missing — <b>listed below.</b></div>
+                    </div>
+                    <span className="fdr-src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>From SAM.gov</span>
+                  </div>
+                  <div className="fd-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><div className="fd-flag-tx">A core section wasn&rsquo;t in the package. Add it for a complete audit, or proceed without it. <b>We never run a partial audit silently.</b></div></div>
+                  <div className="fdr-foot"><div className="fdr-info">Completing the package keeps the audit airtight.</div><div className="sp"></div><button type="button" className="fd-btn-ghost" onClick={() => switchMode("pdf")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Add the missing files</button><button type="submit" className="fd-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M5 3l14 9-14 9z"/></svg>Proceed anyway</button></div>
+                </div>
+              </div>
+
+              {/* ERROR — wired to a real resolve/fetch failure */}
+              <div className="fdstate fd-error">
+                <div className="fdres">
+                  <div className="fd-err">
+                    <div className="fd-err-head">
+                      <span className="fd-err-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg></span>
+                      <div>
+                        <h3 className="fd-err-h">We couldn&rsquo;t fetch that solicitation</h3>
+                        <p className="fd-err-p">{error || <>Nothing matched <span className="sol">{smartTrim || "that input"}</span>. It may be mistyped, withdrawn, or a closed notice SAM no longer serves. Check the number, or upload the files directly.</>}</p>
+                      </div>
+                    </div>
+                    <div className="fd-err-acts">
+                      <button type="button" className="fd-btn" onClick={() => { setError(null); setPieeGated(false); setNoticeId(""); setFetchState("empty"); }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>Check &amp; retry
+                      </button>
+                      <button type="button" className="fd-btn-ghost" onClick={() => switchMode("pdf")}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>Upload the files instead
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FA-118 — PIEE-gated failure: badge + manual-upload instruction. */}
+            {pieeGated && (
+              <div className="audit-error" style={{ marginTop: 16, display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left" }}>
+                <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", padding: "2px 6px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
+                <span>{getPieeInstructions()}</span>
+              </div>
+            )}
+
+            {/* PIEE / eBuy — quiet secondary (intentionally subordinate to Fetch) */}
+            <div className="ra-piee">
+              <span className="ra-piee-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span>
+              <div className="ra-piee-tx">
+                <div className="ra-piee-t">Connect PIEE / eBuy <span className="ra-piee-soon">Not yet live</span></div>
+                <div className="ra-piee-s">Direct pull for CAC-walled DLA / eBuy postings. We&rsquo;re building approved access — join the waitlist.</div>
+              </div>
+              <button type="button" className="ra-piee-btn" onClick={() => setPieeWaitlisted(true)} disabled={pieeWaitlisted}>{pieeWaitlisted ? "Requested ✓" : "Request access"}</button>
+            </div>
           </div>
         ) : (
-          <>
-            <label className="audit-drop-zone" style={{ display: "block" }}>
-              <div className="adz-title">Drop your solicitation PDF here</div>
-              <div className="adz-sub">{pdfs.length === 0 ? "Or click to browse · Upload the whole group (solicitation + SOW + Section L/M) · Any agency" : pdfs.length === 1 ? pdfs[0].name : `${pdfs.length} files selected — ${pdfs.map((f) => f.name).join(", ")}`}</div>
-              <input type="file" accept="application/pdf" multiple onChange={(e) => setPdfs(e.target.files ? Array.from(e.target.files) : [])} style={{ display: "none" }} />
-              <span className="adz-btn" style={{ marginTop: 18 }}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 2v9M4 7l4-5 4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                Select PDF to Audit
-              </span>
-            </label>
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <button type="submit" className="adz-btn" style={{ marginTop: 0 }} disabled={submitDisabled}>
-                {submitLabel}
-              </button>
+          /* UPLOAD mode (fallback) — drop zone + live section-coverage strip */
+          <div className={`uz${pdfs.length > 0 ? " loaded" : ""}`}>
+            <div className="uz-head">
+              <span className="lbl">Upload solicitation</span>
+              <span className="uz-hint">{pdfs.length ? `${pdfs.length} of 5 · ${(pdfs.reduce((n, f) => n + f.size, 0) / (1024 * 1024)).toFixed(1)} MB` : ""}</span>
             </div>
-          </>
-        )}
-        <div className="audit-formats" style={{ marginTop: 22 }}>
-          <span className="af">RFQ</span><span className="af">RFP</span><span className="af">IDIQ</span>
-          <span className="af">IFB</span><span className="af">Sources Sought</span><span className="af">Pre-Sol Synopsis</span>
-          <span className="af">Task Order</span><span className="af">Modification</span>
-        </div>
-        {/* FA-118 — PIEE-gated failure: badge + manual-upload instruction, no generic error copy. */}
-        {pieeGated && (
-          <div className="audit-error" style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left" }}>
-            <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", padding: "2px 6px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
-            <span>{getPieeInstructions()}</span>
+            <label className="dz">
+              <span className="dz-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M12 4v12"/><path d="M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></span>
+              <span className="dz-tx">
+                <span className="t">Drop files or <span className="br">browse</span></span>
+                <span className="s">PDF · DOCX · 5 files · 15MB max</span>
+              </span>
+              <span className="dz-cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add</span>
+              <input type="file" accept="application/pdf" multiple onChange={(e) => setPdfs(e.target.files ? Array.from(e.target.files) : [])} style={{ display: "none" }} />
+            </label>
+            <div className="uz-tease"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z"/></svg><span>FARaudit auto-detects <b>§C</b>, <b>§L</b> and <b>§M</b> on upload — and flags what&rsquo;s missing before you bid.</span></div>
+            {pdfs.length > 0 && (() => {
+              // Coverage strip — real section roles (FA-182 classifySectionRoles).
+              // Each file's name → ["C"|"H"|"L"|"M"]; a core section is detected
+              // iff some uploaded file's roles include it. Honest: copy says
+              // "not detected" (what we see), never invented coverage.
+              const roleByFile = pdfs.map((f) => ({ name: f.name, size: f.size, roles: classifySectionRolesClient(f.name) }));
+              const present = new Set<string>();
+              roleByFile.forEach((f) => f.roles.forEach((r) => present.add(r.toUpperCase())));
+              const core = [
+                { key: "C", label: "§C" },
+                { key: "L", label: "§L" },
+                { key: "M", label: "§M" }
+              ];
+              const coreHits = core.filter((c) => present.has(c.key)).length;
+              const missing = core.filter((c) => !present.has(c.key));
+              const totalMb = (pdfs.reduce((n, f) => n + f.size, 0) / (1024 * 1024)).toFixed(1);
+              const left = 5 - pdfs.length;
+              return (
+                <div className="uz-files">
+                  <div className="cov">
+                    <div className="cov-h"><span className="k">Section coverage</span><span className="pct">{coreHits} / 3 core</span></div>
+                    <div className="cov-grid">
+                      {core.map((c) => (
+                        <span key={c.key} className={`covcell ${present.has(c.key) ? "ok" : "miss"}`}><span className="dot"></span>{c.label}{present.has(c.key) ? "" : " not detected"}</span>
+                      ))}
+                      <span className={`covcell ${present.has("H") ? "ok" : "optmiss"}`}><span className="dot"></span>§H{present.has("H") ? "" : " optional"}</span>
+                    </div>
+                    {missing.length ? (
+                      <div className="cov-note">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+                        <span><b>{missing.map((m) => m.label).join(" · ")}</b> not detected in the uploaded set — the audit still runs, but its read on those sections will be limited. Add them if you have them.</span>
+                      </div>
+                    ) : (
+                      <div className="cov-note ok">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+                        <span>All core sections present — full-fidelity audit.</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flist">
+                    {roleByFile.map((f, i) => (
+                      <div className="frow" key={`${f.name}-${i}`}>
+                        <span className="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span>
+                        <span className="fmeta"><span className="fname">{f.name}</span><span className="fsize">{(f.size / (1024 * 1024)).toFixed(1)} MB</span></span>
+                        <button type="button" className="fx" aria-label={`Remove ${f.name}`} onClick={() => setPdfs(pdfs.filter((_, j) => j !== i))}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="uz-foot">
+                    <span className="cnt"><b>{pdfs.length}</b> of 5 files · {totalMb} MB · <b>{left}</b> slot{left === 1 ? "" : "s"} left</span>
+                    <button type="submit" className="uz-run" disabled={submitDisabled}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M5 3l14 9-14 9z"/></svg>{submitting ? "Auditing…" : "Run audit"}</button>
+                  </div>
+                </div>
+              );
+            })()}
+            {error && !pieeGated && <div className="audit-error">{error}</div>}
+            {pieeGated && (
+              <div className="audit-error" style={{ display: "flex", alignItems: "flex-start", gap: 8, textAlign: "left" }}>
+                <span style={{ flexShrink: 0, fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", padding: "2px 6px", borderRadius: 2, background: "rgba(168,85,247,.15)", color: "#C084FC", border: "1px solid rgba(168,85,247,.35)", lineHeight: 1.4 }}>PIEE</span>
+                <span>{getPieeInstructions()}</span>
+              </div>
+            )}
           </div>
         )}
-        {error && !pieeGated && <div className="audit-error">{error}</div>}
-        {queuedNote && !error && !pieeGated && <div className="audit-success">⟳ {queuedNote}</div>}
+
+        {queuedNote && fetchState !== "fetching" && !error && !pieeGated && <div className="audit-success">⟳ {queuedNote}</div>}
         {result && (
           <div className="audit-success">
             ✓ Audit complete · {result.auditId}
