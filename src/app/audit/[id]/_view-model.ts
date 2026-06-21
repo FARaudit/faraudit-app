@@ -2341,7 +2341,12 @@ function deriveWorkStatementReveal(audit: AuditRow): {
 }
 
 function deriveSubmissionChecklistFiltered(
-  compJson: Record<string, unknown>
+  compJson: Record<string, unknown>,
+  // FACTS-vs-analysis (P0, 2026-06-21): the single canonical submission deadline,
+  // already resolved in buildViewModel as the SAM-authoritative `responseDeadline`
+  // that drives the masthead/timeline. Passed in so the checklist shows the SAME
+  // one fact instead of re-deriving it from doc text (see drop+inject below).
+  canonicalDeadline: string | null
 ): AuditViewModel["submission_checklist_filtered"] {
   // Source: prefer raw[] (engine emits this), fall back to objects[].
   const reqsRaw = Array.isArray(compJson.submission_requirements_raw) ? (compJson.submission_requirements_raw as unknown[]) : null;
@@ -2366,11 +2371,32 @@ function deriveSubmissionChecklistFiltered(
     // persisted before the engine-side fix (DLA fixture's 42 rep/cert
     // clause-excerpt fragments).
     if (!isActionableSubmissionItem(line, bucket)) continue;
+    // P0 deadline single-source (2026-06-21): NEVER render doc-extracted deadline
+    // text. On N4008526R0065 this bucket surfaced a STALE base-doc date
+    // ("17 February 2026") and a garbage parse ("date shall be submitted
+    // electronically, Attn: Sarah Bradshaw, sarah.") that contradicted the
+    // masthead's authoritative SAM deadline by six months. The deadline is a SAM
+    // fact; we inject the one canonical value (canonicalDeadline) below instead.
+    if (bucket === "deadline") continue;
     items.push({
       bucket,
       text: line,
       source: "Section L",
       isCritical: CHECKLIST_CRITICAL_BUCKETS.has(bucket),
+      complete: false,
+    });
+  }
+
+  // Inject the ONE canonical deadline (SAM-authoritative, same value the masthead
+  // shows) as the single Submission-deadline item, so the checklist can never
+  // disagree with the masthead. unshift → it leads the list. Omitted entirely when
+  // no deadline is known (no-blank honesty: the deadline group then doesn't render).
+  if (canonicalDeadline) {
+    items.unshift({
+      bucket: "deadline",
+      text: `Submit your complete offer before ${canonicalDeadline} (response deadline per SAM.gov).`,
+      source: "SAM.gov",
+      isCritical: true,
       complete: false,
     });
   }
@@ -2625,7 +2651,12 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const incumbentExpiry = parseDate(audit.incumbent_expiry);
   const incumbentLookup = parseDate(audit.incumbent_lookup_at);
   const incumbentAwardValueRaw = audit.incumbent_award_value;
-  const incumbentName = (audit.incumbent_name as string) || "";
+  // P0 root-class incumbent fix (2026-06-21): prefer the FPDS/DB column, but fall
+  // back to the engine's source-extracted incumbent (v2 surfaces) so §02 never
+  // reads "no incumbent identified" while the risk narrative names one. The engine
+  // guarantees has_incumbent ⟺ incumbent_name != null, so this stays consistent.
+  const v2IncumbentName = typeof v2SurfacesObj.incumbent_name === "string" ? v2SurfacesObj.incumbent_name : "";
+  const incumbentName = ((audit.incumbent_name as string) || "").trim() || v2IncumbentName.trim();
   const incumbentInitial = incumbentName.trim()[0]?.toUpperCase() || "—";
   const daysToExpiry = incumbentExpiry ? Math.max(0, daysBetween(now, incumbentExpiry)) : 0;
   // Track width is "% of a 5-year cycle elapsed" — bigger = closer to expiry.
@@ -3033,7 +3064,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     ko_email: koCard,
 
-    submission_checklist_filtered: deriveSubmissionChecklistFiltered(compJson),
+    submission_checklist_filtered: deriveSubmissionChecklistFiltered(
+      compJson,
+      responseDeadline ? fmtDayMonYear(responseDeadline) : null
+    ),
     ...deriveWorkStatementReveal(audit),
 
     has_incumbent: incumbentHasData,
