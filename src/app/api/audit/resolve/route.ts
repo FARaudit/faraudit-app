@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency } from "@/lib/sam";
-import { fetchAttachmentManifest, classifySectionRoles, planDocumentOrder } from "@/lib/sam-attachments";
+import { fetchAttachmentManifest, classifySectionRoles, planDocumentOrder, type DocumentPlanEntry } from "@/lib/sam-attachments";
+import { extractText } from "@/lib/pdf-text-extractor";
+import { detectSections } from "@/lib/section-boundary-detector";
 
 // Synchronous resolve+manifest endpoint backing the Run Audit front door
 // (fix/run-audit-frontdoor-static). It answers ONE question — "what does the
@@ -39,6 +41,109 @@ interface ResolveDoc {
 
 function fail(reason: string, status: number): NextResponse {
   return NextResponse.json({ ok: false, reason }, { status });
+}
+
+// ━━ Content-based coverage guards (keep resolve fast + safe) ━━
+// Download ONLY the primary doc, size-cap it, and time-box the fetch so the
+// whole resolve stays within a few seconds. On ANY failure (cap / timeout /
+// not-a-PDF / image-only / parse failure) we return null and the caller falls
+// back to the prior, honest name-based coverage — never hang, never error.
+const PRIMARY_DOWNLOAD_TIMEOUT_MS = 8000;
+const PRIMARY_MAX_BYTES = 15 * 1024 * 1024; // ~15MB — skip text-extraction above this.
+
+// Sections we can credit from the primary doc TEXT (real, not name-based).
+type ContentSections = { C: boolean; L: boolean; M: boolean; I: boolean };
+
+// Pick the doc to READ for embedded §C/§L/§M — the SUBSTANTIVE solicitation
+// BODY, not a thin SF-30 amendment cover. planDocumentOrder optimizes the audit
+// ingestion plan (form first, size-ascending tie-break), which surfaces the
+// small SF-30 cover ahead of the large combined-RFP body — but the SF-30 cover
+// has no §L/§M to read, so reading it would mask the embedded sections we're
+// trying to detect (the N4008526R0065 defect). For CONTENT detection only, the
+// real combined RFP body is the highest-value form, identified by a true
+// "Solicitation"/RFP/SF-cover name that is NOT merely an SF-30/amendment cover;
+// among those the LARGEST is the combined body (covers are thin). This does NOT
+// touch the shared planDocumentOrder used by the audit pipeline.
+const SF30_COVER_RE = /sf[\s-]?30|amendment of solicitation|amendment\/modification of contract|\bamd\b|\bamendment\b/i;
+const REAL_SOL_BODY_RE = /\bsolicitation\b|\brf[qp]\b|sf[\s-]?1449|sf[\s-]?1442|sf[\s-]?33\b|sf[\s-]?0?18\b/i;
+function pickContentPrimary(plan: DocumentPlanEntry[]): DocumentPlanEntry | null {
+  const forms = plan.filter((e) => e.role === "form");
+  const pool = forms.length > 0 ? forms : plan;
+  if (pool.length === 0) return null;
+  const score = (e: DocumentPlanEntry): number => {
+    const isCover = SF30_COVER_RE.test(e.name);
+    const isBody = REAL_SOL_BODY_RE.test(e.name);
+    // A real solicitation body that is NOT an amendment cover is the best read.
+    if (isBody && !isCover) return 2;
+    if (isBody) return 1; // names itself a solicitation but also amendment-marked
+    return 0;             // SF-30 cover / generic
+  };
+  // Highest score wins; among equals prefer the LARGEST (the combined body is
+  // far bigger than a cover sheet); unknown size sorts last; name as final tie.
+  return [...pool].sort((a, b) =>
+    score(b) - score(a) ||
+    (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) ||
+    a.name.localeCompare(b.name)
+  )[0];
+}
+
+// Download the single primary doc and run the EXISTING section detection
+// (extractText → detectSections) on its text. Returns which of §C/§L/§M/§I are
+// actually present in the body, or null to signal "fall back to name-based".
+// No new dependency: reuses the audit pipeline's own extractor + boundary
+// detector. HEAD-checks the size when known, hard-caps the downloaded bytes,
+// and treats an image-only / unparsable PDF as null (honest — we couldn't read
+// it, so we don't claim sections from it).
+async function detectPrimarySectionsFromText(
+  primary: DocumentPlanEntry
+): Promise<ContentSections | null> {
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) return null;
+
+  // Size cap from the manifest (when SAM reported it) — skip the download
+  // entirely for an oversized primary.
+  if (primary.sizeBytes != null && primary.sizeBytes > PRIMARY_MAX_BYTES) return null;
+
+  const url = primary.url.includes("api_key=")
+    ? primary.url
+    : `${primary.url}${primary.url.includes("?") ? "&" : "?"}api_key=${apiKey}`;
+
+  let buf: Buffer;
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(PRIMARY_DOWNLOAD_TIMEOUT_MS)
+    });
+    if (!res.ok) return null;
+    // Guard against an oversized body even when the manifest size was unknown:
+    // honor a Content-Length header before reading the bytes.
+    const len = Number(res.headers.get("content-length") ?? "");
+    if (Number.isFinite(len) && len > PRIMARY_MAX_BYTES) return null;
+    const ab = await res.arrayBuffer();
+    if (ab.byteLength > PRIMARY_MAX_BYTES) return null;
+    buf = Buffer.from(ab);
+  } catch {
+    return null; // timeout / network — fall back to name-based.
+  }
+
+  // magic-byte check — the manifest said .pdf; verify before parsing.
+  if (buf.subarray(0, 4).toString("latin1") !== "%PDF") return null;
+
+  let doc;
+  try {
+    doc = await extractText(buf);
+  } catch {
+    return null;
+  }
+  // Image-only / extraction failure → don't claim sections we couldn't read.
+  if (doc.extractionMethod === "fallback") return null;
+  if (doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"))) return null;
+
+  // Reuse the audit pipeline's real section detection (the same section bag the
+  // extractors consume: s["C"], s["L"], s["M"], s["I"]).
+  const bag = detectSections(doc);
+  const s = bag.sections;
+  return { C: !!s["C"], L: !!s["L"], M: !!s["M"], I: !!s["I"] };
 }
 
 export async function GET(req: NextRequest) {
@@ -138,6 +243,29 @@ export async function GET(req: NextRequest) {
     return { name: e.name, sizeBytes: e.sizeBytes, sectionRoles: roles };
   });
 
+  // ━━ Step 5: content-based coverage of the PRIMARY doc (combined-RFP fix) ━━
+  // Filename-only coverage UNDER-REPORTS when the package is a single combined
+  // RFP/SF-1449: §C/§L/§M live INSIDE the main doc, not as separate files, so
+  // they wrongly show "not detected" (e.g. N4008526R0065). Download ONLY the
+  // primary (form) and run the SAME section detection the audit pipeline uses
+  // on its text, then UNION the result with the name-based roles: a section
+  // counts as present if found EITHER in the primary text OR as a tagged
+  // attachment. On any download/parse/image-only failure this returns null and
+  // coverage degrades to the prior honest name-based behavior.
+  const primaryDoc = pickContentPrimary(plan);
+  let coverageBasis: "content" | "name_only" = "name_only";
+  if (primaryDoc) {
+    const textSections = await detectPrimarySectionsFromText(primaryDoc);
+    if (textSections) {
+      coverageBasis = "content";
+      // UNION — text-detected presence is REAL; never un-set a name-based hit.
+      coverage.C = coverage.C || textSections.C;
+      coverage.L = coverage.L || textSections.L;
+      coverage.M = coverage.M || textSections.M;
+      coverage.I = coverage.I || textSections.I;
+    }
+  }
+
   const complete = coverage.main && coverage.C && coverage.L && coverage.M;
   const missingCore: string[] = [];
   if (!coverage.main) missingCore.push("MAIN");
@@ -155,6 +283,7 @@ export async function GET(req: NextRequest) {
     filesTotal: docs.length,
     docs,
     coverage,
+    coverageBasis,
     missingCore,
     complete
   });
