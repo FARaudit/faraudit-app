@@ -1614,49 +1614,130 @@ function setInnerByClass(html: string, className: string, tagName: string, inner
 // key, but setFieldInner is single-match and both calls hit the masthead,
 // leaving §06 at its static demo. Switched to setInnerByClass for both —
 // each surface targeted by its unique class name.
+type GateConditionVM = {
+  title: string; short_label: string; context: string; citation: string; blocker_note: string;
+  severity: "hard" | "curable"; severity_label: string;
+};
+
+// Densify port (Design 2026-06-21): name the hard + curable gates by their
+// concise short_label in the masthead/exec count line — e.g.
+// "(Safety, Corporate Experience, SPRS)". Honest: short_label is derived from
+// the real title in the view model, never invented; falls back to a clipped
+// title there. Empty list → "" so the renderer adds no parenthetical.
+function gateLabelList(conditions: GateConditionVM[]): string {
+  const names = conditions
+    .map((c) => (c.short_label || "").trim())
+    .filter((s) => s.length > 0)
+    .map((s) => escapeHtml(s));
+  return names.length ? ` (${names.join(", ")})` : "";
+}
+
+// Densify port (Design 2026-06-21): spell the hard/curable split as English.
+function countWord(n: number): string {
+  const W = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+  return n >= 0 && n < W.length ? W[n] : String(n);
+}
+
 function renderGateConditions(
   html: string,
-  conditions: Array<{ title: string; context: string; citation: string; blocker_note: string }>,
+  conditions: GateConditionVM[],
   gateModeActive: boolean
 ): string {
   if (!gateModeActive || conditions.length === 0) {
     // No real gate applies to THIS solicitation. The template ships the gate
-    // shells with HARDCODED DoD demo tiles (SPRS / JCP / CAGE / an H-60 part
-    // number) as design mock content. If we leave them and the client reveals
-    // the gate (score_locked → applyVerdictMode('gate')), that fabricated
-    // defense content ships on a non-defense report. The prior element-removal
-    // (removeElementByOpenRe) missed the nested .mhv-gates, so the demo leaked.
-    // CLEARING the inner content is nesting-proof and guarantees nothing fake
-    // can render — empty containers show nothing.
-    let cleared = setInnerByClass(html, "mhv-gates", "div", "");
+    // shells with HARDCODED DoD demo content as design mock. If we leave them
+    // and the client reveals the gate (score_locked → applyVerdictMode('gate')),
+    // that fabricated content ships. CLEARING the inner content is nesting-proof.
+    let cleared = setInnerByClass(html, "mhv-countref", "div", "");
     cleared = setInnerByClass(cleared, "g-rows", "div", "");
+    // Exec gate-ref card: keep it hidden + cleared (score mode keeps .es-actions).
+    cleared = setInnerByClass(cleared, "es-ref", "div", "");
     return cleared;
   }
-  // Masthead .mhv-gates — preserves the cap "<p class='mhv-gates-cap'>" prelude.
-  const mhvCap = `<p class="mhv-gates-cap">Bid only if — all true today</p>`;
-  const mhvRows = conditions
-    .map((c) => {
-      const detail = c.context
-        ? `${escapeHtml(c.context)}${c.citation && c.citation !== "—" ? ` &middot; ${escapeHtml(c.citation)}` : ""}`
-        : (c.citation && c.citation !== "—" ? escapeHtml(c.citation) : "");
-      return `<div class="mhv-gate"><span class="gk"></span><span class="gx"><b>${escapeHtml(c.title)}</b>${detail ? ` — ${detail}` : ""}</span></div>`;
+  // Densify port: severity-sort — hard (uncurable in-window) first, then curable.
+  // Stable within each band so the engine's intra-band order is preserved.
+  const sorted = conditions
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => {
+      const rank = (s: string): number => (s === "hard" ? 0 : 1);
+      return rank(a.c.severity) - rank(b.c.severity) || a.i - b.i;
     })
-    .join("");
-  let out = setInnerByClass(html, "mhv-gates", "div", mhvCap + mhvRows);
-  // §06 .g-rows — verbose detail rows.
-  const gRows = conditions
+    .map((x) => x.c);
+
+  const hardGates = sorted.filter((c) => c.severity === "hard");
+  const curableGates = sorted.filter((c) => c.severity === "curable");
+  const hardCount = hardGates.length;
+  const curableCount = curableGates.length;
+  const total = sorted.length;
+  // Densify port: name the gates by their short_label in the split line, e.g.
+  // "three hard (Safety, Corporate Experience, SPRS), two in your control".
+  const hardList = gateLabelList(hardGates);
+  const curableList = gateLabelList(curableGates);
+
+  // 1. Masthead .mhv-countref — the count tile (0/N + the split line). No
+  //    re-listed FULL TITLES in the hero (those live once, in §06) — only the
+  //    concise short labels naming which gates are hard/curable.
+  const countRefInner =
+    `<span class="cn">0<span class="u">/${total}</span></span>` +
+    `<span class="ck"><b>${escapeHtml(`${capitalize(countWord(total))} pass/fail gate${total === 1 ? "" : "s"}`)}</b> cleared today — ${escapeHtml(`${countWord(hardCount)} hard`)}${hardList}, ${escapeHtml(`${countWord(curableCount)} in your control`)}${curableList}</span>`;
+  let out = setInnerByClass(html, "mhv-countref", "div", countRefInner);
+
+  // 2. Exec Summary .es-ref — the 0/N count + hard/curable split + §06 link.
+  //    Reveal .es-col-gate, hide .es-col-scored. Per Design's 1:1 acceptance the
+  //    gate condition FULL TITLES render only in §06 .g-rows — the es-ref states
+  //    the count + the hard/curable split named by short_label, NOT the full
+  //    title list.
+  const refSplit =
+    (hardCount > 0 ? ` ${capitalize(countWord(hardCount))} hard${hardList}` : "") +
+    (curableCount > 0 ? `${hardCount > 0 ? "," : ""} ${countWord(curableCount)} in your control${curableList}` : "") +
+    ".";
+  const esRefInner =
+    `<span class="erc">0/${total}</span>` +
+    `<span class="ert"><b>${escapeHtml(`${capitalize(countWord(total))} pass/fail gate${total === 1 ? "" : "s"}`)}</b> — none cleared today.${refSplit} <a href="#reco-gate">Full checklist in §06 →</a></span>`;
+  out = setInnerByClass(out, "es-ref", "div", esRefInner);
+  out = revealExecGateRef(out);
+
+  // 3. §06 .g-rows — dense, severity-sorted, one-line rows with .g-sev badge +
+  //    click-to-expand .g-detail (why / how to clear + optional blocker note).
+  const chev = `<svg class="g-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>`;
+  const gRows = sorted
     .map((c) => {
-      const detail = `<code>${escapeHtml(c.citation)}</code>${c.context ? ` — ${escapeHtml(c.context)}` : ""}`;
+      const sevCls = c.severity === "hard" ? "hard" : "cure";
+      const cite = c.citation && c.citation !== "—" ? `<span class="g-cite">${escapeHtml(c.citation)}</span>` : "";
+      const detailBody = c.context
+        ? `${c.citation && c.citation !== "—" ? `<code>${escapeHtml(c.citation)}</code> — ` : ""}${escapeHtml(c.context)}`
+        : (c.citation && c.citation !== "—" ? `<code>${escapeHtml(c.citation)}</code>` : "");
       const blocker = c.blocker_note ? `<span class="g-blocker">${escapeHtml(c.blocker_note)}</span>` : "";
-      return `<div class="g-row"><span class="gbx"></span><div><div class="gt">${escapeHtml(c.title)}</div><div class="gd">${detail}${blocker}</div></div></div>`;
+      const detail = detailBody || blocker
+        ? `<div class="g-detail">${detailBody}${blocker}</div>`
+        : `<div class="g-detail"></div>`;
+      return `<div class="g-row" data-gate><div class="g-row-top"><span class="gbx"></span><span class="g-sev ${sevCls}">${escapeHtml(c.severity_label)}</span><span class="gt">${escapeHtml(c.title)}</span>${cite}${chev}</div>${detail}</div>`;
     })
     .join("");
   out = setInnerByClass(out, "g-rows", "div", gRows);
-  // .gs-cnt initial denominator — resolver IIFE recomputes on click but
-  // the static initial render needs the correct N.
+  // .gs-cnt initial denominator — resolver IIFE recomputes on click.
   out = out.replace(
     /<span class="gs-cnt">0 \/ \d+<\/span>/,
-    `<span class="gs-cnt">0 / ${conditions.length}</span>`
+    `<span class="gs-cnt">0 / ${total}</span>`
+  );
+  return out;
+}
+
+// Capitalize the first letter (for the count word at sentence start).
+function capitalize(s: string): string {
+  return s.length ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+// Reveal the exec gate-ref card + hide the scored "Next 48 hours" column in
+// gate mode by stripping/adding the inline display style.
+function revealExecGateRef(html: string): string {
+  let out = html.replace(
+    /<div class="es-col es-col-gate" data-field="exec_gate_ref" style="display:none">/,
+    `<div class="es-col es-col-gate" data-field="exec_gate_ref">`
+  );
+  out = out.replace(
+    /<div class="es-col es-col-scored">/,
+    `<div class="es-col es-col-scored" style="display:none">`
   );
   return out;
 }
@@ -2684,7 +2765,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // lookups are null-guarded, so tile suppression still works.
   if (gateModeActive && vm.gate_conditions.length === 0) {
     html = removeElementByOpenRe(html, /<div class="gate-card"[^>]*>/, "div");
-    html = removeElementByOpenRe(html, /<div class="mhv-gates"[^>]*>/, "div");
+    // Densify port: strip the masthead count tile + repurposed gate CTA (the
+    // .mhv-gates list is gone) so an empty gate-mode hero shows nothing.
+    html = removeElementByOpenRe(html, /<div class="mhv-countref"[^>]*>/, "div");
+    html = removeElementByOpenRe(html, /<a class="mhv-cta" data-field="gate_cta"[^>]*>/, "a");
   }
   // Reveal gate-mode (applyVerdictMode('gate') → adds .is-gate, swaps the score
   // tiles for the gate) ONLY when there are real gate conditions to show. Without
@@ -2704,7 +2788,20 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // hiding (FA-108) must survive.
   if (vm.verdict_word === "NO-BID") {
     html = removeElementByOpenRe(html, /<div class="gate-card"[^>]*>/, "div");
-    html = removeElementByOpenRe(html, /<div class="mhv-gates"[^>]*>/, "div");
+    // Densify port: strip the masthead count tile + repurposed gate CTA on a
+    // final NO-BID (the interactive "resolve the gate" instrument contradicts it).
+    html = removeElementByOpenRe(html, /<div class="mhv-countref"[^>]*>/, "div");
+    html = removeElementByOpenRe(html, /<a class="mhv-cta" data-field="gate_cta"[^>]*>/, "a");
+    // The §06 card is gone, so the exec gate-ref's "Full checklist in §06 →"
+    // would dangle — revert the exec column to its scored "Next 48 hours" form.
+    html = html.replace(
+      /<div class="es-col es-col-gate" data-field="exec_gate_ref">/,
+      `<div class="es-col es-col-gate" data-field="exec_gate_ref" style="display:none">`
+    );
+    html = html.replace(
+      /<div class="es-col es-col-scored" style="display:none">/,
+      `<div class="es-col es-col-scored">`
+    );
   }
 
   // Canonicalization wiring (Brain ruling 2026-06-06) — single-source

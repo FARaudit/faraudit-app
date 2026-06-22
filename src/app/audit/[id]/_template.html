@@ -82,7 +82,7 @@ button{font-family:inherit}
 .rpt-stamp .dot{width:3px;height:3px;border-radius:50%;background:var(--mute-2)}
 
 /* ═══════════ MASTHEAD ═══════════ */
-.masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 340px}
+.masthead{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 360px}
 /* ═══════════ INGESTION BANNER — what the verdict is built on (item ⑤.5) ═══════════
    Always-on. Every file FARaudit received + its detected role. No fabrication:
    the reader sees exactly what was read. Bound to compliance_json.ingestion.files[]. */
@@ -112,6 +112,58 @@ button{font-family:inherit}
 [data-theme="dark"] .ingest-cov.ok{background:rgba(16,185,129,.12);color:var(--green-light,#6ee7b7);border-color:transparent}
 .ingest-cov.warn{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
 [data-theme="dark"] .ingest-cov.warn{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
+/* ═══════════ SOURCE MANIFEST (collapsed read-vs-indexed) — Densify port 2026-06-21 ═══════════
+   Replaces the .ingest chip cloud. Collapsed by default; summary counts (total/read/indexed)
+   + coverage chip + "View sources". Expand reveals two groups: "Read in full" and
+   "Indexed — not deep-read" (grouped, one reason chip per group). PRINT forces .man open. */
+.man{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);overflow:hidden}
+.man-sum{display:flex;align-items:center;gap:15px;padding:15px 18px;cursor:pointer;flex-wrap:wrap}
+.man .il-k{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:3px}
+.man-sum-tx{min-width:0}
+.man-counts{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.mc{display:inline-flex;align-items:baseline;gap:5px;font-size:14px;font-weight:700;color:var(--ink)}
+.mc .mc-n{font-family:"IBM Plex Mono",monospace;font-size:16px}
+.mc .mc-k{font-size:11.5px;font-weight:600;color:var(--mute)}
+.mc.read .mc-n{color:var(--green-700)}
+.mc.idx .mc-n{color:var(--mute)}
+[data-theme="dark"] .mc.read .mc-n{color:#6ee7b7}
+.mc-sep{width:1px;height:17px;background:var(--line)}
+.man-cov{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:8px}
+.man-cov svg{width:12px;height:12px}
+.man-cov.ok{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+.man-cov.warn{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+[data-theme="dark"] .man-cov.ok{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+[data-theme="dark"] .man-cov.warn{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
+.man-expand{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;color:var(--accent-deep);white-space:nowrap;background:none;border:0;cursor:pointer}
+[data-theme="dark"] .man-expand{color:var(--accent-light)}
+.man-expand svg{width:14px;height:14px;transition:transform .2s}
+.man.open .man-expand svg{transform:rotate(180deg)}
+.man-body{display:none;border-top:1px solid var(--line);padding:6px 18px 18px}
+.man.open .man-body{display:block}
+.man-grp{margin-top:16px}
+.man-grp-h{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.man-grp-h .gh-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.man-grp.read .gh-dot{background:var(--green-600)}
+.man-grp.idx .gh-dot{background:var(--mute-2)}
+.gh-t{font-size:14px;font-weight:800;color:var(--ink)}
+.gh-c{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--mute)}
+.gh-note{margin-left:auto;font-size:11.5px;color:var(--mute);font-style:italic}
+.man-sub{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute-2);margin:13px 0 6px}
+.man-cols{columns:2;column-gap:34px}
+@media(max-width:900px){.man-cols{columns:1}}
+.doc-row{display:grid;grid-template-columns:16px 1fr auto;gap:11px;align-items:center;padding:7px 10px;border-radius:8px;break-inside:avoid}
+.doc-row:hover{background:var(--card-soft)}
+.doc-ic{width:15px;height:15px;color:var(--mute-2)}
+.man-grp.read .doc-ic{color:var(--green-600)}
+.doc-name{font-size:13px;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-name .raw{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute-2);font-weight:500;margin-left:8px}
+.doc-tags{display:flex;align-items:center;gap:5px;flex:none}
+.dtag{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.dtag.sec{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+.dtag.role{background:var(--search-bg);color:var(--mute);border:1px solid var(--line)}
+.dtag.reason{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-200)}
+[data-theme="dark"] .dtag.sec{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+[data-theme="dark"] .dtag.reason{background:rgba(214,162,60,.14);color:#fcd34d;border-color:transparent}
 /* ═══════════ HEADER SOURCE CHIPS — provenance per masthead fact (item ⑤.1) ═══════════
    3 states: extracted (gray chip) · inferred (amber .verify chip) · not-in-documents
    (the value <b> goes italic .notfound). Engine-driven status — never inferred from a blank. */
@@ -216,14 +268,21 @@ button{font-family:inherit}
 /* ── decision-gate variant — replaces the numeric tiles when the verdict is a DECISION, not a score.
    Sole-source to a named vendor, or pass/fail eligibility gates that can't be cured in the response
    window, are switches, not gradients — a 0–100 score on them is false precision. ── */
-.mh-verdict .mhv-gates{display:none}
+/* Densify port 2026-06-21: gate-mode masthead drops the re-listed .mhv-gates
+   in favour of a single .mhv-countref tile + the repurposed "Resolve the gate"
+   CTA. The verdict column sizes to its own short content (label + word + tag +
+   count tile + CTA) — no dead white band. */
+.mh-verdict .mhv-gates,.mh-verdict .mhv-countref{display:none}
 .mh-verdict.is-gate .mhv-metrics{display:none}
-.mh-verdict.is-gate .mhv-gates{display:flex;flex-direction:column;gap:7px;margin-top:auto}
-.mhv-gates-cap{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.66);margin:0 0 1px;padding-left:2px}
-.mhv-gate{display:grid;grid-template-columns:16px 1fr;gap:9px;align-items:start;background:rgba(0,0,0,.16);border-radius:9px;padding:9px 11px}
-.mhv-gate .gk{width:15px;height:15px;border-radius:4px;border:2px solid rgba(255,255,255,.55);margin-top:1px}
-.mhv-gate .gx{font-size:11.5px;font-weight:600;color:rgba(255,255,255,.9);line-height:1.32}
-.mhv-gate .gx b{font-weight:800;color:#fff}
+.mh-verdict.is-gate .mhv-countref{display:flex}
+.mhv-countref{align-items:center;gap:12px;background:rgba(0,0,0,.18);border-radius:11px;padding:13px 15px;margin-top:auto;margin-bottom:11px}
+.mhv-countref .cn{font-family:"IBM Plex Mono",monospace;font-size:30px;font-weight:700;line-height:1;color:#fff}
+.mhv-countref .cn .u{font-size:15px;opacity:.6}
+.mhv-countref .ck{font-size:12px;font-weight:600;color:rgba(255,255,255,.84);line-height:1.36}
+.mhv-countref .ck b{color:#fff;font-weight:800}
+/* the repurposed gate CTA shows in gate mode only (score mode keeps its own tiles) */
+.mh-verdict .mhv-cta[data-field="gate_cta"]{display:none}
+.mh-verdict.is-gate .mhv-cta[data-field="gate_cta"]{display:inline-flex;margin-top:0}
 /* customer-facing legend — defuses the "low score vs high confidence" confusion at the source */
 .mhv-foot{margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:500;letter-spacing:.01em;line-height:1.55;color:rgba(255,255,255,.6)}
 .mhv-foot b{font-weight:700;color:rgba(255,255,255,.84)}
@@ -276,6 +335,14 @@ button{font-family:inherit}
 .es-actions{display:flex;flex-direction:column;gap:8px}
 .es-act{display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:9px 12px;font-size:12.5px;line-height:1.42;color:rgba(255,255,255,.92);min-width:0;overflow-wrap:anywhere}
 .es-act .es-when{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--accent-light);white-space:nowrap;padding-top:2px;flex-shrink:0;min-width:50px}
+/* Densify port 2026-06-21: the gate-mode reference card — replaces the re-listed
+   gate conditions / "Next 48 hours" column with the 0/N count + hard/curable
+   split + a §06 link. Conditions are NOT re-listed here; they live once in §06. */
+.es-ref{display:flex;align-items:flex-start;gap:13px;background:rgba(252,211,77,.1);border:1px solid rgba(252,211,77,.28);border-radius:11px;padding:14px 16px}
+.es-ref .erc{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:700;color:#fcd34d;line-height:1}
+.es-ref .ert{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.9)}
+.es-ref .ert b{color:#fff;font-weight:800}
+.es-ref a{color:#fcd34d;text-decoration:none;border-bottom:1px solid rgba(252,211,77,.5);font-weight:700;white-space:nowrap}
 @media (max-width:760px){.es-grid{grid-template-columns:1fr;gap:18px}}
 
 /* ═══ TIMELINE — critical path strip ═══ */
@@ -610,13 +677,33 @@ button{font-family:inherit}
 .gate-verdict.nobid{color:var(--red-700)}
 .gate-verdict.cond{color:var(--amber-700)}
 .gc-lead{font-size:13px;color:var(--ink-2);margin:9px 0 13px;line-height:1.52;max-width:78ch}
+/* Densify port 2026-06-21: §06 is the SINGLE home for the gate list. Rows are
+   severity-sorted (hard first), one line each ([checkbox][sev badge][title]
+   [citation][chevron]), with the why/how-to-clear moved into a click-to-expand
+   .g-detail. The checkbox still toggles .checked + the live 0/N count + pill. */
 .g-rows{display:flex;flex-direction:column;gap:8px}
-.g-row{display:grid;grid-template-columns:20px 1fr;gap:11px;align-items:start;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-.g-row .gbx{width:18px;height:18px;border-radius:5px;border:2px solid var(--mute-2);margin-top:1px}
-.g-row .gt{font-size:13px;font-weight:700;color:var(--ink);line-height:1.35}
-.g-row .gd{font-size:12px;color:var(--ink-2);line-height:1.46;margin-top:3px}
-.g-row .gd code{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);background:var(--blue-50);padding:1px 5px;border-radius:4px}
-.g-blocker{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;color:var(--red-700);letter-spacing:.04em;margin-top:6px;display:block}
+.g-row{border:1px solid var(--line);border-radius:11px;background:var(--card);overflow:hidden;transition:border-color .15s}
+.g-row.checked{border-color:var(--green-600)}
+.g-row-top{display:grid;grid-template-columns:20px auto 1fr auto;gap:13px;align-items:center;padding:12px 14px;cursor:pointer}
+.g-row .gbx{width:18px;height:18px;border-radius:5px;border:2px solid var(--mute-2);position:relative;transition:background .15s,border-color .15s;flex:none}
+.g-row.checked .gbx{background:var(--green-600);border-color:var(--green-600)}
+.g-row.checked .gbx::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(45deg)}
+.g-sev{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.g-sev.hard{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.g-sev.cure{background:var(--blue-50);color:var(--accent-deep);border:1px solid var(--blue-200)}
+[data-theme="dark"] .g-sev.hard{background:rgba(220,38,38,.16);color:#fca5a5;border-color:transparent}
+[data-theme="dark"] .g-sev.cure{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+.g-row .gt{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;min-width:0}
+.g-row.checked .gt{color:var(--mute)}
+.g-cite{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent-deep);background:var(--blue-50);border:1px solid var(--blue-200);border-radius:5px;padding:2px 8px;white-space:nowrap}
+[data-theme="dark"] .g-cite{background:rgba(55,138,221,.14);color:var(--accent-light);border-color:transparent}
+.g-chev{width:15px;height:15px;color:var(--mute-2);transition:transform .2s}
+.g-row.open .g-chev{transform:rotate(180deg)}
+.g-detail{display:none;padding:0 14px 13px 47px;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.g-row.open .g-detail{display:block}
+.g-detail code{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent-deep);background:var(--blue-50);padding:1px 5px;border-radius:4px}
+[data-theme="dark"] .g-detail code{background:rgba(55,138,221,.14);color:var(--accent-light)}
+.g-blocker{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;color:var(--red-700);letter-spacing:.04em;margin-top:7px;display:inline-block}
 .g-outcome{margin-top:13px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .g-oc{padding:10px 13px;border-radius:9px;font-size:12.5px;line-height:1.45}
 .g-oc.win{background:var(--green-50);color:var(--green-700)}
@@ -625,13 +712,7 @@ button{font-family:inherit}
 .g-pearl{margin-top:13px;padding:11px 13px;border-left:3px solid var(--ink);background:var(--card);border-radius:0 9px 9px 0;font-size:12.5px;color:var(--ink-2);line-height:1.52}
 .g-pearl b{color:var(--ink);font-weight:700}
 @media (max-width:560px){.g-outcome{grid-template-columns:1fr}}
-/* interactive gate — the report becomes a live decision: tick what you hold, the verdict resolves */
-.g-row{cursor:pointer;transition:border-color .15s,background .15s}
 .g-row:hover{border-color:var(--mute-2)}
-.g-row.checked{border-color:var(--green-600)}
-.g-row .gbx{position:relative;flex:0 0 auto;transition:background .15s,border-color .15s}
-.g-row.checked .gbx{background:var(--green-600);border-color:var(--green-600)}
-.g-row.checked .gbx::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(45deg)}
 .g-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 11px}
 .g-status .gs-k{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}
 .g-status .gs-k b{color:var(--ink)}
@@ -779,6 +860,10 @@ button{font-family:inherit}
 
   /* collapsibles must be fully expanded on paper */
   .risk-body{max-height:none!important;overflow:visible!important}
+  /* source manifest forced open in print (collapsed by default on screen) */
+  .man-body{display:block!important}
+  .man-expand{display:none!important}
+  .g-detail{display:block!important}
   /* risk-register cap is a screen-only UX cap — print/PDF shows every risk,
      re-reveals any orphaned group label, and hides the "N more flags" toggle. */
   .risk-more{display:none!important}
@@ -1283,15 +1368,16 @@ button{font-family:inherit}
             </div>
           </div>
           <p class="mhv-foot" data-field="metrics_legend"><b>Fit Score</b> rates how winnable this is for a small business — a go/no-go signal, not a grade on the audit. The <b>Doc-type</b> figure in &sect;01 is a separate measure: how sure we are what the document is.</p>
-          <!-- DECISION-GATE variant of the masthead — Code adds class "is-gate" to this .mh-verdict when
-               audit.verdict_mode === 'gate', and populates .mhv-gates from audit.gate_conditions[].
-               In gate mode the numeric tiles hide and these conditions take their place. -->
-          <div class="mhv-gates" data-field="gate_conditions">
-            <p class="mhv-gates-cap">Bid only if — all true today</p>
-            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Current SPRS score on file</b> &middot; DFARS 252.204-7020</span></div>
-            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Active JCP</b> — you + mfr CAGE 81996 &middot; A-11</span></div>
-            <div class="mhv-gate"><span class="gk"></span><span class="gx"><b>Written supplier lead-time &le; 135 days</b></span></div>
+          <!-- DECISION-GATE variant of the masthead (Densify port 2026-06-21) — Code adds class
+               "is-gate" to this .mh-verdict when audit.verdict_mode === 'gate'. In gate mode the
+               numeric tiles hide and this count tile + CTA take their place (no re-listed gates —
+               those live once, in §06 #reco-gate). renderGateConditions fills .mhv-countref .cn and
+               the .ck split line from audit.gate_conditions[]. -->
+          <div class="mhv-countref" data-field="gate_conditions">
+            <span class="cn">0<span class="u">/0</span></span>
+            <span class="ck"><b>0 pass/fail gates</b> cleared today</span>
           </div>
+          <a class="mhv-cta" data-field="gate_cta" href="#reco-gate">Resolve the gate<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></a>
         </div>
 
         <!-- ═══════════ PRELIMINARY READ · metadata-only (no document retrieved) ═══════════
@@ -1424,12 +1510,22 @@ button{font-family:inherit}
               <li><b>Gate.</b> Two unpriced items — a current SPRS score and the CLIN 0002 data-rights exposure — must close before you bid with confidence.</li>
             </ol>
           </div>
-          <div class="es-col">
+          <div class="es-col es-col-scored">
             <p class="es-h">Next 48 hours</p>
             <div class="es-actions" data-field="exec_actions">
               <div class="es-act"><span class="es-when">By Jun 6</span><span>File the data-rights clarification with the KO — draft ready in §08.</span></div>
               <div class="es-act"><span class="es-when">By Jun 9</span><span>Confirm your SPRS score is posted and current.</span></div>
               <div class="es-act"><span class="es-when">By Jun 18</span><span>Lock the wage determination before the Q&amp;A deadline.</span></div>
+            </div>
+          </div>
+          <!-- Densify port 2026-06-21: gate-mode reference card. renderGateConditions reveals this
+               (and hides .es-col-scored) when gate mode is active; .es-ref is filled from
+               audit.gate_conditions[] — the 0/N count + hard/curable split + §06 link. -->
+          <div class="es-col es-col-gate" data-field="exec_gate_ref" style="display:none">
+            <p class="es-h">The gate</p>
+            <div class="es-ref">
+              <span class="erc">0/0</span>
+              <span class="ert"><b>0 pass/fail gates</b> — none cleared today. <a href="#reco-gate">Full checklist in §06 →</a></span>
             </div>
           </div>
         </div>
@@ -1940,9 +2036,9 @@ button{font-family:inherit}
                 <p class="gc-lead" data-field="gate_lead">This is a small-business LPTA you can win on price — but three gates close the door if any is open at submission. None can be remedied inside the 20-day window.</p>
                 <div class="g-status"><span class="gs-k">Bid gate — <b><span class="gs-cnt">0 / 3</span></b> cleared</span><span class="gs-pill no">NO-BID</span></div>
                 <div class="g-rows" data-field="gate_conditions">
-                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Current SPRS score on file</div><div class="gd"><code>DFARS 252.204-7020</code> — scores take ~30 days to post after self-assessment.<span class="g-blocker">UNFIXABLE IN 20 DAYS IF MISSING</span></div></div></div>
-                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Active JCP — you and mfr CAGE 81996</div><div class="gd"><code>A-11 / 252.225-7048</code> — a lapse on either party blocks the export-controlled TDP; no TDP = no responsible price.</div></div></div>
-                  <div class="g-row"><span class="gbx"></span><div><div class="gt">Written supplier lead-time &le; 135 days</div><div class="gd">P/N 70410-02501-045 from a sole manufacturer — unconfirmed lead time = default-termination exposure.</div></div></div>
+                  <div class="g-row" data-gate><div class="g-row-top"><span class="gbx"></span><span class="g-sev hard">Hard · lead time</span><span class="gt">Current SPRS score on file</span><span class="g-cite">DFARS 252.204-7020</span><svg class="g-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div><div class="g-detail"><code>DFARS 252.204-7020</code> — scores take ~30 days to post after self-assessment.<span class="g-blocker">UNFIXABLE IN 20 DAYS IF MISSING</span></div></div>
+                  <div class="g-row" data-gate><div class="g-row-top"><span class="gbx"></span><span class="g-sev hard">Hard · eligibility</span><span class="gt">Active JCP — you and mfr CAGE 81996</span><span class="g-cite">A-11 / 252.225-7048</span><svg class="g-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div><div class="g-detail">A lapse on either party blocks the export-controlled TDP; no TDP = no responsible price.</div></div>
+                  <div class="g-row" data-gate><div class="g-row-top"><span class="gbx"></span><span class="g-sev hard">Hard · lead time</span><span class="gt">Written supplier lead-time &le; 135 days</span><span class="g-cite">§L</span><svg class="g-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></div><div class="g-detail">P/N 70410-02501-045 from a sole manufacturer — unconfirmed lead time = default-termination exposure.</div></div>
                 </div>
                 <div class="g-outcome" data-field="gate_outcomes">
                   <div class="g-oc win"><b>All three &check;</b> → straightforward LPTA win on price + packaging. Low competition.</div>
@@ -2326,6 +2422,9 @@ Capture Lead, [Company]
 /* ───── interactive decision gate — tick what you hold, the verdict resolves live ─────
    Turns §06's gate from a static list into a decision instrument. All conditions checked → BID (green);
    any unchecked → NO-BID (red, the conservative default that also prints correctly). */
+/* Densify port 2026-06-21: dense rows split the click — the checkbox toggles
+   .checked (the live 0/N count + pill), the rest of the row toggles .open (the
+   .g-detail). Handlers are gated on the event target so they never both fire. */
 (function(){
   var card=document.getElementById('reco-gate'); if(!card) return;
   var rows=[].slice.call(card.querySelectorAll('.g-row'));
@@ -2341,10 +2440,14 @@ Capture Lead, [Company]
     if(no) no.classList.toggle('active', !all);
   }
   rows.forEach(function(r){
-    r.setAttribute('role','checkbox'); r.setAttribute('tabindex','0'); r.setAttribute('aria-checked','false');
-    function toggle(){ var c=r.classList.toggle('checked'); r.setAttribute('aria-checked', c?'true':'false'); resolve(); }
-    r.addEventListener('click', toggle);
-    r.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+    var top=r.querySelector('.g-row-top')||r, box=r.querySelector('.gbx');
+    function check(){ var c=r.classList.toggle('checked'); r.setAttribute('aria-checked', c?'true':'false'); resolve(); }
+    box && box.setAttribute('role','checkbox'); box && box.setAttribute('tabindex','0'); box && box.setAttribute('aria-checked','false');
+    top.addEventListener('click',function(e){
+      if(box && (e.target===box || box.contains(e.target))) check();
+      else r.classList.toggle('open');
+    });
+    box && box.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); check(); } });
   });
   resolve();
 })();
@@ -2660,6 +2763,16 @@ document.querySelectorAll('.jump a, .act[href^="#"]').forEach(function(a){
     try{localStorage.setItem(KEY,next);}catch(e){}
   });
 })();
+
+/* Densify port 2026-06-21: source-manifest expand/collapse. Collapsed by
+   default; "View sources" / "Hide sources" toggles .man.open. */
+document.querySelectorAll('[data-man-toggle]').forEach(function(t){
+  t.addEventListener('click',function(){
+    var m=t.closest('.man'); if(!m) return; m.classList.toggle('open');
+    var lbl=m.querySelector('.man-expand');
+    if(lbl&&lbl.firstChild) lbl.firstChild.textContent=m.classList.contains('open')?'Hide sources':'View sources';
+  });
+});
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════

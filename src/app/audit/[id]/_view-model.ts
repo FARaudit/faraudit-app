@@ -166,9 +166,22 @@ export interface AuditViewModel {
   // entry maps an engine DecisionGate to a renderable condition row.
   gate_conditions: Array<{
     title: string;       // Short condition headline (gate_label core)
+    // Densify port (Design 2026-06-21): a CONCISE distinguishing label derived
+    // from `title` — the key noun phrase (e.g. "Safety", "Corporate Experience",
+    // "SPRS"). Used by the masthead .mhv-countref split line + the exec .es-ref
+    // card to name the hard gates ("3 hard (Safety, …)") WITHOUT re-listing the
+    // full titles (those stay only in §06 .g-rows). Honesty: derived from the
+    // real title, never invented.
+    short_label: string;
     context: string;     // Inline context (e.g. CAGE / vendor / brief verification)
     citation: string;    // Clause cite or "—" when none (e.g. "DFARS 252.204-7020")
     blocker_note: string; // "UNFIXABLE IN N DAYS IF MISSING" when not curable, else ""
+    // Densify port (Design 2026-06-21): severity drives the §06 sort (hard first)
+    // + the .g-sev badge. "hard" = uncurable in the response window (blocker_note
+    // present); "curable" = in the offeror's control. severity_label is the human
+    // string Design renders ("Hard · historical", "In your control").
+    severity: "hard" | "curable";
+    severity_label: string;
   }>;
 
   // FA-112: gate_pearl ("catch worth the subscription" band). No engine surface
@@ -291,7 +304,7 @@ export interface AuditViewModel {
   gate_card: {
     verdict_text: string;       // .gate-verdict text inside .gc-h
     lead_text: string;          // .gc-lead text
-    count_text: string;         // .gs-cnt initial "0 / N cleared"
+    count_text: string;         // .gs-cnt initial "0 / N" (template adds "cleared")
     pill_text: "BID" | "CAUTION" | "NO-BID"; // .gs-pill initial — matches the
                                  // verdict (CAUTION when curable); resolver flips to BID on full check
     // Phase 3 E7 (F7) — outcome lead words inside .g-oc.win/.g-oc.no <b>
@@ -1516,7 +1529,7 @@ function deriveGateCardProse(
     return {
       verdict_text: recommendation === "GO" ? "Bid with confidence" : recommendation === "DECLINE" ? "No-bid — bid not recommended" : "Caution — close gaps before bid",
       lead_text: "No structural gates fired on this audit. Standard scored audit applies.",
-      count_text: "0 / 0 cleared",
+      count_text: "0 / 0",
       pill_text: recommendation === "GO" ? "BID" : recommendation === "DECLINE" ? "NO-BID" : "CAUTION",
       // No gates → outcome words are placeholders; .gate-card is hidden
       // when verdict_mode !== "gate", so these never render in practice.
@@ -1593,7 +1606,9 @@ function deriveGateCardProse(
   return {
     verdict_text: verdictText,
     lead_text: leadText,
-    count_text: `0 / ${n} cleared`,
+    // gs-cnt holds "N / M" only; the template + JS resolver supply the trailing
+    // "cleared" word once (avoids the doubled "cleared cleared" — Design flag).
+    count_text: `0 / ${n}`,
     // FA-165: curable gates are CAUTION (match verdict_word), not a hard NO-BID.
     pill_text: allUncurable ? "NO-BID" : "CAUTION",
     outcome_win_lead: outcomeWin,
@@ -1646,13 +1661,79 @@ function deriveGateConditions(
       context = sanitizeDisplayText(truncateOnWord(firstSentence, 110));
     }
     const citation = CITATIONS[id] || "—";
-    const blockerNote = g.cure_possible_in_window === false
+    const hard = g.cure_possible_in_window === false;
+    const blockerNote = hard
       ? (daysToDeadline != null && daysToDeadline > 0
           ? `UNFIXABLE IN ${daysToDeadline} DAYS IF MISSING`
           : "UNFIXABLE BEFORE DEADLINE IF MISSING")
       : "";
-    return { title, context, citation, blocker_note: blockerNote };
+    return { title, short_label: deriveGateShortLabel(title, id), context, citation, blocker_note: blockerNote, ...gateSeverity(hard, id) };
   });
+}
+
+// Densify port (Design 2026-06-21): derive a CONCISE distinguishing label from
+// the gate's full title for the masthead/exec count line (Design shows e.g.
+// "3 hard (Safety, Corporate Experience, SPRS)"). HONESTY: every label is the
+// title's own key noun phrase — never invented. Heuristic:
+//   1. drop a "Factor N —" / "Factor N:" prefix,
+//   2. take the head clause before the first ":" / em-dash / en-dash,
+//   3. strip a trailing parenthetical / "required"/"requirement" tail,
+//   4. fall back to the first ~3 words when nothing clean survives.
+// Known gate ids get their canonical short term so the well-known DoD gates
+// read crisply ("SPRS", "JCP", "FAA Part 145") rather than a clipped sentence.
+const GATE_SHORT_BY_ID: Record<string, string> = {
+  SPRS_SCORE_REQUIRED: "SPRS",
+  JCP_CERTIFICATION_REQUIRED: "JCP",
+  FAA_145_SPECIFIC_PNS: "FAA Part 145",
+  TEST_JIG_APPROVAL: "Test jig approval",
+  AFTO_ACCESS: "AFTO access",
+  SOLE_SOURCE_NAMED_VENDOR: "Sole-source vendor",
+};
+function deriveGateShortLabel(title: string, gateId?: string): string {
+  const id = String(gateId ?? "");
+  if (id && GATE_SHORT_BY_ID[id]) return GATE_SHORT_BY_ID[id];
+  let s = sanitizeDisplayText(title);
+  if (!s) return "";
+  // 1. drop a leading gate-DISPOSITION prefix that doesn't distinguish the gate
+  //    ("Pass/Fail:", "Mandatory:", "Disqualifier:", "Go/No-Go:", "Gate:") so
+  //    the real noun phrase that follows wins (titles arrive as e.g.
+  //    "Pass/Fail: Factor 3 - Safety").
+  s = s.replace(/^\s*(?:pass\s*\/?\s*fail|go\s*\/?\s*no[\s-]?go|mandatory|disqualif\w*|required|gate|hard\s*gate)\s*[:—–-]\s*/i, "").trim();
+  // 2. drop "Factor N —"/"Factor N:"/"Factor N." / "Factor N -" prefix.
+  s = s.replace(/^\s*factor\s+\d+\s*[—–:.\-]\s*/i, "").trim();
+  // 3. head clause before the first ":" / em-dash / en-dash (NOT a hyphen — a
+  //    hyphen inside "Technical/Management" or "Service-Disabled" is part of the
+  //    noun phrase). The Factor prefix's " - " was already removed in step 2.
+  s = s.split(/\s*[:—–]\s*/)[0].trim();
+  // 3. strip a trailing parenthetical + a trailing "required/requirement" tail.
+  s = s.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  s = s.replace(/\s+(?:is\s+)?(?:required|requirement|mandatory)\b.*$/i, "").trim();
+  s = s.replace(/[.,;:\s]+$/, "").trim();
+  // 4. fall back to first ~3 words when the head clause is empty or still long.
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 5) {
+    return sanitizeDisplayText(title).split(/\s+/).slice(0, 3).join(" ");
+  }
+  return s;
+}
+
+// Densify port (Design 2026-06-21): map a gate's curability to the severity
+// field set the §06 card sorts + badges on. "hard" = can't be cured inside the
+// response window; "curable" = in the offeror's control. The label leans on the
+// gate identity for the historical/eligibility/lead-time nuance Design shows,
+// falling back to a generic phrase for unknown ids.
+function gateSeverity(hard: boolean, gateId?: string): { severity: "hard" | "curable"; severity_label: string } {
+  if (!hard) return { severity: "curable", severity_label: "In your control" };
+  const id = String(gateId ?? "");
+  const HARD_LABEL: Record<string, string> = {
+    SPRS_SCORE_REQUIRED: "Hard · lead time",
+    JCP_CERTIFICATION_REQUIRED: "Hard · lead time",
+    FAA_145_SPECIFIC_PNS: "Hard · eligibility",
+    TEST_JIG_APPROVAL: "Hard · lead time",
+    AFTO_ACCESS: "Hard · eligibility",
+    SOLE_SOURCE_NAMED_VENDOR: "Hard · eligibility"
+  };
+  return { severity: "hard", severity_label: HARD_LABEL[id] || "Hard" };
 }
 
 // Data-driven gates from the solicitation's OWN deal-breakers. The DoD gate
@@ -1679,7 +1760,9 @@ function deriveGatesFromRiskFindings(
     // FA-195-v2 Fix 3: clamp on a WORD boundary, never mid-word.
     const context = sanitizeDisplayText(truncateOnWord(textFirst, 110)) || "";
     const citation = sanitizeDisplayText(f.citation) || "—";
-    out.push({ title, context, citation, blocker_note: "" });
+    // Engine-categorized "Disqualification" findings bar award — treat as hard
+    // (the offeror can't author their way out of a disqualifier in-window).
+    out.push({ title, short_label: deriveGateShortLabel(title), context, citation, blocker_note: "", severity: "hard", severity_label: "Hard" });
   }
   return out;
 }
@@ -1698,11 +1781,23 @@ function readEngineGateConditions(
     const o = r as Record<string, unknown>;
     const title = sanitizeDisplayText(o.title);
     if (!title) continue;
+    const blockerNote = sanitizeDisplayText(o.blocker_note) || "";
+    // Densify port: honor an explicit engine severity if present, else derive
+    // from blocker_note (a non-empty "UNFIXABLE…" note = hard).
+    const explicitSeverity = String(o.severity ?? "").toLowerCase() === "curable" ? "curable"
+      : String(o.severity ?? "").toLowerCase() === "hard" ? "hard"
+      : null;
+    const hard = explicitSeverity ? explicitSeverity === "hard" : blockerNote.length > 0;
+    const severityLabel = sanitizeDisplayText(o.severity_label)
+      || (hard ? "Hard" : "In your control");
     out.push({
       title,
+      short_label: sanitizeDisplayText(o.short_label) || deriveGateShortLabel(title),
       context: sanitizeDisplayText(o.context) || "",
       citation: sanitizeDisplayText(o.citation) || "—",
-      blocker_note: sanitizeDisplayText(o.blocker_note) || ""
+      blocker_note: blockerNote,
+      severity: hard ? "hard" : "curable",
+      severity_label: severityLabel
     });
   }
   return out;
