@@ -966,7 +966,17 @@ export function readIngestion(comp: Record<string, unknown> | null | undefined):
 // V1-only renders). Strips itself when there's no manifest.
 export function renderIngestionBannerFromAudit(html: string, audit: Record<string, unknown> | null | undefined): string {
   const comp = audit?.compliance_json as Record<string, unknown> | undefined;
-  return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput);
+  // FA-INGEST4b — §L/§M coverage reconciliation. The manifest coverage chip otherwise
+  // detects sections by FILENAME only (classifySectionRoles), so a COMBINED RFP — where
+  // §C/§L/§M live inside the primary solicitation doc, not as separate files — falsely
+  // reads "§L · §M not detected" even though the engine clearly read them. Reconcile with
+  // what the engine ACTUALLY analyzed: non-empty evaluation_factors ⇒ §M was read;
+  // non-empty submission_requirements ⇒ §L was read. (If the engine truly found neither,
+  // these stay empty and the honest "not detected" warning still fires.)
+  const analyzed = new Set<string>();
+  if (Array.isArray(comp?.evaluation_factors) && (comp!.evaluation_factors as unknown[]).length > 0) analyzed.add("M");
+  if (Array.isArray(comp?.submission_requirements) && (comp!.submission_requirements as unknown[]).length > 0) analyzed.add("L");
+  return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput, analyzed);
 }
 
 // Densify port (Design 2026-06-21): normalize a raw SAM filename into a clean
@@ -1017,7 +1027,7 @@ function docRowHtml(f: IngestionRender["files"][number], tags: string): string {
 // coverage chip + "View sources". Expanded body: "Read in full" (per file, by
 // §-section/role) and "Indexed — not deep-read" (grouped by reason, one reason
 // chip per group). Raw filename preserved in each row's title attribute.
-function renderIngestionBanner(html: string, v: V2RenderInput): string {
+function renderIngestionBanner(html: string, v: V2RenderInput, analyzedSections: Set<string> = new Set()): string {
   const ing = v.ingestion;
   // No manifest → strip the banner. Always-on when files exist; never faked.
   if (!ing || ing.files.length === 0) return stripIfEmpty(html, "ingestion", true);
@@ -1037,6 +1047,9 @@ function renderIngestionBanner(html: string, v: V2RenderInput): string {
   const allIngested = ing.files_total > 0 && ing.files_read >= ing.files_total;
   const detected = new Set<string>();
   ing.files.forEach((f) => (f.section_roles ?? []).forEach((s) => detected.add(s)));
+  // FA-INGEST4b: merge in sections the ENGINE analyzed from the primary doc's text
+  // (combined RFPs carry §L/§M inside the solicitation, not as named files).
+  analyzedSections.forEach((s) => detected.add(s));
   let covClass: "ok" | "warn";
   let covText: string;
   if (detected.size > 0) {

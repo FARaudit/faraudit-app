@@ -209,6 +209,17 @@ button{font-family:inherit}
 .eval-gap b{color:var(--ink);font-weight:700}
 [data-theme="dark"] .eval-gap{background:rgba(214,162,60,.12);border-color:transparent;color:var(--ink-2)}
 [data-theme="dark"] .eval-gap svg{color:#fcd34d}
+/* FA-INGEST4b — Design-approved dark-mode fix for the page-level amber warning
+   banners (partial-ingest + not-a-solicitation). Previously inline-styled with a
+   hardcoded light --amber-50 fill + --ink-2 body (which flips light in dark) →
+   light text on a light banner. Move the visual to this class (light pixel-
+   unchanged) + the dark override mirrors .moment/.eval-gap. */
+.ingest-incomplete{display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);margin:18px 0}
+.ingest-incomplete .ii-ico{flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--amber-600);color:#fff;display:grid;place-items:center}
+.ingest-incomplete .ib-h{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin:0 0 6px}
+.ingest-incomplete .ii-body{font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch}
+[data-theme="dark"] .ingest-incomplete{background:linear-gradient(98deg,rgba(217,119,6,.12),var(--card) 64%);border-color:rgba(217,119,6,.4);border-left-color:var(--amber-600)}
+[data-theme="dark"] .ingest-incomplete .ib-h{color:#fcd34d}
 .mh-left{padding:26px 30px 24px;min-width:0;display:flex;flex-direction:column}
 .mh-eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
 .mh-eyebrow .doc-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;background:rgba(55,138,221,.08);border:1px solid var(--accent-light);color:var(--accent-deep);letter-spacing:.08em}

@@ -701,14 +701,12 @@ function injectCtaHandlers(html: string, auditId: string, noticeId: string): str
 // above §05 Risk Register (per DESIGN spec). Inline-styled to match the
 // .moment band's amber palette without touching the template's CSS block.
 function insertNotSolicitationBanner(html: string): string {
-  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);margin:18px 0";
-  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--amber-600);color:#fff;display:grid;place-items:center";
-  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin:0 0 6px";
-  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  // FA-INGEST4b: class-based (.ingest-incomplete) so dark mode doesn't wash out
+  // (Design-approved); light render is pixel-identical to the prior inline styling.
   const banner = `
-      <section style="${bannerStyle}" role="status" aria-label="Document is not a solicitation">
-        <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-        <div style="min-width:0"><p style="${eyebrowStyle}">Not a solicitation</p><p style="${bodyStyle}">This document doesn't appear to be a solicitation — award notice, attachment, or no FAR/DFARS clauses detected. <b>Upload the actual RFP/RFQ/IFB to run a full audit.</b></p></div>
+      <section class="ingest-incomplete" role="status" aria-label="Document is not a solicitation">
+        <div class="ii-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div style="min-width:0"><p class="ib-h">Not a solicitation</p><p class="ii-body">This document doesn't appear to be a solicitation — award notice, attachment, or no FAR/DFARS clauses detected. <b>Upload the actual RFP/RFQ/IFB to run a full audit.</b></p></div>
       </section>
 `;
   // Insert directly before the rpt-grid so it lands between the masthead/key-
@@ -725,14 +723,12 @@ function insertNotSolicitationBanner(html: string): string {
 // identified. Amber: the audit is real but its input set is incomplete —
 // a different severity class than FA-137's red §05 collapse.
 function insertIngestionBanner(html: string, note: string): string {
-  const bannerStyle = "display:flex;align-items:flex-start;gap:14px;padding:18px 22px;background:linear-gradient(98deg,var(--amber-50),var(--card) 64%);border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:16px;box-shadow:var(--shadow);margin:18px 0";
-  const icoStyle = "flex-shrink:0;width:32px;height:32px;border-radius:9px;background:var(--amber-600);color:#fff;display:grid;place-items:center";
-  const eyebrowStyle = "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-800);margin:0 0 6px";
-  const bodyStyle = "font-size:14px;line-height:1.55;color:var(--ink-2);margin:0;max-width:80ch";
+  // FA-INGEST4b: class-based (.ingest-incomplete) dark-mode fix (Design-approved);
+  // light render pixel-identical to the prior inline styling.
   const banner = `
-      <section style="${bannerStyle}" role="status" data-ingestion-incomplete aria-label="Document set partially ingested">
-        <div style="${icoStyle}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-        <div style="min-width:0"><p style="${eyebrowStyle}">Document set partially ingested</p><p style="${bodyStyle}">${escapeHtml(note)}</p></div>
+      <section class="ingest-incomplete" role="status" data-ingestion-incomplete aria-label="Document set partially ingested">
+        <div class="ii-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div style="min-width:0"><p class="ib-h">Document set partially ingested</p><p class="ii-body">${escapeHtml(note)}</p></div>
       </section>
 `;
   return html.replace(

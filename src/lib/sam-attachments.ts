@@ -65,7 +65,7 @@ const FETCH_TIMEOUT_MS = 30000;
 // the real, safe ceilings: a genuinely huge package still trims lowest-tier docs
 // in tier order rather than 400-ing. 30 lets a normal large solicitation ingest
 // in full at no extra cost.
-export const MAX_DOCS = 30;
+export const MAX_DOCS = 36;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-INGEST4 (2026-06-22, root-class fix on the live N4008526R0065 run): the 15MB
 // MAX_TOTAL_INLINE_BYTES gate was running PRE-DOWNLOAD inside applyBudget, summing
@@ -114,6 +114,14 @@ export const MAX_TOTAL_TOKENS = 850_000;
 // truncated to at most this many tokens (with an honest "(truncated)" note), so
 // one huge member can never evict §C/§L/§M.
 export const MAX_DOC_TOKENS = 250_000;
+// FA-INGEST4b (2026-06-22) — per-doc cap for BULK SPREADSHEETS (.xlsx). ELINS /
+// inventory sheets extract to enormous text (thousands of line-item rows); at the
+// 250k MAX_DOC_TOKENS cap, 3 ingested inventory .xlsx ate ~750k of the 850k budget
+// and starved the rest (N4008526R0065 stalled at 20/33). An audit needs the sheet's
+// STRUCTURE + a representative sample + totals, not every row — so .xlsx is truncated
+// far smaller (with an honest note) at extraction, freeing the budget for the other
+// docs. .docx (prose addenda — §M, price narratives) keeps full text.
+export const MAX_XLSX_DOC_TOKENS = 60_000;
 // FA-INGEST4 (2026-06-22) — INLINE VISION byte budget. The 32MB-per-request
 // Anthropic hard limit is on the base64-ENCODED payload (base64 inflates raw
 // bytes ~33%). Text docs ride as cheap text blocks (token-bounded above); only
@@ -613,9 +621,23 @@ export function isPdfPortfolio(buffer: Buffer): boolean {
 // fallback; the caller flags it, never fabricates).
 async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null> {
   if (raw.subarray(0, 4).toString("latin1") === "%PDF") return raw;
-  if (nonPdfKind(name)) {
-    const text = await extractNonPdfText(name, raw);
-    if (text) return textToPdfBuffer(text, name);
+  const kind = nonPdfKind(name);
+  if (kind) {
+    let text = await extractNonPdfText(name, raw);
+    if (text) {
+      // FA-INGEST4b: cap bulk spreadsheets (.xlsx) at the source so a giant
+      // inventory/ELINS sheet can't hog the token budget and starve other docs.
+      // Keep the structure + a representative sample; honest truncation note.
+      // .docx prose is left intact (bounded later by MAX_DOC_TOKENS if needed).
+      if (kind === "xlsx") {
+        const maxChars = Math.floor(MAX_XLSX_DOC_TOKENS * CHARS_PER_TOKEN);
+        if (text.length > maxChars) {
+          text = text.slice(0, Math.max(0, maxChars - 130)) +
+            "\n\n[… spreadsheet truncated for the analysis budget — representative rows shown; full line-item file on SAM.gov …]";
+        }
+      }
+      return textToPdfBuffer(text, name);
+    }
   }
   return null;
 }
@@ -658,24 +680,35 @@ async function countPdfPages(buf: Buffer): Promise<number> {
   }
 }
 
+// Anthropic PDF vision cost is billed roughly per PAGE (a rendered page-image
+// costs far less than its base64 byte length). Used to estimate a no-text doc's
+// token cost sanely instead of by raw bytes.
+const VISION_TOKENS_PER_PAGE = 1600;
+
 // Token estimate for a (PDF) buffer: extract the text and estimate via
-// CHARS_PER_TOKEN. This mirrors what Anthropic actually charges for an inline
-// PDF (the text content dominates), and it's the same text the section/clause
-// extractors already read — so the estimate tracks the real prompt cost. An
-// extraction failure yields a conservative non-zero estimate from the raw byte
-// length so an unreadable doc never silently counts as 0 tokens.
+// CHARS_PER_TOKEN — the text content is what the model reads and is billed for.
 async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string }> {
   try {
     const extracted = await extractText(buf);
     const text = extracted.rawText ?? "";
     if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text };
   } catch {
-    /* fall through to the byte-length estimate */
+    /* fall through to the page-based vision estimate */
   }
-  // No usable text (scanned/image PDF, parse failure): a vision-rendered page is
-  // far cheaper than its base64 byte length, but we still want a non-zero, safe
-  // figure. Use raw bytes / CHARS_PER_TOKEN as a conservative ceiling.
-  return { tokens: estimateTokensFromChars(buf.length), text: "" };
+  // No usable text (scanned/image PDF, parse/OCR failure): it will ride as a
+  // base64 VISION block, billed by PAGE — NOT by raw byte length. The old
+  // buf.length/CHARS_PER_TOKEN fallback produced phantom counts (a 4MB scan →
+  // ~1.1M "tokens") that blew the 850k budget and FALSELY dropped readable docs
+  // (FA-INGEST4b: the package's real text is only ~381k tokens, yet the engine
+  // stalled at 20/33 because one inflated doc saturated the budget). Estimate by
+  // pages at the vision rate; cap by MAX_DOC_TOKENS when pages are unknown so a
+  // single unreadable file can never explode the budget.
+  let pages = 0;
+  try { pages = await countPdfPages(buf); } catch { /* pages unknown */ }
+  const tokens = pages > 0
+    ? pages * VISION_TOKENS_PER_PAGE
+    : Math.min(estimateTokensFromChars(buf.length), MAX_DOC_TOKENS);
+  return { tokens, text: "" };
 }
 
 // Truncate a doc to a token budget. We have the extracted `text`; keep the
