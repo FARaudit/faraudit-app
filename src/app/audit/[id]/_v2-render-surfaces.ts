@@ -338,6 +338,24 @@ export function buildV2ViewModelFromShadow(
             required.push({ number: num, title: trap.title, badge: "trap" as MatrixBadge, trapReason: trap.reason });
           }
         }
+        // FA-report-batch: the V2 matrix_rollup can be a SUBSET of the exhaustively
+        // extracted far_clauses/dfars_clauses (N4008526R0065: source + engine have
+        // 156 FAR + 61 DFARS = 217, but V2's matrix rendered only 123). A clause
+        // matrix that silently drops ~94 extracted clauses fails the "exhaustive"
+        // promise — UNION the V1 lists into the reference set so every extracted
+        // clause shows. V2 keeps its trap-badging; V1 fills the long tail.
+        const v1Union = [
+          ...(Array.isArray(comp.far_clauses) ? (comp.far_clauses as unknown[]) : []),
+          ...(Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as unknown[]) : []),
+        ]
+          .map((c) => (typeof c === "string" ? c : String((c as { number?: string })?.number ?? "")).trim())
+          .filter(Boolean);
+        for (const num of v1Union) {
+          if (!present.has(num)) {
+            reference.push({ number: num, title: resolveClauseTitle(num) || "(title not extracted)", badge: "reference" as MatrixBadge, trapReason: null });
+            present.add(num);
+          }
+        }
         return { required, reference, reference_count: reference.length };
       }
       const dfars: string[] = Array.isArray(comp.dfars_clauses) ? (comp.dfars_clauses as string[]) : [];
