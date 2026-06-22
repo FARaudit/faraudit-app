@@ -26,7 +26,7 @@
 // know nothing about the set), logged loudly.
 
 import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extractor";
-import { extractText } from "./pdf-text-extractor";
+import { extractText, MIN_TEXT_CHARS_FOR_TEXT_BLOCK, meaningfulCharCount } from "./pdf-text-extractor";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
@@ -56,7 +56,16 @@ const FETCH_TIMEOUT_MS = 30000;
 // 12 of 33, dropping the Inventory). 18 admits the long-tail content of large
 // multi-section sets; the token budget below + the per-call guard remain the
 // real ceilings, so this never risks the API payload limit.
-export const MAX_DOCS = 18;
+// FA-INGEST3 (2026-06-21, ground-truth verified): raised 18 → 30. Ground-truth
+// measurement of the N4008526R0065 set showed all 33 docs total only ~380k tokens
+// as text — the full package fits ~4x under the 850k token budget. With the
+// page-budget now vision-only (text docs no longer page-dropped), the doc-COUNT
+// cap was the last artificial limit leaving valuable docs (ELINs, annexes) unread.
+// The TOKEN budget (850k) + the per-call count_tokens guard (1M context) remain
+// the real, safe ceilings: a genuinely huge package still trims lowest-tier docs
+// in tier order rather than 400-ing. 30 lets a normal large solicitation ingest
+// in full at no extra cost.
+export const MAX_DOCS = 30;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
@@ -750,17 +759,31 @@ export async function assembleSamDocumentSet(
     const { tokens, text } = await estimateDocTokens(buf);
     fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
   }
-  // Pass 2: trim by the page ceiling (pure, tier order, form exempt → generics
-  // drop first; the work statement, evaluated first, is never the one dropped).
+  // Pass 2: trim by the page ceiling — but ONLY for VISION-delivered docs.
+  // FA-INGEST3 (2026-06-21): the ~600-page API ceiling that MAX_TOTAL_PAGES guards
+  // applies to base64-PDF VISION blocks (page-images). After FA-INGEST1, any doc
+  // with substantial extractable text rides as a TEXT block instead — it has NO
+  // page cost, only token cost (bounded by the token budget below + the per-call
+  // guard). The page budget was running BEFORE the text/vision decision and
+  // dropping text-deliverable docs for a limit that never applies to them
+  // (N4008526R0065: 11 of 33 ingested while the ELINs/amendments rode as text).
+  // Fix: text-deliverable docs contribute 0 pages → never page-dropped; only
+  // genuinely image-only docs consume the page budget. No added cost — same single
+  // call-set, the text just rides in the cache-controlled prefix.
+  // Text-vs-vision decision shared with the engine (single source of truth in
+  // pdf-text-extractor) so the page-exemption here can never drift from how the
+  // engine actually delivers the doc.
+  const isTextDeliverable = (f: { text: string }): boolean =>
+    !!f.text && !f.text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(f.text) >= MIN_TEXT_CHARS_FOR_TEXT_BLOCK;
   const { ingest: pageKept } = applyPageBudget(
-    fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: f.pages })),
+    fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: isTextDeliverable(f) ? 0 : f.pages })),
     MAX_TOTAL_PAGES
   );
   const pageKeptIds = new Set(pageKept.map((k) => k.resourceId));
   // Pass 2b — TOKEN ceiling (regression fix 2026-06-21): the byte + page budgets
   // do NOT bound tokens, so a dense set could still exceed the 1M model context
   // (N4008526R0065 hit 1.14M → hard 400). Over the page-kept set, in tier order
-  // (primary first, form exempt), cap the assembled DOCUMENT text at ~700k and
+  // (primary first, form exempt), cap the assembled DOCUMENT text at ~850k and
   // truncate any single oversized doc to ~250k so one huge file can't starve the
   // core solicitation.
   const tokenInputs = fetched.filter((f) => pageKeptIds.has(f.entry.resourceId));
