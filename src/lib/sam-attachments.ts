@@ -67,6 +67,22 @@ const FETCH_TIMEOUT_MS = 30000;
 // in full at no extra cost.
 export const MAX_DOCS = 30;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
+// FA-INGEST4 (2026-06-22, root-class fix on the live N4008526R0065 run): the 15MB
+// MAX_TOTAL_INLINE_BYTES gate was running PRE-DOWNLOAD inside applyBudget, summing
+// each file's raw size and dropping the overflow BEFORE the engine ever learned a
+// doc was text-readable. On N4008526R0065 (33 docs / 31.5MB) it killed 13 readable
+// docs as "inline budget exceeded" — the engine deep-read only 15/33. This is the
+// SAME class of bug FA-INGEST3 fixed for the PAGE budget (text-deliverable docs
+// dropped for a vision-era ceiling); the BYTE budget was missed. Under FA-INGEST1
+// text-first delivery a text doc costs TOKENS, not inline base64 bytes — so the
+// inline-bytes ceiling is the wrong pre-download metric. Fix: the pre-download gate
+// now enforces only a GENEROUS download-sanity guard (this constant); the real
+// ceilings are the post-extraction, text-aware PAGE (vision-only) + TOKEN budgets
+// below, plus the per-call count_tokens guard. Scanned docs (e.g. SF-30 amendment
+// covers) are OCR'd to text by extractText (PR #88 + worker ocrmypdf, FA-INGEST4)
+// so they ride cheap instead of consuming inline bytes. 80MB stops only pathological
+// download dumps; a normal large package (≤MAX_DOCS, ~30MB) ingests in full.
+export const MAX_DOWNLOAD_BYTES = 80 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
 // FAILS the run (unlike an empty-JSON call-3 collapse). Bytes (15MB) do NOT
@@ -98,6 +114,19 @@ export const MAX_TOTAL_TOKENS = 850_000;
 // truncated to at most this many tokens (with an honest "(truncated)" note), so
 // one huge member can never evict §C/§L/§M.
 export const MAX_DOC_TOKENS = 250_000;
+// FA-INGEST4 (2026-06-22) — INLINE VISION byte budget. The 32MB-per-request
+// Anthropic hard limit is on the base64-ENCODED payload (base64 inflates raw
+// bytes ~33%). Text docs ride as cheap text blocks (token-bounded above); only
+// genuinely image-only / scanned docs are delivered as base64 vision blocks —
+// and the per-call count_tokens guard trims TEXT, never vision blocks. So an
+// image-heavy package (e.g. four 20MB scanned drawing sets) could otherwise
+// assemble >32MB of base64 and hard-400 the run. This caps the cumulative
+// base64 size of VISION-delivered docs so the assembled request can never breach
+// 32MB; text docs are unaffected. ~24MB base64 leaves headroom for the text
+// blocks + system/template/output under 32MB. The form is exempt (a single huge
+// scanned solicitation is routed via the Files API, not inline). Measured on the
+// base64 length, not raw bytes.
+export const MAX_INLINE_VISION_BYTES = 24 * 1024 * 1024;
 // Cheap token estimate — ~3.5 chars/token (no tokenizer dependency; deliberately
 // conservative so we under-fill rather than overflow). Exported for the gate suite.
 export const CHARS_PER_TOKEN = 3.5;
@@ -535,7 +564,7 @@ const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
 // budget on an unsized file beyond the form). Near-duplicate files are deduped
 // first so duplicate copies never consume slots that distinct docs need.
-export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_TOTAL_INLINE_BYTES): {
+export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
   ingest: DocumentPlanEntry[];
   skipped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
@@ -563,7 +592,7 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
     if (!INGESTIBLE_EXT.test(e.name)) { skipped.push({ entry: e, reason: "unsupported attachment type (not PDF/DOCX/XLSX)" }); continue; }
     if (e.sizeBytes == null) { skipped.push({ entry: e, reason: "size unknown — excluded from budget" }); continue; }
     if (ingest.length >= maxDocs) { skipped.push({ entry: e, reason: `document cap (${maxDocs}) reached` }); continue; }
-    if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `inline budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
+    if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `download budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
     ingest.push(e);
     total += e.sizeBytes;
   }
@@ -796,12 +825,25 @@ export async function assembleSamDocumentSet(
   const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
   const downloaded: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  // FA-INGEST4: cumulative base64 size of VISION-delivered (image-only) docs.
+  // The count_tokens guard trims text, never vision blocks, so this is the only
+  // bound on the 32MB-per-request inline payload. Text docs don't count.
+  let visionBase64Bytes = 0;
   for (const f of fetched) {
     const kept = tokenKeptById.get(f.entry.resourceId);
     if (kept) {
       // Apply per-doc truncation when the token budget flagged this doc.
       const buf = kept.truncated ? truncateDocToTokens(f.entry.name, f.buffer, f.text, MAX_DOC_TOKENS) : f.buffer;
       const base64 = buf === f.buffer ? f.base64 : buf.toString("base64");
+      // A doc with no meaningful extractable text rides as a base64 VISION block
+      // (the engine's textForDocOrNull would return null). The form is exempt — a
+      // single huge scanned solicitation is handled via the Files-API path, not here.
+      const isVisionDoc = f.entry.role !== "form" && !isTextDeliverable(f);
+      if (isVisionDoc && visionBase64Bytes + base64.length > MAX_INLINE_VISION_BYTES) {
+        files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `inline image budget (${Math.round(MAX_INLINE_VISION_BYTES / 1048576)}MB) exceeded — scanned/image doc (keeps the request under the 32MB API limit)` });
+        continue;
+      }
+      if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
       files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
@@ -825,7 +867,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
@@ -929,11 +971,23 @@ export async function assembleUploadedDocumentSet(
   const tokenSkippedIds = new Set(tokenSkipped.map((s) => s.entry.resourceId));
   // Pass 3: build the ingested set + the loud per-file record.
   const ingested: Array<{ name: string; base64: string; buffer: Buffer; role: DocumentPlanEntry["role"] }> = [];
+  // FA-INGEST4: same inline VISION byte cap as the SAM arm (keep the assembled
+  // request under the 32MB API limit; the count_tokens guard trims text, never
+  // vision blocks). Text docs don't count; the form is exempt.
+  const isTextDeliverable = (t: string): boolean =>
+    !!t && !t.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(t) >= MIN_TEXT_CHARS_FOR_TEXT_BLOCK;
+  let visionBase64Bytes = 0;
   for (const c of counted) {
     const kept = tokenKeptById.get(c.entry.resourceId);
     if (kept) {
       const buf = kept.truncated ? truncateDocToTokens(c.entry.name, c.buffer, c.text, MAX_DOC_TOKENS) : c.buffer;
       const base64 = buf === c.buffer ? c.base64 : buf.toString("base64");
+      const isVisionDoc = c.entry.role !== "form" && !isTextDeliverable(c.text);
+      if (isVisionDoc && visionBase64Bytes + base64.length > MAX_INLINE_VISION_BYTES) {
+        files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `inline image budget (${Math.round(MAX_INLINE_VISION_BYTES / 1048576)}MB) exceeded — scanned/image doc (keeps the request under the 32MB API limit)` });
+        continue;
+      }
+      if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
       files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
@@ -955,7 +1009,7 @@ export async function assembleUploadedDocumentSet(
     form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {

@@ -53,7 +53,12 @@ async function main(): Promise<void> {
   const { ingest, skipped } = att.applyBudget(plan1232);
   const totalBytes = ingest.reduce((s, e) => s + (e.sizeBytes ?? 0), 0);
   check("B1 form + amendment always ingested", ingest.some((e) => e.role === "form") && ingest.some((e) => e.role === "amendment"));
-  check(`B2 budget respected (${ingest.length} docs, ${(totalBytes / 1048576).toFixed(1)}MB)`, ingest.length <= att.MAX_DOCS && totalBytes <= att.MAX_TOTAL_INLINE_BYTES);
+  // FA-INGEST4: the pre-download byte gate is now the 80MB MAX_DOWNLOAD_BYTES
+  // sanity guard (the 15MB inline ceiling was wrongly pre-dropping text-readable
+  // docs). NOTE: B4's "Drawing Set" exclusion now only fires if the set exceeds
+  // 80MB OR the 30-doc cap — re-confirm against the live 1232 manifest when this
+  // paid evidence script is next run.
+  check(`B2 budget respected (${ingest.length} docs, ${(totalBytes / 1048576).toFixed(1)}MB)`, ingest.length <= att.MAX_DOCS && totalBytes <= att.MAX_DOWNLOAD_BYTES);
   check("B3 ZIPs excluded with named reason", skipped.some((s) => /\.zip$/i.test(s.entry.name) && /non-PDF/.test(s.reason)));
   check("B4 oversize drawing sets excluded with named reason", skipped.some((s) => /Drawing Set/.test(s.entry.name)));
 

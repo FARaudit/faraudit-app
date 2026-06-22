@@ -9,6 +9,16 @@
 
 providers = ["node"]
 
+# FA-INGEST4 (2026-06-22) — OCR binary activation (earns-its-keep trigger met).
+# The live N4008526R0065 run proved scanned SF-30 amendment covers are image-only:
+# native pdf-parse can't read them, so they fell to base64 vision and consumed the
+# inline budget, starving the package (15/33 deep-read). ocrmypdf converts them to
+# text (extractText OCR fallback, PR #88) so they ride as cheap text instead.
+# ocrmypdf pulls tesseract-ocr + ghostscript as deps. Graceful: extractText returns
+# native text if the binary is ever absent, so this never hard-breaks the worker.
+[phases.setup]
+aptPkgs = ["ocrmypdf"]
+
 [phases.install]
 cmds = ["npm ci --legacy-peer-deps || npm install --legacy-peer-deps"]
 
