@@ -304,7 +304,7 @@ export interface AuditViewModel {
   gate_card: {
     verdict_text: string;       // .gate-verdict text inside .gc-h
     lead_text: string;          // .gc-lead text
-    count_text: string;         // .gs-cnt initial "0 / N cleared"
+    count_text: string;         // .gs-cnt initial "0 / N" (template adds "cleared")
     pill_text: "BID" | "CAUTION" | "NO-BID"; // .gs-pill initial — matches the
                                  // verdict (CAUTION when curable); resolver flips to BID on full check
     // Phase 3 E7 (F7) — outcome lead words inside .g-oc.win/.g-oc.no <b>
@@ -1529,7 +1529,7 @@ function deriveGateCardProse(
     return {
       verdict_text: recommendation === "GO" ? "Bid with confidence" : recommendation === "DECLINE" ? "No-bid — bid not recommended" : "Caution — close gaps before bid",
       lead_text: "No structural gates fired on this audit. Standard scored audit applies.",
-      count_text: "0 / 0 cleared",
+      count_text: "0 / 0",
       pill_text: recommendation === "GO" ? "BID" : recommendation === "DECLINE" ? "NO-BID" : "CAUTION",
       // No gates → outcome words are placeholders; .gate-card is hidden
       // when verdict_mode !== "gate", so these never render in practice.
@@ -1606,7 +1606,9 @@ function deriveGateCardProse(
   return {
     verdict_text: verdictText,
     lead_text: leadText,
-    count_text: `0 / ${n} cleared`,
+    // gs-cnt holds "N / M" only; the template + JS resolver supply the trailing
+    // "cleared" word once (avoids the doubled "cleared cleared" — Design flag).
+    count_text: `0 / ${n}`,
     // FA-165: curable gates are CAUTION (match verdict_word), not a hard NO-BID.
     pill_text: allUncurable ? "NO-BID" : "CAUTION",
     outcome_win_lead: outcomeWin,
