@@ -17,7 +17,7 @@ import {
   applyBudget,
   applyPageBudget,
   MAX_DOCS,
-  MAX_TOTAL_INLINE_BYTES,
+  MAX_DOWNLOAD_BYTES,
   MAX_TOTAL_PAGES,
   type AttachmentManifestEntry,
 } from '../../src/lib/sam-attachments';
@@ -80,11 +80,15 @@ test('WS-3 ballistic control: PWS still ingested (no regression)', () => {
   expect(names.some((n) => /\bPWS\b/i.test(n))).toBe(true);
 });
 
-test('WS-4 budget constants honored (≤5 docs / ≤15MB) on both manifests', () => {
+test('WS-4 budget constants honored (≤30 docs / ≤80MB download guard) on both manifests', () => {
+  // FA-INGEST4: applyBudget's pre-download byte ceiling is now the generous
+  // MAX_DOWNLOAD_BYTES download-sanity guard (not the 15MB inline ceiling, which
+  // was wrongly pre-dropping text-readable docs). The real ceilings are the
+  // post-extraction token/page budgets, exercised elsewhere.
   for (const ingest of [tornadoIngest(), ballisticIngest()]) {
     const totalBytes = ingest.reduce((s, e) => s + (e.sizeBytes ?? 0), 0);
     expect(ingest.length).toBeLessThanOrEqual(MAX_DOCS);
-    expect(totalBytes).toBeLessThanOrEqual(MAX_TOTAL_INLINE_BYTES);
+    expect(totalBytes).toBeLessThanOrEqual(MAX_DOWNLOAD_BYTES);
   }
 });
 

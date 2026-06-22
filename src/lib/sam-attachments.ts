@@ -67,6 +67,22 @@ const FETCH_TIMEOUT_MS = 30000;
 // in full at no extra cost.
 export const MAX_DOCS = 30;
 export const MAX_TOTAL_INLINE_BYTES = 15 * 1024 * 1024;
+// FA-INGEST4 (2026-06-22, root-class fix on the live N4008526R0065 run): the 15MB
+// MAX_TOTAL_INLINE_BYTES gate was running PRE-DOWNLOAD inside applyBudget, summing
+// each file's raw size and dropping the overflow BEFORE the engine ever learned a
+// doc was text-readable. On N4008526R0065 (33 docs / 31.5MB) it killed 13 readable
+// docs as "inline budget exceeded" — the engine deep-read only 15/33. This is the
+// SAME class of bug FA-INGEST3 fixed for the PAGE budget (text-deliverable docs
+// dropped for a vision-era ceiling); the BYTE budget was missed. Under FA-INGEST1
+// text-first delivery a text doc costs TOKENS, not inline base64 bytes — so the
+// inline-bytes ceiling is the wrong pre-download metric. Fix: the pre-download gate
+// now enforces only a GENEROUS download-sanity guard (this constant); the real
+// ceilings are the post-extraction, text-aware PAGE (vision-only) + TOKEN budgets
+// below, plus the per-call count_tokens guard. Scanned docs (e.g. SF-30 amendment
+// covers) are OCR'd to text by extractText (PR #88 + worker ocrmypdf, FA-INGEST4)
+// so they ride cheap instead of consuming inline bytes. 80MB stops only pathological
+// download dumps; a normal large package (≤MAX_DOCS, ~30MB) ingests in full.
+export const MAX_DOWNLOAD_BYTES = 80 * 1024 * 1024;
 // FA-119 Phase 2B: the API enforced a 600-PAGE ceiling in production on
 // 2026-06-15 (trace req_011Cc5c19aV7pZng2C1J99ok) — a payload-400 that HARD-
 // FAILS the run (unlike an empty-JSON call-3 collapse). Bytes (15MB) do NOT
@@ -535,7 +551,7 @@ const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
 // budget on an unsized file beyond the form). Near-duplicate files are deduped
 // first so duplicate copies never consume slots that distinct docs need.
-export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_TOTAL_INLINE_BYTES): {
+export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
   ingest: DocumentPlanEntry[];
   skipped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
@@ -563,7 +579,7 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
     if (!INGESTIBLE_EXT.test(e.name)) { skipped.push({ entry: e, reason: "unsupported attachment type (not PDF/DOCX/XLSX)" }); continue; }
     if (e.sizeBytes == null) { skipped.push({ entry: e, reason: "size unknown — excluded from budget" }); continue; }
     if (ingest.length >= maxDocs) { skipped.push({ entry: e, reason: `document cap (${maxDocs}) reached` }); continue; }
-    if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `inline budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
+    if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `download budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
     ingest.push(e);
     total += e.sizeBytes;
   }
@@ -825,7 +841,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
@@ -955,7 +971,7 @@ export async function assembleUploadedDocumentSet(
     form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_INLINE_BYTES / 1048576)}MB inline / ${MAX_TOTAL_PAGES}pp / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens; PDF + .docx/.xlsx inlined, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
