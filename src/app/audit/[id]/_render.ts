@@ -234,10 +234,21 @@ function renderScoreFactor(f: ScoreFactor): string {
 // and mute on the bar have no styled fill, which is intentional: mute
 // always carries coverage_pct=0 anyway (Price + no-profile cases).
 function renderEvalFactor(f: EvaluationFactorVM): string {
+  // Card A change 2 — when the engine emits a short threshold, lead with a mono
+  // chip and collapse the full prose behind a disclosure; otherwise prose stays
+  // visible (never synthesize a chip from a blank). threshold is engine-derived from §M.
+  const chip = f.threshold && f.threshold.trim()
+    ? `<div class="fac-chip"><span class="kk">${escapeHtml(f.threshold_kind || "Threshold")}</span>${escapeHtml(f.threshold)}</div>`
+    : "";
+  const prose = `<div class="sf-note">${escapeHtml(f.note)}</div>`;
+  const proseBlock = chip
+    ? `<details class="fac-more"><summary>Full evaluation prose ▾</summary>${prose}</details>`
+    : prose;
   return `<div class="sfactor">
                   <div class="sf-top"><span class="sf-name"><span class="sf-rank">${f.rank}</span>${escapeHtml(f.name)}<span class="sf-w">${escapeHtml(f.importance)}</span></span><span class="sf-cov ${f.tone}">${escapeHtml(f.coverage)}</span></div>
                   <div class="sf-bar"><i class="${f.tone}" style="width:${Math.max(0, Math.min(100, f.coverage_pct))}%"></i></div>
-                  <div class="sf-note">${escapeHtml(f.note)}</div>
+                  ${chip}
+                  ${proseBlock}
                 </div>`;
 }
 

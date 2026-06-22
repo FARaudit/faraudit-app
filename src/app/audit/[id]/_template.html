@@ -789,6 +789,13 @@ button{font-family:inherit}
 .sf-right{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1;justify-content:flex-end}
 .sf-note{font-size:11.5px;color:var(--mute);line-height:1.4;text-align:left;margin-top:1px;overflow-wrap:anywhere}
 .sf-note b{font-weight:700;color:var(--ink-2)}
+/* Card A change 2 — §M threshold chip + collapse the full prose behind a disclosure */
+.fac-chip{display:inline-flex;align-items:center;gap:7px;margin-top:9px;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;color:var(--ink);background:var(--blue-50);border:1px solid var(--blue-200);border-radius:8px;padding:6px 11px}
+.fac-chip .kk{font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-deep)}
+.fac-more{margin-top:8px}
+.fac-more summary{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);cursor:pointer;list-style:none}
+.fac-more[open] summary{margin-bottom:6px}
+[data-theme="dark"] .fac-chip{background:rgba(55,138,221,.15);border-color:transparent;color:var(--ink)}
 .sfactor.drag .sf-note b{color:var(--amber-700)}
 [data-theme="dark"] .sfactor.drag .sf-note b{color:#fcd34d}
 .sf-score{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;flex-shrink:0;width:26px;text-align:right}
@@ -916,8 +923,12 @@ button{font-family:inherit}
 .act:not(.primary) .act-ico{background:rgba(55,138,221,.08);color:var(--accent-deep)}
 [data-theme="dark"] .act:not(.primary) .act-ico{background:rgba(55,138,221,.16);color:var(--accent-light)}
 .act .a-main{min-width:0}
-.act .a-t{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.2}
-.act .a-s{font-size:11px;color:var(--mute);margin-top:2px;line-height:1.3}
+/* Card A change 1 — two-line stack (kill the title/descriptor collision). The
+   live classes are .a-t/.a-s (Design's spec called them .lbl .t/.s); both were
+   inline spans so margin-top did nothing and they ran together. display:block
+   stacks them: title on top, descriptor on its own line. */
+.act .a-t{display:block;font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.2}
+.act .a-s{display:block;font-size:11px;color:var(--mute);margin-top:2px;line-height:1.3}
 .act .a-arrow{margin-left:auto;color:var(--mute-2);flex-shrink:0}
 .act .a-arrow svg{width:15px;height:15px}
 .act.primary .a-arrow{color:rgba(255,255,255,.8)}

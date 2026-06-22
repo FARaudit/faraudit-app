@@ -64,6 +64,10 @@ export interface EvaluationFactorVM {
   coverage_pct: number;
   tone: "good" | "warn" | "bad" | "mute";
   note: string;
+  // Card A change 2 — short engine-derived threshold for the .fac-chip (e.g.
+  // "DART ≤ 2.99 · TCR ≤ 4.49"); optional, never synthesized from a blank.
+  threshold?: string;
+  threshold_kind?: string;
 }
 
 // §L Submission Requirement — mirrors audit-engine SubmissionRequirement.
@@ -2828,7 +2832,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         name: sanitizeDisplayText(f.name),
         importance: sanitizeDisplayText(f.importance),
         coverage: sanitizeDisplayText(f.coverage),
-        note: sanitizeDisplayText(f.note)
+        note: sanitizeDisplayText(f.note),
+        // Card A change 2 — sanitize the engine-derived threshold chip text (threshold_kind passes via spread).
+        ...(f.threshold ? { threshold: sanitizeDisplayText(f.threshold) } : {})
       }))
     : [];
   // P1 deadline reconciliation (2026-06-21): drop any §L requirement line that
