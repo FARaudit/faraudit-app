@@ -2237,17 +2237,21 @@ function riskToClarificationAsk(r: Risk): string {
   const cite = (r.citation || "").trim();
   const anchor = cite && !headline.includes(cite) ? `${headline} (${cite})` : headline;
   const desc = (r.description || "").trim();
-  // FA-125c: the char budget must never cut mid-word ("...the requiremen").
-  // Keep the whole first sentence when it fits; when it overruns the budget,
-  // back off to the last word boundary and mark the cut with an ellipsis.
-  const firstSentence = desc ? (desc.split(/(?<=[.!?])\s+/)[0] || "").trim() : "";
-  let descSentence = firstSentence;
-  if (firstSentence.length > 220) {
-    const cut = firstSentence.slice(0, 219);
+  // FA-report-batch: the prior first-sentence split (/(?<=[.!?])\s+/) cut at
+  // ABBREVIATION periods — "self-performed vs.", "Laborers' Local, eff." — leaving
+  // the ask truncated mid-thought (unsendable). Don't sentence-split on bare
+  // periods; cap the description at a word boundary instead so the ask always
+  // reads as a complete clause. Never cut mid-word; strip a dangling connective or
+  // abbreviation; mark a real cut with an ellipsis.
+  let descSentence = desc;
+  const BUDGET = 220;
+  if (desc.length > BUDGET) {
+    const cut = desc.slice(0, BUDGET - 1);
     const lastSpace = cut.lastIndexOf(" ");
-    const capped = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—-]+$/, "");
-    // FA-152: drop a dangling conjunction/preposition left by the word-boundary cap.
-    descSentence = stripTrailingConnective(capped) + "…";
+    let capped = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—-]+$/, "");
+    // Drop a trailing connective ("…and") or a dangling abbreviation ("…vs", "…eff").
+    capped = stripTrailingConnective(capped).replace(/\s+(?:vs|eff|approx|incl|no|etc|e\.g|i\.e)\.?$/i, "");
+    descSentence = capped + "…";
   }
   return descSentence && descSentence.toLowerCase() !== headline.toLowerCase()
     ? `${anchor} — ${descSentence}`
@@ -2849,7 +2853,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         requirement: sanitizeDisplayText(r.requirement)
       }))
     : [];
-  const submissionSummary = (compJson.submission_summary ?? null) as string | null;
+  // FA-report-batch: derive the "N to clear" pill from the ACTUAL rendered rows
+  // (status !== "ok"), not the AI's separate submission_summary string — they were
+  // emitted independently and didn't reconcile ("21 to clear" over 20 open rows /
+  // 24 rendered). Single source of truth = the rows the customer actually sees.
+  const _toClear = submissionRequirements.filter((r) => r.status !== "ok").length;
+  const submissionSummary = submissionRequirements.length > 0
+    ? `${_toClear} to clear`
+    : ((compJson.submission_summary ?? null) as string | null);
 
   // KO email — FA-102: single derivation. Path B retired; deriveKoEmailCard's
   // §05 (Section L) extraction is canonical for ko_email.to on every surface.
@@ -3083,19 +3094,32 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // FA-136 — partial-ingestion / form-unidentified loud flag. null meta
     // (single-doc, upload arm, pre-FA-136 rows) → never flags.
     ...((): { ingestion_incomplete: boolean; ingestion_note: string } => {
-      const ing = compJson.ingestion as { files_total?: number; files_ingested?: number; form_identified?: boolean; form_name?: string | null; overflow?: string; portfolio_detected?: boolean } | null | undefined;
+      const ing = compJson.ingestion as { files_total?: number; files_ingested?: number; form_identified?: boolean; form_name?: string | null; overflow?: string; portfolio_detected?: boolean; files?: Array<{ ingested?: boolean; reason?: string; name?: string }> } | null | undefined;
       if (!ing || typeof ing.files_total !== "number") return { ingestion_incomplete: false, ingestion_note: "" };
-      const partial = (ing.files_ingested ?? 0) < ing.files_total;
       const formless = ing.form_identified !== true;
-      if (!partial && !formless && !ing.portfolio_detected) return { ingestion_incomplete: false, ingestion_note: "" };
+      // FA-report-batch: business-language, accuracy-honest disclosure (no internal
+      // mechanics — no token/page/MB budgets, no "ingested"). Classify the skipped
+      // files: near-duplicate/superseded copies are BENIGN (the manifest already
+      // shows them) — they do NOT make the audit "partial", so they must not fire
+      // the amber warning. Only genuinely dropped CONTENT (too large to read in
+      // full) or a missing form/portfolio is a real caveat — stated as professional
+      // analyst caution, naming the docs to verify, never the code mechanics.
+      const skipped = Array.isArray(ing.files) ? ing.files.filter((f) => f.ingested === false) : [];
+      const isBenign = (r?: string) => /near-duplicate|duplicate|superseded/i.test(r || "");
+      const realDrops = skipped.filter((f) => !isBenign(f.reason));
+      if (realDrops.length === 0 && !formless && !ing.portfolio_detected) {
+        // All unique documents reviewed; only duplicate copies set aside → no warning.
+        return { ingestion_incomplete: false, ingestion_note: "" };
+      }
       const parts: string[] = [];
-      if (formless) parts.push("the solicitation form could not be identified in the posted document set — findings are based on the attachments that were ingested");
-      if (partial) parts.push(`${ing.files_ingested} of ${ing.files_total} posted files were ingested${ing.overflow ? ` (${ing.overflow})` : ""} — findings may not reflect the full document set`);
-      if (ing.portfolio_detected) parts.push("the primary PDF is a portfolio/wrapper containing embedded files that were not unpacked");
-      return {
-        ingestion_incomplete: true,
-        ingestion_note: `Partial document-set ingestion: ${parts.join("; ")}. Review the un-ingested files on SAM.gov before relying on this audit for a bid decision.`
-      };
+      if (formless) parts.push("the primary solicitation document could not be identified in the posted set — findings are based on the documents that were reviewed");
+      if (realDrops.length > 0) {
+        const names = realDrops.map((f) => (f.name || "").trim()).filter(Boolean).slice(0, 4).join(", ");
+        parts.push(`${realDrops.length} document${realDrops.length === 1 ? " was" : "s were"} too large to analyze in full — the core solicitation and key sections were prioritized${names ? `; review ${names} in the full solicitation before finalizing your bid` : ""}`);
+      }
+      if (ing.portfolio_detected) parts.push("the primary file is a document portfolio whose embedded files were not expanded — review them in the full solicitation");
+      if (parts.length === 0) return { ingestion_incomplete: false, ingestion_note: "" };
+      return { ingestion_incomplete: true, ingestion_note: `${parts.join("; ")}.` };
     })(),
     verdict_mode: verdictMode,
     // FA-144: engine-persisted gate rows when present, canonical VM-side
