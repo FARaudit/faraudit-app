@@ -1187,6 +1187,16 @@ const DEFAULT_CONTEXT_LIMIT = 1_000_000;
 // safety pad for tokenizer drift between our count_tokens pre-flight and the
 // actual request (system text, tool schemas, role framing, count skew).
 const TOKEN_SAFETY_PAD = 40_000;
+// ━━ Cache-stability budget (cost fix 2026-06-22) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// The doc/system prefix must be BYTE-IDENTICAL across the 3-4 audit calls or the
+// prompt cache never hits (the $22 bug: each call trimmed the docs to a different
+// size because the trim used the call's own maxTokens, and the volatile userPrompt
+// was counted into the trim). We now trim the cached prefix (system + doc blocks)
+// against a FIXED reserve — the largest output any call uses + a fixed allowance
+// for the volatile per-call userPrompt — so the trimmed docs are identical every
+// call. Proof of a hit is cache_read_input_tokens > 0 on calls 2-4 (now logged).
+const MAX_AUDIT_OUTPUT_TOKENS = 16_000; // largest maxTokens any audit call passes
+const MAX_USERPROMPT_RESERVE = 12_000;  // fixed reserve for the per-call userPrompt (kept OUT of the cached prefix)
 // MIN_TEXT_CHARS_FOR_TEXT_BLOCK + meaningfulCharCount now imported from
 // pdf-text-extractor (single source of truth shared with sam-attachments'
 // page-budget text/vision decision — see that import below).
@@ -1387,50 +1397,52 @@ async function callClaude(
   // the output (maxTokens) + a safety pad. Trim drops/truncates the LOWEST-
   // priority text blocks first (attachments before primary); the primary doc and
   // the userPrompt (which carries §C/§L/§M analysis instructions) are kept.
-  const inputBudget = modelContextLimit(model) - maxTokens - TOKEN_SAFETY_PAD;
-  if (inputBudget > 0) {
-    let count = await countInputTokens(model, systemPrompt, content);
+  // Cost fix (2026-06-22): trim the CACHED PREFIX (system + doc blocks) ONLY,
+  // against a FIXED, call-independent reserve, so the prefix is byte-identical
+  // across all 3-4 calls and the prompt cache actually hits. The volatile
+  // per-call userPrompt is the LAST block (after the cache breakpoint) — it is
+  // excluded from the trim count and given a fixed reserve instead. Previously
+  // the budget used this call's `maxTokens` and counted the userPrompt, so each
+  // call trimmed the docs to a slightly different size → different prefix bytes →
+  // 100% cache miss (the root cause of the ~$22 audit).
+  const inputBudget = modelContextLimit(model) - MAX_AUDIT_OUTPUT_TOKENS - MAX_USERPROMPT_RESERVE - TOKEN_SAFETY_PAD;
+  const docContent = content.slice(0, -1); // message blocks BEFORE userPrompt = the cached prefix (shares block refs with `content`)
+  if (inputBudget > 0 && docContent.length > 0) {
+    let count = await countInputTokens(model, systemPrompt, docContent);
     if (count !== null && count > inputBudget) {
-      console.warn(`[audit-engine] token guard: ${count.toLocaleString()} input tokens > budget ${inputBudget.toLocaleString()} (model=${model}, out=${maxTokens}) — trimming text blocks deterministically`);
-      // Indices of trimmable text DOC blocks (the labelled "--- name ---" text
-      // blocks), in priority order: LAST doc first (lowest tier, since attachments
-      // ride after the primary), primary doc last. The final userPrompt block and
-      // any image/document(vision) blocks are never trimmed here.
-      const docTextIdx = content
+      console.warn(`[audit-engine] token guard: doc prefix ${count.toLocaleString()} tokens > budget ${inputBudget.toLocaleString()} (model=${model}) — trimming docs deterministically (call-independent for cache stability)`);
+      // Trimmable text DOC blocks ("--- name ---"), LAST doc first (lowest tier).
+      // Mutating docContent[idx] mutates content[idx] (shared refs).
+      const docTextIdx = docContent
         .map((b, i) => ({ b, i }))
-        .filter(({ b, i }) => b.type === "text" && i < content.length - 1 && (b as { text: string }).text.startsWith("--- "))
+        .filter(({ b }) => b.type === "text" && (b as { text: string }).text.startsWith("--- "))
         .map(({ i }) => i)
-        .reverse(); // last (lowest-priority) first
-      // Pass 1: hard-truncate each doc text block to a shrinking share until it
-      // fits; drop entirely as a last resort. Re-count after each step.
+        .reverse();
       for (const idx of docTextIdx) {
         if (count === null || count <= inputBudget) break;
-        const block = content[idx] as { type: "text"; text: string; cache_control?: CacheControl };
+        const block = docContent[idx] as { type: "text"; text: string; cache_control?: CacheControl };
         const overflowTokens = count - inputBudget;
         const overflowChars = Math.ceil(overflowTokens * 3.5) + 2000; // pad
         if (block.text.length > overflowChars + 500) {
           const keep = Math.max(500, block.text.length - overflowChars);
           block.text = block.text.slice(0, keep) +
-            `\n\n[… truncated by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+            `\n\n[… truncated to fit the model context — full file on SAM.gov …]`;
         } else {
-          // Block is smaller than the overflow — drop its content wholesale.
           const label = (block.text.split("\n", 1)[0] || "--- document ---");
-          block.text = `${label}\n[… omitted by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+          block.text = `${label}\n[… omitted to fit the model context — full file on SAM.gov …]`;
         }
-        count = await countInputTokens(model, systemPrompt, content);
+        count = await countInputTokens(model, systemPrompt, docContent);
       }
       if (count !== null && count > inputBudget) {
-        // Even after trimming every attachment + the primary doc text we still
-        // don't fit (pathological: a single image-only PDF's vision tokens, or a
-        // giant userPrompt). Throw so the executor's trim-and-run ladder takes
-        // over with a lower-budget / primary-only assembly.
+        // Even after trimming every doc we still don't fit. Throw so the
+        // executor's trim-and-run ladder takes over with a smaller assembly.
         throw new OversizeInputError(
-          `assembled request is ${count.toLocaleString()} tokens after trim > budget ${inputBudget.toLocaleString()} (model=${model})`,
+          `assembled doc prefix is ${count.toLocaleString()} tokens after trim > budget ${inputBudget.toLocaleString()} (model=${model})`,
           count,
           inputBudget
         );
       }
-      console.log(`[audit-engine] token guard: trimmed to ${count?.toLocaleString() ?? "?"} input tokens (<= ${inputBudget.toLocaleString()})`);
+      console.log(`[audit-engine] token guard: doc prefix trimmed to ${count?.toLocaleString() ?? "?"} tokens (<= ${inputBudget.toLocaleString()})`);
     }
   }
 
@@ -1511,11 +1523,17 @@ async function callClaude(
   if (!res) throw new Error("Claude API: no response");
 
   const data = await res.json();
+  const u = data?.usage ?? {};
+  // Cache-visibility log (cost fix 2026-06-22): the proof the prompt cache hits.
+  // Call 1 should show cache_write>0, cache_read=0; calls 2-4 should show
+  // cache_read>0. If cache_read stays 0 across a multi-call audit, the cached
+  // prefix is NOT stable — this log is how we catch that on a real run.
+  console.log(`[audit-engine] usage · model=${model} · in=${u.input_tokens ?? 0} · cache_write=${u.cache_creation_input_tokens ?? 0} · cache_read=${u.cache_read_input_tokens ?? 0} · out=${u.output_tokens ?? 0} · ${Date.now() - t0}ms`);
   if (_usageSink && data?.usage) {
     _usageSink({
       model,
-      input_tokens: data.usage.input_tokens || 0,
-      output_tokens: data.usage.output_tokens || 0,
+      input_tokens: u.input_tokens || 0,
+      output_tokens: u.output_tokens || 0,
       ms: Date.now() - t0
     });
   }
@@ -3142,6 +3160,16 @@ If the source is too thin to anchor risks to document text, you may emit finding
 
 JSON only — one key: risk_findings.`;
 
+  // Cost fix (2026-06-22): ONE byte-identical system prompt across all 3-4 calls
+  // so the cached doc/system prefix actually HITS. Each call previously used a
+  // different persona in `system`, which renders BEFORE the documents — so the
+  // cumulative cached prefix diverged on every call → 100% cache miss (root cause
+  // of the ~$22 audit). The distinct personas now move into each call's userPrompt
+  // (AFTER the cache breakpoint), preserving their analytical voice at no cache cost.
+  const SHARED_AUDIT_SYSTEM = `${SECURITY_DIRECTIVE}\n\nYou are a senior U.S. federal-contracting analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`;
+  const COMPLIANCE_ROLE = `ROLE: You are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. Extract EVERY clause exhaustively and flag every compliance action required.`;
+  const RISKS_ROLE = `ROLE: You are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. Identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. Be brutal, specific, and actionable.`;
+
   // FA-179/cost (CSV 2026-06-22: ~$45/day was Opus `input_no_cache`): the three
   // calls share the same cache_control'd doc+system prefix, but firing them in one
   // Promise.all made ALL THREE miss the cache (none had been written yet) → each
@@ -3158,7 +3186,7 @@ JSON only — one key: risk_findings.`;
       // parse failed → Opus retry truncated same → engine wrote {} for
       // overview, losing the §09 Q1 measurement field entirely. 4000 tokens
       // (≈16K char capacity) is comfortable headroom even for long §L.
-      `${SECURITY_DIRECTIVE}\n\nYou are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`,
+      SHARED_AUDIT_SYSTEM,
       overviewPrompt,
       4000,
       pdfBase64,
@@ -3171,8 +3199,8 @@ JSON only — one key: risk_findings.`;
   // Cache now primed by the overview call — the next two READ the shared prefix.
   const [complianceResult, risksResult] = await Promise.all([
     callWithRetry(
-      `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
-      compliancePrompt,
+      SHARED_AUDIT_SYSTEM,
+      `${COMPLIANCE_ROLE}\n\n${compliancePrompt}`,
       8000,
       pdfBase64,
       "compliance",
@@ -3184,8 +3212,8 @@ JSON only — one key: risk_findings.`;
     // FA-137 — risks uses the validation-driven ladder (structural checks
     // decide the retry, not just parseability) and reports a Call3Outcome.
     callRisksWithValidation(
-      `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
-      risksPrompt,
+      SHARED_AUDIT_SYSTEM,
+      `${RISKS_ROLE}\n\n${risksPrompt}`,
       // FA-119 Phase 3 (OUTCOME 1): the risks call had the SMALLEST ceiling
       // (6000) yet needs the most verbose output — on clause-dense solicitations
       // (b91c1ac6: 142 FAR + 83 DFARS) the capture-manager JSON overran 6000 and
