@@ -574,28 +574,45 @@ button{font-family:inherit}
 /* CLIN cards — breaks the ALL-CAPS table wall into scannable item / desc / metadata pills.
    (Replaces the former .clin-tbl; the table inflated the 1fr grid column → the Jun 8 scroll fix.) */
 .clins{display:flex;flex-direction:column;gap:10px}
-.clin{display:grid;grid-template-columns:62px 1fr;gap:16px;padding:14px 16px;border:1px solid var(--line);border-radius:13px;background:var(--card);transition:border-color .14s,box-shadow .14s;min-width:0}
+/* Card A change 4 — CLIN is now a collapsible card: .clin-head is the toggle,
+   .clin-detail reveals the four fields you price against. Card itself is a block;
+   the head is the grid (num · desc · chevron). */
+.clin{border:1px solid var(--line);border-radius:13px;background:var(--card);transition:border-color .14s,box-shadow .14s;min-width:0;overflow:hidden}
 .clin:hover{border-color:var(--mute-2);box-shadow:var(--shadow-sm)}
 .clin.has-flag{background:rgba(217,119,6,.04)}
 [data-theme="dark"] .clin.has-flag{background:rgba(217,119,6,.07)}
-.clin-num{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--accent-deep);letter-spacing:.02em;padding-top:1px}
+.clin-head{display:grid;grid-template-columns:62px 1fr auto;gap:16px;align-items:center;padding:14px 16px;cursor:pointer}
+.clin-num{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--accent-deep);letter-spacing:.02em}
 [data-theme="dark"] .clin-num{color:var(--accent-light)}
 .clin-num .sub{display:block;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-2);margin-top:3px}
-.clin-main{min-width:0}
-.clin-desc{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
+.clin-desc{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--ink);overflow-wrap:anywhere;min-width:0}
 .clin-desc .nsn{display:block;margin-top:4px;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
-.clin-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.clin-chev{width:15px;height:15px;color:var(--mute-2);transition:transform .2s;flex-shrink:0}
+.clin.open .clin-chev{transform:rotate(180deg)}
+.clin-detail{display:none;border-top:1px solid var(--line-2);padding:13px 16px 15px;background:var(--card-soft)}
+.clin.open .clin-detail{display:block}
+.clin-pills{display:flex;flex-wrap:wrap;gap:7px}
 .cpill{display:inline-flex;align-items:center;gap:7px;min-height:24px;padding:2px 10px;border-radius:6px;background:var(--card-soft);border:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--ink-2);max-width:100%}
 /* long extracted values (e.g. multi-range QTY strings) wrap inside the pill instead of clipping at the card edge — Jun 11 five-doc walk, DLA SPRTA126R0220 */
 .cpill .v{overflow-wrap:anywhere}
 .cpill i{font-style:normal;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:8.5px;color:var(--mute-2)}
 .cpill .v{color:var(--ink)}
+.cpill b{color:var(--ink)}
 .cpill i{flex-shrink:0}
 .cpill.psc{background:rgba(55,138,221,.08);border-color:var(--accent-light);color:var(--accent-deep)}
 [data-theme="dark"] .cpill.psc{background:rgba(55,138,221,.16);border-color:rgba(181,212,244,.28);color:var(--accent-light)}
 .cpill.flag{background:rgba(217,119,6,.1);border-color:var(--amber-200);color:var(--amber-700)}
 [data-theme="dark"] .cpill.flag{background:rgba(217,119,6,.16);border-color:transparent;color:#fcd34d}
 .cpill.flag svg{width:11px;height:11px}
+/* Card A change 4 — the IQ min/max hero (sizes the IDIQ bid) + the amber
+   "awaiting extraction" pill for fields the engine can't reliably pull yet
+   (never a fabricated range). Dark reuses the translucent token family. */
+.cpill.hero{background:var(--blue-50);border-color:var(--blue-200);color:var(--accent-deep)}
+.cpill.hero b{color:var(--accent-deep)}
+[data-theme="dark"] .cpill.hero{background:rgba(55,138,221,.15);border-color:transparent;color:var(--ink)}
+.cpill.await{background:var(--amber-50);border-color:var(--amber-200);color:var(--amber-700)}
+.cpill.await b{color:var(--amber-700)}
+[data-theme="dark"] .cpill.await{background:rgba(217,119,6,.15);border-color:transparent;color:#fcd34d}
 
 /* ── Section 04 — Compliance flags ── */
 .flags{display:flex;flex-direction:column;gap:12px}
@@ -837,7 +854,14 @@ button{font-family:inherit}
 
   /* ── hide every screen affordance — only the report itself prints ── */
   .sidebar,.topbar,.rail,.scrim,.drawer,.demo-toggle,.prelim-modes,.toast,
-  .rpt-return,.risk-chev,.kd-note{display:none!important}
+  .rpt-return,.risk-chev,.kd-note,.clin-chev{display:none!important}
+
+  /* ── Card A: collapsibles carry their detail into the PDF — force every CLIN
+        open and reveal §M's <details> prose (UA hides closed-details content) ── */
+  .clin-detail{display:block!important}
+  details{display:block}
+  details>summary{display:none!important}
+  details>:not(summary){display:block!important}
 
   /* ── §08 in print: the drawer is unreachable on paper, so swap the
         truncated preview + action buttons for the full draft email ── */
@@ -868,7 +892,7 @@ button{font-family:inherit}
   #sec-classify,#sec-incumbent,#sec-ko,.matrix-artifact,.ws-reveal,.award-basis,.gate-card{break-inside:avoid}
   /* 4 · every card / row is atomic — never split down the middle */
   .risk,.flag-row,.cmx-row,.cmx-rollup,.ck-group,.ck-item,.et-card,.sfactor,
-  .es-act,.tl-node,.vtl-node,.win-theme,.g-row,.g-oc,.vn-row,.clin,.cmatrix tr,.ko-card,.cmatrix,.sev-legend,.v2-overlay{break-inside:avoid}
+  .es-act,.tl-node,.vtl-node,.win-theme,.g-row,.g-oc,.vn-row,.cv-row,.clin,.cmatrix tr,.ko-card,.cmatrix,.sev-legend,.v2-overlay{break-inside:avoid}
   /* 5 · sub-headers / group labels glue to the first row beneath them */
   .subsec-h,.risk-group-label,.ck-gh,.cmx-h,.win-h,.gc-h,.vn-head,.et-kick,.sev-legend,.vn-frame{break-after:avoid}
   /* 6 · long tables repeat their header row on each page they span */
@@ -1268,7 +1292,13 @@ button{font-family:inherit}
 .vn-assume .va-k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute-2);margin-right:5px}
 .vn-assume .va-resolve{color:var(--accent-deep);font-weight:600}
 [data-theme="dark"] .vn-assume .va-resolve{color:var(--accent-light)}
-@media(max-width:680px){.vn-row{grid-template-columns:1fr}.vn-frame{padding-left:0}}
+/* Card A change 6 — full-width key/value caveat row (fixes the mid-phrase wrap):
+   narrow mono "Assumed" key + 1fr value with the resolve action bold. */
+.cv-row{display:grid;grid-template-columns:74px 1fr;gap:13px;padding:8px 0;border-bottom:1px solid var(--line-2);font-size:12.5px;line-height:1.5}
+.cv-row:last-child{border-bottom:0}
+.cv-k{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-700);padding-top:2px}
+.cv-v{color:var(--ink-2)}.cv-v b{color:var(--ink)}
+@media(max-width:680px){.vn-row,.cv-row{grid-template-columns:1fr}.vn-frame{padding-left:0}}
 </style>
 </head>
 <body>
@@ -2571,6 +2601,15 @@ Capture Lead, [Company]
       '<td><span class="cm-status clear"><span class="d"></span>Clear</span></td>';
     lastTb.appendChild(tr);
   }
+})();
+
+/* ───── Card A change 4 — CLIN rows collapse/expand (delegated, CSP-safe) ───── */
+(function(){
+  document.querySelectorAll('.clin .clin-head').forEach(function(h){
+    h.addEventListener('click', function(){
+      var card = h.closest('.clin'); if(card) card.classList.toggle('open');
+    });
+  });
 })();
 
 /* ───── §09 submission checklist — live progress + per-audit session persistence ───── */

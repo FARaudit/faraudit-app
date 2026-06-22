@@ -324,25 +324,38 @@ function renderRisk(r: Risk, isFirst: boolean): string {
 function renderClinCard(c: ClinLineItem): string {
   const cardClass = c.has_flag ? "clin has-flag" : "clin";
   const nsnLine = c.nsn ? `<div class="nsn">${escapeHtml(c.nsn)}</div>` : "";
-  const pills: string[] = [];
-  if (c.psc && c.psc !== "—") {
-    pills.push(`<span class="cpill psc"><i>PSC</i> <span class="v">${escapeHtml(c.psc)}</span></span>`);
-  }
-  if (c.type && c.type !== "—") {
-    pills.push(`<span class="cpill"><i>Type</i> <span class="v">${escapeHtml(c.type)}</span></span>`);
-  }
-  if (c.qty && c.qty !== "—") {
-    pills.push(`<span class="cpill"><i>Qty</i> <span class="v">${escapeHtml(c.qty)}</span></span>`);
-  }
-  if (c.has_flag) {
-    pills.push(`<span class="cpill flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>${escapeHtml(c.flag_label || "Flag")}</span>`);
-  }
-  return `<div class="${cardClass}">
-                  <div class="clin-num">${escapeHtml(c.clin)}<span class="sub">CLIN</span></div>
-                  <div class="clin-main">
+  // Card A change 4 — the expand surfaces the four fields you actually price
+  // against (Type · Period · IQ min/max hero · Maps-to), not generic metadata.
+  // Any field the engine can't reliably extract yet renders an amber
+  // "awaiting extraction" pill — NEVER a fabricated value (spec ship-gate).
+  // NAICS / PoP / Qty / PSC are intentionally dropped from the expand per spec
+  // (they repeat in the masthead or are not price drivers); flagged to Design.
+  const awaiting = `<b>awaiting extraction</b>`;
+  const has = (s?: string) => !!(s && s.trim() && s.trim() !== "—");
+  const typePill = has(c.type)
+    ? `<span class="cpill">Type <b>${escapeHtml(c.type)}</b></span>`
+    : `<span class="cpill await">Type ${awaiting}</span>`;
+  const periodPill = has(c.period_label)
+    ? `<span class="cpill">Period <b>${escapeHtml(c.period_label!)}</b></span>`
+    : `<span class="cpill await">Period ${awaiting}</span>`;
+  const iqPill = has(c.iq_min) && has(c.iq_max)
+    ? `<span class="cpill hero">IQ min&ndash;max <b>${escapeHtml(c.iq_min!)} &ndash; ${escapeHtml(c.iq_max!)}</b></span>`
+    : `<span class="cpill await">IQ min&ndash;max ${awaiting}</span>`;
+  const mapsPill = has(c.maps_to)
+    ? `<span class="cpill">Maps to <b>${escapeHtml(c.maps_to!)}</b></span>`
+    : `<span class="cpill await">Maps to ${awaiting}</span>`;
+  // The risk/conflict tag is a fact, not metadata — the scope guard forbids
+  // dropping tags, so it stays (the visual target omitted it; flagged to Design).
+  const flagPill = c.has_flag
+    ? `<span class="cpill flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/></svg>${escapeHtml(c.flag_label || "Flag")}</span>`
+    : "";
+  return `<div class="${cardClass}" data-clin>
+                  <div class="clin-head">
+                    <span class="clin-num">${escapeHtml(c.clin)}<span class="sub">CLIN</span></span>
                     <div class="clin-desc">${escapeHtml(c.description)}${nsnLine}</div>
-                    <div class="clin-pills">${pills.join("")}</div>
+                    <svg class="clin-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
                   </div>
+                  <div class="clin-detail"><div class="clin-pills">${typePill}${periodPill}${iqPill}${mapsPill}${flagPill}</div></div>
                 </div>`;
 }
 

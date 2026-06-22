@@ -831,11 +831,17 @@ function renderConfidenceNotes(html: string, v: V2RenderInput): string {
     /(<span class="vn-count"><span data-field="confidence_count">\d+<\/span>) notes?(<\/span>)/,
     `$1${v.confidence_notes.length === 1 ? " note" : " notes"}$2`
   );
+  // Card A change 6 — full-width key/value .cv-row (kills the mid-phrase wrap of
+  // the old narrow .vn-body column). Key is the short "Assumed" label (the engine
+  // has no assumed/verify kind to key on yet — never synthesize one); the value
+  // carries the caveat with the resolve action bold. The raw .field tag is folded
+  // out per the visual target — flagged to Design/SME for the 1:1 sign-off.
   const rows = v.confidence_notes
-    .map(
-      (n) =>
-        `<div class="vn-row"><span class="vn-field">${esc(n.field)}</span><div class="vn-body"><p class="vn-unsure">${esc(n.uncertain)}</p><p class="vn-assume"><span class="va-k">Assumed</span>${esc(n.assumption)} <span class="va-resolve">${esc(n.resolve)}</span></p></div></div>`
-    )
+    .map((n) => {
+      const lead = [n.uncertain, n.assumption].map((s) => esc(String(s || "")).trim()).filter(Boolean).join(" ");
+      const action = esc(String(n.resolve || "")).trim();
+      return `<div class="cv-row"><span class="cv-k">Assumed</span><span class="cv-v">${lead}${action ? ` <b>${action}</b>` : ""}</span></div>`;
+    })
     .join("");
   out = replaceInnerByDataField(out, "confidence_notes.list", rows);
   return out;

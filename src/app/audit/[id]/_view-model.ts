@@ -89,6 +89,13 @@ export interface ClinLineItem {
   flag_label?: string;
   nsn?: string;
   psc?: string;
+  // Card A change 4 — the four fields the CLIN expand prices against. All
+  // optional/nullable; a missing field drives the amber "awaiting extraction"
+  // pill (never fabricated). Populated by the engine as extraction lands.
+  period_label?: string;
+  iq_min?: string;
+  iq_max?: string;
+  maps_to?: string;
 }
 
 export interface HierarchyNode {
@@ -1275,6 +1282,11 @@ interface RawClin {
   nsn?: string;
   part_number?: string;
   psc?: string;
+  // Card A change 4 — per-CLIN price drivers (engine-populated as they land).
+  period_label?: string;
+  iq_min?: string | number;
+  iq_max?: string | number;
+  maps_to?: string;
 }
 
 // Format an ISO date (YYYY-MM-DD) into the same "DD MMM YYYY" shape the rest
@@ -1306,6 +1318,15 @@ function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineIte
     const nsnRaw = c.nsn ?? c.part_number;
     const nsn = nsnRaw != null && String(nsnRaw).trim() ? String(nsnRaw).trim() : undefined;
     const psc = c.psc != null && String(c.psc).trim() ? String(c.psc).trim() : undefined;
+    // Card A change 4 — price-driver fields; emit only when the engine actually
+    // extracted them so the render falls back to the "awaiting extraction" pill
+    // rather than a fabricated value. IQ min/max only count as present when BOTH
+    // bounds exist (a half-range can't size a bid).
+    const clean = (v: unknown) => (v != null && String(v).trim() ? String(v).trim() : undefined);
+    const period_label = clean(c.period_label);
+    const iq_min = clean(c.iq_min);
+    const iq_max = clean(c.iq_max);
+    const maps_to = clean(c.maps_to);
     return {
       clin: String(c.clin ?? "—"),
       description: desc,
@@ -1314,7 +1335,11 @@ function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineIte
       has_flag: hasFlag,
       flag_label: hasFlag ? (linkedRisk ? linkedRisk.title.slice(0, 64) : status === "conflict" ? "Conflict flagged" : "Ambiguity flagged") : undefined,
       nsn,
-      psc
+      psc,
+      period_label,
+      iq_min,
+      iq_max,
+      maps_to
     };
   });
 }
