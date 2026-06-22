@@ -2853,7 +2853,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         requirement: sanitizeDisplayText(r.requirement)
       }))
     : [];
-  const submissionSummary = (compJson.submission_summary ?? null) as string | null;
+  // FA-report-batch: derive the "N to clear" pill from the ACTUAL rendered rows
+  // (status !== "ok"), not the AI's separate submission_summary string — they were
+  // emitted independently and didn't reconcile ("21 to clear" over 20 open rows /
+  // 24 rendered). Single source of truth = the rows the customer actually sees.
+  const _toClear = submissionRequirements.filter((r) => r.status !== "ok").length;
+  const submissionSummary = submissionRequirements.length > 0
+    ? `${_toClear} to clear`
+    : ((compJson.submission_summary ?? null) as string | null);
 
   // KO email — FA-102: single derivation. Path B retired; deriveKoEmailCard's
   // §05 (Section L) extraction is canonical for ko_email.to on every surface.

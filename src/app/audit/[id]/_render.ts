@@ -956,7 +956,7 @@ function stripHandoffComment(html: string): string {
 function stripDevComments(html: string): string {
   // Marker tokens that identify a comment as developer-only implementation
   // detail rather than customer-facing content.
-  const devMarkers = /_render\.ts|repeater|Renderer\b|matrix_rollup|harness\s+prob|data-field|data-bucket|reviewer aid|data-state=|post hero-dedup|Renderer rebuilds/i;
+  const devMarkers = /_render\.ts|_v2-render|view-model|repeater|Renderer\b|render[A-Z]\w+|matrix_rollup|harness\s+prob|data-field|data-bucket|reviewer aid|data-state=|post hero-dedup|Renderer rebuilds|compliance_json|risks_json|overview_json|_json\b|\.files\[\]|Bound to|count_tokens|cache_control|IngestionRender|setInnerByClass|replaceField|\bvm\.\w+/i;
   return html.replace(/<!--[\s\S]*?-->/g, (m) => (devMarkers.test(m) ? "" : m));
 }
 
