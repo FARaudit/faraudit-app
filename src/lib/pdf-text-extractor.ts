@@ -12,11 +12,13 @@ export interface PageText {
   lines: string[];
 }
 
+import { ocrPdfToText, looksGarbled } from "./pdf-ocr";
+
 export interface ExtractedDocument {
   pages: PageText[];
   rawText: string;
   pageCount: number;
-  extractionMethod: "pdf-parse" | "pdfjs" | "fallback";
+  extractionMethod: "pdf-parse" | "pdfjs" | "ocr" | "fallback";
   warnings: string[];
 }
 
@@ -99,6 +101,29 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
             };
           })
         : buildPageStructure(rawText, pageCount);
+
+      // Stage-2 parse-tier OCR fallback (2026-06-22). The native layer is either
+      // MISSING (true scan → low meaningful chars) or GARBLED (present but
+      // unreadable font/encoding junk — N4008526R0065's CBA). In both cases OCR
+      // recovers clean text for ~$0, removing the Opus-vision dependency. OCR is
+      // attempted ONLY when needed, used ONLY when it's genuinely better, and is a
+      // graceful no-op where the OCR binary is absent (e.g. serverless).
+      const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText);
+      if (needsOcr) {
+        const ocrText = await ocrPdfToText(pdfBuffer);
+        if (ocrText && meaningfulCharCount(ocrText) > meaningfulLength && !looksGarbled(ocrText)) {
+          warnings.push(
+            `OCR parse-tier applied: native text was ${looksGarbled(rawText) ? "garbled" : "missing"} (${meaningfulLength} meaningful chars) → recovered ${meaningfulCharCount(ocrText)} clean chars via self-host OCR.`
+          );
+          return {
+            pages: buildPageStructure(ocrText, pageCount),
+            rawText: ocrText,
+            pageCount,
+            extractionMethod: "ocr",
+            warnings,
+          };
+        }
+      }
 
       return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings };
     }

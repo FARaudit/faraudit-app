@@ -76,10 +76,17 @@ export const CLAUSE_TITLES: Record<string, string> = {
   "52.249-8": "Default (Fixed-Price Supply and Service)",
 };
 
-// Resolve a clause title from the static corpus. Returns null when the clause
-// number is unknown, so callers keep their honest placeholder fallback.
+// Stage-5 facts (2026-06-22): authoritative FAR/DFARS clause titles generated
+// from the official eCFR (Title 48, issue 2026-06-02) — 7,339 clauses
+// (FAR 52.x=667, DFARS 252.x=387, + agency supplements). Deterministic, $0,
+// regenerate with scripts/audit-ai/gen-clause-titles.ts. The hand-curated
+// CLAUSE_TITLES above stays as a fallback for the rare clause eCFR lacks.
+import GENERATED_CLAUSE_TITLES from "./clause-titles.generated.json";
+
+// Resolve a clause title. eCFR (authoritative) first, hand-curated fallback,
+// then null so callers keep their honest placeholder.
 export function resolveClauseTitle(clauseNumber: string | null | undefined): string | null {
   if (!clauseNumber) return null;
   const key = clauseNumber.trim().replace(/^(?:FAR|DFARS)\s+/i, "");
-  return CLAUSE_TITLES[key] ?? null;
+  return (GENERATED_CLAUSE_TITLES as Record<string, string>)[key] ?? CLAUSE_TITLES[key] ?? null;
 }
