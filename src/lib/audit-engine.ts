@@ -3142,8 +3142,14 @@ If the source is too thin to anchor risks to document text, you may emit finding
 
 JSON only — one key: risk_findings.`;
 
-  const [overviewResult, complianceResult, risksResult] = await Promise.all([
-    callWithRetry(
+  // FA-179/cost (CSV 2026-06-22: ~$45/day was Opus `input_no_cache`): the three
+  // calls share the same cache_control'd doc+system prefix, but firing them in one
+  // Promise.all made ALL THREE miss the cache (none had been written yet) → each
+  // paid full input. Prime the cache with the first call, THEN parallelize the
+  // other two so they READ the cached prefix (~90% off input). All three are Opus,
+  // so the model-specific cache is shared. (When overview later moves to Sonnet for
+  // tiering, prime with an Opus call instead so the Opus calls still hit cache.)
+  const overviewResult = await callWithRetry(
       // Cycle 2 (2026-06-07): overview maxTokens raised 1500 → 4000. Pre-
       // Cycle-2 overview prompt fit 1500 comfortably; Cycle-2 prompt adds
       // exhaustive submission_requirements_raw[] (15-25 verbatim §L imperatives
@@ -3161,7 +3167,9 @@ JSON only — one key: risk_findings.`;
       imageMediaType,
       pdfFileId,
       attachmentPdfs
-    ),
+  );
+  // Cache now primed by the overview call — the next two READ the shared prefix.
+  const [complianceResult, risksResult] = await Promise.all([
     callWithRetry(
       `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
       compliancePrompt,

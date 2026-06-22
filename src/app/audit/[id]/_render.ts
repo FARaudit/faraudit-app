@@ -726,9 +726,9 @@ function insertIngestionBanner(html: string, note: string): string {
   // FA-INGEST4b: class-based (.ingest-incomplete) dark-mode fix (Design-approved);
   // light render pixel-identical to the prior inline styling.
   const banner = `
-      <section class="ingest-incomplete" role="status" data-ingestion-incomplete aria-label="Document set partially ingested">
+      <section class="ingest-incomplete" role="status" data-ingestion-incomplete aria-label="Some documents not fully reviewed">
         <div class="ii-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-        <div style="min-width:0"><p class="ib-h">Document set partially ingested</p><p class="ii-body">${escapeHtml(note)}</p></div>
+        <div style="min-width:0"><p class="ib-h">Some documents not fully reviewed</p><p class="ii-body">${escapeHtml(note)}</p></div>
       </section>
 `;
   return html.replace(
