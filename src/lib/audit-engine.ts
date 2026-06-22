@@ -3281,6 +3281,41 @@ JSON only — one key: risk_findings.`;
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
 
+  // ━━ Clause-completeness guard (Wave-1 G6, 2026-06-22) ━━━━━━━━━━━━━━━━━━━━━━
+  // The moat for a compliance product: a dropped FAR/DFARS clause is a customer-
+  // killing miss. Deterministically scan the INGESTED source for every clause
+  // NUMBER and compare against what the engine extracted. For now this is a
+  // LOGGED + persisted completeness metric (NOT a hard gate yet — the hard-fail
+  // flips on once we measure the false-positive rate from incorporated-by-
+  // reference noise on real exports). It is also the safety net that will make
+  // Stage-2 selective reading safe (never drop a clause silently).
+  try {
+    const clauseRe = /\b(?:52|252)\.\d{3}-\d{1,4}\b/g;
+    const norm = (s: string): string => (s.match(clauseRe)?.[0] ?? s.trim());
+    const inSource = new Set<string>(solText.match(clauseRe) ?? []);
+    const extracted = new Set<string>(
+      [...(complianceJson.far_clauses ?? []), ...(complianceJson.dfars_clauses ?? [])]
+        .map((c) => norm(String(c)))
+        .filter(Boolean)
+    );
+    const missing = [...inSource].filter((c) => !extracted.has(c));
+    const ratio = inSource.size === 0 ? 1 : (inSource.size - missing.length) / inSource.size;
+    (complianceJson as Record<string, unknown>).clause_completeness = {
+      source_count: inSource.size,
+      extracted_count: extracted.size,
+      missing_count: missing.length,
+      missing_sample: missing.slice(0, 25),
+      ratio: Math.round(ratio * 1000) / 1000,
+    };
+    if (missing.length > 0) {
+      console.warn(`[audit-engine] clause-completeness: ${missing.length} clause number(s) in source but NOT in extracted output (${(ratio * 100).toFixed(1)}%) — sample: ${missing.slice(0, 8).join(", ")}`);
+    } else {
+      console.log(`[audit-engine] clause-completeness: 100% (${inSource.size} source clauses all extracted)`);
+    }
+  } catch (e) {
+    console.warn(`[audit-engine] clause-completeness scan skipped: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   // ━━ Cycle 2 (2026-06-06) — facts-only assembly ━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Call 1 (Overview) now emits raw facts only: eval_basis_text +
   // evaluation_factors_raw + submission_requirements_raw. Derive the legacy
