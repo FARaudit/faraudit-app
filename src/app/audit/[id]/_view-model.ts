@@ -64,6 +64,10 @@ export interface EvaluationFactorVM {
   coverage_pct: number;
   tone: "good" | "warn" | "bad" | "mute";
   note: string;
+  // Card A change 2 — short engine-derived threshold for the .fac-chip (e.g.
+  // "DART ≤ 2.99 · TCR ≤ 4.49"); optional, never synthesized from a blank.
+  threshold?: string;
+  threshold_kind?: string;
 }
 
 // §L Submission Requirement — mirrors audit-engine SubmissionRequirement.
@@ -85,6 +89,13 @@ export interface ClinLineItem {
   flag_label?: string;
   nsn?: string;
   psc?: string;
+  // Card A change 4 — the four fields the CLIN expand prices against. All
+  // optional/nullable; a missing field drives the amber "awaiting extraction"
+  // pill (never fabricated). Populated by the engine as extraction lands.
+  period_label?: string;
+  iq_min?: string;
+  iq_max?: string;
+  maps_to?: string;
 }
 
 export interface HierarchyNode {
@@ -1271,6 +1282,11 @@ interface RawClin {
   nsn?: string;
   part_number?: string;
   psc?: string;
+  // Card A change 4 — per-CLIN price drivers (engine-populated as they land).
+  period_label?: string;
+  iq_min?: string | number;
+  iq_max?: string | number;
+  maps_to?: string;
 }
 
 // Format an ISO date (YYYY-MM-DD) into the same "DD MMM YYYY" shape the rest
@@ -1302,6 +1318,15 @@ function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineIte
     const nsnRaw = c.nsn ?? c.part_number;
     const nsn = nsnRaw != null && String(nsnRaw).trim() ? String(nsnRaw).trim() : undefined;
     const psc = c.psc != null && String(c.psc).trim() ? String(c.psc).trim() : undefined;
+    // Card A change 4 — price-driver fields; emit only when the engine actually
+    // extracted them so the render falls back to the "awaiting extraction" pill
+    // rather than a fabricated value. IQ min/max only count as present when BOTH
+    // bounds exist (a half-range can't size a bid).
+    const clean = (v: unknown) => (v != null && String(v).trim() ? String(v).trim() : undefined);
+    const period_label = clean(c.period_label);
+    const iq_min = clean(c.iq_min);
+    const iq_max = clean(c.iq_max);
+    const maps_to = clean(c.maps_to);
     return {
       clin: String(c.clin ?? "—"),
       description: desc,
@@ -1310,7 +1335,11 @@ function mapClins(compJson: Record<string, unknown>, risks: Risk[]): ClinLineIte
       has_flag: hasFlag,
       flag_label: hasFlag ? (linkedRisk ? linkedRisk.title.slice(0, 64) : status === "conflict" ? "Conflict flagged" : "Ambiguity flagged") : undefined,
       nsn,
-      psc
+      psc,
+      period_label,
+      iq_min,
+      iq_max,
+      maps_to
     };
   });
 }
@@ -2828,7 +2857,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         name: sanitizeDisplayText(f.name),
         importance: sanitizeDisplayText(f.importance),
         coverage: sanitizeDisplayText(f.coverage),
-        note: sanitizeDisplayText(f.note)
+        note: sanitizeDisplayText(f.note),
+        // Card A change 2 — sanitize the engine-derived threshold chip text (threshold_kind passes via spread).
+        ...(f.threshold ? { threshold: sanitizeDisplayText(f.threshold) } : {})
       }))
     : [];
   // P1 deadline reconciliation (2026-06-21): drop any §L requirement line that
