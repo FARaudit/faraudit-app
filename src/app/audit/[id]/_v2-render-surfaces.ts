@@ -74,8 +74,31 @@ export interface CaptureMove {
 export interface IngestionRender {
   files_total: number;
   files_ingested: number;
+  // Densify port (Design 2026-06-21): the read-vs-indexed manifest split.
+  // files_read = deep-read in full (ingested); files_indexed = listed but not
+  // deep-read. (files_read mirrors files_ingested; the named pair drives the
+  // manifest summary row.)
+  files_read: number;
+  files_indexed: number;
   form_name: string | null;
-  files: Array<{ name: string; role: "form" | "amendment" | "attachment"; ingested: boolean; section_roles: string[] }>;
+  files: Array<{
+    name: string;
+    role: "form" | "amendment" | "attachment";
+    ingested: boolean;
+    section_roles: string[];
+    // "full" = ingested/deep-read · "indexed" = listed-but-not-ingested.
+    depth: "full" | "indexed";
+    // For depth:"indexed" files only — the engine's per-file drop reason. "" when full.
+    indexed_reason: string;
+    // Densify port (Design 2026-06-21): an HONEST friendly bucket mapped from
+    // indexed_reason, used to GROUP the "Indexed — not deep-read" manifest by
+    // category (one category chip per group) while the raw reason stays in the
+    // chip's title. "" when full or when no reason. Falls back to the raw reason
+    // string when it matches no known bucket (never invented).
+    indexed_category: string;
+    // Engine-normalized display name; "" → the client normalizes from `name`.
+    display_name: string;
+  }>;
 }
 
 // ⑤.4 — detect a §M evaluation-criteria attachment that was referenced but
@@ -886,6 +909,23 @@ function renderPriceAnchor(html: string, v: V2RenderInput): string {
 
 // ─── Surface 10 — Ingestion banner (Phase 4 · ⑤.5) ────────────────────────
 
+// Densify port (Design 2026-06-21): map a raw per-file indexed_reason to an
+// HONEST friendly bucket so the "Indexed — not deep-read" manifest groups by a
+// human category instead of N near-identical raw sentences. The raw reason is
+// kept in the chip's title attribute (caller). Anything that matches no bucket
+// passes through as the raw reason string — never invented.
+function deriveIndexedCategory(reason: string): string {
+  const r = String(reason ?? "").trim();
+  if (!r) return "";
+  if (/near-duplicate|duplicate|superseded/i.test(r)) return "Duplicate / superseded";
+  // Bare amendment / "SF-30" cover sheet → superseded amendments bucket.
+  if (/\bsf[\s-]?30\b|amendment\s+cover|bare\s+amendment|^amendment\b/i.test(r)) return "Superseded amendments";
+  if (/document cap|page budget|token budget|inline budget|exceeded/i.test(r)) return "Beyond ingest budget";
+  if (/sign-in|incident report|administrative|roster/i.test(r)) return "Administrative";
+  // Honest fallback — the raw reason string itself.
+  return r;
+}
+
 // Read the ingestion manifest from compliance_json.ingestion (FA-136 — a
 // V1-level field set by the multi-doc assembly, INDEPENDENT of v2_shadow).
 export function readIngestion(comp: Record<string, unknown> | null | undefined): IngestionRender | null {
@@ -901,13 +941,23 @@ export function readIngestion(comp: Record<string, unknown> | null | undefined):
       const section_roles = Array.isArray(f.section_roles)
         ? (f.section_roles as unknown[]).filter((s): s is string => typeof s === "string" && /^[CHLM]$/.test(s))
         : [];
-      return { name: String(f.name), role, ingested: f.ingested !== false, section_roles };
+      const ingested = f.ingested !== false;
+      // Densify port: depth = full when deep-read (ingested), indexed otherwise.
+      // indexed_reason reuses the engine's per-file drop `reason` (no-blank honesty:
+      // every indexed file states why it wasn't deep-read).
+      const depth: "full" | "indexed" = ingested ? "full" : "indexed";
+      const indexed_reason = !ingested && typeof f.reason === "string" ? String(f.reason).trim() : "";
+      const indexed_category = deriveIndexedCategory(indexed_reason);
+      const display_name = typeof f.display_name === "string" ? String(f.display_name).trim() : "";
+      return { name: String(f.name), role, ingested, section_roles, depth, indexed_reason, indexed_category, display_name };
     });
   if (files.length === 0) return null;
   const filesTotal = typeof ing!.files_total === "number" ? (ing!.files_total as number) : files.length;
   const filesIngested = typeof ing!.files_ingested === "number" ? (ing!.files_ingested as number) : files.filter((f) => f.ingested).length;
+  const filesRead = files.filter((f) => f.depth === "full").length;
+  const filesIndexed = files.filter((f) => f.depth === "indexed").length;
   const formName = typeof ing!.form_name === "string" ? (ing!.form_name as string) : null;
-  return { files_total: filesTotal, files_ingested: filesIngested, form_name: formName, files };
+  return { files_total: filesTotal, files_ingested: filesIngested, files_read: filesRead, files_indexed: filesIndexed, form_name: formName, files };
 }
 
 // Standalone banner render — driven by compliance_json.ingestion DIRECTLY, so
@@ -919,59 +969,176 @@ export function renderIngestionBannerFromAudit(html: string, audit: Record<strin
   return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput);
 }
 
+// Densify port (Design 2026-06-21): normalize a raw SAM filename into a clean
+// display name for the manifest rows. Conservative — strips the extension, the
+// leading sol/amendment token noise, and de-shouts; keeps the raw name in the
+// row's title attribute (done by the caller). Falls back to a trimmed raw name.
+function normalizeDocName(raw: string): string {
+  let s = String(raw);
+  // Strip a leading timestamp/index upload prefix, e.g. "1781745825510-0-".
+  // A long digit run (10+) optionally followed by "-<index>", then a "-"/"_".
+  s = s.replace(/^\d{10,}(?:[-_]\d{1,3})?[-_]/, "");
+  s = s.replace(/\.[a-z0-9]{2,4}$/i, ""); // drop extension
+  s = s.replace(/[_]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  // De-shout: convert ALL-CAPS *words* to Title Case (leave already-mixed-case
+  // words alone). Preserves amendment/section tokens by Title-casing them too
+  // ("AMENDMENT 0011" → "Amendment 0011", "SECTION C" → "Section C"). Short
+  // all-caps acronyms (≤3 letters, e.g. SOW, PWS, RFP) are kept as-is.
+  s = s.replace(/[A-Za-z][A-Za-z'.]*/g, (w) => {
+    const letters = w.replace(/[^A-Za-z]/g, "");
+    if (letters.length === 0) return w;
+    const isAllCaps = w === w.toUpperCase();
+    if (!isAllCaps) return w; // leave mixed-case words untouched
+    if (letters.length <= 3) return w; // keep short acronyms (SOW/PWS/RFP/SF)
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  });
+  s = s.replace(/\s{2,}/g, " ").trim();
+  return s || String(raw).trim();
+}
+
+// Densify port: a §-section tag (from section_roles) takes precedence over a
+// role badge for the "Read in full" rows; otherwise a role badge.
+function docTagHtml(f: IngestionRender["files"][number]): string {
+  const sec = (f.section_roles ?? [])[0];
+  if (sec) return `<span class="dtag sec">&sect;${esc(sec)}</span>`;
+  const ROLE: Record<string, string> = { form: "FORM", amendment: "AMENDMENT", attachment: "ATTACH" };
+  return `<span class="dtag role">${ROLE[f.role] ?? "ATTACH"}</span>`;
+}
+
+const DOC_SVG = `<svg class="doc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>`;
+
+function docRowHtml(f: IngestionRender["files"][number], tags: string): string {
+  const display = f.display_name || normalizeDocName(f.name);
+  return `<div class="doc-row">${DOC_SVG}<span class="doc-name" title="${esc(f.name)}">${esc(display)}</span><span class="doc-tags">${tags}</span></div>`;
+}
+
+// Densify port — the collapsed read-vs-indexed manifest. Replaces the .ingest
+// chip cloud. Collapsed by default; summary counts (total / read / indexed) +
+// coverage chip + "View sources". Expanded body: "Read in full" (per file, by
+// §-section/role) and "Indexed — not deep-read" (grouped by reason, one reason
+// chip per group). Raw filename preserved in each row's title attribute.
 function renderIngestionBanner(html: string, v: V2RenderInput): string {
   const ing = v.ingestion;
   // No manifest → strip the banner. Always-on when files exist; never faked.
   if (!ing || ing.files.length === 0) return stripIfEmpty(html, "ingestion", true);
-  let out = html;
-  // Lead counts ("<b>N</b> of <span>M</span> files").
-  out = out.replace(
-    /(<b data-field="files_ingested">)[\s\S]*?(<\/b>)/,
-    `$1${esc(String(ing.files_ingested))}$2`
-  );
-  out = setSpanByDataField(out, "files_total", String(ing.files_total));
-  // Per-file chips — role badge only (§-section tags = FA-182, deferred).
-  const ROLE: Record<string, [string, string]> = {
-    form: ["main", "FORM"],
-    amendment: ["sec", "AMENDMENT"],
-    attachment: ["other", "ATTACHMENT"],
-  };
-  const fileRows = ing.files
-    .map((f) => {
-      const [cls, label] = ROLE[f.role] ?? ROLE.attachment;
-      // FA-182 — per-file §-section tags after the role badge (e.g. §L §M).
-      const secTags = (f.section_roles ?? []).map((s) => `<span class="isec">&sect;${esc(s)}</span>`).join("");
-      return `<span class="ifile"><svg class="fdoc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg><span class="ifn">${esc(f.name)}</span><span class="irole ${cls}">${label}</span>${secTags}</span>`;
-    })
-    .join("");
-  out = replaceInnerByDataField(out, "ingestion_files", fileRows);
-  // Coverage chip. FA-182 upgrades this from form-grain to TRUE section
-  // coverage when any §-role was detected: core = §C/§L/§M. Honest layering —
-  // a file-ingestion gap trumps; with no §-roles detected (generic names) we
-  // do NOT claim a section is "missing", we fall back to file-level coverage.
-  const allIngested = ing.files_total > 0 && ing.files_ingested >= ing.files_total;
+
+  const readFiles = ing.files.filter((f) => f.depth === "full");
+  const indexedFiles = ing.files.filter((f) => f.depth === "indexed");
+
+  // Summary counts — total / read / indexed.
+  const counts =
+    `<span class="mc"><span class="mc-n">${esc(String(ing.files_total))}</span><span class="mc-k">documents</span></span>` +
+    `<span class="mc-sep"></span>` +
+    `<span class="mc read"><span class="mc-n">${esc(String(ing.files_read))}</span><span class="mc-k">read in full</span></span>` +
+    `<span class="mc-sep"></span>` +
+    `<span class="mc idx"><span class="mc-n">${esc(String(ing.files_indexed))}</span><span class="mc-k">indexed</span></span>`;
+
+  // Coverage chip — TRUE §-section coverage when §-roles detected, else file-level.
+  const allIngested = ing.files_total > 0 && ing.files_read >= ing.files_total;
   const detected = new Set<string>();
   ing.files.forEach((f) => (f.section_roles ?? []).forEach((s) => detected.add(s)));
-  let covClass: string;
+  let covClass: "ok" | "warn";
   let covText: string;
-  if (!allIngested) {
-    covClass = "warn";
-    covText = `${ing.files_ingested} of ${ing.files_total} read · review the rest on SAM.gov`;
-  } else if (detected.size > 0) {
-    const missing = ["C", "L", "M"].filter((c) => !detected.has(c));
-    covClass = missing.length === 0 ? "ok" : "warn";
-    covText = missing.length === 0 ? "Core sections present" : `${missing.map((c) => `§${c}`).join(" · ")} not detected`;
-  } else {
+  if (detected.size > 0) {
+    const present = ["C", "H", "L", "M", "F"].filter((c) => detected.has(c));
+    const missingCore = ["C", "L", "M"].filter((c) => !detected.has(c));
+    covClass = missingCore.length === 0 ? "ok" : "warn";
+    covText = missingCore.length === 0
+      ? `Core sections present · ${present.map((c) => `§${c}`).join(" ")}`
+      : `${missingCore.map((c) => `§${c}`).join(" · ")} not detected`;
+  } else if (allIngested) {
     covClass = "ok";
     covText = "All sources read in full";
+  } else {
+    covClass = "warn";
+    covText = `${ing.files_read} of ${ing.files_total} read · rest indexed`;
   }
   const okSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
   const warnSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`;
-  out = out.replace(
-    /<span class="ingest-cov[^"]*" data-field="ingest_coverage">[\s\S]*?<\/span>/,
-    `<span class="ingest-cov ${covClass}" data-field="ingest_coverage">${allIngested ? okSvg : warnSvg}${esc(covText)}</span>`
-  );
-  return out;
+  const covChip = `<span class="man-cov ${covClass}">${covClass === "ok" ? okSvg : warnSvg}${esc(covText)}</span>`;
+
+  // "Read in full" group.
+  const readRows = readFiles.map((f) => docRowHtml(f, docTagHtml(f))).join("");
+  const readGroup = readFiles.length === 0 ? "" :
+    `<div class="man-grp read">` +
+    `<div class="man-grp-h"><span class="gh-dot"></span><span class="gh-t">Read in full</span><span class="gh-c">${readFiles.length}</span><span class="gh-note">every word parsed against the compliance map</span></div>` +
+    `<div class="man-cols">${readRows}</div>` +
+    `</div>`;
+
+  // "Indexed — not deep-read" group, grouped by friendly CATEGORY (Densify port,
+  // Design 2026-06-21). One category chip per group; the RAW per-file reason is
+  // kept in each chip's title attribute (no-blank honesty). Files with no engine
+  // reason fall into a generic "not deep-read" bucket so none render reason-less.
+  let indexedGroup = "";
+  if (indexedFiles.length > 0) {
+    const byCategory = new Map<string, IngestionRender["files"]>();
+    for (const f of indexedFiles) {
+      const key = f.indexed_category || f.indexed_reason || "not deep-read";
+      const arr = byCategory.get(key) ?? [];
+      arr.push(f);
+      byCategory.set(key, arr);
+    }
+    const reasonBlocks = [...byCategory.entries()].map(([category, group]) => {
+      const sub = `<p class="man-sub">${esc(category)} · ${group.length}</p>`;
+      const rows = group.map((f) => {
+        // Category chip; raw reason preserved in the chip's title attribute.
+        const rawReason = f.indexed_reason || category;
+        return docRowHtml(f, `<span class="dtag reason" title="${esc(rawReason)}">${esc(category)}</span>`);
+      }).join("");
+      return `<div>${sub}${rows}</div>`;
+    }).join("");
+    indexedGroup =
+      `<div class="man-grp idx">` +
+      `<div class="man-grp-h"><span class="gh-dot"></span><span class="gh-t">Indexed — not deep-read</span><span class="gh-c">${indexedFiles.length}</span><span class="gh-note">searchable for lookup; each carries a reason</span></div>` +
+      `<div class="man-cols">${reasonBlocks}</div>` +
+      `</div>`;
+  }
+
+  const manInner =
+    `<div class="man-sum" data-man-toggle>` +
+      `<span class="ingest-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7l2 2h7a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></span>` +
+      `<div class="man-sum-tx"><span class="il-k">Source manifest</span><div class="man-counts">${counts}</div></div>` +
+      covChip +
+      `<button class="man-expand" type="button">View sources<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></button>` +
+    `</div>` +
+    `<div class="man-body">${readGroup}${indexedGroup}</div>`;
+
+  // Swap the entire .ingest banner element for the .man manifest.
+  return replaceIngestBannerWithManifest(html, manInner);
+}
+
+// Replace the legacy .ingest banner element with the new .man manifest, keeping
+// the data-field="ingestion" + data-hide-when-empty hooks the render pipeline
+// keys off (the standalone caller already gated on a present manifest).
+function replaceIngestBannerWithManifest(html: string, manInner: string): string {
+  const re = /<div class="ingest"[^>]*>/;
+  const m = re.exec(html);
+  if (!m) return html;
+  const range = findElementRange(html, m.index, "div");
+  if (!range) return html;
+  const replacement = `<div class="man" id="manA" data-field="ingestion" data-hide-when-empty="ingestion">${manInner}</div>`;
+  return html.slice(0, range.start) + replacement + html.slice(range.end);
+}
+
+// Tag-balanced element-range finder (open-tag start .. matching close-tag end).
+function findElementRange(html: string, openStart: number, tag: string): { start: number; end: number } | null {
+  const openRe = new RegExp(`<${tag}\\b`, "g");
+  const closeRe = new RegExp(`</${tag}>`, "g");
+  // Find end of the opening tag.
+  const tagEnd = html.indexOf(">", openStart);
+  if (tagEnd === -1) return null;
+  let depth = 1;
+  let cursor = tagEnd + 1;
+  while (depth > 0) {
+    openRe.lastIndex = cursor;
+    closeRe.lastIndex = cursor;
+    const o = openRe.exec(html);
+    const c = closeRe.exec(html);
+    if (!c) return null;
+    if (o && o.index < c.index) { depth++; cursor = o.index + 1; }
+    else { depth--; cursor = c.index + c[0].length; }
+  }
+  return { start: openStart, end: cursor };
 }
 
 // ─── Surface 11 — The Capture Play (Phase 4 · ⑤.7) ────────────────────────
