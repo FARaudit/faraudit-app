@@ -223,7 +223,7 @@ function renderScoreFactor(f: ScoreFactor): string {
   return `<div class="sfactor${f.drag ? " drag" : ""}">
                     <div class="sf-top"><span class="sf-name">${escapeHtml(f.name)}<span class="sf-w">${f.weight}% weight</span></span><span class="sf-score ${f.tone}">${Math.round(f.score)}</span></div>
                     <div class="sf-bar"><i class="${f.tone}" style="width:${Math.max(0, Math.min(100, f.score))}%"></i></div>
-                    <div class="sf-note">${f.note}</div>
+                    <div class="sf-note">${escapeHtml(f.note)}</div>
                   </div>`;
 }
 
@@ -1898,7 +1898,7 @@ function renderWorkStatementReveal(
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement\.meaning">)[\s\S]*?(<\/p>)/,
-      `$1${ws.meaning}$2`
+      `$1${escapeHtml(ws.meaning)}$2`
     );
     out = out.replace(
       /(<span class="ev-cite" data-field="work_statement\.evidence">)[\s\S]*?(<\/span>)/,
@@ -1906,7 +1906,7 @@ function renderWorkStatementReveal(
     );
     out = out.replace(
       /(<p class="wst-t" data-field="work_statement\.bid_strategy">)[\s\S]*?(<\/p>)/,
-      `$1${ws.bid_strategy}$2`
+      `$1${escapeHtml(ws.bid_strategy)}$2`
     );
     return out;
   }
@@ -1922,11 +1922,11 @@ function renderWorkStatementReveal(
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement_unknown\.reason">)[\s\S]*?(<\/p>)/,
-      `$1${wsu.reason}$2`
+      `$1${escapeHtml(wsu.reason)}$2`
     );
     out = out.replace(
       /(<span class="wsi-t" data-field="work_statement_unknown\.action">)[\s\S]*?(<\/span>)/,
-      `$1${wsu.action}$2`
+      `$1${escapeHtml(wsu.action)}$2`
     );
     return out;
   }
@@ -2520,7 +2520,7 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     if (vm.key_dates_note && vm.key_dates_note.trim().length > 0) {
       html = html.replace(
         /(<div class="kd-note"[^>]*>[\s\S]*?<span>)[\s\S]*?(<\/span>\s*<\/div>)/,
-        `$1${vm.key_dates_note}$2`
+        `$1${escapeHtml(vm.key_dates_note)}$2`
       );
     } else {
       html = removeKdNote(html);
