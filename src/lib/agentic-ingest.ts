@@ -53,7 +53,11 @@ export interface CoverageLedger {
 }
 
 const SECTION_CODE_RE = /\b([jc])[-\s]?(\d{6,7})(?:-(\d{2}))?\b/i;
-const SF30_RE = /amendment.*sf\s*30|solicitation amendment\s*n?\d/i;
+// Matches common SAM amendment/SF-30 filename shapes, in any order:
+// "SF30_Amendment_0001.pdf", "SF-30.pdf", "Amendment 0011.pdf", "Amd_0001.pdf",
+// "Mod_0002.pdf", "Solicitation Amendment N0040.pdf". Word-boundaries on the
+// short tokens (amd/mod) avoid matching "model"/"amduat" etc.
+const SF30_RE = /sf[\s_-]?30|amendment|solicitation amendment|\bamd[\s_-]?\d|\bmod[\s_-]?\d/i;
 
 /** Logical-document cluster key. A version GROUP is formed ONLY by a stable
  *  attachment code (J-…/C-… — a doc-specific identity that survives across

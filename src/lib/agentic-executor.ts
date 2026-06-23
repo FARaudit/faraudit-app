@@ -135,7 +135,7 @@ export async function buildAgenticFacts(params: {
   primaryBytes: Buffer | null;
   primaryText: string | null;
   attachments: Array<{ name: string; base64: string }> | null;
-}): Promise<AgenticMapResult | null> {
+}, signal?: AbortSignal): Promise<AgenticMapResult | null> {
   try {
     const docs = await buildAgenticDocs({
       primaryName: params.primaryName,
@@ -148,8 +148,17 @@ export async function buildAgenticFacts(params: {
       return null;
     }
     const scalars = scalarsFromSolicitation(params.solicitation, params.agency);
-    const result = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL });
+    const result = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL, signal });
     console.log(`[AGENTIC-PRIMARY] ${params.auditId}: ${result.coverage.statement}`);
+    // Empty-but-non-null guard: if the MAP read ZERO documents (every per-doc call
+    // failed — OCR misses, API overload, parse errors), the composed facts are vacuous.
+    // Returning them as factsOverride makes runAuditV2 SKIP its own extractor and render
+    // an EMPTY report stamped from those facts. Fall back to V2's single-pass extraction
+    // instead (which can still read doc.rawText) rather than ship an empty audit.
+    if (result.coverage.read.length === 0) {
+      console.warn(`[AGENTIC-PRIMARY] ${params.auditId}: MAP read 0 documents — V2 extractor fallback`);
+      return null;
+    }
     return result;
   } catch (e) {
     console.error(`[AGENTIC-PRIMARY] ${params.auditId} facts build failed (non-fatal, V2 fallback):`, e instanceof Error ? e.message : e);
@@ -157,7 +166,11 @@ export async function buildAgenticFacts(params: {
   }
 }
 
+// Tolerant truthy parse — accept true/1/yes/on (any case) so a "True"/"1" value set
+// in the Railway dashboard doesn't silently leave the agentic path OFF.
+const isEnvOn = (v: string | undefined): boolean =>
+  v != null && ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
 /** Flag-gate — agentic shadow runs only when explicitly enabled. */
-export const AGENTIC_SHADOW_ENABLED = process.env.AUDIT_AGENTIC === "true";
+export const AGENTIC_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
 /** Flag-gate — agentic PRIMARY (facts feed the rendered V2 report) when enabled. */
-export const AGENTIC_PRIMARY_ENABLED = process.env.AUDIT_AGENTIC_PRIMARY === "true";
+export const AGENTIC_PRIMARY_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_PRIMARY);

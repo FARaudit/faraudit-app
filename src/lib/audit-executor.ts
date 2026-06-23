@@ -195,13 +195,15 @@ const ATTACHMENT_SET_MAX = MAX_DOCS;
 // (catch → fallback) or fails (propagate). Mirrors the inline V2 race already
 // in this file; factored out so all three budget sites share one timer-cleanup-
 // correct implementation (the timer is always cleared, win or lose).
-async function withBudget<T>(work: Promise<T>, budgetMs: number, label: string): Promise<T> {
+async function withBudget<T>(workFactory: (signal: AbortSignal) => Promise<T>, budgetMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
   try {
     return await Promise.race([
-      work,
+      workFactory(controller.signal),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(label)), budgetMs);
+        // Abort the in-flight work on timeout so it stops spending, THEN reject.
+        timer = setTimeout(() => { controller.abort(); reject(new Error(label)); }, budgetMs);
       }),
     ]);
   } finally {
@@ -308,7 +310,7 @@ export async function executeAudit(
       // "leave facts to extraction / honest-unknown" below). Best-effort fact
       // enrichment, never a blocker.
       const samFacts = await withBudget(
-        fetchSolicitationByNoticeId(solNum),
+        () => fetchSolicitationByNoticeId(solNum),
         FACTS_SAM_BUDGET_MS,
         `FACTS SAM cross-ref budget (${FACTS_SAM_BUDGET_MS / 1000}s) exceeded`
       ).catch((e) => {
@@ -421,7 +423,7 @@ export async function executeAudit(
       // the attempt cap). Converts a silent multi-minute stall into a prompt,
       // diagnosable terminal failure the report page can exit to.
       result = await withBudget(
-        runAudit({
+        () => runAudit({
           solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
           attachmentPdfs: step.attachments,
           primaryDocName: input.primaryDocName ?? null
@@ -733,7 +735,7 @@ export async function executeAudit(
         const mapBudgetMs = Number(process.env.AGENTIC_MAP_BUDGET_MS) || 300000;
         try {
           agenticMap = await withBudget(
-            buildAgenticFacts({
+            (signal) => buildAgenticFacts({
               auditId,
               solicitation,
               agency,
@@ -746,7 +748,7 @@ export async function executeAudit(
               // and make the coverage ledger report "partial". Cost/wall-clock are
               // bounded by the MAP budget above + Haiku's cheap per-doc rate.
               attachments: inputAttachments,
-            }),
+            }, signal),
             mapBudgetMs,
             `agentic MAP budget (${mapBudgetMs / 60000}min) exceeded`
           );
@@ -1040,7 +1042,7 @@ export async function executeAudit(
     const shadowBudgetMs = Number(process.env.AGENTIC_SHADOW_BUDGET_MS) || 300000;
     try {
       await withBudget(
-        runAgenticShadow({
+        () => runAgenticShadow({
           auditId,
           solicitation,
           agency,

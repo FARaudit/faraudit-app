@@ -33,6 +33,8 @@ export interface AgenticAuditInput {
   amendmentText?: string | null; // override; else derived from SF-30 cover docs
   mapModel?: string;
   judgeModel?: string;
+  /** Cancellation — aborts in-flight per-doc MAP reads when an upstream budget fires. */
+  signal?: AbortSignal;
 }
 
 export interface CoverageReport {
@@ -79,18 +81,23 @@ export function composeExtractedFacts(scalars: ScalarFacts, mapped: MappedFacts)
 
 /** Build the honest coverage report. Pure. The completeness claim is gated on
  *  read failures, not asserted. */
-export function buildCoverageReport(ledger: ResolvedLedger, mapCoverage: MapCoverage, readFailures: string[]): CoverageReport {
+export function buildCoverageReport(ledger: ResolvedLedger, mapCoverage: MapCoverage, readFailures: string[], truncatedDocs: string[] = []): CoverageReport {
   const superseded = ledger.entries.filter((e) => e.status === "superseded").map((e) => e.name);
   const duplicatesSkipped = mapCoverage.skipped.filter((s) => s.reason.includes("duplicate")).length;
-  const complete = readFailures.length === 0;
+  // A truncated doc was NOT read in full (over MAP_INPUT_CHAR_LIMIT, trimmed for the
+  // prompt) — it cannot count toward "Audited N of N in full" any more than a read
+  // failure can. Completeness requires zero read failures AND zero truncations.
+  const complete = readFailures.length === 0 && truncatedDocs.length === 0;
   const readN = mapCoverage.read.length;
   const total = readN + readFailures.length; // honest denominator — failures are visible, not hidden
   const statement = complete
     ? `Audited ${readN} of ${total} operative documents in full · ` +
       `${superseded.length} superseded version(s) excluded with proof · ${duplicatesSkipped} byte-identical duplicate(s) skipped · ` +
       `${ledger.versionGroups} unresolved version group(s) read in full (amendment-resolution would reduce cost, not coverage).`
-    : `⚠ INCOMPLETE — read ${readN} of ${total} operative documents; ${readFailures.length} could not be read: ${readFailures.join(", ")}. ` +
-      `Coverage is PARTIAL; this is NOT a full review.`;
+    : `⚠ INCOMPLETE — read ${readN} of ${total} operative documents` +
+      (readFailures.length ? `; ${readFailures.length} could not be read: ${readFailures.join(", ")}` : "") +
+      (truncatedDocs.length ? `; ${truncatedDocs.length} too large to read in full (trimmed): ${truncatedDocs.join(", ")}` : "") +
+      `. Coverage is PARTIAL; this is NOT a full review.`;
   return {
     totalFiles: ledger.entries.length,
     read: mapCoverage.read,
@@ -152,7 +159,8 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   const concurrency = 4;
   for (let i = 0; i < mappable.length; i += concurrency) {
     const batch = mappable.slice(i, i + concurrency);
-    const settled = await Promise.allSettled(batch.map((d) => mapDocument(d.name, d.text, input.mapModel)));
+    if (input.signal?.aborted) break; // budget fired — stop launching new batches
+    const settled = await Promise.allSettled(batch.map((d) => mapDocument(d.name, d.text, input.mapModel, input.signal)));
     settled.forEach((r, j) => {
       if (r.status === "fulfilled") extracts.push(r.value);
       else readFailures.push(batch[j].name);
@@ -163,10 +171,13 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   // includes docs whose MAP call later failed (those are in readFailures; counting
   // them as read too would double-count and inflate the "N of N" headline).
   const mapCoverage: MapCoverage = { read: extracts.map((e) => e.docName), skipped };
+  // Docs that produced an extract but were over the char cap (trimmed) — read, but
+  // NOT in full; they keep coverage from claiming completeness.
+  const truncatedDocs = extracts.filter((e) => e.truncated).map((e) => e.docName);
 
   // 4) compose facts (deterministic SAM scalars + mapped analysis) + coverage report
   const facts = composeExtractedFacts(input.scalars, merged);
-  const coverage = buildCoverageReport(ledger, mapCoverage, readFailures);
+  const coverage = buildCoverageReport(ledger, mapCoverage, readFailures, truncatedDocs);
   // assembled MAP text = the text the read docs were extracted from (the grounding
   // source for V2's fabrication guards on the agentic-primary path).
   const assembledText = mappable.map((d) => d.text).join("\n\n");

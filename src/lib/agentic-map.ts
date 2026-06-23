@@ -38,6 +38,9 @@ export interface DocExtract {
   evaluationFactors: EvaluationFactor[];
   workStatementText: string | null;
   warnings: string[];
+  /** true when the source exceeded MAP_INPUT_CHAR_LIMIT and was trimmed for the
+   *  prompt — the doc was NOT read in full, so coverage must not claim completeness. */
+  truncated: boolean;
 }
 
 /** The array half of ExtractedFacts that the MAP produces. Scalars (NAICS/etc.)
@@ -82,30 +85,44 @@ export function mergeExtracts(extracts: DocExtract[]): MappedFacts {
   const provenance: Record<string, string> = {};
   let workStatementText: string | null = null;
 
+  // VALUE-AWARE dedup (was: identifier-only first-wins). Keying on the identifier
+  // alone silently dropped an AMENDED row when a later doc revised the same
+  // clause/CLIN/delivery line (e.g. CLIN 0001 delivery 30→60 days) — reintroducing
+  // the binding-doc-supersession failure the ingest layer exists to prevent. The
+  // full-value key collapses byte-identical duplicates only; a revised value differs
+  // and is KEPT, so the judge/report sees both versions (design: "read both,
+  // supersede nothing"). Provenance accumulates every contributing doc.
   const seenClause = new Set<string>();
   const seenClin = new Set<string>();
   const seenDelivery = new Set<string>();
+  const addProv = (k: string, doc: string) => {
+    provenance[k] = provenance[k] ? `${provenance[k]}, ${doc}` : doc;
+  };
   for (const ex of extracts) {
     for (const c of ex.clauses) {
-      const key = c.number.replace(/\s+/g, "").toUpperCase();
-      if (key && seenClause.has(key)) continue;       // dedup clauses by number
-      if (key) seenClause.add(key);
+      // Clauses dedup on BINDING identity (number + incorporation mode + trap), not
+      // full value — the same clause re-cited in two sections with an incidental
+      // title difference collapses, but an amendment that flips incorporation
+      // (by_reference→full_text) or trap status is KEPT.
+      const key = [c.number.replace(/\s+/g, "").toUpperCase(), c.incorporated, c.isTrap].join("|");
+      if (seenClause.has(key)) continue;
+      seenClause.add(key);
       clauses.push(c);
-      provenance[`clause:${c.number}`] = ex.docName;
+      addProv(`clause:${c.number}`, ex.docName);
     }
     for (const cl of ex.clins) {
-      const key = cl.lineItem.replace(/\s+/g, "").toUpperCase();
-      if (key && seenClin.has(key)) continue;          // dedup CLINs by line item
-      if (key) seenClin.add(key);
+      const key = JSON.stringify(cl);
+      if (seenClin.has(key)) continue;          // dedup CLINs by full value
+      seenClin.add(key);
       clins.push(cl);
-      provenance[`clin:${cl.lineItem}`] = ex.docName;
+      addProv(`clin:${cl.lineItem}`, ex.docName);
     }
     for (const d of ex.delivery) {
-      const key = d.lineItem.replace(/\s+/g, "").toUpperCase();
-      if (key && seenDelivery.has(key)) continue;   // dedup delivery by line item (unresolved version groups read both)
-      if (key) seenDelivery.add(key);
+      const key = JSON.stringify(d);
+      if (seenDelivery.has(key)) continue;   // dedup delivery by full value (amended terms kept)
+      seenDelivery.add(key);
       delivery.push(d);
-      provenance[`delivery:${d.lineItem}`] = ex.docName;
+      addProv(`delivery:${d.lineItem}`, ex.docName);
     }
     for (const s of ex.submissionRequirements) { submissionRequirements.push(s); provenance[`subreq:${s.text.slice(0, 40)}`] = ex.docName; }
     for (const f of ex.evaluationFactors) { evaluationFactors.push(f); provenance[`evalfactor:${f.factor.slice(0, 40)}`] = ex.docName; }
@@ -224,10 +241,16 @@ const MAP_OUTPUT_TOKENS = 8000;
 /** Read ONE document on the cheap model, schema-validated. Isolated so the
  *  deterministic logic above is testable without the API. Live call — runs only
  *  on the agentic path, behind the review gate. */
-export async function mapDocument(docName: string, text: string, modelOverride?: string): Promise<DocExtract> {
+export async function mapDocument(docName: string, text: string, modelOverride?: string, signal?: AbortSignal): Promise<DocExtract> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — MAP call cannot proceed");
   const model = modelOverride ?? process.env.AUDIT_MAP_MODEL ?? "claude-haiku-4-5";
+  // Cost guard: the MAP runs once PER DOCUMENT (33+ on a big package), so an Opus
+  // map model re-introduces the multi-call near-full-package Opus cost bleed. The
+  // map is meant to run on a cheap model; flag a stray Opus override loudly.
+  if (/opus/i.test(model)) {
+    console.warn(`[agentic-map] ⚠ AUDIT_MAP_MODEL=${model} is an OPUS model — per-doc MAP on Opus is a cost bleed. Expected a cheap model (claude-haiku-4-5).`);
+  }
   // Injection defense (parity with the main engine): strip injection-pattern spans
   // and pass a security directive in the system prompt. Document text is untrusted.
   const { sanitized, redactionCount } = sanitizePdfText(text);
@@ -239,6 +262,7 @@ export async function mapDocument(docName: string, text: string, modelOverride?:
     schema: DOC_EXTRACT_SCHEMA,
     maxTokens: MAP_OUTPUT_TOKENS,
     label: `MAP ${docName}`,
+    signal,
   });
   let parsed: Omit<DocExtract, "docName">;
   try {
@@ -252,7 +276,8 @@ export async function mapDocument(docName: string, text: string, modelOverride?:
   if (redactionCount > 0) {
     warnings.push(`${redactionCount} prompt-injection pattern span(s) redacted from source`);
   }
-  if (sanitized.length > MAP_INPUT_CHAR_LIMIT) {
+  const truncated = sanitized.length > MAP_INPUT_CHAR_LIMIT;
+  if (truncated) {
     warnings.push(`INPUT TRUNCATED to ${MAP_INPUT_CHAR_LIMIT} chars (document is ${sanitized.length}) — NOT fully read; needs chunking`);
   }
   if (stopReason === "max_tokens") {
@@ -264,5 +289,5 @@ export async function mapDocument(docName: string, text: string, modelOverride?:
   if (findingCount === 0 && !parsed.workStatementText) {
     warnings.push(`VACUOUS extract — model returned no findings; verify the document was actually readable`);
   }
-  return { docName, ...parsed, warnings };
+  return { docName, ...parsed, warnings, truncated };
 }

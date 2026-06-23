@@ -21,6 +21,9 @@ export interface StructuredCallOpts {
   maxTokens: number;
   timeoutMs?: number;
   label?: string;
+  /** External cancellation — when this aborts (e.g. an upstream MAP budget timeout),
+   *  the in-flight request is aborted too, so a timed-out batch stops spending. */
+  signal?: AbortSignal;
 }
 
 export interface StructuredCallResult {
@@ -47,6 +50,11 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
   };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // External cancellation also aborts this request (upstream budget timeout).
+  if (opts.signal) {
+    if (opts.signal.aborted) controller.abort();
+    else opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
   let res: Response;
   try {
     res = await fetch(ANTHROPIC_API_URL, {

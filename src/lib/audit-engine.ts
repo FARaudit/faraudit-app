@@ -1446,6 +1446,26 @@ async function callClaude(
     }
   }
 
+  // Total-request safety net (separate from the cache-prefix trim above). The
+  // userPrompt is the LAST block (after the cache breakpoint), excluded from the
+  // doc-prefix trim so the cached prefix stays byte-identical across calls. But it
+  // carries the full primary office-doc text (solText), so a large primary can push
+  // the REAL request (prefix + userPrompt + output) past the context window even when
+  // the doc prefix fit. We can't trim the userPrompt without diverging it per call
+  // (cache miss), so route oversize to the executor's trim-and-run ladder instead of
+  // letting it 400. (The pre-cache-fix guard counted the userPrompt; this restores it.)
+  {
+    const totalBudget = modelContextLimit(model) - MAX_AUDIT_OUTPUT_TOKENS - TOKEN_SAFETY_PAD;
+    const totalCount = await countInputTokens(model, systemPrompt, content);
+    if (totalCount !== null && totalCount > totalBudget) {
+      throw new OversizeInputError(
+        `total request ${totalCount.toLocaleString()} tokens (incl. userPrompt) > budget ${totalBudget.toLocaleString()} (model=${model})`,
+        totalCount,
+        totalBudget
+      );
+    }
+  }
+
   console.log(`[audit-engine] V1 call · model=${model}`);
   const t0 = Date.now();
   // 529/503 transient overload — 3-attempt retry with exponential backoff (2s, 4s).
@@ -4995,12 +5015,18 @@ export function _v2GroundRiskClauses(
     .replace(/-\s*\n\s*/g, "-") // de-hyphenate line-wraps (52.222-\n50)
     .replace(/\s+/g, " ")
     .toUpperCase();
+  // Degraded-source fallback (parity with _v2GroundClauseList): if the grounding
+  // text has NO clause token at all, the text layer is missing/unreadable (e.g. the
+  // agentic-primary path passed an empty groundingText override). Nulling on text
+  // absence would silently strip valid risk citations — so only the `known` clause
+  // set grounds them in that case; we do NOT null on text-not-found.
+  const sourceHasClauses = !!norm && (norm.match(_V2_CLAUSE_TOKEN_RE) || []).length > 0;
   let nulled = 0;
   for (const r of risks) {
     if (!r || !r.trapClause) continue;
     const toks = r.trapClause.toUpperCase().match(_V2_CLAUSE_TOKEN_RE) || [];
     if (toks.length === 0) continue; // not a clause-number citation — leave as-is
-    const grounded = toks.some((t) => known.has(t) || norm.includes(t));
+    const grounded = toks.some((t) => known.has(t)) || !sourceHasClauses || toks.some((t) => norm.includes(t));
     if (!grounded) {
       r.trapClause = null;
       if ("isDfarsTrap" in r) r.isDfarsTrap = false;

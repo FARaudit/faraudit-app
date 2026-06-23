@@ -55,10 +55,13 @@ const dupSel = selectMapTargets(dupLedger);
 check("MAP skips byte-identical duplicate (1 read, 1 skipped)", dupSel.read.length === 1 && dupSel.skipped.length === 1);
 
 // ── MAP merge: dedup clauses by number, record provenance to first source
-const exA: DocExtract = { docName: "Section I.pdf", clauses: [{ number: "52.204-7", title: "SAM", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [] };
-const exB: DocExtract = { docName: "Section H.pdf", clauses: [{ number: "52.204-7", title: "SAM dup", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }, { number: "252.204-7012", title: "Safeguarding CUI", incorporated: "full_text", effectiveDate: null, isTrap: true, trapReason: "CUI" }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [] };
+const exA: DocExtract = { docName: "Section I.pdf", clauses: [{ number: "52.204-7", title: "SAM", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [], truncated: false };
+const exB: DocExtract = { docName: "Section H.pdf", clauses: [{ number: "52.204-7", title: "SAM dup", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }, { number: "252.204-7012", title: "Safeguarding CUI", incorporated: "full_text", effectiveDate: null, isTrap: true, trapReason: "CUI" }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [], truncated: false };
 const merged = mergeExtracts([exA, exB]);
-check("MAP merge dedups clauses by number (2 unique)", merged.clauses.length === 2);
+// Value-aware dedup: 52.204-7 collapses (same number+incorporation+trap, title-only
+// diff), 252.204-7012 is distinct → 2 unique. Amendment-revised binding values would
+// instead be kept (the dedup-drops-amendments fix).
+check("MAP merge dedups clauses by binding identity (2 unique)", merged.clauses.length === 2);
 check("MAP merge records provenance to first source doc", merged.provenance["clause:52.204-7"] === "Section I.pdf");
 
 // ── orchestrator compose: scalars come from SAM (deterministic), arrays from MAP
