@@ -161,8 +161,21 @@ export async function buildAgenticFacts(params: {
     const mapEmpty =
       f.clauses.length === 0 && f.clins.length === 0 && f.delivery.length === 0 &&
       f.submissionRequirements.length === 0 && f.evaluationFactors.length === 0 && !f.workStatementText;
-    if (result.coverage.read.length === 0 || mapEmpty) {
-      console.warn(`[AGENTIC-PRIMARY] ${params.auditId}: MAP produced no usable facts (read ${result.coverage.read.length}, empty=${mapEmpty}) — V2 extractor fallback`);
+    // Coverage-ratio floor: a MAP that read only a small fraction of the operative
+    // docs (e.g. 2 of 31) still produces SOME facts, so mapEmpty is false — but using
+    // those thin facts as factsOverride would render a near-empty report the banner
+    // could present as authoritative. Below the floor, fall back to V2's single-pass
+    // extractor (reads every doc's text) rather than ship a thin partial as primary.
+    const readN = result.coverage.read.length;
+    const failN = result.coverage.readFailures.length;
+    const total = readN + failN;
+    const coverageRatio = total > 0 ? readN / total : 0;
+    const MIN_COVERAGE_RATIO = 0.5;
+    if (readN === 0 || mapEmpty || coverageRatio < MIN_COVERAGE_RATIO) {
+      console.warn(
+        `[AGENTIC-PRIMARY] ${params.auditId}: MAP coverage too thin for primary ` +
+        `(read ${readN}/${total} = ${(coverageRatio * 100).toFixed(0)}%, empty=${mapEmpty}) — V2 extractor fallback`
+      );
       return null;
     }
     return result;

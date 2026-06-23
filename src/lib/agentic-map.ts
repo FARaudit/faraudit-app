@@ -173,7 +173,13 @@ const DOC_EXTRACT_SCHEMA = {
           description: { type: "string" },
           quantity: { type: ["number", "null"] },
           unit: { type: ["string", "null"] },
-          contractType: { type: ["string", "null"], enum: ["FFP", "T&M", "CPFF", "CPAF", "other", null] },
+          // Anthropic strict structured-outputs (output_config.format.schema) REJECTS
+          // a union `type:["string","null"]` combined with an `enum` ("Enum value
+          // 'FFP' does not match declared type ['string','null']") — every per-doc
+          // MAP call 400'd on this, so the agentic engine read 0 docs live. The
+          // constraint-preserving form is anyOf{enum-string | null}: keeps the
+          // canonical value set (downstream switches on exact strings) AND nullability.
+          contractType: { anyOf: [{ type: "string", enum: ["FFP", "T&M", "CPFF", "CPAF", "other"] }, { type: "null" }] },
           ambiguityFlag: { type: ["string", "null"] },
         },
       },
@@ -187,7 +193,7 @@ const DOC_EXTRACT_SCHEMA = {
           lineItem: { type: "string" },
           deliveryDate: { type: ["string", "null"] },
           dodaac: { type: ["string", "null"] },
-          fobType: { type: ["string", "null"], enum: ["government", "contractor", "origin", "destination", null] },
+          fobType: { anyOf: [{ type: "string", enum: ["government", "contractor", "origin", "destination"] }, { type: "null" }] }, // see contractType — nullable-enum 400 fix
           shipToAddress: { type: ["string", "null"] },
         },
       },
@@ -213,7 +219,7 @@ const DOC_EXTRACT_SCHEMA = {
         properties: {
           factor: { type: "string" },
           weight: { type: ["string", "null"] },
-          method: { type: ["string", "null"], enum: ["LPTA", "best_value", "other", null] },
+          method: { anyOf: [{ type: "string", enum: ["LPTA", "best_value", "other"] }, { type: "null" }] }, // see contractType — nullable-enum 400 fix (downstream switches on exact "LPTA"/"best_value")
         },
       },
     },
@@ -246,7 +252,14 @@ function mapPrompt(docName: string, text: string): string {
 // mapDocument FLAGS it (never a silent partial read). The real fix for genuinely
 // huge single docs is chunking; until then, truncation is at least visible.
 const MAP_INPUT_CHAR_LIMIT = 600_000;
-const MAP_OUTPUT_TOKENS = 8000;
+// 8000 truncated the biggest docs mid-JSON (the Solicitation's extract alone
+// exceeded it → "Unterminated string in JSON" → the doc counted as a read-failure).
+// Haiku supports far more output (64K ceiling); 16000 fits a full single-doc extract.
+// NOTE: a doc whose extract STILL exceeds 16000 truncates mid-JSON, so JSON.parse
+// throws and the doc is an HONEST read-failure (counted in readFailures, never a
+// silent full-read claim) — the stopReason==="max_tokens" warning path below is NOT
+// reached in that case (parse throws first). The real fix for such docs is chunking.
+const MAP_OUTPUT_TOKENS = 16000;
 
 /** Read ONE document on the cheap model, schema-validated. Isolated so the
  *  deterministic logic above is testable without the API. Live call — runs only

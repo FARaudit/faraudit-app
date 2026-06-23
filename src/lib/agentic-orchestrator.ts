@@ -159,7 +159,14 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   const concurrency = 4;
   for (let i = 0; i < mappable.length; i += concurrency) {
     const batch = mappable.slice(i, i + concurrency);
-    if (input.signal?.aborted) break; // budget fired — stop launching new batches
+    if (input.signal?.aborted) {
+      // Budget fired — every not-yet-attempted doc is an HONEST read-failure, not a
+      // silent drop. Without this they'd vanish from the denominator (total = read +
+      // readFailures) and coverage could report "Audited 8 of 8 · complete" after a
+      // mid-run abort. Push the whole remaining tail before breaking.
+      for (const d of mappable.slice(i)) readFailures.push(d.name);
+      break;
+    }
     const settled = await Promise.allSettled(batch.map((d) => mapDocument(d.name, d.text, input.mapModel, input.signal)));
     settled.forEach((r, j) => {
       if (r.status === "fulfilled") extracts.push(r.value);
@@ -178,9 +185,13 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   // 4) compose facts (deterministic SAM scalars + mapped analysis) + coverage report
   const facts = composeExtractedFacts(input.scalars, merged);
   const coverage = buildCoverageReport(ledger, mapCoverage, readFailures, truncatedDocs);
-  // assembled MAP text = the text the read docs were extracted from (the grounding
-  // source for V2's fabrication guards on the agentic-primary path).
-  const assembledText = mappable.map((d) => d.text).join("\n\n");
+  // assembled MAP text = the text of docs that ACTUALLY produced an extract (the
+  // grounding source for V2's fabrication guards on the agentic-primary path). Built
+  // from `extracts`, NOT `mappable` — mappable still includes docs whose MAP call
+  // failed; including their text would let V2 surface clauses from a doc the agentic
+  // facts don't cover, widening the facts↔grounding mismatch.
+  const extractNames = new Set(extracts.map((e) => e.docName));
+  const assembledText = mappable.filter((d) => extractNames.has(d.name)).map((d) => d.text).join("\n\n");
   return { facts, coverage, ledger, assembledText };
 }
 
