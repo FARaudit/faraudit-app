@@ -5079,7 +5079,21 @@ export async function runAuditV2(
   // a provenance separator BEFORE section detection, so both engines see the
   // same assembled input (no arm divergence). Extraction failure on an
   // attachment degrades to a warning, never kills the run.
-  extraDocs?: Array<{ name: string; buffer: Buffer }> | null
+  extraDocs?: Array<{ name: string; buffer: Buffer }> | null,
+  // AGENTIC graduate-to-primary (2026-06-22): when provided, the V2 pipeline runs
+  // its proven reshapers (matrix/checklist/L02/work-statement/judgment) over THESE
+  // facts — produced by the agentic per-document MAP (every doc model-read, full
+  // coverage, no overflow) — instead of the single-pass _v2ExtractAllFacts. Null/
+  // absent = unchanged V2 behavior, so this is inert until the agentic path sets it.
+  factsOverride?: ReturnType<typeof _v2ExtractAllFacts> | null,
+  // AGENTIC graduate-to-primary, grounding fix (2026-06-23): the post-extraction
+  // guards (clause-fabrication, risk-clause fidelity, work-statement promotion)
+  // re-validate facts against text. With factsOverride set, those facts came from
+  // the agentic MAP's text — NOT from this function's own _v2ExtractText(doc) —
+  // so grounding them against doc.rawText would silently DROP clauses the MAP read
+  // from image-only attachments V2 can't see. Pass the MAP's assembled text here
+  // so the guards validate the agentic facts against the text they CAME FROM.
+  groundingTextOverride?: string | null
 ): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
   if (extraDocs && extraDocs.length > 0) {
@@ -5117,13 +5131,28 @@ export async function runAuditV2(
     );
   }
 
-  const facts = _v2ExtractAllFacts(sectionBag.sections);
+  // factsOverride (agentic primary) wins when supplied — the V2 reshapers run over
+  // the agentic full-coverage facts; otherwise the single-pass extractor as before.
+  const facts = factsOverride ?? _v2ExtractAllFacts(sectionBag.sections);
+  if (factsOverride) warnings.push(`[facts] source = agentic MAP (per-document, full coverage)`);
   for (const w of facts.extractionWarnings) warnings.push(`[facts] ${w}`);
+
+  // Grounding source for the fabrication guards below. With agentic facts injected,
+  // validate them against the MAP's assembled text (their actual source); otherwise
+  // V2's own doc.rawText. Prevents the guards from silently dropping agentic clauses
+  // V2's single-pass extractor couldn't read (image-only attachments).
+  // `!= null` (not truthy): an empty override string must NOT silently fall back to
+  // doc.rawText — that would re-prune agentic facts. When the override is empty the
+  // guards' own honest-degradation fallback keeps the list (no spurious drops).
+  const groundingText = (factsOverride && groundingTextOverride != null) ? groundingTextOverride : doc.rawText;
 
   // FA-131 — fill scalar-fact gaps from V1 vision + SAM metadata before the
   // judgment call. The presence map below (FA-113 contradiction filter) reads
   // facts AFTER this fill, so bound facts also suppress contradictory output.
-  const boundSources = bindExternalFacts(facts, external, doc.rawText);
+  // groundingText (= the MAP's text on the agentic path) so the scalar doc-text
+  // fallbacks (NAICS/set-aside/due-date/agency) also read the text the facts came
+  // from; identical to doc.rawText on the normal V2 path.
+  const boundSources = bindExternalFacts(facts, external, groundingText);
 
   // §03 FIX (FA-119) — attachment work-statement fallback. extractScope(s["C"])
   // only reads the in-form Section C; on real solicitations the governing work
@@ -5154,7 +5183,11 @@ export async function runAuditV2(
       /(performance\s*work\s*statement|statement\s*of\s*work|statement\s*of\s*objectives?|scope\s*of\s*work)/i,
       /\b(?:1\.0|2\.0|3\.0|section\s+[1-9])\b[\s\S]{0,80}(scope|background|requirements?|tasks?|objectives?|performance)/i,
     ].filter((re) => re.test(_sectionCBody)).length >= 2;
-  if (!facts.workStatementText || facts.workStatementText.length < 200 || _sectionCLooksLikeWs) {
+  // Agentic-primary: if the MAP already supplied a substantial work statement
+  // (it read the SOW/PWS attachment directly, possibly via OCR V2 can't see),
+  // do NOT let this doc.rawText-based promotion overwrite or blank it.
+  const _agenticHasWs = !!factsOverride && !!facts.workStatementText && facts.workStatementText.length >= 200;
+  if (!_agenticHasWs && (!facts.workStatementText || facts.workStatementText.length < 200 || _sectionCLooksLikeWs)) {
     const isManufacturingSupply = /^3[123]/.test(facts.naicsCode ?? "");
     if (!isManufacturingSupply) {
       // Strong work-statement name signals only (full phrases + boundaried
@@ -5353,14 +5386,16 @@ export async function runAuditV2(
   // of the assembled doc.rawText (same pattern, single source of truth), dedup by
   // normalized clause number, then split by prefix. This becomes the persisted
   // far_clauses / dfars_clauses (AI list kept only as fallback when empty).
-  const _detClauses = _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
+  const _detClauses = _v2BuildDeterministicClauses(facts.clauses, groundingText);
   // Fix #3 — fabrication guard. Drop any clause number not grounded in the
   // normalized source text so the rendered list is 100% source-backed (zero-
   // fabrication law). Honest-degradation fallback keeps the list when the text
   // layer is missing. Same normalization as the risk-clause guard below.
-  const farClausesDet = _v2GroundClauseList(_detClauses.farClausesDet, doc.rawText);
-  const dfarsClausesDet = _v2GroundClauseList(_detClauses.dfarsClausesDet, doc.rawText);
-  const agencyClausesDet = _v2GroundClauseList(_detClauses.agencyClausesDet, doc.rawText);
+  // groundingText = the MAP's text on the agentic path (so agentic clauses ground
+  // against their real source), else doc.rawText.
+  const farClausesDet = _v2GroundClauseList(_detClauses.farClausesDet, groundingText);
+  const dfarsClausesDet = _v2GroundClauseList(_detClauses.dfarsClausesDet, groundingText);
+  const agencyClausesDet = _v2GroundClauseList(_detClauses.agencyClausesDet, groundingText);
   const _droppedClauses =
     (_detClauses.farClausesDet.length - farClausesDet.length) +
     (_detClauses.dfarsClausesDet.length - dfarsClausesDet.length) +
@@ -5382,7 +5417,7 @@ export async function runAuditV2(
 
   // Clause-citation fidelity (Polish B): de-attribute any risk trapClause whose
   // clause number isn't grounded in the extracted clause set or the source text.
-  const _ungroundedClauses = _v2GroundRiskClauses(judgment.risks, doc.rawText, [
+  const _ungroundedClauses = _v2GroundRiskClauses(judgment.risks, groundingText, [
     ...farClausesDet,
     ...dfarsClausesDet,
     ...agencyClausesDet,
