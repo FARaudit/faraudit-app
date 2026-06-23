@@ -10,6 +10,7 @@
 // path is the only line that differs between the two engine files — everything
 // from `type ContentBlock` onward is byte-equivalent. See parity header.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
+import { isEnvOn } from "@/lib/env-flags";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
@@ -2991,8 +2992,20 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
   // the SAM metadata so the model sees both via the prompt channel. Image
   // content rides on a separate Anthropic vision block, not the prompt body.
   const metadataText = JSON.stringify(solicitation).slice(0, 4000) + docSetManifest;
-  const rawText = extractedText
-    ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${extractedText}`
+  // Bound the office-doc primary text that rides in the userPrompt. The userPrompt is
+  // the post-cache-breakpoint block, so the doc-prefix trim can't shrink it and the
+  // executor's trim-and-run ladder only drops ATTACHMENTS — a giant DOCX/XLSX/TXT
+  // primary would otherwise overflow the context with no recourse (terminal fail).
+  // Cap deterministically with a visible marker (parity with the doc-prefix trim's
+  // honesty); ~3.5 chars/token ⇒ 700k chars ≈ 200k tokens, well within budget after
+  // metadata + output reserve. PDFs are unaffected (their text rides in a trimmable
+  // doc block, not here).
+  const MAX_PRIMARY_TEXT_CHARS = 700_000;
+  const boundedExtracted = extractedText && extractedText.length > MAX_PRIMARY_TEXT_CHARS
+    ? extractedText.slice(0, MAX_PRIMARY_TEXT_CHARS) + `\n\n[… primary document truncated at ${MAX_PRIMARY_TEXT_CHARS.toLocaleString()} chars to fit the model context — full file on SAM.gov …]`
+    : extractedText;
+  const rawText = boundedExtracted
+    ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${boundedExtracted}`
     : metadataText;
   const { sanitized: solText, redactionCount } = sanitizePdfText(rawText);
   if (redactionCount > 0) {
@@ -5511,4 +5524,4 @@ export async function runAuditV2(
   };
 }
 
-export const AUDIT_V2_ENABLED = process.env.AUDIT_ENGINE_V2 === "true";
+export const AUDIT_V2_ENABLED = isEnvOn(process.env.AUDIT_ENGINE_V2);

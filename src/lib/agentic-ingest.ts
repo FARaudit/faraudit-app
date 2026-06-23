@@ -16,6 +16,7 @@
 
 import { createHash } from "node:crypto";
 import { classifySectionRoles } from "./sam-attachments";
+import { isEnvOn } from "./env-flags";
 
 export type FileRole = "C" | "H" | "L" | "M";
 
@@ -55,9 +56,10 @@ export interface CoverageLedger {
 const SECTION_CODE_RE = /\b([jc])[-\s]?(\d{6,7})(?:-(\d{2}))?\b/i;
 // Matches common SAM amendment/SF-30 filename shapes, in any order:
 // "SF30_Amendment_0001.pdf", "SF-30.pdf", "Amendment 0011.pdf", "Amd_0001.pdf",
-// "Mod_0002.pdf", "Solicitation Amendment N0040.pdf". Word-boundaries on the
-// short tokens (amd/mod) avoid matching "model"/"amduat" etc.
-const SF30_RE = /sf[\s_-]?30|amendment|solicitation amendment|\bamd[\s_-]?\d|\bmod[\s_-]?\d/i;
+// "Mod_0002.pdf", "Solicitation Amendment N0040.pdf". "amendment" must be followed
+// by a number (optionally "No."/"N") so a benign "Amendment_to_PWS_guidance.pdf"
+// does NOT match; word-boundaries on amd/mod avoid "model"/"amduat".
+const SF30_RE = /sf[\s_-]?30|amendment[\s_-]*(?:no\.?\s*|n)?\d|\bamd[\s_-]?\d|\bmod[\s_-]?\d/i;
 
 /** Logical-document cluster key. A version GROUP is formed ONLY by a stable
  *  attachment code (J-…/C-… — a doc-specific identity that survives across
@@ -294,4 +296,4 @@ export function resolveAmendments(ledger: CoverageLedger, amendmentText: string)
 
 /** Flag-gate for the agentic path. OFF by default — prod is unchanged until the
  *  full build is reviewed (code-review + expert panels) and proven on a live run. */
-export const AGENTIC_INGEST_ENABLED = process.env.AUDIT_AGENTIC === "true";
+export const AGENTIC_INGEST_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);

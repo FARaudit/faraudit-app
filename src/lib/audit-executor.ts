@@ -1042,7 +1042,7 @@ export async function executeAudit(
     const shadowBudgetMs = Number(process.env.AGENTIC_SHADOW_BUDGET_MS) || 300000;
     try {
       await withBudget(
-        () => runAgenticShadow({
+        (signal) => runAgenticShadow({
           auditId,
           solicitation,
           agency,
@@ -1050,7 +1050,7 @@ export async function executeAudit(
           primaryBytes,
           primaryText: extractedText ?? null,
           attachments: inputAttachments,
-        }),
+        }, signal),
         shadowBudgetMs,
         `agentic shadow budget (${shadowBudgetMs / 60000}min) exceeded`
       );

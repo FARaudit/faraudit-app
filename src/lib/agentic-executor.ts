@@ -10,6 +10,7 @@
 // engine uses (native text first; OCR for image-only).
 
 import { extractText } from "./pdf-text-extractor";
+import { isEnvOn } from "./env-flags";
 import { runAgenticAudit, runAgenticMap, type ScalarFacts, type AgenticAuditResult, type AgenticMapResult, type AgenticDoc } from "./agentic-orchestrator";
 
 /** Structural view of the SAM solicitation fields we need — kept minimal so any
@@ -91,7 +92,7 @@ export async function runAgenticShadow(params: {
   primaryBytes: Buffer | null;
   primaryText: string | null;
   attachments: Array<{ name: string; base64: string }> | null;
-}): Promise<AgenticAuditResult | null> {
+}, signal?: AbortSignal): Promise<AgenticAuditResult | null> {
   try {
     const docs = await buildAgenticDocs({
       primaryName: params.primaryName,
@@ -109,6 +110,7 @@ export async function runAgenticShadow(params: {
       scalars,
       mapModel: process.env.AUDIT_MAP_MODEL,
       judgeModel: process.env.AUDIT_MODEL,
+      signal, // abort the shadow MAP on budget timeout (parity with the primary path)
     });
     console.log(
       `[AGENTIC-SHADOW] ${params.auditId}: ${result.coverage.complete ? "COMPLETE" : "PARTIAL"} · ` +
@@ -150,13 +152,17 @@ export async function buildAgenticFacts(params: {
     const scalars = scalarsFromSolicitation(params.solicitation, params.agency);
     const result = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL, signal });
     console.log(`[AGENTIC-PRIMARY] ${params.auditId}: ${result.coverage.statement}`);
-    // Empty-but-non-null guard: if the MAP read ZERO documents (every per-doc call
-    // failed — OCR misses, API overload, parse errors), the composed facts are vacuous.
-    // Returning them as factsOverride makes runAuditV2 SKIP its own extractor and render
-    // an EMPTY report stamped from those facts. Fall back to V2's single-pass extraction
-    // instead (which can still read doc.rawText) rather than ship an empty audit.
-    if (result.coverage.read.length === 0) {
-      console.warn(`[AGENTIC-PRIMARY] ${params.auditId}: MAP read 0 documents — V2 extractor fallback`);
+    // Vacuous-facts guard: returning empty facts as factsOverride makes runAuditV2
+    // SKIP its own extractor and render an EMPTY report stamped from those facts. Fall
+    // back to V2's single-pass extraction (which can still read doc.rawText) when the
+    // MAP read ZERO docs (all per-doc calls failed) OR read docs but extracted nothing
+    // usable (readable-but-noise OCR text the map can't pull facts from).
+    const f = result.facts;
+    const mapEmpty =
+      f.clauses.length === 0 && f.clins.length === 0 && f.delivery.length === 0 &&
+      f.submissionRequirements.length === 0 && f.evaluationFactors.length === 0 && !f.workStatementText;
+    if (result.coverage.read.length === 0 || mapEmpty) {
+      console.warn(`[AGENTIC-PRIMARY] ${params.auditId}: MAP produced no usable facts (read ${result.coverage.read.length}, empty=${mapEmpty}) — V2 extractor fallback`);
       return null;
     }
     return result;
@@ -166,10 +172,6 @@ export async function buildAgenticFacts(params: {
   }
 }
 
-// Tolerant truthy parse — accept true/1/yes/on (any case) so a "True"/"1" value set
-// in the Railway dashboard doesn't silently leave the agentic path OFF.
-const isEnvOn = (v: string | undefined): boolean =>
-  v != null && ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
 /** Flag-gate — agentic shadow runs only when explicitly enabled. */
 export const AGENTIC_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
 /** Flag-gate — agentic PRIMARY (facts feed the rendered V2 report) when enabled. */

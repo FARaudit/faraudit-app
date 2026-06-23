@@ -98,6 +98,16 @@ export function mergeExtracts(extracts: DocExtract[]): MappedFacts {
   const addProv = (k: string, doc: string) => {
     provenance[k] = provenance[k] ? `${provenance[k]}, ${doc}` : doc;
   };
+  // Canonical (sorted-key) serialization so the dedup key doesn't depend on the
+  // key INSERTION order of two separate structured-output generations — otherwise
+  // a byte-identical CLIN emitted with reordered keys would slip past dedup as a
+  // phantom duplicate.
+  const canonical = (o: unknown): string =>
+    JSON.stringify(o, (_k, v) =>
+      v && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(Object.keys(v as Record<string, unknown>).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))
+        : v
+    );
   for (const ex of extracts) {
     for (const c of ex.clauses) {
       // Clauses dedup on BINDING identity (number + incorporation mode + trap), not
@@ -111,14 +121,14 @@ export function mergeExtracts(extracts: DocExtract[]): MappedFacts {
       addProv(`clause:${c.number}`, ex.docName);
     }
     for (const cl of ex.clins) {
-      const key = JSON.stringify(cl);
-      if (seenClin.has(key)) continue;          // dedup CLINs by full value
+      const key = canonical(cl);
+      if (seenClin.has(key)) continue;          // dedup CLINs by full value (amended terms kept)
       seenClin.add(key);
       clins.push(cl);
       addProv(`clin:${cl.lineItem}`, ex.docName);
     }
     for (const d of ex.delivery) {
-      const key = JSON.stringify(d);
+      const key = canonical(d);
       if (seenDelivery.has(key)) continue;   // dedup delivery by full value (amended terms kept)
       seenDelivery.add(key);
       delivery.push(d);
