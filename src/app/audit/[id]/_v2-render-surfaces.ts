@@ -696,7 +696,7 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement\.meaning">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement.meaning}$2`
+      `$1${esc(v.work_statement.meaning)}$2`
     );
     out = out.replace(
       /(<span class="ev-cite" data-field="work_statement\.evidence">)[\s\S]*?(<\/span>)/,
@@ -704,7 +704,7 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="wst-t" data-field="work_statement\.bid_strategy">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement.bid_strategy}$2`
+      `$1${esc(v.work_statement.bid_strategy)}$2`
     );
     return out;
   }
@@ -725,11 +725,11 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement_unknown\.reason">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement_unknown.reason}$2`
+      `$1${esc(v.work_statement_unknown.reason)}$2`
     );
     out = out.replace(
       /(<span class="wsi-t" data-field="work_statement_unknown\.action">)[\s\S]*?(<\/span>)/,
-      `$1${v.work_statement_unknown.action}$2`
+      `$1${esc(v.work_statement_unknown.action)}$2`
     );
     return out;
   }
