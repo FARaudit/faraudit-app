@@ -16,6 +16,7 @@ import type { AuditJudgment } from "./audit-judgment";
 import { runJudgment } from "./audit-judgment";
 import { buildCoverageLedger, resolveAmendments, type CoverageLedger, type ResolvedLedger, type PackageFileInput } from "./agentic-ingest";
 import { mapDocument, mergeExtracts, selectMapTargets, type MappedFacts, type MapCoverage, type DocExtract } from "./agentic-map";
+import { buildCompactMatrix, selectBindingExcerpts, runLenses, type LensSurfaces } from "./agentic-lenses";
 
 export type ScalarFacts = Partial<
   Pick<ExtractedFacts, "contractType" | "setAside" | "naicsCode" | "solicitorNumber" | "offerDueDate" | "issuingOffice" | "periodOfPerformance">
@@ -33,6 +34,8 @@ export interface AgenticAuditInput {
   amendmentText?: string | null; // override; else derived from SF-30 cover docs
   mapModel?: string;
   judgeModel?: string;
+  lensModel?: string;      // Stage 2 — overview/compliance/risks lenses (else registry "lens")
+  crossDocModel?: string;  // Stage 2.5 — cross-doc pass (else registry "crossdoc")
   /** Cancellation — aborts in-flight per-doc MAP reads when an upstream budget fires. */
   signal?: AbortSignal;
 }
@@ -56,6 +59,12 @@ export interface AgenticAuditResult {
   facts: ExtractedFacts;
   ledger: ResolvedLedger;
   coverage: CoverageReport;
+  /** Stage 2 — the overview/compliance/risks/cross-doc surfaces, produced by the
+   *  lenses over the COMPACT MATRIX (no 925k Opus stuff). Render-compatible subsets
+   *  of the legacy OverviewJSON/ComplianceJSON/RisksJSON. */
+  surfaces: LensSurfaces;
+  /** The compact matrix the lenses consumed — kept for observability + Stage-5 grounding. */
+  matrix: string;
 }
 
 /** Compose the full ExtractedFacts from deterministic SAM scalars + the MAP's
@@ -152,6 +161,9 @@ export interface AgenticMapResult {
    *  runAuditV2 so its fabrication guards ground the agentic facts against THEIR
    *  source — not V2's weaker single-pass extraction. */
   assembledText: string;
+  /** finding-key → source-doc citation map from the MAP merge — powers the matrix's
+   *  per-line citations in Stage 2 (and any downstream provenance surface). */
+  provenance: Record<string, string>;
 }
 
 export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMapResult> {
@@ -215,14 +227,46 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   // facts don't cover, widening the facts↔grounding mismatch.
   const extractNames = new Set(extracts.map((e) => e.docName));
   const assembledText = mappable.filter((d) => extractNames.has(d.name)).map((d) => d.text).join("\n\n");
-  return { facts, coverage, ledger, assembledText };
+  return { facts, coverage, ledger, assembledText, provenance: merged.provenance };
 }
 
-/** Run a full agentic audit (MAP + judgment). Live. Behind the review gate. */
+/** Run a full agentic audit: MAP → compact matrix → LENSES + cross-doc (Stage 2) and
+ *  the JUDGE (call 4, unchanged) in parallel. Live. Behind the review gate.
+ *
+ *  This is where calls 1–3 are REBORN: instead of stuffing ~925k tokens into Opus
+ *  three times, the overview/compliance/risks surfaces are produced by small
+ *  judge-model lens calls over the deterministic compact matrix, and a cross-doc pass
+ *  restores the cross-document reasoning the per-doc MAP can't see — at a fraction of
+ *  the cost and with ~zero context rot. The matrix is the shared CACHED prefix across
+ *  the four lens calls (prime-then-parallel inside runLenses). */
 export async function runAgenticAudit(input: AgenticAuditInput): Promise<AgenticAuditResult> {
-  const { facts, coverage, ledger } = await runAgenticMap(input);
-  const judgment = await runJudgment(facts, undefined, input.judgeModel);
-  return { judgment, facts, ledger, coverage };
+  const { facts, coverage, ledger, provenance } = await runAgenticMap(input);
+
+  // Build the compact matrix (deterministic, $0) the lenses consume.
+  const matrix = buildCompactMatrix(facts, {
+    provenance,
+    coverageStatement: coverage.statement,
+    warnings: facts.extractionWarnings,
+  });
+  // The cross-doc pass reads the few BINDING docs together (bounded) — not the package.
+  const { text: bindingExcerpts } = selectBindingExcerpts(
+    input.docs.map((d) => ({ name: d.name, text: d.text }))
+  );
+
+  // Lenses (over the matrix) and the judge (over the compact facts) are independent —
+  // run them concurrently. The judge is unchanged (the already-correct call 4).
+  const [surfaces, judgment] = await Promise.all([
+    runLenses({
+      matrix,
+      bindingExcerpts,
+      lensModel: input.lensModel,
+      crossDocModel: input.crossDocModel,
+      signal: input.signal,
+    }),
+    runJudgment(facts, undefined, input.judgeModel),
+  ]);
+
+  return { judgment, facts, ledger, coverage, surfaces, matrix };
 }
 
 /** Flag-gate. OFF until the full build passes /code-review + expert panels and

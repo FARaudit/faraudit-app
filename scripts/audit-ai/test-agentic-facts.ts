@@ -20,12 +20,16 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { buildAgenticDocs } from "../../src/lib/agentic-executor";
 import { mapDocument } from "../../src/lib/agentic-map";
+import { runAgenticMap } from "../../src/lib/agentic-orchestrator";
+import { buildCompactMatrix, selectBindingExcerpts, runLenses } from "../../src/lib/agentic-lenses";
+import { modelFor } from "../../src/lib/model-registry";
 
 const DEFAULT_DIR =
   "/Users/josearodriguezjr./faraudit-app/ceo/Solicitation + Export Reviews/N4008526R0065/Naval Station Norfolk Custodial Services";
 
 const args = process.argv.slice(2);
 const runMap = args.includes("--map");
+const runLensesMode = args.includes("--lenses");
 const dumpArg = args.find((a) => a.startsWith("--dump="));
 const dumpSubstr = dumpArg ? dumpArg.slice("--dump=".length).toLowerCase() : null;
 const dir = args.find((a) => !a.startsWith("--")) ?? DEFAULT_DIR;
@@ -95,6 +99,48 @@ async function main() {
     console.log(`warnings (${ex.warnings.length}): ${JSON.stringify(ex.warnings, null, 2)}`);
     if (ex.submissionRequirements.length) console.log(`submissionRequirements sample: ${JSON.stringify(ex.submissionRequirements.slice(0, 3), null, 2)}`);
     console.log("");
+    return;
+  }
+
+  // STAGE C — the REAL Stage-2 lenses over the compact matrix (proves calls 1–3 are
+  // reborn: overview/compliance/risks + cross-doc produced from the matrix, no 925k).
+  if (runLensesMode) {
+    if (!process.env.ANTHROPIC_API_KEY) { console.log("STAGE C skipped — ANTHROPIC_API_KEY not set.\n"); return; }
+    const sol = path.basename(path.dirname(dir)) || "N4008526R0065";
+    console.log(`\n=== STAGE C — MAP → COMPACT MATRIX → LENSES (real API) ===`);
+    console.log(`lens model = ${modelFor("lens")} · crossdoc model = ${modelFor("crossdoc")} · extractor = ${modelFor("extractor")}\n`);
+    // 1) the real MAP over the whole package (the Stage-1 baseline ~$0.38).
+    const mapResult = await runAgenticMap({ docs, scalars: { solicitorNumber: sol }, mapModel: process.env.AUDIT_MAP_MODEL });
+    console.log(`MAP: ${mapResult.coverage.read.length} read · ${mapResult.coverage.readFailures.length} fail · ${mapResult.coverage.complete ? "COMPLETE" : "PARTIAL"}`);
+    // 2) deterministic compact matrix (no API).
+    const matrix = buildCompactMatrix(mapResult.facts, {
+      provenance: mapResult.provenance,
+      coverageStatement: mapResult.coverage.statement,
+      warnings: mapResult.facts.extractionWarnings,
+    });
+    const matrixTokEst = Math.round(matrix.length / 3.5);
+    console.log(`MATRIX: ${matrix.length.toLocaleString()} chars (~${matrixTokEst.toLocaleString()} tok) — vs the ~925k the legacy calls 1–3 stuffed`);
+    const { text: bindingExcerpts, selected } = selectBindingExcerpts(docs.map((d) => ({ name: d.name, text: d.text })));
+    console.log(`BINDING SUBSET (cross-doc): ${selected.length} docs, ${bindingExcerpts.length.toLocaleString()} chars — ${selected.slice(0, 6).join(", ")}${selected.length > 6 ? " …" : ""}`);
+    // 3) the lenses (prime-then-parallel, matrix cached).
+    const t0 = Date.now();
+    const s = await runLenses({ matrix, bindingExcerpts });
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(`\n--- LENS SURFACES (produced in ${secs}s) ---`);
+    console.log(`OVERVIEW : fit_score=${s.overview.fit_score} · summary=${s.overview.summary.length}ch · evalFactors=${s.overview.evaluation_factors_raw.length} · subReqs=${s.overview.submission_requirements_raw.length} · contract=${s.overview.contract_type || "—"}`);
+    console.log(`           rationale: "${(s.overview.fit_score_rationale || "").slice(0, 120)}"`);
+    console.log(`COMPLIANCE: far=${s.compliance.far_clauses.length} · dfars=${s.compliance.dfars_clauses.length} · certs=${s.compliance.required_certifications.length} · actions=${s.compliance.key_compliance_actions.length} · deadlines=${s.compliance.deadlines.length} · clins=${s.compliance.clins.length} · §L=${s.compliance.section_l_summary.length}ch · §M=${s.compliance.section_m_summary.length}ch`);
+    const cats = s.risks.risk_findings.reduce((m: Record<string, number>, r) => ((m[r.category] = (m[r.category] || 0) + 1), m), {});
+    console.log(`RISKS    : ${s.risks.risk_findings.length} findings · ${JSON.stringify(cats)}`);
+    console.log(`CROSS-DOC: ${s.crossDoc.crossDocFindings.length} cross-doc findings · ${s.crossDoc.reconciliationNotes.length} reconciliation notes`);
+    if (s.crossDoc.crossDocFindings[0]) console.log(`           e.g. "${s.crossDoc.crossDocFindings[0].title}" — ${(s.crossDoc.crossDocFindings[0].citation || "").slice(0, 80)}`);
+    // non-empty surface assertions (the Stage-2 "same surfaces" done-criterion)
+    const ok =
+      s.overview.summary.length > 0 && typeof s.overview.fit_score === "number" &&
+      s.compliance.far_clauses.length + s.compliance.dfars_clauses.length > 0 &&
+      s.risks.risk_findings.length > 0;
+    console.log(`\nSTAGE C RESULT: lenses produced ${ok ? "NON-EMPTY render surfaces ✅" : "an EMPTY surface ❌ — investigate"} · no 925k Opus call (matrix ~${matrixTokEst.toLocaleString()} tok)`);
+    console.log(`Cost actualizes on the Anthropic Console; matrix-cached after the overview primes it.\n`);
     return;
   }
 

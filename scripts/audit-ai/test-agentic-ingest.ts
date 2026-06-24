@@ -5,6 +5,10 @@ import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAm
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
 import { composeExtractedFacts, buildCoverageReport } from "../../src/lib/agentic-orchestrator";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
+import {
+  buildCompactMatrix, selectBindingExcerpts,
+  OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
+} from "../../src/lib/agentic-lenses";
 
 const buf = (s: string) => Buffer.from(s);
 // 3 versions of one inventory (different bytes) + a base section C (single).
@@ -106,6 +110,43 @@ check("amendment# parses real SAM shapes (Amd_0001 / Amendment 0011 / Mod 0002)"
 // discoverable by spending money on a live MAP that read 0 docs)
 const unionCount = countSchemaUnions(DOC_EXTRACT_SCHEMA);
 check(`DOC_EXTRACT_SCHEMA union params (${unionCount}) under Anthropic's 16 limit`, unionCount <= 16);
+
+// ── STAGE 2: lens schema union-budget guards (same free pre-flight as the MAP) ──
+for (const [name, schema] of [
+  ["OVERVIEW_LENS_SCHEMA", OVERVIEW_LENS_SCHEMA],
+  ["COMPLIANCE_LENS_SCHEMA", COMPLIANCE_LENS_SCHEMA],
+  ["RISKS_LENS_SCHEMA", RISKS_LENS_SCHEMA],
+  ["CROSSDOC_LENS_SCHEMA", CROSSDOC_LENS_SCHEMA],
+] as const) {
+  const u = countSchemaUnions(schema);
+  check(`${name} union params (${u}) under Anthropic's 16 limit`, u <= 16);
+}
+
+// ── STAGE 2: buildCompactMatrix — deterministic, citation-bearing, bounded ──────
+const matrixFacts = composeExtractedFacts(
+  { naicsCode: "561720", setAside: "SDVOSB", contractType: "FFP", solicitorNumber: "N4008526R0065" },
+  mergedSow
+);
+const m1 = buildCompactMatrix(matrixFacts, { provenance: merged.provenance, coverageStatement: "Audited 2 of 2 in full" });
+const m2 = buildCompactMatrix(matrixFacts, { provenance: merged.provenance, coverageStatement: "Audited 2 of 2 in full" });
+check("matrix: deterministic (same facts → byte-identical matrix)", m1 === m2);
+check("matrix: carries SAM scalars (sol# + NAICS)", m1.includes("N4008526R0065") && m1.includes("561720"));
+check("matrix: surfaces performance requirements (the most-missed category)", m1.includes("PERFORMANCE REQUIREMENTS") && m1.includes("restrooms"));
+check("matrix: surfaces amendment deltas (SF-30 Item-14)", m1.includes("AMENDMENT CHANGES") && m1.includes("Amd 0005"));
+check("matrix: includes the coverage statement", m1.includes("Audited 2 of 2 in full"));
+// bounding: a pathological facts set is trimmed with a VISIBLE note, never silent
+const bigPerf = Array.from({ length: 2000 }, (_, i) => ({ text: `obligation number ${i} `.repeat(20), category: "scope" as const, sourceSection: "C", isCritical: false }));
+const bigMatrix = buildCompactMatrix({ ...matrixFacts, performanceRequirements: bigPerf }, { maxChars: 50_000 });
+check("matrix: over-budget input is bounded + marked (never silent)", bigMatrix.length <= 50_400 && /TRUNCATED|trims/.test(bigMatrix));
+
+// ── STAGE 2: selectBindingExcerpts — picks binding docs, bounded ────────────────
+const bindingPick = selectBindingExcerpts([
+  { name: "Attch 2 Wage Determination.pdf", text: "The contractor shall pay the prevailing wage rate of $24.18 per hour. ".repeat(50) },
+  { name: "J-1503010-09 Inventory.xlsx", text: "room count area sqft ".repeat(50) }, // pure-data → skipped
+  { name: "Section M Evaluation.pdf", text: "Proposals shall be evaluated on a best-value basis. ".repeat(50) },
+], { perDocChars: 500, totalChars: 2_000 });
+check("binding-excerpts: selects binding docs, skips pure-data inventory", bindingPick.selected.includes("Attch 2 Wage Determination.pdf") && bindingPick.selected.includes("Section M Evaluation.pdf") && !bindingPick.selected.includes("J-1503010-09 Inventory.xlsx"));
+check("binding-excerpts: bounded to the total char budget", bindingPick.text.length <= 2_400);
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);

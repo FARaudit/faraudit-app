@@ -24,6 +24,14 @@ export interface StructuredCallOpts {
   /** External cancellation — when this aborts (e.g. an upstream MAP budget timeout),
    *  the in-flight request is aborted too, so a timed-out batch stops spending. */
   signal?: AbortSignal;
+  /** A large, SHARED system prefix (e.g. the agentic compact matrix) sent as a
+   *  separate, CACHED system block (cache_control ephemeral) ahead of `system`.
+   *  When several calls pass the BYTE-IDENTICAL prefix, the first writes the cache
+   *  and the rest read it (prime-then-parallel) — the per-role `system` + userPrompt
+   *  vary freely after the cache breakpoint. Anthropic silently no-ops the cache when
+   *  the prefix is under the model minimum (~1024 tok Sonnet / 2048 Haiku), so passing
+   *  a short prefix is safe — it just isn't cached. */
+  cachedSystemPrefix?: string;
 }
 
 export interface StructuredCallResult {
@@ -40,11 +48,21 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
   const { apiKey, model, system, userPrompt, schema, maxTokens } = opts;
   const timeoutMs = opts.timeoutMs ?? (Number(process.env.CLAUDE_TIMEOUT_MS) || 240000);
   const label = opts.label ?? "structured call";
+  // When a cached prefix is supplied, send `system` as a two-block array: the shared
+  // prefix FIRST with a cache_control breakpoint (the first call writes the cache, the
+  // rest read it), then the per-call role block uncached. Otherwise send the plain
+  // string. cache_control is GA — no extra beta header needed.
+  const systemField = opts.cachedSystemPrefix
+    ? [
+        { type: "text", text: opts.cachedSystemPrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: system },
+      ]
+    : system;
   const body = {
     model,
     max_tokens: maxTokens,
     ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
-    system,
+    system: systemField,
     messages: [{ role: "user", content: userPrompt }],
     output_config: { format: { type: "json_schema", schema } },
   };
