@@ -5,8 +5,11 @@ import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAm
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
 import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings } from "../../src/lib/agentic-orchestrator";
 import { decideCoverageChip } from "../../src/app/audit/[id]/_v2-render-surfaces";
-import { scoreGoldSet, type GoldSetPackage, type EngineExtraction } from "./gold-set-score";
+import { scoreGoldSet, parseGoldSet, type GoldSetPackage, type EngineExtraction } from "./gold-set-score";
+import { agenticToExtraction, legacyToExtraction, detectGates, clauseNumber, priceUsd } from "./ab-extract-adapter";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
+import type { ExtractedFacts } from "../../src/lib/section-extractors";
+import type { AuditResult } from "../../src/lib/audit-engine";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -219,6 +222,76 @@ check("gold-score: bindingClauseRecall over binding subset only (0.5)", Math.abs
 check("gold-score: plantedHardRecall = 0 when the seeded bid-loser is missed (the moat metric)", gss.plantedHardRecall === 0);
 check("gold-score: missedBinding NAMES the bid-losers", gss.missedBinding.includes("252.204-7012") && !gss.missedBinding.includes("52.204-7"));
 check("gold-score: missed gate → gate recall 0", gss.gates.recall === 0 && gss.evalFactors.recall === 1);
+
+// ── STAGE 4: A/B extraction ADAPTER — SYMMETRIC reduction of both engines ───────
+// The A/B is only honest if both engines reduce to the same 4-tuple by the same rules.
+// Prove clause-number canonicalization + the shared gate detector are engine-agnostic.
+check("clauseNumber: pulls canonical number from a titled clause string", clauseNumber("52.204-7 System for Award Management") === "52.204-7" && clauseNumber("252.204-7012 Safeguarding CUI") === "252.204-7012" && clauseNumber("no clause here") === null);
+
+const agFacts: ExtractedFacts = {
+  clins: [], delivery: [],
+  clauses: [
+    { number: "252.204-7021", title: "CMMC", incorporated: "by_reference", effectiveDate: null, isTrap: true, trapReason: "CMMC level required" },
+    { number: "252.204-7012 Safeguarding", title: "Safeguarding CUI", incorporated: "full_text", effectiveDate: null, isTrap: true, trapReason: "CUI" },
+    { number: "52.204-7", title: "SAM", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null },
+  ],
+  submissionRequirements: [{ bucket: "mandatory_doc", text: "Submit SF-1449 signed", sourceClause: null, isCritical: true }],
+  evaluationFactors: [{ factor: "Technical", weight: "most important", method: "best_value" }, { factor: "Price", weight: null, method: null }],
+  contractType: "FFP", setAside: "8(a)", naicsCode: "561720", solicitorNumber: "N4008526R0065",
+  offerDueDate: "2026-07-01", issuingOffice: "NAVY", extractionWarnings: ["wage determination floor applies"],
+  performanceRequirements: [{ text: "Respond to call-backs within 4 hours", category: "frequency", sourceSection: "C", isCritical: true }],
+};
+const agEx = agenticToExtraction(agFacts);
+check("agentic adapter: clauses canonicalized (titled DFARS → number)", agEx.clauses.includes("52.204-7") && agEx.clauses.includes("252.204-7012") && agEx.clauses.includes("252.204-7021"));
+check("agentic adapter: requirements merge submission + performance", agEx.requirements.includes("Submit SF-1449 signed") && agEx.requirements.includes("Respond to call-backs within 4 hours"));
+check("agentic adapter: evalFactors = §M factor names", agEx.evalFactors.includes("Technical") && agEx.evalFactors.includes("Price"));
+check("agentic adapter: gates detected from native signals (CMMC·CUI·set-aside·WD)", ["CMMC", "CUI-7012", "SET-ASIDE", "WAGE-DETERMINATION"].every((g) => agEx.gates.includes(g)));
+
+// Legacy engine: same package, native surfaces. Only the fields the adapter reads are
+// populated (cast through unknown — the harness exercises the adapter, not the engine).
+const legResult = {
+  overview: { summary: "", json: {} },
+  compliance: { summary: "", json: {
+    far_clauses: ["52.204-7 System for Award Management"],
+    dfars_clauses: ["252.204-7012 Safeguarding CUI", "252.204-7021 CMMC Level 2"],
+    required_certifications: ["8(a) set-aside eligibility"],
+    key_compliance_actions: ["Comply with the prevailing wage determination floor"],
+    submission_requirements: [{ requirement: "Submit SF-1449 signed", status: "todo", meta: "Action" }],
+    evaluation_factors: [{ rank: 1, name: "Technical", importance: "Most important", coverage: "—", coverage_pct: 0, tone: "mute", note: "" }],
+  } },
+  risks: { summary: "", json: { risk_findings: [] } },
+} as unknown as AuditResult;
+const legEx = legacyToExtraction(legResult);
+check("legacy adapter: clauses canonicalized from far+dfars", legEx.clauses.includes("52.204-7") && legEx.clauses.includes("252.204-7012") && legEx.clauses.includes("252.204-7021"));
+check("legacy adapter: gates from native legacy surfaces match the controlled vocab", ["CMMC", "CUI-7012", "SET-ASIDE", "WAGE-DETERMINATION"].every((g) => legEx.gates.includes(g)));
+check("adapter SYMMETRY: same clauses + same gates from both engines on equivalent input", JSON.stringify([...agEx.clauses].sort()) === JSON.stringify([...legEx.clauses].sort()) && JSON.stringify([...agEx.gates].sort()) === JSON.stringify([...legEx.gates].sort()));
+
+// detectGates: controlled vocab only, no false fires on inert text.
+check("detectGates: inert text → no gates (no false positives)", detectGates({ clauseNumbers: ["52.212-4"], text: "the contractor shall deliver widgets monthly" }).length === 0);
+
+// ── STAGE 4: gold-set FILE validator — fail LOUD before any paid run ────────────
+const goldFileObj = {
+  packageId: "VALID-1", auditId: "abc-123", adjudicated: true,
+  groundTruth: { clauses: [{ number: "52.204-7", binding: true }, { number: "252.204-7012", binding: true, plantedHard: true }], requirements: ["submit sf-1449"], evalFactors: ["Technical"], gates: ["CUI-7012"] },
+};
+const parsed = parseGoldSet(goldFileObj);
+check("parseGoldSet: valid file parses + carries auditId/adjudicated", parsed.packageId === "VALID-1" && parsed.auditId === "abc-123" && parsed.adjudicated === true && parsed.groundTruth.clauses[1].plantedHard === true);
+const throws = (fn: () => unknown): boolean => { try { fn(); return false; } catch { return true; } };
+check("parseGoldSet: missing packageId → throws (no silent half-built ground truth)", throws(() => parseGoldSet({ groundTruth: {} })));
+check("parseGoldSet: clause without boolean binding → throws", throws(() => parseGoldSet({ packageId: "X", groundTruth: { clauses: [{ number: "52.1-1" }], requirements: [], evalFactors: [], gates: [] } })));
+check("parseGoldSet: non-string requirement → throws", throws(() => parseGoldSet({ packageId: "X", groundTruth: { clauses: [], requirements: [5], evalFactors: [], gates: [] } })));
+// the proposed TEMPLATE on disk is intentionally adjudicated:false — the runner refuses it; here just prove it parses structurally.
+check("parseGoldSet: template-shaped (adjudicated:false) parses but is flagged unadjudicated", parseGoldSet({ packageId: "T", adjudicated: false, groundTruth: { clauses: [], requirements: [], evalFactors: [], gates: [] } }).adjudicated === false);
+
+// ── STAGE 4: cost roll-up — handles new (cache-bearing) + legacy usage shapes ───
+const costNew = priceUsd([
+  { model: "claude-haiku-4-5", input_tokens: 100_000, output_tokens: 5_000 },          // MAP
+  { model: "claude-opus-4-8", input_tokens: 0, output_tokens: 8_000, cache_write: 43_000 }, // lens prime (writes matrix cache)
+  { model: "claude-opus-4-8", input_tokens: 0, output_tokens: 8_000, cache_read: 43_000 },   // lens read
+]);
+// haiku: 0.1+0.025=0.125 ; opus write: 0.043*6.25=0.26875 + 0.2 = 0.46875 ; opus read: 0.043*0.5=0.0215 + 0.2 = 0.2215 → 0.81525
+check("priceUsd: rolls up mixed-model usage with cache write(1.25×)/read(0.1×)", Math.abs(costNew.usd - 0.81525) < 1e-6 && costNew.calls === 3 && costNew.cache_read === 43_000);
+check("priceUsd: unknown model priced as Opus (never under-states cost)", Math.abs(priceUsd([{ model: "mystery-model", input_tokens: 1_000_000, output_tokens: 0 }]).usd - 5.0) < 1e-9);
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);

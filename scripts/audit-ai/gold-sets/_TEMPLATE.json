@@ -1,0 +1,25 @@
+{
+  "_README": "TEMPLATE ONLY — NOT adjudicated ground truth. Real gold sets are produced by ab-propose.ts (independent ensemble PROPOSES) then CEO + Code (lead SME) ADJUDICATE the binding + planted-hard items (the non-circular step). Gates use the controlled vocabulary in ab-extract-adapter.ts GATE_TOKENS. Copy this to <packageId>.json and replace with real adjudicated values. See ceo/AGENTIC-ENGINE-REBUILD-PLAN.md Stage 4.",
+  "packageId": "TEMPLATE-PKG",
+  "auditId": "<supabase audits.id to source the package docs from>",
+  "adjudicated": false,
+  "groundTruth": {
+    "clauses": [
+      { "number": "52.204-7", "binding": true },
+      { "number": "252.204-7012", "binding": true, "plantedHard": true },
+      { "number": "52.222-50", "binding": false }
+    ],
+    "requirements": [
+      "submit SF-1449 signed",
+      "past performance three references"
+    ],
+    "evalFactors": [
+      "Technical",
+      "Price"
+    ],
+    "gates": [
+      "CUI-7012",
+      "SET-ASIDE"
+    ]
+  }
+}

@@ -53,7 +53,7 @@ const CLAUDE_TIMEOUT_MS = Math.min(
 // disables capture. Production code paths never call either, so the engine's
 // runtime behavior is unchanged unless explicitly opted in by a harness.
 let _activeModel: string | null = null;
-let _usageSink: ((u: { model: string; input_tokens: number; output_tokens: number; ms: number }) => void) | null = null;
+let _usageSink: ((u: { model: string; input_tokens: number; output_tokens: number; cache_write?: number; cache_read?: number; ms: number }) => void) | null = null;
 export function setActiveModel(m: string | null) { _activeModel = m; }
 export function setUsageSink(sink: typeof _usageSink) { _usageSink = sink; }
 
@@ -1555,6 +1555,8 @@ async function callClaude(
       model,
       input_tokens: u.input_tokens || 0,
       output_tokens: u.output_tokens || 0,
+      cache_write: u.cache_creation_input_tokens || 0,
+      cache_read: u.cache_read_input_tokens || 0,
       ms: Date.now() - t0
     });
   }

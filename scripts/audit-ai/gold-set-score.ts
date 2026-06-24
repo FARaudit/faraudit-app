@@ -82,6 +82,50 @@ export function scoreCategory(found: string[], goldTruth: string[]): CategorySco
   };
 }
 
+/** A gold-set FILE on disk carries the package plus provenance fields the scorer
+ *  itself doesn't need (where to source the docs, whether a human adjudicated it). */
+export interface GoldSetFile extends GoldSetPackage {
+  auditId?: string;       // supabase audits.id to re-source the package docs
+  adjudicated?: boolean;  // true ONLY after CEO + Code sign off (the non-circular gate)
+}
+
+/** Validate an arbitrary parsed JSON object into a GoldSetFile. Pure (takes an
+ *  already-parsed value, does no I/O) → gate-testable. Throws with a precise message
+ *  on the first structural problem so a malformed gold set fails LOUD before any paid
+ *  engine run, never silently scoring against a half-built ground truth. */
+export function parseGoldSet(obj: unknown): GoldSetFile {
+  const o = obj as Record<string, unknown>;
+  if (!o || typeof o !== "object") throw new Error("gold set: not an object");
+  if (typeof o.packageId !== "string" || !o.packageId) throw new Error("gold set: missing packageId");
+  const gt = o.groundTruth as Record<string, unknown> | undefined;
+  if (!gt || typeof gt !== "object") throw new Error(`gold set ${o.packageId}: missing groundTruth`);
+  const strArr = (v: unknown, field: string): string[] => {
+    if (!Array.isArray(v)) throw new Error(`gold set ${o.packageId}: groundTruth.${field} must be an array`);
+    return v.map((x, i) => {
+      if (typeof x !== "string") throw new Error(`gold set ${o.packageId}: groundTruth.${field}[${i}] must be a string`);
+      return x;
+    });
+  };
+  if (!Array.isArray(gt.clauses)) throw new Error(`gold set ${o.packageId}: groundTruth.clauses must be an array`);
+  const clauses: GoldClause[] = gt.clauses.map((c, i) => {
+    const cc = c as Record<string, unknown>;
+    if (!cc || typeof cc.number !== "string") throw new Error(`gold set ${o.packageId}: clauses[${i}].number must be a string`);
+    if (typeof cc.binding !== "boolean") throw new Error(`gold set ${o.packageId}: clauses[${i}].binding must be a boolean`);
+    return { number: cc.number, binding: cc.binding, plantedHard: cc.plantedHard === true };
+  });
+  return {
+    packageId: o.packageId,
+    auditId: typeof o.auditId === "string" ? o.auditId : undefined,
+    adjudicated: o.adjudicated === true,
+    groundTruth: {
+      clauses,
+      requirements: strArr(gt.requirements, "requirements"),
+      evalFactors: strArr(gt.evalFactors, "evalFactors"),
+      gates: strArr(gt.gates, "gates"),
+    },
+  };
+}
+
 /** Score one engine's extraction against one package's gold set. Pure. */
 export function scoreGoldSet(extraction: EngineExtraction, pkg: GoldSetPackage): GoldSetScore {
   const gt = pkg.groundTruth;
