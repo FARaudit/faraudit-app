@@ -88,8 +88,10 @@ async function main() {
     const model = process.env.AUDIT_MAP_MODEL ?? "claude-haiku-4-5";
     console.log(`\n=== DUMP · ${d.name} · text=${d.text.length} chars · model=${model} ===`);
     const ex = await mapDocument(d.name, d.text, model);
-    console.log(`clauses=${ex.clauses.length} clins=${ex.clins.length} delivery=${ex.delivery.length} submissionRequirements=${ex.submissionRequirements.length} evaluationFactors=${ex.evaluationFactors.length}`);
+    console.log(`clauses=${ex.clauses.length} clins=${ex.clins.length} delivery=${ex.delivery.length} submissionRequirements=${ex.submissionRequirements.length} evaluationFactors=${ex.evaluationFactors.length} performanceRequirements=${ex.performanceRequirements.length} amendmentChanges=${ex.amendmentChanges.length}`);
     console.log(`workStatementText: ${ex.workStatementText ? `${ex.workStatementText.length} chars — "${ex.workStatementText.slice(0, 400)}…"` : "NULL"}`);
+    if (ex.performanceRequirements.length) console.log(`performanceRequirements sample: ${JSON.stringify(ex.performanceRequirements.slice(0, 3), null, 2)}`);
+    if (ex.amendmentChanges.length) console.log(`amendmentChanges sample: ${JSON.stringify(ex.amendmentChanges.slice(0, 3), null, 2)}`);
     console.log(`warnings (${ex.warnings.length}): ${JSON.stringify(ex.warnings, null, 2)}`);
     if (ex.submissionRequirements.length) console.log(`submissionRequirements sample: ${JSON.stringify(ex.submissionRequirements.slice(0, 3), null, 2)}`);
     console.log("");
@@ -118,6 +120,8 @@ async function main() {
   let read = 0;
   let failed = 0;
   let totalFindings = 0;
+  let totalPerfReqs = 0;
+  let docsWithPerfReqs = 0;
   let inputChars = 0;
   // Bounded concurrency mirrors runAgenticMap (4) so timing/throughput is representative.
   for (let i = 0; i < targets.length; i += 4) {
@@ -129,9 +133,11 @@ async function main() {
       const r = settled[j];
       if (r.status === "fulfilled") {
         const { d, ex } = r.value;
-        const findings = ex.clauses.length + ex.clins.length + ex.delivery.length + ex.submissionRequirements.length + ex.evaluationFactors.length;
+        const findings = ex.clauses.length + ex.clins.length + ex.delivery.length + ex.submissionRequirements.length + ex.evaluationFactors.length + ex.performanceRequirements.length + ex.amendmentChanges.length;
         read++; totalFindings += findings; inputChars += d.text.length;
-        console.log(`  READ ${String(findings).padStart(4)} findings · ${batch[j].name}`);
+        totalPerfReqs += ex.performanceRequirements.length;
+        if (ex.performanceRequirements.length > 0) docsWithPerfReqs++;
+        console.log(`  READ ${String(findings).padStart(4)} findings (${String(ex.performanceRequirements.length).padStart(3)} perfReq) · ${batch[j].name}`);
       } else {
         failed++;
         console.log(`  FAIL ${batch[j].name} · ${r.reason instanceof Error ? r.reason.message : r.reason}`);
@@ -143,7 +149,7 @@ async function main() {
   // actual — the real per-audit cost still actualizes on the CSV delta of a live run.
   const estInTokens = Math.round(inputChars / 3.5);
   const estInCost = (estInTokens / 1_000_000) * 1.0;
-  console.log(`\nSTAGE B RESULT: ${read} read · ${failed} failed (of ${targets.length}) · ${totalFindings} total findings`);
+  console.log(`\nSTAGE B RESULT: ${read} read · ${failed} failed (of ${targets.length}) · ${totalFindings} total findings · ${totalPerfReqs} performanceRequirements across ${docsWithPerfReqs} doc(s)`);
   console.log(`AGENTIC READ COST (est, input-side): ~${estInTokens.toLocaleString()} Haiku input tokens ≈ $${estInCost.toFixed(3)} (vs V1's ~$5.78 for one 925k Opus cache-write). Output adds a little; confirm on a live CSV delta.\n`);
 }
 

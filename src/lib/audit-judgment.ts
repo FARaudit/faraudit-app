@@ -15,6 +15,7 @@
 // No silent {} fallback at this layer.
 
 import type { ExtractedFacts } from "./section-extractors";
+import { modelFor } from "./model-registry";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -202,6 +203,27 @@ function buildJudgmentPrompt(facts: ExtractedFacts, boundSources?: BoundFactSour
     ? `\n\nWORK STATEMENT (Section C / attached PWS — read this to determine the document type SOW/PWS/SOO):\n${facts.workStatementText}\n`
     : "";
 
+  // Structured contractor PERFORMANCE obligations (agentic MAP) — distinct from the
+  // offeror's submission requirements. Surfacing these directly lets the judge anchor
+  // execution-risk catches to a specific obligation instead of re-parsing prose.
+  const perfReqs = facts.performanceRequirements ?? [];
+  const critPerf = perfReqs.filter((p) => p.isCritical);
+  const perfBlock = perfReqs.length
+    ? `\n**Performance requirements (${perfReqs.length} found — what the CONTRACTOR must DO after award):**\n` +
+      critPerf.slice(0, 20).map((p) => `- [CRITICAL${p.category ? "/" + p.category : ""}] ${p.text.slice(0, 180)}${p.sourceSection ? ` (${p.sourceSection})` : ""}`).join("\n") +
+      (critPerf.length ? "\n" : "") +
+      perfReqs.filter((p) => !p.isCritical).slice(0, 15).map((p) => `- [${p.category ?? "other"}] ${p.text.slice(0, 140)}`).join("\n")
+    : "";
+
+  // SF-30 amendment deltas — the changes the package's amendments made. The judge
+  // should treat these as authoritative current-state and flag any that move a
+  // deadline / quantity / scope line.
+  const amendChanges = facts.amendmentChanges ?? [];
+  const amendBlock = amendChanges.length
+    ? `\n**Amendment changes (${amendChanges.length} — SF-30 deltas; these are the CURRENT terms, supersede the base):**\n` +
+      amendChanges.slice(0, 20).map((a) => `- ${a.amendmentNumber ? `[Amd ${a.amendmentNumber}] ` : ""}${a.change.slice(0, 180)}${a.affectedSection ? ` (${a.affectedSection})` : ""}`).join("\n")
+    : "";
+
   return `You are a defense contract compliance expert. Analyze this solicitation and produce a structured audit judgment.
 
 ## Bound Facts (fused: deterministic local extraction · vision extraction · SAM.gov notice metadata)
@@ -239,6 +261,8 @@ ${facts.evaluationFactors.map((e) => `- ${e.factor.slice(0, 100)}${e.weight ? ` 
 
 **Extraction warnings (pre-verified issues):**
 ${facts.extractionWarnings.length > 0 ? facts.extractionWarnings.map((w) => `- ${w}`).join("\n") : "None"}
+${perfBlock}
+${amendBlock}
 ${scopeBlock}
 ## Your task
 
@@ -285,9 +309,10 @@ export async function runJudgment(facts: ExtractedFacts, boundSources?: BoundFac
   // MI-1 (2026-06-19): single-source the judgment model from the engine's
   // CLAUDE_MODEL (threaded via modelOverride) so the V2 verdict/score/catches
   // layer — the user-visible product — can never silently diverge from the V1
-  // model again. AUDIT_MODEL stays as an explicit override hook; the literal
-  // default tracks the engine decision (opus-4-8), no longer Sonnet.
-  const model = modelOverride ?? process.env.AUDIT_MODEL ?? "claude-opus-4-8";
+  // model again. The model now resolves through the role registry ("judge"):
+  // modelOverride escape hatch → AUDIT_MODEL env → curated default. No hardcoded
+  // model ID in this layer.
+  const model = modelOverride ?? modelFor("judge");
   console.log(`[audit-judgment] V2 judgment call · model=${model}`);
   const timeoutMs = Number(process.env.CLAUDE_TIMEOUT_MS) || 240000;
 

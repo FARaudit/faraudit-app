@@ -2,7 +2,7 @@
 // Proves: (1) coverage ledger flags version groups; (2) amendment-resolution
 // supersedes ONLY on proven full-replacement, KEEPS all on incremental-patch text.
 import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAmendmentNumber } from "../../src/lib/agentic-ingest";
-import { selectMapTargets, mergeExtracts, type DocExtract } from "../../src/lib/agentic-map";
+import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
 import { composeExtractedFacts, buildCoverageReport } from "../../src/lib/agentic-orchestrator";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
 
@@ -55,14 +55,27 @@ const dupSel = selectMapTargets(dupLedger);
 check("MAP skips byte-identical duplicate (1 read, 1 skipped)", dupSel.read.length === 1 && dupSel.skipped.length === 1);
 
 // ── MAP merge: dedup clauses by number, record provenance to first source
-const exA: DocExtract = { docName: "Section I.pdf", clauses: [{ number: "52.204-7", title: "SAM", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [], truncated: false };
-const exB: DocExtract = { docName: "Section H.pdf", clauses: [{ number: "52.204-7", title: "SAM dup", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }, { number: "252.204-7012", title: "Safeguarding CUI", incorporated: "full_text", effectiveDate: null, isTrap: true, trapReason: "CUI" }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], workStatementText: null, warnings: [], truncated: false };
+const exA: DocExtract = { docName: "Section I.pdf", clauses: [{ number: "52.204-7", title: "SAM", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], performanceRequirements: [], amendmentChanges: [], workStatementText: null, warnings: [], truncated: false };
+const exB: DocExtract = { docName: "Section H.pdf", clauses: [{ number: "52.204-7", title: "SAM dup", incorporated: "by_reference", effectiveDate: null, isTrap: false, trapReason: null }, { number: "252.204-7012", title: "Safeguarding CUI", incorporated: "full_text", effectiveDate: null, isTrap: true, trapReason: "CUI" }], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], performanceRequirements: [], amendmentChanges: [], workStatementText: null, warnings: [], truncated: false };
 const merged = mergeExtracts([exA, exB]);
 // Value-aware dedup: 52.204-7 collapses (same number+incorporation+trap, title-only
 // diff), 252.204-7012 is distinct → 2 unique. Amendment-revised binding values would
 // instead be kept (the dedup-drops-amendments fix).
 check("MAP merge dedups clauses by binding identity (2 unique)", merged.clauses.length === 2);
 check("MAP merge records provenance to first source doc", merged.provenance["clause:52.204-7"] === "Section I.pdf");
+
+// ── MAP merge: workStatements append-ALL (was first-wins → dropped all but one SOW)
+const sowA: DocExtract = { docName: "Section C base.pdf", clauses: [], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], performanceRequirements: [{ text: "Clean all restrooms daily", category: "frequency", sourceSection: "C.3.2", isCritical: true }], amendmentChanges: [], workStatementText: "BASE SOW BODY", warnings: [], truncated: false };
+const sowB: DocExtract = { docName: "Amendment 0005 Revised Section C.pdf", clauses: [], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], performanceRequirements: [{ text: "clean all restrooms   daily", category: "frequency", sourceSection: "C.3.2", isCritical: true }, { text: "Respond to call-backs within 4 hours", category: "standard", sourceSection: "C.3.5", isCritical: true }], amendmentChanges: [{ amendmentNumber: "0005", change: "Restroom frequency changed 24h→4h", affectedSection: "C.3.2" }], workStatementText: "AMENDED SOW BODY", warnings: [], truncated: false };
+const mergedSow = mergeExtracts([sowA, sowB]);
+check("MAP merge keeps BOTH work statements (append-all, not first-wins)", mergedSow.workStatements.length === 2 && mergedSow.workStatements[1].docName.includes("0005"));
+check("MAP merge dedups perfReqs by normalized text (1 dup collapses → 2 unique)", mergedSow.performanceRequirements.length === 2);
+check("MAP merge collects amendment changes", mergedSow.amendmentChanges.length === 1 && mergedSow.amendmentChanges[0].amendmentNumber === "0005");
+
+// compose joins all work statements WITH source-doc headers (no SOW silently dropped)
+const sowFacts = composeExtractedFacts({}, mergedSow);
+check("compose joins all SOW bodies with doc headers", !!sowFacts.workStatementText && sowFacts.workStatementText.includes("Section C base.pdf") && sowFacts.workStatementText.includes("Amendment 0005"));
+check("compose threads performanceRequirements + amendmentChanges to facts", (sowFacts.performanceRequirements?.length ?? 0) === 2 && (sowFacts.amendmentChanges?.length ?? 0) === 1);
 
 // ── orchestrator compose: scalars come from SAM (deterministic), arrays from MAP
 const facts = composeExtractedFacts({ naicsCode: "561720", setAside: "SDVOSB", contractType: "FFP" }, merged);
@@ -88,6 +101,11 @@ check("amendment# parses real SAM shapes (Amd_0001 / Amendment 0011 / Mod 0002)"
   parseAmendmentNumber("Amendment 0011 Revised X.pdf") === 11 &&
   parseAmendmentNumber("Mod 0002.pdf") === 2 &&
   parseAmendmentNumber("J-1503010-09 Inventory.xlsx") === null);
+
+// ── schema union-budget guard: catch the Anthropic 16-union 400 for FREE (was only
+// discoverable by spending money on a live MAP that read 0 docs)
+const unionCount = countSchemaUnions(DOC_EXTRACT_SCHEMA);
+check(`DOC_EXTRACT_SCHEMA union params (${unionCount}) under Anthropic's 16 limit`, unionCount <= 16);
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);

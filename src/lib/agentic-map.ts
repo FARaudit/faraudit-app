@@ -17,10 +17,19 @@
 
 import type {
   ClauseItem, ClinItem, DeliveryItem, SubmissionRequirement, EvaluationFactor,
+  PerformanceRequirement, AmendmentChange,
 } from "./section-extractors";
 import type { CoverageLedger, LedgerEntry } from "./agentic-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
 import { sanitizePdfText } from "./audit-engine";
+import { modelFor, isOpusModel } from "./model-registry";
+
+/** One work-statement body, tagged with its source document. Append-all (NOT
+ *  first-wins) so a package with multiple SOW/PWS docs keeps every one. */
+export interface WorkStatement {
+  docName: string;
+  text: string;
+}
 
 // Injection defense for the MAP — parity with the main engine. Document text is
 // untrusted; a malicious solicitation can embed "ignore your instructions" prose.
@@ -36,6 +45,8 @@ export interface DocExtract {
   delivery: DeliveryItem[];
   submissionRequirements: SubmissionRequirement[];
   evaluationFactors: EvaluationFactor[];
+  performanceRequirements: PerformanceRequirement[];
+  amendmentChanges: AmendmentChange[];
   workStatementText: string | null;
   warnings: string[];
   /** true when the source exceeded MAP_INPUT_CHAR_LIMIT and was trimmed for the
@@ -51,7 +62,11 @@ export interface MappedFacts {
   delivery: DeliveryItem[];
   submissionRequirements: SubmissionRequirement[];
   evaluationFactors: EvaluationFactor[];
-  workStatementText: string | null;
+  performanceRequirements: PerformanceRequirement[];
+  amendmentChanges: AmendmentChange[];
+  /** EVERY work-statement body, each tagged with its source doc (append-all). Was
+   *  a single first-wins string — that silently dropped all but one SOW/PWS. */
+  workStatements: WorkStatement[];
   extractionWarnings: string[];
   /** provenance: finding key → source document name (powers the citation line) */
   provenance: Record<string, string>;
@@ -81,9 +96,17 @@ export function mergeExtracts(extracts: DocExtract[]): MappedFacts {
   const delivery: DeliveryItem[] = [];
   const submissionRequirements: SubmissionRequirement[] = [];
   const evaluationFactors: EvaluationFactor[] = [];
+  const performanceRequirements: PerformanceRequirement[] = [];
+  const amendmentChanges: AmendmentChange[] = [];
   const warnings: string[] = [];
   const provenance: Record<string, string> = {};
-  let workStatementText: string | null = null;
+  // Append-all, NOT first-wins. A custodial package commonly ships a base Section C
+  // PLUS an amended Section C PLUS a PWS attachment — the old `if (!workStatementText)`
+  // kept exactly ONE and dropped the rest, re-creating the binding-doc-supersession
+  // failure the ingest layer exists to prevent. Each body keeps its source doc tag.
+  const workStatements: WorkStatement[] = [];
+  const seenPerfReq = new Set<string>();
+  const seenAmendChange = new Set<string>();
 
   // VALUE-AWARE dedup (was: identifier-only first-wins). Keying on the identifier
   // alone silently dropped an AMENDED row when a later doc revised the same
@@ -136,17 +159,42 @@ export function mergeExtracts(extracts: DocExtract[]): MappedFacts {
     }
     for (const s of ex.submissionRequirements) { submissionRequirements.push(s); provenance[`subreq:${s.text.slice(0, 40)}`] = ex.docName; }
     for (const f of ex.evaluationFactors) { evaluationFactors.push(f); provenance[`evalfactor:${f.factor.slice(0, 40)}`] = ex.docName; }
-    if (!workStatementText && ex.workStatementText) workStatementText = ex.workStatementText;
+    // Performance requirements dedup on normalized text (the same obligation re-stated
+    // in a base + amended Section C collapses; a reworded/amended obligation is KEPT).
+    for (const p of ex.performanceRequirements) {
+      const key = p.text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (seenPerfReq.has(key)) continue;
+      seenPerfReq.add(key);
+      performanceRequirements.push(p);
+      addProv(`perfreq:${p.text.slice(0, 40)}`, ex.docName);
+    }
+    // Amendment changes dedup on (amendment# + normalized change) — the same SF-30
+    // delta seen on two cover docs collapses; distinct deltas all kept.
+    for (const a of ex.amendmentChanges) {
+      const key = `${a.amendmentNumber ?? ""}|${a.change.replace(/\s+/g, " ").trim().toLowerCase()}`;
+      if (seenAmendChange.has(key)) continue;
+      seenAmendChange.add(key);
+      amendmentChanges.push(a);
+      addProv(`amend:${a.change.slice(0, 40)}`, ex.docName);
+    }
+    // Append-all: keep every SOW/PWS body, tagged with its source doc.
+    if (ex.workStatementText && ex.workStatementText.trim().length > 0) {
+      workStatements.push({ docName: ex.docName, text: ex.workStatementText });
+    }
     for (const w of ex.warnings) warnings.push(`[${ex.docName}] ${w}`);
   }
-  return { clauses, clins, delivery, submissionRequirements, evaluationFactors, workStatementText, extractionWarnings: warnings, provenance };
+  return { clauses, clins, delivery, submissionRequirements, evaluationFactors, performanceRequirements, amendmentChanges, workStatements, extractionWarnings: warnings, provenance };
 }
 
 // ── schema-validated per-document model call ─────────────────────────────────
-const DOC_EXTRACT_SCHEMA = {
+// Exported so the deterministic gate can assert the union-parameter count stays
+// under Anthropic's hard limit (16) — a schema addition that exceeds it 400s EVERY
+// per-doc call (the agentic engine reads 0 docs), and that failure is otherwise only
+// discoverable by spending money on a live MAP. Catch it for free instead.
+export const DOC_EXTRACT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["clauses", "clins", "delivery", "submissionRequirements", "evaluationFactors", "workStatementText", "warnings"],
+  required: ["clauses", "clins", "delivery", "submissionRequirements", "evaluationFactors", "performanceRequirements", "amendmentChanges", "workStatementText", "warnings"],
   properties: {
     clauses: {
       type: "array",
@@ -223,28 +271,108 @@ const DOC_EXTRACT_SCHEMA = {
         },
       },
     },
+    performanceRequirements: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        required: ["text", "category", "sourceSection", "isCritical"],
+        properties: {
+          text: { type: "string" },
+          // nullable enum → anyOf{enum|null} (see contractType — the type:[...]+enum
+          // union 400s under Anthropic strict structured-outputs).
+          category: { anyOf: [{ type: "string", enum: ["scope", "frequency", "standard", "deliverable", "personnel", "other"] }, { type: "null" }] },
+          // PLAIN required string (not nullable) — Anthropic caps a schema at 16
+          // union/nullable parameters; the new fields pushed us to 18 → 400 on every
+          // call. These optional-text fields emit "" when absent (downstream treats
+          // "" as absent, same as null), spending no union budget. (Stage 1 fix.)
+          sourceSection: { type: "string" },
+          isCritical: { type: "boolean" },
+        },
+      },
+    },
+    amendmentChanges: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        required: ["amendmentNumber", "change", "affectedSection"],
+        properties: {
+          amendmentNumber: { type: "string" }, // "" when absent — see sourceSection (union-budget fix)
+          change: { type: "string" },
+          affectedSection: { type: "string" }, // "" when absent — see sourceSection (union-budget fix)
+        },
+      },
+    },
     workStatementText: { type: ["string", "null"] },
     warnings: { type: "array", items: { type: "string" } },
   },
 } as const;
 
+/** Count union-typed parameters in a JSON schema (type:[...] arrays + anyOf nodes).
+ *  Anthropic strict structured-outputs caps this at 16; exceeding it 400s every call.
+ *  Pure + recursive so the deterministic gate can assert the budget without the API. */
+export function countSchemaUnions(node: unknown): number {
+  if (!node || typeof node !== "object") return 0;
+  const n = node as Record<string, unknown>;
+  let count = 0;
+  if (Array.isArray(n.type)) count += 1;            // {type:["string","null"]}
+  if (Array.isArray(n.anyOf)) count += 1;           // {anyOf:[...]}
+  for (const v of Object.values(n)) {
+    if (Array.isArray(v)) v.forEach((x) => (count += countSchemaUnions(x)));
+    else if (v && typeof v === "object") count += countSchemaUnions(v);
+  }
+  return count;
+}
+
 function mapPrompt(docName: string, text: string): string {
+  // Document-first ordering: the model reads the document, THEN the extraction
+  // instructions. Putting the long source last (closest to the generation point)
+  // keeps the instructions out of the lost-in-the-middle zone and is the ordering
+  // Anthropic recommends for long-context extraction.
   return [
-    `You are extracting compliance facts from ONE document of a federal solicitation package.`,
-    `DOCUMENT: ${docName}`,
-    ``,
-    `Extract EXHAUSTIVELY from THIS document only — do not infer content from other documents:`,
-    `- clauses: every FAR/DFARS clause (number + title; incorporated full_text or by_reference).`,
-    `- clins: every CLIN / bid-schedule line item.`,
-    `- delivery: per-CLIN delivery terms if present.`,
-    `- submissionRequirements: every offeror "shall/must" submission action (§L-style).`,
-    `- evaluationFactors: every evaluation factor / basis of award (§M-style).`,
-    `- workStatementText: the SOW/PWS/SOO body if this document is one (else null).`,
-    `- warnings: anything unreadable, ambiguous, or that looks truncated.`,
-    `If a category is absent in this document, return an empty array. Never fabricate.`,
-    ``,
-    `--- DOCUMENT TEXT ---`,
+    `<document name="${docName}">`,
     text.slice(0, MAP_INPUT_CHAR_LIMIT),
+    `</document>`,
+    ``,
+    `You are extracting compliance facts from the ONE document above — a single file`,
+    `of a federal solicitation package. Extract EXHAUSTIVELY from THIS document only;`,
+    `do not infer or borrow content from other documents you have not been shown.`,
+    ``,
+    `Extract into these arrays (empty array if a category is absent — never fabricate):`,
+    `- clauses: every FAR/DFARS clause. number + title; "incorporated" is exactly`,
+    `  "full_text" (printed in full) or "by_reference" (cited by number only).`,
+    `- clins: every CLIN / bid-schedule line item. "contractType" is one of the exact`,
+    `  tokens FFP, T&M, CPFF, CPAF, other (null if the line does not state one).`,
+    `- delivery: per-CLIN delivery terms. "fobType" is exactly government, contractor,`,
+    `  origin, or destination (null if unstated).`,
+    `- submissionRequirements: every action the OFFEROR must take to submit a compliant`,
+    `  proposal (§L-style "the offeror shall submit…"). "bucket" is exactly deadline,`,
+    `  format, mandatory_doc, representation, registration, or other. Do NOT put the`,
+    `  government's or the eventual contractor's PERFORMANCE duties here.`,
+    `- evaluationFactors: every evaluation factor / basis of award (§M-style). "method"`,
+    `  is exactly LPTA, best_value, or other (null if unstated).`,
+    `- performanceRequirements: every obligation the CONTRACTOR must PERFORM after award`,
+    `  — the work itself, stated in the SOW/PWS/SOO prose (e.g. "clean all restrooms`,
+    `  daily", "respond within 4 hours", "maintain a 98% quality score"). "category" is`,
+    `  exactly scope, frequency, standard, deliverable, personnel, or other (null if`,
+    `  unclear). "sourceSection" = the section/paragraph it came from, or "" if unclear.`,
+    `  Capture frequencies, response times, and quality standards verbatim in "text".`,
+    `  These are distinct from submissionRequirements (how to BID) — these are how to DO`,
+    `  THE WORK. This is the most-missed category; be thorough.`,
+    `- amendmentChanges: if this document is an SF-30 / amendment cover, every change it`,
+    `  describes (Item-14 "description of amendment"). "change" = what changed`,
+    `  (e.g. "offer due date extended to 2026-07-15", "deleted CLIN 0003"). Use "" for`,
+    `  "amendmentNumber" / "affectedSection" when not stated. Empty array if not an`,
+    `  amendment document.`,
+    `- workStatementText: a SHORT excerpt of the SOW/PWS/SOO body — the opening ~4000`,
+    `  characters is plenty — IF this document is or contains a work statement (e.g.`,
+    `  Section C). It is used ONLY to identify the document type; the actual obligations`,
+    `  belong in performanceRequirements, so do NOT echo the entire body here. null if`,
+    `  this document is not a work statement.`,
+    `- warnings: anything unreadable, ambiguous, OCR-garbled, or that looks truncated.`,
+    ``,
+    `Be exhaustive. A real solicitation document typically yields many requirements —`,
+    `returning all-empty arrays for a substantive document is almost always a miss, not`,
+    `a true absence. Re-scan before returning empty.`,
   ].join("\n");
 }
 
@@ -252,14 +380,18 @@ function mapPrompt(docName: string, text: string): string {
 // mapDocument FLAGS it (never a silent partial read). The real fix for genuinely
 // huge single docs is chunking; until then, truncation is at least visible.
 const MAP_INPUT_CHAR_LIMIT = 600_000;
-// 8000 truncated the biggest docs mid-JSON (the Solicitation's extract alone
-// exceeded it → "Unterminated string in JSON" → the doc counted as a read-failure).
-// Haiku supports far more output (64K ceiling); 16000 fits a full single-doc extract.
-// NOTE: a doc whose extract STILL exceeds 16000 truncates mid-JSON, so JSON.parse
-// throws and the doc is an HONEST read-failure (counted in readFailures, never a
-// silent full-read claim) — the stopReason==="max_tokens" warning path below is NOT
-// reached in that case (parse throws first). The real fix for such docs is chunking.
+// Base output cap. 8000 truncated the biggest docs mid-JSON; 16000 fit a single-doc
+// extract — until performanceRequirements/amendmentChanges were added, which pushed
+// the 4 largest docs' extracts past 16000 (truncated mid-JSON → read-failure). The
+// retry ladder below escalates the cap rather than failing those docs.
 const MAP_OUTPUT_TOKENS = 16000;
+// Ladder ceiling. Capped at 32k (NOT Haiku's 64k hardware max) because generating
+// more than ~32k output tokens cannot finish inside the production request timeout
+// (~240-300s on the worker/route, Rule 17) — a 64k rung would just slow-timeout in
+// prod, so it is dishonest to attempt here. A doc whose extract still truncates at
+// 32k AFTER workStatementText is bounded is a genuine chunking case (Stage-3+ work)
+// and an HONEST read-failure, not a silent partial.
+const MAP_OUTPUT_TOKENS_CEILING = 32000;
 
 /** Read ONE document on the cheap model, schema-validated. Isolated so the
  *  deterministic logic above is testable without the API. Live call — runs only
@@ -267,35 +399,59 @@ const MAP_OUTPUT_TOKENS = 16000;
 export async function mapDocument(docName: string, text: string, modelOverride?: string, signal?: AbortSignal): Promise<DocExtract> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — MAP call cannot proceed");
-  const model = modelOverride ?? process.env.AUDIT_MAP_MODEL ?? "claude-haiku-4-5";
+  // Model binding flows through the role registry (no hardcoded model IDs in engine
+  // logic). modelOverride is the explicit per-call escape hatch (harness/orchestrator);
+  // otherwise the "extractor" role resolves (AUDIT_MAP_MODEL override → curated default).
+  const model = modelOverride ?? modelFor("extractor");
   // Cost guard: the MAP runs once PER DOCUMENT (33+ on a big package), so an Opus
   // map model re-introduces the multi-call near-full-package Opus cost bleed. The
   // map is meant to run on a cheap model; flag a stray Opus override loudly.
-  if (/opus/i.test(model)) {
+  if (isOpusModel(model)) {
     console.warn(`[agentic-map] ⚠ AUDIT_MAP_MODEL=${model} is an OPUS model — per-doc MAP on Opus is a cost bleed. Expected a cheap model (claude-haiku-4-5).`);
   }
   // Injection defense (parity with the main engine): strip injection-pattern spans
   // and pass a security directive in the system prompt. Document text is untrusted.
   const { sanitized, redactionCount } = sanitizePdfText(text);
-  const { text: raw, stopReason } = await callStructuredClaude({
-    apiKey,
-    model,
-    system: MAP_SYSTEM,
-    userPrompt: mapPrompt(docName, sanitized),
-    schema: DOC_EXTRACT_SCHEMA,
-    maxTokens: MAP_OUTPUT_TOKENS,
-    label: `MAP ${docName}`,
-    signal,
-  });
-  let parsed: Omit<DocExtract, "docName">;
-  try {
-    parsed = JSON.parse(raw) as Omit<DocExtract, "docName">;
-  } catch (e) {
-    throw new Error(`MAP ${docName}: structured output was not valid JSON: ${(e as Error).message}`);
+  // OUTPUT retry ladder: an extract that exceeds the token cap truncates mid-JSON →
+  // JSON.parse throws. Escalate the cap (16k→32k→64k) and re-read; a higher cap only
+  // costs more on docs that actually emit more output. Only AFTER the Haiku ceiling
+  // still truncates is the doc an HONEST read-failure. Note: only JSON.parse is in the
+  // try — an API/abort error from callStructuredClaude propagates immediately (more
+  // tokens won't fix a 400 or an abort), so we never retry those.
+  let maxTokens = MAP_OUTPUT_TOKENS;
+  let raw = "";
+  let stopReason: string | null | undefined;
+  let parsed: Omit<DocExtract, "docName"> | null = null;
+  const retryNotes: string[] = [];
+  for (;;) {
+    const res = await callStructuredClaude({
+      apiKey,
+      model,
+      system: MAP_SYSTEM,
+      userPrompt: mapPrompt(docName, sanitized),
+      schema: DOC_EXTRACT_SCHEMA,
+      maxTokens,
+      label: `MAP ${docName}${maxTokens > MAP_OUTPUT_TOKENS ? ` @${maxTokens}` : ""}`,
+      signal,
+    });
+    raw = res.text;
+    stopReason = res.stopReason;
+    try {
+      parsed = JSON.parse(raw) as Omit<DocExtract, "docName">;
+      break; // valid JSON — done
+    } catch (e) {
+      if (maxTokens < MAP_OUTPUT_TOKENS_CEILING) {
+        const next = Math.min(maxTokens * 2, MAP_OUTPUT_TOKENS_CEILING);
+        retryNotes.push(`extract exceeded the ${maxTokens}-token output cap — re-read at ${next}`);
+        maxTokens = next;
+        continue;
+      }
+      throw new Error(`MAP ${docName}: structured output not valid JSON even at the ${maxTokens}-token ceiling: ${(e as Error).message}`);
+    }
   }
   // Read-fidelity flags — make any partial/low-confidence read VISIBLE so coverage
   // can never claim a truncated/capped/empty doc was read "in full".
-  const warnings = [...(parsed.warnings ?? [])];
+  const warnings = [...(parsed.warnings ?? []), ...retryNotes];
   if (redactionCount > 0) {
     warnings.push(`${redactionCount} prompt-injection pattern span(s) redacted from source`);
   }
@@ -304,11 +460,12 @@ export async function mapDocument(docName: string, text: string, modelOverride?:
     warnings.push(`INPUT TRUNCATED to ${MAP_INPUT_CHAR_LIMIT} chars (document is ${sanitized.length}) — NOT fully read; needs chunking`);
   }
   if (stopReason === "max_tokens") {
-    warnings.push(`OUTPUT hit the ${MAP_OUTPUT_TOKENS}-token cap — extraction may be incomplete`);
+    warnings.push(`OUTPUT hit the ${maxTokens}-token cap — extraction may be incomplete`);
   }
   const findingCount =
     parsed.clauses.length + parsed.clins.length + parsed.delivery.length +
-    parsed.submissionRequirements.length + parsed.evaluationFactors.length;
+    parsed.submissionRequirements.length + parsed.evaluationFactors.length +
+    parsed.performanceRequirements.length + parsed.amendmentChanges.length;
   if (findingCount === 0 && !parsed.workStatementText) {
     warnings.push(`VACUOUS extract — model returned no findings; verify the document was actually readable`);
   }

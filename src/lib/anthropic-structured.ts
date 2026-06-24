@@ -48,35 +48,54 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
     messages: [{ role: "user", content: userPrompt }],
     output_config: { format: { type: "json_schema", schema } },
   };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  // External cancellation also aborts this request (upstream budget timeout).
-  if (opts.signal) {
-    if (opts.signal.aborted) controller.abort();
-    else opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  // Transient server-overload / rate-limit are retried with exponential backoff —
+  // live runs hit 529 "Overloaded" (Anthropic capacity), which is NOT a code defect
+  // and a retry clears it. A 4xx (schema/auth) is NEVER retried (more attempts won't
+  // fix it), and an EXTERNAL abort (upstream budget cancellation) stops retrying too.
+  const RETRYABLE = new Set([429, 500, 502, 503, 529]);
+  const MAX_RETRIES = 3;
+  let lastErr = "";
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    // External cancellation also aborts this request (upstream budget timeout).
+    if (opts.signal) {
+      if (opts.signal.aborted) controller.abort();
+      else opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+    let res: Response;
+    try {
+      res = await fetch(ANTHROPIC_API_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "anthropic-beta": ANTHROPIC_BETA,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.ok) {
+      const data = await res.json();
+      // Defensive: take the first block that actually carries text (structured outputs
+      // surface the JSON in a text block, but don't hard-require type==="text" — a
+      // future block-type change would otherwise throw on an OK 200).
+      const textBlock = (data?.content as Array<{ type?: string; text?: string }> | undefined)?.find((b) => typeof b?.text === "string");
+      if (!textBlock?.text) throw new Error(`${label}: structured output returned no text block`);
+      return { text: textBlock.text, stopReason: (data?.stop_reason as string | null) ?? null };
+    }
+    lastErr = `${label} ${res.status}: ${(await res.text()).slice(0, 400)}`;
+    if (RETRYABLE.has(res.status) && attempt < MAX_RETRIES && !opts.signal?.aborted) {
+      const backoffMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
+      console.warn(`[anthropic-structured] ${label} ${res.status} transient — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+      await new Promise((r) => setTimeout(r, backoffMs));
+      continue;
+    }
+    throw new Error(lastErr);
   }
-  let res: Response;
-  try {
-    res = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "anthropic-beta": ANTHROPIC_BETA,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`${label} ${res.status}: ${(await res.text()).slice(0, 400)}`);
-  const data = await res.json();
-  // Defensive: take the first block that actually carries text (structured outputs
-  // surface the JSON in a text block, but don't hard-require type==="text" — a
-  // future block-type change would otherwise throw on an OK 200).
-  const textBlock = (data?.content as Array<{ type?: string; text?: string }> | undefined)?.find((b) => typeof b?.text === "string");
-  if (!textBlock?.text) throw new Error(`${label}: structured output returned no text block`);
-  return { text: textBlock.text, stopReason: (data?.stop_reason as string | null) ?? null };
+  throw new Error(lastErr || `${label}: exhausted retries`);
 }

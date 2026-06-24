@@ -47,6 +47,26 @@ export interface EvaluationFactor {
   method: "LPTA" | "best_value" | "other" | null;
 }
 
+// SOW/PWS/SOO prose obligations. The agentic MAP gives these a structured home so
+// performance requirements buried in work-statement prose are no longer dropped on
+// the floor (they used to land only in free-text workStatementText, which
+// findingCount ignored → "0 findings" on prose-heavy packages).
+export interface PerformanceRequirement {
+  text: string;
+  category: "scope" | "frequency" | "standard" | "deliverable" | "personnel" | "other" | null;
+  sourceSection: string | null;
+  isCritical: boolean;
+}
+
+// SF-30 amendment deltas (Item-14 "describe the change"). Captured so an amendment
+// that changes a date / quantity / scope line is a first-class finding, not prose
+// the judge has to re-discover.
+export interface AmendmentChange {
+  amendmentNumber: string | null;
+  change: string;
+  affectedSection: string | null;
+}
+
 export interface ExtractedFacts {
   clins: ClinItem[];
   delivery: DeliveryItem[];
@@ -65,6 +85,11 @@ export interface ExtractedFacts {
   /** Verbatim PoP / base+option term (e.g. "12-mo base + 4 option years"). V1-bound,
    *  threaded into V2 so the judgment doesn't flatten the term to a single CLIN's base. */
   periodOfPerformance?: string | null;
+  /** SOW/PWS/SOO prose obligations (agentic MAP). Structured so the judge sees
+   *  performance requirements directly instead of re-parsing workStatementText. */
+  performanceRequirements?: PerformanceRequirement[];
+  /** SF-30 amendment deltas resolved during the agentic MAP. */
+  amendmentChanges?: AmendmentChange[];
 }
 
 // ── DFARS trap clause list (matches engine DFARS_TRAPS) ───────────────────

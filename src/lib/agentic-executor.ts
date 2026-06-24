@@ -160,7 +160,9 @@ export async function buildAgenticFacts(params: {
     const f = result.facts;
     const mapEmpty =
       f.clauses.length === 0 && f.clins.length === 0 && f.delivery.length === 0 &&
-      f.submissionRequirements.length === 0 && f.evaluationFactors.length === 0 && !f.workStatementText;
+      f.submissionRequirements.length === 0 && f.evaluationFactors.length === 0 &&
+      (f.performanceRequirements?.length ?? 0) === 0 && (f.amendmentChanges?.length ?? 0) === 0 &&
+      !f.workStatementText;
     // Coverage-ratio floor: a MAP that read only a small fraction of the operative
     // docs (e.g. 2 of 31) still produces SOME facts, so mapEmpty is false — but using
     // those thin facts as factsOverride would render a near-empty report the banner

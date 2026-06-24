@@ -67,6 +67,8 @@ export function composeExtractedFacts(scalars: ScalarFacts, mapped: MappedFacts)
     clauses: mapped.clauses,
     submissionRequirements: mapped.submissionRequirements,
     evaluationFactors: mapped.evaluationFactors,
+    performanceRequirements: mapped.performanceRequirements,
+    amendmentChanges: mapped.amendmentChanges,
     contractType: scalars.contractType ?? null,
     setAside: scalars.setAside ?? null,
     naicsCode: scalars.naicsCode ?? null,
@@ -74,9 +76,30 @@ export function composeExtractedFacts(scalars: ScalarFacts, mapped: MappedFacts)
     offerDueDate: scalars.offerDueDate ?? null,
     issuingOffice: scalars.issuingOffice ?? null,
     extractionWarnings: mapped.extractionWarnings,
-    workStatementText: mapped.workStatementText ?? undefined,
+    // Every work-statement body, each headed by its source doc (append-all). The
+    // judge consumes this single string today; Stage 2 moves to the compact matrix.
+    // Per-doc cap keeps a multi-SOW package from blowing the judge prompt — capped
+    // bodies are marked, never silently dropped (the structured performanceRequirements
+    // above carry the obligations regardless).
+    workStatementText: composeWorkStatementText(mapped.workStatements),
     periodOfPerformance: scalars.periodOfPerformance ?? null,
   };
+}
+
+// Per-document body cap (chars). Generous — most SOW/PWS bodies fit. A body over
+// this is marked truncated in-band (visible to the judge), never silently dropped.
+const WORK_STATEMENT_PER_DOC_CAP = 40_000;
+
+function composeWorkStatementText(workStatements: MappedFacts["workStatements"]): string | undefined {
+  if (!workStatements.length) return undefined;
+  return workStatements
+    .map((w) => {
+      const body = w.text.length > WORK_STATEMENT_PER_DOC_CAP
+        ? `${w.text.slice(0, WORK_STATEMENT_PER_DOC_CAP)}\n[…work-statement body truncated for the judge prompt — full obligations captured as performanceRequirements…]`
+        : w.text;
+      return `=== ${w.docName} ===\n${body}`;
+    })
+    .join("\n\n");
 }
 
 /** Build the honest coverage report. Pure. The completeness claim is gated on
