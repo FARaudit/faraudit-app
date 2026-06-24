@@ -227,6 +227,7 @@ check("gold-score: missed gate → gate recall 0", gss.gates.recall === 0 && gss
 // The A/B is only honest if both engines reduce to the same 4-tuple by the same rules.
 // Prove clause-number canonicalization + the shared gate detector are engine-agnostic.
 check("clauseNumber: pulls canonical number from a titled clause string", clauseNumber("52.204-7 System for Award Management") === "52.204-7" && clauseNumber("252.204-7012 Safeguarding CUI") === "252.204-7012" && clauseNumber("no clause here") === null);
+check("clauseNumber: canonical regex reuse — catches AFFARS 5352.x trap + rejects junk prefix", clauseNumber("5352.242-9000 Base Access") === "5352.242-9000" && clauseNumber("999.123-4 not a real clause") === null);
 
 const agFacts: ExtractedFacts = {
   clins: [], delivery: [],

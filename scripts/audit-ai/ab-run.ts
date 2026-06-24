@@ -37,7 +37,10 @@ const onlyPkg = arg("--only");
 const mapModelOverride = arg("--map-model"); // "haiku" | "sonnet" | full id — the Haiku-vs-Sonnet decision lever
 
 function loadGoldSets(): GoldSetFile[] {
-  const files = readdirSync(GOLD_DIR).filter((n) => n.endsWith(".json") && !n.startsWith("_"));
+  // Load adjudicated gold sets ONLY. Exclude "_"-prefixed templates AND the proposer's
+  // "<id>.proposed.json" output (adjudicated:false) — otherwise a stray proposed file
+  // would trip the unadjudicated-refusal below and block an otherwise-valid run.
+  const files = readdirSync(GOLD_DIR).filter((n) => n.endsWith(".json") && !n.startsWith("_") && !n.endsWith(".proposed.json"));
   const sets = files.map((n) => parseGoldSet(JSON.parse(readFileSync(path.join(GOLD_DIR, n), "utf8"))));
   const usable = sets.filter((s) => (onlyPkg ? s.packageId === onlyPkg : true));
   // HONEST GATE: never score against a gold set a human hasn't adjudicated — that would

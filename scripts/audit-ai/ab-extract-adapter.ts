@@ -14,28 +14,24 @@
 // ab-run.ts wraps these. See ceo/AGENTIC-ENGINE-REBUILD-PLAN.md Stage 4.
 
 import type { EngineExtraction } from "./gold-set-score";
-import type { ExtractedFacts } from "../../src/lib/section-extractors";
+import { extractClauseNumbers, CLAUSE_NUMBER_RE_SOURCE, type ExtractedFacts } from "../../src/lib/section-extractors";
 import type { AuditResult } from "../../src/lib/audit-engine";
 import type { StructuredUsage } from "../../src/lib/anthropic-structured";
 
 // ── Clause-number canonicalization ────────────────────────────────────────────
-// FAR/DFARS clause numbers: 2-3 digit part + 3-digit section + dash + 1-4 digit
-// subsection, optional alpha suffix (52.212-4, 252.204-7012, 52.219-14 Alt I → base).
-// Pull the NUMBER out of any string ("52.204-7 System for Award Management" → "52.204-7")
-// so a clause that arrives as a bare number on one engine and a titled string on the
-// other still matches. Applied to BOTH engines → symmetric.
-const CLAUSE_RE = /\b(\d{2,3}\.\d{3}-\d{1,4})\b/;
+// REUSE the engine's CANONICAL clause-number regex (section-extractors.ts) — the
+// single source of truth that binds REAL prefixes (5X52|5352|252|52), so it catches
+// AFFARS 5352.x base-access traps (a DFARS_TRAPS_MAP entry) and REJECTS junk tokens
+// like "999.123-4". A private copy here drifted from it on both counts (review
+// 2026-06-24). Pull the NUMBER out of any string ("52.204-7 System for Award
+// Management" → "52.204-7"); applied to BOTH engines → symmetric.
+const CLAUSE_RE = new RegExp(`\\b${CLAUSE_NUMBER_RE_SOURCE}\\b`);
 export function clauseNumber(raw: string): string | null {
   const m = CLAUSE_RE.exec(raw ?? "");
-  return m ? m[1] : null;
+  return m ? m[0] : null;
 }
 function clauseNumbers(raws: string[]): string[] {
-  const out = new Set<string>();
-  for (const r of raws) {
-    const n = clauseNumber(r);
-    if (n) out.add(n);
-  }
-  return [...out];
+  return [...new Set(raws.flatMap(extractClauseNumbers))];
 }
 
 // ── Controlled gate vocabulary ────────────────────────────────────────────────
@@ -127,6 +123,12 @@ export function legacyToExtraction(result: AuditResult): EngineExtraction {
   ];
   const gateText = [
     cj.set_aside_text ?? "",
+    // Raw clause STRINGS carry clause TITLES — fed to gate detection so a gate named
+    // only in a clause title (e.g. "...CMMC...") fires on the legacy side too. SYMMETRIC
+    // with the agentic arm feeding c.title; without this the A/B over-credited the new
+    // engine's gate-recall (review 2026-06-24).
+    ...(cj.far_clauses ?? []),
+    ...(cj.dfars_clauses ?? []),
     ...(cj.required_certifications ?? []),
     ...(cj.key_compliance_actions ?? []),
     ...requirements,
@@ -138,8 +140,10 @@ export function legacyToExtraction(result: AuditResult): EngineExtraction {
 }
 
 // ── Cost ──────────────────────────────────────────────────────────────────────
-// $/M-token (matches scripts/audit-ai/cost-gate.mjs PRICE — single source of truth
-// for the cost band). Cache write 1.25× / read 0.10× of base input.
+// $/M-token. NB: cost-gate.mjs + simulate-audit-cost.mjs hold the SAME table (they're
+// .mjs and can't import this .ts) — on an Anthropic reprice, update ALL THREE in
+// lockstep or the A/B cost verdict drifts from the deploy cost-gate. Cache write 1.25× /
+// read 0.10× of base input.
 export const PRICE_PER_M: Record<string, { in: number; out: number }> = {
   "opus-4.8": { in: 5.0, out: 25.0 },
   "sonnet-4.6": { in: 3.0, out: 15.0 },
