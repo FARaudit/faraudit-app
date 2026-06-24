@@ -5,6 +5,7 @@ import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAm
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
 import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings } from "../../src/lib/agentic-orchestrator";
 import { decideCoverageChip } from "../../src/app/audit/[id]/_v2-render-surfaces";
+import { scoreGoldSet, type GoldSetPackage, type EngineExtraction } from "./gold-set-score";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
 import {
   buildCompactMatrix, selectBindingExcerpts,
@@ -190,6 +191,34 @@ const chipNormalComplete = decideCoverageChip({ detected: new Set(), allIngested
 check("banner: non-agentic path unchanged — all ingested → 'All sources read in full'", chipNormalComplete.covClass === "ok" && /All sources read in full/.test(chipNormalComplete.covText));
 const chipAgenticOk = decideCoverageChip({ detected: new Set(), allIngested: true, filesRead: 5, filesTotal: 5, agenticComplete: true });
 check("banner: agentic COMPLETE does not force a false warn", chipAgenticOk.covClass === "ok");
+
+// ── STAGE 4 scaffold: gold-set scorer — recall/precision + binding + planted-hard ──
+const goldPkg: GoldSetPackage = {
+  packageId: "FIXTURE-1",
+  groundTruth: {
+    clauses: [
+      { number: "52.204-7", binding: true },
+      { number: "252.204-7012", binding: true, plantedHard: true }, // the buried CMMC bid-loser
+      { number: "52.222-50", binding: false },
+    ],
+    requirements: ["submit SF-1449", "past performance 3 refs"],
+    evalFactors: ["Technical", "Price"],
+    gates: ["CMMC L2"],
+  },
+};
+const engineExtract: EngineExtraction = {
+  clauses: ["52.204-7 ", "99.99-9"], // recovers 1 binding (normalized), 1 false positive; MISSES the planted 252.204-7012
+  requirements: ["Submit SF-1449"],   // case/space variant → must still match
+  evalFactors: ["Technical", "Price"],
+  gates: [],                          // misses the CMMC gate
+};
+const gss = scoreGoldSet(engineExtract, goldPkg);
+check("gold-score: clause recall counts normalized matches (1 of 3) + flags the false positive", gss.clauses.found === 1 && gss.clauses.total === 3 && gss.clauses.falsePositives === 1 && Math.abs(gss.clauses.precision - 0.5) < 1e-9);
+check("gold-score: requirement match is whitespace/case-insensitive (1 of 2)", gss.requirements.found === 1 && gss.requirements.total === 2);
+check("gold-score: bindingClauseRecall over binding subset only (0.5)", Math.abs(gss.bindingClauseRecall - 0.5) < 1e-9);
+check("gold-score: plantedHardRecall = 0 when the seeded bid-loser is missed (the moat metric)", gss.plantedHardRecall === 0);
+check("gold-score: missedBinding NAMES the bid-losers", gss.missedBinding.includes("252.204-7012") && !gss.missedBinding.includes("52.204-7"));
+check("gold-score: missed gate → gate recall 0", gss.gates.recall === 0 && gss.evalFactors.recall === 1);
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);
