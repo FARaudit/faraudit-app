@@ -10,7 +10,10 @@ import { agenticToExtraction, legacyToExtraction, detectGates, clauseNumber, pri
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
 import type { ExtractedFacts } from "../../src/lib/section-extractors";
 import type { AuditResult } from "../../src/lib/audit-engine";
-import { checkManifest, gradePanelOutput, RUBRIC, type DimScore } from "../../src/lib/agentic-panel";
+import {
+  checkManifest, gradePanelOutput, RUBRIC, type DimScore,
+  PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
+} from "../../src/lib/agentic-panel";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -317,6 +320,26 @@ check("rubric: quality-dim average <4 → HONEST_FAILURE (eligible + gates pass,
 const missingOne = perfect.filter((s) => s.key !== "actionability");
 check("rubric: an unscored dim is a MISS (drops the quality avg 5→4) — never a free pass", Math.abs(gradePanelOutput(missingOne, true).qualityAverage - 4) < 1e-9);
 check("rubric: Dimension 10 (submission-logistics, Brain-added) is present", RUBRIC.some((d) => d.id === 10 && d.key === "submission_logistics"));
+
+// ── STAGE 6A-ii: the panel — 5 lenses + verifier + chief judge, with Brain's guards ──
+check("panel: 5 independent lenses (gatekeeper is the chief judge, not a 6th lens)", PANELISTS.length === 5 && !PANELISTS.some((p) => p.key === "bd_gatekeeper"));
+check("panel: chief judge = the BD gatekeeper persona, on Opus", CHIEF_JUDGE.key === "bd_gatekeeper" && CHIEF_JUDGE.tier === "opus");
+check("panel: tier mix (not all one tier — reduces same-family correlation)", new Set(PANELISTS.map((p) => p.tier)).size >= 2);
+// Brain's anti-monoculture guard present on EVERY lens.
+check("panel: every lens forces a contrarian_finding + grounding (monoculture guard)", PANELISTS.every((p) => /contradict/i.test(p.system) && /[Gg]round|cite/i.test(p.system)));
+// Persona-specific validated scope (Brain).
+check("panel: Capture Strategist has the NO-SPECULATION competitive ceiling (FPDS/SAM only)", PANELISTS.find((p) => p.id === 1)!.system.toLowerCase().includes("fpds") && /never speculate|forbidden/i.test(PANELISTS.find((p) => p.id === 1)!.system));
+check("panel: Eligibility Counsel owns ostensible-sub + teaming (Brain-expanded scope)", /ostensible/i.test(PANELISTS.find((p) => p.id === 6)!.system) && /teaming agreement/i.test(PANELISTS.find((p) => p.id === 6)!.system));
+check("panel: Ex-KO lens owns LPTA-vs-tradeoff + competitive-range", /LPTA/.test(PANELISTS.find((p) => p.id === 3)!.system) && /competitive[- ]range/i.test(PANELISTS.find((p) => p.id === 3)!.system));
+// Verifier 3-state tagging (Brain fix).
+check("panel: verifier schema enforces 3-state tagging VERIFIED/UNVERIFIABLE/REFUTED", JSON.stringify(VERIFIER_SCHEMA).includes("UNVERIFIABLE") && /default to UNVERIFIABLE/i.test(VERIFIER.system));
+// Chief judge: dissent-preserving + honest-fail + Score-AI-Driven law.
+check("panel: chief judge preserves dissent + honest-fail (NEEDS_HUMAN_REVIEW) + NO-BID only on a named gate", JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("preserved_dissent") && CHIEF_JUDGE.system.includes("NEEDS_HUMAN_REVIEW") && /NAMED hard gate/i.test(CHIEF_JUDGE.system));
+// Schema union budgets (same free pre-flight as the lenses — catch the Anthropic 16-union 400 for $0).
+for (const [name, schema] of [["PANELIST_SCHEMA", PANELIST_SCHEMA], ["VERIFIER_SCHEMA", VERIFIER_SCHEMA], ["CHIEF_JUDGE_SCHEMA", CHIEF_JUDGE_SCHEMA]] as const) {
+  const u = countSchemaUnions(schema);
+  check(`panel: ${name} union params (${u}) under Anthropic's 16 limit`, u <= 16);
+}
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);
