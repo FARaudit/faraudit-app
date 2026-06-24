@@ -10,6 +10,7 @@ import { agenticToExtraction, legacyToExtraction, detectGates, clauseNumber, pri
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
 import type { ExtractedFacts } from "../../src/lib/section-extractors";
 import type { AuditResult } from "../../src/lib/audit-engine";
+import { checkManifest, gradePanelOutput, RUBRIC, type DimScore } from "../../src/lib/agentic-panel";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -293,6 +294,29 @@ const costNew = priceUsd([
 // haiku: 0.1+0.025=0.125 ; opus write: 0.043*6.25=0.26875 + 0.2 = 0.46875 ; opus read: 0.043*0.5=0.0215 + 0.2 = 0.2215 → 0.81525
 check("priceUsd: rolls up mixed-model usage with cache write(1.25×)/read(0.1×)", Math.abs(costNew.usd - 0.81525) < 1e-6 && costNew.calls === 3 && costNew.cache_read === 43_000);
 check("priceUsd: unknown model priced as Opus (never under-states cost)", Math.abs(priceUsd([{ model: "mystery-model", input_tokens: 1_000_000, output_tokens: 0 }]).usd - 5.0) < 1e-9);
+
+// ── STAGE 6: pre-synthesis MANIFEST GATE (Brain's #1 risk — panel must not fire on
+// an incomplete document set, building a verdict on an empty section) ─────────────
+check("manifest: all binding sections (C/L/M/B) present → panel may fire", checkManifest(new Set(["C", "L", "M", "B"])).ok === true);
+const missM = checkManifest(new Set(["C", "L", "B"]));
+check("manifest: missing §M → INCOMPLETE, panel suppressed, names the gap (no charge)", missM.ok === false && missM.missing.some((x) => x.includes("§M")) && /INCOMPLETE/.test(missM.statement));
+
+// ── STAGE 6: 10-DIM board-room rubric grader (Dim 3 binary eligibility; Dim 10 added) ──
+const perfect: DimScore[] = RUBRIC.map((d) => (d.kind === "eligibility" ? { key: d.key, pass: true } : { key: d.key, score: 5 }));
+check("rubric: all gates 5 + eligible + quality 5 + manifest ok → SHIP", gradePanelOutput(perfect, true).verdict === "SHIP");
+check("rubric: manifest FAIL short-circuits → HONEST_FAILURE despite perfect scores", gradePanelOutput(perfect, false).verdict === "HONEST_FAILURE");
+const inelig = perfect.map((s) => (s.key === "eligibility_detection" ? { key: s.key, pass: false } : s));
+check("rubric: eligibility (Dim 3) = FAIL → INELIGIBLE overrides everything (binary, no partial credit)", gradePanelOutput(inelig, true).verdict === "INELIGIBLE" && gradePanelOutput(inelig, true).eligible === false);
+const gateLow = perfect.map((s) => (s.key === "grounding" ? { key: s.key, score: 3 } : s));
+const gl = gradePanelOutput(gateLow, true);
+check("rubric: a quality-GATE dim <4 → HONEST_FAILURE, names the blocker", gl.verdict === "HONEST_FAILURE" && gl.failedGates.some((n) => /Grounding/.test(n)));
+const af = perfect.map((s) => (s.key === "compliance_completeness" ? { key: s.key, score: 5, autoFailed: true } : s));
+check("rubric: an auto-fail trigger hard-floors a gate dim to 1 → blocks SHIP", gradePanelOutput(af, true).verdict === "HONEST_FAILURE");
+const qLow: DimScore[] = RUBRIC.map((d) => (d.kind === "eligibility" ? { key: d.key, pass: true } : d.kind === "quality" ? { key: d.key, score: 3 } : { key: d.key, score: 5 }));
+check("rubric: quality-dim average <4 → HONEST_FAILURE (eligible + gates pass, but not board-room grade)", gradePanelOutput(qLow, true).verdict === "HONEST_FAILURE");
+const missingOne = perfect.filter((s) => s.key !== "actionability");
+check("rubric: an unscored dim is a MISS (drops the quality avg 5→4) — never a free pass", Math.abs(gradePanelOutput(missingOne, true).qualityAverage - 4) < 1e-9);
+check("rubric: Dimension 10 (submission-logistics, Brain-added) is present", RUBRIC.some((d) => d.id === 10 && d.key === "submission_logistics"));
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);
