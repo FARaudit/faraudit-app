@@ -415,8 +415,30 @@ export function selectBindingExcerpts(
 
 const LENS_MAX_TOKENS = 8_000;
 const LENS_MAX_TOKENS_CEILING = 16_000;   // retry ladder — a finding-rich matrix can exceed 8k output
-const CROSSDOC_MAX_TOKENS = 12_000;
-const CROSSDOC_MAX_TOKENS_CEILING = 24_000;
+// CROSS-DOC OUTPUT BUDGET (Stage 3 right-size). The cross-doc pass is SELECTIVE — it
+// emits only the handful of findings that need >1 doc read together — so a 24k ceiling
+// was over-provisioned and was the single biggest latency risk: at Opus throughput
+// (~50 tok/s) a fully-generated 24k output is ~480s, far past the per-call timeout, so
+// the worst-case retry rung could never finish (the 1 abort / 2 clean in Stage 2). Base
+// 10k covers a rich cross-doc (~15-20 findings + notes) and at ~200s of output + input
+// latency fits comfortably inside CROSSDOC_TIMEOUT_MS. The ladder escalates to 16k ONLY
+// on a (rare) truncation retry; that rung is BEST-EFFORT — if Opus can't finish it inside
+// the window it HONEST-fails (an abort becomes an honest failure, never a false/partial
+// report — the whole point of the design), it is not relied on to always complete. The
+// MAP encodes the same lesson (32k Haiku ceiling — Haiku is faster, so a higher cap fits).
+const CROSSDOC_MAX_TOKENS = 10_000;
+const CROSSDOC_MAX_TOKENS_CEILING = 16_000;
+
+// PER-CALL timeouts (Stage 3). Distinct because the cross-doc is the long pole: Opus
+// over ~82k input + up to 16k output. The Sonnet lenses are fast (8-16k output) so the
+// 240s default catches a genuine hang. The cross-doc (Opus) gets a longer window —
+// safe on the live audit path (the Railway audit-worker has no platform request cap;
+// only the Vercel fallback route is hard-capped at 300s, where the shadow is non-fatal).
+// Both env-overridable for per-package tuning WITHOUT a code change. The OVERALL agentic
+// budget (AGENTIC_SHADOW_BUDGET_MS in audit-executor) must exceed MAP + these per-call
+// timeouts for a large package — raised to 600s there to match the observed ~9-min run.
+const LENS_TIMEOUT_MS = Number(process.env.AUDIT_LENS_TIMEOUT_MS) || 240_000;
+const CROSSDOC_TIMEOUT_MS = Number(process.env.AUDIT_CROSSDOC_TIMEOUT_MS) || 360_000;
 
 interface LensCallParams {
   /** The pre-built, sanitized, security-sandwiched matrix prefix — built ONCE by the
@@ -428,6 +450,7 @@ interface LensCallParams {
   schema: object;
   maxTokens: number;
   maxTokensCeiling: number; // retry-ladder ceiling — a truncated output escalates to this before failing
+  timeoutMs: number;        // per-call abort window — cross-doc (Opus) gets a longer one than the Sonnet lenses
   label: string;
   signal?: AbortSignal;
 }
@@ -463,6 +486,7 @@ async function runLensCall<T>(p: LensCallParams): Promise<T> {
       userPrompt: p.task,
       schema: p.schema,
       maxTokens,
+      timeoutMs: p.timeoutMs,
       label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`,
       signal: p.signal,
     });
@@ -534,7 +558,7 @@ export async function runLenses(params: {
     cachedSystemPrefix, model: lensModel, role: OVERVIEW_ROLE,
     task: "Produce the executive overview from the matrix above.",
     schema: OVERVIEW_LENS_SCHEMA, maxTokens: LENS_MAX_TOKENS, maxTokensCeiling: LENS_MAX_TOKENS_CEILING,
-    label: "LENS overview", signal: params.signal,
+    timeoutMs: LENS_TIMEOUT_MS, label: "LENS overview", signal: params.signal,
   });
 
   // PARALLEL — compliance + risks read the now-warm Sonnet cache; cross-doc (Opus) runs
@@ -548,19 +572,19 @@ export async function runLenses(params: {
       cachedSystemPrefix, model: lensModel, role: COMPLIANCE_ROLE,
       task: "Produce the compliance surface from the matrix above.",
       schema: COMPLIANCE_LENS_SCHEMA, maxTokens: LENS_MAX_TOKENS, maxTokensCeiling: LENS_MAX_TOKENS_CEILING,
-      label: "LENS compliance", signal: params.signal,
+      timeoutMs: LENS_TIMEOUT_MS, label: "LENS compliance", signal: params.signal,
     }),
     runLensCall<RisksLens>({
       cachedSystemPrefix, model: lensModel, role: RISKS_ROLE,
       task: "Produce the risk findings from the matrix above.",
       schema: RISKS_LENS_SCHEMA, maxTokens: LENS_MAX_TOKENS, maxTokensCeiling: LENS_MAX_TOKENS_CEILING,
-      label: "LENS risks", signal: params.signal,
+      timeoutMs: LENS_TIMEOUT_MS, label: "LENS risks", signal: params.signal,
     }),
     runLensCall<CrossDocLens>({
       cachedSystemPrefix, model: crossDocModel, role: CROSSDOC_ROLE,
       task: bindingTask,
       schema: CROSSDOC_LENS_SCHEMA, maxTokens: CROSSDOC_MAX_TOKENS, maxTokensCeiling: CROSSDOC_MAX_TOKENS_CEILING,
-      label: "LENS cross-doc", signal: params.signal,
+      timeoutMs: CROSSDOC_TIMEOUT_MS, label: "LENS cross-doc", signal: params.signal,
     }),
   ]);
 

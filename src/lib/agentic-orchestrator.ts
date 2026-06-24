@@ -14,7 +14,7 @@
 import type { ExtractedFacts } from "./section-extractors";
 import type { AuditJudgment } from "./audit-judgment";
 import { runJudgment } from "./audit-judgment";
-import { buildCoverageLedger, resolveAmendments, type CoverageLedger, type ResolvedLedger, type PackageFileInput } from "./agentic-ingest";
+import { buildCoverageLedger, resolveAmendments, classifyBindingContent, type CoverageLedger, type ResolvedLedger, type PackageFileInput } from "./agentic-ingest";
 import { mapDocument, mergeExtracts, selectMapTargets, type MappedFacts, type MapCoverage, type DocExtract } from "./agentic-map";
 import { buildCompactMatrix, selectBindingExcerpts, runLenses, type LensSurfaces } from "./agentic-lenses";
 
@@ -109,6 +109,54 @@ function composeWorkStatementText(workStatements: MappedFacts["workStatements"])
       return `=== ${w.docName} ===\n${body}`;
     })
     .join("\n\n");
+}
+
+/** A MAP extract carries NO content — every fact array empty AND no work-statement prose.
+ *  (warnings don't count — a doc can warn yet extract nothing.) Pure. */
+function isVacuousExtract(e: DocExtract): boolean {
+  return (
+    e.clauses.length === 0 && e.clins.length === 0 && e.delivery.length === 0 &&
+    e.submissionRequirements.length === 0 && e.evaluationFactors.length === 0 &&
+    e.performanceRequirements.length === 0 && e.amendmentChanges.length === 0 &&
+    !(e.workStatementText && e.workStatementText.trim())
+  );
+}
+
+/** Split MAP extracts into the ones that count as READ vs BINDING docs that produced a
+ *  vacuous (zero-content) extract — the latter are extraction FAILURES, not reads (Stage 3
+ *  honest-fail). A binding doc (classifyBindingContent.mustFullRead — WD/CBA/PWS/SOW/§L/§M/
+ *  SF-30/spec/CDRL) that vanished to nothing is OCR noise / a scanned form the map couldn't
+ *  parse / an empty-but-valid JSON — counting it "read in full" would let coverage claim
+ *  completeness on the single MOST important class of document while it contributed nothing.
+ *  A vacuous NON-binding doc (a pure-data inventory/pricing template) is a legitimate empty
+ *  read and stays valid — only binding content that disappeared is suspicious. Keyed on the
+ *  source TEXT so a doc whose text was present but un-extractable is caught (the upstream
+ *  MIN_TEXT_CHARS filter only catches docs with no text at all). Pure + exported so the
+ *  deterministic gate proves it without the API.
+ *
+ *  IMPORTANT — only demote a POSITIVELY-identified binding doc (classification.source ===
+ *  "type" or "obligation"): a never-summarize doc type (WD/CBA/PWS/§M/spec…) or one with
+ *  obligation language in the body. classifyBindingContent ALSO returns mustFullRead:true for
+ *  its conservative "default" fallback (a generically-named file not provably inert) — a
+ *  legitimately-empty cover sheet / blank form would hit that default, and demoting it would
+ *  flip a VALID package to PARTIAL/no-charge (breaking "valid package still ships complete").
+ *  So the default fallback is NOT enough to call a vanished extract a read-failure. */
+export function partitionVacuousBindings(
+  extracts: DocExtract[],
+  docTextByName: Map<string, string>
+): { valid: DocExtract[]; vacuousBindingNames: string[] } {
+  const valid: DocExtract[] = [];
+  const vacuousBindingNames: string[] = [];
+  for (const ex of extracts) {
+    const cls = classifyBindingContent(ex.docName, docTextByName.get(ex.docName) ?? null);
+    const positivelyBinding = cls.source === "type" || cls.source === "obligation";
+    if (isVacuousExtract(ex) && positivelyBinding) {
+      vacuousBindingNames.push(ex.docName);
+    } else {
+      valid.push(ex);
+    }
+  }
+  return { valid, vacuousBindingNames };
 }
 
 /** Build the honest coverage report. Pure. The completeness claim is gated on
@@ -208,14 +256,22 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
       else readFailures.push(batch[j].name);
     });
   }
-  const merged = mergeExtracts(extracts);
-  // read = docs that ACTUALLY produced an extract — never `mappable`, which still
-  // includes docs whose MAP call later failed (those are in readFailures; counting
-  // them as read too would double-count and inflate the "N of N" headline).
-  const mapCoverage: MapCoverage = { read: extracts.map((e) => e.docName), skipped };
+  // VACUOUS-BINDING GUARD (Stage 3 honest-fail) — see partitionVacuousBindings. A binding
+  // doc that returned a zero-content extract is an extraction failure, not a "read in full";
+  // demote it to a read-failure so coverage reports PARTIAL / no-charge.
+  const docTextByName = new Map(mappable.map((d) => [d.name, d.text]));
+  const { valid: validExtracts, vacuousBindingNames } = partitionVacuousBindings(extracts, docTextByName);
+  readFailures.push(...vacuousBindingNames);
+
+  const merged = mergeExtracts(validExtracts);
+  // read = docs that ACTUALLY produced a NON-VACUOUS extract — never `mappable`, which
+  // still includes docs whose MAP call later failed OR returned an empty binding extract
+  // (those are in readFailures; counting them as read too would double-count and inflate
+  // the "N of N" headline).
+  const mapCoverage: MapCoverage = { read: validExtracts.map((e) => e.docName), skipped };
   // Docs that produced an extract but were over the char cap (trimmed) — read, but
   // NOT in full; they keep coverage from claiming completeness.
-  const truncatedDocs = extracts.filter((e) => e.truncated).map((e) => e.docName);
+  const truncatedDocs = validExtracts.filter((e) => e.truncated).map((e) => e.docName);
 
   // 4) compose facts (deterministic SAM scalars + mapped analysis) + coverage report
   const facts = composeExtractedFacts(input.scalars, merged);
@@ -225,7 +281,7 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   // from `extracts`, NOT `mappable` — mappable still includes docs whose MAP call
   // failed; including their text would let V2 surface clauses from a doc the agentic
   // facts don't cover, widening the facts↔grounding mismatch.
-  const extractNames = new Set(extracts.map((e) => e.docName));
+  const extractNames = new Set(validExtracts.map((e) => e.docName));
   const assembledText = mappable.filter((d) => extractNames.has(d.name)).map((d) => d.text).join("\n\n");
   return { facts, coverage, ledger, assembledText, provenance: merged.provenance };
 }

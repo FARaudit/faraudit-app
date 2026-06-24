@@ -832,6 +832,10 @@ export async function executeAudit(
           // AGENTIC PRIMARY: the honest coverage line (Audited N of M · superseded ·
           // skipped · read failures) — null when not on the agentic-primary path.
           agentic_coverage: agenticMap?.coverage.statement ?? null,
+          // Structured completeness signal the ingestion banner consults (Stage 3): a
+          // boolean is unambiguous where parsing the statement string would be brittle.
+          // null off the agentic-primary path → the banner behaves exactly as before.
+          agentic_coverage_complete: agenticMap?.coverage.complete ?? null,
           agentic_facts_source: agenticMap ? "agentic_map" : null,
         },
         rendered_at: new Date().toISOString(),
@@ -1039,7 +1043,14 @@ export async function executeAudit(
     // executeAudit past the worker timeout → DegradedRunError replay → the exact
     // full-Opus retry cost-bleed the V1 budget exists to prevent. The report is
     // already marked complete above, so a shadow timeout never affects the result.
-    const shadowBudgetMs = Number(process.env.AGENTIC_SHADOW_BUDGET_MS) || 300000;
+    // 600s default (Stage 3 right-size): the shadow runs MAP (per-doc, cheap) → compact
+    // matrix → lenses + the Opus cross-doc pass. On a large package (27+ docs) that chain
+    // is ~9 min, so a 300s budget aborted the cross-doc mid-generation (Stage 2: 1 abort /
+    // 2 clean — latency, not a hang). The live audit path is the Railway audit-worker,
+    // which has NO platform request cap, so 600s is safe there; on the Vercel fallback
+    // route (maxDuration=300) the function ends first, but the shadow is non-fatal — the
+    // report is already marked complete above. Env-overridable for per-package tuning.
+    const shadowBudgetMs = Number(process.env.AGENTIC_SHADOW_BUDGET_MS) || 600000;
     try {
       await withBudget(
         (signal) => runAgenticShadow({

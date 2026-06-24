@@ -157,6 +157,13 @@ export function buildCoverageLedger(files: PackageFileInput[]): CoverageLedger {
 export interface BindingClassification {
   mustFullRead: boolean;
   reason: string;
+  /** WHY mustFullRead was decided — lets a consumer distinguish a POSITIVELY-identified
+   *  binding doc ("type" = never-summarize doc type · "obligation" = obligation language in
+   *  the body) from the conservative "default" fallback (full-read because not provably
+   *  inert) and a "pure-data" summarize candidate. The vacuous-binding honest-fail demotes
+   *  ONLY positively-binding docs, so a generically-named legitimately-empty file is not
+   *  wrongly flagged a read-failure. */
+  source: "type" | "obligation" | "pure-data" | "default";
 }
 
 // Hard never-summarize: these carry obligations regardless of format/length.
@@ -178,15 +185,15 @@ const PURE_DATA_HINT_RE =
  *  default to full-read. */
 export function classifyBindingContent(name: string, text: string | null): BindingClassification {
   if (NEVER_SUMMARIZE_RE.test(name)) {
-    return { mustFullRead: true, reason: "never-summarize document type (WD/CBA/PWS/SOW/QASP/AQL/spec/CDRL/SLA)" };
+    return { mustFullRead: true, reason: "never-summarize document type (WD/CBA/PWS/SOW/QASP/AQL/spec/CDRL/SLA)", source: "type" };
   }
   if (text && OBLIGATION_LEXICON_RE.test(text)) {
-    return { mustFullRead: true, reason: "obligation language present (shall/must/frequency/AQL/wage/penalty)" };
+    return { mustFullRead: true, reason: "obligation language present (shall/must/frequency/AQL/wage/penalty)", source: "obligation" };
   }
   if (PURE_DATA_HINT_RE.test(name)) {
-    return { mustFullRead: false, reason: "pure-data file (inventory/list) with no obligation signals — summarize candidate; still verify columns before summarizing" };
+    return { mustFullRead: false, reason: "pure-data file (inventory/list) with no obligation signals — summarize candidate; still verify columns before summarizing", source: "pure-data" };
   }
-  return { mustFullRead: true, reason: "default full-read — not provably inert" };
+  return { mustFullRead: true, reason: "default full-read — not provably inert", source: "default" };
 }
 
 // ── Amendment resolution (panel-validated 2026-06-22; FLAG-ONLY) ─────────────

@@ -1,7 +1,7 @@
 {
   "model": "opusplan",
   "permissions": {
-    "defaultMode": "acceptEdits",
+    "defaultMode": "auto",
     "allow": [
       "Edit",
       "Write",

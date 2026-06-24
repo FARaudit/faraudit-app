@@ -3,7 +3,8 @@
 // supersedes ONLY on proven full-replacement, KEEPS all on incremental-patch text.
 import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAmendmentNumber } from "../../src/lib/agentic-ingest";
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
-import { composeExtractedFacts, buildCoverageReport } from "../../src/lib/agentic-orchestrator";
+import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings } from "../../src/lib/agentic-orchestrator";
+import { decideCoverageChip } from "../../src/app/audit/[id]/_v2-render-surfaces";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
 import {
   buildCompactMatrix, selectBindingExcerpts,
@@ -147,6 +148,48 @@ const bindingPick = selectBindingExcerpts([
 ], { perDocChars: 500, totalChars: 2_000 });
 check("binding-excerpts: selects binding docs, skips pure-data inventory", bindingPick.selected.includes("Attch 2 Wage Determination.pdf") && bindingPick.selected.includes("Section M Evaluation.pdf") && !bindingPick.selected.includes("J-1503010-09 Inventory.xlsx"));
 check("binding-excerpts: bounded to the total char budget", bindingPick.text.length <= 2_400);
+
+// ── STAGE 3: vacuous-binding → read-failure (honest-fail ship-gate) ─────────────
+// A BINDING doc (mustFullRead) that produced a zero-content extract is an extraction
+// failure, NOT a "read in full"; a vacuous NON-binding (pure-data) doc is a legit empty.
+const emptyExtract = (docName: string): DocExtract => ({
+  docName, clauses: [], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [],
+  performanceRequirements: [], amendmentChanges: [], workStatementText: null, warnings: [], truncated: false,
+});
+const richExtract: DocExtract = { ...emptyExtract("Section M Evaluation.pdf"), evaluationFactors: [{ factor: "Technical", weight: "most important", method: "best_value" }] };
+const vacText = new Map<string, string>([
+  ["Attch 2 Wage Determination.pdf", "the contractor shall pay the prevailing wage rate per hour"], // binding (obligation text)
+  ["J-1503010-09 Inventory.xlsx", "room count area sqft "], // pure-data → NOT binding
+  ["Section M Evaluation.pdf", "proposals evaluated on best value"],
+]);
+const partition = partitionVacuousBindings(
+  [emptyExtract("Attch 2 Wage Determination.pdf"), emptyExtract("J-1503010-09 Inventory.xlsx"), richExtract],
+  vacText
+);
+check("vacuous-binding: empty Wage Determination → demoted to read-failure", partition.vacuousBindingNames.includes("Attch 2 Wage Determination.pdf"));
+check("vacuous-binding: empty pure-data inventory → kept as a legit empty read (not a failure)", partition.valid.some(e => e.docName === "J-1503010-09 Inventory.xlsx") && !partition.vacuousBindingNames.includes("J-1503010-09 Inventory.xlsx"));
+check("vacuous-binding: non-vacuous binding (§M w/ a factor) → stays valid", partition.valid.some(e => e.docName === "Section M Evaluation.pdf") && partition.vacuousBindingNames.length === 1);
+// FALSE-PARTIAL GUARD: a generically-named, legitimately-empty file (cover sheet / blank
+// form) hits classifyBindingContent's conservative DEFAULT full-read — it must NOT be
+// demoted, or a valid package would flip to PARTIAL/no-charge. Only POSITIVELY-binding
+// (never-summarize type OR obligation text) vacuous docs are read-failures.
+const genericPartition = partitionVacuousBindings(
+  [emptyExtract("Attachment 7.pdf")],
+  new Map([["Attachment 7.pdf", "cover page see attached enclosures"]]) // no obligation words, generic name → default full-read
+);
+check("vacuous-binding: generic legit-empty file (default full-read) → NOT demoted (valid stays complete)", genericPartition.vacuousBindingNames.length === 0 && genericPartition.valid.length === 1);
+// the demoted name, fed to buildCoverageReport as a read-failure, flips coverage INCOMPLETE
+const vacCoverage = buildCoverageReport(r2, { read: ["b.pdf"], skipped: [] }, partition.vacuousBindingNames);
+check("vacuous-binding: demotion makes coverage report INCOMPLETE (no-charge)", vacCoverage.complete === false && /INCOMPLETE/.test(vacCoverage.statement));
+
+// ── STAGE 3: honest ingestion-banner coverage chip — agentic partial is AUTHORITATIVE
+const allDetected = new Set(["C", "L", "M"]);
+const chipForcedWarn = decideCoverageChip({ detected: allDetected, allIngested: true, filesRead: 9, filesTotal: 9, agenticComplete: false });
+check("banner: agentic INCOMPLETE overrides 'all read' → warn, never the false 'All sources read in full' claim", chipForcedWarn.covClass === "warn" && !/All sources read in full/.test(chipForcedWarn.covText) && /Partial/.test(chipForcedWarn.covText));
+const chipNormalComplete = decideCoverageChip({ detected: new Set(), allIngested: true, filesRead: 5, filesTotal: 5, agenticComplete: null });
+check("banner: non-agentic path unchanged — all ingested → 'All sources read in full'", chipNormalComplete.covClass === "ok" && /All sources read in full/.test(chipNormalComplete.covText));
+const chipAgenticOk = decideCoverageChip({ detected: new Set(), allIngested: true, filesRead: 5, filesTotal: 5, agenticComplete: true });
+check("banner: agentic COMPLETE does not force a false warn", chipAgenticOk.covClass === "ok");
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);
