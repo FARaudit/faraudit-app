@@ -14,6 +14,7 @@ import {
   checkManifest, gradePanelOutput, RUBRIC, type DimScore,
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
 } from "../../src/lib/agentic-panel";
+import { GRADER_SCHEMA } from "./panel-grader";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -345,6 +346,10 @@ for (const [name, schema] of [["PANELIST_SCHEMA", PANELIST_SCHEMA], ["VERIFIER_S
   const u = countSchemaUnions(schema);
   check(`panel: ${name} union params (${u}) under Anthropic's 16 limit`, u <= 16);
 }
+
+// ── STAGE 6D: quality grader schema — free union pre-flight (catches the Anthropic 400 for $0)
+const graderUnions = countSchemaUnions(GRADER_SCHEMA);
+check(`grader: GRADER_SCHEMA union params (${graderUnions}) under Anthropic's 16 limit`, graderUnions <= 16);
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);
