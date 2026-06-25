@@ -30,7 +30,10 @@ function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>
 
 const PANELIST_TIMEOUT_MS = Number(process.env.AUDIT_PANELIST_TIMEOUT_MS) || 240_000;
 const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 360_000;
-const MAX_PANELIST_BRIEF_CHARS = 1_800; // normalize density so a verbose lens can't outweigh a terse one (Brain's verbosity-bias guard)
+// Per-field caps normalize density (Brain's verbosity-bias guard) WITHOUT dropping the
+// contrarian_finding — capping the whole string used to truncate it (review 2026-06-24).
+const CONTRARIAN_CHARS = 500;
+const FIELD_CHARS = 650;
 
 /** Build the cached system prefix ONCE (sanitize + security sandwich), byte-identical
  *  across panelists so it's the prompt-cache key — same invariant as runLenses. */
@@ -122,6 +125,19 @@ export async function runPanelJudge(params: {
       : { key: p.key, name: p.name, output: null, error: r.reason instanceof Error ? r.reason.message : String(r.reason) };
   });
 
+  // ALL-LENSES-FAILED guard (review 2026-06-24): if every lens failed, the panel produced
+  // NO analysis — do NOT let the chief judge invent a verdict over nothing (the manifest
+  // gate's post-gate sibling). Honest-fail, no charge, no further model calls.
+  if (panelists.every((p) => p.output === null)) {
+    return {
+      fired: true, manifest, panelists, verifier: null,
+      judgment: {
+        verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [],
+        rationale: "All panel lenses failed — no analysis was produced. Honest failure (no charge); a verdict cannot be rendered.",
+      },
+    };
+  }
+
   // Adversarial verifier — refute each named gate + risk against the source (separate call).
   const claims = panelists.flatMap((p) =>
     p.output
@@ -141,11 +157,15 @@ export async function runPanelJudge(params: {
     }).catch(() => null);
   }
 
-  // Normalized brief — equal density per lens (verbosity-bias guard), + verifier tags.
+  // Normalized brief — equal density per lens (verbosity-bias guard). CAP EACH COMPONENT
+  // (review 2026-06-24): slicing the whole string dropped the contrarian_finding (the
+  // monoculture guard) + tail risks for verbose lenses. Cap per-field so verdict +
+  // contrarian + the severest risks always survive.
+  const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
   const brief = panelists
     .map((p) =>
       p.output
-        ? `### ${p.name}\nverdict=${p.output.verdict} fit=${p.output.fit_score} conf=${p.output.confidence}\ngates: ${p.output.named_hard_gates.map((g) => `${g.gate}(met=${g.met})`).join("; ") || "none"}\nrisks: ${p.output.risks.map((r) => `${r.severity}:${r.risk}`).join("; ") || "none"}\ncontrarian: ${p.output.contrarian_finding}`.slice(0, MAX_PANELIST_BRIEF_CHARS)
+        ? `### ${p.name}\nverdict=${p.output.verdict} fit=${p.output.fit_score} conf=${p.output.confidence}\ncontrarian: ${cap(p.output.contrarian_finding, CONTRARIAN_CHARS)}\ngates: ${cap(p.output.named_hard_gates.map((g) => `${g.gate}(met=${g.met})`).join("; ") || "none", FIELD_CHARS)}\nrisks: ${cap(p.output.risks.map((r) => `${r.severity}:${r.risk}`).join("; ") || "none", FIELD_CHARS)}`
         : `### ${p.name}\n(LENS FAILED — ${p.error}; treat as missing coverage, do not assume clear)`
     )
     .join("\n\n");
