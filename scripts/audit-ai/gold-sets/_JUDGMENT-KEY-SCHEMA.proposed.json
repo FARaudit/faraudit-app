@@ -1,0 +1,62 @@
+{
+  "_README": "APPROVED schema (Brain 2026-06-25, +4 amendments) for the expected-JUDGMENT gold key. SCHEMA ONLY — NO entries. The clause-recall key is RETRACTED as a graduation signal (tautological after the §I enumerator). This key scores JUDGMENT, not extraction. ENTRIES must be authored by BLIND human-SME adjudication (CEO + Brain) from RAW source BEFORE any scored run, then frozen + hashed. CODE IS CONTAMINATED on N4008526R0065 (already ran it) and will ONLY freeze+hash the CEO+Brain-authored key — Code NEVER authors judgment entries. No scorer is built until an amended key is committed + ruled.",
+  "schemaVersion": "0.2-approved",
+  "packageId": "<solicitation number>",
+  "bidderProfile": "AMENDMENT 1 (required, top-level): the KNOWN bidder attributes, or null. null for N4008526R0065. DOCTRINE: INELIGIBLE requires a named gate × a KNOWN bidder attribute proving structural impossibility; with a null profile the expectedVerdict CANNOT be INELIGIBLE on a bidder-side gate (caution, never auto-INELIGIBLE).",
+  "adjudication": {
+    "_doc": "blind-SME provenance + tamper-evidence — a scored run is valid ONLY against a frozen, hashed key authored blind by CEO+Brain (NOT Code)",
+    "adjudicatedBy": ["<CEO>", "<Brain>"],
+    "authoredBlind": "boolean — true iff authored from raw source WITHOUT seeing engine output",
+    "frozenAt": "<ISO timestamp>",
+    "sourceSha256": "<hash of the raw source the key was authored from>",
+    "keySha256": "<hash of this key's entries — recomputed at scoring; mismatch = INVALID run. Code computes this hash; Code does not author the entries it hashes>"
+  },
+  "acquisitionPart": "PART_12 | PART_15 | UNKNOWN  (doctrine pre-step — sets the applicable clause checklist; classifyAcquisitionPart() proposes it, SME confirms). N4008526R0065 = PART_15.",
+  "expectedVerdict": {
+    "_doc": "the ONE correct answer for THIS package + bidderProfile",
+    "verdict": "BID | BID_WITH_CAUTION | NO_BID | INELIGIBLE | NEEDS_HUMAN_REVIEW",
+    "eligible": "boolean",
+    "maxShowStoppers": "integer",
+    "reason": "<one-paragraph SME rationale the panel's reason is scored against>"
+  },
+  "namedGates": [
+    {
+      "_doc": "a gate the panel MUST raise, WITH its correct disposition. Empty in the schema — entries authored blind.",
+      "token": "<canonical gate, e.g. SET-ASIDE>",
+      "aliases": ["<bounded match keywords>"],
+      "mustRaise": "boolean",
+      "expectedDisposition": "met | unmet | caution",
+      "sourceCite": "<verbatim source span proving the gate exists>"
+    }
+  ],
+  "showStoppers": [
+    {
+      "_doc": "a DISQUALIFYING finding the panel MUST surface as a show-stopper",
+      "description": "",
+      "sourceCite": "",
+      "disqualifiesBecause": "AMENDMENT 2 (required enum): bidder-structural | solicitation-defect"
+    }
+  ],
+  "cautionItems": [
+    { "_doc": "an item the panel SHOULD flag as caution (NOT disqualifying) — e.g. an unmet eligibility line with no known bidder attribute", "description": "", "sourceCite": "" }
+  ],
+  "decoys": [
+    {
+      "_doc": "AMENDMENT 3: split the absent case. kind=absent ⇒ NOT in source at all ⇒ mustNotRaiseAtAll:true (ANY raise = fabrication). kind=boilerplate ⇒ present but non-binding here ⇒ may be mentioned met=true, but must NOT be raised as disqualifying.",
+      "token": "<e.g. CMMC>",
+      "kind": "absent | boilerplate",
+      "mustNotRaiseAtAll": "true ONLY for kind=absent (any raise = fabrication)",
+      "mustNotRaiseAsDisqualifying": "true for both kinds"
+    }
+  ],
+  "scoring": {
+    "_doc": "how each section is checked (deterministic, no AI) — the scorer is encoded WHEN an amended key is committed + ruled, not before",
+    "partClassification": "AMENDMENT 4: SCORED pre-step (NOT reported-only) — classifyAcquisitionPart(clauses) MUST equal acquisitionPart (expected PART_15 for N4008526R0065); mismatch = FAIL",
+    "verdict": "panel verdict/eligible/showStoppers vs expectedVerdict (bidderProfile-aware: null profile ⇒ no INELIGIBLE on bidder-side gates)",
+    "namedGates": "panel RAISED each mustRaise gate with the expectedDisposition (bounded match, 2b)",
+    "showStoppers": "recall over showStoppers the panel surfaced; disqualifiesBecause checked",
+    "fabrication": "ANY raised clause absent from source = HARD fail (2c); a kind=absent decoy raised at all = fabrication",
+    "decoys": "ANY decoy raised as disqualifying = HARD fail",
+    "clauseRecall": "REPORTED only — NOT scored (retracted, tautological)"
+  }
+}
