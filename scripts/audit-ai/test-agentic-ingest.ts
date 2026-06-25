@@ -15,6 +15,7 @@ import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
 } from "../../src/lib/agentic-panel";
 import { GRADER_SCHEMA } from "./panel-grader";
+import { enforceVerifiedShowStoppers, type ChiefJudgeOutput } from "../../src/lib/agentic-panel-runner";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -350,6 +351,17 @@ for (const [name, schema] of [["PANELIST_SCHEMA", PANELIST_SCHEMA], ["VERIFIER_S
 // ── STAGE 6D: quality grader schema — free union pre-flight (catches the Anthropic 400 for $0)
 const graderUnions = countSchemaUnions(GRADER_SCHEMA);
 check(`grader: GRADER_SCHEMA union params (${graderUnions}) under Anthropic's 16 limit`, graderUnions <= 16);
+
+// ── STAGE 6 review fix: show_stopper enforcement (no fabricated verdict — now STRUCTURAL) ──
+const mkJudgment = (verdict: ChiefJudgeOutput["verdict"], refs: string[]): ChiefJudgeOutput => ({
+  verdict, fit_score: 40, rationale: "r", preserved_dissent: [], eligible: true,
+  show_stoppers: refs.map((r) => ({ finding: "x", source_lens: "ex_ko", claim_ref: r })),
+});
+const verifiedSet = new Set(["ex_ko:G1", "pricing_contracts_risk:R1"]);
+check("enforce: a show_stopper citing a NON-verified ref is dropped", enforceVerifiedShowStoppers(mkJudgment("BID", ["ex_ko:G1", "ex_ko:G9_fake"]), verifiedSet).show_stoppers.length === 1);
+check("enforce: NO_BID resting on ONLY an unverified ref → honest-fail NEEDS_HUMAN_REVIEW (no fabricated gate)", enforceVerifiedShowStoppers(mkJudgment("NO_BID", ["ex_ko:G9_fake"]), verifiedSet).verdict === "NEEDS_HUMAN_REVIEW");
+check("enforce: NO_BID with a real verified gate (+ a fake) → stays NO_BID, fake dropped", (() => { const j = enforceVerifiedShowStoppers(mkJudgment("NO_BID", ["ex_ko:G1", "ex_ko:G9_fake"]), verifiedSet); return j.verdict === "NO_BID" && j.show_stoppers.length === 1; })());
+check("enforce: all-verified show_stoppers pass through untouched", enforceVerifiedShowStoppers(mkJudgment("NO_BID", ["ex_ko:G1"]), verifiedSet).verdict === "NO_BID");
 
 console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
 process.exit(pass ? 0 : 1);

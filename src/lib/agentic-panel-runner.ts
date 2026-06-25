@@ -169,9 +169,19 @@ export async function runPanelJudge(params: {
   // ── Gatekeeper + synthesizer reads VERIFIED FINDINGS ONLY (never raw docs) ────
   // REFUTED claims are dropped; UNVERIFIABLE flagged for reduced weight; an untagged claim is
   // treated as UNVERIFIED (conservative). Each finding keeps its ref so show_stoppers cite it.
-  const stateByRef = new Map((verifier?.claims ?? []).map((c) => [c.ref, c] as const));
+  // Conservative dedup (review fix): if the verifier echoes a ref twice with conflicting
+  // states, keep the MOST conservative (REFUTED < UNVERIFIABLE < VERIFIED) so a refuted claim
+  // can never be silently upgraded to VERIFIED by a later duplicate.
+  const stateRank = { REFUTED: 0, UNVERIFIABLE: 1, VERIFIED: 2 } as const;
+  const stateByRef = new Map<string, { state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>();
+  for (const c of verifier?.claims ?? []) {
+    const prev = stateByRef.get(c.ref);
+    if (!prev || stateRank[c.state] < stateRank[prev.state]) stateByRef.set(c.ref, { state: c.state, evidence: c.evidence });
+  }
   const verifiedFindings = claims
-    .map((c) => { const t = stateByRef.get(c.ref); return { ...c, state: t?.state ?? "UNVERIFIED", evidence: t?.evidence ?? "" }; })
+    // an untagged claim defaults to UNVERIFIABLE (a state the gatekeeper prompt DEFINES —
+    // "UNVERIFIED" was out-of-vocabulary), i.e. reduced weight, never confirmed.
+    .map((c) => { const t = stateByRef.get(c.ref); return { ...c, state: t?.state ?? "UNVERIFIABLE", evidence: t?.evidence ?? "" }; })
     .filter((c) => c.state !== "REFUTED");
   const findingsBrief = verifiedFindings.length
     ? verifiedFindings.map((c) => `[${c.ref}] <${c.state}> (${c.lens}) ${cap(c.text, FIELD_CHARS)}${c.evidence ? ` — verifier: ${cap(c.evidence, 200)}` : ""}`).join("\n")
@@ -194,5 +204,23 @@ export async function runPanelJudge(params: {
     label: "panel:gatekeeper", signal: params.signal,
   }).catch((e) => { throw new Error(`gatekeeper+synthesizer failed: ${e instanceof Error ? e.message : e}`); });
 
-  return { fired: true, manifest, panelists, verifier, judgment };
+  const verifiedRefs = new Set(verifiedFindings.filter((c) => c.state === "VERIFIED").map((c) => c.ref));
+  return { fired: true, manifest, panelists, verifier, judgment: enforceVerifiedShowStoppers(judgment, verifiedRefs) };
+}
+
+/** ENFORCE "no independent interpretation" STRUCTURALLY (review fix — was prompt-only). Pure:
+ *  drop any show_stopper whose claim_ref is not a VERIFIED finding (the gatekeeper may not
+ *  invent a gate from its own reading). If a NO_BID/INELIGIBLE rests on ZERO surviving verified
+ *  show-stoppers, the verdict is built on a fabricated/unverified gate ⇒ honest-fail to
+ *  NEEDS_HUMAN_REVIEW (Score-AI-Driven law: NO-BID only on a NAMED, verified gate). Gate-testable. */
+export function enforceVerifiedShowStoppers(judgment: ChiefJudgeOutput, verifiedRefs: Set<string>): ChiefJudgeOutput {
+  const validStoppers = judgment.show_stoppers.filter((s) => verifiedRefs.has(s.claim_ref));
+  if (validStoppers.length === judgment.show_stoppers.length) return judgment;
+  const escalate = (judgment.verdict === "NO_BID" || judgment.verdict === "INELIGIBLE") && validStoppers.length === 0;
+  return {
+    ...judgment,
+    show_stoppers: validStoppers,
+    verdict: escalate ? "NEEDS_HUMAN_REVIEW" : judgment.verdict,
+    rationale: escalate ? `[honest-fail] gate verdict cited no VERIFIED finding (unverified show-stopper dropped). ${judgment.rationale}` : judgment.rationale,
+  };
 }
