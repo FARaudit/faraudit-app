@@ -3,11 +3,12 @@
 // supersedes ONLY on proven full-replacement, KEEPS all on incremental-patch text.
 import { buildCoverageLedger, resolveAmendments, classifyBindingContent, parseAmendmentNumber } from "../../src/lib/agentic-ingest";
 import { selectMapTargets, mergeExtracts, countSchemaUnions, DOC_EXTRACT_SCHEMA, type DocExtract } from "../../src/lib/agentic-map";
-import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings } from "../../src/lib/agentic-orchestrator";
+import { composeExtractedFacts, buildCoverageReport, partitionVacuousBindings, mapWithResilience } from "../../src/lib/agentic-orchestrator";
 import { decideCoverageChip } from "../../src/app/audit/[id]/_v2-render-surfaces";
 import { scoreGoldSet, parseGoldSet, type GoldSetPackage, type EngineExtraction } from "./gold-set-score";
 import { agenticToExtraction, legacyToExtraction, detectGates, clauseNumber, priceUsd } from "./ab-extract-adapter";
 import { scalarsFromSolicitation } from "../../src/lib/agentic-executor";
+import { LENS_SECTIONS, assembleLensSource, lensBundlesDroppedContent, buildSectionText, excerptInSource } from "../../src/lib/agentic-sections";
 import type { ExtractedFacts } from "../../src/lib/section-extractors";
 import type { AuditResult } from "../../src/lib/audit-engine";
 import {
@@ -15,7 +16,7 @@ import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
 } from "../../src/lib/agentic-panel";
 import { GRADER_SCHEMA } from "./panel-grader";
-import { enforceVerifiedShowStoppers, type ChiefJudgeOutput } from "../../src/lib/agentic-panel-runner";
+import { enforceVerifiedShowStoppers, enforceVerifiedFloor, type ChiefJudgeOutput } from "../../src/lib/agentic-panel-runner";
 import {
   buildCompactMatrix, selectBindingExcerpts,
   OVERVIEW_LENS_SCHEMA, COMPLIANCE_LENS_SCHEMA, RISKS_LENS_SCHEMA, CROSSDOC_LENS_SCHEMA,
@@ -337,8 +338,11 @@ check("panel: Capture Strategist has the NO-SPECULATION competitive ceiling (FPD
 check("panel: Eligibility Counsel owns ostensible-sub + teaming (Brain-expanded scope)", /ostensible/i.test(PANELISTS.find((p) => p.id === 6)!.system) && /teaming agreement/i.test(PANELISTS.find((p) => p.id === 6)!.system));
 check("panel: Ex-KO lens owns LPTA-vs-tradeoff + competitive-range", /LPTA/.test(PANELISTS.find((p) => p.id === 3)!.system) && /competitive[- ]range/i.test(PANELISTS.find((p) => p.id === 3)!.system));
 // Verifier 3-state tagging (Brain fix).
-check("panel: verifier schema enforces 3-state tagging VERIFIED/UNVERIFIABLE/REFUTED", JSON.stringify(VERIFIER_SCHEMA).includes("UNVERIFIABLE") && /default to UNVERIFIABLE/i.test(VERIFIER.system));
-check("panel: verifier schema carries a claim `ref` (structural claim↔tag join, no free-text match)", (VERIFIER_SCHEMA.properties.claims.items.required as readonly string[]).includes("ref") && /echo it|echo the/i.test(VERIFIER.system));
+check("panel: verifier schema enforces 3-state tagging VERIFIED/UNVERIFIABLE/REFUTED", ["VERIFIED", "UNVERIFIABLE", "REFUTED"].every((s) => JSON.stringify(VERIFIER_SCHEMA).includes(s)));
+check("panel: verifier schema carries a claim `ref` (structural claim↔tag join) + prompt echoes it", (VERIFIER_SCHEMA.properties.claims.items.required as readonly string[]).includes("ref") && /echo/i.test(VERIFIER.system));
+// Step 3: verifier reshaped to a LOGIC checker over claim+excerpt (no matrix); doctrine VERIFIABLE
+check("step3: verifier is a LOGIC checker (no 'default to UNVERIFIABLE' — the circular-failure behavior is gone)", /logic|follow from|reasoning|conclusion/i.test(VERIFIER.system) && !/default to unverifiable/i.test(VERIFIER.system));
+check("step3: verifier prompt lets a doctrine claim be VERIFIED on reasoning (kills the force-UNVERIFIABLE 6E bug)", /doctrine claim can/i.test(VERIFIER.system));
 // Chief judge: dissent-preserving + honest-fail + Score-AI-Driven law.
 check("panel: gatekeeper schema makes show_stoppers cite a verified finding (source_lens + claim_ref) structurally", JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("show_stoppers") && JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("claim_ref") && JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("source_lens"));
 check("panel: gatekeeper enforces the 3 rules — verified hard gate→NO_BID · conflict→NEEDS_HUMAN_REVIEW · no independent doc interpretation", CHIEF_JUDGE.system.includes("NEEDS_HUMAN_REVIEW") && /VERIFIED.*hard gate|hard gate.*NO_BID/i.test(CHIEF_JUDGE.system) && /no independent document interpretation|never the raw documents|only the VERIFIED/i.test(CHIEF_JUDGE.system) && /preserved_dissent/.test(JSON.stringify(CHIEF_JUDGE_SCHEMA)));
@@ -363,5 +367,65 @@ check("enforce: NO_BID resting on ONLY an unverified ref → honest-fail NEEDS_H
 check("enforce: NO_BID with a real verified gate (+ a fake) → stays NO_BID, fake dropped", (() => { const j = enforceVerifiedShowStoppers(mkJudgment("NO_BID", ["ex_ko:G1", "ex_ko:G9_fake"]), verifiedSet); return j.verdict === "NO_BID" && j.show_stoppers.length === 1; })());
 check("enforce: all-verified show_stoppers pass through untouched", enforceVerifiedShowStoppers(mkJudgment("NO_BID", ["ex_ko:G1"]), verifiedSet).verdict === "NO_BID");
 
-console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
-process.exit(pass ? 0 : 1);
+// ── 6E structural-floor fix: a verdict with NO adversarial verification is NEVER trustworthy ──
+check("floor: verifier FAILED → eligible BID forced to NEEDS_HUMAN_REVIEW + not-eligible + fit 0", (() => {
+  const j = enforceVerifiedFloor(mkJudgment("BID", []), 3, true); // 3 verified but verifier flagged failed
+  return j.verdict === "NEEDS_HUMAN_REVIEW" && j.eligible === false && j.fit_score === 0;
+})());
+check("floor: ZERO verified findings → eligible BID forced to NEEDS_HUMAN_REVIEW (the 6E false-positive)", (() => {
+  const j = enforceVerifiedFloor(mkJudgment("BID_WITH_CAUTION", []), 0, false);
+  return j.verdict === "NEEDS_HUMAN_REVIEW" && j.eligible === false && j.fit_score === 0;
+})());
+check("floor: verifier OK + ≥1 verified finding → judgment passes through untouched", (() => {
+  const j = enforceVerifiedFloor(mkJudgment("BID", ["ex_ko:G1"]), 2, false);
+  return j.verdict === "BID" && j.eligible === true && j.fit_score === 40;
+})());
+// the VERIFIER_SCHEMA no longer forces a `claim` echo (truncation root cause) — prove it's gone
+check("verifier: schema no longer requires the claim-text echo (6E truncation fix)", !((VERIFIER_SCHEMA.properties.claims.items.required as readonly string[]).includes("claim")));
+
+// ── STEP 2: per-section fan-out substrate (Brain ruling) — deterministic assignment + honest budget ──
+const SECTXT = { A: "cover", B: "CLIN 0001 ...", C: "PWS work ...", H: "special reqs ...", I: "52.219-14 ...", L: "submit by ...", M: "eval factors ..." };
+const capBundle = assembleLensSource("capture_strategist", SECTXT);
+check("step2: lens→section map is the Brain assignment (capture = B,C,L,M)", JSON.stringify(LENS_SECTIONS.capture_strategist) === JSON.stringify(["B", "C", "L", "M"]));
+check("step2: assembleLensSource includes all assigned sections when present", capBundle.includedSections.join(",") === "B,C,L,M" && capBundle.missingSections.length === 0);
+check("step2: a MISSING assigned section is reported, not silently skipped", (() => { const b = assembleLensSource("pricing_contracts_risk", { B: "x", H: "y" }); return b.missingSections.includes("J") && b.includedSections.join(",") === "B,H"; })());
+check("step2: over-budget section is DROPPED (honest), never silently truncated", (() => { const b = assembleLensSource("source_selection_evaluator", { L: "L".repeat(50), M: "M".repeat(50) }, { perLensBudgetChars: 70 }); return b.includedSections.length === 1 && b.droppedForBudget.length === 1; })());
+check("step2: dropped-for-budget content surfaces a coverage-INCOMPLETE trigger", (() => { const b = assembleLensSource("source_selection_evaluator", { L: "L".repeat(50), M: "M".repeat(50) }, { perLensBudgetChars: 70 }); return lensBundlesDroppedContent([b]).length === 1; })());
+check("step2: included section text is headed by its UCF key (lens can cite the section)", capBundle.text.includes("## SECTION C"));
+// buildSectionText attachment routing (detector-independent: empty primary → only attachment-derived)
+const stPws = buildSectionText("", { attachments: [{ name: "Attachment 1 PWS.pdf", text: "perform custodial services daily" }] });
+check("step2: a PWS/SOW attachment is folded into §C", (stPws.C ?? "").includes("custodial services") && stPws.C.includes("[attachment:"));
+const stWd = buildSectionText("", { attachments: [{ name: "Wage Determination 2015-4281.pdf", text: "janitor $18.50/hr" }] });
+check("step2: a wage-determination attachment is folded into §B (pricing floor)", (stWd.B ?? "").includes("18.50"));
+check("step2: empty primary + no attachments → empty section map (no fabrication)", Object.keys(buildSectionText("", {})).length === 0);
+// PANELIST_SCHEMA now REQUIRES a verbatim excerpt on every gate + risk (the non-circular-verifier fix)
+check("step2: PANELIST_SCHEMA requires a verbatim `excerpt` on gates", (PANELIST_SCHEMA.properties.named_hard_gates.items.required as readonly string[]).includes("excerpt"));
+check("step2: PANELIST_SCHEMA requires a verbatim `excerpt` on risks", (PANELIST_SCHEMA.properties.risks.items.required as readonly string[]).includes("excerpt"));
+// #4a — excerptInSource: the guard that makes the verbatim-excerpt discipline real (anti-fabrication)
+check("step2/#4a: a verbatim excerpt present in source is GROUNDED (whitespace-normalized)", excerptInSource("the contractor SHALL submit proposals by 2 PM", "...text... The   contractor shall submit proposals by 2 pm EST ...more...") === true);
+check("step2/#4a: a fabricated/paraphrased excerpt NOT in source is flagged ungrounded", excerptInSource("the contractor must post a five million dollar bond", "the contractor shall submit proposals by 2pm") === false);
+check("step2/#4a: an empty excerpt is NOT grounded (no free pass)", excerptInSource("", "any source text") === false);
+// #2 — a too-short generic snippet cannot count as grounding (it would substring-match anything)
+check("step3/#2: a 2-word generic snippet is NOT grounded even if present (min-word floor)", excerptInSource("the Government", "the Government shall evaluate all proposals fairly") === false);
+// #3 — OCR/curly-quote/dash drift on a LEGITIMATE excerpt must not false-REFUTE it
+check("step3/#3: curly-quote + dash drift on a real excerpt still grounds (punctuation-normalized)", excerptInSource("offeror's price—including all option years", "The offeror’s price—including all option years—shall be evaluated") === true);
+// #2b — an unrouted attachment fires the onUnrouted callback (never silently dropped)
+check("step2/#2b: an attachment matching NO routing rule is reported via onUnrouted", (() => { const u: string[] = []; buildSectionText("", { attachments: [{ name: "Attachment 3.pdf", text: "binding terms here" }], onUnrouted: (n) => u.push(...n) }); return u.includes("Attachment 3.pdf"); })());
+
+// ── MAP RESILIENCE (2026-06-25): a transient burst failure is recovered on serial retry, NOT
+// dropped to "could not be read". DETERMINISTIC proof (injected mapOne) — the $0 replacement for a
+// non-deterministic live MAP run (a live run might not even re-trigger the transient, so it can't
+// prove the retry LOGIC). This is the executable evidence for the N4008526R0065 CIRS false-PARTIAL fix.
+(async () => {
+  const mkE = (n: string): DocExtract => ({ docName: n, clauses: [], clins: [], delivery: [], submissionRequirements: [], evaluationFactors: [], performanceRequirements: [], amendmentChanges: [], workStatementText: null, warnings: [], truncated: false });
+  let c1 = 0;
+  const r1 = await mapWithResilience([{ name: "a.pdf" }], async () => { c1++; if (c1 === 1) throw new Error("transient overload (burst)"); return mkE("a.pdf"); });
+  check("resilience: a transient first-pass MAP failure is RECOVERED on the serial retry (not a read-failure)", r1.failures.length === 0 && r1.extracts.length === 1);
+  const r2 = await mapWithResilience([{ name: "b.pdf" }], async () => { throw new Error("persistent failure"); });
+  check("resilience: a doc that fails EVEN on the retry is an honest read-failure (no false-success)", r2.failures.includes("b.pdf") && r2.extracts.length === 0);
+  const r3 = await mapWithResilience([{ name: "c.pdf" }, { name: "d.pdf" }], async (d) => mkE(d.name), { aborted: () => true });
+  check("resilience: an aborted budget marks remaining docs as failures, never a silent drop", r3.failures.length === 2 && r3.extracts.length === 0);
+
+  console.log(pass ? "\nALL PASS ✅" : "\nSOME FAILED ❌");
+  process.exit(pass ? 0 : 1);
+})();

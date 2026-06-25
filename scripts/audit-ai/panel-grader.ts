@@ -35,7 +35,7 @@ export const GRADER_SCHEMA = {
   required: ["dimension", "score", "pass", "auto_failed", "evidence"],
   properties: {
     dimension: { type: "string" },
-    score: { type: "integer", minimum: 0, maximum: 5, description: "1–5 for gate/quality dims; 0 for the eligibility dim (use `pass`)" },
+    score: { type: "integer", description: "1–5 for gate/quality dims; 0 for the eligibility dim (use `pass`). Range enforced post-parse — the structured-outputs API rejects integer minimum/maximum." },
     pass: { type: "boolean", description: "the eligibility dim only — did the panel correctly clear/flag the hard gate vs ground truth" },
     auto_failed: { type: "boolean", description: "true if this dimension's auto-fail trigger fired (hard-floors the dim to 1)" },
     evidence: { type: "string", description: "the cited reason for the score — a span from the panel output or matrix" },
@@ -84,6 +84,18 @@ export async function gradePanelQuality(params: {
   signal?: AbortSignal;
 }): Promise<QualityGrade> {
   const { panel, matrix, apiKey } = params;
+  // 6E fix (#7): a panel that did not fire, has no judgment, or already STRUCTURALLY honest-failed
+  // (NEEDS_HUMAN_REVIEW — verifier failed / zero verified findings) is NOT a quality question.
+  // Grading it with 10 paid judges only mislabels a pipeline failure as INELIGIBLE (the confusing
+  // 6E result). Short-circuit to HONEST_FAILURE deterministically — mirrors the manifest gate.
+  if (!panel.fired || !panel.judgment || panel.judgment.verdict === "NEEDS_HUMAN_REVIEW") {
+    const reason = !panel.fired
+      ? `Manifest incomplete — panel did not fire: ${panel.manifest.missing.join(", ")}.`
+      : panel.verifierError
+        ? `Panel honest-failed before a quality verdict (verifier error: ${panel.verifierError}).`
+        : "Panel honest-failed (NEEDS_HUMAN_REVIEW) — no trustworthy verdict to grade.";
+    return { grade: { ships: false, eligible: false, failedGates: [], qualityAverage: 0, verdict: "HONEST_FAILURE", reason }, dims: [] };
+  }
   // Default multi-family rotation: alternate Sonnet / Opus across dimensions (Haiku for the
   // cheapest deterministic checks). Override for a stricter or cheaper panel.
   const rotation = ["claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"];
@@ -113,7 +125,10 @@ export async function gradePanelQuality(params: {
           signal: params.signal,
         });
         const v = JSON.parse(res.text) as GraderDimVerdict;
-        return { ...v, dimension: d.key };
+        // Range now enforced post-parse (the structured-outputs API rejects integer
+        // minimum/maximum, so the schema can't bound it). Clamp 0–5 defensively.
+        const score = Math.max(0, Math.min(5, Math.round(Number(v.score) || 0)));
+        return { ...v, score, dimension: d.key };
       } catch (e) {
         // One dim judge failing must NOT discard the other 9 already-paid grades (review fix).
         // Sentinel = worst-case → floors the dim → honest-fail (the SAFE direction for a dim we

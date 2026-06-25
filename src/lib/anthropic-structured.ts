@@ -137,7 +137,18 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
       if (!textBlock?.text) throw new Error(`${label}: structured output returned no text block`);
       return { text: textBlock.text, stopReason: (data?.stop_reason as string | null) ?? null };
     }
-    lastErr = `${label} ${res.status}: ${(await res.text()).slice(0, 400)}`;
+    const errBody = await res.text();
+    lastErr = `${label} ${res.status}: ${errBody.slice(0, 400)}`;
+    // Cost honesty (6E review): a non-2xx can still bill tokens already generated. Capture usage
+    // from the error body when present so the sink isn't a silent undercount on failure paths.
+    // (Aborts/timeouts return NO body → unknowable client-side; the Anthropic Console CSV remains
+    // the authoritative actualization — the sink is a lower-bound estimate.)
+    if (_usageSink) {
+      try {
+        const eu = (JSON.parse(errBody) as { usage?: Record<string, number | undefined> }).usage;
+        if (eu) _usageSink({ label, model, input_tokens: eu.input_tokens ?? 0, output_tokens: eu.output_tokens ?? 0, cache_write: eu.cache_creation_input_tokens ?? 0, cache_read: eu.cache_read_input_tokens ?? 0, ms: Date.now() - t0 });
+      } catch { /* error body not JSON / carries no usage — nothing to capture */ }
+    }
     if (RETRYABLE.has(res.status) && attempt < MAX_RETRIES && !opts.signal?.aborted) {
       const backoffMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
       console.warn(`[anthropic-structured] ${label} ${res.status} transient — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);

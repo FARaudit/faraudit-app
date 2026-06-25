@@ -172,20 +172,23 @@ export const PANELIST_SCHEMA = {
   properties: {
     lens: { type: "string" },
     verdict: { type: "string", enum: ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE", "INSUFFICIENT_INFO"] },
-    fit_score: { type: "integer", minimum: 0, maximum: 100, description: "0 when INSUFFICIENT_INFO — the verdict carries the meaning" },
+    fit_score: { type: "integer", description: "0–100 (clamped in code). 0 when INSUFFICIENT_INFO — the verdict carries the meaning. NOTE: the structured-outputs API rejects integer minimum/maximum, so the range lives here + is enforced post-parse." },
     confidence: { type: "string", enum: ["high", "medium", "low"] },
     named_hard_gates: {
       type: "array",
       items: {
-        type: "object", additionalProperties: false, required: ["gate", "met", "citation"],
-        properties: { gate: { type: "string" }, met: { type: "boolean" }, citation: { type: "string" } },
+        type: "object", additionalProperties: false, required: ["gate", "met", "citation", "excerpt"],
+        // excerpt = VERBATIM source sentence(s) from the assigned section, copied not paraphrased.
+        // This is what makes the verifier non-circular (Step 2): it checks the claim against the
+        // lens's OWN cited source span, so a doctrine claim can be VERIFIED/REFUTED, not forced UNVERIFIABLE.
+        properties: { gate: { type: "string" }, met: { type: "boolean" }, citation: { type: "string" }, excerpt: { type: "string", description: "VERBATIM source text supporting this gate — copy the exact sentence(s) from the assigned section; \"\" only if genuinely absent" } },
       },
     },
     risks: {
       type: "array",
       items: {
-        type: "object", additionalProperties: false, required: ["risk", "severity", "citation"],
-        properties: { risk: { type: "string" }, severity: { type: "string", enum: ["P0", "P1", "P2"] }, citation: { type: "string" } },
+        type: "object", additionalProperties: false, required: ["risk", "severity", "citation", "excerpt"],
+        properties: { risk: { type: "string" }, severity: { type: "string", enum: ["P0", "P1", "P2"] }, citation: { type: "string" }, excerpt: { type: "string", description: "VERBATIM source text supporting this risk — copy the exact sentence(s) from the assigned section; \"\" only if genuinely absent" } },
       },
     },
     contrarian_finding: { type: "string" },
@@ -202,14 +205,16 @@ export const VERIFIER_SCHEMA = {
     claims: {
       type: "array",
       items: {
-        type: "object", additionalProperties: false, required: ["ref", "claim", "state", "evidence"],
+        type: "object", additionalProperties: false, required: ["ref", "state", "evidence"],
         properties: {
           // ref = the STABLE claim id the runner assigned (e.g. "ex_ko:G1"). The verifier
           // MUST echo it so the gatekeeper can cite a verified finding by id (no free-text join).
+          // NOTE (6E fix): the verifier does NOT re-echo the claim text — the runner already holds
+          // it keyed by ref and re-joins on ref (stateByRef). Echoing full claim text forced the
+          // output past the 8000-token ceiling on big packages → truncation → verifier nulled.
           ref: { type: "string" },
-          claim: { type: "string" },
           state: { type: "string", enum: ["VERIFIED", "UNVERIFIABLE", "REFUTED"] },
-          evidence: { type: "string" },
+          evidence: { type: "string", description: "ONE short sentence (≤200 chars) — why the conclusion does/doesn't follow from the cited excerpt, or why unverifiable. Do NOT restate the claim." },
         },
       },
     },
@@ -225,7 +230,7 @@ export const CHIEF_JUDGE_SCHEMA = {
   required: ["verdict", "fit_score", "rationale", "show_stoppers", "preserved_dissent", "eligible"],
   properties: {
     verdict: { type: "string", enum: ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE", "NEEDS_HUMAN_REVIEW"] },
-    fit_score: { type: "integer", minimum: 0, maximum: 100 },
+    fit_score: { type: "integer", description: "0–100 (clamped in code; structured-outputs API rejects integer minimum/maximum)" },
     rationale: { type: "string" },
     // Every show-stopper MUST trace to a verified lens finding (source_lens + claim_ref) —
     // the gatekeeper may not introduce a finding from its own reading of the documents.
@@ -287,7 +292,13 @@ export const PANELISTS: ReadonlyArray<PanelPersona> = [
  *  pass over all 5 lenses, one Opus call, defends the whole panel at one choke point. */
 export const VERIFIER: { name: string; tier: PanelTier; system: string } = {
   name: "Adversarial Verifier", tier: "opus",
-  system: `ROLE: You are a skeptic. For EACH claim the panel raised (each carries a [ref] id — ECHO it in your \`ref\` field), try to REFUTE it claim-by-claim against the cited source. Your HARDEST job is not citation-checking — it is catching the claim that sounds right, cites a real document, but MISREADS what the clause actually requires. Tag every claim EXACTLY one of: VERIFIED (grounded in the source + you can cite where AND it reads the clause correctly), UNVERIFIABLE (a claim about external regulatory interpretation / industry practice / precedent NOT in the provided documents — no ground truth, so NOT verified), or REFUTED (the source contradicts it OR the claim misreads the cited clause). Default to UNVERIFIABLE when uncertain. ${SECURITY}`,
+  // Step 3 (Brain ruling): the verifier is a LOGIC checker, NOT a document re-reader. Each claim
+  // arrives WITH the lens's own verbatim excerpt; the verifier judges whether the conclusion FOLLOWS
+  // from that excerpt. This makes doctrine (FAR/DFARS/CFR) claims VERIFIABLE on reasoning soundness —
+  // they are no longer force-marked UNVERIFIABLE just because the regulation text isn't in the package
+  // (the circular-matrix failure that tanked 6E). (Excerpts the engine already proved are NOT in source
+  // were structurally REFUTED before reaching you — so anything you see has a real cited span.)
+  system: `ROLE: You are an adversarial LOGIC checker — NOT a document reader. For EACH claim you receive the claim AND the lens's VERBATIM EXCERPT (the exact source sentence it cited). Your job: does the claim's CONCLUSION actually FOLLOW from that excerpt — is the clause read correctly and any regulatory inference (FAR/DFARS/CFR/CMMC/size-standard) applied SOUNDLY? You do NOT need the full regulation text — judge the REASONING, not document presence. ECHO each [ref] in your \`ref\` field; give ONE short evidence sentence. Tag EXACTLY one: VERIFIED (the excerpt genuinely supports the claim AND the reading + any rule-application is correct — a doctrine claim CAN and SHOULD be VERIFIED when the cited clause is read right and the rule applied right), REFUTED (the excerpt contradicts the claim, does NOT actually support it, or the inference overreaches / misreads the clause), or UNVERIFIABLE (ONLY when the claim rests on a fact with no usable excerpt — you have nothing to check). Be strict: a fluent claim resting on a thin or off-point excerpt is REFUTED, not VERIFIED. ${SECURITY}`,
 };
 
 /** The folded GATEKEEPER + SYNTHESIZER (Brain cost-aware final ruling): the thin synthesizer

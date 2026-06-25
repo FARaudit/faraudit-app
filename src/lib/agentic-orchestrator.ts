@@ -214,6 +214,36 @@ export interface AgenticMapResult {
   provenance: Record<string, string>;
 }
 
+/** Run `mapOne` over every item with a CONCURRENT burst, then a SERIAL retry of any first-pass
+ *  failures, and only THEN record a failure. A doc whose analysis call errors during the burst
+ *  (Haiku 429/overload/abort under load) is NOT unreadable — it maps fine on a calm serial retry
+ *  (proven 2026-06-25: N4008526R0065's CIRS form, 15,966 chars, dropped to "could not be read" in the
+ *  6E burst, maps in 10.7s → 5 reqs + 8 perfReqs in isolation). Dropping it on the first blip is a
+ *  FALSE PARTIAL on a good package. `mapOne` is INJECTED so this is deterministically gate-testable
+ *  (a stub that throws once-then-succeeds proves recovery) with ZERO live spend. Returns the
+ *  extracts + the names of docs that failed EVEN the retry (genuine analysis-failures). */
+export async function mapWithResilience<T extends { name: string }>(
+  items: T[],
+  mapOne: (item: T) => Promise<DocExtract>,
+  opts: { concurrency?: number; aborted?: () => boolean } = {},
+): Promise<{ extracts: DocExtract[]; failures: string[] }> {
+  const concurrency = opts.concurrency ?? 4;
+  const extracts: DocExtract[] = [];
+  const failures: string[] = [];
+  const firstPassFailures: T[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    if (opts.aborted?.()) { for (const d of items.slice(i)) failures.push(d.name); return { extracts, failures }; }
+    const batch = items.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(batch.map(mapOne));
+    settled.forEach((r, j) => { if (r.status === "fulfilled") extracts.push(r.value); else firstPassFailures.push(batch[j]); });
+  }
+  for (const d of firstPassFailures) {
+    if (opts.aborted?.()) { failures.push(d.name); continue; }
+    try { extracts.push(await mapOne(d)); } catch { failures.push(d.name); }
+  }
+  return { extracts, failures };
+}
+
 export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMapResult> {
   // 1) manifest + coverage ledger (deterministic)
   const files: PackageFileInput[] = input.docs.map((d) => ({ name: d.name, bytes: d.bytes }));
@@ -239,23 +269,15 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
     if (!ok) readFailures.push(d.name);
     return ok;
   });
-  const concurrency = 4;
-  for (let i = 0; i < mappable.length; i += concurrency) {
-    const batch = mappable.slice(i, i + concurrency);
-    if (input.signal?.aborted) {
-      // Budget fired — every not-yet-attempted doc is an HONEST read-failure, not a
-      // silent drop. Without this they'd vanish from the denominator (total = read +
-      // readFailures) and coverage could report "Audited 8 of 8 · complete" after a
-      // mid-run abort. Push the whole remaining tail before breaking.
-      for (const d of mappable.slice(i)) readFailures.push(d.name);
-      break;
-    }
-    const settled = await Promise.allSettled(batch.map((d) => mapDocument(d.name, d.text, input.mapModel, input.signal)));
-    settled.forEach((r, j) => {
-      if (r.status === "fulfilled") extracts.push(r.value);
-      else readFailures.push(batch[j].name);
-    });
-  }
+  // Resilient MAP: concurrent burst → SERIAL retry of first-pass failures → only then a read-failure.
+  // See mapWithResilience. (Injectable + deterministically gate-tested — no live spend to prove it.)
+  const { extracts: mapExtracts, failures: mapFailures } = await mapWithResilience(
+    mappable,
+    (d) => mapDocument(d.name, d.text, input.mapModel, input.signal),
+    { concurrency: 4, aborted: () => !!input.signal?.aborted },
+  );
+  extracts.push(...mapExtracts);
+  readFailures.push(...mapFailures);
   // VACUOUS-BINDING GUARD (Stage 3 honest-fail) — see partitionVacuousBindings. A binding
   // doc that returned a zero-content extract is an extraction failure, not a "read in full";
   // demote it to a read-failure so coverage reports PARTIAL / no-charge.

@@ -12,6 +12,7 @@ import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
   checkManifest, type ManifestResult, type PanelTier,
 } from "./agentic-panel";
+import { assembleLensSource, excerptInSource, LENS_SECTIONS, type PanelLensKey } from "./agentic-sections";
 
 export const AGENTIC_PANEL_ENABLED = process.env.AUDIT_PANEL_JUDGE === "true"; // OFF until Stage 6E proves it
 
@@ -35,17 +36,11 @@ const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 360_000;
 const CONTRARIAN_CHARS = 500;
 const FIELD_CHARS = 650;
 
-/** Build the cached system prefix ONCE (sanitize + security sandwich), byte-identical
- *  across panelists so it's the prompt-cache key — same invariant as runLenses. */
-function buildPanelPrefix(matrix: string): string {
-  const { sanitized } = sanitizePdfText(matrix);
-  return `${PANEL_SECURITY}\n\n<compliance-matrix>\n${sanitized}\n</compliance-matrix>\n\n${PANEL_SECURITY}`;
-}
 
 /** One structured call with the MAP/lens retry ladder (a truncated JSON escalates the cap
  *  before failing loud — never an opaque SyntaxError). */
 async function panelCall<T>(p: {
-  model: string; system: string; cachedSystemPrefix: string; userPrompt: string;
+  model: string; system: string; cachedSystemPrefix?: string; userPrompt: string;
   schema: object; maxTokens: number; ceiling: number; timeoutMs: number; label: string; signal?: AbortSignal;
 }): Promise<T> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -72,11 +67,11 @@ export interface PanelistOutput {
   verdict: "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "INSUFFICIENT_INFO";
   fit_score: number;
   confidence: "high" | "medium" | "low";
-  named_hard_gates: Array<{ gate: string; met: boolean; citation: string }>;
-  risks: Array<{ risk: string; severity: "P0" | "P1" | "P2"; citation: string }>;
+  named_hard_gates: Array<{ gate: string; met: boolean; citation: string; excerpt: string }>;
+  risks: Array<{ risk: string; severity: "P0" | "P1" | "P2"; citation: string; excerpt: string }>;
   contrarian_finding: string;
 }
-export interface VerifierOutput { claims: Array<{ ref: string; claim: string; state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>; }
+export interface VerifierOutput { claims: Array<{ ref: string; state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>; }
 export interface ChiefJudgeOutput {
   verdict: "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW";
   fit_score: number; rationale: string;
@@ -88,14 +83,20 @@ export interface PanelResult {
   manifest: ManifestResult;
   panelists: Array<{ key: string; name: string; output: PanelistOutput | null; error?: string }>;
   verifier: VerifierOutput | null;
+  verifierError?: string;    // 6E fix: the captured reason the verifier nulled (was swallowed) — diagnosable post-run
+  /** Step 2: assigned sections a lens could NOT see because they exceeded its budget. NON-EMPTY ⇒
+   *  the panel did not see binding content ⇒ coverage MUST be INCOMPLETE upstream (honesty rule). */
+  droppedSectionsForBudget?: string[];
   judgment: ChiefJudgeOutput | null;
 }
 
 /** Run the live panel. Manifest-gated: on an incomplete doc set the panel does NOT fire
  *  (Brain's #1 risk — a verdict over an empty section is worse than no verdict). */
 export async function runPanelJudge(params: {
-  matrix: string;
-  bindingExcerpts?: string;
+  // STEP 2/3 — the panel is now FULLY source-grounded: lenses read assigned source sections and
+  // cite verbatim excerpts; the verifier logic-checks claim+excerpt pairs; the judge reads verified
+  // findings. The matrix is no longer part of the panel (it remains a Stage-1/2 observability artifact).
+  sectionText: Record<string, string>;
   detectedSections: Set<string>;
   models?: Partial<Record<PanelTier, string>>;
   signal?: AbortSignal;
@@ -105,21 +106,33 @@ export async function runPanelJudge(params: {
     return { fired: false, manifest, panelists: [], verifier: null, judgment: null };
   }
 
-  const prefix = buildPanelPrefix(params.matrix);
-  const task = "Apply YOUR lens to the compliance matrix above. Return ONLY the structured JSON. Populate every required field; cite every gate and risk.";
-
-  // 5 lenses, prime-then-parallel: the first Sonnet lens writes the cache, the rest read it
-  // warm (cache is keyed on model+prefix, so the Haiku lens writes its own — accepted).
-  const runOne = (p: typeof PANELISTS[number]) =>
-    panelCall<PanelistOutput>({
-      model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: prefix,
+  // ── 5 lenses, each reading its ASSIGNED SOURCE sections (Step 2 per-section fan-out) ──
+  // Each lens gets a DIFFERENT source bundle (its LENS_SECTIONS), so there is no shared cached
+  // prefix — the matrix's shared-prefix cache is intentionally gone. Source-grounding is the point:
+  // a lens cites a verbatim excerpt the verifier can check, instead of reasoning over a lossy
+  // summary. Net cost (smaller per-lens context vs. lost cache sharing) is measured on the gold set.
+  const droppedForBudget: string[] = [];
+  const bundleByLens = new Map<string, string>(); // p.key → its assigned source (for #4a excerpt grounding)
+  const runOne = (p: typeof PANELISTS[number]) => {
+    const bundle = assembleLensSource(p.key as PanelLensKey, params.sectionText);
+    bundleByLens.set(p.key, bundle.text);
+    droppedForBudget.push(...bundle.droppedForBudget.map((s) => `${p.key}:§${s}`));
+    const { sanitized } = sanitizePdfText(bundle.text || "(none of this lens's assigned sections were found in the package)");
+    const lensPrefix = `${PANEL_SECURITY}\n\n<assigned-source lens="${p.key}" sections="${bundle.includedSections.join(",") || "none"}">\n${sanitized}\n</assigned-source>\n\n${PANEL_SECURITY}`;
+    const missingNote = bundle.missingSections.length
+      ? ` ASSIGNED SECTIONS NOT FOUND IN PACKAGE: ${bundle.missingSections.join(", ")} — do not assume their content; if your judgment needs them, say so and lower confidence.`
+      : "";
+    const task =
+      `Read your ASSIGNED SOURCE above (UCF §${LENS_SECTIONS[p.key as PanelLensKey].join(", §")}) and apply YOUR lens. ` +
+      `For EVERY named_hard_gate and risk, copy the VERBATIM source sentence(s) into its \`excerpt\` field (exact text, not a paraphrase) so it can be independently verified — use "" only if the claim genuinely has no supporting source text. ` +
+      `Return ONLY the structured JSON; populate every required field.${missingNote}`;
+    return panelCall<PanelistOutput>({
+      model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: lensPrefix,
       userPrompt: task, schema: PANELIST_SCHEMA, maxTokens: 4_000, ceiling: 8_000,
       timeoutMs: PANELIST_TIMEOUT_MS, label: `panel:${p.key}`, signal: params.signal,
     });
-  const [first, ...rest] = PANELISTS;
-  const firstSettled = await Promise.allSettled([runOne(first)]); // prime the Sonnet cache
-  const restSettled = await Promise.allSettled(rest.map(runOne));
-  const settled = [...firstSettled, ...restSettled];
+  };
+  const settled = await Promise.allSettled(PANELISTS.map(runOne));
   const panelists = PANELISTS.map((p, i) => {
     const r = settled[i];
     return r.status === "fulfilled"
@@ -133,6 +146,7 @@ export async function runPanelJudge(params: {
   if (panelists.every((p) => p.output === null)) {
     return {
       fired: true, manifest, panelists, verifier: null,
+      droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
       judgment: {
         verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [], show_stoppers: [],
         rationale: "All panel lenses failed — no analysis was produced. Honest failure (no charge); a verdict cannot be rendered.",
@@ -145,35 +159,49 @@ export async function runPanelJudge(params: {
   // ── Adversarial verifier (ONE Opus pass over all 5 lenses) ───────────────────
   // Each claim gets a STABLE ref ("<lensKey>:G<n>" / ":R<n>") so the gatekeeper can cite a
   // VERIFIED finding by id — the structural claim↔tag join (no fragile free-text match).
-  interface Claim { ref: string; lens: string; text: string }
+  // Each claim carries the lens's VERBATIM excerpt + a `grounded` flag (#4a: is the excerpt actually
+  // in the lens's assigned source?). Grounding is structural, not the verifier's job.
+  interface Claim { ref: string; lens: string; text: string; grounded: boolean }
   const claims: Claim[] = panelists.flatMap((p) => {
     if (!p.output) return [];
-    const gates = p.output.named_hard_gates.map((g, i): Claim => ({ ref: `${p.key}:G${i + 1}`, lens: p.name, text: `GATE: ${g.gate} (met=${g.met}) — cite: ${g.citation}` }));
-    const risks = p.output.risks.map((r, i): Claim => ({ ref: `${p.key}:R${i + 1}`, lens: p.name, text: `RISK(${r.severity}): ${r.risk} — cite: ${r.citation}` }));
+    const src = bundleByLens.get(p.key) ?? "";
+    const mk = (ref: string, body: string, excerpt: string): Claim => {
+      const grounded = excerptInSource(excerpt ?? "", src);
+      return { ref, lens: p.name, grounded, text: `${body} [${grounded ? "EXCERPT✓" : "EXCERPT-UNGROUNDED"}] — excerpt: "${cap(excerpt ?? "", 300)}"` };
+    };
+    const gates = p.output.named_hard_gates.map((g, i) => mk(`${p.key}:G${i + 1}`, `GATE: ${g.gate} (met=${g.met}) — cite: ${g.citation}`, g.excerpt));
+    const risks = p.output.risks.map((r, i) => mk(`${p.key}:R${i + 1}`, `RISK(${r.severity}): ${r.risk} — cite: ${r.citation}`, r.excerpt));
     return [...gates, ...risks];
   });
 
-  let verifier: VerifierOutput | null = null;
-  let verifierFailed = false;
-  if (claims.length) {
-    verifier = await panelCall<VerifierOutput>({
-      model: modelFor(VERIFIER.tier, params.models), system: VERIFIER.system, cachedSystemPrefix: prefix,
-      userPrompt: `Tag EACH claim VERIFIED / UNVERIFIABLE / REFUTED against the matrix. ECHO the [ref] in your \`ref\` field:\n\n${claims.map((c) => `[${c.ref}] (${c.lens}) ${c.text}`).join("\n")}`,
-      schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: 8_000, timeoutMs: PANELIST_TIMEOUT_MS,
-      label: "panel:verifier", signal: params.signal,
-      // Verifier FAILURE must be visible (review fix): a thrown verifier is NOT "nothing to
-      // verify" — the gatekeeper is told to treat everything UNVERIFIED + escalate.
-    }).catch(() => { verifierFailed = true; return null; });
-  }
-
-  // ── Gatekeeper + synthesizer reads VERIFIED FINDINGS ONLY (never raw docs) ────
-  // REFUTED claims are dropped; UNVERIFIABLE flagged for reduced weight; an untagged claim is
-  // treated as UNVERIFIED (conservative). Each finding keeps its ref so show_stoppers cite it.
-  // Conservative dedup (review fix): if the verifier echoes a ref twice with conflicting
-  // states, keep the MOST conservative (REFUTED < UNVERIFIABLE < VERIFIED) so a refuted claim
-  // can never be silently upgraded to VERIFIED by a later duplicate.
+  // ── Step 3: STRUCTURAL ground pre-filter + LOGIC-checking verifier (no matrix) ──
+  // A claim whose excerpt is NOT in its source = fabricated/paraphrased grounding → REFUTED
+  // deterministically, BEFORE the verifier (structure > prompt; also cheaper). The verifier is a
+  // LOGIC checker over the GROUNDED claim+excerpt pairs only — it judges whether the conclusion
+  // FOLLOWS from the cited excerpt, NOT whether text appears in a summary (kills the 6E circularity;
+  // doctrine claims can now be VERIFIED on reasoning soundness).
   const stateRank = { REFUTED: 0, UNVERIFIABLE: 1, VERIFIED: 2 } as const;
   const stateByRef = new Map<string, { state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>();
+  for (const c of claims) {
+    if (!c.grounded) stateByRef.set(c.ref, { state: "REFUTED", evidence: "excerpt not found in the lens's assigned source (fabricated/paraphrased grounding)" });
+  }
+  const groundedClaims = claims.filter((c) => c.grounded);
+
+  let verifier: VerifierOutput | null = null;
+  let verifierFailed = false;
+  let verifierError = "";
+  if (groundedClaims.length) {
+    verifier = await panelCall<VerifierOutput>({
+      model: modelFor(VERIFIER.tier, params.models), system: VERIFIER.system, // no cachedSystemPrefix — the verifier reads claim+excerpt pairs, NOT the matrix
+      userPrompt: `LOGIC-CHECK each claim: does the CONCLUSION follow from its cited excerpt (correct reading + sound rule-application)? ECHO the [ref] in your \`ref\` field; give ONE short evidence sentence:\n\n${groundedClaims.map((c) => `[${c.ref}] (${c.lens}) ${c.text}`).join("\n")}`,
+      schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: 12_000, timeoutMs: JUDGE_TIMEOUT_MS,
+      label: "panel:verifier", signal: params.signal,
+    }).catch((e) => { verifierFailed = true; verifierError = e instanceof Error ? e.message : String(e); return null; });
+  }
+
+  // Overlay the verifier's verdicts on the grounded claims. Conservative dedup: keep the MOST
+  // conservative state (REFUTED < UNVERIFIABLE < VERIFIED) — a structural REFUTED can never be
+  // upgraded, and a duplicate can't silently promote a refuted claim.
   for (const c of verifier?.claims ?? []) {
     const prev = stateByRef.get(c.ref);
     if (!prev || stateRank[c.state] < stateRank[prev.state]) stateByRef.set(c.ref, { state: c.state, evidence: c.evidence });
@@ -198,14 +226,41 @@ export async function runPanelJudge(params: {
     : "";
 
   const judgment = await panelCall<ChiefJudgeOutput>({
-    model: modelFor(CHIEF_JUDGE.tier, params.models), system: CHIEF_JUDGE.system, cachedSystemPrefix: prefix,
+    // no cachedSystemPrefix — the judge reads VERIFIED FINDINGS ONLY (in the user prompt), never the matrix/source.
+    model: modelFor(CHIEF_JUDGE.tier, params.models), system: CHIEF_JUDGE.system,
     userPrompt: `VERIFIED FINDINGS (cite show_stoppers ONLY from these, by ref):\n${findingsBrief}\n\nPER-LENS LEAN (context for the verdict; NOT citable as show-stoppers):\n${leanBrief}${verifierNote}\n\nApply your three rules and emit the final verdict.`,
     schema: CHIEF_JUDGE_SCHEMA, maxTokens: 6_000, ceiling: 12_000, timeoutMs: JUDGE_TIMEOUT_MS,
     label: "panel:gatekeeper", signal: params.signal,
   }).catch((e) => { throw new Error(`gatekeeper+synthesizer failed: ${e instanceof Error ? e.message : e}`); });
 
   const verifiedRefs = new Set(verifiedFindings.filter((c) => c.state === "VERIFIED").map((c) => c.ref));
-  return { fired: true, manifest, panelists, verifier, judgment: enforceVerifiedShowStoppers(judgment, verifiedRefs) };
+  // fit_score range is enforced post-parse (structured-outputs API rejects integer
+  // minimum/maximum). Clamp 0–100 before the verdict relies on it.
+  judgment.fit_score = Math.max(0, Math.min(100, Math.round(Number(judgment.fit_score) || 0)));
+  // STRUCTURAL honest-fail (6E fix): floor an unsound verdict FIRST (verifier failed or zero
+  // VERIFIED findings), THEN drop unverified show-stoppers. 6E proved the prompt-only escalation
+  // is not enough — the gatekeeper emitted eligible=true on a nulled verifier.
+  const floored = enforceVerifiedFloor(judgment, verifiedRefs.size, verifierFailed);
+  return {
+    fired: true, manifest, panelists, verifier, verifierError: verifierError || undefined,
+    droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
+    judgment: enforceVerifiedShowStoppers(floored, verifiedRefs),
+  };
+}
+
+/** STRUCTURAL honest-fail when the adversarial check did not happen (6E fix). If the verifier
+ *  FAILED or produced ZERO VERIFIED findings, no verdict is trustworthy — force NEEDS_HUMAN_REVIEW
+ *  / not-eligible / fit 0 regardless of what the gatekeeper returned. The gatekeeper is only
+ *  PROMPTED to escalate; 6E proved a prompt is not enough (it emitted eligible=true on a nulled
+ *  verifier). Pure → gate-testable. */
+export function enforceVerifiedFloor(judgment: ChiefJudgeOutput, verifiedCount: number, verifierFailed: boolean): ChiefJudgeOutput {
+  if (!verifierFailed && verifiedCount > 0) return judgment;
+  const why = verifierFailed ? "the adversarial verifier failed (no claim was checked)" : "zero findings were VERIFIED";
+  return {
+    ...judgment,
+    verdict: "NEEDS_HUMAN_REVIEW", eligible: false, fit_score: 0,
+    rationale: `[honest-fail] ${why}; a verdict cannot be rendered without adversarial verification. ${judgment.rationale}`,
+  };
 }
 
 /** ENFORCE "no independent interpretation" STRUCTURALLY (review fix — was prompt-only). Pure:
