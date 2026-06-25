@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { resolveCustomerNaics } from "@/lib/customer-naics";
 
-// Target NAICS codes — TX/OK aerospace + machining corridor focus.
-const NAICS_CODES = "336413,332710,332721";
+// NAICS codes are per-customer (capability_statements.naics_codes), seeded from
+// the customer's SAM registration on first use — no hardcoded corridor default.
 // sam.gov/api/prod, NOT api.sam.gov (the latter 404s). Same fix in agents/sam-ingest/sam-client.ts and src/lib/sam.ts.
 const SAM_SEARCH_URL = "https://sam.gov/api/prod/opportunities/v2/search";
 const LOOKBACK_DAYS = 7;
@@ -53,6 +54,13 @@ export async function GET() {
     return NextResponse.json({ solicitations: [], note: "SAM_API_KEY not set" });
   }
 
+  // Per-customer NAICS — saved list, else seed from their SAM registration,
+  // else empty (no preset). Empty → tell the UI to prompt for configuration.
+  const { naics, needsConfig } = await resolveCustomerNaics(sb, user.id);
+  if (naics.length === 0) {
+    return NextResponse.json({ solicitations: [], needsNaicsConfig: needsConfig });
+  }
+
   const today = new Date();
   const lookback = new Date(today.getTime() - LOOKBACK_DAYS * 86400000);
 
@@ -60,7 +68,9 @@ export async function GET() {
     api_key: SAM_KEY,
     postedFrom: fmtSamDate(lookback),
     postedTo: fmtSamDate(today),
-    ncode: NAICS_CODES,
+    // naicsCode is the param the proven sam-ingest client + src/lib/sam.ts use
+    // (the prior `ncode` here did not match and risked an unfiltered feed).
+    naicsCode: naics.join(","),
     limit: String(RESULT_LIMIT)
   });
 

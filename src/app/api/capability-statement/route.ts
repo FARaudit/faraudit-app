@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { resolveCustomerNaics } from "@/lib/customer-naics";
 
 export const dynamic = "force-dynamic";
 
@@ -260,5 +261,16 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ statement: data, savedAt: update.updated_at });
+  // First-login seed (Brain ruling — option a): the moment a customer saves a
+  // UEI and has no NAICS configured yet, pull their registered NAICS from SAM
+  // and persist. resolveCustomerNaics is the single seed path; it no-ops once
+  // naics_codes is non-empty, so an explicit naics edit always wins.
+  let statement = data;
+  const savedNaics = Array.isArray(data?.naics_codes) ? data.naics_codes : [];
+  if (typeof body.uei === "string" && body.uei.trim() && savedNaics.length === 0) {
+    const seeded = await resolveCustomerNaics(supabase, user.id);
+    if (seeded.naics.length > 0) statement = { ...data, naics_codes: seeded.naics };
+  }
+
+  return NextResponse.json({ statement, savedAt: update.updated_at });
 }

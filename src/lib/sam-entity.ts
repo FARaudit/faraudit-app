@@ -152,3 +152,41 @@ export async function searchTeamingPartners(opts: TeamingSearch): Promise<SamEnt
     return true;
   });
 }
+
+// Look up a SINGLE registered entity by its SAM UEI. Used to seed a customer's
+// monitored NAICS from their own SAM registration (capability_statements.uei).
+// SAM Entity v3 filters by the `ueiSAM` param (same field surfaced in the raw
+// response at entityRegistration.ueiSAM). Returns null on any miss/error so
+// callers fall back to the empty/no-preset path rather than throwing.
+export async function fetchEntityByUei(uei: string): Promise<SamEntity | null> {
+  const apiKey = process.env.SAM_API_KEY;
+  const clean = (uei || "").trim();
+  if (!apiKey || !clean) return null;
+
+  const params = new URLSearchParams({ api_key: apiKey, ueiSAM: clean });
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000)
+    });
+  } catch (err) {
+    console.error("[sam-entity] fetchEntityByUei fetch failed:", err);
+    return null;
+  }
+  if (!res.ok) {
+    console.error("[sam-entity] fetchEntityByUei", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+
+  let data: { entityData?: SamEntityRaw[] } = {};
+  try {
+    data = await res.json();
+  } catch (err) {
+    console.error("[sam-entity] fetchEntityByUei JSON parse failed:", err);
+    return null;
+  }
+  const first = (data.entityData || [])[0];
+  return first ? toSamEntity(first) : null;
+}
