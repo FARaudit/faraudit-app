@@ -202,8 +202,11 @@ export const VERIFIER_SCHEMA = {
     claims: {
       type: "array",
       items: {
-        type: "object", additionalProperties: false, required: ["claim", "state", "evidence"],
+        type: "object", additionalProperties: false, required: ["ref", "claim", "state", "evidence"],
         properties: {
+          // ref = the STABLE claim id the runner assigned (e.g. "ex_ko:G1"). The verifier
+          // MUST echo it so the gatekeeper can cite a verified finding by id (no free-text join).
+          ref: { type: "string" },
           claim: { type: "string" },
           state: { type: "string", enum: ["VERIFIED", "UNVERIFIABLE", "REFUTED"] },
           evidence: { type: "string" },
@@ -213,15 +216,26 @@ export const VERIFIER_SCHEMA = {
   },
 } as const;
 
-/** The chief judge / BD gatekeeper's final, integrated output. */
+/** The folded GATEKEEPER + SYNTHESIZER's final, integrated output. show_stoppers must each
+ *  cite a VERIFIED lens finding by source_lens + claim_ref — the schema makes the
+ *  "no independent document interpretation" rule STRUCTURAL, not a prompt request. */
 export const CHIEF_JUDGE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["verdict", "fit_score", "rationale", "preserved_dissent", "eligible"],
+  required: ["verdict", "fit_score", "rationale", "show_stoppers", "preserved_dissent", "eligible"],
   properties: {
     verdict: { type: "string", enum: ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE", "NEEDS_HUMAN_REVIEW"] },
     fit_score: { type: "integer", minimum: 0, maximum: 100 },
     rationale: { type: "string" },
+    // Every show-stopper MUST trace to a verified lens finding (source_lens + claim_ref) —
+    // the gatekeeper may not introduce a finding from its own reading of the documents.
+    show_stoppers: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false, required: ["finding", "source_lens", "claim_ref"],
+        properties: { finding: { type: "string" }, source_lens: { type: "string" }, claim_ref: { type: "string" } },
+      },
+    },
     // Dissent kept VERBATIM — a single lens's verifier-SURVIVED hard gate is escalated, never averaged away.
     preserved_dissent: { type: "array", items: { type: "string" } },
     eligible: { type: "boolean" },
@@ -248,28 +262,41 @@ export const PANELISTS: ReadonlyArray<PanelPersona> = [
     system: `ROLE: You are a proposal manager. Question you OWN: is a response COMPLIANT with Section L and responsive to Section M? Shred every shall/will/must (including ones buried in §C/SOW/attachments) into a checklist; enforce page limits LITERALLY (a cover page can count); flag missing required forms / reps & certs as FATAL/non-curable. ${GROUNDING} ${CONTRARIAN} ${SECURITY}`,
   },
   {
-    id: 3, key: "source_selection_evaluator", name: "Source-Selection Evaluator (Ex-KO)", tier: "sonnet",
+    // Ex-KO → OPUS (Brain ruling Q2): highest systematic-misread risk (LPTA-as-tradeoff).
+    // HYPOTHESIS to validate on the gold set — if Opus shows no delta vs Sonnet here, drop to
+    // Sonnet and the panel is 1 Opus call (verifier only). Build to 2, measure, maybe drop to 1.
+    id: 3, key: "source_selection_evaluator", name: "Source-Selection Evaluator (Ex-KO)", tier: "opus",
     system: `ROLE: You are a former Contracting Officer / Source Selection Authority. Question you OWN: how will the GOVERNMENT evaluate this under FAR 15.3 — what gets rated Unacceptable or eliminated? Score AS the government will, against the stated factors ONLY. Catch: deficiencies (FAR 15.001), competitive-range elimination (15.306), LPTA-vs-tradeoff (under LPTA, exceeding the minimum scores ZERO — do not credit it), neutral past performance (no record ≠ negative, 15.305(a)(2)(iv)). ${GROUNDING} ${CONTRARIAN} ${SECURITY}`,
   },
   {
-    id: 4, key: "pricing_contracts_risk", name: "Pricing & Contracts Risk Analyst", tier: "haiku",
+    // Pricing → SONNET (cost-aware final): risk flagging / pattern-match against doc text.
+    id: 4, key: "pricing_contracts_risk", name: "Pricing & Contracts Risk Analyst", tier: "sonnet",
     system: `ROLE: You are a contracts manager / pricing analyst. Question you OWN: is the price-to-win viable and what is the contract-type / terms / flow-down risk? Catch: price realism vs reasonableness, cost-realism normalization (FAR 15.404-1), FFP max-risk allocation (16.104), mandatory flow-downs (52.244-6), unbalanced pricing, and any WD/SCA wage FLOOR or option-year line the bid cannot go under (NEVER skip the WD / option-year rows). ${GROUNDING} ${CONTRARIAN} ${SECURITY}`,
   },
   {
-    id: 6, key: "smallbiz_eligibility_counsel", name: "Small-Business Eligibility & Teaming Counsel", tier: "sonnet",
+    // SB-Eligibility → HAIKU (Brain ruling): deterministic lookup-and-apply (NAICS/size/50%
+    // arithmetic/SAM status) — clear rules, Opus is overkill, Haiku is appropriate.
+    id: 6, key: "smallbiz_eligibility_counsel", name: "Small-Business Eligibility & Teaming Counsel", tier: "haiku",
     system: `ROLE: You are small-business contracts counsel. Question you OWN: is this small-business subcontractor even ELIGIBLE, and does the deal survive SBA rules + the PRIME relationship? Catch (all fatal, all invisible to the other lenses): NAICS/size standard against the CONTRACT-ASSIGNED code; FAR 52.219-14 limitations-on-subcontracting (the 50% rule; similarly-situated work is excluded — a teaming lever); the OSTENSIBLE-SUBCONTRACTOR / affiliation trap (13 CFR 121.103 — if the sub does the primary-and-vital work or the prime is unduly reliant, affiliation may blow the size standard); whether a TEAMING AGREEMENT is required before the bid is even viable; flow-down exposure + prime payment-terms/counterparty reliability; Rule of Two. Keep size thresholds data-driven (live SBA table), never hardcoded. ${GROUNDING} ${CONTRARIAN} ${SECURITY}`,
   },
 ];
 
-/** The adversarial VERIFIER — separate context, never self-review. */
+/** The adversarial VERIFIER — separate context, never self-review. OPUS (Brain ruling Q3):
+ *  the single highest-leverage upgrade — its hard job is catching the claim that sounds right
+ *  + cites a real doc but MISREADS the clause, exactly where Opus diverges from Sonnet. One
+ *  pass over all 5 lenses, one Opus call, defends the whole panel at one choke point. */
 export const VERIFIER: { name: string; tier: PanelTier; system: string } = {
-  name: "Adversarial Verifier", tier: "sonnet",
-  system: `ROLE: You are a skeptic. For EACH named hard gate and top risk the panel raised, try to REFUTE it claim-by-claim against the cited source. Tag every claim EXACTLY one of: VERIFIED (grounded in the source + you can cite where), UNVERIFIABLE (a claim about external regulatory interpretation / industry practice / precedent that is NOT in the provided documents — you have no ground truth, so it is NOT verified), or REFUTED (the source contradicts it). Default to UNVERIFIABLE when uncertain. ${SECURITY}`,
+  name: "Adversarial Verifier", tier: "opus",
+  system: `ROLE: You are a skeptic. For EACH claim the panel raised (each carries a [ref] id — ECHO it in your \`ref\` field), try to REFUTE it claim-by-claim against the cited source. Your HARDEST job is not citation-checking — it is catching the claim that sounds right, cites a real document, but MISREADS what the clause actually requires. Tag every claim EXACTLY one of: VERIFIED (grounded in the source + you can cite where AND it reads the clause correctly), UNVERIFIABLE (a claim about external regulatory interpretation / industry practice / precedent NOT in the provided documents — no ground truth, so NOT verified), or REFUTED (the source contradicts it OR the claim misreads the cited clause). Default to UNVERIFIABLE when uncertain. ${SECURITY}`,
 };
 
-/** The CHIEF JUDGE = the BD Bid/No-Bid GATEKEEPER (doctrine: the integrating decision gate).
- *  Opus. Synthesizes; does NOT vote/average. */
+/** The folded GATEKEEPER + SYNTHESIZER (Brain cost-aware final ruling): the thin synthesizer
+ *  and the gatekeeper are ONE call on SONNET — its job is reading-comprehension + RULE-FOLLOWING
+ *  over CLEAN, already-verified findings, not novel analysis (the dangerous analytical work
+ *  lives in the lenses). Runs SEQUENCED after the single verifier pass; reads VERIFIED outputs
+ *  only. The 3 rules are enforced by the OUTPUT SCHEMA (show_stoppers must cite a verified
+ *  claim_ref), not by trusting the prose. */
 export const CHIEF_JUDGE: { id: number; key: string; name: string; tier: PanelTier; system: string } = {
-  id: 5, key: "bd_gatekeeper", name: "BD Bid/No-Bid Gatekeeper (Chief Judge)", tier: "opus",
-  system: `ROLE: You are the BD executive who owns the bid/no-bid GATE. You receive a NORMALIZED brief of the 5 lens verdicts (equal weight — ignore length/verbosity) plus the verifier's VERIFIED/UNVERIFIABLE/REFUTED tags. You do NOT vote or average. Rules: (1) treat UNVERIFIABLE claims at REDUCED weight, never as confirmed; drop REFUTED claims. (2) PRESERVE DISSENT — a SINGLE lens's NAMED, source-cited, verifier-SURVIVED hard gate that is unmet ⇒ NO_BID/INELIGIBLE, never averaged away (NO-BID only on a NAMED hard gate — the Score-AI-Driven law). (3) If the lenses conflict AND the verifier cannot resolve it, or confidence is low ⇒ NEEDS_HUMAN_REVIEW (honest failure), never a confident guess. Emit the single final verdict + fit_score + rationale citing WHICH lens raised what, and list any preserved_dissent verbatim. ${SECURITY}`,
+  id: 5, key: "gatekeeper_synthesizer", name: "Gatekeeper + Synthesizer", tier: "sonnet",
+  system: `ROLE: You are the BD gatekeeper AND the synthesizer, folded into one. You read ONLY the VERIFIED lens findings (each with its [ref] id) — never the raw documents; you do NO independent document interpretation. THREE NON-NEGOTIABLE RULES: (1) if ANY lens produced a VERIFIED, unmet hard gate ⇒ verdict NO_BID (or INELIGIBLE for an eligibility gate), cite that finding in show_stoppers by its source_lens + claim_ref, and do NOT reason past it. (2) if two lenses VERIFIABLY conflict and you cannot resolve it from the verified findings ⇒ verdict NEEDS_HUMAN_REVIEW, do not force a verdict. (3) EVERY show_stopper you list MUST cite a specific VERIFIED finding by source_lens + claim_ref — you may not introduce a show-stopper from your own reading. Otherwise emit the integrated verdict + fit_score (carry the bid/no-bid lean from the verified findings; BID is the default for an open, eligible solicitation) + a rationale naming which lens raised what, and list preserved_dissent verbatim. Treat UNVERIFIABLE claims at REDUCED weight; ignore REFUTED claims entirely. ${SECURITY}`,
 };

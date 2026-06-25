@@ -322,9 +322,12 @@ check("rubric: an unscored dim is a MISS (drops the quality avg 5→4) — never
 check("rubric: Dimension 10 (submission-logistics, Brain-added) is present", RUBRIC.some((d) => d.id === 10 && d.key === "submission_logistics"));
 
 // ── STAGE 6A-ii: the panel — 5 lenses + verifier + chief judge, with Brain's guards ──
-check("panel: 5 independent lenses (gatekeeper is the chief judge, not a 6th lens)", PANELISTS.length === 5 && !PANELISTS.some((p) => p.key === "bd_gatekeeper"));
-check("panel: chief judge = the BD gatekeeper persona, on Opus", CHIEF_JUDGE.key === "bd_gatekeeper" && CHIEF_JUDGE.tier === "opus");
-check("panel: tier mix (not all one tier — reduces same-family correlation)", new Set(PANELISTS.map((p) => p.tier)).size >= 2);
+check("panel: 5 independent lenses (gatekeeper is folded into the synthesizer, not a 6th lens)", PANELISTS.length === 5 && !PANELISTS.some((p) => p.key.includes("gatekeeper")));
+check("panel: gatekeeper+synthesizer folded on SONNET (cost-aware final — not Opus)", CHIEF_JUDGE.key === "gatekeeper_synthesizer" && CHIEF_JUDGE.tier === "sonnet");
+// COST GATE: exactly 2 Opus calls total (Ex-KO lens + Verifier) — the locked cost-aware design.
+const opusCalls = [...PANELISTS, VERIFIER, CHIEF_JUDGE].filter((x) => x.tier === "opus").length;
+check(`panel: EXACTLY 2 Opus calls (Ex-KO + Verifier) — the cost-aware design, got ${opusCalls}`, opusCalls === 2 && PANELISTS.find((p) => p.id === 3)!.tier === "opus" && VERIFIER.tier === "opus" && PANELISTS.find((p) => p.id === 4)!.tier === "sonnet" && PANELISTS.find((p) => p.id === 6)!.tier === "haiku");
+check("panel: tier mix spans 3 tiers (opus/sonnet/haiku — real cross-tier diversity)", new Set([...PANELISTS, VERIFIER, CHIEF_JUDGE].map((p) => p.tier)).size === 3);
 // Brain's anti-monoculture guard present on EVERY lens.
 check("panel: every lens forces a contrarian_finding + grounding (monoculture guard)", PANELISTS.every((p) => /contradict/i.test(p.system) && /[Gg]round|cite/i.test(p.system)));
 // Persona-specific validated scope (Brain).
@@ -333,8 +336,10 @@ check("panel: Eligibility Counsel owns ostensible-sub + teaming (Brain-expanded 
 check("panel: Ex-KO lens owns LPTA-vs-tradeoff + competitive-range", /LPTA/.test(PANELISTS.find((p) => p.id === 3)!.system) && /competitive[- ]range/i.test(PANELISTS.find((p) => p.id === 3)!.system));
 // Verifier 3-state tagging (Brain fix).
 check("panel: verifier schema enforces 3-state tagging VERIFIED/UNVERIFIABLE/REFUTED", JSON.stringify(VERIFIER_SCHEMA).includes("UNVERIFIABLE") && /default to UNVERIFIABLE/i.test(VERIFIER.system));
+check("panel: verifier schema carries a claim `ref` (structural claim↔tag join, no free-text match)", (VERIFIER_SCHEMA.properties.claims.items.required as readonly string[]).includes("ref") && /echo it|echo the/i.test(VERIFIER.system));
 // Chief judge: dissent-preserving + honest-fail + Score-AI-Driven law.
-check("panel: chief judge preserves dissent + honest-fail (NEEDS_HUMAN_REVIEW) + NO-BID only on a named gate", JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("preserved_dissent") && CHIEF_JUDGE.system.includes("NEEDS_HUMAN_REVIEW") && /NAMED hard gate/i.test(CHIEF_JUDGE.system));
+check("panel: gatekeeper schema makes show_stoppers cite a verified finding (source_lens + claim_ref) structurally", JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("show_stoppers") && JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("claim_ref") && JSON.stringify(CHIEF_JUDGE_SCHEMA).includes("source_lens"));
+check("panel: gatekeeper enforces the 3 rules — verified hard gate→NO_BID · conflict→NEEDS_HUMAN_REVIEW · no independent doc interpretation", CHIEF_JUDGE.system.includes("NEEDS_HUMAN_REVIEW") && /VERIFIED.*hard gate|hard gate.*NO_BID/i.test(CHIEF_JUDGE.system) && /no independent document interpretation|never the raw documents|only the VERIFIED/i.test(CHIEF_JUDGE.system) && /preserved_dissent/.test(JSON.stringify(CHIEF_JUDGE_SCHEMA)));
 // Schema union budgets (same free pre-flight as the lenses — catch the Anthropic 16-union 400 for $0).
 for (const [name, schema] of [["PANELIST_SCHEMA", PANELIST_SCHEMA], ["VERIFIER_SCHEMA", VERIFIER_SCHEMA], ["CHIEF_JUDGE_SCHEMA", CHIEF_JUDGE_SCHEMA]] as const) {
   const u = countSchemaUnions(schema);

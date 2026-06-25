@@ -76,10 +76,12 @@ export interface PanelistOutput {
   risks: Array<{ risk: string; severity: "P0" | "P1" | "P2"; citation: string }>;
   contrarian_finding: string;
 }
-export interface VerifierOutput { claims: Array<{ claim: string; state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>; }
+export interface VerifierOutput { claims: Array<{ ref: string; claim: string; state: "VERIFIED" | "UNVERIFIABLE" | "REFUTED"; evidence: string }>; }
 export interface ChiefJudgeOutput {
   verdict: "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW";
-  fit_score: number; rationale: string; preserved_dissent: string[]; eligible: boolean;
+  fit_score: number; rationale: string;
+  show_stoppers: Array<{ finding: string; source_lens: string; claim_ref: string }>;
+  preserved_dissent: string[]; eligible: boolean;
 }
 export interface PanelResult {
   fired: boolean;            // false ⇒ manifest gate suppressed the panel (honest INCOMPLETE)
@@ -132,53 +134,65 @@ export async function runPanelJudge(params: {
     return {
       fired: true, manifest, panelists, verifier: null,
       judgment: {
-        verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [],
+        verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [], show_stoppers: [],
         rationale: "All panel lenses failed — no analysis was produced. Honest failure (no charge); a verdict cannot be rendered.",
       },
     };
   }
 
-  // Adversarial verifier — refute each named gate + risk against the source (separate call).
-  const claims = panelists.flatMap((p) =>
-    p.output
-      ? [
-          ...p.output.named_hard_gates.map((g) => `[${p.name}] GATE: ${g.gate} (met=${g.met}) — cite: ${g.citation}`),
-          ...p.output.risks.map((r) => `[${p.name}] RISK(${r.severity}): ${r.risk} — cite: ${r.citation}`),
-        ]
-      : []
-  );
+  const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
+
+  // ── Adversarial verifier (ONE Opus pass over all 5 lenses) ───────────────────
+  // Each claim gets a STABLE ref ("<lensKey>:G<n>" / ":R<n>") so the gatekeeper can cite a
+  // VERIFIED finding by id — the structural claim↔tag join (no fragile free-text match).
+  interface Claim { ref: string; lens: string; text: string }
+  const claims: Claim[] = panelists.flatMap((p) => {
+    if (!p.output) return [];
+    const gates = p.output.named_hard_gates.map((g, i): Claim => ({ ref: `${p.key}:G${i + 1}`, lens: p.name, text: `GATE: ${g.gate} (met=${g.met}) — cite: ${g.citation}` }));
+    const risks = p.output.risks.map((r, i): Claim => ({ ref: `${p.key}:R${i + 1}`, lens: p.name, text: `RISK(${r.severity}): ${r.risk} — cite: ${r.citation}` }));
+    return [...gates, ...risks];
+  });
+
   let verifier: VerifierOutput | null = null;
+  let verifierFailed = false;
   if (claims.length) {
     verifier = await panelCall<VerifierOutput>({
       model: modelFor(VERIFIER.tier, params.models), system: VERIFIER.system, cachedSystemPrefix: prefix,
-      userPrompt: `Tag EACH claim VERIFIED / UNVERIFIABLE / REFUTED against the matrix:\n\n${claims.join("\n")}`,
+      userPrompt: `Tag EACH claim VERIFIED / UNVERIFIABLE / REFUTED against the matrix. ECHO the [ref] in your \`ref\` field:\n\n${claims.map((c) => `[${c.ref}] (${c.lens}) ${c.text}`).join("\n")}`,
       schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: 8_000, timeoutMs: PANELIST_TIMEOUT_MS,
       label: "panel:verifier", signal: params.signal,
-    }).catch(() => null);
+      // Verifier FAILURE must be visible (review fix): a thrown verifier is NOT "nothing to
+      // verify" — the gatekeeper is told to treat everything UNVERIFIED + escalate.
+    }).catch(() => { verifierFailed = true; return null; });
   }
 
-  // Normalized brief — equal density per lens (verbosity-bias guard). CAP EACH COMPONENT
-  // (review 2026-06-24): slicing the whole string dropped the contrarian_finding (the
-  // monoculture guard) + tail risks for verbose lenses. Cap per-field so verdict +
-  // contrarian + the severest risks always survive.
-  const cap = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
-  const brief = panelists
-    .map((p) =>
-      p.output
-        ? `### ${p.name}\nverdict=${p.output.verdict} fit=${p.output.fit_score} conf=${p.output.confidence}\ncontrarian: ${cap(p.output.contrarian_finding, CONTRARIAN_CHARS)}\ngates: ${cap(p.output.named_hard_gates.map((g) => `${g.gate}(met=${g.met})`).join("; ") || "none", FIELD_CHARS)}\nrisks: ${cap(p.output.risks.map((r) => `${r.severity}:${r.risk}`).join("; ") || "none", FIELD_CHARS)}`
-        : `### ${p.name}\n(LENS FAILED — ${p.error}; treat as missing coverage, do not assume clear)`
-    )
-    .join("\n\n");
-  const verifierBrief = verifier
-    ? `\n\nVERIFIER TAGS:\n${verifier.claims.map((c) => `[${c.state}] ${c.claim} — ${c.evidence}`).join("\n")}`
-    : "\n\nVERIFIER TAGS: (none — treat all gates/risks as UNVERIFIED)";
+  // ── Gatekeeper + synthesizer reads VERIFIED FINDINGS ONLY (never raw docs) ────
+  // REFUTED claims are dropped; UNVERIFIABLE flagged for reduced weight; an untagged claim is
+  // treated as UNVERIFIED (conservative). Each finding keeps its ref so show_stoppers cite it.
+  const stateByRef = new Map((verifier?.claims ?? []).map((c) => [c.ref, c] as const));
+  const verifiedFindings = claims
+    .map((c) => { const t = stateByRef.get(c.ref); return { ...c, state: t?.state ?? "UNVERIFIED", evidence: t?.evidence ?? "" }; })
+    .filter((c) => c.state !== "REFUTED");
+  const findingsBrief = verifiedFindings.length
+    ? verifiedFindings.map((c) => `[${c.ref}] <${c.state}> (${c.lens}) ${cap(c.text, FIELD_CHARS)}${c.evidence ? ` — verifier: ${cap(c.evidence, 200)}` : ""}`).join("\n")
+    : "(no verified findings)";
+  // Per-lens bid/no-bid lean — equal-density context (verbosity guard). The gatekeeper carries
+  // the lean from here but may ONLY cite show_stoppers from verifiedFindings (schema-enforced).
+  const leanBrief = panelists
+    .map((p) => p.output
+      ? `### ${p.name}: verdict=${p.output.verdict} fit=${p.output.fit_score} conf=${p.output.confidence} · contrarian: ${cap(p.output.contrarian_finding, CONTRARIAN_CHARS)}`
+      : `### ${p.name}: LENS FAILED (${p.error}) — missing coverage, do not assume clear`)
+    .join("\n");
+  const verifierNote = verifierFailed
+    ? "\n\nVERIFIER FAILED — no claim was adversarially checked; treat every finding as UNVERIFIED and escalate to NEEDS_HUMAN_REVIEW if any is decision-critical."
+    : "";
 
   const judgment = await panelCall<ChiefJudgeOutput>({
     model: modelFor(CHIEF_JUDGE.tier, params.models), system: CHIEF_JUDGE.system, cachedSystemPrefix: prefix,
-    userPrompt: `NORMALIZED PANEL BRIEF (equal weight — ignore length):\n\n${brief}${verifierBrief}\n\nSynthesize the single final verdict per your rules. Preserve any verifier-survived dissent verbatim.`,
+    userPrompt: `VERIFIED FINDINGS (cite show_stoppers ONLY from these, by ref):\n${findingsBrief}\n\nPER-LENS LEAN (context for the verdict; NOT citable as show-stoppers):\n${leanBrief}${verifierNote}\n\nApply your three rules and emit the final verdict.`,
     schema: CHIEF_JUDGE_SCHEMA, maxTokens: 6_000, ceiling: 12_000, timeoutMs: JUDGE_TIMEOUT_MS,
-    label: "panel:chief-judge", signal: params.signal,
-  }).catch((e) => { throw new Error(`chief judge failed: ${e instanceof Error ? e.message : e}`); });
+    label: "panel:gatekeeper", signal: params.signal,
+  }).catch((e) => { throw new Error(`gatekeeper+synthesizer failed: ${e instanceof Error ? e.message : e}`); });
 
   return { fired: true, manifest, panelists, verifier, judgment };
 }
