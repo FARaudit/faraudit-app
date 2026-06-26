@@ -279,6 +279,24 @@ export async function GET(req: NextRequest) {
   if (!coverage.L) missingCore.push("L");
   if (!coverage.M) missingCore.push("M");
 
+  // ━━ Fix #4 — THREE HONEST STATES (Brain card 39): present · absent · unverified ━━
+  // The front door is BEST-EFFORT (the MAP owns the authoritative coverage). The cardinal sin is
+  // calling a section "missing" when we never actually read the body. `coverageBasis` records whether
+  // content detection ran: "content" = we READ the primary, so a not-found section is genuinely ABSENT;
+  // "name_only" = we could NOT read it (image-only / timeout / oversized) → we CANNOT claim absence, it
+  // is UNVERIFIED ("the full audit reads the complete package"). Never present unverified as missing.
+  const sectionState = (present: boolean): "present" | "absent" | "unverified" =>
+    present ? "present" : coverageBasis === "content" ? "absent" : "unverified";
+  const coverageStates: Record<string, "present" | "absent" | "unverified"> = {
+    MAIN: coverage.main ? "present" : "unverified", // a form-role signal; its absence is never "confirmed"
+    C: sectionState(coverage.C),
+    L: sectionState(coverage.L),
+    M: sectionState(coverage.M),
+    I: sectionState(coverage.I)
+  };
+  const absentCore = ["C", "L", "M"].filter((k) => coverageStates[k] === "absent");
+  const unverifiedCore = ["MAIN", "C", "L", "M"].filter((k) => coverageStates[k] === "unverified");
+
   return NextResponse.json({
     ok: true,
     noticeId,
@@ -290,7 +308,10 @@ export async function GET(req: NextRequest) {
     docs,
     coverage,
     coverageBasis,
-    missingCore,
+    missingCore, // retained (back-compat) = absent ∪ unverified
+    coverageStates, // Fix #4 — per-section present|absent|unverified
+    absentCore, // CONFIRMED not in the package (we read the body)
+    unverifiedCore, // could NOT verify at the door — the full audit confirms (never "missing")
     complete
   });
 }

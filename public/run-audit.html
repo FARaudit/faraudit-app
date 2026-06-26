@@ -1089,17 +1089,31 @@ var __fdPartialNoticeId=null;
     // set complete → start the audit automatically (the COMPLETE card says so).
     submitAudit({noticeId:data.noticeId,btn:go,onErr:function(m){showError(m);}});
   }
-  // drive the PARTIAL state from the REAL missing core sections.
+  // drive the PARTIAL state — Fix #4 (Brain card 39): THREE HONEST STATES. A section we never read
+  // (unverified) is NEVER shown as "missing" — only a section we read-and-confirmed-absent is. The
+  // door is best-effort; the full audit (the MAP) is the authoritative read and confirms the rest.
   function drivePartial(data){
     var sub=$('fdPartialSub'),missBox=$('fdPartialMiss');
     var LBL={MAIN:'Main solicitation (SF-1449 / 1442)',C:'§C — Statement of Work / PWS',L:'§L — Instructions to offerors',M:'§M — Evaluation factors'};
     var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
-    var missNames=(data.missingCore||[]).map(function(k){return (k==='MAIN'?'the main solicitation':('§'+k));});
-    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' retrieved, but '+missNames.join(', ')+' '+(missNames.length===1?'is':'are')+' not in the posted package.';
-    if(missBox)missBox.innerHTML='<div class="fd-miss-h">Core sections not in the posted package</div>'+
-      (data.missingCore||[]).map(function(k){
-        return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(LBL[k]||k)+'</span><span class="fsub"><span class="sb2 sb-sec">'+(k==='MAIN'?'MAIN':('§'+escapeHtml(k)))+'</span><span class="fsize">not in posted package</span></span></span></div>';
-      }).join('');
+    var absent=(data.absentCore||[]).slice(), unver=(data.unverifiedCore||[]).slice();
+    // back-compat: an older API without the three states → treat plain missingCore as "absent" (except MAIN).
+    if(!absent.length && !unver.length && (data.missingCore||[]).length){
+      (data.missingCore||[]).forEach(function(k){ (k==='MAIN'?unver:absent).push(k); });
+    }
+    var label=function(k){return (k==='MAIN'?'the main solicitation':('§'+k));};
+    var nDocs=escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' retrieved';
+    var parts=[];
+    if(absent.length){var an=absent.map(label);parts.push(an.join(', ')+' '+(an.length===1?'is':'are')+' not in the posted package');}
+    if(unver.length){var un=unver.map(label);parts.push('we couldn’t verify '+un.join(', ')+' at the door — the full audit reads the complete package and confirms (these are often inside one combined solicitation document)');}
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+nDocs+(parts.length?(', but '+parts.join('; ')+'.'):'.');
+    function row(k,stateText){
+      return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9L2 18a2 2 0 001.7 3h16.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(LBL[k]||k)+'</span><span class="fsub"><span class="sb2 sb-sec">'+(k==='MAIN'?'MAIN':('§'+escapeHtml(k)))+'</span><span class="fsize">'+stateText+'</span></span></span></div>';
+    }
+    var rows=absent.map(function(k){return row(k,'not in posted package');})
+      .concat(unver.map(function(k){return row(k,'not yet verified — the full audit confirms');}));
+    var boxH=absent.length?'Core sections not in the posted package':'Sections we’ll confirm during the audit';
+    if(missBox)missBox.innerHTML='<div class="fd-miss-h">'+boxH+'</div>'+rows.join('');
     // stash the canonical notice id so "Proceed on what we have" enqueues the right thing.
     __fdPartialNoticeId=data.noticeId;
     setState('partial');
