@@ -24,8 +24,9 @@ export type RequirementKind =
  *  This is the genuine LLM judgment the expert asserts; the verdict is then a pure function of it. */
 export type Controllability =
   | "bidder_controls"     // bidder satisfies it by doing the work (source / price / configure / document) → GATE-TO-CLEAR, never disqualifying
-  | "bidder_cannot_move"  // bidder cannot satisfy regardless of effort (failed eligibility, single-source it can't legally supply, unattainable past-perf, exclusivity) → DISQUALIFYING bar
-  | "already_satisfied";  // structurally true RIGHT NOW (set-aside the firm qualifies under, existing registration/size, a passed deadline) → MET
+  | "bidder_cannot_move"  // PROFILE-DEPENDENT bar — THIS firm may or may not satisfy it (failed eligibility, a cert/clearance it must HOLD, exclusivity). Disqualifying only if the firm provably fails OR (unknown) it is non-curable; needs requiredAttribute + curableInWindow (Brain card-44)
+  | "no_one_can_move"     // UNIVERSAL impossibility — disqualifies EVERY bidder regardless of attribute (e.g. 5-day delivery vs a 90-day irreducible lead time, an already-passed deadline). A proven show-stopper → NO_BID regardless of profile (Brain card-45 typing guard)
+  | "already_satisfied";  // structurally true RIGHT NOW (set-aside the firm qualifies under, existing registration/size) → MET
 
 /** One grounded fact an agentic expert produces. Facts only — no verdict, no disposition (that's derived). */
 export interface TypedFinding {

@@ -64,14 +64,19 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (!inp.verifierSound)
     return mk("NEEDS_HUMAN_REVIEW", false, "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
 
-  // 3. Disqualifying bars the firm PROVABLY fails → the only NO_BID / INELIGIBLE drivers. A bar the firm
-  //    PROVABLY satisfies is cleared (a fact, not a risk); an UNKNOWN one is a residual caution (step 5).
+  // 3. Show-stoppers → the only NO_BID / INELIGIBLE drivers. Two kinds (Brain card-45 typing guard):
+  //    (a) UNIVERSAL impossibilities (no_one_can_move) — disqualify EVERY bidder regardless of profile, so
+  //        they are PROVEN show-stoppers even under a null profile (do NOT soften to human-review); and
+  //    (b) PROFILE-DEPENDENT bars the firm PROVABLY fails. A bar the firm provably SATISFIES is cleared; an
+  //        UNKNOWN profile-dependent bar is handled by curability in step 5.
   const disqualifying = dispositions.filter((f) => f.disposition === "disqualifying");
-  const showStoppers = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile) === "fails");
+  const universal = disqualifying.filter((f) => f.controllability === "no_one_can_move");
+  const provenFails = disqualifying.filter((f) => f.controllability !== "no_one_can_move" && firmStatus(f, inp.bidderProfile) === "fails");
+  const showStoppers = [...universal, ...provenFails];
   if (showStoppers.length) {
     const elig = !showStoppers.some((s) => s.kind === "eligibility_bar");
     return mk(elig ? "NO_BID" : "INELIGIBLE", elig,
-      `Bidder-uncontrollable bar(s) the firm fails: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
+      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
   }
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
@@ -92,12 +97,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     return mk("NEEDS_HUMAN_REVIEW", true,
       `Disqualifying bar(s) missing required typing (requiredAttribute / curableInWindow) — fail closed to human review, never a silent caution: ${names(untyped)}`, dispositions, untyped);
 
-  // 5b. NON-CURABLE structural bar (curableInWindow === false) under unknown status → cannot be soft-cautioned;
-  //     human must confirm eligibility (the bidder may be unable to win AND unable to cure within the window).
+  // 5b. NON-CURABLE structural bar (curableInWindow === false) under unknown status. Top-line verdict is
+  //     NEEDS_HUMAN_REVIEW (the determining fact — does the firm already hold it — is absent, so the engine
+  //     must not over-assert NO_BID). But the PAYLOAD carries the decisive conditional-NO_BID so the customer
+  //     gets the call, not mush (Brain card-45 refinement): hold-it-or-walk.
   const nonCurable = unknownBars.filter((f) => f.curableInWindow === false);
   if (nonCurable.length)
     return mk("NEEDS_HUMAN_REVIEW", true,
-      `Non-curable structural bar(s) that cannot be cleared within the response window — a human must confirm eligibility (not a soft caution): ${names(nonCurable)}`, dispositions, nonCurable);
+      `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`, dispositions, nonCurable);
 
   // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
   const residual = unknownBars.filter((f) => f.curableInWindow === true);

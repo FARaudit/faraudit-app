@@ -47,6 +47,18 @@ eq("non-curable bar names the bar in showStoppers", deriveVerdict(inp(nonCurable
 const curable = [...two, f({ requirement: "obtain SAM registration before award", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "sam:registered", curableInWindow: true })];
 eq("curable bar, null profile → BID_WITH_CAUTION", deriveVerdict(inp(curable)).verdict, "BID_WITH_CAUTION");
 
+// Brain card-45 refinement: the non-curable human-review state must CARRY the conditional-NO_BID payload.
+eq("non-curable reason carries CONDITIONAL NO-BID payload", /CONDITIONAL NO-BID/.test(deriveVerdict(inp(nonCurable)).reason), true);
+
+// Brain card-45 typing guard: a UNIVERSAL impossibility (no_one_can_move) is a PROVEN show-stopper even under
+// a null profile — must hit NO_BID, NOT soften to human-review (the mistype Brain warned about).
+const universal = [...two, f({ requirement: "5-day delivery against a 90-day irreducible lead time", kind: "technical_spec", controllability: "no_one_can_move" })];
+eq("universal impossibility, null profile → NO_BID (not human-review)", deriveVerdict(inp(universal)).verdict, "NO_BID");
+eq("universal impossibility is a named show-stopper", deriveVerdict(inp(universal)).showStoppers.length, 1);
+// a universal ELIGIBILITY impossibility → INELIGIBLE
+const universalElig = [f({ requirement: "set-aside category no firm can meet", kind: "eligibility_bar", controllability: "no_one_can_move" })];
+eq("universal eligibility impossibility → INELIGIBLE", deriveVerdict(inp(universalElig)).verdict, "INELIGIBLE");
+
 // eligibility bar the firm provably FAILS (profile lacks the required NAICS) → INELIGIBLE
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
 eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
