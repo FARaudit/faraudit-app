@@ -4,6 +4,7 @@ import { fetchSolicitationByNoticeId, resolveAgency } from "@/lib/sam";
 import { fetchAttachmentManifest, classifySectionRoles, planDocumentOrder, type DocumentPlanEntry } from "@/lib/sam-attachments";
 import { extractText } from "@/lib/pdf-text-extractor";
 import { detectSections } from "@/lib/section-boundary-detector";
+import { anthropic } from "@/lib/anthropic";
 
 // Synchronous resolve+manifest endpoint backing the Run Audit front door
 // (fix/run-audit-frontdoor-static). It answers ONE question — "what does the
@@ -141,15 +142,67 @@ async function detectPrimarySectionsFromText(
   } catch {
     return null;
   }
-  // Image-only / extraction failure → don't claim sections we couldn't read.
-  if (doc.extractionMethod === "fallback") return null;
-  if (doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"))) return null;
+  // Fix #3 — VISION FAST-PATH (Brain card 39). The text layer is empty/thin (a scanned/image-only
+  // PDF). Instead of giving up (which would falsely read as "missing"), READ THE PAGES with a cheap
+  // vision model — but ONLY for a SMALL doc (<5 pages), synchronously, so the door stays fast. A larger
+  // scanned doc → null → the section state is UNVERIFIED (Fix #4) and the MAP (the full audit) owns the
+  // authoritative read. Never block the door on a big vision call.
+  const imageOnly = doc.extractionMethod === "fallback" || doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"));
+  if (imageOnly) {
+    if (doc.pageCount >= 1 && doc.pageCount < 5) return await detectPrimarySectionsViaVision(buf);
+    return null; // too large to read synchronously at the door — unverified; the MAP confirms
+  }
 
   // Reuse the audit pipeline's real section detection (the same section bag the
   // extractors consume: s["C"], s["L"], s["M"], s["I"]).
   const bag = detectSections(doc);
   const s = bag.sections;
   return { C: !!s["C"], L: !!s["L"], M: !!s["M"], I: !!s["I"] };
+}
+
+// Fix #3 helper — the synchronous, Haiku-tier vision read for a SMALL scanned primary. Reads the PDF
+// pages as images and reports which UCF sections are present — the "drag-into-a-frontier-model" read,
+// bounded so the door never hangs. Returns null on any failure (→ unverified, the MAP confirms). Brain
+// guard: best-effort only; this is a fast-path hint, NOT the authoritative coverage (that is the MAP).
+const VISION_COVERAGE_MODEL = "claude-haiku-4-5";
+async function detectPrimarySectionsViaVision(buf: Buffer): Promise<ContentSections | null> {
+  if (!anthropic) return null;
+  try {
+    const resp = await anthropic.messages.create(
+      {
+        model: VISION_COVERAGE_MODEL,
+        max_tokens: 120,
+        system:
+          "You classify the structure of a U.S. federal solicitation document (which may be scanned page images). Report ONLY which Uniform Contract Format sections are PRESENT in THIS document. Reply with a single compact JSON object, no prose.",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } },
+              {
+                type: "text",
+                text:
+                  'Which of these are present in this document? ' +
+                  'C = Description / Specifications / Statement of Work / salient characteristics. ' +
+                  'L = Instructions to Offerors (incl. FAR 52.212-1). ' +
+                  'M = Evaluation factors / Basis for Award (incl. FAR 52.212-2). ' +
+                  'I = Contract Clauses. ' +
+                  'Respond with EXACTLY: {"C":true|false,"L":true|false,"M":true|false,"I":true|false}'
+              }
+            ]
+          }
+        ]
+      },
+      { signal: AbortSignal.timeout(PRIMARY_DOWNLOAD_TIMEOUT_MS) }
+    );
+    const text = resp.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
+    const m = text.match(/\{[^}]*\}/);
+    if (!m) return null;
+    const j = JSON.parse(m[0]) as Record<string, unknown>;
+    return { C: !!j.C, L: !!j.L, M: !!j.M, I: !!j.I };
+  } catch {
+    return null; // vision unavailable / timeout / parse failure → unverified; the MAP confirms
+  }
 }
 
 export async function GET(req: NextRequest) {
