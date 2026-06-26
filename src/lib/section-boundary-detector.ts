@@ -82,7 +82,11 @@ const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
   F: /^(Deliveries\s+or\s+Performance|Period\s+of\s+Performance)/im,
   G: /^(Contract\s+Administration\s+Data)/im,
   H: /^(Special\s+Contract\s+Requirements)/im,
-  I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference)/im,
+  // §I — UCF "Contract Clauses" OR COMMERCIAL forms: FAR 52.212-4 (Contract Terms & Conditions—Commercial)
+  //   and 52.212-5 (Terms & Conditions Required to Implement Statutes) ARE the §I clause section of a
+  //   Part-12 combined RFQ; they appear as headings / clause-number-prefixed lines. Line-anchored (^) so a
+  //   prose mention can't false-fire. Coverage-depth (Brain card 40): §I was undetected on commercial #2.
+  I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference|Contract\s+Terms\s+and\s+Conditions|(?:ADDENDUM\s+TO\s+)?(?:FAR\s+)?5?2\.212-[45])\b/im,
   J: /^(List\s+of\s+Attachments)/im,
   K: /^(Representations,?\s+Cert|Other\s+Statements\s+of\s+Offerors)/im,
   // §L — UCF titles (line-start) OR COMMERCIAL forms: FAR 52.212-1 IS the commercial "Instructions to
