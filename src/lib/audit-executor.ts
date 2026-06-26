@@ -29,7 +29,7 @@ import {
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
 import { MAX_DOCS, classifySectionRoles, type IngestionMeta } from "@/lib/sam-attachments";
-import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED } from "@/lib/agentic-executor";
+import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED, resolveAgenticCoverageComplete } from "@/lib/agentic-executor";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -832,10 +832,14 @@ export async function executeAudit(
           // AGENTIC PRIMARY: the honest coverage line (Audited N of M · superseded ·
           // skipped · read failures) — null when not on the agentic-primary path.
           agentic_coverage: agenticMap?.coverage.statement ?? null,
-          // Structured completeness signal the ingestion banner consults (Stage 3): a
-          // boolean is unambiguous where parsing the statement string would be brittle.
-          // null off the agentic-primary path → the banner behaves exactly as before.
-          agentic_coverage_complete: agenticMap?.coverage.complete ?? null,
+          // Structured completeness signal the ingestion banner + verdict safety-gate consult
+          // (Stage 3): a boolean is unambiguous where parsing the statement string would be brittle.
+          // Hole-B fix (2026-06-25): when the agentic-primary path is ON but the MAP ABORTED
+          // (budget/exception → agenticMap===null), coverage is NOT guaranteed — V2 silently ran as
+          // the plain single-pass path. That MUST report `false` (→ verdict suppression), never the
+          // pre-fix `null` that read as "feature off → render confidently". null only when the feature
+          // is genuinely OFF (behave exactly as before). Pure → gate-testable.
+          agentic_coverage_complete: resolveAgenticCoverageComplete(AGENTIC_PRIMARY_ENABLED, agenticMap),
           agentic_facts_source: agenticMap ? "agentic_map" : null,
         },
         rendered_at: new Date().toISOString(),

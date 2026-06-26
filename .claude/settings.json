@@ -101,6 +101,18 @@
     ]
   },
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$HOME/faraudit-app}\" && python3 ceo/build-board.py >/dev/null 2>&1; bash ceo/update-digest.sh >/dev/null 2>&1",
+            "statusMessage": "Syncing CEO board + digest…",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

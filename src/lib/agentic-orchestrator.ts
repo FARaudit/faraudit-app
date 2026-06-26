@@ -15,7 +15,7 @@ import type { ExtractedFacts } from "./section-extractors";
 import type { AuditJudgment } from "./audit-judgment";
 import { runJudgment } from "./audit-judgment";
 import { buildCoverageLedger, resolveAmendments, classifyBindingContent, type CoverageLedger, type ResolvedLedger, type PackageFileInput } from "./agentic-ingest";
-import { mapDocument, mergeExtracts, selectMapTargets, type MappedFacts, type MapCoverage, type DocExtract } from "./agentic-map";
+import { mapDocument, mergeExtracts, selectMapTargets, type MappedFacts, type MapCoverage, type DocExtract, type DocExtractCache } from "./agentic-map";
 import { buildCompactMatrix, selectBindingExcerpts, runLenses, type LensSurfaces } from "./agentic-lenses";
 
 export type ScalarFacts = Partial<
@@ -38,6 +38,10 @@ export interface AgenticAuditInput {
   crossDocModel?: string;  // Stage 2.5 — cross-doc pass (else registry "crossdoc")
   /** Cancellation — aborts in-flight per-doc MAP reads when an upstream budget fires. */
   signal?: AbortSignal;
+  /** #7 — content-addressed MAP extract cache. When provided, a doc already mapped (by content
+   *  hash) is served from cache for $0 (re-runs + corpus-wide reuse of standard attachments).
+   *  Omitted ⇒ every doc is read live (behavior unchanged). */
+  docCache?: DocExtractCache;
 }
 
 export interface CoverageReport {
@@ -273,7 +277,7 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
   // See mapWithResilience. (Injectable + deterministically gate-tested — no live spend to prove it.)
   const { extracts: mapExtracts, failures: mapFailures } = await mapWithResilience(
     mappable,
-    (d) => mapDocument(d.name, d.text, input.mapModel, input.signal),
+    (d) => mapDocument(d.name, d.text, input.mapModel, input.signal, input.docCache),
     { concurrency: 4, aborted: () => !!input.signal?.aborted },
   );
   extracts.push(...mapExtracts);
@@ -347,6 +351,8 @@ export async function runAgenticAudit(input: AgenticAuditInput): Promise<Agentic
   return { judgment, facts, ledger, coverage, surfaces, matrix };
 }
 
-/** Flag-gate. OFF until the full build passes /code-review + expert panels and
- *  one CEO live run actualizes the cost + proves all docs digested. */
+/** ⚠ Exported but currently CONSUMED BY NOBODY (re-review 2026-06-25): the live shadow path reads
+ *  AUDIT_AGENTIC independently as AGENTIC_SHADOW_ENABLED in agentic-executor.ts, so this constant is
+ *  inert and must NOT be read as a readiness signal. Kept (not deleted) to avoid breaking any future
+ *  import; consolidate the AUDIT_AGENTIC reads when the agentic engine graduates. */
 export const AGENTIC_ORCHESTRATOR_ENABLED = process.env.AUDIT_AGENTIC === "true";

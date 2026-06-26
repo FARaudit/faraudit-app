@@ -1,0 +1,27 @@
+{
+  "_comment": "GRADUATION PASS-BAR — locked by Brain (blind, pre-run) 2026-06-26 via CEO relay. Do NOT change after seeing any scored results; changing it post-hoc recreates the circularity the gold-recall retraction fixed. This file is the integrity artifact for Gate-2.",
+  "lockedBy": "Brain (blind, pre-run)",
+  "lockedAt": "2026-06-26",
+  "relayedBy": "CEO",
+  "revisedBy": "Brain (Option A ruling, 2026-06-26) — see _BAR-CHANGE-LOG.md 2026-06-26 entry",
+  "perPackage": {
+    "hardFail_anyOne": [
+      "fabrication: any raised clause absent from source",
+      "decoy_misfire: absent decoy raised at all, OR any decoy raised as disqualifying",
+      "verdict_mismatch: verdict + eligible + showStopper-count wrong",
+      "concept_presence_miss: any mustRaise:true concept (token OR alias) not surfaced ANYWHERE in the engine's analysis output (raised gates + cites + judge rationale + dissent + verifier claims)"
+    ],
+    "advisory_logOnly_doNotBlock": [
+      "disposition_mismatch: mustRaise concept surfaced but not at the key's expected disposition (REVISED to advisory 2026-06-26 — null-bidder met≠unmet semantics + gate-naming non-determinism)",
+      "show_stopper_fuzzy_probe false-negative (known fuzzy-match limitation)",
+      "acquisitionPart mismatch (classifier tuning, not a safety failure)"
+    ]
+  },
+  "graduationBar_across5": {
+    "minimumPass": "4 of 5",
+    "mustPass_noCarveOut": ["1240LP26Q0067", "SPRDL125Q0030", "FA667024R0001"],
+    "carveOutCandidates": ["N4008526R0065", "AOCSSB26R0023"],
+    "note": "#2 BID-clean anchor + #3 INELIGIBLE fire + #5 bond-inversion MUST pass. The single allowed carve-out (if needed to reach 4/5) may only be #1 or #4."
+  },
+  "scorerAlignmentNote": "Brain Option A (2026-06-26): scoreJudgment now hard-fails named gates on CONCEPT-PRESENCE (jr.namedGates[].surfaced) — disposition is advisory (jr.dispositionAdvisories). jr.failures already excludes disposition + (in the report filter) PART + show-stopper. Hard bar = fabrication + decoy + verdict + concept-presence miss. Keys re-frozen at schemaVersion 0.3-concept-presence (judgment content unchanged; mechanical bump only — Code did not re-author)."
+}

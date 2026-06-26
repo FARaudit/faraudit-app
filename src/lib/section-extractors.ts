@@ -34,6 +34,21 @@ export interface ClauseItem {
   trapReason: string | null;
 }
 
+/** Canonical FAR/DFARS clause-number key — the SINGLE normalizer shared by the §I enumerator and the
+ *  gold scorer so they never drift (Brain substrate fix 2d, 2026-06-25). Normalizes unicode, maps every
+ *  hyphen/dash variant (en-dash, em-dash, minus, non-breaking) to ASCII "-", strips ALL whitespace, and
+ *  lowercases — so "52.219 ‑6" / "52.219–6" / "52.219-6" all compare equal. Pure. */
+export function normClause(s: string): string {
+  return s.normalize("NFKC").replace(/[‐-―−﹣－]/g, "-").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+/** Canonical FAR/DFARS clause-number pattern (FAR 52.xxx-x · DFARS 252.xxx-xxxx), tolerant of en-dash /
+ *  OCR hyphen variants. The SINGLE source of truth (review 2026-06-25 flagged the regex triplicated across
+ *  the enumerator + scorer + rescore). Exported as a SOURCE string so each call site builds its own /g
+ *  instance — a shared /g RegExp is stateful (lastIndex) and unsafe to reuse. */
+export const CLAUSE_NUMBER_PATTERN = "\\b2?52\\.\\d{3}[-‐‑‒–—―−﹣－]\\d{1,4}\\b";
+export const clauseNumberRegex = (): RegExp => new RegExp(CLAUSE_NUMBER_PATTERN, "g");
+
 export interface SubmissionRequirement {
   bucket: "deadline" | "format" | "mandatory_doc" | "representation" | "registration" | "other";
   text: string;

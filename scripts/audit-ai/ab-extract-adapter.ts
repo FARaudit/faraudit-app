@@ -166,6 +166,7 @@ export interface UsageLike {
   output_tokens: number;
   cache_write?: number;
   cache_read?: number;
+  label?: string;  // per-call label (e.g. "MAP <doc>", "panel:verifier") — enables per-stage cost rollup
 }
 
 /** Sum a run's per-call usage into a single $ figure. Handles BOTH the new-engine

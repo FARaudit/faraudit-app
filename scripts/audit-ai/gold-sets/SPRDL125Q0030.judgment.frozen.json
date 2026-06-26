@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "SPRDL1-25-Q-0030",
+  "_title": "Mount, Machine Gun (Dillon Aero DGMT1002) — DLA Land Warren",
+  "_suiteRole": "INELIGIBLE test: directed sole-source to a named approved manufacturer/part number. Mirror to Norfolk — proves the eligibility doctrine FIRES correctly when a named hard gate meets a known disqualifying bidder attribute (non-null bidderProfile). Norfolk proved no over-fire on null profile; this proves correct fire on a structural mismatch.",
+  "_authoringMethod": "blind three-way human-adjudicated (Brain cold read + Gemini 3.1 Pro Extended + ChatGPT 5.5 Thinking; CEO adjudicated)",
+  "acquisitionPart": "PART_12",
+  "bidderProfile": {
+    "description": "Generic small business. NOT Dillon Aero. NOT an authorized Dillon Aero dealer or distributor. Holds NO Government Engineering pre-approval of an equivalent/alternate part obtained prior to receipt of this solicitation.",
+    "isApprovedSource": false,
+    "isAuthorizedDealerOfApprovedSource": false,
+    "hasPreSolicitationEngineeringApproval": false
+  },
+  "expectedVerdict": {
+    "verdict": "INELIGIBLE",
+    "eligible": false,
+    "maxShowStoppers": 1,
+    "reason": "Directed sole-source to Dillon Aero part DGMT1002 (CAGE 1PN61). The specified bidder is not the approved source, not an authorized dealer/distributor, and has no pre-solicitation Government Engineering approval for an equivalent — so it fits none of the approved-source or alternate-approval paths (C.12 x L.6). Structurally impossible to win. INELIGIBLE."
+  },
+  "namedGates": [
+    {
+      "id": "approved-source-restriction",
+      "token": "DGMT1002",
+      "aliases": [
+        "Dillon Aero",
+        "1PN61",
+        "Only the following Manufacturer's part number is approved",
+        "approved source"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Page 4 Schedule: 'Only the following Manufacturer's part number is approved for this procurement. MFR: Dillon Aero, CAGE: 1PN61, Part Number: DGMT1002.' C.12 (p.9) defines who may offer: approved source, its dealer/distributor, or a manufacturer producing under the approved source's direction with authorization. This bidder fits none. THE driving disqualifier."
+    },
+    {
+      "id": "alternate-part-pre-approval",
+      "token": "written Government Engineering approval",
+      "aliases": [
+        "Prior to receipt of this solicitation",
+        "will not be considered for contract award",
+        "L.6",
+        "Representation of Intent to Supply a Source-Controlled Item"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "L.6 (pp.76-78): the ONLY path for a non-listed/equivalent part requires written Government Engineering approval of a test procedure obtained BEFORE solicitation receipt, identified in the offer, with final approval by award. The specified bidder has no such approval. This is the escape hatch the engine must surface to prove it understands WHY the bidder is ineligible — not merely that a part number is named."
+    },
+    {
+      "id": "all-or-none-total-quantity",
+      "token": "OFFERS SUBMITTED FOR LESS THAN THE TOTAL QUANTITIES",
+      "aliases": [
+        "All or None",
+        "ineligible for award",
+        "A.9",
+        "total quantity"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "caution",
+      "note": "A.9 (p.3): partial-quantity offers are ineligible for award. A real named requirement, easily met by a compliant bidder, and NOT the reason this bidder fails. Caution-level. CEO-adjudicated: real gate, not a decoy, not the show-stopper."
+    },
+    {
+      "id": "new-material-only",
+      "token": "Government intends to acquire only new material",
+      "aliases": [
+        "L.24",
+        "other than new material",
+        "used, reconditioned, remanufactured"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "caution",
+      "note": "L.24 (p.80): only new material unless PCO approves other-than-new. Performance/compliance caution."
+    },
+    {
+      "id": "origin-inspection-acceptance",
+      "token": "INSPECTION: Origin ACCEPTANCE: Origin",
+      "aliases": [
+        "E.18",
+        "DCMA",
+        "inspection point",
+        "acceptance point"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "caution",
+      "note": "E.18 (p.13): offeror must specify facility name/address/CAGE for origin inspection; arrange DCMA inspection before shipment. Performance caution."
+    }
+  ],
+  "showStoppers": [
+    {
+      "id": "ss-approved-source-mismatch",
+      "description": "The Dillon Aero approved-source restriction (DGMT1002, CAGE 1PN61) combined with the specified bidder's profile (not the source, not an authorized dealer, no pre-solicitation engineering approval) forms a closed loop with no available path to award. C.12 x L.6 x bidderProfile = structural impossibility.",
+      "disqualifiesBecause": "bidder-structural",
+      "note": "This is the single show-stopper. maxShowStoppers=1."
+    }
+  ],
+  "cautionItems": [
+    {
+      "id": "sam-registration-active",
+      "description": "Successful offeror must be SAM-registered to receive award (H.1, p.25). Bidder-side obligation; caution, never auto-ineligible per eligibility doctrine."
+    },
+    {
+      "id": "supply-chain-traceability",
+      "description": "C.23 (p.11): contractor confirms it has/will obtain supply-chain traceability documentation showing the item is from an approved manufacturer. Real compliance requirement; caution."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "tina-certified-cost-pricing",
+      "token": "Requirements for Certified Cost or Pricing Data",
+      "aliases": [
+        "252.215-7010",
+        "certified cost or pricing data"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "252.215-7010 listed (p.74) but this is a competitive commercial Part-12 RFQ below threshold. TINA exempt. Must NOT be raised as a disqualifying gate."
+    },
+    {
+      "id": "itar-ddform2345-tdp-access",
+      "token": "Militarily Critical Technical Data Agreement",
+      "aliases": [
+        "DD 2345",
+        "DD2345",
+        "Joint Certification Program",
+        "JCP",
+        "export-controlled TDP",
+        "C.5"
+      ],
+      "kind": "absent",
+      "mustNotRaiseAtAll": true,
+      "note": "C.5 (p.8) box 1 is checked: 'There is no Technical Data Package (TDP) included with this solicitation.' The DD2345/JCP/export-control language sits under unchecked alternatives and is inert here. Must NOT be raised as an access/eligibility gate. (Note: C.13/L.6 reference a TDP — boilerplate contradiction with C.5; the checked box governs: no TDP.)"
+    },
+    {
+      "id": "demilitarization-tsc",
+      "token": "Demilitarization and Trade Security Control",
+      "aliases": [
+        "H.2",
+        "DEMIL",
+        "End Use Certificate",
+        "EUC",
+        "DLA Form 1822",
+        "TSC"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "H.2 (pp.25-28): post-award disposal/excess-property and GFE machinery. Not a pre-award eligibility bar. Must NOT be raised as a disqualifier."
+    },
+    {
+      "id": "small-business-set-aside-status",
+      "token": "is not a small business set-aside",
+      "aliases": [
+        "unrestricted",
+        "NAICS 332994",
+        "size standard 1,000"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": false,
+      "note": "SF-18 box (p.1): 'This RFQ is [X] is not a small business set-aside.' Unrestricted. The engine must NOT raise small-business/socioeconomic status as a disqualifier — irrelevant to eligibility here. mustNotRaiseAtAll=false because a neutral mention is acceptable; disqualifying on it is the error."
+    }
+  ],
+  "adjudication": {
+    "authoredBlind": true,
+    "adjudicatedBy": [
+      "CEO",
+      "Brain"
+    ],
+    "frozenAt": "2026-06-26T18:00:00Z",
+    "sourceSha256": "a1ebdd890b8707475e0601b3bede26d2a8b4c4d8ee974ab9017ddda5a3aeaaa2",
+    "keySha256": "a9bf41b4cfe2c5c1e4d520e2b9e90f845a95e3a7763f6808690de0ae621184d8"
+  }
+}

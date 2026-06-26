@@ -191,3 +191,18 @@ export async function buildAgenticFacts(params: {
 export const AGENTIC_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
 /** Flag-gate — agentic PRIMARY (facts feed the rendered V2 report) when enabled. */
 export const AGENTIC_PRIMARY_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_PRIMARY);
+
+/** Hole-B fix — the honest coverage-complete signal the verdict safety-gate consults.
+ *   • feature OFF              → null  (no agentic claim; the renderer behaves exactly as pre-agentic)
+ *   • feature ON, MAP aborted  → false (MAP===null: full-coverage premise abandoned, V2 ran single-pass
+ *                                       → the verdict MUST NOT render confidently)
+ *   • feature ON, MAP ran      → the MAP's own coverage.complete (read-failures / truncation honest)
+ *  Pure → gate-testable. Closes the silent fall-through where an aborted MAP read as "feature off". */
+export function resolveAgenticCoverageComplete(
+  primaryEnabled: boolean,
+  agenticMap: { coverage: { complete: boolean } } | null,
+): boolean | null {
+  if (!primaryEnabled) return null;
+  if (!agenticMap) return false;
+  return agenticMap.coverage.complete;
+}

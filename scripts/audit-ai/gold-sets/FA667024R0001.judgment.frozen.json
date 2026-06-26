@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "FA667024R0001",
+  "_title": "USAF Repair Roof Bldg. 917 — construction (FAR Part 36)",
+  "_suiteRole": "Construction + bond-inversion anchor. Mirrors/inverts #1 Norfolk (where bid bond NOT required is a decoy). Here bonding MUST be raised; silence = miss. Also the only Davis-Bacon construction-wage key in the suite.",
+  "_authoringMethod": "Blind cold-read (Brain + Gemini 3.1 Pro) with full Brain source-verification (grep against raw source) + Brain adversarial pass. GPT-5.5 UNAVAILABLE this session (repeated file-load crash) — settled two-way with source verification; re-run GPT later if a third leg is desired. Authored from raw source only, never engine output.",
+  "acquisitionPart": "PART_15",
+  "bidderProfile": null,
+  "expectedVerdict": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "100% SDVOSB set-aside (FAR 19.14) restricts competition, but with null bidderProfile the bidder's SDVOSB status is unknown, so this is a caution, not a structural disqualifier (Norfolk doctrine: set-aside + unknown status != INELIGIBLE). LPTA construction. Non-routine risk cluster justifying caution: bid guarantee required WITH the offer (submission-responsiveness), 100% performance + payment bonds at award, Davis-Bacon construction wage compliance, and a funds-not-yet-available contingency."
+  },
+  "namedGates": [
+    {
+      "id": "award-basis-lpta",
+      "token": "Lowest Price Technically Acceptable (LPTA) source selection",
+      "aliases": [
+        "LPTA",
+        "lowest evaluated price",
+        "Total Evaluated Price",
+        "TEP",
+        "lowest priced offeror"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "met",
+      "isTrap": true,
+      "note": "ANCHOR. Section M.1 verbatim: 'This is a Lowest Price Technically Acceptable (LPTA) source selection.' Binary acceptability on non-price factors (Past Performance, Prior Experience) then award to lowest TEP. Engine MUST classify LPTA, NOT best-value tradeoff. Mirror to #1 Norfolk LPTA; opposite of #4 AOC tradeoff."
+    },
+    {
+      "id": "bid-guarantee-with-offer",
+      "token": "Bid Guarantee",
+      "aliases": [
+        "52.228-1",
+        "Bid Bond",
+        "Standard Form 24",
+        "fully executed Bid Guarantee",
+        "Power of Attorney"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "isTrap": true,
+      "note": "ANCHOR — THE BOND INVERSION. Section L Factor 3 item 5: 'Bid Bond: See FAR Clause 52.228-1 Bid Guarantee. Scanned copy of fully executed Bid Guarantee (Standard Form 24 and Power of Attorney)' — listed among required business/price proposal submission items. This is a SUBMISSION-RESPONSIVENESS gate: no executed bid guarantee WITH the offer = non-responsive. DIRECT INVERSION of #1 Norfolk's 'bid bond NOT required' decoy. Engine MUST raise it. Failure to raise = caught by this key."
+    },
+    {
+      "id": "performance-payment-bonds",
+      "token": "Performance and Payment Bonds-Construction",
+      "aliases": [
+        "52.228-15",
+        "performance bond",
+        "payment bond",
+        "Standard Form 25",
+        "Standard Form 25A",
+        "100 percent of the original contract price"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "caution",
+      "note": "SF-1442 block 12a 'MUST FURNISH'; block 18 offeror agrees to furnish; clause 52.228-15: performance bond (SF-25) 100% + payment bond (SF-25A) 100% of original contract price, at award. Distinct from bid guarantee (Q3 is with-offer; this is at-award). Real bonding gate."
+    },
+    {
+      "id": "davis-bacon-construction-wage",
+      "token": "Construction Wage Rate Requirements",
+      "aliases": [
+        "52.222-6",
+        "Davis-Bacon",
+        "wage determination",
+        "prevailing wage",
+        "52.222-7",
+        "52.222-13"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "caution",
+      "note": "52.222-6 Construction Wage Rate Requirements + 52.222-7/-13/-14 family + WD attachments (NY20240019 Building). Mandatory prevailing-wage compliance. The construction-labor standard absent from all 4 prior keys. Raw WD rate tables omitted (garbled font extraction) — gate authorable from 52.222-6 + WD-applies in main solicitation."
+    },
+    {
+      "id": "sdvosb-set-aside",
+      "token": "Service-Disabled Veteran Owned Small Business",
+      "aliases": [
+        "SDVOSB",
+        "100% Service-Disabled",
+        "FAR Subpart 19.14",
+        "19.14"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "caution",
+      "note": "Line 235 operative restriction: 'This acquisition is restricted to 100% Service-Disabled Veteran Owned Small Business, (SDVOSB), concerns IAW FAR Subpart 19.14.' This is the OPERATIVE set-aside. 52.219-6 (Notice of Total Small Business Set-Aside) appears in the incorporated clause list (line 723) but is the PARENT-CATEGORY clause, NOT a conflicting gate — SDVOSB is a subset of small business and the localized Block-10/line-235 text governs over the boilerplate clause list. With null bidderProfile, SDVOSB = caution, NOT auto-INELIGIBLE (Norfolk doctrine). Engine must NOT over-fire INELIGIBLE here."
+    }
+  ],
+  "showStoppers": [],
+  "cautionItems": [
+    {
+      "id": "sam-active-at-offer",
+      "description": "Section L (1)(b): 'Offeror must have an active entity registration at time of proposal at sam.gov in order to submit an offer.' Note timing tension: SF-1442 cover (line 240) says 'prior to award'; Section L is stricter ('at time of proposal'). Section L is the operative/stricter instruction — SAM must be active AT offer. Bidder-side obligation; caution, not structural bar under null profile."
+    },
+    {
+      "id": "min-acceptance-period-33-days",
+      "description": "SF-1442 block, line 265: 'Offers providing less than 33 calendar days for Government acceptance after the date offers are due will not be considered and will be rejected.' A with-offer responsiveness condition — offeror must allow >=33 days acceptance. Easy to comply; caution-level completeness item."
+    },
+    {
+      "id": "funds-not-available-contingency",
+      "description": "Line 237: 'Funds are not presently available for this project. No award will be made until funds are available.' Plus Government right to cancel before/after bid closing with no obligation. Non-routine but government-side appropriations contingency — does not bar a bidder. Surfaced as caution."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "funds-not-available-as-defect",
+      "token": "Funds are not presently available",
+      "aliases": [
+        "No award will be made until funds are available",
+        "right to cancel this solicitation",
+        "subject to availability of funds"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Government-side appropriations contingency (52.232-18 style). Looks alarming but bars no bidder and is not a solicitation defect. Must NOT be raised as a disqualifying gate. (Also surfaced as a caution item for completeness; it must not be raised as a GATE.)"
+    },
+    {
+      "id": "preaward-responsibility-docs",
+      "token": "Financial ability to perform the contract",
+      "aliases": [
+        "lowest priced bidder must be determined to be responsible",
+        "FAR 9.104-1",
+        "current financial statement",
+        "bank",
+        "four or more commercial firms",
+        "Contractor Qualification"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Section L (3): pre-award responsibility check (FAR 9.104-1) applied ONLY to the apparent low bidder — financial statements, bank refs, 4 commercial references. NOT an all-offerors submission gate. Must NOT be raised as a disqualifying submission gate."
+    },
+    {
+      "id": "adequate-price-competition-no-tina",
+      "token": "high probability of adequate price competition",
+      "aliases": [
+        "52.215-1",
+        "certification under FAR 15.406-2 will not be required",
+        "adequate price competition",
+        "no additional cost information"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Section L (1)(d): CO determined high probability of adequate price competition; 15.406-2 certified cost/pricing data NOT required. Competitive acquisition = TINA-exempt. Must NOT be raised as a cost/pricing-data disqualifier."
+    },
+    {
+      "id": "insurance-work-on-installation",
+      "token": "Insurance-Work on a Government Installation",
+      "aliases": [
+        "52.228-5",
+        "General Liability",
+        "$500,000 per occurrence",
+        "Employers Liability",
+        "bodily injury liability"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Lines 669-681: 52.228-5, FAR 28.307-2 minimum insurance ($500K GL per occurrence, $100K employers liability, auto). Post-award performance machinery to work on the installation — NOT a pre-award submission gate or eligibility bar. Mirrors #4 (AOC) insurance decoy. Must NOT be conflated with bonding (Q3/Q4) and must NOT be raised as a disqualifier."
+    }
+  ],
+  "_notes": {
+    "verdict_adjudication": "Two-way blind cold-read (Brain + Gemini 3.1 Pro), every load-bearing call source-verified by Brain via grep against raw source. GPT-5.5 unavailable (repeated file-load crash) — NOT an analytical disagreement; documented for provenance. Brain adversarial pass found only two minor completeness items (33-day acceptance min; base-version due date), no missed gate or contradiction. All anchors confirmed: LPTA (line 8), bid-guarantee-with-offer (line 159), perf/payment 100% (line 1375), Davis-Bacon (line 728), SDVOSB operative (line 235), insurance decoy (line 669).",
+    "set_aside_resolution": "Apparent contradiction (line 235 SDVOSB vs line 723 clause-list 52.219-6 Total SB) resolved: line-235 localized operative restriction governs; 52.219-6 is parent-category boilerplate, not a conflicting gate. 52.219-27 (SDVOSB notice clause) absent from clause list — a solicitation drafting gap, noted, but the operative restriction is unambiguous.",
+    "source_caveat": "Uploaded source is the BASE solicitation (issued 30 Jul 2024). Amendment 4 (which supersedes Amds 1-3 per CEO) was NOT in the uploaded text dump. Due date shown is the base 29 Aug 2024; any amended date is out-of-source. Gates/verdict/decoys do not depend on the exact due date. Two Davis-Bacon WD PDFs garbled on extraction; wage GATE authored from 52.222-6 + WD-applies in main body.",
+    "evaluation_factors": "Section M: Factor 1 Relevant Past Performance (unknown = acceptable in LPTA), Factor 2 Prior Experience, Factor 3 Price. Binary acceptability then lowest TEP."
+  },
+  "adjudication": {
+    "authoredBlind": true,
+    "adjudicatedBy": [
+      "CEO",
+      "Brain"
+    ],
+    "frozenAt": "2026-06-26T18:00:00Z",
+    "sourceSha256": "42c65df66c682e503239764fcdc04f73d87247742f8b8c0baa058af5d06e869b",
+    "keySha256": "0ccc20b9722b705b40dac8973ef142173fe6e79e2f4fa974cd057de29032512d"
+  }
+}

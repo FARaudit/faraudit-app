@@ -72,3 +72,5 @@ e2e/tests/_diag-*.spec.ts
 # local PDF verification artifacts (FA-130 era exports)
 test/pdfs/
 supabase/.temp/
+
+.claude/worktrees/

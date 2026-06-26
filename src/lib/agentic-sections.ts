@@ -88,6 +88,85 @@ export function assembleLensSource(
   return { lens, text: parts.join("\n\n"), includedSections, missingSections, droppedForBudget };
 }
 
+/** Split text into chunks each ≤ maxChars, preferring paragraph (blank-line) then line then hard
+ *  boundaries. NO content is dropped — `chunks.join("") === text` exactly (the #4 anti-drop guarantee:
+ *  budget pressure produces MORE passes, never a lost section). Pure → gate-testable. */
+export function chunkText(text: string, maxChars: number): string[] {
+  const max = Math.max(1, Math.floor(maxChars));
+  if (text.length <= max) return [text];
+  const chunks: string[] = [];
+  let buf = "";
+  const flush = () => { if (buf) { chunks.push(buf); buf = ""; } };
+  for (const para of text.split(/(\n\n+)/)) {            // keep separators as elements (no loss on rejoin)
+    if (para.length > max) {                              // a single paragraph too big → go finer
+      if (buf.length + para.length > max) flush();
+      for (const line of para.split(/(\n)/)) {
+        if (line.length > max) {                          // pathological single line → hard slices
+          flush();
+          let i = 0;
+          while (i < line.length) {
+            let end = Math.min(i + max, line.length);
+            // re-review #6: don't end a slice on a high surrogate (would split a 😀-style pair and
+            // hand a lens a lone/broken code unit in its excerpt) — push it to the next chunk.
+            if (end < line.length) { const c = line.charCodeAt(end - 1); if (c >= 0xd800 && c <= 0xdbff) end -= 1; }
+            if (end <= i) end = Math.min(i + max, line.length); // never zero-progress (degenerate max=1)
+            chunks.push(line.slice(i, end));
+            i = end;
+          }
+        } else if (buf.length + line.length > max) { flush(); buf = line; }
+        else buf += line;
+      }
+      continue;
+    }
+    if (buf.length + para.length > max) { flush(); buf = para; }
+    else buf += para;
+  }
+  flush();
+  return chunks;
+}
+
+/** #4 — CHUNK-REDUCE assembly (Brain ruling). Like assembleLensSource but NEVER drops a section for
+ *  budget: assigned sections are bin-packed into one or more PASSES (each ≤ budget); a single section
+ *  larger than the budget is chunked across passes. The runner calls the lens once per pass and
+ *  REDUCES (merges) the findings — so every binding section is read in full, no matter the size. The
+ *  §B-drop root cause is gone: budget pressure costs an extra pass, not a lost section. Returns the
+ *  passes, the absent (missing) sections, and the concatenated source (for excerpt-grounding across
+ *  all passes). Pure → gate-testable. */
+export function assembleLensPasses(
+  lens: PanelLensKey,
+  sectionText: Record<string, string>,
+  opts: { perLensBudgetChars?: number } = {}
+): { passes: LensSourceBundle[]; missingSections: string[]; sourceConcat: string } {
+  const budget = opts.perLensBudgetChars ?? DEFAULT_LENS_BUDGET_CHARS;
+  const assigned = LENS_SECTIONS[lens] ?? [];
+  const missingSections: string[] = [];
+  // 1) build blocks; chunk any single section that alone exceeds budget (header preserved per part).
+  const blocks: Array<{ key: string; text: string }> = [];
+  for (const key of assigned) {
+    const raw = (sectionText[key] ?? "").trim();
+    if (!raw) { missingSections.push(key); continue; }
+    const header = `## SECTION ${key}`;
+    const full = `${header}\n${raw}`;
+    if (full.length <= budget) { blocks.push({ key, text: full }); continue; }
+    // chunk budget must leave room for the per-part header "## SECTION X (part 99/99)\n" (re-review #4
+    // — a too-small allowance produced over-budget parts). 20 chars covers the part-label + newline.
+    const chunks = chunkText(raw, Math.max(1, budget - header.length - 20));
+    chunks.forEach((c, i) => blocks.push({ key, text: `${header} (part ${i + 1}/${chunks.length})\n${c}` }));
+  }
+  // 2) first-fit bin-pack blocks into passes ≤ budget (preserves the priority order of LENS_SECTIONS).
+  const passes: LensSourceBundle[] = [];
+  let cur: { parts: string[]; keys: Set<string>; used: number } | null = null;
+  const flush = () => { if (cur) { passes.push({ lens, text: cur.parts.join("\n\n"), includedSections: [...cur.keys], missingSections, droppedForBudget: [] }); cur = null; } };
+  for (const b of blocks) {
+    if (cur && cur.used + b.text.length > budget && cur.parts.length) flush();
+    if (!cur) cur = { parts: [], keys: new Set(), used: 0 };
+    cur.parts.push(b.text); cur.keys.add(b.key); cur.used += b.text.length + 2;
+  }
+  flush();
+  if (!passes.length) passes.push({ lens, text: "", includedSections: [], missingSections, droppedForBudget: [] });
+  return { passes, missingSections, sourceConcat: passes.map((p) => p.text).join("\n\n") };
+}
+
 /** Wrap raw extracted text as a minimal ExtractedDocument for section detection. Boundary
  *  detection is line/pattern based, so one synthetic page suffices — we only need the per-section
  *  .text slices, not real page numbers. */
@@ -102,6 +181,9 @@ export interface SectionTextOpts {
   /** called with attachment names that matched NO routing rule (binding content the lenses won't
    *  see) — the caller MUST treat a non-empty list as a coverage concern (anti silent-drop, #2b). */
   onUnrouted?: (names: string[]) => void;
+  /** called with the amendment-resolution audit trail (#3) — which amendment superseded which per
+   *  section/exhibit. Observability, not a gap (resolution is the fix, not a failure). */
+  onResolutionLog?: (log: string[]) => void;
 }
 
 /** Minimum normalized WORD count for an excerpt to count as grounding. A 2–3 word generic snippet
@@ -129,11 +211,207 @@ export function excerptInSource(excerpt: string, source: string): boolean {
   return norm(source).includes(e);
 }
 
+/** Route ONE binding attachment to a destination by filename (Stage-6 completion #2 — route everything).
+ *  Returns a UCF section key ("C", "J", …) for additive base content the lens reads directly;
+ *  "AMENDMENTS" for SF-30 covers AND "revised Section X" replacements — these CANNOT be appended to
+ *  their section as-is (that would put the superseded original AND its replacement in front of the lens
+ *  as conflicting text — the exact trap Brain flagged); they go to amendment-resolution (#3) which
+ *  assembles the current version before chunking; or null for genuinely unclassifiable content (still
+ *  surfaced → coverage floor, never silently dropped). Order = most-specific first. Pure → gate-testable.
+ *
+ *  Real N4008526R0065 names this resolves (was 28 unrouted):
+ *    "Amendment 0005 Revised Section C …"        → AMENDMENTS (replacement, needs resolution)
+ *    "N4008525R2574 Section C ANNEXES.pdf"        → C  (base annex, additive)
+ *    "J-1503010-09 Inventory.xlsx"                → J  (J-exhibit)
+ *    "Solicitation Amendment …SF 30.pdf"          → AMENDMENTS
+ *    "Site Visit Sign-In Sheet_Redacted.pdf"      → null (administrative; flagged, not dropped) */
+/** REGEX: an attachment is an amendment/revision (vs base content). SF-30 covers, ANY "Amendment"/
+ *  "Amend", "revised/revision/conformed/amended", and "Mod(ification)". Re-review HIGH #1 fix: the
+ *  prior version required a DIGIT right after "Amendment" or the literal word "revised", so a real
+ *  amendment named "Conformed Section M" / "Amendment - Section C Update" slipped through as base
+ *  content and got merged with the superseded original — the exact conflicting-text trap this module
+ *  exists to kill. Broadened to bare amendment verbs; over-flagging errs SAFE (→ resolution/INCOMPLETE),
+ *  under-flagging errs DANGEROUS (conflicting text). Shared by routeAttachment (#2) + classifyAttachment (#3). */
+export const AMENDMENT_NAME_RE = /\bsf[\s_-]?30\b|solicitation\s+amendment|\bamendments?\b|\bamend(?:ed|ment)?\b|\b(revised|revision|conformed)\b|\bmod(?:ification)?\b/i;
+
+/** The UCF section letter an attachment's CONTENT belongs to, by filename (NO amendment logic —
+ *  shared by routeAttachment + classifyAttachment so the two never drift). Returns null if no rule
+ *  matches. Order = most-specific first. Pure. */
+export function sectionLetterFromName(name: string): string | null {
+  const sec = name.match(/\bsection\s+([a-m])\b/i);
+  if (sec) return sec[1].toUpperCase();
+  const ex = name.match(/\b([a-m])-\d{3,}/i); // exhibit naming "J-1503010-09", "C-0200000"
+  if (ex) return ex[1].toUpperCase();
+  if (/\b(pws|sow|soo|statement\s+of\s+work|performance\s+work\s+statement|statement\s+of\s+objectives|scope\s+of\s+work)\b/i.test(name)) return "C";
+  if (/\b(wage\s*det(?:ermination)?|sca|cba|collective\s+bargaining|davis-bacon)\b/i.test(name)) return "B";
+  if (/\b(inventory|elins?|government\s+furnished|gfp|gfe|exhibit|annex(?:es)?|service\s+level\s+standards?)\b/i.test(name)) return "J";
+  return null;
+}
+
+/** The section letter ONLY when the name EXPLICITLY says "Section X" (whole-section identity), NOT when
+ *  it was inferred by content type (wage→B, PWS→C). Content-loss fix (Brain 2026-06-25): a revision may
+ *  REPLACE a whole section only when it explicitly names that section ("Revised Section B"); a content-
+ *  routed revision ("Revised Wage Determination" → §B by heuristic) is §B CONTENT, not the whole §B, and
+ *  must APPEND — replacing §B with just the WD drops the primary's pricing schedule. Pure. */
+export function explicitSectionLetter(name: string): string | null {
+  const sec = name.match(/\bsection\s+([a-m])\b/i);
+  return sec ? sec[1].toUpperCase() : null;
+}
+
+/** Is an attachment an UNAMBIGUOUSLY administrative artifact carrying NO binding obligations (a sign-in
+ *  sheet, attendance roster, visitor log, distribution/mailing list, table of contents)? Such a file
+ *  routes to no UCF section, but it is NOT a coverage gap — forcing INCOMPLETE on it is the over-precision
+ *  bug that killed the 6E run (a redacted Site Visit Sign-In Sheet). CONSERVATIVE on BOTH axes (Brain's
+ *  "under-flagging errs DANGEROUS"): the NAME must match a clearly-administrative pattern AND the body
+ *  must carry no obligation language — if either is uncertain, it stays a binding gap (honest INCOMPLETE).
+ *  A revision/amendment is NEVER administrative. Pure → gate-testable. */
+const ADMIN_NAME_RE = /\b(sign[\s_-]?in|attendance|attendee|visitor)\b.*\b(sheet|roster|log|list)\b|\bsign[\s_-]?in\s+sheet\b|\bsite\s+visit\s+sign[\s_-]?in\b|\b(distribution|mailing)\s+list\b|\btable\s+of\s+contents\b|\b(toc)\b/i;
+// Obligation language ⇒ the file may bind the offeror ⇒ treat as a coverage gap, never administrative.
+const OBLIGATION_RE = /\b(shall|must|required|offeror|contractor\s+shall|wage|clause|far\s|dfars|deliverable|cdrl|evaluat|proposal|price|cost\b|period\s+of\s+performance|qaspx?|sow|pws)\b/i;
+export function isAdministrativeNonBinding(name: string, text: string | null): boolean {
+  if (AMENDMENT_NAME_RE.test(name)) return false;       // a revision is never benign-administrative
+  if (!ADMIN_NAME_RE.test(name)) return false;          // name must be unambiguously administrative
+  if (OBLIGATION_RE.test(text ?? "")) return false;     // body carries obligations → still a binding gap
+  return true;
+}
+
+export function routeAttachment(name: string): string | "AMENDMENTS" | null {
+  // Amendment covers + ANY "revised" replacement → resolution stream (must precede section/exhibit
+  // matching: "Amendment 0005 Revised Section C" is a replacement, NOT a base §C to append).
+  if (AMENDMENT_NAME_RE.test(name)) return "AMENDMENTS";
+  return sectionLetterFromName(name);
+}
+
+/** Part-12 (commercial-item, streamlined) vs Part-15 (negotiated) classification from the incorporated
+ *  clause set (Brain doctrine 2026-06-25). A 52.212-x clause ⇒ Part-12; a 52.215-x clause ⇒ Part-15;
+ *  neither ⇒ UNKNOWN. Replaces any ASSUMED commercial-item treatment — the panel must apply the correct
+ *  clause checklist (N4008526R0065 has zero 52.212-x and ten 52.215-x ⇒ Part-15). The classification
+ *  feeds the (to-be-authored) judgment key, NOT a hardcoded default. Pure → gate-testable. */
+export function classifyAcquisitionPart(clauseNumbers: string[]): "PART_12" | "PART_15" | "UNKNOWN" {
+  if (clauseNumbers.some((c) => /\b2?52\.212-/.test(c))) return "PART_12"; // commercial-item provisions present
+  if (clauseNumbers.some((c) => /\b52\.215-/.test(c))) return "PART_15";   // negotiated-procurement clauses present
+  return "UNKNOWN";
+}
+
+/** Classify ANY attachment (base OR amendment) for resolution (#3): its amendment sequence NUMBER
+ *  (base = 0; "Amendment 0011" = 11; SF-30 cover trailing seq), the EXHIBIT id if it revises one
+ *  specific exhibit ("J-1503010-09" — must NOT wipe sibling §J exhibits), the parent SECTION letter,
+ *  and whether it is a revision. Pure → gate-testable. */
+export function classifyAttachment(name: string): { number: number; section: string | null; sectionExplicit: boolean; exhibitId: string | null; isRevision: boolean; isCover: boolean } {
+  const isRevision = AMENDMENT_NAME_RE.test(name);
+  let number = 0;
+  const amd = name.match(/amendment\s*0*(\d+)/i); // capture the FULL run (re-review #5: \d{1,4} truncated "Amendment 10000"→1000)
+  if (amd) number = parseInt(amd[1], 10);
+  else { const sf = name.match(/(\d{2,4})\s*[\s_-]*sf[\s_-]*30/i); if (sf) number = parseInt(sf[1], 10); }
+  const ex = name.match(/\b([a-m])-\d{3,}(?:-\d+)*/i);
+  const exhibitId = ex ? ex[0].toUpperCase() : null;
+  const section = sectionLetterFromName(name);
+  // An SF-30 COVER (vs a "Revised Section/exhibit" replacement) carries no section text — its binding
+  // Item-14 deltas (deadline extensions, Q&A) are captured by the MAP/facts layer, NOT a lens section.
+  // So a cover is benign (logged), never a coverage gap. KEY DISTINCTION (2nd-pass review fix): a file
+  // is a pure cover ONLY if it does NOT carry revised/conformed content or name an exhibit — that
+  // carve-out must apply to BOTH the SF-30 branch AND the bare-amendment branch, else a combined
+  // "Solicitation Amendment 0005 SF 30 Revised Section C" (cover + the revised pages in one PDF) is
+  // misread as a benign cover and its replacement text is dropped. We carve out on revised/conformed/
+  // exhibit (content IS here) but NOT on a bare "Section" mention (a cover that merely says "amends
+  // Section B" is still a pure cover — the §B text isn't in it).
+  const isCover = (/\bsf[\s_-]?30\b|solicitation\s+amendment/i.test(name) || /\bamendment\s*\d/i.test(name))
+    && !/\b(revised|revision|conformed)\b/i.test(name) && !/\b[a-m]-\d{3,}/i.test(name);
+  return { number, section, sectionExplicit: explicitSectionLetter(name) !== null, exhibitId, isRevision, isCover };
+}
+
+/** AMENDMENT RESOLUTION (Stage-6 #3, the architectural heart). Given ALL attachments (base + SF-30
+ *  revisions), assemble the CURRENT version per section so a lens never sees a superseded original AND
+ *  its replacement as conflicting text (the trap Brain flagged). Rules, each LATEST-sequence-wins:
+ *   • EXHIBIT revision (has exhibitId) supersedes only THAT exhibit; surviving siblings stay — the
+ *     winner merges into its parent section. (base counts as sequence 0, so any amendment beats it.)
+ *   • SECTION-LEVEL "Revised Section X" REPLACES the whole section (returned in `replaces` so the
+ *     caller overrides the primary's detected §X too — the amendment is the current §X).
+ *   • plain base additive (no exhibit, not a revision) appends to its section.
+ *   • a revision whose target can't be identified → `unresolved` (a coverage gap → INCOMPLETE).
+ *  Returns the attachment-derived section text + which sections fully REPLACE the primary + an audit
+ *  log of every supersession + the unresolved list. Pure → gate-testable. */
+export function resolveAttachments(attachments: Array<{ name: string; text: string }>): {
+  sections: Record<string, string>;
+  replaces: Set<string>;
+  log: string[];
+  unresolved: string[];
+} {
+  const out: Record<string, string> = {};
+  const replaces = new Set<string>();
+  const log: string[] = [];
+  const unresolved: string[] = [];
+  const classified = attachments
+    .map((a) => ({ ...a, ...classifyAttachment(a.name) }))
+    .filter((a) => (a.text ?? "").trim());
+
+  const exhibitGroups = new Map<string, typeof classified>();
+  const sectionReplacements = new Map<string, typeof classified>();
+  const plain: typeof classified = [];
+  for (const a of classified) {
+    // ORDER (re-review HIGH #2): a COVER is tested BEFORE "revision+section", so an SF-30 cover that
+    // merely MENTIONS a section ("…SF 30 amends Section B") is logged benign — it can NEVER be
+    // mistaken for a whole-section REPLACEMENT that would wipe the real §B. An exhibit id is still
+    // most-specific (first). A genuine "Revised Section X" is not a cover (isCover excludes it).
+    if (a.exhibitId) { const g = exhibitGroups.get(a.exhibitId) ?? []; g.push(a); exhibitGroups.set(a.exhibitId, g); }
+    else if (a.isCover) log.push(`amendment cover ${a.number ? `(Amendment ${a.number}) ` : ""}${a.name} — Item-14 deltas captured upstream (MAP), no section text`);
+    // CONTENT-LOSS FIX (Brain 2026-06-25): a revision REPLACES a whole section ONLY when it EXPLICITLY
+    // names that section ("Revised Section B"). A content-routed revision ("Revised Wage Determination"
+    // → §B by heuristic) is §B CONTENT, not the whole §B — it falls through to `plain` and APPENDS, so
+    // the primary's pricing schedule is never overwritten.
+    else if (a.isRevision && a.section && a.sectionExplicit) { const g = sectionReplacements.get(a.section) ?? []; g.push(a); sectionReplacements.set(a.section, g); }
+    else if (a.section) plain.push(a);
+    else if (isAdministrativeNonBinding(a.name, a.text)) log.push(`administrative (non-binding): ${a.name} — routes to no section but carries no obligation language; NOT a coverage gap`);
+    else unresolved.push(a.name); // a "Revised <thing>" / unplaceable binding file we could NOT place — a real coverage gap
+  }
+
+  // DETERMINISTIC latest-wins: sort by sequence, tie-break by name (re-review #3 — equal numbers were
+  // resolved by array order, i.e. nondeterministic; a name tie-break makes the winner reproducible).
+  const latestWins = (grp: typeof classified): typeof classified => [...grp].sort((x, y) => x.number - y.number || x.name.localeCompare(y.name));
+  const collisionNote = (grp: typeof classified, label: string) => {
+    const max = grp[grp.length - 1].number;
+    const tied = grp.filter((g) => g.number === max);
+    if (tied.length > 1) log.push(`⚠ ${label}: ${tied.length} attachments share sequence ${max} — winner picked by name (verify): ${tied.map((t) => t.name).join(" vs ")}`);
+  };
+
+  // ORDER MATTERS: section-level replacement first (it is the current §X FOUNDATION), THEN exhibits
+  // APPEND to it — so a "Revised Section C" never clobbers a surviving C-NNNN exhibit (adversarial fix).
+  for (const [sec, raw] of sectionReplacements) {
+    const grp = latestWins(raw); const win = grp[grp.length - 1];
+    out[sec] = `[Section ${sec} — CURRENT VERSION (Amendment ${win.number || "?"}): ${win.name}]\n${win.text.trim()}`;
+    replaces.add(sec);
+    collisionNote(grp, `§${sec} replacement`);
+    log.push(`§${sec}: current = Amendment ${win.number || "?"} (${win.name})${grp.length > 1 ? `; superseded ${grp.slice(0, -1).map((s) => `Amd ${s.number || "?"}`).join(", ")}` : ""}`);
+  }
+  // exhibit revisions → latest per exhibit wins; winners merge into parent section (siblings preserved)
+  for (const [exId, raw] of exhibitGroups) {
+    const grp = latestWins(raw); const win = grp[grp.length - 1];
+    const superseded = grp.slice(0, -1);
+    const tag = `[exhibit ${exId} — CURRENT${win.number ? ` (Amendment ${win.number})` : ""}${superseded.length ? `; supersedes ${superseded.map((s) => s.number ? `Amd ${s.number}` : "base").join(", ")}` : ""}]\n${win.text.trim()}`;
+    const parent = exId[0];
+    out[parent] = out[parent] ? `${out[parent]}\n\n${tag}` : tag;
+    collisionNote(grp, `exhibit ${exId}`);
+    if (superseded.length) log.push(`exhibit ${exId}: current = ${win.number ? `Amendment ${win.number}` : "base"}; superseded ${superseded.map((s) => s.number ? `Amd ${s.number}` : "base").join(", ")}`);
+  }
+  // plain base additive — BUT if this section was REPLACED by an amendment, the base version is
+  // SUPERSEDED by definition of a section-level replacement: do NOT append it (that would re-create
+  // the conflicting-text trap the HIGH #1 fix closes), log it for the audit trail instead. (Genuine
+  // surviving supplements are EXHIBITS — C-NNNN — and resolve via exhibitGroups, not here.)
+  for (const a of plain) {
+    if (replaces.has(a.section!)) { log.push(`§${a.section} base "${a.name}" not merged — superseded by the amendment replacement (avoids conflicting text)`); continue; }
+    const tag = `[attachment: ${a.name}]\n${a.text.trim()}`;
+    out[a.section!] = out[a.section!] ? `${out[a.section!]}\n\n${tag}` : tag;
+  }
+  return { sections: out, replaces, log, unresolved };
+}
+
 /** Build the UCF-section → source-text map the lenses read (Step 2 substrate). detectSections on
- *  the primary yields A–M where present; PWS/SOW/SOO attachments augment §C (the work) and wage
- *  determination / CBA attachments augment §B (pricing floors) — the primary's §C/§B often only
- *  REFERENCE the attachment, so the binding text lives in the attachment. Deterministic (no model/
- *  network). Filename-routed conservatively; richer per-attachment classification is a later refinement. */
+ *  the primary yields A–M where present; binding attachments are routed to their section by
+ *  routeAttachment() (#2 route-everything) — the primary's §C/§B/§J often only REFERENCE the
+ *  attachment, so the binding text lives in the attachment. SF-30 / "revised" attachments are NOT
+ *  routed to a section (they need amendment-resolution first, #3) — they're reported via onAmendments;
+ *  unclassifiable attachments via onUnrouted. Both lists are coverage gaps the caller must honor.
+ *  Deterministic (no model/network). */
 export function buildSectionText(primaryText: string, opts: SectionTextOpts = {}): Record<string, string> {
   const out: Record<string, string> = {};
   if (primaryText && primaryText.trim()) {
@@ -146,22 +424,17 @@ export function buildSectionText(primaryText: string, opts: SectionTextOpts = {}
       }
     } catch { /* detector failed — leave `out` to be filled by attachments; lenses see MISSING sections */ }
   }
-  const unrouted: string[] = [];
-  for (const a of opts.attachments ?? []) {
-    const t = (a.text ?? "").trim();
-    if (!t) continue;
-    const tagged = `[attachment: ${a.name}]\n${t}`;
-    if (/\b(pws|sow|soo|statement\s+of\s+work|performance\s+work\s+statement|statement\s+of\s+objectives)\b/i.test(a.name)) {
-      out.C = out.C ? `${out.C}\n\n${tagged}` : tagged;
-    } else if (/\b(wage\s*det(?:ermination)?|sca|cba|collective\s+bargaining)\b/i.test(a.name)) {
-      out.B = out.B ? `${out.B}\n\n${tagged}` : tagged;
-    } else {
-      // #2b: an attachment that matches NO rule is binding content the lenses won't see — report it,
-      // never silently drop (the failure mode the whole reshape exists to kill).
-      unrouted.push(a.name);
-    }
+  // #3 — resolve base + amendments to the CURRENT version BEFORE the lens reads (no conflicting text).
+  const { sections: attSections, replaces, log, unresolved } = resolveAttachments(opts.attachments ?? []);
+  for (const [sec, txt] of Object.entries(attSections)) {
+    // a section-level "Revised Section X" is the current §X — it REPLACES the primary's detected §X.
+    if (replaces.has(sec)) out[sec] = txt;
+    else out[sec] = out[sec] ? `${out[sec]}\n\n${txt}` : txt; // exhibits / base additive append
   }
-  if (unrouted.length) opts.onUnrouted?.(unrouted);
+  if (log.length) opts.onResolutionLog?.(log);
+  // a revision whose target could not be identified is binding content the lenses won't see — report
+  // it (→ coverage floor → INCOMPLETE), never silently drop (the failure the reshape exists to kill).
+  if (unresolved.length) opts.onUnrouted?.(unresolved);
   return out;
 }
 

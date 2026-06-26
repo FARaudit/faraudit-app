@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "AOCSSB26R0023",
+  "_title": "AOC President's Room Ceiling S-216 — Conservation/Stabilization of Plaster & Decorative Paint",
+  "_suiteRole": "Best-value tradeoff anchor (mirror to #2 LPTA). Proves engine distinguishes tradeoff from lowest-price.",
+  "_authoringMethod": "Blind three-way cold-read (Brain + GPT-5.5 + Gemini 3.1 Pro), CEO-adjudicated. Authored from raw source, never engine output.",
+  "acquisitionPart": "PART_15",
+  "bidderProfile": null,
+  "expectedVerdict": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "Open to all sizes, no set-aside, no structural bar for a generic qualified bidder. Non-routine risk cluster justifies caution: mandatory technical-acceptability floor (below Acceptable on Factors 1/2/3 = ineligible, price not evaluated), 20-year senior-conservator experience minimums, and an unpriced implementation option. Best-value tradeoff, technical significantly more important than price."
+  },
+  "namedGates": [
+    {
+      "id": "award-basis-tradeoff",
+      "token": "Trade-Off",
+      "aliases": [
+        "Tradeoff Process",
+        "best value",
+        "technical factors when combined are considered significantly more important than price",
+        "descending order of importance"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "met",
+      "isTrap": true,
+      "note": "ANCHOR CALL. Award basis is best-value tradeoff per Section L preamble (AOC Contracting Manual 9.1.2(a) Tradeoff Process) + Section M.1. Technical factors combined significantly more important than price; four ranked non-price factors. Engine MUST classify as tradeoff, NOT LPTA, NOT lowest-price. Mirror to #2 (1240LP26Q0067) where LPTA governs. Tie-breaker: if technically equivalent, price may become determining — does NOT convert this to LPTA."
+    },
+    {
+      "id": "technical-acceptability-floor",
+      "token": "rate below Acceptable under Factors 1, 2, and 3 will not be eligible for award",
+      "aliases": [
+        "price (Factor 5) will not be evaluated",
+        "Acceptable floor",
+        "below Acceptable"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Section M.2. Hard disqualification mechanic inside a tradeoff: any non-price Factor 1/2/3 rated below Acceptable = ineligible for award, price not evaluated. Real gate, drives the BID_WITH_CAUTION verdict."
+    },
+    {
+      "id": "senior-conservator-20yr-minimum",
+      "token": "minimum of twenty (20) years",
+      "aliases": [
+        "20 years hands-on",
+        "Senior plaster conservator",
+        "Senior painting conservator",
+        "masonry vaults"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "SOW 3.1. Senior plaster + senior painting conservators each require 20 years hands-on on masonry-vault plaster/fresco; plaster senior must include multi-coat plaster on masonry vaults, painting senior must include painted/gilded/fresco on plaster vaults. Real Key-Personnel (Factor 3) acceptability gate."
+    },
+    {
+      "id": "volume-organization-page-limits",
+      "token": "Content that is outside the Page Limits in the above chart will be redacted and not evaluated",
+      "aliases": [
+        "Volume I Technical",
+        "Volume II Price",
+        "Pricing is prohibited in, and shall be omitted from, Volume I",
+        "10-page limit",
+        "shall not be considered or evaluated"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "caution",
+      "note": "Section L.3. Strict two-volume structure, page limits, price-in-Volume-II-only. Content outside designated location/limits redacted and not evaluated. Responsiveness/format gate — caution, not auto-disqualifier."
+    }
+  ],
+  "showStoppers": [],
+  "cautionItems": [
+    {
+      "id": "on-time-submission",
+      "description": "Proposal due Monday 20 April 2026 2:00 PM ET, email only to CO (troy.dorsey@aoc.gov) and Contract Specialist (lily.najera@aoc.gov). Late = not accepted unless in Government's best interest. Universal responsiveness gate."
+    },
+    {
+      "id": "unpriced-option-1",
+      "description": "CLIN 0002 (Option 1, Implementation) is UNPRICED — negotiated after treatment plan approval, with CLIN 0004 T&M rates as the basis. Bidder must NOT force-price CLIN 0002. Part of the non-routine risk cluster."
+    },
+    {
+      "id": "sam-registration-active",
+      "description": "Active SAM registration required at offer submission through final payment (AOC52.204-5). Bidder-side obligation — caution, not disqualifier under null profile."
+    },
+    {
+      "id": "ppq-routing",
+      "description": "Past Performance Questionnaires (J.9) must be completed by the offeror's references and emailed DIRECTLY to CO + Contract Specialist by the proposal due date — not bundled in the bidder's own volume. Misrouting risks a neutral/fail on Factor 4."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "insurance-not-a-bond",
+      "token": "Insurance",
+      "aliases": [
+        "AOC52.228-2",
+        "AOC52.228-3",
+        "AOC52.228-4",
+        "$500,000 for each occurrence",
+        "$1,000,000.00 professional liability",
+        "Indemnification and Hold Harmless"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Post-award performance insurance (bodily injury/property $500K/$2M, professional liability $1M, indemnification). Due within 20 days after award / before commencing work — NOT a proposal submission gate. CRITICAL CONTRAST: there is NO performance or payment bond in this solicitation (only conditional JV 'bid bond if applicable'). The bond gate belongs to #5 (FA6670-24-R-0001 construction). Insurance must NOT be raised as a disqualifying gate or conflated with bonding."
+    },
+    {
+      "id": "conditional-cost-pricing-data",
+      "token": "If price analysis cannot establish a fair and reasonable price",
+      "aliases": [
+        "AOC52.215-11",
+        "Examination of Costs",
+        "cost and pricing data"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "AOC52.215-11. Cost/pricing data only IF price analysis fails to establish fair/reasonable price. Competitive negotiated tradeoff — conditional, not a triggered TINA gate. Must NOT be raised as a disqualifier."
+    },
+    {
+      "id": "non-mandatory-site-visit",
+      "token": "NON-MANDATORY site visit",
+      "aliases": [
+        "52.237-1 Site Visit",
+        "urged and expected",
+        "Tuesday, April 7, 2026"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Section L.2.1 expressly NON-MANDATORY. Standard 52.237-1 'urged and expected' language does not override the specific non-mandatory instruction. Nonattendance is not a disqualifier. Mirrors Norfolk (#1) site-visit decoy."
+    },
+    {
+      "id": "aoc-not-far-subject",
+      "token": "is not subject to the Federal Acquisition Regulation",
+      "aliases": [
+        "AOC Contracting Manual",
+        "not subject to the FAR",
+        "Legislative Branch"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "AOC runs its own Contracting Manual; stated twice. FAR provisions on the SF-33 (e.g. 52.215-1) act as incorporated contractual terms, not governing statute. Engine must NOT flag the solicitation as defective/non-compliant on this basis — it is the governing framework, not a defect. Classification = negotiated/Part-15-equivalent."
+    },
+    {
+      "id": "dpas-rated-order",
+      "token": "Rated Order under the Defense Priorities and Allocations System",
+      "aliases": [
+        "DPAS",
+        "15 CFR 700"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "SF-33 Block 1. DPAS rated order is a post-award delivery-priority obligation, not a pre-award bidder disqualifier. Easy-to-miss cover-page item that looks alarming but bars no bidder. Must NOT be raised as a gate."
+    }
+  ],
+  "_notes": {
+    "verdict_adjudication": "Three-way blind reconcile. Tradeoff-not-LPTA and no-bond confirmed across all three reads. Gemini misread Factor 1 as Technical Approach (dropped Corporate Experience); CEO ruled Factor 1 = Corporate Experience per explicit Section M.1 text — Gemini discarded on that point. Gemini's INELIGIBLE-by-lapsed-deadline discarded (invented 04/23 date; keys judge solicitation as authored, not against wall-clock; past deadline is not a structural disqualifier under doctrine).",
+    "ranked_factors": "Section M.1 verbatim descending: Factor 1 Corporate Experience > Factor 2 Technical Approach > Factor 3 Key Personnel > Factor 4 Past Performance; Factor 5 Price (subordinate, non-adjectival).",
+    "amendment": "Amendment 01 (04/09/2026) governs: revised SOW 20260409 adds sections 4.2 (kick-off + Architect meeting) and 4.13.5 (wall/floor protection by AOC); proposal due date unchanged.",
+    "section_citation_errors": "Internal citation inconsistency (L.3.5 'Section C.15.1', M.1.3 'Section 15.0'; actual key-personnel reqs at SOW 3.0). Requirements are clear — note only, not a gate.",
+    "delivery_conflict": "SF-33 embedded AOC language references sealed envelopes/courier; standalone Section L says email ONLY. Section L/M is the controlling specific instruction. Note only, not a defect."
+  }
+}

@@ -18,11 +18,13 @@
 //
 // See ceo/AGENTIC-ENGINE-REBUILD-PLAN.md Stage 6E.
 import dotenv from "dotenv";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import type { Solicitation } from "@/lib/sam";
 import { priceUsd, type UsageLike } from "./ab-extract-adapter";
+import { parseGoldSet, scoreGoldSet, graduationGate, type EngineExtraction, type PanelVerdictLike, type GoldSetFile } from "./gold-set-score";
+import { scoreJudgment, keySha256, type JudgmentKey } from "./judgment-score";
 
 dotenv.config({ path: ".env.local", quiet: true });
 
@@ -34,6 +36,27 @@ const arg = (k: string): string | undefined => {
   return i >= 0 ? process.argv[i + 1] : undefined;
 };
 const sol = arg("--sol") ?? "N4008526R0065";
+// Brain ruling 2026-06-25: gold-set recall is the SOLE correctness gate; the AI grader is OFF the
+// evidence chain (only runs with --ai-grader, as a $-costing DEV SIGNAL, never load-bearing).
+const GOLD_DRY_RUN = process.argv.includes("--gold-dry-run"); // score the cached-MAP EXTRACTION layer, $0, exit before the paid panel
+const RUN_AI_GRADER = process.argv.includes("--ai-grader");
+
+/** Load + validate the adjudicated gold set for this sol, or null. Pure I/O. */
+function loadGold(solId: string): GoldSetFile | null {
+  const p = path.join("scripts", "audit-ai", "gold-sets", `${solId}.json`);
+  if (!existsSync(p)) return null;
+  return parseGoldSet(JSON.parse(readFileSync(p, "utf8")));
+}
+/** EngineExtraction from MAP facts (clauses/requirements/evalFactors); gates come from the PANEL. */
+function extractionFromFacts(facts: { clauses?: Array<{ number?: string }>; submissionRequirements?: Array<{ text?: string }>; evaluationFactors?: Array<{ factor?: string }> }, raisedGates: string[]): EngineExtraction {
+  return {
+    clauses: (facts.clauses ?? []).map((c) => c.number ?? "").filter(Boolean),
+    requirements: (facts.submissionRequirements ?? []).map((s) => s.text ?? "").filter(Boolean),
+    evalFactors: (facts.evaluationFactors ?? []).map((f) => f.factor ?? "").filter(Boolean),
+    gates: raisedGates,
+  };
+}
+const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
 /** Derive the panel manifest set (§C/§L/§M/§B) from the agentic facts.
  *  IMPORTANT (code-review 2026-06-24): §C is the STATEMENT OF WORK (SOW/PWS/SOO), which
@@ -72,7 +95,7 @@ async function main() {
   const { runAgenticMap } = await import("@/lib/agentic-orchestrator");
   const { buildCompactMatrix, selectBindingExcerpts } = await import("@/lib/agentic-lenses");
   const { buildSectionText } = await import("@/lib/agentic-sections");
-  const { runPanelJudge } = await import("@/lib/agentic-panel-runner");
+  const { runPanelJudge, coverageTruth } = await import("@/lib/agentic-panel-runner");
   const { setStructuredUsageSink } = await import("@/lib/anthropic-structured");
   const { gradePanelQuality } = await import("./panel-grader");
   const { RUBRIC } = await import("@/lib/agentic-panel");
@@ -126,7 +149,17 @@ async function main() {
     attachments: assembled.attachments,
   });
   const scalars = scalarsFromSolicitation(solicitation, row.agency);
-  const map = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL });
+  // #7 — disk-backed content-addressed MAP cache: a re-run (or any package reusing a doc by content
+  // hash) serves the extract for $0 instead of re-paying the Haiku read. Persists across runs.
+  const cacheDir = path.join("ceo", "proofs", "map-cache");
+  mkdirSync(cacheDir, { recursive: true });
+  let mapCacheHits = 0;
+  const docCache = {
+    get: (k: string) => { const f = path.join(cacheDir, `${k}.json`); if (!existsSync(f)) return null; mapCacheHits++; return JSON.parse(readFileSync(f, "utf8")); },
+    set: (k: string, v: unknown) => { writeFileSync(path.join(cacheDir, `${k}.json`), JSON.stringify(v)); },
+  };
+  const map = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL, docCache });
+  if (mapCacheHits) console.log(`💾 MAP cache: ${mapCacheHits}/${docs.length} doc reads served from cache ($0 — not re-paid)`);
   const matrix = buildCompactMatrix(map.facts, {
     provenance: map.provenance,
     coverageStatement: map.coverage.statement,
@@ -139,8 +172,9 @@ async function main() {
   const sectionText = buildSectionText(docs[0]?.text ?? "", {
     attachments: docs.slice(1).map((d) => ({ name: d.name, text: d.text })),
     onUnrouted: (names) => unroutedAttachments.push(...names),
+    onResolutionLog: (log) => { console.log(`📑 AMENDMENT RESOLUTION (current version assembled · #3):`); for (const l of log) console.log(`   • ${l}`); },
   });
-  if (unroutedAttachments.length) console.log(`⚠ UNROUTED attachments (binding content NO lens will see — coverage concern): ${unroutedAttachments.join(" · ")}`);
+  if (unroutedAttachments.length) console.log(`⚠ UNRESOLVED/UNROUTED attachments (binding content NO lens will see — coverage concern): ${unroutedAttachments.join(" · ")}`);
   const engineCost = priceUsd(engineUsage);
   console.log(`\nENGINE(MAP) · $${engineCost.usd.toFixed(2)} · matrix≈${Math.round(matrix.length / 4)} tok · sections={${Object.keys(sectionText).sort().join(",")}} · coverage="${map.coverage.statement}"`);
 
@@ -151,17 +185,42 @@ async function main() {
   writeFileSync(matrixCachePath, JSON.stringify({ matrix, sectionText, bindingExcerpts, detected: [...detected], engineCostUsd: engineCost.usd, coverage: map.coverage.statement }, null, 2));
   console.log(`matrix+sections cached → ${matrixCachePath}`);
 
+  // ── $0 GOLD DRY-RUN: score the EXTRACTION layer (clauses/reqs/factors) against the gold key using
+  //    the cached MAP, then EXIT before the paid panel. No panel ⇒ gates/verdict/decoy-precision are
+  //    NOT scored here (those need the paid run). This is the "$0 dry-run against the cached MAP". ──
+  if (GOLD_DRY_RUN) {
+    const gold = loadGold(sol);
+    if (!gold) { console.log(`\n[gold-dry-run] no gold set for ${sol} — nothing to score.`); return; }
+    const ext = extractionFromFacts(map.facts, []);
+    const score = scoreGoldSet(ext, gold);
+    const grad = graduationGate(score, gold, null); // null panel ⇒ extraction-layer only
+    console.log(`\n──────── GOLD DRY-RUN · EXTRACTION LAYER · $0 (cached MAP · NO panel · NO AI grader) ────────`);
+    console.log(`planted-hard CLAUSE recall: ${pct(score.plantedHardRecall)} ${score.plantedHardRecall === 1 ? "✅" : "❌ FAIL"}  (missed: ${grad.missedPlantedHard.join(", ") || "none"})`);
+    console.log(`binding-clause recall: ${pct(score.bindingClauseRecall)} · precision: ${pct(score.clauses.precision)}`);
+    console.log(`binding misses (${score.missedBinding.length}): ${score.missedBinding.slice(0, 30).join(", ")}${score.missedBinding.length > 30 ? " …" : ""}`);
+    console.log(`requirements recall ${pct(score.requirements.recall)} · evalFactors recall ${pct(score.evalFactors.recall)}`);
+    console.log(`\nEXPECTED at graduation (needs the paid panel): planted-hard=100% · decoy-misfires=0 · verdict=${gold.expectedVerdict?.verdict}/eligible=${gold.expectedVerdict?.eligible}/stoppers≤${gold.expectedVerdict?.maxShowStoppers}.`);
+    console.log(`ACTUAL (extraction layer, $0): planted-hard=${pct(score.plantedHardRecall)} · gates+verdict+decoy = NOT YET SCORED (panel required).`);
+    return;
+  }
+
   // ── Fire the PANEL JUDGE (this IS the judge now) — capture $ separately ──
   const panelUsage: UsageLike[] = [];
   setStructuredUsageSink((u) => panelUsage.push(u));
   const panel = await runPanelJudge({
     sectionText,
     detectedSections: detected,
+    // only genuinely UNRESOLVED/unrouted binding content is a coverage gap now (#3 resolves amendments).
+    unroutedBinding: unroutedAttachments,
   });
   const panelCost = priceUsd(panelUsage);
   setStructuredUsageSink(null);
 
   console.log(`\n──────── PANEL RESULT ────────`);
+  // #5 ONE COVERAGE TRUTH — the authoritative coverage answer (panel layer), NOT the MAP statement.
+  const cov = coverageTruth(panel);
+  console.log(`COVERAGE TRUTH: ${cov.complete ? "✅ COMPLETE" : "⛔ INCOMPLETE"} — ${cov.reason}`);
+  if (cov.complete !== (map.coverage.statement?.toLowerCase().includes("complete") ?? false)) console.log(`   (note: MAP-layer read coverage = observability only; the panel-layer truth above governs)`);
   console.log(`fired: ${panel.fired} · manifest.ok: ${panel.manifest.ok}${panel.manifest.ok ? "" : ` (missing: ${panel.manifest.missing.join(", ")})`}`);
   if (!panel.fired) {
     console.log(`PANEL DID NOT FIRE → INCOMPLETE (honest fail, no charge to a customer). Missing required sections.`);
@@ -189,32 +248,117 @@ async function main() {
   }
   console.log(`PANEL · $${pcost.toFixed(2)}`);
 
-  // ── GRADE the panel output on the 10-dim board-room rubric — capture $ ──
+  // ── GOLD-SET RECALL — the SOLE correctness gate (Brain ruling 2026-06-25). Deterministic, NO AI,
+  //    $0. Grades the panel against the human-adjudicated answer key: planted-hard gates 100% (binary),
+  //    decoy traps mis-fired 0, named-gate recall, binding recall+precision with EVERY named miss, and
+  //    verdict-correctness vs the doctrine expectedVerdict. ──
+  const gold = loadGold(sol);
+  let grad: ReturnType<typeof graduationGate> | null = null;
+  let persistedExtraction: EngineExtraction | null = null;
+  if (gold && panel.judgment) {
+    const raised = panel.panelists.flatMap((p) => p.output?.named_hard_gates.map((g) => ({ name: g.gate, met: g.met, cite: g.citation })) ?? []);
+    const pv: PanelVerdictLike = { verdict: panel.judgment.verdict, eligible: panel.judgment.eligible, showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised };
+    persistedExtraction = extractionFromFacts(map.facts, raised.map((r) => r.name));
+    const score = scoreGoldSet(persistedExtraction, gold);
+    const sourceLedgerText = Object.values(sectionText).join("\n");
+    grad = graduationGate(score, gold, pv, sourceLedgerText); // sourceText → fabrication check (2c)
+    console.log(`\n──────── SUBSTRATE HEALTH (deterministic · $0 · NOT a graduation gate — Brain 2026-06-25) ────────`);
+    console.log(`FABRICATION (raised clause absent from source): ${grad.fabricatedClauses.length} ${grad.fabricatedClauses.length === 0 ? "✅" : "❌ " + grad.fabricatedClauses.join(", ")}`);
+    console.log(`decoy traps mis-fired as DISQUALIFYING gates  : ${grad.decoyMisfired.length} ${grad.decoyMisfired.length === 0 ? "✅" : "❌ " + grad.decoyMisfired.join(", ")}`);
+    console.log(`SUBSTRATE: ${grad.substrateClean ? "✅ CLEAN" : "❌ " + grad.failures.join(" · ")}`);
+    console.log(`[observability — RETRACTED as signals] clause-list binding ${pct(grad.bindingClauseRecall)}/prec ${pct(grad.bindingClausePrecision)} (tautological) · gate-recall ${pct(grad.gateRecall)} · verdict ${grad.verdictMatch === null ? "n/a" : grad.verdictMatch ? "match" : "differ"}`);
+    console.log(`GRADUATION: ⛔ ${grad.graduationBlockedReason}`);
+
+    // ── JUDGMENT SCORE (Brain schema 0.2) — the REAL graduation signal. Runs ONLY if the BLIND-authored
+    //    key has been frozen; verifies keySha256 (mismatch ⇒ INVALID run) then scores deterministically
+    //    ($0, no AI). No-op until Brain's key is frozen. Code did NOT author the key — only reads it. ──
+    const fkPath = path.join("scripts", "audit-ai", "gold-sets", `${sol}.judgment.frozen.json`);
+    if (existsSync(fkPath)) {
+      const jkey = JSON.parse(readFileSync(fkPath, "utf8")) as JudgmentKey;
+      const recomputed = keySha256(jkey);
+      if (jkey.adjudication?.keySha256 && jkey.adjudication.keySha256 !== recomputed) {
+        console.log(`\n⛔ JUDGMENT KEY INVALID — keySha256 mismatch (frozen ${jkey.adjudication.keySha256.slice(0, 12)}… vs recomputed ${recomputed.slice(0, 12)}…). NOT scoring.`);
+      } else {
+        // "anywhere in output" corpus (Brain Option A, 2026-06-26): judge rationale + dissent + verifier claims + gate names.
+        const analysisText = [
+          String(panel.judgment?.rationale ?? ""),
+          ...(panel.judgment?.preserved_dissent ?? []).map((d: any) => typeof d === "string" ? d : JSON.stringify(d)),
+          ...((panel as any).verifier?.claims ?? []).map((c: any) => typeof c === "string" ? c : JSON.stringify(c)),
+          ...raised.map((r) => `${r.name} ${r.cite ?? ""}`),
+        ].join(" \n ");
+        const jr = scoreJudgment(pv, jkey, sourceLedgerText, { extractedClauses: persistedExtraction?.clauses ?? [], analysisText });
+        console.log(`\n──────── JUDGMENT SCORE · frozen key · deterministic · $0 · NO AI · concept-presence (Brain Option A) ────────`);
+        console.log(`part ${jr.partClassification.ok ? "✅" : "⚠️adv"} (${jr.partClassification.actual}) · verdict ${jr.verdict.ok ? "✅" : "❌"} (${jr.verdict.actual}) · fabrication ${jr.fabricated.length === 0 ? "✅" : "❌ " + jr.fabricated.join(",")} · decoy ${jr.decoyHardFails.length === 0 ? "✅" : "❌ " + jr.decoyHardFails.join(",")}`);
+        console.log(`concepts surfaced (HARD): ${jr.namedGates.map((g) => `${g.token}:${g.surfaced ? "✅" : "❌"}`).join(" · ")}`);
+        console.log(`disposition (advisory): ${jr.dispositionAdvisories.length ? jr.dispositionAdvisories.join(" · ") : "all aligned"}`);
+        console.log(`show-stoppers surfaced (advisory): ${jr.showStoppers.map((s) => s.surfaced ? "✅" : "⚠️").join("")}`);
+        console.log(`\nJUDGMENT: ${jr.pass ? "✅ PASS" : "❌ FAIL — " + jr.failures.join(" · ")}`);
+      }
+    } else {
+      console.log(`[judgment] no frozen judgment key at ${fkPath} — judgment not scored (awaiting Brain's blind-authored key + freeze).`);
+    }
+  } else {
+    console.log(`\n[gold] no adjudicated gold set for ${sol} (or no panel judgment) — graduation cannot be scored.`);
+  }
+
+  // Persist the panel's structured output so a future grade/score never re-pays the panel ($2.53).
+  const panelOutPath = path.join("ceo", "proofs", `stage6e-panel-output-${sol}.json`);
+  writeFileSync(panelOutPath, JSON.stringify({
+    sol, coverage: cov, gradedGold: grad,
+    extraction: persistedExtraction, // self-contained $0 re-scores (no MAP/matrix needed)
+    judgment: panel.judgment, verifier: panel.verifier,
+    panelists: panel.panelists.map((p) => ({ key: p.key, output: p.output })),
+  }, null, 2));
+  console.log(`panel output persisted → ${panelOutPath}`);
+
+  // ── AI grader — OFF the evidence chain by default (Brain 2026-06-25). Runs ONLY with --ai-grader,
+  //    as a $-costing DEV SIGNAL, never load-bearing on the graduation decision. ──
   const graderUsage: UsageLike[] = [];
-  setStructuredUsageSink((u) => graderUsage.push(u));
-  const grade = await gradePanelQuality({ panel, matrix, apiKey });
-  const graderCost = priceUsd(graderUsage);
-  setStructuredUsageSink(null);
+  if (RUN_AI_GRADER) {
+    const sourceLedger = Object.entries(sectionText).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `## SECTION ${k}\n${v}`).join("\n\n");
+    setStructuredUsageSink((u) => graderUsage.push(u));
+    const grade = await gradePanelQuality({ panel, sourceLedger, apiKey });
+    setStructuredUsageSink(null);
+    console.log(`\n──────── AI GRADER (DEV SIGNAL ONLY — NOT load-bearing) ────────`);
+    console.log(`signal: ${grade.grade.verdict} — ${grade.grade.reason}`);
+    grade.dims.forEach((d, i) => {
+      const kind = RUBRIC[i]?.kind ?? "quality";
+      const mark = kind === "eligibility" ? (d.pass ? "PASS" : "FAIL") : `${d.score}/5`;
+      console.log(`  [${kind === "gate" ? "GATE" : kind === "eligibility" ? "ELIG" : "QUAL"}] ${d.dimension}: ${mark}${d.auto_failed ? " ⚠AUTO-FAIL" : ""}`);
+    });
+    console.log(`AI-GRADER · $${priceUsd(graderUsage).usd.toFixed(2)} (dev signal, excluded from the correctness gate)`);
+  } else {
+    console.log(`\n[ai-grader] OFF — not on the evidence chain (Brain 2026-06-25). Pass --ai-grader to run it as a $-costing dev signal only.`);
+  }
 
-  console.log(`\n──────── QUALITY GRADE (10-dim board-room rubric) ────────`);
-  console.log(`OUTCOME: ${grade.grade.verdict} — ${grade.grade.reason}`);
-  console.log(`eligible=${grade.grade.eligible} · quality-avg=${grade.grade.qualityAverage.toFixed(2)}${grade.grade.failedGates.length ? ` · failed-gates: ${grade.grade.failedGates.join(", ")}` : ""}`);
-  grade.dims.forEach((d, i) => {
-    const kind = RUBRIC[i]?.kind ?? "quality";
-    const mark = kind === "eligibility" ? (d.pass ? "PASS" : "FAIL") : `${d.score}/5`;
-    console.log(`  [${kind === "gate" ? "GATE" : kind === "eligibility" ? "ELIG" : "QUAL"}] ${d.dimension}: ${mark}${d.auto_failed ? " ⚠AUTO-FAIL" : ""}`);
-  });
-  console.log(`GRADER · $${graderCost.usd.toFixed(2)} (proof instrument, not a prod cost)`);
+  // ── AUDIT-LEVEL per-stage cost (CEO ask: "how the engine works" — what each stage costs) ──
+  const perStage = (heading: string, usages: UsageLike[]) => {
+    const byKey = new Map<string, UsageLike[]>();
+    for (const u of usages) {
+      const lbl = u.label ?? "?";
+      const key = lbl.startsWith("MAP ") ? "MAP per-doc (Haiku)" : lbl.replace(/\s*@\d+$/, "").trim();
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key)!.push(u);
+    }
+    console.log(`\n  ${heading} — per stage:`);
+    [...byKey.entries()].sort((a, b) => priceUsd(b[1]).usd - priceUsd(a[1]).usd)
+      .forEach(([k, us]) => console.log(`    ${k.padEnd(26)} $${priceUsd(us).usd.toFixed(2)}  (${us.length} call${us.length > 1 ? "s" : ""})`));
+  };
+  console.log(`\n──────── AUDIT-LEVEL COST BREAKDOWN (per engine stage) ────────`);
+  perStage("ENGINE / MAP", engineUsage);
+  perStage("PANEL (lenses → verifier → judge)", panelUsage);
+  if (RUN_AI_GRADER) perStage("AI GRADER (dev signal, off-chain)", graderUsage);
 
-  // ── Verdict ──
-  const total = engineCost.usd + pcost + graderCost.usd;
+  // ── Verdict — driven by the GOLD GATE, not the AI grader ──
+  const graderCostUsd = RUN_AI_GRADER ? priceUsd(graderUsage).usd : 0;
+  const total = engineCost.usd + pcost + graderCostUsd;
   console.log(`\n════════ 6E TOTAL (this run) ════════`);
-  console.log(`ENGINE $${engineCost.usd.toFixed(2)} + PANEL $${pcost.toFixed(2)} + GRADER $${graderCost.usd.toFixed(2)} = $${total.toFixed(2)}`);
-  console.log(`PER-AUDIT PROD COST (engine + panel, NOT grader) = $${(engineCost.usd + pcost).toFixed(2)}`);
+  console.log(`ENGINE $${engineCost.usd.toFixed(2)} + PANEL $${pcost.toFixed(2)}${RUN_AI_GRADER ? ` + AI-GRADER $${graderCostUsd.toFixed(2)}` : ""} = $${total.toFixed(2)}`);
+  console.log(`PER-AUDIT PROD COST (engine + panel; gold gate is $0) = $${(engineCost.usd + pcost).toFixed(2)}`);
   console.log(`Anthropic Console CSV delta is the authoritative actualization.`);
-  console.log(grade.grade.verdict === "SHIP"
-    ? `\n→ PANEL PRODUCES BOARD-ROOM OUTPUT. Eligible to graduate (Stage 5) — CEO call.`
-    : `\n→ Outcome=${grade.grade.verdict}. Do NOT graduate. Inspect the failed dims above.`);
+  console.log(grad
+    ? `\n→ SUBSTRATE ${grad.substrateClean ? "✅ CLEAN" : "❌ " + grad.failures.join(" · ")}. GRADUATION ⛔ BLOCKED — ${grad.graduationBlockedReason}. (Recall is observability only, retracted as a signal.)`
+    : `\n→ Gold not scored.`);
 }
 
 main().catch((e) => {

@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "N4008526R0065",
+  "bidderProfile": null,
+  "acquisitionPart": "PART_15",
+  "expectedVerdict": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "Part-15 negotiated 8(a) services IDIQ, LPTA acceptability-gate award; no bidder profile loaded so no bidder-side gate can produce INELIGIBLE; real compliance gates present but all bidder-satisfiable."
+  },
+  "scoring": {
+    "partClassification": {
+      "expected": "PART_15",
+      "scored": true
+    },
+    "verdict": true,
+    "gateDisposition": true,
+    "showStopperRecall": true,
+    "fabrication": 0,
+    "decoyMisfire": 0,
+    "clauseRecall": "reported-not-scored"
+  },
+  "namedGates": [
+    {
+      "id": "award-basis-lpta",
+      "aliases": [
+        "LPTA",
+        "technically acceptable",
+        "M.1.3"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "caution",
+      "sourceCite": "Section M.1.3",
+      "note": "Acceptability gate, NOT best-value tradeoff. Must not be framed as tradeoff.",
+      "token": "lowest price technically acceptable"
+    },
+    {
+      "id": "past-performance-factor",
+      "aliases": [
+        "Factor 4",
+        "non-price factor"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "Section M.2",
+      "note": "One of 4 non-price factors; UNACCEPTABLE on any factor => ineligible for award.",
+      "token": "past performance"
+    },
+    {
+      "id": "cba-scls-wage-floor",
+      "aliases": [
+        "Service Contract Labor Standards",
+        "CBA",
+        "SCLS",
+        "52.222-41",
+        "wage determination"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "Section B.6",
+      "note": "CBA/SCLS sets wage+fringe floor; pricing below is non-compliant.",
+      "token": "Collective Bargaining Agreement"
+    },
+    {
+      "id": "limitations-on-subcontracting-50pct",
+      "aliases": [
+        "Limitations on Subcontracting",
+        "50 percent",
+        "similarly situated"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "FAR 52.219-14(e)(1)",
+      "note": "Services set-aside: prime must self-perform >=50%; not optional.",
+      "token": "52.219-14"
+    },
+    {
+      "id": "proposal-due-date",
+      "aliases": [
+        "27 Aug 2026",
+        "2:00 PM EST 27 August 2026"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "unmet",
+      "sourceCite": "Amendment 0011 (supersedes base SF-33 Block 9)",
+      "isTrap": true,
+      "trapNote": "PLANTED TRAP. Correct date = 27 Aug 2026 via amendment chain (19 Mar->27 May->09 Jul->27 Aug). Reporting base 17 Feb 2026 = FAIL. Gate keys on the SPECIFIC operative date, NOT a generic 'proposal due' token, per Code's pre-flight note.",
+      "token": "27 August 2026"
+    },
+    {
+      "id": "pricing-structure",
+      "aliases": [
+        "unit price",
+        "B.10",
+        "B.11",
+        "extended total",
+        "recomputed"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "Section B.10 / B.11b",
+      "note": "Lump-sum CLINs 0001-0012 + unit prices for exhibits; unit price governs on conflict.",
+      "token": "lump sum"
+    },
+    {
+      "id": "amendment-acknowledgment",
+      "aliases": [
+        "acknowledge receipt",
+        "SF-33 Block 14",
+        "Block 14"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "unmet",
+      "sourceCite": "SF-33 Block 14",
+      "note": "11 amendments; failure to acknowledge can result in rejection.",
+      "token": "acknowledgment of amendments"
+    }
+  ],
+  "showStoppers": [
+    {
+      "id": "8a-eligibility",
+      "aliases": [
+        "52.219-6",
+        "8(a) Set-Aside",
+        "Notice of Total Small Business Set-Aside"
+      ],
+      "mustRaise": true,
+      "disqualifiesBecause": "bidder-structural",
+      "expectedDisposition": "caution",
+      "sourceCite": "Section B.4",
+      "note": "100% 8(a) competitive set-aside. Bidder-side eligibility. bidderProfile=null => surfaced as named caution gate, NOT INELIGIBLE. Flips to INELIGIBLE only if a known bidder profile is not 8(a)-certified.",
+      "description": "100% 8(a) competitive set-aside. Bidder-side eligibility. bidderProfile=null => surfaced as named caution gate, NOT INELIGIBLE. Flips to INELIGIBLE only if a known bidder profile is not 8(a)-certified.",
+      "token": "8(a)"
+    }
+  ],
+  "cautionItems": [
+    {
+      "id": "cac-base-access",
+      "tokens": [
+        "base access",
+        "CAC"
+      ],
+      "sourceCite": "Amd 11 site visit / base access form J-0200000-10",
+      "note": "Performance-side access requirement; not an eligibility gate."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "bid-bond",
+      "kind": "boilerplate",
+      "mustNotRaiseAsDisqualifying": true,
+      "mustNotRaiseAtAll": false,
+      "sourceCite": "Section B.7",
+      "note": "Bid Guarantee/Bonding: NOT REQUIRED. Raising absence = false flag.",
+      "token": "bid guarantee",
+      "aliases": [
+        "bond"
+      ]
+    },
+    {
+      "id": "idiq-minimum-guarantee",
+      "kind": "boilerplate",
+      "mustNotRaiseAsDisqualifying": true,
+      "mustNotRaiseAtAll": false,
+      "sourceCite": "Section B.3 / B.8",
+      "note": "Contract structure (recurring base-year min, 66-month ceiling). Not an eligibility gate.",
+      "token": "minimum guarantee",
+      "aliases": [
+        "indefinite delivery"
+      ]
+    },
+    {
+      "id": "site-visit",
+      "kind": "boilerplate",
+      "mustNotRaiseAsDisqualifying": true,
+      "mustNotRaiseAtAll": false,
+      "sourceCite": "Amendment 0011 revised Section L.6",
+      "note": "Site visit set to 10 Feb 2026 9:00am (Amd 11 supersedes base 'TBD'). Government-side scheduling, NOT a bidder disqualifier. NOTE: base 'to be determined' text is superseded — do not encode 'TBD'.",
+      "token": "site visit",
+      "aliases": []
+    }
+  ]
+}
