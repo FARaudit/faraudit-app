@@ -274,6 +274,32 @@ export function sectionLetterFromContent(text: string | null): string | null {
   return null;
 }
 
+// ── FABRICATION-SUPPRESSION (Fix b, Brain card 40 · Rule 64) ──────────────────────
+// "A clause the document never contained cannot be cited as document truth." A FAR/DFARS clause NUMBER
+// the engine raises but that is NOT literally in the package source is a fabricated cite (e.g. inferring
+// 52.219-14 from a Total-SB set-aside). These two pure helpers gate clause cites on literal source
+// presence; the caller strips the fabricated cite before it can propagate or be scored. Pure → testable.
+const CLAUSE_NUM_RE = /\b2?52\.\d{3}-\d{1,4}\b/g;
+const normClauseCite = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, "");
+
+/** Build a literal-source-presence checker for clause numbers (normalizes en-dashes + whitespace so
+ *  "52.219 – 14" matches "52.219-14"). */
+export function makeClauseSourceChecker(sourceText: string): (clause: string) => boolean {
+  const norm = normClauseCite(sourceText);
+  return (clause: string) => norm.includes(normClauseCite(clause));
+}
+
+/** Replace any clause NUMBER not literally in source with an honest marker. Returns the cleaned text and
+ *  the suppressed clause numbers. The underlying CONCERN survives; the unfounded clause cite does not. */
+export function stripFabricatedClauses(text: string, inSource: (c: string) => boolean): { clean: string; stripped: string[] } {
+  const stripped: string[] = [];
+  let clean = text;
+  for (const c of new Set(text.match(CLAUSE_NUM_RE) ?? [])) {
+    if (!inSource(c)) { clean = clean.split(c).join("[clause not in source — suppressed]"); stripped.push(c); }
+  }
+  return { clean, stripped };
+}
+
 /** The section letter ONLY when the name EXPLICITLY says "Section X" (whole-section identity), NOT when
  *  it was inferred by content type (wage→B, PWS→C). Content-loss fix (Brain 2026-06-25): a revision may
  *  REPLACE a whole section only when it explicitly names that section ("Revised Section B"); a content-

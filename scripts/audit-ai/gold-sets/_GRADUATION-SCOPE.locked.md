@@ -1,6 +1,6 @@
 # Agentic-engine graduation — FROZEN SCOPE + Definition-of-Done
 
-**Status:** LOCKED — CEO confirmed DoD + greenlit the build 2026-06-26. Scope frozen; DoD is the acceptance bar. Ship-gates folded in (CEO).
+**Status:** LOCKED v2 (RE-FROZEN) — original 4 fixes + Brain card-40 EXPANSION (2 named fixes + disposition correction). CEO CONFIRMED the 9-point DoD + greenlit the expansion 2026-06-26.
 **Authority:** Brain ruling on card 39 (2026-06-26). Re-sequences the 5-package Gate-2 plan.
 **Trigger:** #2 Gate-2 returned honest-INCOMPLETE — a binding attachment (`C04 Specs_Mini-Excavator.pdf`, the LPTA spec) routed to NO lens. Brain: honesty correct, **routing is the bug.**
 
@@ -34,3 +34,29 @@ The **gold SET is the BUILD TARGET**; the **5 frozen keys are the ACCEPTANCE TES
 
 ## Hold
 No spend, no build until **CEO confirms the DoD + greenlights.** Section fix is LIVE on prod; doctrine files committed `c486c3b` (local).
+
+---
+
+# EXPANSION — Brain ruling on card 40 (2026-06-26)
+
+**Why it's not scope-creep (Brain):** the gold key completed the graduation definition the attachment-fix left under-scoped. Same doctrine as the routing fix, one level up — *every binding content unit must reach a role-appropriate lens: **sections**, not just attachments.* Graduating while §L/§M/§I/§B go unread reproduces the exact failure class we just closed. ONE bounded expansion; re-freeze after; no further additions without a new card.
+
+## Two named fixes (the ONLY additions)
+**(a) Coverage-depth** — §L/§M/§I/§B content actually reaches its lenses. Carries the missed `submit pricing for all items` concept (a §B extraction miss — same root cause) and §I clause detection. Root cause: section content not reaching a lens (3 lenses returned INSUFFICIENT_INFO on #2).
+**(b) Fabrication-suppression** — source-cite-gate every raised clause: **no clause raised without a literal source cite; suppress any clause not present in the source.** Inferring 52.219-14 from "Total-SB set-aside" is the prohibited inference (Rule 64: a clause the document never contained cannot be cited as document truth). A graduated engine that fabricates is not graduated.
+
+## Plus — disposition-logic correction (counts inside (a)/(b), NOT a third lane)
+Requirements the **bidder must fulfill at proposal time** (LPTA acceptability, enclosed-cab, Certificate-of-Conformance, exact-machine brochure, …) default to **UNMET / gate-to-clear**, **never MET**. Marking them "met" pre-bid is a category error (reading bidder-side requirements as already-satisfied — a soft fabrication, asserting satisfaction with no proposal to satisfy it).
+
+## Verdict re-adjudication (sequencing note from Brain)
+Engine is WRONG; target is **BID** (the unmet gates are routine clearable execution — the *work* of bidding, not a threat to the bid decision; Buy-American / NAICS-size / 90-day-hold are standard on a Total-SB set-aside the firm is eligible for). BUT part of the current `BID_WITH_CAUTION` is **manufactured by thin §L/§M/§I reads** — so fix coverage-depth + disposition FIRST, then **re-adjudicate**. Only if it still says BID_WITH_CAUTION on full reads is it a pure calibration error to chase.
+
+## UPDATED DoD (the original 4 + these 5 — CEO to confirm)
+1. **No clause raised without a literal source cite; zero clauses in output that are absent from source.**
+2. **§L/§M/§I/§B content reaches its lenses** — zero INSUFFICIENT_INFO caused by unrouted section content; `submit pricing for all items` surfaced.
+3. **Bidder-fulfilled requirements disposition as UNMET gates, not MET.**
+4. **Re-graded against `5649b421`: verdict resolves to BID, fabrication gone, missed concept present.**
+5. **All 5 gold packages re-proven end-to-end** before any key is scored.
+
+## Hold (Brain)
+CEO confirmed + greenlit 2026-06-26 — build authorized.

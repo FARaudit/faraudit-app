@@ -12,7 +12,7 @@ import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
   checkManifest, type ManifestResult, type PanelTier,
 } from "./agentic-panel";
-import { assembleLensPasses, excerptInSource, LENS_SECTIONS, type PanelLensKey } from "./agentic-sections";
+import { assembleLensPasses, excerptInSource, LENS_SECTIONS, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
 
 // ⚠ NOT YET WIRED: this flag currently GATES NOTHING — runPanelJudge has no production caller
 // (only the proof driver + tests). Flipping AUDIT_PANEL_JUDGE on Railway does NOT activate the panel
@@ -295,14 +295,28 @@ export async function runPanelJudge(params: {
   // VERIFIED finding by id — the structural claim↔tag join (no fragile free-text match).
   // Each claim carries the lens's VERBATIM excerpt + a `grounded` flag (#4a: is the excerpt actually
   // in the lens's assigned source?). Grounding is structural, not the verifier's job.
+  // ── FABRICATION-SUPPRESSION (Brain card 40 · Rule 64) ──────────────────────────
+  // A clause NUMBER the engine cites but that is NOT literally in the package source is a fabricated
+  // cite — "a clause the document never contained cannot be cited as document truth." Inferring 52.219-14
+  // from a Total-SB set-aside is exactly the prohibited inference. We ground clause cites against the FULL
+  // panel source (the union of every lens bundle = every section the panel read) and STRIP any clause not
+  // present — so the fabricated cite cannot propagate to the verifier/judge or the output, while the
+  // underlying CONCERN survives. Deterministic, logged (no silent edit).
+  const clauseInSource = makeClauseSourceChecker([...bundleByLens.values()].join("\n")); // FULL panel source
+  const fabricatedClauseLog: string[] = [];
+
   interface Claim { ref: string; lens: string; text: string; grounded: boolean; kind: "gate" | "risk"; sev: number }
   const claimsRaw: Claim[] = panelists.flatMap((p) => {
     if (!p.output) return [];
     const src = bundleByLens.get(p.key) ?? "";
     const mk = (ref: string, body: string, excerpt: string, kind: "gate" | "risk", sev: number): Claim => {
       const grounded = excerptInSource(excerpt ?? "", src); // grounding checks the ORIGINAL excerpt
+      // Strip any cited clause NUMBER absent from source (fabrication-suppression) BEFORE it reaches the
+      // verifier/judge. The concern stays; the unfounded clause cite is replaced with an honest marker.
+      const { clean: cleanBody, stripped } = stripFabricatedClauses(body, clauseInSource);
+      for (const c of stripped) fabricatedClauseLog.push(`${ref}: ${c}`);
       const safe = sanitizePdfText(excerpt ?? "").sanitized; // #6: neutralize injection in the embedded copy
-      return { ref, lens: p.name, grounded, kind, sev, text: `${body} [${grounded ? "EXCERPT✓" : "EXCERPT-UNGROUNDED"}] — excerpt: "${cap(safe, 300)}"` };
+      return { ref, lens: p.name, grounded, kind, sev, text: `${cleanBody} [${grounded ? "EXCERPT✓" : "EXCERPT-UNGROUNDED"}] — excerpt: "${cap(safe, 300)}"` };
     };
     // A gate that is NOT met (met=false) is the highest-priority signal a lens can raise (a hard
     // disqualifier) — rank it above a met gate so bounding never starves it. Risks rank by P0/P1/P2.
@@ -310,6 +324,7 @@ export async function runPanelJudge(params: {
     const risks = p.output.risks.map((r, i) => mk(`${p.key}:R${i + 1}`, `RISK(${r.severity}): ${r.risk} — cite: ${r.citation}`, r.excerpt, "risk", RISK_SEV_RANK[r.severity] ?? 0));
     return [...gates, ...risks];
   });
+  if (fabricatedClauseLog.length) console.log(`[panel] fabrication-suppression: stripped ${fabricatedClauseLog.length} clause cite(s) absent from source — ${fabricatedClauseLog.join(" · ")}`);
 
   // ROOT FIX: bound to the MATERIAL set BEFORE verification (all gates kept; risks deduped + top-N by
   // severity). Kills both the O(n) claim explosion that truncated the verifier AND the 90-risks/lens
