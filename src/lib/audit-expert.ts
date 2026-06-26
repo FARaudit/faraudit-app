@@ -82,7 +82,14 @@ export const SUBMIT_FINDINGS_TOOL = {
 } as const;
 
 type SdkBlock = { type: string; id?: string; name?: string; input?: Record<string, unknown> };
-type SdkClient = { messages: { create: (a: Record<string, unknown>) => Promise<{ content: SdkBlock[]; stop_reason?: string }> } };
+type SdkUsage = { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+type SdkClient = { messages: { create: (a: Record<string, unknown>) => Promise<{ content: SdkBlock[]; stop_reason?: string; usage?: SdkUsage }> } };
+
+/** Opt-in usage capture for the expert tool-loop (mirrors anthropic-structured's setStructuredUsageSink so
+ *  a proof run can total cost across BOTH the SDK expert loop AND the structured skeptic). NULL in prod. */
+export interface ExpertUsage { model: string; input_tokens: number; output_tokens: number; cache_write: number; cache_read: number; }
+let _expertUsageSink: ((u: ExpertUsage) => void) | null = null;
+export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _expertUsageSink = sink; }
 
 /** Production model call — the FULL Anthropic SDK tool-use turn. Reconstructs a PROTOCOL-VALID transcript
  *  from the loop's normalized history (assistant `tool_use` blocks → user `tool_result` blocks), gives the
@@ -99,6 +106,7 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
       messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
     }
     const resp = await client.messages.create({ model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages });
+    if (_expertUsageSink && resp.usage) _expertUsageSink({ model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 });
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
     if (submit) return { toolCalls: [], findings: (submit.input?.findings as RawFinding[]) ?? [] };
