@@ -85,8 +85,12 @@ const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
   I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference)/im,
   J: /^(List\s+of\s+Attachments)/im,
   K: /^(Representations,?\s+Cert|Other\s+Statements\s+of\s+Offerors)/im,
-  L: /^(Instructions,?\s+Conditions|Special\s+Notes\s+and\s+Instructions|Notice\s+to\s+Quoter|Notes\s+to\s+Offeror)/im,
-  M: /^(Evaluation\s+Factors\s+for\s+Award|Technical\s+Evaluation)/im,
+  // §L — UCF titles (line-start) OR COMMERCIAL forms: FAR 52.212-1 IS the commercial "Instructions to
+  //   Offerors" (Part-12), which appears clause-number-prefixed ("52.212-1  Instructions to Offerors…").
+  L: /^(Instructions,?\s+Conditions|Special\s+Notes\s+and\s+Instructions|Notice\s+to\s+Quoter|Notes\s+to\s+Offeror)|Instructions\s+to\s+Offerors?\b|^5?2\.212-1\b/im,
+  // §M — UCF titles OR COMMERCIAL forms: "Evaluation and Basis for Award" / FAR 52.212-2 (Evaluation—
+  //   Commercial). Commercial RFQs phrase §M as "Basis for Award", not "Evaluation Factors for Award".
+  M: /^(Evaluation\s+Factors\s+for\s+Award|Technical\s+Evaluation)|Evaluation\s+and\s+Basis\s+for\s+Award|Basis\s+for\s+Award\b|FAR\s+5?2\.212-2|^5?2\.212-2\b/im,
 };
 
 // Format detection patterns.
