@@ -1,6 +1,6 @@
 // $0 gate for the P2 ADVERSARIAL VERIFIER (Brain card 43). Proves: deterministic re-grounding drops
 // ungrounded findings; the skeptic overturns misclassifications; an INCOMPLETE challenge ⇒ not sound.
-import { makeAgenticVerifier, type SkepticFn } from "@/lib/audit-verifier";
+import { makeAgenticVerifier, makeTieredSkeptic, type SkepticFn } from "@/lib/audit-verifier";
 import type { AuditToolContext } from "@/lib/audit-tools";
 import type { TypedFinding } from "@/lib/audit-findings";
 
@@ -44,6 +44,23 @@ async function main() {
   r = await makeAgenticVerifier(broken)(ctx, [grounded]);
   ok("skeptic failure ⇒ not sound", r.sound, false);
   ok("skeptic failure preserves grounded findings", r.survived.length, 1);
+
+  // (5) capability-tiered skeptic (Brain card-44 §4): Opus escalation only on CONTESTED (overturned) findings.
+  let baseCalls = 0, escCalls = 0, escSeen = 0;
+  const base: SkepticFn = async (_c, fs) => { baseCalls++; return fs.map((x, i) => ({ index: i, upheld: x.controllability !== "bidder_cannot_move", reason: "base" })); };
+  const escalate: SkepticFn = async (_c, fs) => { escCalls++; escSeen = fs.length; return fs.map((_x, i) => ({ index: i, upheld: true, reason: "opus overrules — actually fine" })); };
+  const tiered = makeTieredSkeptic(base, escalate);
+  // one bidder_cannot_move finding (base overturns) + one normal (base upholds) → escalate sees ONLY the 1 contested.
+  let r5 = await tiered(ctx, [grounded, misclassified]);
+  ok("base ran once", baseCalls, 1);
+  ok("escalation ran once (contested present)", escCalls, 1);
+  ok("escalation saw ONLY the 1 contested finding (Opus bounded)", escSeen, 1);
+  ok("escalation overrules base → contested finding upheld", r5.find((v) => v.index === 1)?.upheld, true);
+  ok("uncontested finding keeps base ruling", r5.find((v) => v.index === 0)?.upheld, true);
+  // no contest → Opus never spent
+  escCalls = 0;
+  await tiered(ctx, [grounded]);
+  ok("no contested findings → escalation NOT called (no Opus spend)", escCalls, 0);
 
   console.log(`verifier gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }

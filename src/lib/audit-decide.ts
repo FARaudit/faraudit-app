@@ -78,13 +78,32 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (inp.conflict)
     return mk("NEEDS_HUMAN_REVIEW", true, "Unresolved material conflict between experts.", dispositions, []);
 
-  // 5. Genuine residual risk = an uncontrollable bar whose satisfaction is UNKNOWN (can't confirm the firm
-  //    clears it) → real but non-disqualifying → BID_WITH_CAUTION. A bar the firm provably SATISFIES is not
-  //    a risk; routine controllable gates never reach here.
-  const residual = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile) === "unknown");
+  // 5. Disqualifying bars whose firm-status is UNKNOWN (null profile, or no attribute to check). The old
+  //    ladder blanket-routed these to BID_WITH_CAUTION — a hole (Brain card-44 §2): a NON-CURABLE structural
+  //    bar under a null profile is the SPRS error re-armed (soft caution where the bidder cannot win and
+  //    cannot cure). CURABILITY is a property of the GATE, independent of profile, so it is checked HERE —
+  //    and an untyped bar FAILS CLOSED, never silently to caution.
+  const unknownBars = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile) === "unknown");
+  const names = (xs: DecidedFinding[]) => xs.map((x) => x.requirement).join("; ");
+
+  // 5a. UNTYPED disqualifying bar (missing requiredAttribute or curableInWindow) → fail CLOSED to human review.
+  const untyped = unknownBars.filter((f) => !f.requiredAttribute || f.curableInWindow === undefined);
+  if (untyped.length)
+    return mk("NEEDS_HUMAN_REVIEW", true,
+      `Disqualifying bar(s) missing required typing (requiredAttribute / curableInWindow) — fail closed to human review, never a silent caution: ${names(untyped)}`, dispositions, untyped);
+
+  // 5b. NON-CURABLE structural bar (curableInWindow === false) under unknown status → cannot be soft-cautioned;
+  //     human must confirm eligibility (the bidder may be unable to win AND unable to cure within the window).
+  const nonCurable = unknownBars.filter((f) => f.curableInWindow === false);
+  if (nonCurable.length)
+    return mk("NEEDS_HUMAN_REVIEW", true,
+      `Non-curable structural bar(s) that cannot be cleared within the response window — a human must confirm eligibility (not a soft caution): ${names(nonCurable)}`, dispositions, nonCurable);
+
+  // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
+  const residual = unknownBars.filter((f) => f.curableInWindow === true);
   if (residual.length)
     return mk("BID_WITH_CAUTION", true,
-      `Eligible; residual non-disqualifying risk(s) to confirm: ${residual.map((r) => r.requirement).join("; ")}`, dispositions, []);
+      `Eligible; residual curable risk(s) to confirm within the window: ${names(residual)}`, dispositions, []);
 
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID.
   return mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);

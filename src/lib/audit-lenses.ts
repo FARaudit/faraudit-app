@@ -24,6 +24,10 @@ const SHARED = [
   "  bidder_controls    = the bidder satisfies it by doing the work (source/price/configure/document/submit). A GATE TO CLEAR, never disqualifying.",
   "  bidder_cannot_move = the bidder cannot satisfy it regardless of effort (failed eligibility/size, a part it cannot legally supply, unattainable past performance, an exclusivity). A DISQUALIFYING bar.",
   "  already_satisfied  = structurally true right now (a set-aside the firm qualifies under, an existing registration, a passed deadline).",
+  "For EVERY bidder_cannot_move bar you MUST type two fields or it fails closed to human review: requiredAttribute",
+  "(the qualification the firm must HOLD) AND curableInWindow — can a firm that lacks it obtain it within the",
+  "response window? false = structural/non-curable (facility clearance lead-time, QPL listing, special tooling",
+  "cert) — NEVER a soft caution; true = obtainable in time. Curability is a property of the GATE, not the bidder.",
   "Classify routine standard FAR boilerplate (EEO/DEI, standard commercial terms) as kind=boilerplate — NOT a gate.",
   "When every finding in your lane is grounded, call submit_findings. Do not invent requirements to look thorough.",
 ].join(" ");

@@ -16,7 +16,7 @@ import type { TypedFinding, RequirementKind, Controllability } from "./audit-fin
 export interface RawFinding {
   requirement: string; citation: string; excerpt: string;
   kind: RequirementKind; controllability: Controllability;
-  requiredAttribute?: string; severity?: "P0" | "P1" | "P2";
+  requiredAttribute?: string; curableInWindow?: boolean; severity?: "P0" | "P1" | "P2";
 }
 
 /** One normalized turn of the loop: either the model called tools, or it submitted its final findings. */
@@ -57,7 +57,7 @@ export async function runAgenticExpert(
       const findings: TypedFinding[] = [];
       for (const f of out.findings) {
         if (!isGrounded(ctx, f)) { dropped++; continue; } // deterministic backstop — ungrounded never survives
-        findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, severity: f.severity });
+        findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow, severity: f.severity });
       }
       return { findings, turns: turn, dropped, converged: true };
     }
@@ -76,7 +76,8 @@ export const SUBMIT_FINDINGS_TOOL = {
     properties: { requirement: { type: "string" }, citation: { type: "string" }, excerpt: { type: "string", description: "VERBATIM source span proving the requirement exists" },
       kind: { type: "string", enum: ["eligibility_bar", "technical_spec", "pricing", "submission", "past_performance", "clause_flowdown", "boilerplate", "other"] },
       controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "already_satisfied"] },
-      requiredAttribute: { type: "string", description: "for an eligibility bar: the qualification the firm must HOLD (e.g. naics:333120-small)" },
+      requiredAttribute: { type: "string", description: "for a disqualifying/eligibility bar: the qualification the firm must HOLD (e.g. naics:333120-small, clearance:secret-facility). REQUIRED whenever controllability=bidder_cannot_move." },
+      curableInWindow: { type: "boolean", description: "for a disqualifying/eligibility bar (controllability=bidder_cannot_move): can a firm that LACKS the requiredAttribute obtain/satisfy it within the solicitation's response window? false=structural/non-curable (clearance lead-time, QPL listing) → not a soft caution; true=obtainable in time. REQUIRED for every bidder_cannot_move bar — omitting it forces human review." },
       severity: { type: "string", enum: ["P0", "P1", "P2"] } } } } } },
 } as const;
 

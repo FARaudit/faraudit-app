@@ -15,7 +15,7 @@ import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
 import { AUDIT_LENSES } from "./audit-lenses";
-import { makeAgenticVerifier, makeStructuredSkeptic, type SkepticVerdict } from "./audit-verifier";
+import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
@@ -27,7 +27,8 @@ export interface AuditPackageInput {
   bidderProfile?: BidderProfile | null;     // known firm attributes (eligibility matching); null = unknown
   experts?: ExpertSpec[];                   // override the lens panel (default = AUDIT_LENSES)
   expertModel?: string;                     // default modelFor("lens")
-  skepticModel?: string;                    // default modelFor("judge")
+  skepticBaseModel?: string;                // P2 base adversary — default modelFor("lens") (Sonnet)
+  skepticEscalateModel?: string;            // P2 escalation on contested findings — default modelFor("judge") (Opus)
   maxTurns?: number;                        // per-expert react-loop bound (default 8)
 }
 
@@ -48,7 +49,13 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
 
   const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
   const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"));
-  const verify = makeAgenticVerifier(makeStructuredSkeptic(structuredAdapter(apiKey), input.skepticModel ?? modelFor("judge")));
+  // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
+  const adapt = structuredAdapter(apiKey);
+  const skeptic = makeTieredSkeptic(
+    makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
+    makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
+  );
+  const verify = makeAgenticVerifier(skeptic);
 
   return runAgenticAudit({
     ctx,

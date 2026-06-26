@@ -37,6 +37,14 @@ export interface TypedFinding {
   grounded: boolean;          // excerpt verified present in the source (deterministic grounding check)
   lens: string;               // which expert produced it
   requiredAttribute?: string; // for an eligibility bar: the qualification the firm must HOLD (NAICS-small code, cert) — matched against the bidder profile
+  // CURABILITY (Brain card-44 §2) — a property of the GATE, independent of the bidder profile: can a firm
+  // that lacks the requiredAttribute obtain/satisfy it WITHIN the solicitation's response window?
+  //   false → structural / non-curable (facility clearance lead-time > window, QPL listing, special tooling
+  //           cert that can't be earned in time) → cannot be soft-cautioned; routes to human review / NO_BID.
+  //   true  → curable in-window (a registration/cert obtainable in time) → a genuine residual caution.
+  //   undefined on a bidder_cannot_move / eligibility bar → UNTYPED → the decision FAILS CLOSED to human
+  //   review (never a silent caution). REQUIRED for every disqualifying bar.
+  curableInWindow?: boolean;
   severity?: "P0" | "P1" | "P2"; // for a residual RISK (not a hard requirement) — its materiality
 }
 

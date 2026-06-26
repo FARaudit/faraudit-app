@@ -45,6 +45,25 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
   };
 }
 
+/** Capability-tiered skeptic (Brain card-44 §4): a SINGLE Opus adversary is itself single-LLM-one-shot — the
+ *  failure card 43 outlawed, re-armed at the verifier. So the BASE skeptic is Sonnet over everything; only the
+ *  CONTESTED findings — the ones the base wants to OVERTURN (an overturn changes the finding set, so it's the
+ *  high-stakes call) — are re-judged by the ESCALATION skeptic (Opus). Opus is spent only where the verdict is
+ *  contested, never on the easy majority. Cost-bounded: at most one extra call, over the contested subset.
+ *  (Knife-edge verdict-level escalation — BID↔CAUTION etc. — is a follow-on; this triggers on skeptic-overturn.) */
+export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): SkepticFn {
+  return async (ctx, findings) => {
+    const baseVerdicts = await base(ctx, findings);
+    const contestedIdx = baseVerdicts.filter((v) => !v.upheld).map((v) => v.index); // overturns = the consequential calls
+    if (!contestedIdx.length) return baseVerdicts;                                   // no disagreement → no Opus spend
+    const contested = contestedIdx.map((i) => findings[i]).filter(Boolean);
+    const escVerdicts = await escalate(ctx, contested);                             // Opus re-judges ONLY the contested subset
+    const escByOrig = new Map<number, SkepticVerdict>();
+    escVerdicts.forEach((v) => { const orig = contestedIdx[v.index]; if (orig !== undefined) escByOrig.set(orig, { index: orig, upheld: v.upheld, reason: v.reason }); });
+    return baseVerdicts.map((v) => escByOrig.get(v.index) ?? v);                     // escalation wins where it ruled
+  };
+}
+
 /** Production skeptic — a single structured model call that challenges the whole set at once (cost-bounded:
  *  O(1) calls, not O(findings)). Given each finding's requirement + verbatim excerpt + kind + controllability,
  *  it rules upheld/overturned with a reason. Strict JSON schema → the result is shape-guaranteed. PAID;

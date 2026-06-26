@@ -7,7 +7,7 @@ import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-fin
 
 const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding => ({
   requirement: o.requirement ?? "requirement", citation: "FAR 52.x", excerpt: "verbatim", grounded: true, lens: "x",
-  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute,
+  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow,
 });
 const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null; coverage?: boolean; sound?: boolean; conflict?: boolean } = {}): VerdictInputs =>
   ({ findings, bidderProfile: o.profile ?? null, coverageComplete: o.coverage ?? true, verifierSound: o.sound ?? true, conflict: o.conflict ?? false });
@@ -33,9 +33,19 @@ eq("incomplete coverage → INCOMPLETE", deriveVerdict(inp(two, { coverage: fals
 eq("verifier unsound → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { sound: false })).verdict, "NEEDS_HUMAN_REVIEW");
 eq("conflict → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { conflict: true })).verdict, "NEEDS_HUMAN_REVIEW");
 
-// uncontrollable bar, null profile → can't prove failure → residual caution
-const cautionFindings = [...two, f({ requirement: "proprietary single-source widget", kind: "technical_spec", controllability: "bidder_cannot_move" })];
-eq("uncontrollable bar, null profile → BID_WITH_CAUTION", deriveVerdict(inp(cautionFindings)).verdict, "BID_WITH_CAUTION");
+// ── Brain card-44 §2: curability splits the old blanket "unknown → CAUTION" branch. ──
+// 5a. UNTYPED bar (bidder_cannot_move, no requiredAttribute / no curableInWindow) → FAIL CLOSED to human review.
+const untyped = [...two, f({ requirement: "proprietary single-source widget", kind: "technical_spec", controllability: "bidder_cannot_move" })];
+eq("untyped disqualifying bar → NEEDS_HUMAN_REVIEW (fail closed)", deriveVerdict(inp(untyped)).verdict, "NEEDS_HUMAN_REVIEW");
+
+// 5b. THE MOAT-THREAT INPUT (Brain §2): non-curable structural bar + null profile → NOT a soft caution.
+const nonCurable = [...two, f({ requirement: "active facility clearance required at award (lead time > window)", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "clearance:secret-facility", curableInWindow: false })];
+eq("non-curable bar, null profile → NEEDS_HUMAN_REVIEW (not CAUTION — the SPRS error stays disarmed)", deriveVerdict(inp(nonCurable)).verdict, "NEEDS_HUMAN_REVIEW");
+eq("non-curable bar names the bar in showStoppers", deriveVerdict(inp(nonCurable)).showStoppers.length, 1);
+
+// 5c. CURABLE bar + null profile → genuine residual → BID_WITH_CAUTION.
+const curable = [...two, f({ requirement: "obtain SAM registration before award", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "sam:registered", curableInWindow: true })];
+eq("curable bar, null profile → BID_WITH_CAUTION", deriveVerdict(inp(curable)).verdict, "BID_WITH_CAUTION");
 
 // eligibility bar the firm provably FAILS (profile lacks the required NAICS) → INELIGIBLE
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
