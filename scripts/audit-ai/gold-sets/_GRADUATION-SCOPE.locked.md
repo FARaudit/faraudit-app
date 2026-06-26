@@ -86,3 +86,16 @@ A **disqualifying disposition on an eligible-for provision** (e.g. the set-aside
 ## UPDATED DoD (supersedes "re-graded against 5649b421" single-run item)
 - The N-run asymmetric bar above IS the acceptance test: consensus on what it must FIND, unanimity on what it must NOT FABRICATE/misclassify.
 - HOLD all paid runs until the grading model is BUILT; then ONE confirmation N-run (separate greenlight). No iterative paid runs against a moving bar.
+
+---
+
+# SCORER ALIGNMENT — Brain ruling on card 42 (2026-06-26). Consistency fix, model UNCHANGED.
+
+Edit scoped to the decoy semantics in `judgment-score.ts` only; the consensus/asymmetric model is untouched.
+- **Tier 1 — disqualifying-misfire (ZERO-TOLERANCE / unanimity):** a decoy counts as disqualifying ONLY when it lands in **show_stoppers** OR drives a **NO_BID/INELIGIBLE** verdict (an absent-decoy raised at all stays a fabrication-class Tier-1 fail). Any occurrence in ANY of N runs = hard fail. The trust-breaking class, exactly as strict as before.
+- **Tier 2 — disposition-misfile (CONSENSUS / majority):** a decoy listed as a **met=false** gate-to-clear when it should be **met=true** (an eligibility the firm holds, e.g. the set-aside) or **omitted** (EEO/DEI · commercial T&C · unenforceable-terms boilerplate). Graded on majority — a 1-of-N slip is tolerated; a SYSTEMATIC misfile fails. The guard so "not disqualifying" never becomes "not scored."
+- Prompt fix kept as **defense-in-depth** (lens: set-aside=met=true, boilerplate omitted; judge: only an uncontrollable bar → show_stopper).
+
+## DoD for the confirmation N=5 (Brain card 42 — bar STAYS FROZEN)
+- verdict **BID by majority** · all must-raise concepts by majority · **zero fabrication** (unanimous) · **zero disqualifying-misfire** under the new show_stopper definition (unanimous) · **disposition-misfiles cleared on majority**.
+- This closes the grading-definition work. ONE confirmation N=5 after the edit lands; hold all paid runs until CEO greenlight.

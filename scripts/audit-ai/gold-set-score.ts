@@ -64,6 +64,7 @@ export interface PanelVerdictLike {
   eligible: boolean;
   showStoppers: number;
   raisedGates: RaisedGate[];
+  showStopperTexts?: string[]; // the chief judge's show_stopper findings (prose) — for the Tier-1 decoy check (Brain card 42)
 }
 
 /** What ONE engine actually extracted for the same package (new agentic OR legacy). */

@@ -47,7 +47,11 @@ async function main() {
     if (!panel.fired || !panel.judgment) { console.log(`run ${r + 1}: panel did not fire — INCOMPLETE`); continue; }
 
     const raised = panel.panelists.flatMap((p) => p.output?.named_hard_gates.map((g) => ({ name: g.gate, met: g.met, cite: g.citation })) ?? []);
-    const pv = { verdict: panel.judgment.verdict, eligible: panel.judgment.eligible, showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised };
+    const pv = {
+      verdict: panel.judgment.verdict, eligible: panel.judgment.eligible,
+      showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised,
+      showStopperTexts: (panel.judgment.show_stoppers ?? []).map((s) => typeof s === "string" ? s : ((s as { finding?: string }).finding ?? JSON.stringify(s))),
+    };
     const analysisText = [
       String(panel.judgment.rationale ?? ""),
       ...(panel.judgment.preserved_dissent ?? []).map((d) => typeof d === "string" ? d : JSON.stringify(d)),
@@ -57,13 +61,14 @@ async function main() {
     const jr = scoreJudgment(pv, jkey, sourceLedgerText, { extractedClauses: [], analysisText });
     results.push(jr);
     const cov = coverageTruth(panel);
-    console.log(`run ${r + 1}: ${cov.complete ? "COMPLETE" : "INCOMPLETE"} · verdict ${jr.verdict.actual} ${jr.verdict.ok ? "✅" : "❌"} · fab ${jr.fabricated.length ? "❌" + jr.fabricated.join(",") : "✅"} · decoy ${jr.decoyHardFails.length ? "❌" + jr.decoyHardFails.join(",") : "✅"}`);
+    console.log(`run ${r + 1}: ${cov.complete ? "COMPLETE" : "INCOMPLETE"} · verdict ${jr.verdict.actual} ${jr.verdict.ok ? "✅" : "❌"} · fab ${jr.fabricated.length ? "❌" + jr.fabricated.join(",") : "✅"} · disqual-misfire ${jr.decoyHardFails.length ? "❌" + jr.decoyHardFails.join(",") : "✅"} · disposition-misfile ${jr.dispositionMisfiles.length ? "⚠" + jr.dispositionMisfiles.join(",") : "✅"}`);
   }
 
   console.log(`\n──────── CONSENSUS (N=${results.length}) ────────`);
   const con = gradeConsensus(results, jkey);
   console.log(`completeness: verdict ok ${con.completeness.verdictOkRuns}/${con.n} (maj ${con.majority}) · concepts: ${con.completeness.conceptConsensus.map((c) => `${c.token}:${c.surfacedRuns}/${con.n}${c.ok ? "✅" : "❌"}`).join(" · ")}`);
-  console.log(`correctness (zero-tolerance): fabrication ${con.correctness.fabricationRuns.length ? "❌ " + con.correctness.fabricationRuns.join(" · ") : "✅ none"} · misclassification ${con.correctness.misclassificationRuns.length ? "❌ " + con.correctness.misclassificationRuns.join(" · ") : "✅ none"}`);
+  console.log(`disposition-misfile (Tier 2, consensus): ${con.completeness.dispositionMisfileConsensus.length ? con.completeness.dispositionMisfileConsensus.map((m) => `${m.token}:${m.misfiledRuns}/${con.n}${m.fail ? "❌" : "✅"}`).join(" · ") : "✅ none"}`);
+  console.log(`correctness (Tier 1, zero-tolerance): fabrication ${con.correctness.fabricationRuns.length ? "❌ " + con.correctness.fabricationRuns.join(" · ") : "✅ none"} · disqualifying-misfire ${con.correctness.misclassificationRuns.length ? "❌ " + con.correctness.misclassificationRuns.join(" · ") : "✅ none"}`);
   console.log(`\nCONSENSUS GRADE: ${con.pass ? "✅ PASS" : "❌ FAIL — " + con.failures.join(" · ")}`);
   console.log(`\nPANEL COST (N=${results.length}, in-code): $${totalUsd.toFixed(2)} (Console CSV delta authoritative)`);
 }

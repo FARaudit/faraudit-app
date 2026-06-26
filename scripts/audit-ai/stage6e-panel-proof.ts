@@ -257,7 +257,7 @@ async function main() {
   let persistedExtraction: EngineExtraction | null = null;
   if (panel.judgment) {
     const raised = panel.panelists.flatMap((p) => p.output?.named_hard_gates.map((g) => ({ name: g.gate, met: g.met, cite: g.citation })) ?? []);
-    const pv: PanelVerdictLike = { verdict: panel.judgment.verdict, eligible: panel.judgment.eligible, showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised };
+    const pv: PanelVerdictLike = { verdict: panel.judgment.verdict, eligible: panel.judgment.eligible, showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised, showStopperTexts: (panel.judgment.show_stoppers ?? []).map((s: { finding?: string } | string) => typeof s === "string" ? s : (s.finding ?? JSON.stringify(s))) };
     persistedExtraction = extractionFromFacts(map.facts, raised.map((r) => r.name));
     const sourceLedgerText = Object.values(sectionText).join("\n");
 

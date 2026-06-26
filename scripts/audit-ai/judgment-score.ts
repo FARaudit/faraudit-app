@@ -42,8 +42,9 @@ export interface JudgmentResult {
   namedGates: Array<{ token: string; surfaced: boolean; dispositionOk: boolean }>; // surfaced = HARD signal (concept-presence); dispositionOk = advisory
   dispositionAdvisories: string[]; // mustRaise concept surfaced but NOT at expected disposition — ADVISORY only (Brain 2026-06-26, Option A)
   showStoppers: Array<{ description: string; surfaced: boolean }>;
-  fabricated: string[];        // raised clauses absent from source — HARD fail
-  decoyHardFails: string[];    // absent-decoy raised at all, OR any decoy raised as disqualifying — HARD fail
+  fabricated: string[];        // raised clauses absent from source — HARD fail (zero-tolerance)
+  decoyHardFails: string[];    // Tier 1: absent-decoy raised, OR decoy in show_stoppers / driving NO_BID — HARD fail (zero-tolerance)
+  dispositionMisfiles: string[]; // Tier 2: decoy TOKENS listed as a met=false gate that should be met=true/omitted — CONSENSUS-graded (not single-run hard)
   clauseRecallReported: number | null; // observability ONLY (not scored)
 }
 
@@ -100,16 +101,31 @@ export function scoreJudgment(
   const fabricated = fabricatedClauses(raised, sourceText);
   if (fabricated.length) failures.push(`FABRICATION: raised clause(s) absent from source: ${fabricated.join(", ")}`);
 
-  // ── decoys: absent-decoy raised AT ALL = fabrication; ANY decoy raised as DISQUALIFYING (unmet) = hard fail ──
-  const decoyHardFails: string[] = [];
+  // ── decoys — TWO TIERS (Brain card 42, aligned with card-41 disposition semantics) ──
+  //  Tier 1 DISQUALIFYING-misfire (ZERO-TOLERANCE, the trust-breaking class): an absent-decoy raised at
+  //    all (fabrication-class), OR a decoy that lands in show_stoppers, OR a decoy raised-unmet while the
+  //    verdict is NO_BID/INELIGIBLE (it drives a disqualifying verdict). → decoyHardFails (hard fail; the
+  //    consensus correctness axis treats it zero-tolerance).
+  //  Tier 2 DISPOSITION-misfile (CONSENSUS, a lesser correctness signal): a decoy listed as a met=false
+  //    gate-to-clear when it should be met=true (an eligibility the firm already holds, e.g. the set-aside)
+  //    or omitted (EEO/DEI / commercial-T&C / unenforceable-terms boilerplate). NOT a single-run hard fail
+  //    — graded on majority in gradeConsensus, so a stochastic 1-of-N slip doesn't fail the bar, but a
+  //    SYSTEMATIC misfile does (the guard against met=false-decoys becoming silently unscored).
+  const showStopperCorpus = (panel.showStopperTexts ?? []).join(" \n ");
+  const verdictIsDisqualifying = panel.verdict === "NO_BID" || panel.verdict === "INELIGIBLE";
+  const decoyHardFails: string[] = [];     // Tier 1
+  const dispositionMisfiles: string[] = []; // Tier 2 (decoy TOKENS, for cross-run consensus aggregation)
   for (const d of key.decoys) {
     const alias = d.aliases ? { [d.token]: d.aliases } : undefined;
     const raisedAtAll = gateMatched(d.token, raised.map((r) => r.name), alias);
-    const raisedDisqualifying = gateMatched(d.token, unmet.map((r) => r.name), alias);
+    const inShowStoppers = gateMatched(d.token, [showStopperCorpus], alias);
+    const raisedUnmet = gateMatched(d.token, unmet.map((r) => r.name), alias);
     if (d.kind === "absent" && (d.mustNotRaiseAtAll ?? true) && raisedAtAll) decoyHardFails.push(`${d.token} (absent — must not be raised at all)`);
-    else if (raisedDisqualifying) decoyHardFails.push(`${d.token} (raised as disqualifying)`);
+    else if (inShowStoppers || (verdictIsDisqualifying && raisedUnmet)) decoyHardFails.push(`${d.token} (raised as disqualifying)`);
+    else if (raisedUnmet) dispositionMisfiles.push(d.token); // met=false gate-to-clear that should be met=true/omitted
   }
-  if (decoyHardFails.length) failures.push(`DECOY misfire: ${decoyHardFails.join(", ")}`);
+  if (decoyHardFails.length) failures.push(`DECOY disqualifying-misfire: ${decoyHardFails.join(", ")}`);
+  // Tier 2 is NOT pushed to `failures` (not a single-run hard fail) — it rides on JudgmentResult for consensus grading.
 
   return {
     pass: failures.length === 0,
@@ -121,6 +137,7 @@ export function scoreJudgment(
     showStoppers,
     fabricated,
     decoyHardFails,
+    dispositionMisfiles,
     clauseRecallReported: opts?.clauseRecall ?? null,
   };
 }
@@ -138,7 +155,7 @@ export interface ConsensusResult {
   n: number;
   majority: number;
   failures: string[];
-  completeness: { verdictOkRuns: number; conceptConsensus: Array<{ token: string; surfacedRuns: number; ok: boolean }> };
+  completeness: { verdictOkRuns: number; conceptConsensus: Array<{ token: string; surfacedRuns: number; ok: boolean }>; dispositionMisfileConsensus: Array<{ token: string; misfiledRuns: number; fail: boolean }> };
   correctness: { fabricationRuns: string[]; misclassificationRuns: string[] };
 }
 
@@ -170,9 +187,21 @@ export function gradeConsensus(results: JudgmentResult[], key: JudgmentKey): Con
     return { token: g.token, surfacedRuns, ok };
   });
 
+  // Tier 2 — DISPOSITION-misfile consensus (Brain card 42): a decoy listed as a met=false gate-to-clear
+  // that should be met=true (an eligibility the firm holds, e.g. the set-aside) or omitted (boilerplate).
+  // NOT zero-tolerance — a 1-of-N slip is tolerated — but a SYSTEMATIC misfile (majority of runs) FAILS,
+  // keeping met=false decoys visible on the consensus axis rather than silently unscored.
+  const allMisfileTokens = [...new Set(results.flatMap((r) => r.dispositionMisfiles))];
+  const dispositionMisfileConsensus = allMisfileTokens.map((token) => {
+    const misfiledRuns = results.filter((r) => r.dispositionMisfiles.includes(token)).length;
+    const fail = misfiledRuns >= majority;
+    if (fail) failures.push(`COMPLETENESS — disposition-misfile '${token}' (met=false gate that should be met=true/omitted) in ${misfiledRuns}/${n} ≥ majority ${majority}`);
+    return { token, misfiledRuns, fail };
+  });
+
   return {
     pass: failures.length === 0, n, majority, failures,
-    completeness: { verdictOkRuns, conceptConsensus },
+    completeness: { verdictOkRuns, conceptConsensus, dispositionMisfileConsensus },
     correctness: { fabricationRuns, misclassificationRuns },
   };
 }

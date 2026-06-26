@@ -51,6 +51,7 @@ const pv: PanelVerdictLike = {
   eligible: panel.judgment.eligible,
   showStoppers: panel.judgment.show_stoppers.length,
   raisedGates: raised,
+  showStopperTexts: (panel.judgment.show_stoppers ?? []).map((s: { finding?: string } | string) => typeof s === "string" ? s : (s.finding ?? JSON.stringify(s))),
 };
 
 console.log(`\nINPUT (from real cached panel output, ${(readFileSync(panelPath).length / 1024).toFixed(0)} KB):`);
