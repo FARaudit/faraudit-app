@@ -255,23 +255,29 @@ async function main() {
   const gold = loadGold(sol);
   let grad: ReturnType<typeof graduationGate> | null = null;
   let persistedExtraction: EngineExtraction | null = null;
-  if (gold && panel.judgment) {
+  if (panel.judgment) {
     const raised = panel.panelists.flatMap((p) => p.output?.named_hard_gates.map((g) => ({ name: g.gate, met: g.met, cite: g.citation })) ?? []);
     const pv: PanelVerdictLike = { verdict: panel.judgment.verdict, eligible: panel.judgment.eligible, showStoppers: panel.judgment.show_stoppers.length, raisedGates: raised };
     persistedExtraction = extractionFromFacts(map.facts, raised.map((r) => r.name));
-    const score = scoreGoldSet(persistedExtraction, gold);
     const sourceLedgerText = Object.values(sectionText).join("\n");
-    grad = graduationGate(score, gold, pv, sourceLedgerText); // sourceText → fabrication check (2c)
-    console.log(`\n──────── SUBSTRATE HEALTH (deterministic · $0 · NOT a graduation gate — Brain 2026-06-25) ────────`);
-    console.log(`FABRICATION (raised clause absent from source): ${grad.fabricatedClauses.length} ${grad.fabricatedClauses.length === 0 ? "✅" : "❌ " + grad.fabricatedClauses.join(", ")}`);
-    console.log(`decoy traps mis-fired as DISQUALIFYING gates  : ${grad.decoyMisfired.length} ${grad.decoyMisfired.length === 0 ? "✅" : "❌ " + grad.decoyMisfired.join(", ")}`);
-    console.log(`SUBSTRATE: ${grad.substrateClean ? "✅ CLEAN" : "❌ " + grad.failures.join(" · ")}`);
-    console.log(`[observability — RETRACTED as signals] clause-list binding ${pct(grad.bindingClauseRecall)}/prec ${pct(grad.bindingClausePrecision)} (tautological) · gate-recall ${pct(grad.gateRecall)} · verdict ${grad.verdictMatch === null ? "n/a" : grad.verdictMatch ? "match" : "differ"}`);
-    console.log(`GRADUATION: ⛔ ${grad.graduationBlockedReason}`);
 
-    // ── JUDGMENT SCORE (Brain schema 0.2) — the REAL graduation signal. Runs ONLY if the BLIND-authored
-    //    key has been frozen; verifies keySha256 (mismatch ⇒ INVALID run) then scores deterministically
-    //    ($0, no AI). No-op until Brain's key is frozen. Code did NOT author the key — only reads it. ──
+    // SUBSTRATE HEALTH (deterministic · $0 · NOT a graduation gate) — needs the OLD gold .json; optional
+    // observability, present only for N4008526R0065. Absence does NOT block the judgment score below.
+    if (gold) {
+      const score = scoreGoldSet(persistedExtraction, gold);
+      grad = graduationGate(score, gold, pv, sourceLedgerText); // sourceText → fabrication check (2c)
+      console.log(`\n──────── SUBSTRATE HEALTH (deterministic · $0 · NOT a graduation gate — Brain 2026-06-25) ────────`);
+      console.log(`FABRICATION (raised clause absent from source): ${grad.fabricatedClauses.length} ${grad.fabricatedClauses.length === 0 ? "✅" : "❌ " + grad.fabricatedClauses.join(", ")}`);
+      console.log(`decoy traps mis-fired as DISQUALIFYING gates  : ${grad.decoyMisfired.length} ${grad.decoyMisfired.length === 0 ? "✅" : "❌ " + grad.decoyMisfired.join(", ")}`);
+      console.log(`SUBSTRATE: ${grad.substrateClean ? "✅ CLEAN" : "❌ " + grad.failures.join(" · ")}`);
+      console.log(`[observability — RETRACTED as signals] clause-list binding ${pct(grad.bindingClauseRecall)}/prec ${pct(grad.bindingClausePrecision)} (tautological) · gate-recall ${pct(grad.gateRecall)} · verdict ${grad.verdictMatch === null ? "n/a" : grad.verdictMatch ? "match" : "differ"}`);
+      console.log(`GRADUATION: ⛔ ${grad.graduationBlockedReason}`);
+    }
+
+    // ── JUDGMENT SCORE (Brain schema) — the REAL graduation signal vs the BLIND-authored frozen key.
+    //    WIRED to run INDEPENDENT of the old gold .json (which only N4008526R0065 has) so all 5 frozen
+    //    keys actually get graded. Verifies keySha256 (mismatch ⇒ INVALID run) then scores deterministically
+    //    ($0, no AI). Code did NOT author the key — only reads + verifies + scores it. ──
     const fkPath = path.join("scripts", "audit-ai", "gold-sets", `${sol}.judgment.frozen.json`);
     if (existsSync(fkPath)) {
       const jkey = JSON.parse(readFileSync(fkPath, "utf8")) as JudgmentKey;
@@ -298,7 +304,7 @@ async function main() {
       console.log(`[judgment] no frozen judgment key at ${fkPath} — judgment not scored (awaiting Brain's blind-authored key + freeze).`);
     }
   } else {
-    console.log(`\n[gold] no adjudicated gold set for ${sol} (or no panel judgment) — graduation cannot be scored.`);
+    console.log(`\n[panel] no panel judgment produced — nothing to score.`);
   }
 
   // Persist the panel's structured output so a future grade/score never re-pays the panel ($2.53).
