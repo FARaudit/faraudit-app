@@ -60,3 +60,29 @@ Engine is WRONG; target is **BID** (the unmet gates are routine clearable execut
 
 ## Hold (Brain)
 CEO confirmed + greenlit 2026-06-26 — build authorized.
+
+---
+
+# GRADING MODEL — Brain ruling on card 41 (2026-06-26, CEO greenlit). BAR FROZEN AFTER THIS.
+
+**This closes the grading definition — it is a structural definition of "converged," not another per-finding patch. The bar is frozen after this; a third re-definition would signal the gold-key approach itself isn't converging (a different conversation).**
+
+## The unifying rule — CONTROLLABILITY TEST (shared by the disposition prompt AND the verdict judge — ONE rule, not two)
+- **Bidder CONTROLS satisfaction** (sourcing / pricing / configuration / documentation) → an **unmet GATE-TO-CLEAR**: does NOT disqualify, does NOT downgrade the verdict. The bidder resolves it by doing the work.
+- **Bidder CANNOT move it regardless of effort** (eligibility bar · single-source/proprietary spec the firm can't legally supply · unattainable past-performance · exclusivity) → a **DISQUALIFYING BAR**: may NO_BID / downgrade.
+- Narrow ≠ restrictive-to-us. Narrowness alone is NOT materiality. (Enclosed-cab + GVWR 3,500–4,500 lb = a commodity sourcing/config task the firm controls → routine → BID.)
+- **Judge must STOP double-counting:** when satisfiability is firm-dependent/unknown, verdict stays BID and the spec goes on the unmet-gate list — pick ONE, it's a gate, not a verdict-downgrade.
+
+## The new grading bar — replaces single-run hard-pass (Q2, ASYMMETRIC)
+Run **N = 3–5** panel runs of the same package. Two axes, graded differently (the customer runs it ONCE):
+- **COMPLETENESS axis** (verdict · must-raise concepts · gate dispositions) → **CONSENSUS** (majority across N). A hard key must NOT hinge on a tail/depth finding that appears 1-in-2 runs.
+- **CORRECTNESS axis** (fabrications · disqualifying-misclassifications e.g. "100% set-aside = disqualifying" · absent-decoy misfires DEI / "unenforceable supplier terms") → **UNANIMITY / ZERO-TOLERANCE**. ONE occurrence in ANY of the N runs = FAIL. Best-of-N may NEVER hide a correctness error — the customer could get that 1 run.
+- This is doctrinally exact: the moat is "complete AND correct." Completeness tolerates consensus; correctness tolerates nothing.
+- **Variance reduction** (pin settings / lower effort where it costs no reasoning quality) = a tuning lever, NOT the grading definition. Do not over-pin / lobotomize the lenses.
+
+## Scorer backstop (Q3, defense-in-depth)
+A **disqualifying disposition on an eligible-for provision** (e.g. the set-aside) is a **correctness-class error** → fails the run even if the prompt regresses. Same defense-in-depth as fabrication (lens-prompt fix + raw-output scrub).
+
+## UPDATED DoD (supersedes "re-graded against 5649b421" single-run item)
+- The N-run asymmetric bar above IS the acceptance test: consensus on what it must FIND, unanimity on what it must NOT FABRICATE/misclassify.
+- HOLD all paid runs until the grading model is BUILT; then ONE confirmation N-run (separate greenlight). No iterative paid runs against a moving bar.
