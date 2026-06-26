@@ -21,7 +21,9 @@ export interface RawFinding {
 
 /** One normalized turn of the loop: either the model called tools, or it submitted its final findings. */
 export interface ModelTurn { toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }>; findings: RawFinding[] | null; }
-export interface ToolResult { id: string; name: string; result: unknown; }
+/** A completed tool exchange — carries the original call (id/name/input) AND its result so the production
+ *  model wrapper can reconstruct a PROTOCOL-VALID Anthropic transcript (assistant tool_use → user tool_result). */
+export interface ToolResult { id: string; name: string; input: Record<string, unknown>; result: unknown; }
 export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][] }) => Promise<ModelTurn>;
 
 export interface ExpertSpec { key: string; system: string; }
@@ -60,30 +62,42 @@ export async function runAgenticExpert(
       return { findings, turns: turn, dropped, converged: true };
     }
     // execute the tools the expert called, deterministically, and feed results back next turn.
-    priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, result: runAuditTool(ctx, tc.name, tc.input) })));
+    priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
   }
   return { findings: [], turns: maxTurns, dropped: 0, converged: false };
 }
 
-/** Default model call — wraps the Anthropic SDK tool-use turn. The expert is given the audit tools plus a
- *  `submit_findings` tool whose schema forces a typed findings array (structured output via tool input).
- *  Returns either the tool calls it made or, when it calls submit_findings, the parsed findings. PAID. */
-export function makeAnthropicCallModel(anthropic: { messages: { create: (a: unknown) => Promise<unknown> } }, model: string): CallModel {
-  const SUBMIT = {
-    name: "submit_findings", description: "Submit your final typed findings (facts, not a verdict). Call ONLY after every finding is grounded in a verbatim source excerpt.",
-    input_schema: { type: "object", additionalProperties: false, required: ["findings"], properties: { findings: { type: "array", items: {
-      type: "object", additionalProperties: false, required: ["requirement", "citation", "excerpt", "kind", "controllability"],
-      properties: { requirement: { type: "string" }, citation: { type: "string" }, excerpt: { type: "string", description: "VERBATIM source span" },
-        kind: { type: "string", enum: ["eligibility_bar", "technical_spec", "pricing", "submission", "past_performance", "clause_flowdown", "boilerplate", "other"] },
-        controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "already_satisfied"] },
-        requiredAttribute: { type: "string" }, severity: { type: "string", enum: ["P0", "P1", "P2"] } } } } } },
-  };
-  // The harness re-sends the full transcript each turn; for simplicity the default impl rebuilds messages
-  // from priorToolResults. (Production wiring threads the real assistant/tool_result blocks; this is the seam.)
+/** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a
+ *  strict tool). The expert calls it to terminate its loop; the harness parses the validated input. */
+export const SUBMIT_FINDINGS_TOOL = {
+  name: "submit_findings", description: "Submit your final typed findings (facts, not a verdict). Call ONLY after every finding is grounded in a verbatim source excerpt you confirmed with find_in_source / lookup_clause.",
+  input_schema: { type: "object", additionalProperties: false, required: ["findings"], properties: { findings: { type: "array", items: {
+    type: "object", additionalProperties: false, required: ["requirement", "citation", "excerpt", "kind", "controllability"],
+    properties: { requirement: { type: "string" }, citation: { type: "string" }, excerpt: { type: "string", description: "VERBATIM source span proving the requirement exists" },
+      kind: { type: "string", enum: ["eligibility_bar", "technical_spec", "pricing", "submission", "past_performance", "clause_flowdown", "boilerplate", "other"] },
+      controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "already_satisfied"] },
+      requiredAttribute: { type: "string", description: "for an eligibility bar: the qualification the firm must HOLD (e.g. naics:333120-small)" },
+      severity: { type: "string", enum: ["P0", "P1", "P2"] } } } } } },
+} as const;
+
+type SdkBlock = { type: string; id?: string; name?: string; input?: Record<string, unknown> };
+type SdkClient = { messages: { create: (a: Record<string, unknown>) => Promise<{ content: SdkBlock[]; stop_reason?: string }> } };
+
+/** Production model call — the FULL Anthropic SDK tool-use turn. Reconstructs a PROTOCOL-VALID transcript
+ *  from the loop's normalized history (assistant `tool_use` blocks → user `tool_result` blocks), gives the
+ *  expert the audit tools + `submit_findings`, and returns either the tools it called or its parsed findings.
+ *  Stateless → safe under the orchestrator's parallel experts (each expert run owns its own history). PAID.
+ *  Extended thinking is intentionally OMITTED here: the loop reconstructs assistant turns from normalized
+ *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
+ *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
+export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string }): CallModel {
   return async ({ system, userTask, priorToolResults }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
-    for (const batch of priorToolResults) messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
-    const resp = (await anthropic.messages.create({ model, max_tokens: 4096, system, tools: [...AUDIT_TOOLS, SUBMIT], messages })) as { content: Array<{ type: string; id?: string; name?: string; input?: Record<string, unknown> }> };
+    for (const batch of priorToolResults) {
+      messages.push({ role: "assistant", content: batch.map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input })) });
+      messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
+    }
+    const resp = await client.messages.create({ model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages });
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
     if (submit) return { toolCalls: [], findings: (submit.input?.findings as RawFinding[]) ?? [] };
