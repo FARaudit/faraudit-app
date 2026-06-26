@@ -85,12 +85,17 @@ const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
   I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference)/im,
   J: /^(List\s+of\s+Attachments)/im,
   K: /^(Representations,?\s+Cert|Other\s+Statements\s+of\s+Offerors)/im,
-  // §L — UCF titles (line-start) OR COMMERCIAL forms: FAR 52.212-1 IS the commercial "Instructions to
-  //   Offerors" (Part-12), which appears clause-number-prefixed ("52.212-1  Instructions to Offerors…").
-  L: /^(Instructions,?\s+Conditions|Special\s+Notes\s+and\s+Instructions|Notice\s+to\s+Quoter|Notes\s+to\s+Offeror)|Instructions\s+to\s+Offerors?\b|^5?2\.212-1\b/im,
+  // §L — UCF titles OR COMMERCIAL forms: FAR 52.212-1 IS the commercial "Instructions to Offerors"
+  //   (Part-12), appearing clause-number-prefixed ("52.212-1  Instructions to Offerors…") or as an
+  //   ADDENDUM heading. ALL alternatives are LINE-ANCHORED (the ^ leads the whole group) and
+  //   detectSections tests per-line, so a match means a heading line, never a prose mention — a prose
+  //   "…the instructions to offerors say…" must NOT credit §L (that would mask a genuine missing-§L
+  //   gap; no-silent-drop). The 52.212-1 clause-number alt covers the legit "52.212-1 Instructions…" head.
+  L: /^(Instructions,?\s+Conditions|Special\s+Notes\s+and\s+Instructions|Notice\s+to\s+Quoter|Notes\s+to\s+Offeror|Instructions\s+to\s+Offerors?|Quote\s+Preparation|(?:ADDENDUM\s+TO\s+)?(?:FAR\s+)?5?2\.212-1)\b/im,
   // §M — UCF titles OR COMMERCIAL forms: "Evaluation and Basis for Award" / FAR 52.212-2 (Evaluation—
-  //   Commercial). Commercial RFQs phrase §M as "Basis for Award", not "Evaluation Factors for Award".
-  M: /^(Evaluation\s+Factors\s+for\s+Award|Technical\s+Evaluation)|Evaluation\s+and\s+Basis\s+for\s+Award|Basis\s+for\s+Award\b|FAR\s+5?2\.212-2|^5?2\.212-2\b/im,
+  //   Commercial). Commercial RFQs phrase §M as "Basis for/of Award" or "Evaluation Criteria". Same
+  //   line-anchor discipline as §L — a prose "…basis for award is described in…" must NOT credit §M.
+  M: /^(Evaluation\s+Factors\s+for\s+Award|Technical\s+Evaluation|Evaluation\s+and\s+Basis\s+for\s+Award|Basis\s+(?:for|of)\s+Award|Evaluation\s+Criteria|(?:ADDENDUM\s+TO\s+)?(?:FAR\s+)?5?2\.212-2)\b/im,
 };
 
 // Format detection patterns.
