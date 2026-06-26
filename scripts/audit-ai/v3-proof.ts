@@ -4,7 +4,7 @@
 // the authored expectedVerdict, and totals real token cost across BOTH the expert SDK loop AND the skeptic.
 // One sol per invocation (so cost is tracked per audit and a wiring bug halts after one key, not two).
 //   npx dotenv -e .env.local -- tsx scripts/audit-ai/v3-proof.ts <SOL_ID>
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { auditPackage } from "@/lib/audit-package";
 import { setExpertUsageSink, type ExpertUsage } from "@/lib/audit-expert";
 import { setStructuredUsageSink, type StructuredUsage } from "@/lib/anthropic-structured";
@@ -54,6 +54,16 @@ async function main() {
   console.log(`  coverage:  required=[${res.coverage.required}] covered=[${res.coverage.covered}] missing=[${res.coverage.missing}] complete=${res.inputs.coverageComplete}`);
   console.log(`  conflict:  ${res.conflict} | verifierSound: ${res.inputs.verifierSound} | findings: ${res.findings.length}`);
   console.log(`  per-lens:  ${JSON.stringify(res.perLens)}`);
+
+  // Persist the full result for $0 post-mortem — every finding with its lens, excerpt, and typing. No re-run
+  // needed to inspect why a section is uncovered or a lens returned empty.
+  mkdirSync("ceo/proofs", { recursive: true });
+  writeFileSync(`ceo/proofs/v3-${sol}-result.json`, JSON.stringify({
+    sol, expected, got, decision: res.decision, coverage: res.coverage, perLens: res.perLens,
+    conflict: res.conflict, verifierSound: res.inputs.verifierSound,
+    findings: res.findings.map((f) => ({ lens: f.lens, kind: f.kind, controllability: f.controllability, requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow })),
+  }, null, 2));
+  console.log(`  (full result → ceo/proofs/v3-${sol}-result.json)`);
 
   let total = 0;
   console.log(`\n── COST (baseline, pre-caching) ──`);

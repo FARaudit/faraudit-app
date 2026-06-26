@@ -24,7 +24,7 @@ export interface ModelTurn { toolCalls: Array<{ id: string; name: string; input:
 /** A completed tool exchange — carries the original call (id/name/input) AND its result so the production
  *  model wrapper can reconstruct a PROTOCOL-VALID Anthropic transcript (assistant tool_use → user tool_result). */
 export interface ToolResult { id: string; name: string; input: Record<string, unknown>; result: unknown; }
-export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][] }) => Promise<ModelTurn>;
+export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][]; forceSubmit?: boolean }) => Promise<ModelTurn>;
 
 export interface ExpertSpec { key: string; system: string; }
 
@@ -45,13 +45,16 @@ export async function runAgenticExpert(
   const maxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
   const userTask =
-    "Audit THIS solicitation as your lens. Use the tools to READ the relevant sections and GROUND every " +
-    "finding in a verbatim source excerpt before you assert it. Do not cite a clause lookup_clause reports " +
-    "absent. When done, submit your findings — each a typed FACT (requirement, citation, verbatim excerpt, " +
+    "Audit THIS solicitation as your lens. Read ONLY the sections you need (a few tool calls — you have a " +
+    `limited budget of about ${maxTurns} turns), GROUND every finding in a verbatim source excerpt, then call ` +
+    "submit_findings PROMPTLY. Do not keep reading once you can state your findings. Do not cite a clause " +
+    "lookup_clause reports absent. Each finding is a typed FACT (requirement, citation, verbatim excerpt, " +
     "kind, controllability), never a verdict.";
 
   for (let turn = 1; turn <= maxTurns; turn++) {
-    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults });
+    // On the final allowed turn, FORCE submit_findings so a thorough expert that kept reading still produces
+    // its findings instead of exhausting the turn cap with nothing (the 0-findings/INCOMPLETE failure mode).
+    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns });
     if (out.findings) {
       let dropped = 0;
       const findings: TypedFinding[] = [];
@@ -99,13 +102,15 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
 export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string }): CallModel {
-  return async ({ system, userTask, priorToolResults }) => {
+  return async ({ system, userTask, priorToolResults, forceSubmit }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
       messages.push({ role: "assistant", content: batch.map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input })) });
       messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
     }
-    const resp = await client.messages.create({ model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages });
+    const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages };
+    if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
+    const resp = await client.messages.create(req);
     if (_expertUsageSink && resp.usage) _expertUsageSink({ model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 });
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
