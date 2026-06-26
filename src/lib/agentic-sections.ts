@@ -242,9 +242,35 @@ export function sectionLetterFromName(name: string): string | null {
   if (sec) return sec[1].toUpperCase();
   const ex = name.match(/\b([a-m])-\d{3,}/i); // exhibit naming "J-1503010-09", "C-0200000"
   if (ex) return ex[1].toUpperCase();
-  if (/\b(pws|sow|soo|statement\s+of\s+work|performance\s+work\s+statement|statement\s+of\s+objectives|scope\s+of\s+work)\b/i.test(name)) return "C";
+  if (/\b(pws|sow|soo|statement\s+of\s+work|performance\s+work\s+statement|statement\s+of\s+objectives|scope\s+of\s+work|salient\s+characteristics?|item\s+description|purchase\s+description|product\s+description|technical\s+requirements?|requirements?\s+document|description\s+of\s+(?:supplies|services|requirements?))\b/i.test(name)) return "C";
+  // §C technical requirements named as a SPEC. "Specs_Mini-Excavator" — note the trailing "_" is a word
+  // char so a naive \bspecs\b fails; use a non-word/sep/end lookahead. spec | specs | specification(s).
+  // Role-correct (the spec IS the §C description/salient-characteristics the technical lens evaluates),
+  // NOT a catch-all (Brain guard). The §C-1240LP26Q0067 unrouted-binding bug.
+  if (/\bspec(?:ification)?s?(?=[\s_.\-]|$)/i.test(name)) return "C";
   if (/\b(wage\s*det(?:ermination)?|sca|cba|collective\s+bargaining|davis-bacon)\b/i.test(name)) return "B";
   if (/\b(inventory|elins?|government\s+furnished|gfp|gfe|exhibit|annex(?:es)?|service\s+level\s+standards?)\b/i.test(name)) return "J";
+  return null;
+}
+
+/** COVERAGE-FROM-CONTENT (Fix #2, Brain Card-1 Option B): when the NAME can't place a binding
+ *  attachment, classify it by what it actually CONTAINS — the read — not the filename and not the
+ *  ingestion log. Runs the SAME deterministic section detector on the attachment body and routes to
+ *  the most-specific binding UCF section it genuinely exhibits (high/medium confidence only).
+ *  ROLE-appropriate (the content decides the section), NEVER a catch-all default — if the body shows
+ *  no confident binding section, it returns null and the caller keeps it an HONEST coverage gap.
+ *  Pure (no model/network). */
+export function sectionLetterFromContent(text: string | null): string | null {
+  const body = (text ?? "").trim();
+  if (body.length < 200) return null; // too little to classify confidently
+  let bag;
+  try { bag = detectSections(asExtractedDoc(body)); }
+  catch { return null; }
+  // Specificity order for binding content: C (specs/SOW) → M (eval) → L (instructions) → B → H → F → I.
+  for (const k of ["C", "M", "L", "B", "H", "F", "I"]) {
+    const s = bag.sections[k];
+    if (s && s.text && s.text.trim() && (s.confidence === "high" || s.confidence === "medium")) return k;
+  }
   return null;
 }
 
@@ -362,7 +388,14 @@ export function resolveAttachments(attachments: Array<{ name: string; text: stri
     else if (a.isRevision && a.section && a.sectionExplicit) { const g = sectionReplacements.get(a.section) ?? []; g.push(a); sectionReplacements.set(a.section, g); }
     else if (a.section) plain.push(a);
     else if (isAdministrativeNonBinding(a.name, a.text)) log.push(`administrative (non-binding): ${a.name} — routes to no section but carries no obligation language; NOT a coverage gap`);
-    else unresolved.push(a.name); // a "Revised <thing>" / unplaceable binding file we could NOT place — a real coverage gap
+    else {
+      // Fix #2 — COVERAGE-FROM-CONTENT (Brain Card-1 Option B): the filename gave no section and it is
+      // not administrative → classify by the BODY (what the MAP read), not the name and not the ingestion
+      // log. Route only when the content shows a confident binding section (role-appropriate, no catch-all).
+      const bySec = sectionLetterFromContent(a.text);
+      if (bySec) { plain.push({ ...a, section: bySec }); log.push(`${a.name} → §${bySec} by CONTENT (filename gave no section; routed from the read, not the ingestion log)`); }
+      else unresolved.push(a.name); // genuinely unplaceable binding content → honest coverage gap (INCOMPLETE)
+    }
   }
 
   // DETERMINISTIC latest-wins: sort by sequence, tie-break by name (re-review #3 — equal numbers were
