@@ -124,3 +124,55 @@ export function scoreJudgment(
     clauseRecallReported: opts?.clauseRecall ?? null,
   };
 }
+
+// ── N-RUN CONSENSUS GRADING (Brain card 41 — the FROZEN grading bar) ────────────────────────────────
+// The customer runs the stochastic panel ONCE, so single-run hard-pass is the wrong bar. Grade N=3–5 runs
+// ASYMMETRICALLY:
+//   COMPLETENESS (verdict · must-raise concepts) → CONSENSUS (a majority of N runs). A hard key must not
+//     hinge on a tail finding that appears 1-in-2 runs.
+//   CORRECTNESS (fabrications · decoy/disqualifying-misclassifications) → UNANIMITY / ZERO-TOLERANCE:
+//     ONE occurrence in ANY run = FAIL. Best-of-N may NEVER hide a correctness error — the customer
+//     could get that 1 run. ("complete AND correct": completeness tolerates consensus, correctness nothing.)
+export interface ConsensusResult {
+  pass: boolean;
+  n: number;
+  majority: number;
+  failures: string[];
+  completeness: { verdictOkRuns: number; conceptConsensus: Array<{ token: string; surfacedRuns: number; ok: boolean }> };
+  correctness: { fabricationRuns: string[]; misclassificationRuns: string[] };
+}
+
+export function gradeConsensus(results: JudgmentResult[], key: JudgmentKey): ConsensusResult {
+  const n = results.length;
+  const majority = Math.floor(n / 2) + 1;
+  const failures: string[] = [];
+
+  // CORRECTNESS — zero-tolerance (unanimity). ANY run with a fabrication, or a disqualifying-
+  // misclassification (absent-decoy raised, or a decoy / eligible-for provision raised as disqualifying),
+  // fails the whole bar — best-of-N may NOT hide it.
+  const fabricationRuns: string[] = [];
+  const misclassificationRuns: string[] = [];
+  results.forEach((r, i) => {
+    if (r.fabricated.length) fabricationRuns.push(`run${i + 1}: ${r.fabricated.join(", ")}`);
+    if (r.decoyHardFails.length) misclassificationRuns.push(`run${i + 1}: ${r.decoyHardFails.join(", ")}`);
+  });
+  if (fabricationRuns.length) failures.push(`CORRECTNESS (zero-tolerance) — fabrication in ${fabricationRuns.length}/${n} run(s): ${fabricationRuns.join(" · ")}`);
+  if (misclassificationRuns.length) failures.push(`CORRECTNESS (zero-tolerance) — disqualifying-misclassification/decoy in ${misclassificationRuns.length}/${n} run(s): ${misclassificationRuns.join(" · ")}`);
+
+  // COMPLETENESS — consensus (majority). Verdict + each must-raise concept must hold in a MAJORITY of runs.
+  const verdictOkRuns = results.filter((r) => r.verdict.ok).length;
+  if (verdictOkRuns < majority) failures.push(`COMPLETENESS — verdict consensus ${verdictOkRuns}/${n} < majority ${majority} (actuals: ${results.map((r) => r.verdict.actual).join(", ")})`);
+
+  const conceptConsensus = key.namedGates.filter((g) => g.mustRaise).map((g) => {
+    const surfacedRuns = results.filter((r) => r.namedGates.find((x) => x.token === g.token)?.surfaced).length;
+    const ok = surfacedRuns >= majority;
+    if (!ok) failures.push(`COMPLETENESS — must-raise concept '${g.token}' surfaced ${surfacedRuns}/${n} < majority ${majority}`);
+    return { token: g.token, surfacedRuns, ok };
+  });
+
+  return {
+    pass: failures.length === 0, n, majority, failures,
+    completeness: { verdictOkRuns, conceptConsensus },
+    correctness: { fabricationRuns, misclassificationRuns },
+  };
+}
