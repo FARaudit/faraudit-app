@@ -1,7 +1,13 @@
 {
   "_README": "APPROVED schema (Brain 2026-06-25, +4 amendments) for the expected-JUDGMENT gold key. SCHEMA ONLY — NO entries. The clause-recall key is RETRACTED as a graduation signal (tautological after the §I enumerator). This key scores JUDGMENT, not extraction. ENTRIES must be authored by BLIND human-SME adjudication (CEO + Brain) from RAW source BEFORE any scored run, then frozen + hashed. CODE IS CONTAMINATED on N4008526R0065 (already ran it) and will ONLY freeze+hash the CEO+Brain-authored key — Code NEVER authors judgment entries. No scorer is built until an amended key is committed + ruled.",
-  "schemaVersion": "0.2-approved",
+  "schemaVersion": "0.4-benchmark-doctrine (adds Brain 2026-06-26 living-benchmark fields: asOfProcurementLawDate + outcome; supersedes 0.3-concept-presence, which supersedes 0.2-approved. NEW FIELDS ARE OPTIONAL — existing frozen keys remain schema-valid without re-authoring; Brain+CEO populate them at next adjudication, never Code.)",
   "packageId": "<solicitation number>",
+  "asOfProcurementLawDate": "BENCHMARK DOCTRINE (Brain 2026-06-26, VERSIONING): ISO date (YYYY-MM-DD) of the procurement-law baseline this key was authored against (the FAR/DFARS/CMMC state as-of). On a regulatory change that supersedes the key, the OLD version is ARCHIVED (not deleted) and a NEW key is frozen with the updated date. The regression suite always runs the current version; the archive is the audit trail. Optional/null until populated at next blind adjudication.",
+  "outcome": {
+    "_doc": "BENCHMARK DOCTRINE (Brain 2026-06-26, OUTCOME FLYWHEEL): the real market result for this solicitation, captured as it becomes known. A real bid outcome is HARDER ground truth than any human-adjudicated key — the market adjudicated it — so these become the HIGHEST-WEIGHT keys in the challenger loop once volume exists. Capture begins NOW, pre-scale (collection cost ≈ 0; compounding value highest if started early). null until known.",
+    "result": "won | lost | no-bid | null",
+    "awardDate": "<ISO date YYYY-MM-DD, or null>"
+  },
   "bidderProfile": "AMENDMENT 1 (required, top-level): the KNOWN bidder attributes, or null. null for N4008526R0065. DOCTRINE: INELIGIBLE requires a named gate × a KNOWN bidder attribute proving structural impossibility; with a null profile the expectedVerdict CANNOT be INELIGIBLE on a bidder-side gate (caution, never auto-INELIGIBLE).",
   "adjudication": {
     "_doc": "blind-SME provenance + tamper-evidence — a scored run is valid ONLY against a frozen, hashed key authored blind by CEO+Brain (NOT Code)",
