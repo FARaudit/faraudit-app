@@ -39,3 +39,25 @@ Distinct from the bar/scorer changes above — these record ENGINE-ARCHITECTURE 
 - **Three honest states only: `present` · `absent` (confirmed by reading) · `unverified` (reading in progress).** `unverified` is NEVER presented as "missing" (standing no-silent-drop law).
 - **#2 gold-set run: UNBLOCKED.** #2's doc is readable, sections detect correctly post-harden, measurement unaffected. The agentic coverage fix is a SEPARATE track and does not gate the run.
 - **Noted in ruling:** the hardened §L/§M fix (PR #95, main `1596897`) closing the unanchored-match trust-bug was correct — a HIGH-severity issue caught and closed before it reached a customer.
+
+## 2026-06-26 — Completeness criterion (Brain ruling · card 47 → B-corrected · Architecture Ruling)
+
+Context: the v3 field proof on #2 failed CLOSED to INCOMPLETE because §C produced 0 grounded findings under the old criterion (per-section ≥1 finding). The engine behaved as designed (honest-fail, no fabrication, no false BID) — a blunt gate, not an unsafe one.
+
+- **Reject A (per-section ≥1 finding).** Conflates "section honestly handled" with "section produced a finding." A genuinely thin §C (brochure of exact machine + price the CLINs) is fully handled with zero §C-labeled findings → A guarantees chronic INCOMPLETE on clean packages.
+- **Reject naive B.** "Every obligation grounded" with a model free to wave "nothing new, §L has it" re-arms the §C root-cause one layer up (read-then-silently-dismiss).
+- **RULING — B-corrected (completeness = obligation-coverage with three binding guards):**
+  1. **Every binding section READ** — tool-pulled, MAP-confirmed present (preserves the §C guarantee; read-to-confirm, never assume).
+  2. **An empty binding section must emit an explicit grounded `no-residual-obligation` attestation** — naming what it carries and where each obligation is grounded. Silence is NEVER coverage; zero findings on a binding section = INCOMPLETE.
+  3. **The "grounded elsewhere" claim must cite specific finding IDs** — not a model assertion. §C "brochure of exact machine" → completeness requires the actual proposal_manager finding that grounds it. No pointer, no completeness.
+- Kills both A's chronic-INCOMPLETE and naive-B's silent §C wave-off.
+- **Sequence:** $0 diagnosis (thin vs bug) → wire B-corrected → separate CEO greenlight for the #2 re-run. No spend until diagnosis returns AND B-corrected is wired.
+
+## 2026-06-26 — maxShowStoppers semantics (Brain ruling · card 53 · Architecture Ruling)
+
+Context: #3 (SPRDL125Q0030) ran INELIGIBLE earned, but surfaced 3 show-stopper ROWS for ONE logical Dillon sole-source bar (C.14 / CLIN-0001AA / L.6c, three lenses). Pre-run blind-locked rubric had designated show-stopper COUNT as **advisory-only** (the "show-stopper fuzzy probe"), so the count did NOT gate #3 — re-gating on it post-run would break blind-lock integrity. **#3 = earned pass.**
+
+- **Ruling (all keys): `maxShowStoppers` counts distinct LOGICAL bars, not finding rows.** The metric asserts how many genuine barriers exist in the solicitation — a fact about the world, not about dedup plumbing. "One sole-source bar corroborated at three anchors" is ONE bar, three citations (a stronger finding than a bare row). No key VALUES change (#2=0, #3=1 are already logical-bar counts); only the grader's counting function changes.
+- **Dedup = report-quality polish, downstream of verdict derivation ONLY** — never feeds back into deriveVerdict/firmStatus (the proven deterministic core is untouched). Implemented as `logicalShowStoppers()` in audit-decide.ts.
+- **Conservative merge key:** same controllability AND a shared distinctive object identifier (part/CAGE number). NOT an OR over section-cite or loose token (two distinct bars can share a section or "OEM" by coincidence → could mask an over-fire). When in doubt, DO NOT merge. All citations retained.
+- **Proven by REPLAY** over #3's captured findings (3 Dillon rows → 1 bar, 3 citations, INELIGIBLE unchanged) + load-bearing negatives (distinct named-part bars stay separate; coincidental section/token no-merge; different-controllability no-merge). No paid re-run.
