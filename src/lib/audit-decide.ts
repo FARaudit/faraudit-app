@@ -210,6 +210,38 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
   });
 }
 
+// ── AWARD-BASIS OVER-TYPE GUARD (Brain card 108) ─────────────────────────────────────────────────────
+// Override-slot guard (same layer as caution-floor, BEFORE deriveVerdict; deriveVerdict UNTOUCHED). Two
+// deterministic re-types that fix the #1 false-NO_BID class:
+//   (a) An AWARD-BASIS / evaluation-methodology / source-selection finding (LPTA, "lowest price technically
+//       acceptable", screened-by-price, non-price factor, basis of award) is the award MECHANISM — it is NEVER
+//       a universal impossibility. A lens that types it `no_one_can_move` produces a FALSE NO_BID. Re-type to
+//       `bidder_controls`. NEVER touches the `temporal_conflict` finding or a REAL delivery/precondition
+//       impossibility (FAT/ARO/non-waivable/delivery-window) — the moat's genuine universal bars stand.
+//   (b) A SPECIFIC socioeconomic set-aside (8(a)/HUBZone/SDVOSB/WOSB/EDWOSB) under a NULL bidder profile is an
+//       UNVERIFIED eligibility gate — surface it as a caution (mark `cautionFloor`), NOT an assumed
+//       `already_satisfied`. A broad Total-Small-Business pool is NOT socioeconomic → left untouched (no
+//       over-caution). With a known profile (non-null) the existing firmStatus path governs.
+// Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation methodology|basis (?:for|of) award|source selection|screened (?:by|for) price|\bbest value\b|trade.?off|non-price factor|evaluation factor|technically acceptable|proposals?(?: will| are)? (?:initially )?(?:be )?screened/i;
+const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery/i;
+const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
+
+/** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
+ *  bidder_controls (never the temporal_conflict finding or a real delivery/precondition impossibility);
+ *  (b) a specific socioeconomic set-aside under a NULL profile → cautionFloor. Flag-gated; OFF ⇒ unchanged. */
+export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f) => {
+    const hay = `${f.requirement} ${f.excerpt ?? ""}`;
+    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(hay) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
+      return { ...f, controllability: "bidder_controls", awardBasisGuard: true }; // (a) award basis is never a universal bar
+    if (profile === null && f.controllability === "already_satisfied" && SOCIOECONOMIC_SETASIDE_RE.test(hay))
+      return { ...f, cautionFloor: true, awardBasisGuard: true };                  // (b) unverified socioeconomic eligibility → caution
+    return f;
+  });
+}
+
 // ── CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81, Step 2) ──────────────────────────────────────
 // Pure, no-model. Consumes the sweep-grounded `fat_precondition` + `delivery_window` findings (Step 1) and
 // detects a UNIVERSAL impossibility: a NON-WAIVABLE First-Article precondition whose minimum duration

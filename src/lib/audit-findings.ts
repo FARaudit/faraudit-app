@@ -66,6 +66,12 @@ export interface TypedFinding {
   // no_one_can_move with NO co-stated window conflict → bidder_controls (so a feasible precondition is
   // not a false universal bar). Marker only; deriveVerdict reads controllability, not this field.
   preconditionOvertypeFloored?: boolean;
+  // AWARD-BASIS OVER-TYPE GUARD (Brain card 108) — set when the deterministic guard either (a) re-typed an
+  // award-basis / evaluation-methodology / source-selection finding mis-typed no_one_can_move → bidder_controls
+  // (the award basis is never a universal bar — a false NO_BID), or (b) marked a SPECIFIC socioeconomic
+  // set-aside (8(a)/HUBZone/SDVOSB/WOSB) under a NULL profile as cautionFloor (verify-eligibility caution, not
+  // an assumed already_satisfied). Marker only; deriveVerdict reads controllability/cautionFloor, not this field.
+  awardBasisGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,
