@@ -61,3 +61,14 @@ Context: #3 (SPRDL125Q0030) ran INELIGIBLE earned, but surfaced 3 show-stopper R
 - **Dedup = report-quality polish, downstream of verdict derivation ONLY** — never feeds back into deriveVerdict/firmStatus (the proven deterministic core is untouched). Implemented as `logicalShowStoppers()` in audit-decide.ts.
 - **Conservative merge key:** same controllability AND a shared distinctive object identifier (part/CAGE number). NOT an OR over section-cite or loose token (two distinct bars can share a section or "OEM" by coincidence → could mask an over-fire). When in doubt, DO NOT merge. All citations retained.
 - **Proven by REPLAY** over #3's captured findings (3 Dillon rows → 1 bar, 3 citations, INELIGIBLE unchanged) + load-bearing negatives (distinct named-part bars stay separate; coincidental section/token no-merge; different-controllability no-merge). No paid re-run.
+
+## 2026-06-26 — Gold-set source-completeness (Brain ruling · card 57 · Architecture Ruling)
+
+The integrity property is NOT "can we re-confirm the original SAM attachment count" — it's "does the engine run against the COMPLETE artifact, free of the §B/§C content-loss class" (wage-determination/PWS overwriting primary sections — the months-of-UNKNOWN bug). Internal consistency (key authored from the same FULL-SOURCE the engine runs) is necessary but NOT sufficient: a set trimmed BEFORE the key was authored makes key+run jointly wrong (same shape as the knife-edge shared-miss).
+
+- **#4/#5 NOT blocked by SAM-non-verifiability.** They graduate after (i) reconciliation against the solicitation's OWN internal attachment manifest (SF1449 block 27 addenda / "List of Attachments" / L references) passes, and (ii) the content-loss guard confirms §B/§C present + not overwritten. Both $0.
+- **Standing rule — complete package, never a model-trimmed copy** (open sols via engine SAM-fetch; §C root-cause lesson encoded), with three amendments:
+  1. Archived completeness is established by **internal-manifest reconciliation + sha256 freeze**, not inspection judgment.
+  2. A frozen anchor's source is **IMMUTABLE** — no re-pull/substitute under a frozen key; a substitute sol is a NEW key, not a refreshed old one (swapping source breaks freeze provenance).
+  3. Manifest-reconciliation is a **standing pre-graduation gate for every future archived key**, not a one-off.
+- **Key A (NO_BID) still has NO valid source.** Card-56's keyword recon re-surfaced #5/#4/#3 (already frozen as CAUTION/INELIGIBLE) — contradictory provenance, not new sources. A NO_BID key must come from a genuinely NEW currently-open solicitation carrying a real universal impossibility (real-doc provenance or explicitly-labeled FRONTIER-adversarial mod).
