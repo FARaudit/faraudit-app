@@ -1,0 +1,76 @@
+{
+ "noticeId": "a686a9061efa48309b938635418d5313",
+ "title": "HIGH DYNAMIC RANGE THERMAL IMAGING SYSTEM",
+ "solicitationNumber": "FA860126Q00260001",
+ "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE.AIR FORCE MATERIEL COMMAND.AIR FORCE LIFE CYCLE MANAGEMENT CENTER.FA8601  AFLCMC PZIO",
+ "fullParentPathCode": "057.5700.AFMC.AFLCMC.FA8601",
+ "postedDate": "2026-06-25",
+ "type": "Combined Synopsis/Solicitation",
+ "baseType": "Combined Synopsis/Solicitation",
+ "archiveType": "auto15",
+ "archiveDate": "2026-07-14",
+ "typeOfSetAsideDescription": "No Set aside used",
+ "typeOfSetAside": "NONE",
+ "responseDeadLine": "2026-06-29T12:00:00-04:00",
+ "naicsCode": "334511",
+ "naicsCodes": [
+  "334511"
+ ],
+ "classificationCode": "5855",
+ "active": "Yes",
+ "award": null,
+ "pointOfContact": [
+  {
+   "fax": "",
+   "type": "primary",
+   "email": "danara.barlow@us.af.mil",
+   "phone": "",
+   "title": null,
+   "fullName": "Danara Barlow"
+  },
+  {
+   "fax": "",
+   "type": "secondary",
+   "email": "jessica.stamper.2@us.af.mil",
+   "phone": "",
+   "title": null,
+   "fullName": "Jessica Stamper"
+  }
+ ],
+ "description": "https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=a686a9061efa48309b938635418d5313",
+ "organizationType": "OFFICE",
+ "officeAddress": {
+  "zipcode": "45433-5344",
+  "city": "WRIGHT PATTERSON AFB",
+  "countryCode": "USA",
+  "state": "OH"
+ },
+ "placeOfPerformance": {
+  "city": {
+   "code": "OH-05",
+   "name": "Wright Patterson AFB"
+  },
+  "state": {
+   "code": "OH",
+   "name": "Ohio"
+  },
+  "zip": "45433",
+  "country": {
+   "code": "USA",
+   "name": "UNITED STATES"
+  }
+ },
+ "additionalInfoLink": null,
+ "uiLink": "https://sam.gov/workspace/contract/opp/a686a9061efa48309b938635418d5313/view",
+ "links": [
+  {
+   "rel": "self",
+   "href": "https://api.sam.gov/prod/opportunities/v2/search?noticeid=a686a9061efa48309b938635418d5313&limit=1"
+  }
+ ],
+ "resourceLinks": [
+  "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/02208c50c6944832814914e6e451d1fc/download",
+  "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/1a8e2b638c7b47549eff5d46ae4278c2/download",
+  "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/5d48e3c158b44eb6a4181e08c4802505/download"
+ ]
+}

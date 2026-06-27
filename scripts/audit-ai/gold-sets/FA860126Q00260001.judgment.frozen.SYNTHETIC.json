@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "FA860126Q00260001",
+  "_title": "HDR MWIR Thermal Imaging System (AFIT/AFLCMC) — NO_BID anchor via a LABELED SYNTHETIC-ADVERSARIAL delivery contradiction (gradeable JudgmentKey schema)",
+  "_suiteRole": "NO_BID verdict pole — the last missing verdict type (Brain card 72, CEO-chosen labeled-adversarial-mod path; mechanism re-designed by Brain to a Government-controlled First Article contradiction, four-corners gradeable). A REAL unrestricted commercial base package (FA860126Q00260001, fetched from SAM) carries a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod that makes delivery UNIVERSALLY unmeetable from award (60-day non-waivable First Article precondition vs 30-day-ARO binding production delivery). Distinct from the INELIGIBLE pole (#3): that bar is bidder-specific; this is a solicitation-side impossibility that defeats EVERY bidder. eligible stays true.",
+  "key_type": "full_verdict",
+  "bidderProfile": null,
+  "acquisitionPart": "PART_12",
+  "_acquisitionPart_basis": "source-grounded (NOT assumed): FAR Part 12 Commercial Products/Services buy — 52.212-1/-2/-3/-4/-5 all present in the base solicitation; §M is '52.212-2 Evaluation-Commercial Products and Commercial Services'; notice type = Combined Synopsis/Solicitation. No FAR Part 15 'contracting by negotiation' / 52.215-x negotiated clauses (the 52.215-7992/7994 present are AF local ombudsman provisions, not negotiated-procurement clauses).",
+  "expectedVerdict": {
+    "verdict": "NO_BID",
+    "eligible": true,
+    "maxShowStoppers": 1,
+    "reason": "A single Government-controlled, four-corners delivery contradiction makes performance physically impossible for EVERY offeror: the [SYNTHETIC-ADVERSARIAL] mod imposes a NON-WAIVABLE 60-day First Article testing precondition before any production delivery (Synthetic Clause 1) while mandating production delivery within 30 days ARO (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3). 60 > 30, so no bidder can comply regardless of capability — a universal walk-away (NO_BID), NOT a bidder-specific bar (which would be INELIGIBLE, the pole already anchored by #3). eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the defeat is the schedule, not eligibility. A wage-determination or set-aside/eligibility flag must NOT be raised."
+  },
+  "namedGates": [
+    {
+      "token": "delivery window physically unmeetable from award",
+      "scope": "universal",
+      "aliases": [
+        "first article testing",
+        "first article approval",
+        "non-waivable",
+        "60 calendar days",
+        "30 calendar days",
+        "30 days ARO",
+        "physically unmeetable",
+        "physically impossible",
+        "impossible to deliver",
+        "no offeror can",
+        "cannot deliver within 30 days",
+        "precondition to production and delivery"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "First article testing is a NON-WAIVABLE precondition to production and delivery ... The Government will require SIXTY (60) calendar days to conduct first article testing ... The Contractor shall deliver all production units ... NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO) ... Because 60 > 30, NO offeror ... can deliver a production unit within 30 days of award when 60 days of mandatory Government first article testing must first elapse. The delivery window is physically unmeetable from award by EVERY bidder."
+    }
+  ],
+  "showStoppers": [
+    {
+      "description": "Government-controlled, four-corners delivery contradiction: a non-waivable 60-day First Article testing precondition (Synthetic Clause 1) cannot fit inside the binding 30-day-ARO production delivery requirement (Synthetic Clauses 2-3). The window is universally unmeetable, so the solicitation is unbiddable by any offeror.",
+      "scope": "universal",
+      "sourceCite": "First article testing is a NON-WAIVABLE precondition to production and delivery; the Government will require SIXTY (60) calendar days to conduct first article testing; the Contractor shall deliver all production units NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO); any quotation contingent on a later date will be rated UNACCEPTABLE.",
+      "disqualifiesBecause": "solicitation-defect"
+    }
+  ],
+  "cautionItems": [],
+  "decoys": [
+    {
+      "token": "small business set-aside",
+      "kind": "absent",
+      "scope": "eligibility-decoy",
+      "mustNotRaiseAtAll": true,
+      "aliases": [
+        "set-aside",
+        "set aside",
+        "SDVOSB",
+        "WOSB",
+        "EDWOSB",
+        "HUBZone",
+        "8(a)",
+        "socioeconomic",
+        "small business eligibility",
+        "not eligible",
+        "ineligible offeror"
+      ]
+    }
+  ],
+  "_decoy_basis": "Source: block 10 'THIS ACQUISITION IS UNRESTRICTED' + SAM 'No Set aside used'. There is NO set-aside or socioeconomic eligibility gate — raising any set-aside / small-business eligibility / offeror-ineligibility flag is a false positive AND would mis-type the NO_BID as a bidder-specific INELIGIBLE problem (the wrong pole). The defeat is the universal schedule impossibility, not eligibility; eligible:true. Must-not-raise-at-all decoy.",
+  "_provenance_note": "SYNTHETIC-ADVERSARIAL key. The base package FA860126Q00260001 (HDR MWIR thermal imager, AFIT/AFLCMC, NAICS 334511, unrestricted, Combined Synopsis/Solicitation) is REAL — fetched from SAM.gov (source of record) on 2026-06-26. The delivery contradiction is a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod authored by Brain (card 72), fenced inside banner markers in the source file and never blended into base text. The base's own delivery terms (SOW IV: '8 months ARO'; base §F: '90 Calendar Days from Date of Award') are MEETABLE and are explicitly REPLACED by the synthetic mod. The base item description, FAT/delivery aliases, and acquisitionPart are all read from the real base text per Rule 64 (aliases from source/mod text only). DFARS 225.872 qualifying-country, 1-yr warranty, and FOB-destination are real base terms recorded as provenance, NOT gates or decoys.",
+  "source_sha256": "a8fd39b930afce7baf8ab2da353210d7a56150ebcaaacbebdff5afe87dda0eb7",
+  "source_bytes": 97542,
+  "source_completeness": "base-real-from-SAM + labeled-synthetic-mod-layer",
+  "authored_against": "scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.complete.txt",
+  "supersedes": [],
+  "adjudication": {
+    "authoredBlind": false,
+    "verdict_and_doctrine_by": [
+      "Brain",
+      "CEO"
+    ],
+    "transcribed_and_source_cited_by": "Code",
+    "authoredAt": "2026-06-26",
+    "rulingRef": "Brain card 72 (NO_BID via labeled FRONTIER-adversarial mod; base FA860126Q00260001 ratified; mechanism re-designed to a Government-controlled First Article contradiction, four-corners gradeable)",
+    "sourceSha256": "a8fd39b930afce7baf8ab2da353210d7a56150ebcaaacbebdff5afe87dda0eb7",
+    "keySha256": "22424bc8f3b339ffbd79443a3da70d7d8f3f350ec45890a7438bf6ff95303e27"
+  }
+}

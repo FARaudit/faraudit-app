@@ -56,6 +56,15 @@
         "retired_sha256": "86b4331350d6916ca27a51bced9604c319ae5ce7b110019b638fc5de26cc7b26",
         "reason": "reclassified full_verdict->oos_detection per construction honest-fail ruling 2026-06-26; old key retired in place, byte-identical, content untouched"
       }
+    },
+    "FA860126Q00260001": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "NO_BID",
+      "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.json",
+      "synthetic": true,
+      "_synthetic_note": "Real unrestricted commercial base package (fetched from SAM, source of record) + a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod (Brain card 72) imposing a Government-controlled First Article contradiction (60-day non-waivable FAT precondition vs 30-day-ARO binding delivery) → universally unmeetable → NO_BID. Synthetic layer is fenced in the source file; never blended into base text.",
+      "supersedes": []
     }
   },
   "held": {}
