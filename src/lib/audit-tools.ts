@@ -17,6 +17,9 @@ const asDoc = (text: string) => ({
 export interface AuditToolContext {
   fullSource: string;                 // the assembled package source (every routed section + attachment)
   sections?: Record<string, string>;  // optional precomputed UCF section → text (else derived on demand)
+  fetchedDocs?: string[];             // titles/filenames of the documents actually fetched+assembled (production
+                                      // assembly populates this) — reconciled against the manifest so a small
+                                      // material attachment going unfetched caps a no-bar verdict (Brain card-59)
 }
 
 const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {
