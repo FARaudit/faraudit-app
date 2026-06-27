@@ -72,6 +72,11 @@ export interface TypedFinding {
   // set-aside (8(a)/HUBZone/SDVOSB/WOSB) under a NULL profile as cautionFloor (verify-eligibility caution, not
   // an assumed already_satisfied). Marker only; deriveVerdict reads controllability/cautionFloor, not this field.
   awardBasisGuard?: boolean;
+  // STRUCTURAL-BAR WHITELIST (Brain card 114) — set when the deterministic guard downgraded a non-curable
+  // bidder_cannot_move finding under a NULL profile that is NOT a recognized genuine structural impossibility
+  // (a bidder-resolvable compliance / representation / clarification — size-standard, OCI, reps&certs,
+  // registration) → bidder_controls + cautionFloor. Marker only.
+  structuralWhitelistGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

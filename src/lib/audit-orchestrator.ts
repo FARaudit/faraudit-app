@@ -14,7 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -196,6 +196,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
   //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
   findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false" });
+
+  // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
+  //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept
+  //      only if it is a recognized GENUINE structural impossibility (sole-source/QPL/clearance/TDP-less source);
+  //      a bidder-resolvable compliance/representation item (size-standard, OCI, reps&certs) → caution; an
+  //      unrecognized one is LEFT (→ human review), never silently BID. NEVER touches no_one_can_move or a loaded
+  //      profile. Flag off ⇒ findings pass through unchanged.
+  findings = applyStructuralBarWhitelist(findings, bidderProfile, { enabled: process.env.AUDIT_STRUCTURAL_BAR_WHITELIST === "true" });
 
   // P4.4 — PRECONDITION OVER-TYPE FLOOR (Brain card 92), default-OFF (Rule 61). Re-types a time-curable
   //      precondition (FAT/source-approval/qualification-testing) that a lens mis-typed no_one_can_move with

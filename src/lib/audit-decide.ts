@@ -247,6 +247,34 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
   });
 }
 
+// ── STRUCTURAL-BAR WHITELIST (Brain card 114 — the general rule the per-pattern guards were special cases of) ──
+// A non-curable `bidder_cannot_move` bar under a NULL (unknown) profile routes to NEEDS_HUMAN_REVIEW (step 5b).
+// The lenses STOCHASTICALLY over-type bidder-RESOLVABLE compliance/representation/clarification items as such bars
+// (size-standard discrepancy, OCI rep, reps&certs, registration — a long tail; per-pattern guards are whack-a-mole).
+// DOCTRINE: a non-curable bar is kept ONLY if it is a recognized GENUINE structural impossibility (sole-source /
+// brand-name to a named OEM · QPL/QML lead-time · unobtainable clearance/facility cert · TDP-less approved-source).
+// A clearly bidder-resolvable compliance/representation item → downgrade to a caution gate. SAFETY (hard, conservative
+// by construction): an UNRECOGNIZED non-curable bar (neither whitelisted-structural nor clearly compliance) is LEFT
+// AS-IS (→ NEEDS_HUMAN_REVIEW) — NEVER silently downgraded to BID. Only fires under a NULL profile (a real profile →
+// firmStatus governs, so #3's proven Dillon fail stays INELIGIBLE via step 3). Never touches no_one_can_move (#6's
+// temporal impossibility). Flag-gated; default OFF (Rule 61) ⇒ unchanged byte-for-byte.
+const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|unobtainable/i;
+const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|representation|reps? (?:and|&) cert|certif|\bSAM\b|registration|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
+
+/** Generalize the over-type guards (Brain card 114): a non-curable bidder_cannot_move bar under a NULL profile is kept
+ *  only if it is a recognized structural impossibility; a clearly compliance/representation item → caution; an
+ *  unrecognized one is LEFT (→ human review), never silently BID. Pure → gate-tested. Flag-gated; OFF ⇒ unchanged. */
+export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled || profile !== null) return findings; // OFF, or a real profile loaded ⇒ firmStatus governs (unchanged)
+  return findings.map((f) => {
+    if (f.controllability !== "bidder_cannot_move" || f.curableInWindow !== false) return f; // only non-curable bars
+    const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;                                            // genuine structural impossibility → KEEP
+    if (COMPLIANCE_REP_RE.test(hay)) return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, structuralWhitelistGuard: true }; // bidder-resolvable → caution
+    return f;                                                                                 // SAFETY: unrecognized → leave (→ human review), never silently BID
+  });
+}
+
 // ── CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81, Step 2) ──────────────────────────────────────
 // Pure, no-model. Consumes the sweep-grounded `fat_precondition` + `delivery_window` findings (Step 1) and
 // detects a UNIVERSAL impossibility: a NON-WAIVABLE First-Article precondition whose minimum duration
