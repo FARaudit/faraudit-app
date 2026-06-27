@@ -10,14 +10,24 @@ import { setExpertUsageSink, type ExpertUsage } from "@/lib/audit-expert";
 import { setStructuredUsageSink, type StructuredUsage } from "@/lib/anthropic-structured";
 import { modelFor } from "@/lib/model-registry";
 import type { BidderProfile } from "@/lib/audit-findings";
+import { resolveGoldKey, gradeOosKey, goldSource } from "./gold-key-resolver";
 
 const sol = process.argv[2];
 if (!sol) { console.error("usage: v3-proof.ts <SOL_ID>"); process.exit(1); }
 process.env.AUDIT_AGENTIC_V3 = "true"; // explicit greenlight for THIS run (CEO flag-flip, Rule 66)
 
-const G = "scripts/audit-ai/gold-sets";
-const fullSource = readFileSync(`${G}/${sol}-FULL-SOURCE.txt`, "utf8");
-const key = JSON.parse(readFileSync(`${G}/${sol}.judgment.frozen.json`, "utf8"));
+// Resolve the ACTIVE key via the registry (never the retired `${sol}.judgment.frozen.json`).
+const resolved = resolveGoldKey(sol);
+if (resolved.keyType === "oos_detection") {
+  // oos route — deterministic detector, $0; NEVER the paid auditPackage, NEVER scoreJudgment.
+  const g = gradeOosKey(sol);
+  console.log(`\n═══ v3 FIELD PROOF · ${sol} · oos_detection ═══`);
+  console.log(`DETECTOR path (no paid run, no scoreJudgment): ${g.outcome}${g.tier ? ` [${g.tier}] ${g.signals.join(" · ")}` : ""}`);
+  console.log(`${g.pass ? "✅ PASS" : "❌ FAIL"} — ${sol}: expected OUT_OF_SCOPE construction.\n`);
+  process.exit(g.pass ? 0 : 2);
+}
+const fullSource = goldSource(sol);
+const key = JSON.parse(readFileSync(resolved.path, "utf8"));
 const expected = key.expectedVerdict?.verdict as string;
 // Map the authored bidderProfile → the engine's typed profile. null = unknown; a described generic firm that
 // holds NONE of the special bars' attributes → satisfiedAttributes:[] (any requiredAttribute → firmStatus "fails").

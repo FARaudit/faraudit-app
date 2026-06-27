@@ -12,6 +12,7 @@ import { runPanelJudge, coverageTruth } from "@/lib/agentic-panel-runner";
 import { priceUsd, type UsageLike } from "./ab-extract-adapter";
 import { scoreJudgment, gradeConsensus, keySha256, type JudgmentKey, type JudgmentResult } from "./judgment-score";
 import { setStructuredUsageSink } from "@/lib/anthropic-structured";
+import { resolveGoldKey, gradeOosKey } from "./gold-key-resolver";
 
 dotenv.config({ path: ".env.local", quiet: true });
 process.env.AUDIT_ENGINE_V2 = "true";
@@ -22,7 +23,15 @@ const N = Math.max(3, Math.min(5, parseInt(arg("--runs", "3")!, 10) || 3));
 
 async function main() {
   const cachePath = path.join("ceo", "proofs", `stage6e-matrix-${sol}.json`);
-  const fkPath = path.join("scripts", "audit-ai", "gold-sets", `${sol}.judgment.frozen.json`);
+  const resolved = resolveGoldKey(sol);
+  // oos route — deterministic detector, $0; NEVER the paid panel, NEVER scoreJudgment.
+  if (resolved.keyType === "oos_detection") {
+    const g = gradeOosKey(sol);
+    console.log(`oos_detection key '${sol}' → DETECTOR path (no paid panel, scoreJudgment NOT called): ${g.outcome}${g.tier ? ` [${g.tier}] ${g.signals.join(" · ")}` : ""}`);
+    console.log(`${g.pass ? "✅ PASS" : "❌ FAIL"} — expected OUT_OF_SCOPE construction.`);
+    process.exit(g.pass ? 0 : 2);
+  }
+  const fkPath = resolved.path;        // ACTIVE key (not the retired `${sol}.judgment.frozen.json`)
   for (const [label, p] of [["matrix cache (run stage6e first)", cachePath], ["frozen key", fkPath]] as const)
     if (!existsSync(p)) { console.error(`⛔ ${label} MISSING: ${p}`); process.exit(1); }
 

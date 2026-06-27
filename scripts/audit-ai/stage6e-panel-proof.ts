@@ -25,6 +25,7 @@ import type { Solicitation } from "@/lib/sam";
 import { priceUsd, type UsageLike } from "./ab-extract-adapter";
 import { parseGoldSet, scoreGoldSet, graduationGate, type EngineExtraction, type PanelVerdictLike, type GoldSetFile } from "./gold-set-score";
 import { scoreJudgment, keySha256, type JudgmentKey } from "./judgment-score";
+import { resolveGoldKey, gradeOosKey } from "./gold-key-resolver";
 
 dotenv.config({ path: ".env.local", quiet: true });
 
@@ -278,8 +279,14 @@ async function main() {
     //    WIRED to run INDEPENDENT of the old gold .json (which only N4008526R0065 has) so all 5 frozen
     //    keys actually get graded. Verifies keySha256 (mismatch ⇒ INVALID run) then scores deterministically
     //    ($0, no AI). Code did NOT author the key — only reads + verifies + scores it. ──
-    const fkPath = path.join("scripts", "audit-ai", "gold-sets", `${sol}.judgment.frozen.json`);
-    if (existsSync(fkPath)) {
+    // Resolve the ACTIVE key via the registry (not the retired `${sol}.judgment.frozen.json`); route oos.
+    let resolved: ReturnType<typeof resolveGoldKey> | null = null;
+    try { resolved = resolveGoldKey(sol); } catch { /* sol not an active registry key — fall through */ }
+    if (resolved?.keyType === "oos_detection") {
+      const g = gradeOosKey(sol);
+      console.log(`\n[judgment] oos_detection key → DETECTOR path (scoreJudgment NOT called): ${g.outcome}${g.tier ? ` [${g.tier}] ${g.signals.join(" · ")}` : ""} — ${g.pass ? "✅ PASS" : "❌ FAIL"}`);
+    } else if (resolved && existsSync(resolved.path)) {
+      const fkPath = resolved.path;
       const jkey = JSON.parse(readFileSync(fkPath, "utf8")) as JudgmentKey;
       const recomputed = keySha256(jkey);
       if (jkey.adjudication?.keySha256 && jkey.adjudication.keySha256 !== recomputed) {
@@ -301,7 +308,7 @@ async function main() {
         console.log(`\nJUDGMENT: ${jr.pass ? "✅ PASS" : "❌ FAIL — " + jr.failures.join(" · ")}`);
       }
     } else {
-      console.log(`[judgment] no frozen judgment key at ${fkPath} — judgment not scored (awaiting Brain's blind-authored key + freeze).`);
+      console.log(`[judgment] no active full_verdict key for ${sol} in the registry — judgment not scored (held/unknown, or awaiting freeze).`);
     }
   } else {
     console.log(`\n[panel] no panel judgment produced — nothing to score.`);

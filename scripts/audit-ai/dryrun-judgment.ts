@@ -14,6 +14,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { scoreJudgment, keySha256, type JudgmentKey } from "./judgment-score";
 import type { PanelVerdictLike } from "./gold-set-score";
+import { resolveGoldKey, gradeOosKey } from "./gold-key-resolver";
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -23,7 +24,15 @@ function arg(name: string, def?: string): string | undefined {
 const sol = arg("sol", "N4008526R0065")!;
 const panelPath = arg("panel", `ceo/proofs/stage6e-panel-output-${sol}.json`)!;
 const dir = "scripts/audit-ai/gold-sets";
-const fkPath = path.join(dir, `${sol}.judgment.frozen.json`);
+const resolved = resolveGoldKey(sol);
+// oos route — deterministic detector, $0; scoreJudgment NOT called (no cached panel output needed).
+if (resolved.keyType === "oos_detection") {
+  const g = gradeOosKey(sol);
+  console.log(`oos_detection key '${sol}' → DETECTOR path (scoreJudgment NOT called): ${g.outcome}${g.tier ? ` [${g.tier}] ${g.signals.join(" · ")}` : ""}`);
+  console.log(`${g.pass ? "✅ PASS" : "❌ FAIL"} — expected OUT_OF_SCOPE construction.`);
+  process.exit(g.pass ? 0 : 2);
+}
+const fkPath = resolved.path;          // ACTIVE key (not the retired `${sol}.judgment.frozen.json`)
 const srcPath = path.join(dir, `${sol}-FULL-SOURCE.txt`);
 
 for (const [label, p] of [["panel output", panelPath], ["frozen key", fkPath], ["source", srcPath]] as const) {

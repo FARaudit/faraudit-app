@@ -11,6 +11,7 @@ import { normClause } from "../../src/lib/section-extractors";
 export interface JudgmentKey {
   schemaVersion: string;
   packageId: string;
+  key_type?: "full_verdict" | "oos_detection"; // unset on legacy v1 keys ⇒ treated as full_verdict
   bidderProfile: Record<string, unknown> | null;     // null ⇒ no INELIGIBLE on bidder-side gates
   acquisitionPart: "PART_12" | "PART_15" | "UNKNOWN"; // scored pre-step
   expectedVerdict: { verdict: string; eligible: boolean; maxShowStoppers: number; reason?: string };
@@ -55,6 +56,13 @@ export function scoreJudgment(
   sourceText: string,
   opts?: { extractedClauses?: string[]; clauseRecall?: number; analysisText?: string },
 ): JudgmentResult {
+  // ENTRY GUARD (Brain card 71) — scoreJudgment is for full_verdict keys ONLY. An oos_detection key (or any
+  // key missing the verdict-grading arrays) must HONEST-FAIL with a named error, never crash on a direct
+  // `.map` below (:82/:93/:118/:183) and never be silently coerced with `?? []`. Legacy v1 keys have no
+  // key_type field ⇒ treated as full_verdict (they carry the arrays). oos keys are graded by the detector.
+  if ((key.key_type && key.key_type !== "full_verdict") || !Array.isArray(key.namedGates) || !Array.isArray(key.showStoppers) || !Array.isArray(key.decoys)) {
+    throw new Error(`scoreJudgment: non-full_verdict or malformed key '${key.packageId}' (key_type=${key.key_type ?? "unset"}; namedGates/showStoppers/decoys must all be present arrays) — route oos_detection keys to the detector path; do not score`);
+  }
   const failures: string[] = [];
   const raised: RaisedGate[] = panel.raisedGates;
   const unmet = raised.filter((r) => !r.met);
