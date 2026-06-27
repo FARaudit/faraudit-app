@@ -195,7 +195,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      universal bar — fixes the #1 false-NO_BID), and marks a specific socioeconomic set-aside (8(a)/HUBZone/
   //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
   //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
-  findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD === "true" });
+  findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false" });
 
   // P4.4 — PRECONDITION OVER-TYPE FLOOR (Brain card 92), default-OFF (Rule 61). Re-types a time-curable
   //      precondition (FAT/source-approval/qualification-testing) that a lens mis-typed no_one_can_move with
