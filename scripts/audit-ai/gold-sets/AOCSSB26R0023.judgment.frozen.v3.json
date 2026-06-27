@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "AOCSSB26R0023",
+  "_title": "AOC President's Room Ceiling S-216 — Conservation/Stabilization of Plaster & Decorative Paint — in-scope services CAUTION key (gradeable schema)",
+  "_suiteRole": "IN-SCOPE services CAUTION anchor, re-expressed in the JudgmentKey (namedGates) schema so scoreJudgment can grade it. CONTENT-IDENTICAL to v2 (verdict/eligible/caution/decoy unchanged) — SHAPE only. Supersedes v2, which carried the same content in the un-gradeable card-68 caution_reasons schema (card-71 finding). Refills the CAUTION verdict pole #5 vacated when it reclassified to oos_detection.",
+  "key_type": "full_verdict",
+  "bidderProfile": null,
+  "acquisitionPart": "PART_15",
+  "_acquisitionPart_basis": "source-grounded (NOT assumed): FAR Part 15 Contracting by Negotiation — 52.215-x clauses present (×24) + 'negotiated' procurement language (×12). Not a commercial-item/Part-12 buy.",
+  "expectedVerdict": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "Unrestricted professional-services (NAICS 541990) conservation procurement with no disqualifying bar under null bidderProfile. Caution is driven by demanding specialized-conservator qualification gates (verify-status, not structural). NOT INELIGIBLE: the acquisition does not establish a set-aside, so eligibility is an open field. No prevailing-wage standard applies (Davis-Bacon AND SCA both explicitly excluded) — a wage-determination flag must NOT be raised."
+  },
+  "namedGates": [
+    {
+      "token": "specialized conservator qualifications",
+      "aliases": [
+        "minimum of twenty (20) years",
+        "minimum Ten (10) years",
+        "Fine Art Painting Conservator/Project Director",
+        "Architectural Conservator",
+        "Senior Conservators",
+        "Conservators shall have"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "caution",
+      "sourceCite": "Senior Conservators shall have a minimum of twenty (20) years of successful [experience]; Conservators shall have a minimum Ten (10) years; Fine Art Painting Conservator/Project Director; Architectural Conservator (AC) shall review reference documents"
+    }
+  ],
+  "showStoppers": [],
+  "cautionItems": [],
+  "decoys": [
+    {
+      "token": "wage determination",
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "aliases": [
+        "Davis Bacon",
+        "Davis-Bacon Act",
+        "Service Contract Act",
+        "SCA",
+        "McNamara-O'Hara",
+        "52.222-6",
+        "52.222-41",
+        "prevailing wage"
+      ]
+    }
+  ],
+  "_decoy_basis": "Source: 'Davis Bacon Act IS NOT applicable as this requirement is being classified [as services]' + 'The McNamara-O'Hara Service Contract Act (SCA) IS NOT applicable to this procurement.' NO prevailing-wage standard applies — raising any wage-determination flag is a false positive (must-not-raise decoy, like #5's funds-not-available).",
+  "_provenance_note": "NAICS 541990 (All Other Professional, Scientific & Technical Services) + 52.219-14/50% limitation-on-subcontracting OMITTED (does not bind on this unrestricted, no-set-aside buy; not in source) — recorded as provenance only, NOT a gate or decoy.",
+  "source_sha256": "0793d44a9ec0c06afbdf3dede97be652eb152ab759dc85ef69d0c7c6f5aca3b7",
+  "source_bytes": 730676,
+  "source_completeness": "certified-complete",
+  "authored_against": "scripts/audit-ai/gold-sets/AOCSSB26R0023-FULL-SOURCE.complete.txt",
+  "supersedes": {
+    "path": "scripts/audit-ai/gold-sets/AOCSSB26R0023.judgment.frozen.v2.json",
+    "reason": "same CONTENT, wrong SCHEMA — v2 used the card-68 caution_reasons shape, which scoreJudgment cannot grade (card-71 finding); re-expressed in the JudgmentKey/namedGates schema. v2 retired byte-identical."
+  },
+  "adjudication": {
+    "verdict_and_doctrine_by": ["Brain", "CEO"],
+    "transcribed_and_source_cited_by": "Code",
+    "authoredAt": "2026-06-26",
+    "rulingRef": "Brain cards 66/68 (in-scope CAUTION) · 67 (caution-basis source correction) · 73 (re-shape to gradeable JudgmentKey schema)",
+    "sourceSha256": "0793d44a9ec0c06afbdf3dede97be652eb152ab759dc85ef69d0c7c6f5aca3b7",
+    "keySha256": "fcd2cd41a8f8f6fcac723c60887869fdeedb05dfc8087f37277678d3bb5818d4"
+  }
+}

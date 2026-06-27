@@ -24,17 +24,26 @@
       "file": "SPRDL125Q0030.judgment.frozen.json"
     },
     "AOCSSB26R0023": {
-      "active_version": "v2",
+      "active_version": "v3",
       "key_type": "full_verdict",
       "pole": "CAUTION",
-      "file": "AOCSSB26R0023.judgment.frozen.v2.json",
-      "supersedes": {
-        "file": "AOCSSB26R0023.judgment.frozen.json",
-        "key_type": "full_verdict",
-        "status": "retired",
-        "retired_sha256": "9e39ce4c617c747dc7fc019a424a79d3bee583d7a9f29ba7e1d886631a4545f7",
-        "reason": "partial source; restored to full_verdict CAUTION against certified-complete source per #4 in-scope ruling 2026-06-26 (cards 66/68); supersedes the brief card-64 construction reclassification. Caution basis source-corrected per card 67 (Davis-Bacon reason refuted by source)."
-      }
+      "file": "AOCSSB26R0023.judgment.frozen.v3.json",
+      "supersedes": [
+        {
+          "file": "AOCSSB26R0023.judgment.frozen.v2.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "f6aab8724d025f29156a9496ffb728bbe527f7bb9c9a7c9c52a9e10e78304067",
+          "reason": "same CONTENT, wrong SCHEMA — caution_reasons shape was un-gradeable by scoreJudgment (card-71 finding); re-expressed as v3 in the JudgmentKey/namedGates schema. Retired byte-identical."
+        },
+        {
+          "file": "AOCSSB26R0023.judgment.frozen.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "9e39ce4c617c747dc7fc019a424a79d3bee583d7a9f29ba7e1d886631a4545f7",
+          "reason": "partial source (pre-complete); restored to full_verdict CAUTION against certified-complete source per #4 in-scope ruling (cards 66/68); caution basis source-corrected (card 67)."
+        }
+      ]
     },
     "FA667024R0001": {
       "active_version": "v2",
