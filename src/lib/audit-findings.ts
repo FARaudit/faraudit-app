@@ -30,6 +30,8 @@ export type Controllability =
 
 /** One grounded fact an agentic expert produces. Facts only — no verdict, no disposition (that's derived). */
 export interface TypedFinding {
+  id?: string;                // stable id (assigned by the orchestrator, e.g. "proposal_manager#3") — so a
+                              // completeness attestation can CITE the specific findings that ground a section (Brain card-48 guard 3)
   requirement: string;        // the obligation, plain language
   citation: string;           // FAR/DFARS/section reference — must be literally in source (fabrication-gated, Rule 64)
   excerpt: string;            // VERBATIM source span proving it exists (the grounding)

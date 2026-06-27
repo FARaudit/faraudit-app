@@ -41,9 +41,13 @@ export async function runAgenticExpert(
   spec: ExpertSpec,
   ctx: AuditToolContext,
   opts: { callModel: CallModel; maxTurns?: number },
-): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean }> {
+): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean; sectionsRead: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
   const maxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
+  // PURE-OBSERVER trace (Brain card-48 guardrail 1): logging only, ZERO behavior change. Records every tool
+  // the agent called per turn + the sections it read, so thin-vs-bug is adjudicated from the trace, not the verdict.
+  const trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> = [];
+  const sectionsRead = new Set<string>();
   const userTask =
     "Audit THIS solicitation as your lens. Read ONLY the sections you need (a few tool calls — you have a " +
     `limited budget of about ${maxTurns} turns), GROUND every finding in a verbatim source excerpt, then call ` +
@@ -62,12 +66,14 @@ export async function runAgenticExpert(
         if (!isGrounded(ctx, f)) { dropped++; continue; } // deterministic backstop — ungrounded never survives
         findings.push({ requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, kind: f.kind, controllability: f.controllability, grounded: true, lens: spec.key, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow, severity: f.severity });
       }
-      return { findings, turns: turn, dropped, converged: true };
+      return { findings, turns: turn, dropped, converged: true, sectionsRead: [...sectionsRead], trace };
     }
-    // execute the tools the expert called, deterministically, and feed results back next turn.
+    // observe (pure logging) then execute the tools the expert called, deterministically, feeding results back.
+    trace.push({ turn, tools: out.toolCalls.map((tc) => ({ name: tc.name, input: tc.input })) });
+    for (const tc of out.toolCalls) if (tc.name === "read_section" && tc.input?.key) sectionsRead.add(String(tc.input.key).toUpperCase());
     priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
   }
-  return { findings: [], turns: maxTurns, dropped: 0, converged: false };
+  return { findings: [], turns: maxTurns, dropped: 0, converged: false, sectionsRead: [...sectionsRead], trace };
 }
 
 /** The `submit_findings` tool — its input_schema FORCES a typed findings array (structured output via a

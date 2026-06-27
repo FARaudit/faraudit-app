@@ -61,8 +61,10 @@ async function main() {
   writeFileSync(`ceo/proofs/v3-${sol}-result.json`, JSON.stringify({
     sol, expected, got, decision: res.decision, coverage: res.coverage, perLens: res.perLens,
     conflict: res.conflict, verifierSound: res.inputs.verifierSound,
-    findings: res.findings.map((f) => ({ lens: f.lens, kind: f.kind, controllability: f.controllability, requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow })),
+    sectionsRead: res.sectionsRead, trace: res.trace,   // per-agent tool trace — adjudicate thin-vs-bug FIRST (Brain guardrail 2)
+    findings: res.findings.map((f) => ({ id: f.id, lens: f.lens, kind: f.kind, controllability: f.controllability, requirement: f.requirement, citation: f.citation, excerpt: f.excerpt, requiredAttribute: f.requiredAttribute, curableInWindow: f.curableInWindow })),
   }, null, 2));
+  console.log(`  sectionsRead: [${res.sectionsRead.sort()}] | attestations: ${res.coverage.attestations.map((a) => a.section + ":" + a.status).join(" ")}`);
   console.log(`  (full result → ceo/proofs/v3-${sol}-result.json)`);
 
   let total = 0;
