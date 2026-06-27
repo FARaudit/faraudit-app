@@ -67,6 +67,17 @@ eq("socioeconomic set-aside (curable, verify status) → BID_WITH_CAUTION", deri
 // standard self-cert rep = bidder_controls → gate to clear → BID
 eq("self-cert rep (bidder_controls) → BID", deriveVerdict(inp([f({ requirement: "telecom security rep 52.240-91", kind: "clause_flowdown", controllability: "bidder_controls" })])).verdict, "BID");
 
+// ── Brain card-51 pre-#3 guard: CLOSED-world (known-fail) vs OPEN-world (unknown) on the SAME structural bar.
+// The Dillon sole-source bar must yield INELIGIBLE only via firmStatus="fails" on a KNOWN-absent attribute
+// (non-null empty profile = "this generic SB is known not to be the named OEM"), NOT from a null/unknown
+// profile (that's the open-world branch → NEEDS_HUMAN_REVIEW, never eligible:false). Right label, right reason.
+const dillon = (profile: BidderProfile | null) => deriveVerdict(inp([f({ requirement: "sole-source to named OEM (Dillon Aero DGMT1002)", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "oem:dillon-approved-source", curableInWindow: false })], { profile }));
+eq("closed-world (known-empty profile) → INELIGIBLE via firmStatus=fails", dillon({ satisfiedAttributes: [] }).verdict, "INELIGIBLE");
+eq("closed-world INELIGIBLE is eligible:false", dillon({ satisfiedAttributes: [] }).eligible, false);
+eq("open-world (null profile) → NEEDS_HUMAN_REVIEW, NOT eligible:false (no Norfolk over-fire)", dillon(null).verdict, "NEEDS_HUMAN_REVIEW");
+eq("open-world (null profile) stays eligible:true", dillon(null).eligible, true);
+eq("firm PROVABLY holds the OEM attribute → BID (cleared)", dillon({ satisfiedAttributes: ["oem:dillon-approved-source"] }).verdict, "BID");
+
 // eligibility bar the firm provably FAILS (profile lacks the required NAICS) → INELIGIBLE
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
 eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
