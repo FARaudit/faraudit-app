@@ -32,25 +32,40 @@ check("merge: keeps the AI clause's title (no override)", merged.find((c) => c.n
 check("merge: adds the missing 252.204-7012 as by_reference", merged.some((c) => c.number === "252.204-7012" && c.incorporated === "by_reference"));
 check("merge: does NOT duplicate 52.219-6", merged.filter((c) => c.number === "52.219-6").length === 1);
 
-// ── THE PROOF on the REAL cached source: recall 77% → ~100% ──
+// ── THE PROOF on FROZEN fixtures (Brain card 90 — reads tests/fixtures/frozen/, never live ceo/proofs/) ──
 const gold = parseGoldSet(JSON.parse(readFileSync("scripts/audit-ai/gold-sets/N4008526R0065.json", "utf8")));
-const mc = JSON.parse(readFileSync("ceo/proofs/stage6e-matrix-N4008526R0065.json", "utf8"));
-const source: string = Object.values(mc.sectionText ?? {}).join("\n");
-// PRE = what the engine extracted this run (matrix-parsed clause tokens) as ClauseItems.
-const preNums = [...new Set((mc.matrix as string).match(/\b2?52\.\d{3}-\d{1,4}\b/g) ?? [])];
-const preItems = preNums.map(stub);
 const ext = (clauses: string[]): EngineExtraction => ({ clauses, requirements: [], evalFactors: [], gates: [] });
-const preScore = scoreGoldSet(ext(preNums), gold);
-// POST = enumerator merges any source clause missing from PRE.
-const postItems = mergeEnumeratedClauses(preItems, source);
-const postScore = scoreGoldSet(ext(postItems.map((c) => c.number)), gold);
+const FROZEN = "tests/fixtures/frozen";
+function runMatrix(file: string) {
+  const mc = JSON.parse(readFileSync(`${FROZEN}/${file}`, "utf8"));
+  const source: string = Object.values(mc.sectionText ?? {}).join("\n");
+  // PRE = the clause tokens present in the matrix (what the AI extract surfaced); POST = enumerator merges
+  // any clause present in the source but missing from PRE.
+  const preNums = [...new Set((mc.matrix as string).match(/\b2?52\.\d{3}-\d{1,4}\b/g) ?? [])];
+  const preScore = scoreGoldSet(ext(preNums), gold);
+  const postItems = mergeEnumeratedClauses(preNums.map(stub), source);
+  const postScore = scoreGoldSet(ext(postItems.map((c) => c.number)), gold);
+  return { preScore, postScore, decimated: (mc._decimatedBinding as string[]) ?? [] };
+}
 
-console.log(`\n  PRE  binding recall ${(preScore.bindingClauseRecall * 100).toFixed(0)}% · misses ${preScore.missedBinding.length}`);
-console.log(`  POST binding recall ${(postScore.bindingClauseRecall * 100).toFixed(0)}% · misses ${postScore.missedBinding.length} · precision ${(postScore.clauses.precision * 100).toFixed(0)}%`);
-check("PROOF: enumerator RAISES binding recall vs the AI-only extract", postScore.bindingClauseRecall > preScore.bindingClauseRecall);
-check("PROOF: binding recall reaches ≥95% after enumeration ($0, cached source)", postScore.bindingClauseRecall >= 0.95);
-check("PROOF: planted-hard recall = 100% after enumeration", postScore.plantedHardRecall === 1);
-check("PROOF: enumeration is additive — POST misses ⊆ PRE misses", postScore.missedBinding.every((m) => preScore.missedBinding.includes(m)));
+// COMPLETE fixture — the AI matrix already carries every binding clause; the enumerator is a $0 safety net
+// that must never LOWER recall. Invariant: POST == 100% AND POST >= PRE (not "POST > PRE" — that was the
+// stale assertion that broke once PRE already reached 100%).
+const C = runMatrix("n4008-matrix-complete.json");
+console.log(`\n[COMPLETE] PRE ${(C.preScore.bindingClauseRecall * 100).toFixed(0)}% → POST ${(C.postScore.bindingClauseRecall * 100).toFixed(0)}% · precision ${(C.postScore.clauses.precision * 100).toFixed(0)}%`);
+check("COMPLETE: POST binding recall == 100%", C.postScore.bindingClauseRecall === 1);
+check("COMPLETE: POST >= PRE (enumeration never lowers recall)", C.postScore.bindingClauseRecall >= C.preScore.bindingClauseRecall);
+check("COMPLETE: planted-hard recall == 100%", C.postScore.plantedHardRecall === 1);
+check("COMPLETE: additive — POST misses ⊆ PRE misses", C.postScore.missedBinding.every((m) => C.preScore.missedBinding.includes(m)));
+
+// DECIMATED fixture — K binding clauses removed from the matrix (PRE) but LEFT in the source, so the
+// deterministic enumerator must RECOVER them: POST > PRE and POST back to 100%. This is the positive proof
+// the complete fixture can no longer give (its PRE is already 100%).
+const D = runMatrix("n4008-matrix-decimated.json");
+console.log(`[DECIMATED K=${D.decimated.length}: ${D.decimated.join(", ")}] PRE ${(D.preScore.bindingClauseRecall * 100).toFixed(0)}% → POST ${(D.postScore.bindingClauseRecall * 100).toFixed(0)}%`);
+check(`DECIMATED: PRE recall dropped below 100% (K=${D.decimated.length} binding clauses removed from the matrix)`, D.preScore.bindingClauseRecall < 1);
+check("DECIMATED: POST > PRE (enumerator RECOVERED the decimated clauses from source)", D.postScore.bindingClauseRecall > D.preScore.bindingClauseRecall);
+check("DECIMATED: POST recall back to 100%", D.postScore.bindingClauseRecall === 1);
 
 console.log(`\n${pass ? "✅ ALL GREEN" : "❌ FAILURES"} — §I clause enumerator ${pass ? "recovers the dropped clauses ($0, no model call)" : "BROKEN"}`);
 process.exit(pass ? 0 : 1);

@@ -1,0 +1,1725 @@
+{
+  "sol": "1240LP26Q0067",
+  "expected": "BID",
+  "got": "BID",
+  "decision": {
+    "verdict": "BID",
+    "eligible": true,
+    "reason": "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).",
+    "dispositions": [
+      {
+        "requirement": "Award is made on a Lowest-Priced Technically Acceptable (LPTA) basis. Award goes to the lowest-priced quote that meets all technical requirements listed in the solicitation. Past performance rated Acceptable/Neutral/Unacceptable but does not drive tradeoff — price dominates once technical acceptability is established.",
+        "citation": "§M, Evaluation Method",
+        "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA). Award will be made to the lowest-priced quote that meets all technical requirements listed in the solicitation.",
+        "kind": "other",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P0",
+        "id": "capture_strategist#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoted machine must be a Mini-Excavator (compact excavator) with track width of 50 inches or less for tight-access maneuvering; variable-width undercarriages are permissible provided the machine can be set/operated at ≤50 inches. Must be equipped with rubber tracks.",
+        "citation": "§C / SOW §3.0 Operational Requirements – Chassis & Mobility",
+        "excerpt": "Track width of 50 inches for tight-access maneuvering; variable-width undercarriages are permissible. For reference, a system with an adjustable track width of 39 inches (minimum) to 52 inches (maximum) is acceptable, provided it can be set and operated at a width of 50 inches or less. Must be equipped with rubber tracks to protect diverse surfaces.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Engine output minimum 15 HP; minimum digging depth of approximately 7 feet.",
+        "citation": "§C / SOW §3.0 Operational Requirements – Performance",
+        "excerpt": "Engine output 15 HP (Horsepower) minimum; minimum digging depth of approximately 7 feet.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Auxiliary hydraulic flow of 7 GPM (Gear Pump) minimum; must include a factory-installed hydraulic thumb.",
+        "citation": "§C / SOW §3.0 Operational Requirements – Hydraulics",
+        "excerpt": "Auxiliary hydraulic flow of 7 GPM (Gear Pump) minimum; must include a factory-installed hydraulic thumb.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "GVWR must be between 3,500–4,500 lbs.",
+        "citation": "§C / SOW §3.0 Operational Requirements – Weight & Safety",
+        "excerpt": "GVWR (Gross Vehicle Weight Rating) between 3,500–4,500 lbs.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Contractor must furnish a Certificate of Conformance (COC) per FAR 52.246-15, including traceability to the manufacturer, manufacturer's COC, and its own COC. COC must be in the format specified in the clause.",
+        "citation": "§C, Certificate of Conformance paragraph",
+        "excerpt": "The contractor shall furnish a Certificate of Conformance (COC) in accordance with Federal Acquisition Regulation (FAR) clause 52.246-15. COC must be submitted in the format specified in the clause. Quoters must be able to provide necessary certification including traceability to the manufacturer, manufacturer's COC, and its own certificate of conformance.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must address warranty and delivery requirements in the technical approach portion of the quote to be considered responsive.",
+        "citation": "§M, Technical Approach",
+        "excerpt": "Warranty and delivery requirements.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#6",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must provide pricing for all individual line items (CLIN 0001 Mini-Excavator, Qty 1 EA). Failure to propose pricing for all line items may result in exclusion from further consideration.",
+        "citation": "§M, Price",
+        "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#7",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Total Small Business Set-Aside: This acquisition is set aside exclusively for small businesses under 52.219-6 (checked/applicable). Only firms that qualify as small under the applicable NAICS may receive award.",
+        "citation": "§I, 52.219-6 Notice of Total Small Business Aside (Nov 2025) — checked applicable",
+        "excerpt": "☒ 52.219-6 Notice of Total Small Business Aside (Nov 2025)",
+        "kind": "eligibility_bar",
+        "controllability": "already_satisfied",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P0",
+        "id": "contracts_attorney#0",
+        "disposition": "met"
+      },
+      {
+        "requirement": "Payment by Electronic Funds Transfer via SAM: Payment will be made exclusively by EFT through information registered in SAM (52.232-33, checked applicable). The offeror must have a valid EFT banking record in SAM.",
+        "citation": "§I, 52.232-33 Payment by Electronic Funds Transfer—System for Award Management (Oct 2018) [checked]",
+        "excerpt": "☒ 52.232-33 Payment by Electronic Funds Transfer— System for Award Management (Oct 2018)",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Supplier Terms Unenforceable / AGAR 452.203-72: Any supplier/vendor terms (EULAs, TOS, standard terms of sale, clickwrap) that conflict with Federal law or the contract are void. The contractor's standard commercial terms may not impose additional financial obligations, indemnification, forum-selection, data-exploitation, or suspension rights against the Government.",
+        "citation": "§I, AGAR 452.203-72 Unenforceable Supplier Terms (MAY 2026)",
+        "excerpt": "Supplier terms that conflict with any part of this clause, the contract, or Federal law are void and will not be considered incorporated into a contract, even if they are physically present in a contract documentation or systems.",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Accelerated Payments to Small Business Subcontractors (52.232-40): If the prime uses small business subcontractors, it must flow down accelerated payment obligations — pay them to the maximum extent practicable within 15 days after receipt of payment from the Government.",
+        "citation": "§I, 52.232-40 Providing Accelerated Payments to Small Business Subcontractors (Mar 2023)",
+        "excerpt": "52.232-40 Providing Accelerated Payments to Small Business Subcontractors (Mar 2023)",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quotes must remain firm for 90 calendar days from the date specified for receipt of quotes.",
+        "citation": "§L, FAR 52.212-1 as amended — Period for acceptance of quotes",
+        "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Delinquent Tax / Felony Representation: Offeror must complete representation 52.209-11 certifying it has no unpaid Federal tax liability and no felony criminal conviction under Federal law within the preceding 24 months.",
+        "citation": "§L, 52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)",
+        "excerpt": "52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Failure to propose pricing for all individual line items may result in the quotation being excluded from further consideration.",
+        "citation": "Section M – Evaluation and Basis for Award",
+        "excerpt": "Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P0",
+        "id": "pricing_analyst#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Contract type is firm-fixed-price. Offeror must quote a firm price; no cost-reimbursable or T&M pricing is accepted.",
+        "citation": "Section M – Evaluation Method",
+        "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA).",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P0",
+        "id": "pricing_analyst#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Prices must be held firm for 90 calendar days from the date specified for receipt of quotes.",
+        "citation": "Section L – FAR 52.212-1 Amendment",
+        "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quote must be F.O.B. Destination (delivery to 1353 Fort Road, Sheridan, WY 82801) by 09/01/2026, with delivery cost included in quoted price. If F.O.B. Origin is specified instead, estimated shipping costs must be included.",
+        "citation": "Section M – Delivery Information",
+        "excerpt": "F.o.b. destination, is requested as the F.O.B. point for all deliverables. All quotes will be considered F.O.B. Destination unless F.O.B. origin is specified AND estimated shipping costs are included. The USDA requires delivery of all items by 09/01/2026.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Total Small Business Set-Aside (52.219-6 checked). Only small businesses may receive award.",
+        "citation": "§I, checked clause list",
+        "excerpt": "☒ 52.219-6 Notice of Total Small Business Aside (Nov 2025)",
+        "kind": "eligibility_bar",
+        "controllability": "already_satisfied",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P0",
+        "id": "former_ko#0",
+        "disposition": "met"
+      },
+      {
+        "requirement": "Payment will be made only by Electronic Funds Transfer through SAM (52.232-33 checked). Offeror's banking/EFT info must be current in SAM.",
+        "citation": "§I, checked clause list",
+        "excerpt": "☒ 52.232-33 Payment by Electronic Funds Transfer— System for Award Management (Oct 2018)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Buy American – Supplies clause (52.225-1) applies; supplies must be domestic end products or qualify for an exception.",
+        "citation": "§I, checked clause list",
+        "excerpt": "☒ 52.225-1 Buy American-Supplies (Nov 2025)",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must submit a brochure or product literature for the EXACT machine quoted. Failure to include disqualifies quote from evaluation.",
+        "citation": "§M, Technical Approach",
+        "excerpt": "All quoters must provide the following minimum information and documentation with their quotations to be considered responsive and have their quotes evaluated: • Brochure or product literature for the exact machine quoted.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P0",
+        "id": "former_ko#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Failure to propose pricing for all individual line items (CLIN 0001) may result in exclusion from further consideration.",
+        "citation": "§M, Price",
+        "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P0",
+        "id": "former_ko#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Award is LPTA (Lowest-Priced Technically Acceptable). Award goes to the lowest-priced quote meeting all technical requirements; past performance rated Acceptable, Neutral, or Unacceptable.",
+        "citation": "§M, Evaluation Method",
+        "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA). Award will be made to the lowest-priced quote that meets all technical requirements listed in the solicitation.",
+        "kind": "other",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "52.240-91 Security Prohibitions and Exclusions (contract clause) applies. Offeror must not use prohibited telecommunications/technology equipment per covered security prohibitions.",
+        "citation": "§I, listed clauses",
+        "excerpt": "52.240-91 Security Prohibitions and Exclusions (Nov 2025)",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#6",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "52.240-90 Security Prohibitions Representation (pre-award provision) must be completed. Checked as applicable in §L.",
+        "citation": "§L, listed provisions",
+        "excerpt": "52.240-90 Security Prohibitions and Exclusions Representations and Certifications (Nov 2025)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#7",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must hold prices firm for 90 calendar days from the quote receipt date.",
+        "citation": "§L, 52.212-1 amendment",
+        "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#8",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "52.225-18 Place of Manufacture provision applies; offeror may be required to disclose where the machine is manufactured.",
+        "citation": "§L, Other Applicable FAR Provisions",
+        "excerpt": "52.225-18 Place of Manufacture (Aug 2018)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#9",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (checked) must be completed by offeror.",
+        "citation": "§L, checked provisions",
+        "excerpt": "☒ 52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (Feb 2021)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#10",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quote must hold firm prices for 90 calendar days from the date specified for receipt of quotes.",
+        "citation": "§L, 52.212-1 amendment – Period for acceptance of quotes",
+        "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Questions must be submitted via email to stephen.holly@usda.gov by no later than June 2026 at 10:00 AM Mountain Time. Subject line must include the solicitation name and number.",
+        "citation": "§L – Questions",
+        "excerpt": "Questions shall be submitted via email to stephen.holly@usda.gov and are due no later than June 2026, at 10:00 AM Mountain Time. This will ensure enough time to respond before the solicitation period ends. Please include the solicitation name and number as the subject line of the email.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit the 52.203-18 representation (Prohibition on Contracting with Entities that Require Certain Internal Confidentiality Agreements or Statements).",
+        "citation": "§L – 52.203-18",
+        "excerpt": "52.203-18 Prohibition on Contracting with Entities that Require Certain Internal Confidentiality Agreements or Statements-Representation (Jan 2017)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit the 52.209-2 representation (Prohibition on Contracting with Inverted Domestic Corporations).",
+        "citation": "§L – 52.209-2",
+        "excerpt": "52.209-2 Prohibition on Contracting with Inverted Domestic Corporations - Representation (Sep 2025)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit the 52.209-11 representation (Delinquent Tax Liability or Felony Conviction).",
+        "citation": "§L – 52.209-11",
+        "excerpt": "52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit the 52.240-90 Security Prohibitions and Exclusions Representations and Certifications.",
+        "citation": "§L – 52.240-90",
+        "excerpt": "52.240-90 Security Prohibitions and Exclusions Representations and Certifications (Nov 2025)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must be registered in the System for Award Management (SAM) — provision 52.204-7 is checked as applicable.",
+        "citation": "§L – ☒ 52.204-7",
+        "excerpt": "☒ 52.204-7 System for Award Management—Registration (Nov 2025)",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "requiredAttribute": "registration:SAM-active",
+        "curableInWindow": true,
+        "severity": "P0",
+        "id": "proposal_manager#6",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit the 52.222-18 certification regarding knowledge of child labor for listed end products.",
+        "citation": "§L – ☒ 52.222-18",
+        "excerpt": "☒ 52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (Feb 2021)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#7",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete and submit a Buy American Certificate (52.225-2) — checked as applicable.",
+        "citation": "§L – ☒ 52.225-2",
+        "excerpt": "☒ 52.225-2 Buy American Certificate (Oct 2022)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#8",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must complete the 52.225-18 Place of Manufacture provision.",
+        "citation": "§L – Other Applicable FAR Provisions, 52.225-18",
+        "excerpt": "52.225-18 Place of Manufacture (Aug 2018)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P2",
+        "id": "proposal_manager#9",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quote must include a brochure or product literature for the exact machine quoted, to be considered responsive.",
+        "citation": "§M – Technical Approach",
+        "excerpt": "All quoters must provide the following minimum information and documentation with their quotations to be considered responsive and have their quotes evaluated: • Brochure or product literature for the exact machine quoted.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#10",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must provide pricing for all individual line items in the Schedule of Items (CLIN 0001, Mini-Excavator, Qty 1 EA). Failure to price all items may result in exclusion from consideration.",
+        "citation": "§M – Price; §C – Schedule of Items",
+        "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#11",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Quoter must furnish a Certificate of Conformance (COC) per FAR 52.246-15 in the format specified in the clause. Quoter must provide traceability to the manufacturer, manufacturer's COC, and its own COC. Non-OEM/non-authorized distributor vendors must provide traceability back to the OEM or authorized distributor.",
+        "citation": "§C – Schedule of Items / COC requirement",
+        "excerpt": "The contractor shall furnish a Certificate of Conformance (COC) in accordance with Federal Acquisition Regulation (FAR) clause 52.246-15. COC must be submitted in the format specified in the clause. Quoters must be able to provide necessary certification including traceability to the manufacturer, manufacturer's COC, and its own certificate of conformance. Prospective vendors who are not the OEM or an authorized distributor must provide traceability for the quoteed product back to the manufacturer or authorized distributor.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#12",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "All items must have clear traceability to the OEM — a clear, complete, documented, and auditable paper trail from OEM or distributor to current location.",
+        "citation": "§C – Schedule of Items",
+        "excerpt": "All items must have clear traceability to the Original Equipment Manufacturer (OEM). Traceability means a clear, complete, documented, and auditable paper trail which traces each step from an OEM or distributor to its current location.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#13",
+        "disposition": "gate_to_clear"
+      }
+    ],
+    "showStoppers": []
+  },
+  "coverage": {
+    "required": [
+      "C",
+      "I",
+      "L",
+      "M"
+    ],
+    "covered": [
+      "C",
+      "I",
+      "L",
+      "M"
+    ],
+    "missing": [],
+    "attestations": [
+      {
+        "section": "C",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#5",
+          "proposal_manager#12",
+          "proposal_manager#13"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "I",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "contracts_attorney#0",
+          "contracts_attorney#1",
+          "contracts_attorney#2",
+          "contracts_attorney#3",
+          "former_ko#0",
+          "former_ko#1",
+          "former_ko#2",
+          "former_ko#6"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "L",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#1",
+          "capture_strategist#2",
+          "capture_strategist#3",
+          "capture_strategist#4",
+          "contracts_attorney#4",
+          "contracts_attorney#5",
+          "pricing_analyst#2",
+          "former_ko#7",
+          "former_ko#8",
+          "former_ko#9",
+          "former_ko#10",
+          "proposal_manager#0",
+          "proposal_manager#1",
+          "proposal_manager#2",
+          "proposal_manager#3",
+          "proposal_manager#4",
+          "proposal_manager#5",
+          "proposal_manager#6",
+          "proposal_manager#7",
+          "proposal_manager#8",
+          "proposal_manager#9"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "M",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#0",
+          "capture_strategist#6",
+          "capture_strategist#7",
+          "pricing_analyst#0",
+          "pricing_analyst#1",
+          "pricing_analyst#3",
+          "former_ko#3",
+          "former_ko#4",
+          "former_ko#5",
+          "proposal_manager#10",
+          "proposal_manager#11"
+        ],
+        "ungrounded": []
+      }
+    ]
+  },
+  "perLens": {
+    "capture_strategist": 8,
+    "contracts_attorney": 6,
+    "pricing_analyst": 4,
+    "former_ko": 11,
+    "proposal_manager": 14
+  },
+  "conflict": false,
+  "verifierSound": true,
+  "sectionsRead": [
+    "C",
+    "M",
+    "L",
+    "I",
+    "H",
+    "K",
+    "B"
+  ],
+  "trace": {
+    "capture_strategist": {
+      "converged": true,
+      "turns": 6,
+      "sectionsRead": [
+        "C",
+        "M",
+        "L"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Attachment 1 - Specs_Mini-Excavator"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "GVWR (Gross Vehicle Weight Rating) between 3,500–4,500 lbs"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Lowest-Priced Technically Acceptable (LPTA)"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "delivery of all items by 09/01/2026"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Certificate of Conformance"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "factory-installed hydraulic thumb"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "traceability to the Original Equipment Manufacturer"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "contracts_attorney": {
+      "converged": true,
+      "turns": 6,
+      "sectionsRead": [
+        "I",
+        "H",
+        "K",
+        "B",
+        "L"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "H"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "K"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.219-6"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.204-7"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.225-1"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.240-91"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.204-13"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.219-6 Notice of Total Small Business"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.204-7 System for Award Management—Registration"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.225-1 Buy American-Supplies"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.240-91 Security Prohibitions and Exclusions"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "☒ 52.219-6 Notice of Total Small Business Aside"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "☒ 52.204-7 System for Award Management"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.225-2 Buy American Certificate"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.240-90 Security Prohibitions and Exclusions Representations"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pricing_analyst": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "B",
+        "L",
+        "C",
+        "M"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "firm-fixed-price"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Delivery must be included in quoted price"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "CLIN 0001"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Failure to propose pricing for all individual line items"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "MINI-EXCAVAT0R"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "F.o.b. destination"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Schedule of Items"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "09/01/2026"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "90 calendar days from the date specified"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Lowest-Priced Technically Acceptable"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "former_ko": {
+      "converged": true,
+      "turns": 7,
+      "sectionsRead": [
+        "L",
+        "M",
+        "C",
+        "B",
+        "I"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.219-6"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.225-1"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.204-7"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.246-15"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.225-2"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Qualification Requirements"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Qualification Requirements\nThe quoter, product or service, ARE required to meet a qualification requirement"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All items must have clear traceability to the Original Equipment Manufacturer"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Certificate of Conformance"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "USDA requires delivery of all items by 09/01/2026"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Questions shall be submitted via email to stephen.holly@usda.gov and are due no later than June"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Brochure or product literature for the exact machine quoted"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "proposal_manager": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "L",
+        "B",
+        "M",
+        "C"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "due date"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "quotes are due"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "receipt of quotes"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "June 2026"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Certificate of Conformance"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Questions shall be submitted via email"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Brochure or product literature"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Schedule of Items"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "COC must be submitted"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "09/01/2026"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.204-7"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "SAM registration"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Buy American Certificate"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.225-2"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "90 calendar days from the date specified"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Delivery must be included in quoted price"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "traceability to the manufacturer"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "capture_strategist#0",
+      "lens": "capture_strategist",
+      "kind": "other",
+      "controllability": "bidder_controls",
+      "requirement": "Award is made on a Lowest-Priced Technically Acceptable (LPTA) basis. Award goes to the lowest-priced quote that meets all technical requirements listed in the solicitation. Past performance rated Acceptable/Neutral/Unacceptable but does not drive tradeoff — price dominates once technical acceptability is established.",
+      "citation": "§M, Evaluation Method",
+      "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA). Award will be made to the lowest-priced quote that meets all technical requirements listed in the solicitation."
+    },
+    {
+      "id": "capture_strategist#1",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Quoted machine must be a Mini-Excavator (compact excavator) with track width of 50 inches or less for tight-access maneuvering; variable-width undercarriages are permissible provided the machine can be set/operated at ≤50 inches. Must be equipped with rubber tracks.",
+      "citation": "§C / SOW §3.0 Operational Requirements – Chassis & Mobility",
+      "excerpt": "Track width of 50 inches for tight-access maneuvering; variable-width undercarriages are permissible. For reference, a system with an adjustable track width of 39 inches (minimum) to 52 inches (maximum) is acceptable, provided it can be set and operated at a width of 50 inches or less. Must be equipped with rubber tracks to protect diverse surfaces."
+    },
+    {
+      "id": "capture_strategist#2",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Engine output minimum 15 HP; minimum digging depth of approximately 7 feet.",
+      "citation": "§C / SOW §3.0 Operational Requirements – Performance",
+      "excerpt": "Engine output 15 HP (Horsepower) minimum; minimum digging depth of approximately 7 feet."
+    },
+    {
+      "id": "capture_strategist#3",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Auxiliary hydraulic flow of 7 GPM (Gear Pump) minimum; must include a factory-installed hydraulic thumb.",
+      "citation": "§C / SOW §3.0 Operational Requirements – Hydraulics",
+      "excerpt": "Auxiliary hydraulic flow of 7 GPM (Gear Pump) minimum; must include a factory-installed hydraulic thumb."
+    },
+    {
+      "id": "capture_strategist#4",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "GVWR must be between 3,500–4,500 lbs.",
+      "citation": "§C / SOW §3.0 Operational Requirements – Weight & Safety",
+      "excerpt": "GVWR (Gross Vehicle Weight Rating) between 3,500–4,500 lbs."
+    },
+    {
+      "id": "capture_strategist#5",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Contractor must furnish a Certificate of Conformance (COC) per FAR 52.246-15, including traceability to the manufacturer, manufacturer's COC, and its own COC. COC must be in the format specified in the clause.",
+      "citation": "§C, Certificate of Conformance paragraph",
+      "excerpt": "The contractor shall furnish a Certificate of Conformance (COC) in accordance with Federal Acquisition Regulation (FAR) clause 52.246-15. COC must be submitted in the format specified in the clause. Quoters must be able to provide necessary certification including traceability to the manufacturer, manufacturer's COC, and its own certificate of conformance."
+    },
+    {
+      "id": "capture_strategist#6",
+      "lens": "capture_strategist",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must address warranty and delivery requirements in the technical approach portion of the quote to be considered responsive.",
+      "citation": "§M, Technical Approach",
+      "excerpt": "Warranty and delivery requirements."
+    },
+    {
+      "id": "capture_strategist#7",
+      "lens": "capture_strategist",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must provide pricing for all individual line items (CLIN 0001 Mini-Excavator, Qty 1 EA). Failure to propose pricing for all line items may result in exclusion from further consideration.",
+      "citation": "§M, Price",
+      "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration."
+    },
+    {
+      "id": "contracts_attorney#0",
+      "lens": "contracts_attorney",
+      "kind": "eligibility_bar",
+      "controllability": "already_satisfied",
+      "requirement": "Total Small Business Set-Aside: This acquisition is set aside exclusively for small businesses under 52.219-6 (checked/applicable). Only firms that qualify as small under the applicable NAICS may receive award.",
+      "citation": "§I, 52.219-6 Notice of Total Small Business Aside (Nov 2025) — checked applicable",
+      "excerpt": "☒ 52.219-6 Notice of Total Small Business Aside (Nov 2025)"
+    },
+    {
+      "id": "contracts_attorney#1",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Payment by Electronic Funds Transfer via SAM: Payment will be made exclusively by EFT through information registered in SAM (52.232-33, checked applicable). The offeror must have a valid EFT banking record in SAM.",
+      "citation": "§I, 52.232-33 Payment by Electronic Funds Transfer—System for Award Management (Oct 2018) [checked]",
+      "excerpt": "☒ 52.232-33 Payment by Electronic Funds Transfer— System for Award Management (Oct 2018)"
+    },
+    {
+      "id": "contracts_attorney#2",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Supplier Terms Unenforceable / AGAR 452.203-72: Any supplier/vendor terms (EULAs, TOS, standard terms of sale, clickwrap) that conflict with Federal law or the contract are void. The contractor's standard commercial terms may not impose additional financial obligations, indemnification, forum-selection, data-exploitation, or suspension rights against the Government.",
+      "citation": "§I, AGAR 452.203-72 Unenforceable Supplier Terms (MAY 2026)",
+      "excerpt": "Supplier terms that conflict with any part of this clause, the contract, or Federal law are void and will not be considered incorporated into a contract, even if they are physically present in a contract documentation or systems."
+    },
+    {
+      "id": "contracts_attorney#3",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Accelerated Payments to Small Business Subcontractors (52.232-40): If the prime uses small business subcontractors, it must flow down accelerated payment obligations — pay them to the maximum extent practicable within 15 days after receipt of payment from the Government.",
+      "citation": "§I, 52.232-40 Providing Accelerated Payments to Small Business Subcontractors (Mar 2023)",
+      "excerpt": "52.232-40 Providing Accelerated Payments to Small Business Subcontractors (Mar 2023)"
+    },
+    {
+      "id": "contracts_attorney#4",
+      "lens": "contracts_attorney",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quotes must remain firm for 90 calendar days from the date specified for receipt of quotes.",
+      "citation": "§L, FAR 52.212-1 as amended — Period for acceptance of quotes",
+      "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes."
+    },
+    {
+      "id": "contracts_attorney#5",
+      "lens": "contracts_attorney",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "Delinquent Tax / Felony Representation: Offeror must complete representation 52.209-11 certifying it has no unpaid Federal tax liability and no felony criminal conviction under Federal law within the preceding 24 months.",
+      "citation": "§L, 52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)",
+      "excerpt": "52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)"
+    },
+    {
+      "id": "pricing_analyst#0",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Failure to propose pricing for all individual line items may result in the quotation being excluded from further consideration.",
+      "citation": "Section M – Evaluation and Basis for Award",
+      "excerpt": "Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration."
+    },
+    {
+      "id": "pricing_analyst#1",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Contract type is firm-fixed-price. Offeror must quote a firm price; no cost-reimbursable or T&M pricing is accepted.",
+      "citation": "Section M – Evaluation Method",
+      "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA)."
+    },
+    {
+      "id": "pricing_analyst#2",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Prices must be held firm for 90 calendar days from the date specified for receipt of quotes.",
+      "citation": "Section L – FAR 52.212-1 Amendment",
+      "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes."
+    },
+    {
+      "id": "pricing_analyst#3",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Quote must be F.O.B. Destination (delivery to 1353 Fort Road, Sheridan, WY 82801) by 09/01/2026, with delivery cost included in quoted price. If F.O.B. Origin is specified instead, estimated shipping costs must be included.",
+      "citation": "Section M – Delivery Information",
+      "excerpt": "F.o.b. destination, is requested as the F.O.B. point for all deliverables. All quotes will be considered F.O.B. Destination unless F.O.B. origin is specified AND estimated shipping costs are included. The USDA requires delivery of all items by 09/01/2026."
+    },
+    {
+      "id": "former_ko#0",
+      "lens": "former_ko",
+      "kind": "eligibility_bar",
+      "controllability": "already_satisfied",
+      "requirement": "Total Small Business Set-Aside (52.219-6 checked). Only small businesses may receive award.",
+      "citation": "§I, checked clause list",
+      "excerpt": "☒ 52.219-6 Notice of Total Small Business Aside (Nov 2025)"
+    },
+    {
+      "id": "former_ko#1",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Payment will be made only by Electronic Funds Transfer through SAM (52.232-33 checked). Offeror's banking/EFT info must be current in SAM.",
+      "citation": "§I, checked clause list",
+      "excerpt": "☒ 52.232-33 Payment by Electronic Funds Transfer— System for Award Management (Oct 2018)"
+    },
+    {
+      "id": "former_ko#2",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Buy American – Supplies clause (52.225-1) applies; supplies must be domestic end products or qualify for an exception.",
+      "citation": "§I, checked clause list",
+      "excerpt": "☒ 52.225-1 Buy American-Supplies (Nov 2025)"
+    },
+    {
+      "id": "former_ko#3",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must submit a brochure or product literature for the EXACT machine quoted. Failure to include disqualifies quote from evaluation.",
+      "citation": "§M, Technical Approach",
+      "excerpt": "All quoters must provide the following minimum information and documentation with their quotations to be considered responsive and have their quotes evaluated: • Brochure or product literature for the exact machine quoted."
+    },
+    {
+      "id": "former_ko#4",
+      "lens": "former_ko",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Failure to propose pricing for all individual line items (CLIN 0001) may result in exclusion from further consideration.",
+      "citation": "§M, Price",
+      "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration."
+    },
+    {
+      "id": "former_ko#5",
+      "lens": "former_ko",
+      "kind": "other",
+      "controllability": "bidder_controls",
+      "requirement": "Award is LPTA (Lowest-Priced Technically Acceptable). Award goes to the lowest-priced quote meeting all technical requirements; past performance rated Acceptable, Neutral, or Unacceptable.",
+      "citation": "§M, Evaluation Method",
+      "excerpt": "The Government intends to award a single firm-fixed-price contract to the quoter whose proposal is Lowest-Priced Technically Acceptable (LPTA). Award will be made to the lowest-priced quote that meets all technical requirements listed in the solicitation."
+    },
+    {
+      "id": "former_ko#6",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "52.240-91 Security Prohibitions and Exclusions (contract clause) applies. Offeror must not use prohibited telecommunications/technology equipment per covered security prohibitions.",
+      "citation": "§I, listed clauses",
+      "excerpt": "52.240-91 Security Prohibitions and Exclusions (Nov 2025)"
+    },
+    {
+      "id": "former_ko#7",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "52.240-90 Security Prohibitions Representation (pre-award provision) must be completed. Checked as applicable in §L.",
+      "citation": "§L, listed provisions",
+      "excerpt": "52.240-90 Security Prohibitions and Exclusions Representations and Certifications (Nov 2025)"
+    },
+    {
+      "id": "former_ko#8",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must hold prices firm for 90 calendar days from the quote receipt date.",
+      "citation": "§L, 52.212-1 amendment",
+      "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes."
+    },
+    {
+      "id": "former_ko#9",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "52.225-18 Place of Manufacture provision applies; offeror may be required to disclose where the machine is manufactured.",
+      "citation": "§L, Other Applicable FAR Provisions",
+      "excerpt": "52.225-18 Place of Manufacture (Aug 2018)"
+    },
+    {
+      "id": "former_ko#10",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (checked) must be completed by offeror.",
+      "citation": "§L, checked provisions",
+      "excerpt": "☒ 52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (Feb 2021)"
+    },
+    {
+      "id": "proposal_manager#0",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quote must hold firm prices for 90 calendar days from the date specified for receipt of quotes.",
+      "citation": "§L, 52.212-1 amendment – Period for acceptance of quotes",
+      "excerpt": "The Quoter agrees to hold the prices in its quote firm for 90 calendar days from the date specified for receipt of quotes."
+    },
+    {
+      "id": "proposal_manager#1",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Questions must be submitted via email to stephen.holly@usda.gov by no later than June 2026 at 10:00 AM Mountain Time. Subject line must include the solicitation name and number.",
+      "citation": "§L – Questions",
+      "excerpt": "Questions shall be submitted via email to stephen.holly@usda.gov and are due no later than June 2026, at 10:00 AM Mountain Time. This will ensure enough time to respond before the solicitation period ends. Please include the solicitation name and number as the subject line of the email."
+    },
+    {
+      "id": "proposal_manager#2",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit the 52.203-18 representation (Prohibition on Contracting with Entities that Require Certain Internal Confidentiality Agreements or Statements).",
+      "citation": "§L – 52.203-18",
+      "excerpt": "52.203-18 Prohibition on Contracting with Entities that Require Certain Internal Confidentiality Agreements or Statements-Representation (Jan 2017)"
+    },
+    {
+      "id": "proposal_manager#3",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit the 52.209-2 representation (Prohibition on Contracting with Inverted Domestic Corporations).",
+      "citation": "§L – 52.209-2",
+      "excerpt": "52.209-2 Prohibition on Contracting with Inverted Domestic Corporations - Representation (Sep 2025)"
+    },
+    {
+      "id": "proposal_manager#4",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit the 52.209-11 representation (Delinquent Tax Liability or Felony Conviction).",
+      "citation": "§L – 52.209-11",
+      "excerpt": "52.209-11 Representation by Corporations Regarding Delinquent Tax Liability or a Felony Conviction under any Federal Law (Sep 2025)"
+    },
+    {
+      "id": "proposal_manager#5",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit the 52.240-90 Security Prohibitions and Exclusions Representations and Certifications.",
+      "citation": "§L – 52.240-90",
+      "excerpt": "52.240-90 Security Prohibitions and Exclusions Representations and Certifications (Nov 2025)"
+    },
+    {
+      "id": "proposal_manager#6",
+      "lens": "proposal_manager",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must be registered in the System for Award Management (SAM) — provision 52.204-7 is checked as applicable.",
+      "citation": "§L – ☒ 52.204-7",
+      "excerpt": "☒ 52.204-7 System for Award Management—Registration (Nov 2025)",
+      "requiredAttribute": "registration:SAM-active",
+      "curableInWindow": true
+    },
+    {
+      "id": "proposal_manager#7",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit the 52.222-18 certification regarding knowledge of child labor for listed end products.",
+      "citation": "§L – ☒ 52.222-18",
+      "excerpt": "☒ 52.222-18 Certification Regarding Knowledge of Child Labor for Listed End Products (Feb 2021)"
+    },
+    {
+      "id": "proposal_manager#8",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete and submit a Buy American Certificate (52.225-2) — checked as applicable.",
+      "citation": "§L – ☒ 52.225-2",
+      "excerpt": "☒ 52.225-2 Buy American Certificate (Oct 2022)"
+    },
+    {
+      "id": "proposal_manager#9",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must complete the 52.225-18 Place of Manufacture provision.",
+      "citation": "§L – Other Applicable FAR Provisions, 52.225-18",
+      "excerpt": "52.225-18 Place of Manufacture (Aug 2018)"
+    },
+    {
+      "id": "proposal_manager#10",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quote must include a brochure or product literature for the exact machine quoted, to be considered responsive.",
+      "citation": "§M – Technical Approach",
+      "excerpt": "All quoters must provide the following minimum information and documentation with their quotations to be considered responsive and have their quotes evaluated: • Brochure or product literature for the exact machine quoted."
+    },
+    {
+      "id": "proposal_manager#11",
+      "lens": "proposal_manager",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must provide pricing for all individual line items in the Schedule of Items (CLIN 0001, Mini-Excavator, Qty 1 EA). Failure to price all items may result in exclusion from consideration.",
+      "citation": "§M – Price; §C – Schedule of Items",
+      "excerpt": "The quoter shall provide pricing as requested in the Schedule of Items on page 2 of this Request for Quote. Failure to propose pricing for all individual line items may result in a quotation being excluded from further consideration."
+    },
+    {
+      "id": "proposal_manager#12",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Quoter must furnish a Certificate of Conformance (COC) per FAR 52.246-15 in the format specified in the clause. Quoter must provide traceability to the manufacturer, manufacturer's COC, and its own COC. Non-OEM/non-authorized distributor vendors must provide traceability back to the OEM or authorized distributor.",
+      "citation": "§C – Schedule of Items / COC requirement",
+      "excerpt": "The contractor shall furnish a Certificate of Conformance (COC) in accordance with Federal Acquisition Regulation (FAR) clause 52.246-15. COC must be submitted in the format specified in the clause. Quoters must be able to provide necessary certification including traceability to the manufacturer, manufacturer's COC, and its own certificate of conformance. Prospective vendors who are not the OEM or an authorized distributor must provide traceability for the quoteed product back to the manufacturer or authorized distributor."
+    },
+    {
+      "id": "proposal_manager#13",
+      "lens": "proposal_manager",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "All items must have clear traceability to the OEM — a clear, complete, documented, and auditable paper trail from OEM or distributor to current location.",
+      "citation": "§C – Schedule of Items",
+      "excerpt": "All items must have clear traceability to the Original Equipment Manufacturer (OEM). Traceability means a clear, complete, documented, and auditable paper trail which traces each step from an OEM or distributor to its current location."
+    }
+  ]
+}

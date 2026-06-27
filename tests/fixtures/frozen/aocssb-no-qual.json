@@ -1,0 +1,1595 @@
+{
+  "sol": "AOCSSB26R0023",
+  "expected": "BID_WITH_CAUTION",
+  "got": "BID_WITH_CAUTION",
+  "decision": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "reason": "Eligible; qualification caution(s) to verify: Personnel-qualification gate: named role with a quantified minimum experience (grounded by deterministic high-signal sweep).",
+    "dispositions": [
+      {
+        "requirement": "Past performance information will be collected and validated via a dedicated system (implied PPIRS/CPARs equivalent). Offerors must supply past performance references.",
+        "citation": "Section L, evaluation criteria hit",
+        "excerpt": "will be used to collect and validate past performance information.",
+        "kind": "past_performance",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P2",
+        "id": "capture_strategist#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Site visit: Offerors are urged and expected to inspect the site (U.S. Capitol President's Room S-216) before submitting an offer. Failure to inspect does not constitute grounds for a claim after award.",
+        "citation": "Section L, 52.237-1 Site Visit",
+        "excerpt": "Offerors or quoters are urged and expected to inspect the site where services are to be performed and to satisfy themselves regarding all general and local conditions that may affect the cost of contract performance, to the extent that the information is reasonably obtainable. In no event shall failure to inspect the site constitute grounds for a claim after contract award.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P2",
+        "id": "capture_strategist#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Questions/interpretation requests must be submitted in writing no later than 14 calendar days prior to the offer due date. Oral explanations are not binding.",
+        "citation": "Section L, AOC52.215-2(a)",
+        "excerpt": "Any prospective offeror desiring an explanation or interpretation of the solicitation, drawings, specifications, etc., must request it in writing no later than 14 calendar days prior to the date established for receipt of offers. Oral explanations or instructions given before the award of a contract will not be binding.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P2",
+        "id": "capture_strategist#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "SAM Registration — Award will only be made to an offeror actively registered in the System for Award Management (SAM). The solicitation's AOC52.204-5 clause and the solicitation narrative both require active SAM registration.",
+        "citation": "§I, AOC52.204-5, System for Award Management (SAM) (April 2021); solicitation narrative (AOCSSB26R0023)",
+        "excerpt": "This RFP will potentially result in the award of one (1) contract to the responsible Offeror that is actively registered in System for Award Management (SAM)",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P0",
+        "id": "contracts_attorney#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Responsibility Certification — Offeror must certify it is not presently debarred, suspended, proposed for debarment, or declared ineligible; has no relevant convictions/charges or delinquent federal taxes; and has not had contracts terminated for default within the prior three years.",
+        "citation": "§K, 52.209-5, Certification Regarding Responsibility Matters (Aug 2020)",
+        "excerpt": "The Offeror certifies, to the best of its knowledge and belief, that-(i) The Offeror and/or any of its Principals-(A) Are __ are not __ presently debarred, suspended, proposed for debarment, or declared ineligible for the award of contracts by any Federal agency",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P0",
+        "id": "contracts_attorney#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Taxpayer Identification Number (TIN) — Offeror must submit TIN and type-of-organization information with its offer.",
+        "citation": "§K, 52.204-3, Taxpayer Identification (Oct 1998)",
+        "excerpt": "All offerors must submit the information required in paragraphs (d) through (f) of this provision to comply with debt collection requirements of 31 U.S.C.7701(c) and 3325(d)",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Organizational and Personal Conflicts of Interest (OCI) — Offeror must certify whether any facts or circumstances give rise to an OCI. If a conflict exists, full disclosure and a mitigation plan are required.",
+        "citation": "§K, AOC52.209-1, Organizational and Personal Conflicts of Interest (Apr 2010)",
+        "excerpt": "The offeror certifies that, to the best of the its knowledge and belief, there _____ are _____ are not any relevant facts or circumstances which could give rise to an organizational conflict of interest, as defined in FAR Subpart 9.5.",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Representations and Certifications — Offeror must properly execute and submit all Representations and Certifications in Section K with its offer.",
+        "citation": "§K, AOC52.204-3, Representations and Certifications (Nov 2004)",
+        "excerpt": "The offeror shall properly execute and submit with its offer the Representations and Certifications contained herein. Insert information in spaces provided as applicable.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Equal Opportunity Compliance Reports — Offeror must represent whether it has participated in a previous contract subject to the Equal Opportunity clause and has filed all required compliance reports.",
+        "citation": "§K, 52.222-22, Previous Contracts and Compliance Reports (Feb 1999)",
+        "excerpt": "The offeror represents that-It __has, __has not participated in a previous contract or subcontract subject to the Equal Opportunity clause of this solicitation; It __has, __has not filed all required compliance reports",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#5",
+        "disposition": "dropped"
+      },
+      {
+        "requirement": "Special Security Requirements (AOC52.223-5) — All contractor personnel (including substitutes) performing work are subject to Capitol Complex special security requirements, including security screening by the U.S. Capitol Police.",
+        "citation": "§G, AOC52.211-1 Key Personnel and AOC52.211-2; AOC52.223-5 Special Security Requirements (October 2021)",
+        "excerpt": "The special security requirements in AOC52.223-5, Special Security Requirements, or AOC52.223-6, Special Security Requirements - U.S. Supreme Court, shall apply to all approved Contractor personnel substitutions.",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#6",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Vehicle / Delivery Inspection (AOC52.223-7 & AOC52.223-8) — All vehicles and personnel entering Capitol Complex are subject to USCP clearance, x-ray screening, and Off-Site Delivery Center (OSDC) inspection. Contractor must submit driver lists and vehicle information to USCP at least 7 days before first delivery and 24 hours before each arrival.",
+        "citation": "§G, AOC52.223-7 Special Security Clearance and Inspection Procedures (Jun 2004); AOC52.223-8 Vehicle and Delivery Inspection (July 2022)",
+        "excerpt": "All vehicles and contents used by the Contractor or his subcontractors which enter or leave United States Government property during performance of the work will be subject to clearance, inspection, and identification procedures conducted by the United States Capitol Police.",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#7",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "CUI / Security Markings — Contractor must handle, mark, store, transmit, and destroy Controlled Unclassified Information (CUI) in accordance with AOC52.223-3, including immediate incident reporting to the COR for any loss or unauthorized disclosure.",
+        "citation": "§I, AOC52.223-3 Security Markings - CUI (March 2017)",
+        "excerpt": "Incident Reporting: The loss, compromise, suspected compromise or unauthorized disclosure of CUI will be reported immediately, but no later than the next duty day",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P1",
+        "id": "contracts_attorney#8",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Restrictions on Subcontracting with Debarred/Suspended Entities — Contractor must screen and report subcontractors proposed for debarment, suspended, or voluntarily excluded per 52.209-6.",
+        "citation": "§I, 52.209-6 (Jan 2025)",
+        "excerpt": "52.209-6 Protecting the Government's Interest When Subcontracting with Contractors Debarred, Suspended, Proposed for Debarment, or Voluntarily Excluded (Jan 2025)",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#9",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Option to Extend Term — Government may extend contract by written notice within 10 days of expiry, with 30-day preliminary notice. Total contract duration (including options) shall not exceed 60 months.",
+        "citation": "§I, 52.217-9, Option to Extend the Term of the Contract (Mar 2000)",
+        "excerpt": "The total duration of this contract, including the exercise of any options under this clause, shall not exceed 60 months",
+        "kind": "other",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#10",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Firm-Fixed-Price Contract Type — Award will be made as a Firm-Fixed-Price contract.",
+        "citation": "§L, 52.216-1, Type of Contract (Apr 1984)",
+        "excerpt": "The Government contemplates award of a Firm-Fixed Price [Contracting Officer insert specific type of contract] contract resulting from this solicitation.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#11",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Prohibition on ByteDance Covered Application — Contractor is prohibited from using ByteDance-covered applications (e.g., TikTok) on devices used to perform this contract.",
+        "citation": "§I/§H, AOC52.204-10 Prohibition on a ByteDance Covered Application",
+        "excerpt": "AOC52.204-10 Prohibition on a ByteDance Covered Application",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "severity": "P2",
+        "id": "contracts_attorney#12",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Unit price governs over extended price in case of discrepancy. All unit prices must be entered; extended prices are derived by extending the unit price by quantity.",
+        "citation": "Section L, AOC52.215-6(d)",
+        "excerpt": "In case of discrepancy between a unit price and an extended price, the unit price will be presumed to be correct, subject, however, to correction to the same extent and in the same manner as any other mistake.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Unbalanced pricing rule: The Government may determine an offer unacceptable if prices are materially unbalanced between line items or sub-line items. A proposal may be rejected if the Contracting Officer determines the lack of balance poses unacceptable risk.",
+        "citation": "Section M, AOC52.215-5(g)",
+        "excerpt": "The Government may determine that an offer is unacceptable if the prices proposed are materially unbalanced between line items or sub line items. Unbalanced pricing exists when, despite an acceptable total evaluated price, the price of one or more contract line items is significantly overstated or understated as indicated by the application of cost or price analysis techniques. A proposal may be rejected if the Contracting Officer determines that the lack of balance poses an unacceptable risk to the Government.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Options will be evaluated under FAR 52.217-5 (Evaluation of Options). Offerors must price all option CLINs (0002, 0003, 0004) since they will be included in the total evaluated price for award purposes.",
+        "citation": "Section M, 52.217-5 reference",
+        "excerpt": "Provision Title 52.217-5 Evaluation of Options (July 1990)",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Contract type is Firm Fixed Price overall (CLINs 0001–0003); CLIN 0004 is Time and Materials. The solicitation contemplates award of a FFP contract per 52.216-1.",
+        "citation": "Section L, 52.216-1",
+        "excerpt": "52.216-1 Type of Contract (Apr 1984) The Government contemplates award of a Firm-Fixed Price [Contracting Officer insert specific type of contract] contract resulting from this solicitation.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "CLIN 0004 requires separate pricing columns for Material Costs and Travel Costs in addition to Unit Price. The solicitation schedule explicitly shows these as distinct columns for this T&M CLIN.",
+        "citation": "Section B, CLIN 0004 schedule columns",
+        "excerpt": "Number Supplies or Services Qty Unit Unit Price Material Travel Costs Total (Inc. disc., tax, and fees) Costs 0004 Option: Conservation 0.000000 NTE",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "pricing_analyst",
+        "severity": "P1",
+        "id": "pricing_analyst#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Active SAM registration required at time of award",
+        "citation": "RFI/Q&A section (attachment J.2 referenced in solicitation body)",
+        "excerpt": "RFP will potentially result in the award of one (1) contract to the responsible Offeror that is actively registered in System for Award Management (SAM)",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P0",
+        "id": "former_ko#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Base CLIN 0001 Period of Performance: 08/17/2026 – 02/16/2027 (approximately 6 months) for treatment plan, mockups, and final treatment plan (SOW §§1.4.1–1.4.4). This is the performance start date — bidder must be ready to mobilize by 17 August 2026.",
+        "citation": "Section B, CLIN 0001",
+        "excerpt": "Period of Performance: 08/17/2026 - 02/16/2027 Description: Proposed treatment plan, mockups and final treatment plan in accordance with SOW section 1.4.1 through 1.4.4",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Option CLIN 0002 Period of Performance: 02/17/2027 – 06/11/2028 (approximately 16 months) for conservation treatment implementation, documentation, evaluation, and final report (SOW §§1.4.5–1.4.6)",
+        "citation": "Section B, CLIN 0002",
+        "excerpt": "Period of Performance: 02/17/2027 - 06/11/2028 Description: Option 1: Conservation treatment, documentation and evaluation with a final report in accordance with SOW sections 1.4.5 and 1.4.6.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Option CLIN 0003 Period of Performance: 02/17/2027 – 06/11/2028 for structural engineering services / temporary shoring design if needed (SOW §1.4.7)",
+        "citation": "Section B, CLIN 0003",
+        "excerpt": "Period of Performance: 02/17/2027 - 06/11/2028 Description: Option 2: Structural engineering services for temporary shoring design if needed in accordance with SOW section 1.4.7",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Option CLIN 0004 (T&M, ad hoc) conservation services for implementation: 02/17/2027 – 06/11/2028; exercised only at COR and CO direction and approval",
+        "citation": "Section B, CLIN 0004",
+        "excerpt": "Option 3: Ad Hoc conservation treatment, documentation and evaluation services in accordance with SOW sections 1.4.5 and 1.4.6. To be performed if determined to be needed by the COR and solely at the COR and CO's direction and approval.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Total contract duration (including all options) shall not exceed 60 months",
+        "citation": "Section I, 52.217-9",
+        "excerpt": "The total duration of this contract, including the exercise of any options under this clause, shall not exceed 60 months",
+        "kind": "other",
+        "controllability": "already_satisfied",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#5",
+        "disposition": "met"
+      },
+      {
+        "requirement": "Key Personnel must have a minimum of 20 years of successful and professional hands-on experience in the design, planning, and implementation of conservation treatment of paint and plaster on masonry",
+        "citation": "SOW (attached as J.1), Key Personnel section",
+        "excerpt": "shall have a minimum of twenty (20) years of successful and professional hands-on experience in the design, planning and implementation of conservation treatment of paint and plaster on masonry",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "requiredAttribute": "key-personnel:20-years-paint-plaster-masonry-conservation",
+        "curableInWindow": true,
+        "severity": "P0",
+        "id": "former_ko#6",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Contractor advertising/promotional materials that reference the Capitol or Capitol Complex must receive Contracting Officer approval prior to publication",
+        "citation": "Section I, AOC52.203-1",
+        "excerpt": "The Contractor, by signing this contract, agrees to comply with the foregoing and to submit any proposed advertising or promotional copy connected in any manner with this contract and/or the Capitol, other Capitol Complex Buildings, or the United States Capitol Grounds to the Contracting Officer for approval prior to publication.",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#7",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "General public disclosure requests: contractor must promptly notify the AOC Chief (DCA or SSMMD) upon receipt of any public information request and cooperate in compiling/collecting releasable information",
+        "citation": "Section I, AOC52.203-2",
+        "excerpt": "Promptly after receiving any request from the general public for information on or data derived from this contract, the contractor shall notify the Architect of the Capitol, Chief, Design and Construction Acquisition Division (DCA) or the Chief, Supplies, Services and Material Management Division (SSMMD), as applicable.",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#8",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Site visit is urged and expected; failure to inspect does not excuse claims after award",
+        "citation": "Section L, 52.237-1",
+        "excerpt": "Offerors or quoters are urged and expected to inspect the site where services are to be performed and to satisfy themselves regarding all general and local conditions that may affect the cost of contract performance, to the extent that the information is reasonably obtainable. In no event shall failure to inspect the site constitute grounds for a claim after contract award.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P1",
+        "id": "former_ko#9",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Courier/hand-delivery must go to the Congressional Acceptance Site, 160 D Street NE, Washington, DC 20510.",
+        "citation": "Section L, AOC52.215-1(c)(3)",
+        "excerpt": "if an offeror desires to use a courier service or wants to hand deliver an offer themselves, the delivery address is: Congressional Acceptance Site, 160 D Street NE, Washington, DC 20510. Couriered or hand delivered offers shall be delivered to this address.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Late proposals (received after the specified date and time) shall not be accepted by the Government unless it is determined to be in the best interest of the Government.",
+        "citation": "Section L, L.2.2 / AOC52.215-1(d)(1)",
+        "excerpt": "Proposals received after this date and time shall be considered late and shall not be accepted by the Government unless it is determined to be in the best interest of the Government.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Offerors must acknowledge receipt of all amendments to the solicitation by the time and place specified for receipt of offers. Failure of acknowledgment may result in rejection of the offer.",
+        "citation": "Section L, AOC52.215-2(c)(1)–(2)",
+        "excerpt": "Offerors shall acknowledge the receipt of all amendments to the solicitation by: (i) Signing and returning the amendment; (ii) Identifying the amendment number and date in the space provided for this purpose on the form for submitting a offer; (iii) Letter or telegram; or (iv) Facsimile, if facsimile offers are authorized in the solicitation. (2) The Government must receive the acknowledgment by the time and at the place specified for receipt of offers.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Erasures or other changes in the offer must be initialed by the person signing the offer. Offers signed by an agent must be accompanied by evidence of the agent's authority.",
+        "citation": "Section L, AOC52.215-6(b)",
+        "excerpt": "Erasures or other changes must be initialed by the person signing the offer/quote. Offers/Quotes signed by an agent shall be accompanied by evidence of that agent's authority, unless that evidence has been previously furnished to the issuing office.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "If unit prices are solicited, offers must show the unit price and enter the extended price for the quantity of each item in the 'Amount' column of the Schedule.",
+        "citation": "Section L, AOC52.215-6(c)",
+        "excerpt": "If unit prices are solicited, offers/quotes shall: (1) Show the unit price, if required, including, unless otherwise specified, packaging, packing, and preservation; and (2) Enter the extended price for the quantity of each item offer in the \"Amount\" column of the Schedule.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
+        "citation": "§I (grounding sweep)",
+        "excerpt": "52.217-9 Option to Extend the Term of the Contract (Mar 2000)\n(a) The Government may extend the term of this contract by written notice to the Contractor within 10 Days [insert the period of time\nwithin which the Contracting Officer may exercise the option]; provided that the Government gives the Contractor a preliminary\nwritten notice of its intent to extend at least 30 Days days [60 days unless a different number of days is inserted] before the contract\ne",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "delivery_window",
+        "id": "deterministic_sweep#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Personnel-qualification gate: named role with a quantified minimum experience (grounded by deterministic high-signal sweep).",
+        "citation": "§C (grounding sweep)",
+        "excerpt": "ordinate an\ninterdisciplinary team including painting conservators, plaster conservation specialists,\ntechnicians and assistants, historic paint specialists, and a structural engineer. Specific\nexperience requirements are as follows:\n3.1 Plaster and Paint Senior Conservators shall have a minimum of twenty (20) years of\nsuccessful and professional hands-on experience in the design, planning and\nimplementation of conservation treatment of paint and plaster on masonry vaults. (1)\nSenior plaster conservator experience must include assessment and treatment of multi\ncoat plaster applied directly on",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "personnel_qual",
+        "id": "deterministic_sweep#1",
+        "cautionFloor": true,
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Personnel-qualification gate: named role with a quantified minimum experience (grounded by deterministic high-signal sweep).",
+        "citation": "§F (grounding sweep)",
+        "excerpt": "both murals and paintings in a variety of mediums in a historic monumental building as required in\nSection 1.4 of the SOW. The narrative shall include:\na. Overall approach and methods specific to scope of work for this project.\nb. A sample conservation report prepared by the Offeror within the last 5 years. The sample\nconservation report shall include photo documentation. The sample report shall be provided in\nelectronic copy.\nL.3.5 Factor 3 – Key Personnel:\nThe Offeror shall provide the following information for the Key Personnel factor to demonstrate that the\nproposed individual has the expe",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "personnel_qual",
+        "id": "deterministic_sweep#2",
+        "disposition": "gate_to_clear"
+      }
+    ],
+    "showStoppers": []
+  },
+  "coverage": {
+    "required": [
+      "B",
+      "C",
+      "H",
+      "I",
+      "L",
+      "M"
+    ],
+    "covered": [
+      "B",
+      "C",
+      "H",
+      "I",
+      "L",
+      "M"
+    ],
+    "missing": [],
+    "attestations": [
+      {
+        "section": "B",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "pricing_analyst#4",
+          "former_ko#1",
+          "former_ko#2",
+          "former_ko#3",
+          "former_ko#4"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "C",
+        "status": "read_no_obligation",
+        "obligations": [],
+        "citedFindingIds": [],
+        "ungrounded": []
+      },
+      {
+        "section": "H",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "contracts_attorney#9",
+          "contracts_attorney#12"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "I",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "contracts_attorney#9",
+          "contracts_attorney#10",
+          "former_ko#5",
+          "former_ko#7",
+          "former_ko#8",
+          "deterministic_sweep#0"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "L",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#1",
+          "capture_strategist#2",
+          "contracts_attorney#11",
+          "pricing_analyst#0",
+          "pricing_analyst#3",
+          "former_ko#9",
+          "proposal_manager#0",
+          "proposal_manager#2",
+          "proposal_manager#3",
+          "proposal_manager#4"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "M",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "pricing_analyst#1",
+          "pricing_analyst#2"
+        ],
+        "ungrounded": []
+      }
+    ]
+  },
+  "perLens": {
+    "capture_strategist": 3,
+    "contracts_attorney": 13,
+    "pricing_analyst": 5,
+    "former_ko": 10,
+    "proposal_manager": 5,
+    "deterministic_sweep": 3
+  },
+  "conflict": false,
+  "verifierSound": true,
+  "sectionsRead": [
+    "C",
+    "M",
+    "L",
+    "I",
+    "H",
+    "K",
+    "G",
+    "B"
+  ],
+  "trace": {
+    "capture_strategist": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "C",
+        "M",
+        "L"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Senior Conservator"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "years of experience"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Key Personnel"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "evaluation criteria"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.211-1 Key Person"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Basis for Award"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Factor 1"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "plaster stabilization"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Technical Approach"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "implementing and overseeing painted/gilded/fresco finishes conservation"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "contracts_attorney": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "I",
+        "H",
+        "K",
+        "G",
+        "L"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "H"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "K"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.204-5"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.223-5 Special Security Requirements"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "small business set-aside"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "set-aside"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "System for Award Management (SAM)"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "E-Verify"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "actively registered in System for Award Management (SAM) and w"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.204-4 Personal Identity Verification"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.223-7 Special Security Clearance"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "G"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "all sole proprietors (including self-employed individuals); all contractor employees"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "actively registered in System for Award Management"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.223-5 Special Security Requirements (October 2021)"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "AOC52.223-3 Security Markings - CUI"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "registered in System for Award Management (SAM) and w"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pricing_analyst": {
+      "converged": true,
+      "turns": 6,
+      "sectionsRead": [
+        "B",
+        "L",
+        "M"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "NTE"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Time and Materials"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "unbalanced pricing"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "unit price will be presumed to be correct"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Firm Fixed Price"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "materially unbalanced between line items"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.217-5"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "former_ko": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "L",
+        "M",
+        "C",
+        "B",
+        "I"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "small business"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "set-aside"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "actively registered in System for Award Management (SAM)"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "period of performance"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "RFP will potentially result in the award of one (1) contract to the responsible Offeror that is actively registered in System for Award Management (SAM)"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "mockup"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "1.4.1"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "qualifications"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "minimum of twenty (20) years"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Principal Conservator"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "proposal_manager": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "L",
+        "B",
+        "M"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "page limit"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Volume I"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "closing date"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "L3. Volume and Organization"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "receipt of offers"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "posals received after this date and time shall be considered late"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Volume II"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "L.3.1 Document Size and Formatting"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Page Limits"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Volumes shall be organize"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "SF 3881"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "capture_strategist#0",
+      "lens": "capture_strategist",
+      "kind": "past_performance",
+      "controllability": "bidder_controls",
+      "requirement": "Past performance information will be collected and validated via a dedicated system (implied PPIRS/CPARs equivalent). Offerors must supply past performance references.",
+      "citation": "Section L, evaluation criteria hit",
+      "excerpt": "will be used to collect and validate past performance information."
+    },
+    {
+      "id": "capture_strategist#1",
+      "lens": "capture_strategist",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Site visit: Offerors are urged and expected to inspect the site (U.S. Capitol President's Room S-216) before submitting an offer. Failure to inspect does not constitute grounds for a claim after award.",
+      "citation": "Section L, 52.237-1 Site Visit",
+      "excerpt": "Offerors or quoters are urged and expected to inspect the site where services are to be performed and to satisfy themselves regarding all general and local conditions that may affect the cost of contract performance, to the extent that the information is reasonably obtainable. In no event shall failure to inspect the site constitute grounds for a claim after contract award."
+    },
+    {
+      "id": "capture_strategist#2",
+      "lens": "capture_strategist",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Questions/interpretation requests must be submitted in writing no later than 14 calendar days prior to the offer due date. Oral explanations are not binding.",
+      "citation": "Section L, AOC52.215-2(a)",
+      "excerpt": "Any prospective offeror desiring an explanation or interpretation of the solicitation, drawings, specifications, etc., must request it in writing no later than 14 calendar days prior to the date established for receipt of offers. Oral explanations or instructions given before the award of a contract will not be binding."
+    },
+    {
+      "id": "contracts_attorney#0",
+      "lens": "contracts_attorney",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "SAM Registration — Award will only be made to an offeror actively registered in the System for Award Management (SAM). The solicitation's AOC52.204-5 clause and the solicitation narrative both require active SAM registration.",
+      "citation": "§I, AOC52.204-5, System for Award Management (SAM) (April 2021); solicitation narrative (AOCSSB26R0023)",
+      "excerpt": "This RFP will potentially result in the award of one (1) contract to the responsible Offeror that is actively registered in System for Award Management (SAM)"
+    },
+    {
+      "id": "contracts_attorney#1",
+      "lens": "contracts_attorney",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "Responsibility Certification — Offeror must certify it is not presently debarred, suspended, proposed for debarment, or declared ineligible; has no relevant convictions/charges or delinquent federal taxes; and has not had contracts terminated for default within the prior three years.",
+      "citation": "§K, 52.209-5, Certification Regarding Responsibility Matters (Aug 2020)",
+      "excerpt": "The Offeror certifies, to the best of its knowledge and belief, that-(i) The Offeror and/or any of its Principals-(A) Are __ are not __ presently debarred, suspended, proposed for debarment, or declared ineligible for the award of contracts by any Federal agency"
+    },
+    {
+      "id": "contracts_attorney#2",
+      "lens": "contracts_attorney",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Taxpayer Identification Number (TIN) — Offeror must submit TIN and type-of-organization information with its offer.",
+      "citation": "§K, 52.204-3, Taxpayer Identification (Oct 1998)",
+      "excerpt": "All offerors must submit the information required in paragraphs (d) through (f) of this provision to comply with debt collection requirements of 31 U.S.C.7701(c) and 3325(d)"
+    },
+    {
+      "id": "contracts_attorney#3",
+      "lens": "contracts_attorney",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "Organizational and Personal Conflicts of Interest (OCI) — Offeror must certify whether any facts or circumstances give rise to an OCI. If a conflict exists, full disclosure and a mitigation plan are required.",
+      "citation": "§K, AOC52.209-1, Organizational and Personal Conflicts of Interest (Apr 2010)",
+      "excerpt": "The offeror certifies that, to the best of the its knowledge and belief, there _____ are _____ are not any relevant facts or circumstances which could give rise to an organizational conflict of interest, as defined in FAR Subpart 9.5."
+    },
+    {
+      "id": "contracts_attorney#4",
+      "lens": "contracts_attorney",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Representations and Certifications — Offeror must properly execute and submit all Representations and Certifications in Section K with its offer.",
+      "citation": "§K, AOC52.204-3, Representations and Certifications (Nov 2004)",
+      "excerpt": "The offeror shall properly execute and submit with its offer the Representations and Certifications contained herein. Insert information in spaces provided as applicable."
+    },
+    {
+      "id": "contracts_attorney#5",
+      "lens": "contracts_attorney",
+      "kind": "boilerplate",
+      "controllability": "bidder_controls",
+      "requirement": "Equal Opportunity Compliance Reports — Offeror must represent whether it has participated in a previous contract subject to the Equal Opportunity clause and has filed all required compliance reports.",
+      "citation": "§K, 52.222-22, Previous Contracts and Compliance Reports (Feb 1999)",
+      "excerpt": "The offeror represents that-It __has, __has not participated in a previous contract or subcontract subject to the Equal Opportunity clause of this solicitation; It __has, __has not filed all required compliance reports"
+    },
+    {
+      "id": "contracts_attorney#6",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Special Security Requirements (AOC52.223-5) — All contractor personnel (including substitutes) performing work are subject to Capitol Complex special security requirements, including security screening by the U.S. Capitol Police.",
+      "citation": "§G, AOC52.211-1 Key Personnel and AOC52.211-2; AOC52.223-5 Special Security Requirements (October 2021)",
+      "excerpt": "The special security requirements in AOC52.223-5, Special Security Requirements, or AOC52.223-6, Special Security Requirements - U.S. Supreme Court, shall apply to all approved Contractor personnel substitutions."
+    },
+    {
+      "id": "contracts_attorney#7",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Vehicle / Delivery Inspection (AOC52.223-7 & AOC52.223-8) — All vehicles and personnel entering Capitol Complex are subject to USCP clearance, x-ray screening, and Off-Site Delivery Center (OSDC) inspection. Contractor must submit driver lists and vehicle information to USCP at least 7 days before first delivery and 24 hours before each arrival.",
+      "citation": "§G, AOC52.223-7 Special Security Clearance and Inspection Procedures (Jun 2004); AOC52.223-8 Vehicle and Delivery Inspection (July 2022)",
+      "excerpt": "All vehicles and contents used by the Contractor or his subcontractors which enter or leave United States Government property during performance of the work will be subject to clearance, inspection, and identification procedures conducted by the United States Capitol Police."
+    },
+    {
+      "id": "contracts_attorney#8",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "CUI / Security Markings — Contractor must handle, mark, store, transmit, and destroy Controlled Unclassified Information (CUI) in accordance with AOC52.223-3, including immediate incident reporting to the COR for any loss or unauthorized disclosure.",
+      "citation": "§I, AOC52.223-3 Security Markings - CUI (March 2017)",
+      "excerpt": "Incident Reporting: The loss, compromise, suspected compromise or unauthorized disclosure of CUI will be reported immediately, but no later than the next duty day"
+    },
+    {
+      "id": "contracts_attorney#9",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Restrictions on Subcontracting with Debarred/Suspended Entities — Contractor must screen and report subcontractors proposed for debarment, suspended, or voluntarily excluded per 52.209-6.",
+      "citation": "§I, 52.209-6 (Jan 2025)",
+      "excerpt": "52.209-6 Protecting the Government's Interest When Subcontracting with Contractors Debarred, Suspended, Proposed for Debarment, or Voluntarily Excluded (Jan 2025)"
+    },
+    {
+      "id": "contracts_attorney#10",
+      "lens": "contracts_attorney",
+      "kind": "other",
+      "controllability": "bidder_controls",
+      "requirement": "Option to Extend Term — Government may extend contract by written notice within 10 days of expiry, with 30-day preliminary notice. Total contract duration (including options) shall not exceed 60 months.",
+      "citation": "§I, 52.217-9, Option to Extend the Term of the Contract (Mar 2000)",
+      "excerpt": "The total duration of this contract, including the exercise of any options under this clause, shall not exceed 60 months"
+    },
+    {
+      "id": "contracts_attorney#11",
+      "lens": "contracts_attorney",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Firm-Fixed-Price Contract Type — Award will be made as a Firm-Fixed-Price contract.",
+      "citation": "§L, 52.216-1, Type of Contract (Apr 1984)",
+      "excerpt": "The Government contemplates award of a Firm-Fixed Price [Contracting Officer insert specific type of contract] contract resulting from this solicitation."
+    },
+    {
+      "id": "contracts_attorney#12",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Prohibition on ByteDance Covered Application — Contractor is prohibited from using ByteDance-covered applications (e.g., TikTok) on devices used to perform this contract.",
+      "citation": "§I/§H, AOC52.204-10 Prohibition on a ByteDance Covered Application",
+      "excerpt": "AOC52.204-10 Prohibition on a ByteDance Covered Application"
+    },
+    {
+      "id": "pricing_analyst#0",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Unit price governs over extended price in case of discrepancy. All unit prices must be entered; extended prices are derived by extending the unit price by quantity.",
+      "citation": "Section L, AOC52.215-6(d)",
+      "excerpt": "In case of discrepancy between a unit price and an extended price, the unit price will be presumed to be correct, subject, however, to correction to the same extent and in the same manner as any other mistake."
+    },
+    {
+      "id": "pricing_analyst#1",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Unbalanced pricing rule: The Government may determine an offer unacceptable if prices are materially unbalanced between line items or sub-line items. A proposal may be rejected if the Contracting Officer determines the lack of balance poses unacceptable risk.",
+      "citation": "Section M, AOC52.215-5(g)",
+      "excerpt": "The Government may determine that an offer is unacceptable if the prices proposed are materially unbalanced between line items or sub line items. Unbalanced pricing exists when, despite an acceptable total evaluated price, the price of one or more contract line items is significantly overstated or understated as indicated by the application of cost or price analysis techniques. A proposal may be rejected if the Contracting Officer determines that the lack of balance poses an unacceptable risk to the Government."
+    },
+    {
+      "id": "pricing_analyst#2",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Options will be evaluated under FAR 52.217-5 (Evaluation of Options). Offerors must price all option CLINs (0002, 0003, 0004) since they will be included in the total evaluated price for award purposes.",
+      "citation": "Section M, 52.217-5 reference",
+      "excerpt": "Provision Title 52.217-5 Evaluation of Options (July 1990)"
+    },
+    {
+      "id": "pricing_analyst#3",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "Contract type is Firm Fixed Price overall (CLINs 0001–0003); CLIN 0004 is Time and Materials. The solicitation contemplates award of a FFP contract per 52.216-1.",
+      "citation": "Section L, 52.216-1",
+      "excerpt": "52.216-1 Type of Contract (Apr 1984) The Government contemplates award of a Firm-Fixed Price [Contracting Officer insert specific type of contract] contract resulting from this solicitation."
+    },
+    {
+      "id": "pricing_analyst#4",
+      "lens": "pricing_analyst",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "CLIN 0004 requires separate pricing columns for Material Costs and Travel Costs in addition to Unit Price. The solicitation schedule explicitly shows these as distinct columns for this T&M CLIN.",
+      "citation": "Section B, CLIN 0004 schedule columns",
+      "excerpt": "Number Supplies or Services Qty Unit Unit Price Material Travel Costs Total (Inc. disc., tax, and fees) Costs 0004 Option: Conservation 0.000000 NTE"
+    },
+    {
+      "id": "former_ko#0",
+      "lens": "former_ko",
+      "kind": "eligibility_bar",
+      "controllability": "bidder_controls",
+      "requirement": "Active SAM registration required at time of award",
+      "citation": "RFI/Q&A section (attachment J.2 referenced in solicitation body)",
+      "excerpt": "RFP will potentially result in the award of one (1) contract to the responsible Offeror that is actively registered in System for Award Management (SAM)"
+    },
+    {
+      "id": "former_ko#1",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Base CLIN 0001 Period of Performance: 08/17/2026 – 02/16/2027 (approximately 6 months) for treatment plan, mockups, and final treatment plan (SOW §§1.4.1–1.4.4). This is the performance start date — bidder must be ready to mobilize by 17 August 2026.",
+      "citation": "Section B, CLIN 0001",
+      "excerpt": "Period of Performance: 08/17/2026 - 02/16/2027 Description: Proposed treatment plan, mockups and final treatment plan in accordance with SOW section 1.4.1 through 1.4.4"
+    },
+    {
+      "id": "former_ko#2",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Option CLIN 0002 Period of Performance: 02/17/2027 – 06/11/2028 (approximately 16 months) for conservation treatment implementation, documentation, evaluation, and final report (SOW §§1.4.5–1.4.6)",
+      "citation": "Section B, CLIN 0002",
+      "excerpt": "Period of Performance: 02/17/2027 - 06/11/2028 Description: Option 1: Conservation treatment, documentation and evaluation with a final report in accordance with SOW sections 1.4.5 and 1.4.6."
+    },
+    {
+      "id": "former_ko#3",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Option CLIN 0003 Period of Performance: 02/17/2027 – 06/11/2028 for structural engineering services / temporary shoring design if needed (SOW §1.4.7)",
+      "citation": "Section B, CLIN 0003",
+      "excerpt": "Period of Performance: 02/17/2027 - 06/11/2028 Description: Option 2: Structural engineering services for temporary shoring design if needed in accordance with SOW section 1.4.7"
+    },
+    {
+      "id": "former_ko#4",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Option CLIN 0004 (T&M, ad hoc) conservation services for implementation: 02/17/2027 – 06/11/2028; exercised only at COR and CO direction and approval",
+      "citation": "Section B, CLIN 0004",
+      "excerpt": "Option 3: Ad Hoc conservation treatment, documentation and evaluation services in accordance with SOW sections 1.4.5 and 1.4.6. To be performed if determined to be needed by the COR and solely at the COR and CO's direction and approval."
+    },
+    {
+      "id": "former_ko#5",
+      "lens": "former_ko",
+      "kind": "other",
+      "controllability": "already_satisfied",
+      "requirement": "Total contract duration (including all options) shall not exceed 60 months",
+      "citation": "Section I, 52.217-9",
+      "excerpt": "The total duration of this contract, including the exercise of any options under this clause, shall not exceed 60 months"
+    },
+    {
+      "id": "former_ko#6",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Key Personnel must have a minimum of 20 years of successful and professional hands-on experience in the design, planning, and implementation of conservation treatment of paint and plaster on masonry",
+      "citation": "SOW (attached as J.1), Key Personnel section",
+      "excerpt": "shall have a minimum of twenty (20) years of successful and professional hands-on experience in the design, planning and implementation of conservation treatment of paint and plaster on masonry",
+      "requiredAttribute": "key-personnel:20-years-paint-plaster-masonry-conservation",
+      "curableInWindow": true
+    },
+    {
+      "id": "former_ko#7",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Contractor advertising/promotional materials that reference the Capitol or Capitol Complex must receive Contracting Officer approval prior to publication",
+      "citation": "Section I, AOC52.203-1",
+      "excerpt": "The Contractor, by signing this contract, agrees to comply with the foregoing and to submit any proposed advertising or promotional copy connected in any manner with this contract and/or the Capitol, other Capitol Complex Buildings, or the United States Capitol Grounds to the Contracting Officer for approval prior to publication."
+    },
+    {
+      "id": "former_ko#8",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "General public disclosure requests: contractor must promptly notify the AOC Chief (DCA or SSMMD) upon receipt of any public information request and cooperate in compiling/collecting releasable information",
+      "citation": "Section I, AOC52.203-2",
+      "excerpt": "Promptly after receiving any request from the general public for information on or data derived from this contract, the contractor shall notify the Architect of the Capitol, Chief, Design and Construction Acquisition Division (DCA) or the Chief, Supplies, Services and Material Management Division (SSMMD), as applicable."
+    },
+    {
+      "id": "former_ko#9",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Site visit is urged and expected; failure to inspect does not excuse claims after award",
+      "citation": "Section L, 52.237-1",
+      "excerpt": "Offerors or quoters are urged and expected to inspect the site where services are to be performed and to satisfy themselves regarding all general and local conditions that may affect the cost of contract performance, to the extent that the information is reasonably obtainable. In no event shall failure to inspect the site constitute grounds for a claim after contract award."
+    },
+    {
+      "id": "proposal_manager#0",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Courier/hand-delivery must go to the Congressional Acceptance Site, 160 D Street NE, Washington, DC 20510.",
+      "citation": "Section L, AOC52.215-1(c)(3)",
+      "excerpt": "if an offeror desires to use a courier service or wants to hand deliver an offer themselves, the delivery address is: Congressional Acceptance Site, 160 D Street NE, Washington, DC 20510. Couriered or hand delivered offers shall be delivered to this address."
+    },
+    {
+      "id": "proposal_manager#1",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Late proposals (received after the specified date and time) shall not be accepted by the Government unless it is determined to be in the best interest of the Government.",
+      "citation": "Section L, L.2.2 / AOC52.215-1(d)(1)",
+      "excerpt": "Proposals received after this date and time shall be considered late and shall not be accepted by the Government unless it is determined to be in the best interest of the Government."
+    },
+    {
+      "id": "proposal_manager#2",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Offerors must acknowledge receipt of all amendments to the solicitation by the time and place specified for receipt of offers. Failure of acknowledgment may result in rejection of the offer.",
+      "citation": "Section L, AOC52.215-2(c)(1)–(2)",
+      "excerpt": "Offerors shall acknowledge the receipt of all amendments to the solicitation by: (i) Signing and returning the amendment; (ii) Identifying the amendment number and date in the space provided for this purpose on the form for submitting a offer; (iii) Letter or telegram; or (iv) Facsimile, if facsimile offers are authorized in the solicitation. (2) The Government must receive the acknowledgment by the time and at the place specified for receipt of offers."
+    },
+    {
+      "id": "proposal_manager#3",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Erasures or other changes in the offer must be initialed by the person signing the offer. Offers signed by an agent must be accompanied by evidence of the agent's authority.",
+      "citation": "Section L, AOC52.215-6(b)",
+      "excerpt": "Erasures or other changes must be initialed by the person signing the offer/quote. Offers/Quotes signed by an agent shall be accompanied by evidence of that agent's authority, unless that evidence has been previously furnished to the issuing office."
+    },
+    {
+      "id": "proposal_manager#4",
+      "lens": "proposal_manager",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "If unit prices are solicited, offers must show the unit price and enter the extended price for the quantity of each item in the 'Amount' column of the Schedule.",
+      "citation": "Section L, AOC52.215-6(c)",
+      "excerpt": "If unit prices are solicited, offers/quotes shall: (1) Show the unit price, if required, including, unless otherwise specified, packaging, packing, and preservation; and (2) Enter the extended price for the quantity of each item offer in the \"Amount\" column of the Schedule."
+    },
+    {
+      "id": "deterministic_sweep#0",
+      "lens": "deterministic_sweep",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
+      "citation": "§I (grounding sweep)",
+      "excerpt": "52.217-9 Option to Extend the Term of the Contract (Mar 2000)\n(a) The Government may extend the term of this contract by written notice to the Contractor within 10 Days [insert the period of time\nwithin which the Contracting Officer may exercise the option]; provided that the Government gives the Contractor a preliminary\nwritten notice of its intent to extend at least 30 Days days [60 days unless a different number of days is inserted] before the contract\ne"
+    },
+    {
+      "id": "deterministic_sweep#2",
+      "lens": "deterministic_sweep",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Personnel-qualification gate: named role with a quantified minimum experience (grounded by deterministic high-signal sweep).",
+      "citation": "§F (grounding sweep)",
+      "excerpt": "both murals and paintings in a variety of mediums in a historic monumental building as required in\nSection 1.4 of the SOW. The narrative shall include:\na. Overall approach and methods specific to scope of work for this project.\nb. A sample conservation report prepared by the Offeror within the last 5 years. The sample\nconservation report shall include photo documentation. The sample report shall be provided in\nelectronic copy.\nL.3.5 Factor 3 – Key Personnel:\nThe Offeror shall provide the following information for the Key Personnel factor to demonstrate that the\nproposed individual has the expe"
+    }
+  ]
+}
