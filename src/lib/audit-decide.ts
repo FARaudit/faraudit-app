@@ -34,7 +34,7 @@ export interface LogicalShowStopper { requirement: string; controllability: Cont
 
 /** Distinctive object identifiers in a string: tokens ≥4 chars carrying BOTH a letter and a digit (part
  *  numbers / CAGE codes like DGMT1002, 1PN61) — the strongest "same named object" signal. */
-function objectIdsOf(f: DecidedFinding): Set<string> {
+function objectIdsOf(f: TypedFinding): Set<string> {
   const out = new Set<string>();
   for (const src of [f.requiredAttribute, f.requirement, f.excerpt]) {
     for (const tok of (src || "").toLowerCase().split(/[^a-z0-9]+/))
@@ -60,6 +60,77 @@ export function logicalShowStoppers(showStoppers: DecidedFinding[]): LogicalShow
 
 /** The graduation-graded count: distinct logical bars (Brain card-53). */
 export function logicalShowStopperCount(showStoppers: DecidedFinding[]): number { return logicalShowStoppers(showStoppers).length; }
+
+// ── KNIFE-EDGE detection (Brain card-54 doctrine) ────────────────────────────────────────────────────
+// The edge is finding-DISPOSITION contestability, decided by a DETERMINISTIC sensitivity test — never a
+// model "feels close" call (that would reintroduce the single-evaluator failure). A finding is knife-edge
+// iff: (a) it is BOUNDARY-CLASS — its disposition is NOT locked by evidence (firmStatus must be "unknown";
+// a profile-PROVEN fail/satisfy is anchored to a known fact, not contestable — so #3's Dillon bars, proven
+// fails, are NOT knife-edge); AND (b) bumping its disposition ONE NOTCH flips the top-line verdict. Only
+// disqualifying-class findings can move the verdict, so only they are tested. Pure + auditable.
+const provisional = (findings: TypedFinding[], profile: BidderProfile | null): VerdictInputs =>
+  ({ findings, bidderProfile: profile, coverageComplete: true, verifierSound: true, conflict: false });
+
+/** Adjacent re-typings of a disqualifying finding — "one notch" along the disposition ladder. */
+function bumpOneNotch(f: TypedFinding): TypedFinding[] {
+  if (f.controllability === "bidder_cannot_move")
+    return [{ ...f, controllability: "bidder_controls" }, { ...f, curableInWindow: f.curableInWindow === false ? true : false }];
+  if (f.controllability === "no_one_can_move")
+    return [{ ...f, controllability: "bidder_cannot_move", curableInWindow: false }, { ...f, controllability: "bidder_controls" }];
+  return [];
+}
+
+const isBarClass = (f: TypedFinding) => f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move";
+
+/** Cluster finding indices that share a distinctive object id (same named part/cert/OEM) — the units across
+ *  which lenses can DISAGREE on disposition. Greedy, conservative (same key as the dedup). */
+function clusterByObject(findings: TypedFinding[]): number[][] {
+  const clusters: Array<{ ids: Set<string>; idx: number[] }> = [];
+  findings.forEach((f, i) => {
+    const ids = objectIdsOf(f);
+    if (!ids.size) return;                                                            // no distinctive object → no cluster
+    const c = clusters.find((c) => [...ids].some((x) => c.ids.has(x)));
+    if (c) { ids.forEach((x) => c.ids.add(x)); c.idx.push(i); }
+    else clusters.push({ ids: new Set(ids), idx: [i] });
+  });
+  return clusters.map((c) => c.idx).filter((idx) => idx.length > 1);                  // only multi-finding clusters can disagree
+}
+
+/** Indices of the knife-edge findings — the ONLY ones worth the expensive Opus re-type (Brain card-54/55).
+ *  TWO deterministic triggers, both gated by a sensitivity flip; never a model "feels close" call:
+ *    (1) BAR→CAUTION — a bar-typed, boundary-class (firmStatus unknown) finding whose one-notch bump flips
+ *        the verdict (catches an OVER-typed bar that's really a caution). Evidence-locked bars are excluded.
+ *    (2) UNDER-TYPED BAR via LENS DISAGREEMENT — findings on the SAME object typed with DIFFERENT
+ *        controllability (one a bar, one not) where resolving the cluster toward the SEVERE typing flips the
+ *        top-line. This is the dangerous edge (a genuine bar a lens mis-typed DOWN → false BID); it relies on
+ *        multi-lens diversity, not on any single model noticing. */
+export function knifeEdgeIndices(findings: TypedFinding[], profile: BidderProfile | null): number[] {
+  const base = deriveVerdict(provisional(findings, profile)).verdict;
+  const edges = new Set<number>();
+
+  // (1) bar→caution
+  findings.forEach((f, i) => {
+    if (firmStatus(f, profile) !== "unknown" || !isBarClass(f)) return;
+    for (const v of bumpOneNotch(f))
+      if (deriveVerdict(provisional(findings.map((g, j) => (j === i ? v : g)), profile)).verdict !== base) { edges.add(i); break; }
+  });
+
+  // (2) under-typed bar via lens disagreement on the same object. Fire only when there is a genuine
+  //     bar-vs-nonbar disagreement, the bar side is NOT evidence-locked (firmStatus unknown → contestable;
+  //     excludes #3's profile-proven Dillon bars), and the verdict DEPENDS on how the disagreement resolves
+  //     (severe-resolution verdict ≠ lenient-resolution verdict).
+  for (const idx of clusterByObject(findings)) {
+    const bars = idx.filter((i) => isBarClass(findings[i]));
+    const nonbars = idx.filter((i) => !isBarClass(findings[i]));
+    if (!bars.length || !nonbars.length) continue;                                    // need a real disagreement
+    if (!bars.some((i) => firmStatus(findings[i], profile) === "unknown")) continue;  // evidence-locked bar → not contestable
+    const severe = findings.map((g, j) => (idx.includes(j) ? { ...g, controllability: "bidder_cannot_move" as const, curableInWindow: false } : g));
+    const lenient = findings.map((g, j) => (idx.includes(j) ? { ...g, controllability: "bidder_controls" as const } : g));
+    if (deriveVerdict(provisional(severe, profile)).verdict !== deriveVerdict(provisional(lenient, profile)).verdict) idx.forEach((i) => edges.add(i));
+  }
+
+  return [...edges].sort((a, b) => a - b);
+}
 
 /** Disposition is a PURE function of controllability + kind — the Brain card-41 rule as CODE (was prose).
  *  boilerplate → dropped (never a gate); already_satisfied → met; bidder_controls → gate-to-clear (do the

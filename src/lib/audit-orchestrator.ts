@@ -23,8 +23,9 @@ export const BINDING_SECTIONS = ["B", "C", "H", "I", "L", "M"] as const;
 const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
 export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; }
-/** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests. */
-export type VerifyFn = (ctx: AuditToolContext, findings: TypedFinding[]) => Promise<VerifyResult>;
+/** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests.
+ *  bidderProfile is passed so the verifier can compute the deterministic knife-edge set (Brain card-54/55). */
+export type VerifyFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { bidderProfile?: BidderProfile | null }) => Promise<VerifyResult>;
 
 export interface OrchestratorInput {
   ctx: AuditToolContext;
@@ -116,7 +117,7 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
 /** Default P2 — with no skeptic injected, soundness rests on Layer-1 grounding: every finding is already
  *  grounded (ungrounded ones were dropped in the loop), so the set is sound and all survive. A real
  *  adversarial skeptic (agentic refuter) is injected via opts.verify for paid runs. */
-const groundingOnlyVerify: VerifyFn = async (_ctx, findings) => ({ sound: true, survived: findings, rejected: [] });
+const groundingOnlyVerify: VerifyFn = async (_ctx, findings, _opts) => ({ sound: true, survived: findings, rejected: [] });
 
 /** Run the full agentic audit cycle and DERIVE the verdict. Pure orchestration over injected model/verify. */
 export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditResult> {
@@ -145,8 +146,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   findings = dedup(findings);
   const conflict = hasConflict(findings);
 
-  // P2 — adversarial cross-examination → verifierSound + the surviving finding set.
-  const ver = await verify(ctx, findings);
+  // P2 — adversarial cross-examination → verifierSound + the surviving (possibly re-typed) finding set.
+  //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
+  const ver = await verify(ctx, findings, { bidderProfile });
   findings = ver.survived;
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested

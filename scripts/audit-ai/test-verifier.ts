@@ -62,16 +62,24 @@ async function main() {
   await tiered(ctx, [grounded]);
   ok("no contested findings → escalation NOT called (no Opus spend)", escCalls, 0);
 
-  // (6) KNIFE-EDGE escalation (Brain card-49/§4): a verdict-decisive bar escalates to Opus even when the
-  // base skeptic UPHOLDS it — the BID↔CAUTION/CAUTION↔NO_BID driver always gets the second opinion.
+  // (6) tiered escalates the supplied KNIFE-EDGE set (opts.escalateIdx) ∪ base-overturns — even when base
+  // upholds. (Edge SELECTION is tested in test-knife-edge.ts; here we test the tiered mechanism consumes it.)
   let ke = -1;
   const upholdAll2: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: true, reason: "base ok" }));
-  const escTrack: SkepticFn = async (_c, fs) => { ke = fs.length; return fs.map((_x, i) => ({ index: i, upheld: true, reason: "opus" })); };
-  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded, misclassified]); // grounded=bidder_controls, misclassified=bidder_cannot_move
-  ok("knife-edge: disqualifying bar escalates to Opus even when base upholds it", ke, 1);
+  const escTrack: SkepticFn = async (_c, fs) => { ke = fs.length; return fs.map((_x, i) => ({ index: i, upheld: true, reason: "opus", corrected: { controllability: "bidder_controls" as const } })); };
+  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded, misclassified], { escalateIdx: [1] });
+  ok("tiered escalates the supplied knife-edge index even when base upholds", ke, 1);
   ke = -1;
-  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded]); // pure bidder_controls, base upholds → nothing decisive
-  ok("no bar + no overturn → no Opus spend (knife-edge bounded)", ke, -1);
+  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded], { escalateIdx: [] });
+  ok("no escalateIdx + no overturn → no Opus spend", ke, -1);
+
+  // (7) RE-TYPING (Brain card-54 point 3): escalation returns `corrected` → verifier RE-TYPES the finding
+  // (not drop), and the survived finding carries the corrected controllability for the deterministic layer.
+  const retypeSkeptic: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: true, reason: "re-typed", corrected: { controllability: "bidder_cannot_move" as const, curableInWindow: false } }));
+  const rr = await makeAgenticVerifier(retypeSkeptic)(ctx, [grounded], { bidderProfile: null });
+  ok("re-typed finding SURVIVES (not dropped)", rr.survived.length, 1);
+  ok("re-typed finding carries corrected controllability", rr.survived[0]?.controllability, "bidder_cannot_move");
+  ok("re-typed finding carries corrected curability", rr.survived[0]?.curableInWindow, false);
 
   console.log(`verifier gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }
