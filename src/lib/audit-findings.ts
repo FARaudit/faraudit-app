@@ -49,6 +49,18 @@ export interface TypedFinding {
   //   review (never a silent caution). REQUIRED for every disqualifying bar.
   curableInWindow?: boolean;
   severity?: "P0" | "P1" | "P2"; // for a residual RISK (not a hard requirement) — its materiality
+  // CAUTION-FLOOR (Brain card 75-R2 / 78-R1) — set by the deterministic caution-floor pass (default-off
+  // flag) when a finding matches a caution archetype (named role + quantified experience-years, specialized
+  // professional cert/license of performing personnel, QPL/QML membership, or an "or-equal" burden). It
+  // FLOORS the verdict to BID_WITH_CAUTION minimum in deriveVerdict WITHOUT re-typing the finding into a
+  // profile-checked bar — so it can never create a show-stopper (never upgrades to INELIGIBLE) and, being
+  // checked only after the disqualifying/human-review branches, never downgrades a NO_BID/INELIGIBLE.
+  cautionFloor?: boolean;
+  // GROUNDING SWEEP (Brain card 81 Step 1) — set when a finding was grounded by the deterministic
+  // high-signal sweep (not a lens). Tags the archetype (personnel_qual | fat_precondition |
+  // delivery_window | qpl | or_equal) so Step 2 (cross-clause temporal-conflict check) can consume the
+  // FAT + delivery findings deterministically.
+  sweepArchetype?: string;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

@@ -14,7 +14,8 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, type Decision } from "./audit-decide";
+import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against. */
@@ -153,6 +154,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   });
   const allConverged = runs.every((r) => r.converged);
 
+  // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1), default-OFF (Rule 61). Grounds
+  //         the failing archetypes (personnel quals / FAT preconditions / delivery windows / QPL / or-equal)
+  //         directly from source so lens shared-miss can't drop them. Merged before dedup so it collapses
+  //         with any lens duplicate. Flag off ⇒ no sweep findings ⇒ unchanged.
+  if (process.env.AUDIT_GROUNDING_SWEEP === "true") {
+    const swept = highSignalSweep(ctx.fullSource);
+    swept.forEach((f, j) => { f.id = `deterministic_sweep#${j}`; });
+    if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
+  }
+
   // P3 — reconcile: dedup + detect unresolved material conflict.
   findings = dedup(findings);
   const conflict = hasConflict(findings);
@@ -166,6 +177,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
+
+  // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
+  //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
+  //      so deriveVerdict floors to BID_WITH_CAUTION minimum. Flag off ⇒ findings pass through unchanged.
+  findings = applyCautionFloor(findings, { enabled: process.env.AUDIT_CAUTION_FLOOR === "true" });
 
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
   //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment

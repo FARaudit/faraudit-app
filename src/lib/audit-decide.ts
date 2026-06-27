@@ -132,6 +132,49 @@ export function knifeEdgeIndices(findings: TypedFinding[], profile: BidderProfil
   return [...edges].sort((a, b) => a - b);
 }
 
+// ── DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1) ───────────────────────────────────────────
+// A pure, no-model pass that runs on findings BEFORE deriveVerdict (independent of lens consensus — the
+// same override slot as the knife-edge re-typing). It recognizes CAUTION ARCHETYPES and marks the matching
+// finding with `cautionFloor`, which floors the verdict to BID_WITH_CAUTION minimum. It does NOT re-type
+// the finding into a profile-checked bar, so it can NEVER create a show-stopper (never INELIGIBLE) and —
+// checked only after the disqualifying/human-review branches — NEVER downgrades a NO_BID/INELIGIBLE.
+// Gated by a default-OFF flag (Rule 61); flag off ⇒ no marks ⇒ deriveVerdict behaves byte-for-byte as before.
+const ROLE_RE = /\b(?:senior|lead|chief|principal|project|fine\s+art|architectural|registered)?\s*(?:conservator|architect|engineer|scientist|geologist|hydrologist|hygienist|surveyor|estimator|superintendent|inspector|specialist|technician|designer|planner|toxicologist|archaeologist|biologist|chemist)s?\b/i;
+const YEARS_RE = /\b(?:\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|twenty[-\s]five|thirty)\b\s*(?:\(\s*\d{1,2}\s*\)\s*)?years?\b/i;
+const EXP_CONTEXT_RE = /\b(?:experience|minimum|at least|no less than|not less than|shall have|must have|years of)\b/i;
+const CERT_RE = /\b(?:professional engineer|registered architect|licensed (?:professional|architect|engineer|surveyor)|\bP\.?E\.?\b\s*licen|certified industrial hygienist|\bCIH\b|\bPMP\b|\bCISSP\b|state[-\s]licensed|professional (?:license|licensure|certification|registration|credential)|board[-\s]certified)\b/i;
+const PERSONNEL_RE = /\b(?:personnel|staff|conservator|architect|engineer|key personnel|team member|specialist|technician|project director|on-site)\b/i;
+const QPL_RE = /\b(?:QPL|QML)\b|qualified products? list|qualified manufacturers? list/i;
+const OREQUAL_RE = /\bor[-\s]equal\b|salient characteristic|prove(?:n)? equivalen|approved equal|brand name or equal/i;
+// responsibility/SAM/set-aside/boilerplate context that must NOT, by itself, trip the professional-cert arm.
+const EXCLUDE_RE = /\b(?:SAM registration|System for Award Management|active registration|responsib|52\.209-5|conflict of interest|debarr|suspend|set[-\s]aside|small business (?:pool|status|set)|equal opportunity|\bEEO\b|trafficking|bytedance|tiktok)\b/i;
+
+/** Does a finding match a CAUTION archetype? Pure. FIRES on: (a) a named role + a QUANTIFIED experience
+ *  minimum; (c) QPL/QML membership; (d) an "or-equal" qualification burden; (b) a specialized professional
+ *  certification/license OF PERFORMING PERSONNEL (gated by NOT a responsibility/SAM/set-aside context).
+ *  Does NOT fire on generic "qualified/experienced personnel", SAM/responsibility boilerplate, or plain
+ *  set-aside pool membership. */
+export function isCautionArchetype(f: TypedFinding): { fires: boolean; archetype?: string } {
+  const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+  if (ROLE_RE.test(hay) && YEARS_RE.test(hay) && EXP_CONTEXT_RE.test(hay)) return { fires: true, archetype: "named-role+experience-years" };
+  if (QPL_RE.test(hay)) return { fires: true, archetype: "QPL/QML-membership" };
+  if (OREQUAL_RE.test(hay)) return { fires: true, archetype: "or-equal-qualification-burden" };
+  if (CERT_RE.test(hay) && PERSONNEL_RE.test(hay) && !EXCLUDE_RE.test(hay)) return { fires: true, archetype: "professional-cert/license-of-personnel" };
+  return { fires: false };
+}
+
+/** Mark caution-archetype findings with `cautionFloor` so deriveVerdict floors to BID_WITH_CAUTION minimum.
+ *  FLOOR-ONLY: skips findings already bar-class (bidder_cannot_move/no_one_can_move) so it can never soften a
+ *  bar; leaves controllability/kind untouched (no show-stopper can be created). Flag-gated; OFF (the default)
+ *  returns the findings unchanged. Pure. */
+export function applyCautionFloor(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f) => {
+    if (f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move") return f; // already ≥caution — never downgrade
+    return isCautionArchetype(f).fires ? { ...f, cautionFloor: true } : f;
+  });
+}
+
 /** Disposition is a PURE function of controllability + kind — the Brain card-41 rule as CODE (was prose).
  *  boilerplate → dropped (never a gate); already_satisfied → met; bidder_controls → gate-to-clear (do the
  *  work, never disqualifying / never a downgrade); bidder_cannot_move → disqualifying bar. */
@@ -220,11 +263,20 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const manifestIncomplete = inp.manifestComplete === false;
 
   // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
+  //     The deterministic CAUTION-FLOOR (Brain card 75-R2 / 78-R1) joins here: a finding marked cautionFloor
+  //     (a recognized caution archetype — quantified personnel-quals, professional cert/license, QPL/QML,
+  //     or-equal) floors the verdict to BID_WITH_CAUTION minimum. It is reached ONLY after every disqualifying
+  //     and human-review branch above, so it can never downgrade a NO_BID/INELIGIBLE; and it is NOT a
+  //     disqualifying bar, so it can never become a show-stopper / INELIGIBLE. FLOOR-only by construction.
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
-  if (residual.length) {
+  const floored = dispositions.filter((f) => f.cautionFloor === true);
+  if (residual.length || floored.length) {
     if (manifestIncomplete) return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
-    return mk("BID_WITH_CAUTION", true,
-      `Eligible; residual curable risk(s) to confirm within the window: ${names(residual)}`, dispositions, []);
+    const reasons = [
+      residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
+      floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
+    ].filter(Boolean).join("; ");
+    return mk("BID_WITH_CAUTION", true, `Eligible; ${reasons}`, dispositions, []);
   }
 
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
