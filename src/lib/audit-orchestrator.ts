@@ -154,20 +154,23 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   });
   const allConverged = runs.every((r) => r.converged);
 
-  // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1), default-OFF (Rule 61). Grounds
-  //         the failing archetypes (personnel quals / FAT preconditions / delivery windows / QPL / or-equal)
-  //         directly from source so lens shared-miss can't drop them. Merged before dedup so it collapses
-  //         with any lens duplicate. Flag off ⇒ no sweep findings ⇒ unchanged.
-  if (process.env.AUDIT_GROUNDING_SWEEP === "true") {
+  // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE
+  //         step 1 — flip UNCOMMITTED, pending Brain review of the live runs). Grounds the failing archetypes
+  //         (personnel quals / FAT preconditions / delivery windows / QPL / or-equal) directly from source so
+  //         lens shared-miss can't drop them. Merged before dedup so it collapses with any lens duplicate.
+  //         Set AUDIT_GROUNDING_SWEEP="false" to disable.
+  if (process.env.AUDIT_GROUNDING_SWEEP !== "false") {
     const swept = highSignalSweep(ctx.fullSource);
     swept.forEach((f, j) => { f.id = `deterministic_sweep#${j}`; });
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
   }
 
-  // P1.6 — CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81 Step 2), default-OFF (Rule 61). Consumes the
-  //         sweep-grounded FAT precondition + delivery window; emits a no_one_can_move show-stopper when a
-  //         non-waivable precondition's min duration exceeds the delivery window → deriveVerdict → NO_BID.
-  if (process.env.AUDIT_TEMPORAL_CONFLICT === "true") {
+  // P1.6 — CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81 Step 2). DEFAULT-ON (Brain card 98 GO-LIVE
+  //         step 1 — flip UNCOMMITTED, pending Brain review). Consumes the sweep-grounded FAT precondition +
+  //         delivery window; emits a no_one_can_move show-stopper when a non-waivable precondition's min
+  //         duration exceeds the delivery window → deriveVerdict → NO_BID. Set AUDIT_TEMPORAL_CONFLICT="false"
+  //         to disable.
+  if (process.env.AUDIT_TEMPORAL_CONFLICT !== "false") {
     const before = findings.length;
     findings = applyTemporalConflict(findings, { enabled: true });
     if (findings.length > before) { findings[findings.length - 1].id = "temporal_conflict#0"; perLens["temporal_conflict"] = 1; }
