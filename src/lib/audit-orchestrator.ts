@@ -203,7 +203,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      a bidder-resolvable compliance/representation item (size-standard, OCI, reps&certs) → caution; an
   //      unrecognized one is LEFT (→ human review), never silently BID. NEVER touches no_one_can_move or a loaded
   //      profile. Flag off ⇒ findings pass through unchanged.
-  findings = applyStructuralBarWhitelist(findings, bidderProfile, { enabled: process.env.AUDIT_STRUCTURAL_BAR_WHITELIST === "true" });
+  findings = applyStructuralBarWhitelist(findings, bidderProfile, { enabled: process.env.AUDIT_STRUCTURAL_BAR_WHITELIST !== "false" });
 
   // P4.4 — PRECONDITION OVER-TYPE FLOOR (Brain card 92), default-OFF (Rule 61). Re-types a time-curable
   //      precondition (FAT/source-approval/qualification-testing) that a lens mis-typed no_one_can_move with
