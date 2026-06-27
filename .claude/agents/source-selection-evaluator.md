@@ -1,6 +1,6 @@
 ---
 name: source-selection-evaluator
-description: Source-selection evaluator lens (former SSEB chair) — how THIS proposal will actually be SCORED: tradeoff vs LPTA, factor weighting, strengths/weaknesses/deficiencies, past-performance relevance, basis for award. SPECIALIST — fires on competitive negotiated procurements (FAR 15). The scorer's eye.
+description: Use on competitive negotiated (FAR 15) procurements to model scoring. Source-selection evaluator lens (former SSEB chair) — how THIS proposal will actually be SCORED: tradeoff vs LPTA, factor weighting, strengths/weaknesses/deficiencies, past-performance relevance, basis for award. SPECIALIST — fires on competitive negotiated procurements (FAR 15). The scorer's eye.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

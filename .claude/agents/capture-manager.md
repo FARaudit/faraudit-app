@@ -1,6 +1,6 @@
 ---
 name: capture-manager
-description: VP-Capture lens (Shipley-trained, top-prime BD) — bid/no-bid decision usefulness, Pwin, competitive/incumbent read, win-themes from §M, teaming/JV angle for a small sub. Core panel — always runs.
+description: Use on every bid/no-bid review. VP-Capture lens (Shipley-trained, top-prime BD) — bid/no-bid decision usefulness, Pwin, competitive/incumbent read, win-themes from §M, teaming/JV angle for a small sub. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

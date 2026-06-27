@@ -1,6 +1,6 @@
 ---
 name: small-business-eligibility
-description: SBA / small-business eligibility lens — size standards vs NAICS, set-aside program eligibility (8(a)/SDVOSB/HUBZone/WOSB), limitations on subcontracting, affiliation traps, reps & certs. SPECIALIST — fires when any set-aside or small-business consideration is present. Owns the #1 disqualifier.
+description: Use when any set-aside or small-business consideration is present. SBA / small-business eligibility lens — size standards vs NAICS, set-aside program eligibility (8(a)/SDVOSB/HUBZone/WOSB), limitations on subcontracting, affiliation traps, reps & certs. SPECIALIST — fires when any set-aside or small-business consideration is present. Owns the #1 disqualifier.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

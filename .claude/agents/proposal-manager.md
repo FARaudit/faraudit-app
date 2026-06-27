@@ -1,6 +1,6 @@
 ---
 name: proposal-manager
-description: APMP-certified proposal director lens — §L compliance-matrix readiness, §M factors->win-themes+outline, submission checklist completeness, deadline/gate clarity, honesty on unread sections. Core panel — always runs.
+description: Use on every audit to verify §L/§M compliance-matrix readiness. APMP-certified proposal director lens — §L compliance-matrix readiness, §M factors->win-themes+outline, submission checklist completeness, deadline/gate clarity, honesty on unread sections. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

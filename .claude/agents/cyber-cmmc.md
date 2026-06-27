@@ -1,6 +1,6 @@
 ---
 name: cyber-cmmc
-description: DoD cybersecurity / CMMC compliance lens — DFARS 252.204-7012/7019/7020/7021, CMMC 2.0 levels, NIST SP 800-171, SPRS score, CUI/CDI handling, FedRAMP for cloud, ITAR/EAR. SPECIALIST — fires on DoD solicitations with CUI/CDI or DFARS cyber clauses. Owns the cyber gate.
+description: Use when a DoD solicitation carries CUI/CDI or DFARS cyber clauses (252.204-7012/7019/7020/7021). DoD cybersecurity / CMMC compliance lens — DFARS 252.204-7012/7019/7020/7021, CMMC 2.0 levels, NIST SP 800-171, SPRS score, CUI/CDI handling, FedRAMP for cloud, ITAR/EAR. SPECIALIST — fires on DoD solicitations with CUI/CDI or DFARS cyber clauses. Owns the cyber gate.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 

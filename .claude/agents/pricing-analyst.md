@@ -1,7 +1,8 @@
 ---
 name: pricing-analyst
-description: Senior government pricing/cost analyst lens (DCAA-aware) — CLIN/bid-schedule capture, magnitude, wage determinations (SCA/DBA/CBA), bonding, contract-type pricing implications, missing pricing inputs. Core panel — always runs.
+description: Use on every audit to verify CLIN/pricing capture and wage determinations. Senior government pricing/cost analyst lens (DCAA-aware) — CLIN/bid-schedule capture, magnitude, wage determinations (SCA/DBA/CBA), bonding, contract-type pricing implications, missing pricing inputs. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+memory: project
 ---
 
 > **Scope:** dev-workflow Claude Code subagent (panel review / red-team for the CEO), **NOT** a runtime engine lens. The runtime audit lens specs are the single ratified source of truth in `src/lib/audit-lenses.ts` (Brain card 81 #3 / Step 4); edits to RUNTIME lens behavior go there, never here.

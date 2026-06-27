@@ -1,7 +1,14 @@
 ---
 name: contracts-attorney
-description: Federal procurement attorney lens (GAO/COFC protest practice) — FAR/DFARS clause completeness + correctness, incorporation-by-reference (52.252-2), set-aside<->clause reconciliation, sub flowdowns, ZERO fabrication to a protest standard. Core panel — always runs.
+description: Use on every audit to verify FAR/DFARS clause completeness to a protest standard. Federal procurement attorney lens (GAO/COFC protest practice) — FAR/DFARS clause completeness + correctness, incorporation-by-reference (52.252-2), set-aside<->clause reconciliation, sub flowdowns, ZERO fabrication to a protest standard. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+memory: project
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-discipline-guard.sh"
+          timeout: 10
 ---
 
 > **Scope:** dev-workflow Claude Code subagent (panel review / red-team for the CEO), **NOT** a runtime engine lens. The runtime audit lens specs are the single ratified source of truth in `src/lib/audit-lenses.ts` (Brain card 81 #3 / Step 4); edits to RUNTIME lens behavior go there, never here.
