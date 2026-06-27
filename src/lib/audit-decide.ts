@@ -213,12 +213,23 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     return mk("NEEDS_HUMAN_REVIEW", true,
       `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`, dispositions, nonCurable);
 
+  // ASYMMETRY CAP (Brain card-58): a "no-bar" verdict (CAUTION/BID) is valid only if the read was COMPLETE.
+  // If a manifest-named attachment went unfetched, a clean verdict is the §C content-loss failure with a clean
+  // label → cap to INCOMPLETE. (Show-stoppers already returned above: INELIGIBLE/NO_BID are NOT capped — a real
+  // bar can't be un-found by adding documents.)
+  const manifestIncomplete = inp.manifestComplete === false;
+
   // 5c. CURABLE bar (curableInWindow === true) under unknown status → a genuine residual risk → BID_WITH_CAUTION.
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
-  if (residual.length)
+  if (residual.length) {
+    if (manifestIncomplete) return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
     return mk("BID_WITH_CAUTION", true,
       `Eligible; residual curable risk(s) to confirm within the window: ${names(residual)}`, dispositions, []);
+  }
 
-  // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID.
+  // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
+  //    was incomplete (then we cannot assert "no bar found").
+  if (manifestIncomplete)
+    return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
   return mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);
 }

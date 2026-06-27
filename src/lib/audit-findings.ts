@@ -65,4 +65,9 @@ export interface VerdictInputs {
   coverageComplete: boolean; // P4: every section / incorporated clause / obligation in the manifest was read + grounded
   verifierSound: boolean;    // P2/P3: adversarial verification succeeded (findings are trustworthy)
   conflict: boolean;         // an unresolved MATERIAL conflict between experts the loop could not reconcile
+  // Brain card-58 ASYMMETRY: a "no-bar" verdict (BID/CAUTION) is only valid if the read was COMPLETE. When a
+  // manifest-named attachment went unfetched, a clean verdict is the §C content-loss failure wearing a clean
+  // label → cap BID/CAUTION to INCOMPLETE. INELIGIBLE/NO_BID are NOT capped (a real bar can't be un-found by
+  // adding documents). Default true (complete) when not supplied.
+  manifestComplete?: boolean;
 }

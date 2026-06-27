@@ -9,8 +9,8 @@ const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllabil
   requirement: o.requirement ?? "requirement", citation: "FAR 52.x", excerpt: "verbatim", grounded: true, lens: "x",
   kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow,
 });
-const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null; coverage?: boolean; sound?: boolean; conflict?: boolean } = {}): VerdictInputs =>
-  ({ findings, bidderProfile: o.profile ?? null, coverageComplete: o.coverage ?? true, verifierSound: o.sound ?? true, conflict: o.conflict ?? false });
+const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null; coverage?: boolean; sound?: boolean; conflict?: boolean; manifest?: boolean } = {}): VerdictInputs =>
+  ({ findings, bidderProfile: o.profile ?? null, coverageComplete: o.coverage ?? true, verifierSound: o.sound ?? true, conflict: o.conflict ?? false, manifestComplete: o.manifest ?? true });
 
 let pass = 0; const fails: string[] = [];
 const eq = (label: string, got: unknown, exp: unknown) => { if (JSON.stringify(got) === JSON.stringify(exp)) pass++; else fails.push(`${label}: got ${JSON.stringify(got)} exp ${JSON.stringify(exp)}`); };
@@ -85,6 +85,12 @@ eq("same bar, firm qualifies → BID", deriveVerdict(inp(eligBar, { profile: { s
 // non-eligibility uncontrollable bar the firm provably fails → NO_BID
 const noBid = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
 eq("uncontrollable non-elig bar firm fails → NO_BID", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+
+// ── Brain card-58 ASYMMETRY CAP: an unfetched manifest attachment caps no-bar verdicts, NOT bar-found. ──
+eq("BID + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(two, { manifest: false })).verdict, "INCOMPLETE");
+eq("CAUTION + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(curable, { manifest: false })).verdict, "INCOMPLETE");
+eq("INELIGIBLE + manifest incomplete → STILL INELIGIBLE (asymmetry)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "INELIGIBLE");
+eq("NO_BID + manifest incomplete → STILL NO_BID (asymmetry)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NO_BID");
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──
 const baseline = JSON.stringify(deriveVerdict(inp(two)));

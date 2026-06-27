@@ -52,6 +52,17 @@ export function buildManifest(ctx: AuditToolContext): string[] {
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
 }
 
+/** Manifest-completeness detector (Brain card-58 production cap). CONSERVATIVE: flags an unfetched attachment
+ *  only when the source itself NAMES an attachment with a page count whose volume alone (≈1000 chars/page,
+ *  deliberately lenient to avoid false caps) exceeds the ENTIRE assembled source — i.e. that attachment
+ *  cannot physically be present (the #5 459-pg-spec-in-a-221KB-source signature). A package whose named
+ *  attachments are all plausibly contained returns true. Tunable; intentionally errs toward NOT capping. */
+export function manifestComplete(ctx: AuditToolContext): boolean {
+  let maxPages = 0;
+  for (const m of ctx.fullSource.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) maxPages = Math.max(maxPages, parseInt(m[1], 10));
+  return !(maxPages * 1000 > ctx.fullSource.length); // a single named attachment can't exceed the whole source → unfetched
+}
+
 /** P3 — dedup identical findings across lenses, preserving the first seen. The key INCLUDES controllability:
  *  two lenses that agree on the decisive field are duplicates and collapse; two that DISAGREE (cannot_move
  *  vs already_satisfied) are NOT duplicates — they must both survive so hasConflict can catch the clash. */
@@ -156,8 +167,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
 
-  // P5 — DECIDE deterministically from the typed grounded facts.
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict };
+  // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
+  //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment
+  //      is capped to INCOMPLETE (bar-found verdicts are not capped).
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) };
   const decision = deriveVerdict(inputs);
 
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations }, perLens, conflict, sectionsRead: [...sectionsRead], trace };

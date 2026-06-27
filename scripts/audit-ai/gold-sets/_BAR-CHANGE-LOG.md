@@ -72,3 +72,17 @@ The integrity property is NOT "can we re-confirm the original SAM attachment cou
   2. A frozen anchor's source is **IMMUTABLE** — no re-pull/substitute under a frozen key; a substitute sol is a NEW key, not a refreshed old one (swapping source breaks freeze provenance).
   3. Manifest-reconciliation is a **standing pre-graduation gate for every future archived key**, not a one-off.
 - **Key A (NO_BID) still has NO valid source.** Card-56's keyword recon re-surfaced #5/#4/#3 (already frozen as CAUTION/INELIGIBLE) — contradictory provenance, not new sources. A NO_BID key must come from a genuinely NEW currently-open solicitation carrying a real universal impossibility (real-doc provenance or explicitly-labeled FRONTIER-adversarial mod).
+
+## 2026-06-26 — #4 & #5 RETIRED as invalid-frozen + the completeness asymmetry (Brain ruling · card 58 · Architecture Ruling)
+
+Reconciliation (card 57) revealed #4/#5 were authored against INCOMPLETE source. A CAUTION verdict = "no disqualifying bar found" — valid ONLY if the read was complete. #5 returned CAUTION never having seen Attachment 1a (459-pg Specification — the one doc where a buried bar / restrictive spec / QPL-or-equal lives). That is not a key with a gap; it is a key whose verdict is UNFOUNDED.
+
+- **#5 FA667024R0001 — RETIRED (invalid frozen).** sha 42c65df… intact but content incomplete; §C substance (Attachment 1a) never captured = the content-loss root cause wearing a clean label. The spec is NOT immaterial (it is the single most determinative document). Old CAUTION label does NOT carry — must be re-adjudicated blind from complete source (true verdict unknown: could be NO_BID/INELIGIBLE if a bar is in the spec).
+- **#4 AOCSSB26R0023 — RETIRED (invalid frozen).** J.7 HazMat / J.8 Lead Work are scope/compliance docs (specialized-licensing bars / comply-to-win obligations live there); cannot rule immaterial. Absent content could ELEVATE the verdict, not just add detail.
+- Both retained ONLY as the gap/provenance record; removed from the active graduation set.
+
+**ASYMMETRY DOCTRINE (encode):** source-completeness gaps threaten "no-bar" verdicts (BID/CAUTION) far more than "bar-found" verdicts (NO_BID/INELIGIBLE). A real bar can't be un-found by adding documents → #3 INELIGIBLE is ROBUST to source gaps and STANDS. BID/CAUTION assert the ABSENCE of a bar — trustworthy only if the read was complete. This is why #4/#5 fall and #3 stands.
+
+**GATE PROMOTED:** manifest-reconciliation is now a PRE-FREEZE gate (no key freezes until manifest-reconciled). PRODUCTION: the engine caps any BID/CAUTION at INCOMPLETE when a manifest-named attachment went unfetched (a "no bar found" verdict on a package you didn't fully read is the §C failure with a clean label). INELIGIBLE/NO_BID are NOT capped (bar-found is robust).
+
+**CAUTION-CLASS GRADUATION:** #1 (33/33 verified) is the only valid caution anchor now; "one package graduates nothing" → caution-class graduation requires #1 + ≥1 re-sourced anchor. #1 can run for SIGNAL on the knife-edge gate.
