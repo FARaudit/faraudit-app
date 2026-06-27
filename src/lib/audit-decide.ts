@@ -175,6 +175,47 @@ export function applyCautionFloor(findings: TypedFinding[], opts?: { enabled?: b
   });
 }
 
+// ── CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81, Step 2) ──────────────────────────────────────
+// Pure, no-model. Consumes the sweep-grounded `fat_precondition` + `delivery_window` findings (Step 1) and
+// detects a UNIVERSAL impossibility: a NON-WAIVABLE First-Article precondition whose minimum duration
+// exceeds the production delivery window — no bidder can deliver within the window when a longer mandatory
+// precondition must first elapse. Emits a `no_one_can_move` show-stopper → deriveVerdict returns NO_BID,
+// exactly as it handles any universal impossibility. The moat holds: it derives the conflict from grounded
+// clause durations (real excerpts), asserts no verdict itself. Default-OFF flag (Rule 61).
+const SPELLED_DAYS: Record<string, number> = { ten: 10, fifteen: 15, twenty: 20, "twenty-five": 25, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, "one hundred": 100 };
+/** Minimum day-count a clause excerpt commits to. Prefers a parenthetical digit ("SIXTY (60)"), then a bare
+ *  digit-days, then a spelled number; returns the SMALLEST such value (the binding minimum). Pure. */
+export function parseDays(excerpt: string): number | null {
+  const vals: number[] = [];
+  for (const m of excerpt.matchAll(/\(\s*(\d{1,3})\s*\)\s*(?:calendar\s+|business\s+|working\s+)?days?/gi)) vals.push(parseInt(m[1], 10));
+  for (const m of excerpt.matchAll(/\b(\d{1,3})\s*(?:calendar\s+|business\s+|working\s+)?days?\b/gi)) vals.push(parseInt(m[1], 10));
+  for (const m of excerpt.matchAll(/\b(ten|fifteen|twenty-five|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|one hundred)\b\s*(?:\(\s*\d{1,3}\s*\)\s*)?(?:calendar\s+|business\s+|working\s+)?days?/gi)) vals.push(SPELLED_DAYS[m[1].toLowerCase()]);
+  return vals.length ? Math.min(...vals) : null;
+}
+
+/** Emit a `no_one_can_move` show-stopper when a NON-WAIVABLE FAT precondition's minimum duration EXCEEDS the
+ *  delivery window (Brain card 81 Step 2). FLOOR-of-severity guard: only fires on a non-waivable precondition
+ *  (a waivable one isn't universal — the CO could waive it). Adds a finding; never removes/downgrades. Pure.
+ *  Default-OFF. */
+const NONWAIVABLE_RE = /\bnon-?waivable\b|shall not (?:waive|authorize|approve)|may not be waived|\bmandatory\b|must (?:complete|elapse|first)/i;
+export function applyTemporalConflict(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ unchanged
+  const fat = findings.find((f) => f.sweepArchetype === "fat_precondition");
+  const delivery = findings.find((f) => f.sweepArchetype === "delivery_window");
+  if (!fat || !delivery) return findings;
+  if (!NONWAIVABLE_RE.test(fat.excerpt)) return findings;                 // waivable precondition ⇒ not universal
+  const fatDays = parseDays(fat.excerpt), winDays = parseDays(delivery.excerpt);
+  if (fatDays == null || winDays == null || fatDays <= winDays) return findings; // no conflict
+  const ss: TypedFinding = {
+    requirement: `Universal delivery impossibility: a non-waivable First Article precondition (min ~${fatDays} days) cannot complete inside the production delivery window (~${winDays} days ARO). No bidder can comply, regardless of capacity.`,
+    citation: `${fat.citation} + ${delivery.citation} (cross-clause temporal conflict)`,
+    excerpt: fat.excerpt, // verbatim-grounded binding term (the FAT clause)
+    kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false,
+    grounded: true, lens: "temporal_conflict",
+  };
+  return [...findings, ss];
+}
+
 /** Disposition is a PURE function of controllability + kind — the Brain card-41 rule as CODE (was prose).
  *  boilerplate → dropped (never a gate); already_satisfied → met; bidder_controls → gate-to-clear (do the
  *  work, never disqualifying / never a downgrade); bidder_cannot_move → disqualifying bar. */
