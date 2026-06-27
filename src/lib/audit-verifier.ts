@@ -79,6 +79,11 @@ export function makeStructuredSkeptic(
     "  a requirement the bidder could satisfy by doing the work (source/price/configure/document/submit) that was",
     "  labeled bidder_cannot_move; OR routine standard FAR boilerplate labeled as a gate; OR an already_satisfied/",
     "  cannot_move call the excerpt does not support. Uphold (upheld=true) when the classification is defensible.",
+    "BACKSTOP (Brain card-49) — OVERTURN any finding typed as a non-curable bar (bidder_cannot_move + curableInWindow=false)",
+    "that is actually: a plain Total Small Business set-aside (52.219-6 — the bidder's POOL, already_satisfied); a standard",
+    "self-cert rep (inverted-domestic-corp 52.209-10; telecom/security 52.240-91 / 252.204-7017-7018; EEO 52.222-36); or an",
+    "obtainable registration (SAM 52.204-7). These are NEVER structural bars. Reserve non-curable for sole-source-to-named-OEM,",
+    "a QPL/QML with lead>window, or an unobtainable clearance/facility cert.",
     "Rule on EVERY finding by its index. Be specific in each reason.",
   ].join(" ");
   const SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"], properties: { verdicts: { type: "array", items: {

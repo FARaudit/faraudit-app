@@ -33,6 +33,11 @@ const SHARED = [
   "(the qualification the firm must HOLD) AND curableInWindow — can a firm that lacks it obtain it within the",
   "response window? false = structural/non-curable (facility clearance lead-time, QPL listing, special tooling",
   "cert) — NEVER a soft caution; true = obtainable in time. Curability is a property of the GATE, not the bidder.",
+  "ELIGIBILITY/CERT TYPING (Brain card-49 doctrine — do NOT manufacture disqualifiers from standard provisions):",
+  "  • A PLAIN Total Small Business set-aside (52.219-6) = already_satisfied — it is the POOL the bidder competes in, NEVER a gate, never a downgrade (a 'self-cert small' reminder may ride as kind=submission/bidder_controls but NOT a bar).",
+  "  • A NARROWER socioeconomic set-aside (SDVOSB / WOSB / HUBZone / 8(a)) = bidder_cannot_move with requiredAttribute=setaside:<type> AND curableInWindow=true → a 'verify your firm holds this status' CAUTION; never a disqualifier under unknown status.",
+  "  • Standard self-cert REPS: inverted-domestic-corporation (52.209-10) = boilerplate; telecom/security (52.240-91, 252.204-7017/-7018) and EEO (52.222-36) = bidder_controls (comply-to-win). SURFACE genuine DFARS/security obligations as findings — but NEVER type them as bars.",
+  "  • Reserve bidder_cannot_move + curableInWindow=false (non-curable) for GENUINE structural bars ONLY: sole-source/brand-name to a NAMED OEM the bidder isn't; a QPL/QML the bidder isn't on with lead time > window; a clearance or facility cert (AS9100/NADCAP) lacking and unobtainable in the window. A standard set-aside or self-cert rep is NEVER this.",
   "Classify routine standard FAR boilerplate (EEO/DEI, standard commercial terms) as kind=boilerplate — NOT a gate.",
   "When every finding in your lane is grounded, call submit_findings. Do not invent requirements to look thorough.",
 ].join(" ");

@@ -59,6 +59,14 @@ eq("universal impossibility is a named show-stopper", deriveVerdict(inp(universa
 const universalElig = [f({ requirement: "set-aside category no firm can meet", kind: "eligibility_bar", controllability: "no_one_can_move" })];
 eq("universal eligibility impossibility → INELIGIBLE", deriveVerdict(inp(universalElig)).verdict, "INELIGIBLE");
 
+// ── Brain card-49 typing doctrine, locked at the decision layer (correct typing → correct verdict). ──
+// plain Total SB set-aside = already_satisfied (the pool) → NOT a gate → BID
+eq("Total SB set-aside (already_satisfied) → BID, never a bar", deriveVerdict(inp([f({ requirement: "Total Small Business Set-Aside 52.219-6", kind: "eligibility_bar", controllability: "already_satisfied" })])).verdict, "BID");
+// narrower socioeconomic set-aside = bidder_cannot_move + curable (verify status), null profile → CAUTION (never disqualifier)
+eq("socioeconomic set-aside (curable, verify status) → BID_WITH_CAUTION", deriveVerdict(inp([f({ requirement: "SDVOSB set-aside", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "setaside:sdvosb", curableInWindow: true })])).verdict, "BID_WITH_CAUTION");
+// standard self-cert rep = bidder_controls → gate to clear → BID
+eq("self-cert rep (bidder_controls) → BID", deriveVerdict(inp([f({ requirement: "telecom security rep 52.240-91", kind: "clause_flowdown", controllability: "bidder_controls" })])).verdict, "BID");
+
 // eligibility bar the firm provably FAILS (profile lacks the required NAICS) → INELIGIBLE
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
 eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
