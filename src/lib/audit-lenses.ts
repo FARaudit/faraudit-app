@@ -63,3 +63,33 @@ export const AUDIT_LENSES: ExpertSpec[] = [
 ];
 
 export const LENS_KEYS = AUDIT_LENSES.map((l) => l.key);
+
+// ── PERSONA-DIVERSITY QUALITY LAYER (Brain card 81, Step 3) ──────────────────────────────────────────
+// Quality layer, NOT load-bearing — Steps 1+2 (the deterministic sweep + temporal check) already GUARANTEE
+// the specific failing archetypes. This raises GENERAL coverage by giving each lens an EXCLUSIVE must-extract
+// ownership so the panel stops being homogeneous (the shared-miss root cause): every high-signal dimension
+// is OWNED by exactly one lens, and no two lenses share the same checklist. Edits the ENGINE LENS SPECS only
+// (the Card 81 #3 ratified source of truth) — NOT .claude/agents/ (that is Step 4). Flag default-OFF (Rule
+// 61): off ⇒ auditLenses() returns AUDIT_LENSES byte-identical.
+const MUST_EXTRACT: Record<string, string> = {
+  // personnel/qualification gates are OWNED HERE (no other lens covers them).
+  capture_strategist:
+    "PERSONA-DIVERSITY — YOUR EXCLUSIVE OWNERSHIP (no other lens covers these; never defer them): PERSONNEL & QUALIFICATION GATES. Systematically extract every (1) named-role minimum-experience requirement (e.g. 'Senior Conservators shall have a minimum of twenty (20) years'), (2) specialized professional certification/license required OF PERFORMING PERSONNEL (PE, RA, CIH, PMP, state-licensed), (3) QPL/QML membership requirement, (4) brand-name-or-equal / salient-characteristics qualification burden — IN ADDITION to your §C/SOW/§M technical+evaluation lane. Ground each verbatim. A demanding personnel qualification is a verify-status CAUTION, not a clean pass.",
+  // schedule/delivery FEASIBILITY is OWNED HERE.
+  former_ko:
+    "PERSONA-DIVERSITY — YOUR EXCLUSIVE OWNERSHIP (no other lens covers these; never defer them): SCHEDULE & DELIVERY FEASIBILITY. Systematically extract every (1) delivery window (e.g. 'deliver within 30 days ARO'), (2) First-Article/FAT precondition and whether it is non-waivable + its duration, (3) period-of-performance / start-by constraint, (4) any precondition-vs-deadline timing conflict where a mandatory step's duration could exceed the window — IN ADDITION to your evaluator-enforced show-stopper lane. When a non-waivable precondition's minimum duration exceeds the delivery window, that is a UNIVERSAL impossibility (no_one_can_move), not a bidder gate.",
+  contracts_attorney:
+    "PERSONA-DIVERSITY — YOUR EXCLUSIVE OWNERSHIP (no other lens covers these; never defer them): ELIGIBILITY, INCORPORATED CLAUSES & FLOW-DOWNS. Set-aside category, size standard, required certifications/clearances the firm must HOLD, SAM registration, FAR/DFARS flow-downs. Type each carefully per the eligibility doctrine above.",
+  pricing_analyst:
+    "PERSONA-DIVERSITY — YOUR EXCLUSIVE OWNERSHIP (no other lens covers these; never defer them): PRICING & CLIN STRUCTURE. Every CLIN/SLIN that must be priced, units, options, NTE/unbalanced-pricing rules, cost/accounting obligations.",
+  proposal_manager:
+    "PERSONA-DIVERSITY — YOUR EXCLUSIVE OWNERSHIP (no other lens covers these; never defer them): SUBMISSION MECHANICS. Required volumes, forms, page limits, formats, samples/brochures, Certificate of Conformance, due date/method, amendment acknowledgments.",
+};
+
+/** The lens panel, with persona-diversity applied when enabled (Brain card 81 Step 3). OFF (the default)
+ *  returns AUDIT_LENSES byte-identical. ON appends each lens's EXCLUSIVE must-extract ownership so coverage
+ *  is heterogeneous (no two lenses share a checklist). Pure. */
+export function auditLenses(opts?: { personaDiversity?: boolean }): ExpertSpec[] {
+  if (!opts?.personaDiversity) return AUDIT_LENSES; // Rule 61 default-off ⇒ byte-identical
+  return AUDIT_LENSES.map((l) => (MUST_EXTRACT[l.key] ? { ...l, system: `${l.system}\n\n${MUST_EXTRACT[l.key]}` } : l));
+}

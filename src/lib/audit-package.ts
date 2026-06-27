@@ -14,7 +14,7 @@ import { anthropic } from "./anthropic";
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
-import { AUDIT_LENSES } from "./audit-lenses";
+import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
 import type { AuditToolContext } from "./audit-tools";
@@ -59,7 +59,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
 
   return runAgenticAudit({
     ctx,
-    experts: input.experts ?? AUDIT_LENSES,
+    experts: input.experts ?? auditLenses({ personaDiversity: process.env.AUDIT_PERSONA_DIVERSITY === "true" }),
     callModel,
     verify,
     bidderProfile: input.bidderProfile ?? null,
