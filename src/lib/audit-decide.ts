@@ -11,7 +11,7 @@
 // NO LLM, NO network, NO randomness. Pure → gate-testable. The controllability rule (Brain card 41) is a
 // `switch` here, not prose in a prompt — that is the entire point.
 
-import type { VerdictInputs, TypedFinding, BidderProfile } from "./audit-findings";
+import type { VerdictInputs, TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -24,6 +24,42 @@ export interface Decision {
   dispositions: DecidedFinding[];      // every finding with its derived disposition
   showStoppers: DecidedFinding[];      // disqualifying bars the firm PROVABLY fails (the only NO_BID/INELIGIBLE drivers)
 }
+
+// ── LOGICAL show-stopper count (Brain card-53 ruling) ────────────────────────────────────────────────
+// maxShowStoppers counts DISTINCT LOGICAL BARS, not finding rows — a fact about the solicitation, not about
+// dedup plumbing ("one sole-source bar corroborated at C.14, CLIN-0001AA, L.6c" is ONE bar, three citations).
+// This is REPORT-QUALITY POLISH only: it runs DOWNSTREAM of deriveVerdict over the show-stopper set and
+// NEVER feeds back into deriveVerdict/firmStatus (the proven deterministic core is untouched).
+export interface LogicalShowStopper { requirement: string; controllability: Controllability; objectIds: string[]; citations: string[]; findings: DecidedFinding[]; }
+
+/** Distinctive object identifiers in a string: tokens ≥4 chars carrying BOTH a letter and a digit (part
+ *  numbers / CAGE codes like DGMT1002, 1PN61) — the strongest "same named object" signal. */
+function objectIdsOf(f: DecidedFinding): Set<string> {
+  const out = new Set<string>();
+  for (const src of [f.requiredAttribute, f.requirement, f.excerpt]) {
+    for (const tok of (src || "").toLowerCase().split(/[^a-z0-9]+/))
+      if (tok.length >= 4 && /[a-z]/.test(tok) && /[0-9]/.test(tok)) out.add(tok);
+  }
+  return out;
+}
+
+/** Collapse show-stoppers that refer to the SAME underlying restriction — CONSERVATIVE merge key (Brain
+ *  card-53): same controllability AND a shared distinctive object identifier. NOT an OR over section-cite or
+ *  loose tokens (two distinct bars can share a section or the word "OEM" by coincidence). When in doubt — no
+ *  shared distinctive object — DO NOT merge (preserves the over-fire signal). All citations are retained. */
+export function logicalShowStoppers(showStoppers: DecidedFinding[]): LogicalShowStopper[] {
+  const groups: Array<{ controllability: Controllability; ids: Set<string>; findings: DecidedFinding[] }> = [];
+  for (const f of showStoppers) {
+    const ids = objectIdsOf(f);
+    const g = ids.size ? groups.find((g) => g.controllability === f.controllability && [...ids].some((i) => g.ids.has(i))) : undefined;
+    if (g) { ids.forEach((i) => g.ids.add(i)); g.findings.push(f); }
+    else groups.push({ controllability: f.controllability, ids: new Set(ids), findings: [f] });
+  }
+  return groups.map((g) => ({ requirement: g.findings[0].requirement, controllability: g.controllability, objectIds: [...g.ids], citations: g.findings.map((f) => f.citation), findings: g.findings }));
+}
+
+/** The graduation-graded count: distinct logical bars (Brain card-53). */
+export function logicalShowStopperCount(showStoppers: DecidedFinding[]): number { return logicalShowStoppers(showStoppers).length; }
 
 /** Disposition is a PURE function of controllability + kind — the Brain card-41 rule as CODE (was prose).
  *  boilerplate → dropped (never a gate); already_satisfied → met; bidder_controls → gate-to-clear (do the
