@@ -1,0 +1,53 @@
+{
+  "_comment": "GOLD-SET REGISTRY — single source of truth for which key is LIVE per sol (sol -> active_version + key_type). Nothing else guesses liveness. Authored by Code per Brain card-64 Q2 (whole-set registry). key_type enum = {full_verdict, oos_detection}. Construction packages are oos_detection (engine honest-fails OUT_OF_SCOPE, no verdict); discrete supply/repair/services are full_verdict.",
+  "schemaVersion": "1.0",
+  "authoredBy": "Code (per Brain cards 64/66/68, 2026-06-26)",
+  "authoredAt": "2026-06-26",
+  "keyTypeEnum": ["full_verdict", "oos_detection"],
+  "keys": {
+    "N4008526R0065": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "CAUTION",
+      "file": "N4008526R0065.judgment.frozen.json"
+    },
+    "1240LP26Q0067": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "BID",
+      "file": "1240LP26Q0067.judgment.frozen.json"
+    },
+    "SPRDL125Q0030": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "INELIGIBLE",
+      "file": "SPRDL125Q0030.judgment.frozen.json"
+    },
+    "AOCSSB26R0023": {
+      "active_version": "v2",
+      "key_type": "full_verdict",
+      "pole": "CAUTION",
+      "file": "AOCSSB26R0023.judgment.frozen.v2.json",
+      "supersedes": {
+        "file": "AOCSSB26R0023.judgment.frozen.json",
+        "key_type": "full_verdict",
+        "status": "retired",
+        "retired_sha256": "9e39ce4c617c747dc7fc019a424a79d3bee583d7a9f29ba7e1d886631a4545f7",
+        "reason": "partial source; restored to full_verdict CAUTION against certified-complete source per #4 in-scope ruling 2026-06-26 (cards 66/68); supersedes the brief card-64 construction reclassification. Caution basis source-corrected per card 67 (Davis-Bacon reason refuted by source)."
+      }
+    },
+    "FA667024R0001": {
+      "active_version": "v2",
+      "key_type": "oos_detection",
+      "file": "FA667024R0001.judgment.frozen.v2.json",
+      "supersedes": {
+        "file": "FA667024R0001.judgment.frozen.json",
+        "key_type": "full_verdict",
+        "status": "retired",
+        "retired_sha256": "86b4331350d6916ca27a51bced9604c319ae5ce7b110019b638fc5de26cc7b26",
+        "reason": "reclassified full_verdict->oos_detection per construction honest-fail ruling 2026-06-26; old key retired in place, byte-identical, content untouched"
+      }
+    }
+  },
+  "held": {}
+}

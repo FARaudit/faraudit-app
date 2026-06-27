@@ -4,6 +4,7 @@
   "lockedAt": "2026-06-26",
   "relayedBy": "CEO",
   "revisedBy": "Brain (Option A ruling, 2026-06-26) — see _BAR-CHANGE-LOG.md 2026-06-26 entry",
+  "amendedBy": "Brain cards 64/66/68 + CEO carve-out-kill confirm (2026-06-26, PRE-SCORED) — see _BAR-CHANGE-LOG.md '2026-06-26 — Carve-out KILLED + #4/#5 reclassified' entry for before-state + attestation",
   "perPackage": {
     "hardFail_anyOne": [
       "fabrication: any raised clause absent from source",
@@ -18,10 +19,12 @@
     ]
   },
   "graduationBar_across5": {
-    "minimumPass": "4 of 5",
-    "mustPass_noCarveOut": ["1240LP26Q0067", "SPRDL125Q0030", "FA667024R0001"],
-    "carveOutCandidates": ["N4008526R0065", "AOCSSB26R0023"],
-    "note": "#2 BID-clean anchor + #3 INELIGIBLE fire + #5 bond-inversion MUST pass. The single allowed carve-out (if needed to reach 4/5) may only be #1 or #4."
+    "minimumPass": "ALL in-scope full_verdict pass (ZERO-miss) AND all oos_detection fire (ZERO-miss) — NO carve-out",
+    "inScope_fullVerdict_mustPass": ["N4008526R0065", "1240LP26Q0067", "SPRDL125Q0030", "AOCSSB26R0023"],
+    "oosDetection_mustFire": ["FA667024R0001"],
+    "carveOut": "NONE — killed by CEO 2026-06-26",
+    "note": "Carve-out KILLED (CEO confirmed). Graduation = every in-scope full_verdict key passes (#1 CAUTION, #2 BID, #3 INELIGIBLE, #4 CAUTION-services) AND the oos_detection set honest-fails OUT_OF_SCOPE (#5 construction). #5 reclassified from a bond-inversion verdict key to construction oos_detection; #4 restored as an in-scope services CAUTION key (refills the pole #5 vacated). Pre-scored amendment — see _BAR-CHANGE-LOG.md for before-state + attestation.",
+    "supersedes_note": "Prior bar was '4 of 5, mustPass {#2,#3,#5}, carveOut {#1,#4}'. The old '#5 bond-inversion MUST pass' expectation is VOID (#5 is construction → oos_detection)."
   },
   "scorerAlignmentNote": "Brain Option A (2026-06-26): scoreJudgment now hard-fails named gates on CONCEPT-PRESENCE (jr.namedGates[].surfaced) — disposition is advisory (jr.dispositionAdvisories). jr.failures already excludes disposition + (in the report filter) PART + show-stopper. Hard bar = fabrication + decoy + verdict + concept-presence miss. Keys re-frozen at schemaVersion 0.3-concept-presence (judgment content unchanged; mechanical bump only — Code did not re-author)."
 }

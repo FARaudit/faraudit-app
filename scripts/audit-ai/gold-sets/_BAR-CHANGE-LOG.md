@@ -86,3 +86,21 @@ Reconciliation (card 57) revealed #4/#5 were authored against INCOMPLETE source.
 **GATE PROMOTED:** manifest-reconciliation is now a PRE-FREEZE gate (no key freezes until manifest-reconciled). PRODUCTION: the engine caps any BID/CAUTION at INCOMPLETE when a manifest-named attachment went unfetched (a "no bar found" verdict on a package you didn't fully read is the §C failure with a clean label). INELIGIBLE/NO_BID are NOT capped (bar-found is robust).
 
 **CAUTION-CLASS GRADUATION:** #1 (33/33 verified) is the only valid caution anchor now; "one package graduates nothing" → caution-class graduation requires #1 + ≥1 re-sourced anchor. #1 can run for SIGNAL on the knife-edge gate.
+
+## 2026-06-26 — Carve-out KILLED + #4/#5 reclassified (Brain cards 64/66/68 · CEO carve-out-kill confirmed · pre-scored)
+
+**Pre-scored attestation:** this amendment is made BEFORE any paid run scored ANY key (balance ~$84, zero paid grading runs against the v2 keys). It is driven by source/scope FINDINGS (not by seeing results) → it does NOT recreate the gold-recall circularity. Authored by Code; doctrine by Brain; carve-out kill confirmed by CEO 2026-06-26.
+
+**BEFORE-STATE (snapshot of `graduationBar_across5` prior to this edit):**
+```json
+{
+  "minimumPass": "4 of 5",
+  "mustPass_noCarveOut": ["1240LP26Q0067", "SPRDL125Q0030", "FA667024R0001"],
+  "carveOutCandidates": ["N4008526R0065", "AOCSSB26R0023"],
+  "note": "#2 BID-clean anchor + #3 INELIGIBLE fire + #5 bond-inversion MUST pass. The single allowed carve-out (if needed to reach 4/5) may only be #1 or #4."
+}
+```
+
+**WHY:** (1) #5 FA667024R0001 is a TRUE construction procurement (NAICS 236220 + SF-1442) → reclassified to **oos_detection** (engine honest-fails OUT_OF_SCOPE before any paid call; the "bond-inversion MUST pass" verdict expectation was authored on the pre-spec partial source and is void). (2) #4 AOCSSB26R0023 is NOT construction — its source classifies it NAICS **541990 professional services** ("does NOT establish a set-aside") → restored as an **in-scope full_verdict CAUTION** key (v2), refilling the CAUTION verdict pole #5 vacated. Its caution basis was source-corrected (card 67): Davis-Bacon AND SCA are both explicitly NOT applicable → wage-determination is a must-NOT-raise decoy, not a caution. (3) CEO **killed the carve-out**: no in-scope key may be carved out to reach the bar.
+
+**AFTER-STATE:** in-scope full_verdict mustPass = {N4008526R0065, 1240LP26Q0067, SPRDL125Q0030, AOCSSB26R0023}, ZERO-miss · oos_detection mustFire = {FA667024R0001}, ZERO-miss · **no carve-out**.

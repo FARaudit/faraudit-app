@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "oos-detection-1.0",
+  "packageId": "FA667024R0001",
+  "_title": "USAF Repair Roof Bldg. 917 — CONSTRUCTION (FAR Part 36) — out-of-scope detection key",
+  "_suiteRole": "OUT-OF-SCOPE DETECTION anchor. The engine's domain is discrete-document supply/repair/services; construction is the known structural-incompatibility class. This key asserts the engine DETECTS construction and HONEST-FAILS (OUT_OF_SCOPE) BEFORE any paid model call — never a verdict. Authored objectively from the complete source per Brain construction ruling 2026-06-26; supersedes the retired full_verdict key (authored against an incomplete 221KB source, sha 42c65df6…, which never saw the 459-page Specification).",
+  "key_type": "oos_detection",
+  "expected_outcome": "OUT_OF_SCOPE",
+  "expected_reason": "out_of_scope:construction",
+  "grade_pass_iff": "engine emits outcome==OUT_OF_SCOPE AND reason=='out_of_scope:construction' AND cites >=1 matched construction signal, BEFORE any paid model call (no charge)",
+  "grade_fail_subtypes": [
+    "law_violation: any substantive verdict emitted (BID / BID_WITH_CAUTION / NO_BID / INELIGIBLE) on a construction package",
+    "under_fire_safe_backstop: honest-fail with a NON-construction reason (e.g. INCOMPLETE / NEEDS_HUMAN_REVIEW) — safe (no false verdict) but missed the construction class"
+  ],
+  "construction_indicators": {
+    "_note": "OBJECTIVE signals cited from the complete source — these are detection signals, NOT a verdict (Rule 64).",
+    "hard": [
+      {
+        "signal": "NAICS sector 23 (construction)",
+        "value": "236220",
+        "meaning": "Commercial and Institutional Building Construction",
+        "cited_from": "complete source — primary NAICS for the requirement"
+      },
+      {
+        "signal": "SF-1442 construction solicitation form",
+        "evidence": ["Standard Form 1442", "Solicitation/Offer/Award (Construction…)"],
+        "cited_from": "complete source — construction counterpart to SF-1449 (commercial)"
+      }
+    ],
+    "boundary_corroborating": [
+      {
+        "signal": "Davis-Bacon construction wage standard",
+        "evidence": ["Davis Bacon", "Construction Wage Rate (FAR 52.222-6)"],
+        "cited_from": "complete source"
+      },
+      {
+        "signal": "CSI MasterFormat multi-division specification + drawings",
+        "evidence": ["SECTION 01 33 00", "SECTION 01 42 00", "SECTION 07 41 63 (roofing, Division 07)"],
+        "cited_from": "complete source — 459-page Specification, multiple MasterFormat sections"
+      }
+    ],
+    "detector_tier_fired": "hard (NAICS-23 and/or SF-1442 — either alone is sufficient)"
+  },
+  "source_sha256": "0edae7532296fb5359fb288f26c7bbae40696cea416e583a927314567aea84e9",
+  "source_bytes": 1295733,
+  "source_completeness": "certified-complete",
+  "supersedes": {
+    "path": "scripts/audit-ai/gold-sets/FA667024R0001.judgment.frozen.json",
+    "source_sha256": "42c65df66c682e503239764fcdc04f73d87247742f8b8c0baa058af5d06e869b",
+    "reason": "partial source; reclassified full_verdict->oos_detection per construction honest-fail ruling 2026-06-26"
+  },
+  "adjudication": {
+    "authoredBy": "Code (objective signals only — no verdict, no judgment)",
+    "authoredAt": "2026-06-26",
+    "rulingRef": "Brain construction ruling 2026-06-26 (cards 62/64)"
+  }
+}
