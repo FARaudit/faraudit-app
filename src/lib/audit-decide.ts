@@ -236,8 +236,13 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
     if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(hay) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
       return { ...f, controllability: "bidder_controls", awardBasisGuard: true }; // (a) award basis is never a universal bar
-    if (profile === null && f.controllability === "already_satisfied" && SOCIOECONOMIC_SETASIDE_RE.test(hay))
-      return { ...f, cautionFloor: true, awardBasisGuard: true };                  // (b) unverified socioeconomic eligibility → caution
+    // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
+    //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
+    //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b
+    //     (non-curable bar) cannot pre-empt the caution branch. NOT a universal bar (excluded above), NOT a Total-SB pool
+    //     (regex), and NOT touched when a real profile is loaded (then firmStatus governs → satisfies/fails as appropriate).
+    if (profile === null && SOCIOECONOMIC_SETASIDE_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
+      return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
     return f;
   });
 }
