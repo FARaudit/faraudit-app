@@ -179,7 +179,11 @@ export interface ChiefJudgeOutput {
   // SEE all required content (sections dropped/unrouted), so NO eligibility/bid determination was made.
   // Distinct from INELIGIBLE (a substantive "cannot compete" finding) and NEEDS_HUMAN_REVIEW (verified
   // conflict) — Brain ruling 2026-06-25: mislabeling unread-content as INELIGIBLE is worse than honest-fail.
-  verdict: "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
+  // OUT_OF_SCOPE is a DETERMINISTIC pre-panel short-circuit (code-set, never model-emitted, no paid call):
+  // the package is outside the engine's discrete-document supply/repair/services domain (construction —
+  // detected by detectConstructionOutOfScope). The engine HONEST-FAILS rather than render a degraded
+  // verdict it isn't designed for, and the customer is NOT charged (Brain construction ruling 2026-06-26).
+  verdict: "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE" | "OUT_OF_SCOPE";
   fit_score: number; rationale: string;
   show_stoppers: Array<{ finding: string; source_lens: string; claim_ref: string }>;
   preserved_dissent: string[]; eligible: boolean;
