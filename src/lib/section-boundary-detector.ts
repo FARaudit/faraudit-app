@@ -146,6 +146,13 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     for (const pat of UCF_HEADER_PATTERNS) {
       const m = pat.exec(line);
       if (m && m[1]) {
+        // CANDIDATE #1 (Brain card 104/105) — UCF UPPERCASE GUARD, flag-gated DEFAULT-OFF (Rule 61). The generic
+        // pattern #0 (/^SECTION\s+([A-M])\b/im) is case-INSENSITIVE on the captured letter, so a CBA/attachment's
+        // internal "Section l" (Article §1 — the numeral "1" rendered as a lowercase "l") false-matches as a §L
+        // boundary and (with equal high confidence + lower line) beats the REAL "Section L" header in dedup. Reject
+        // a LOWERCASE captured letter on pattern #0 only; uppercase "SECTION L"/"Section L" still matches. Patterns
+        // #1 (dash/colon) and #2 (PART I) are untouched. Flag OFF ⇒ behavior is byte-identical to the prior detector.
+        if (process.env.AUDIT_UCF_UPPERCASE_GUARD === "true" && pat === UCF_HEADER_PATTERNS[0] && !/[A-M]/.test(m[1])) continue;
         const key = m[1].toUpperCase();
         if (UCF_SECTIONS[key]) {
           boundaries.push({ key, lineIdx: i, confidence: "high", matchedPattern: pat.source });
