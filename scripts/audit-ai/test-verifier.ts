@@ -62,6 +62,17 @@ async function main() {
   await tiered(ctx, [grounded]);
   ok("no contested findings → escalation NOT called (no Opus spend)", escCalls, 0);
 
+  // (6) KNIFE-EDGE escalation (Brain card-49/§4): a verdict-decisive bar escalates to Opus even when the
+  // base skeptic UPHOLDS it — the BID↔CAUTION/CAUTION↔NO_BID driver always gets the second opinion.
+  let ke = -1;
+  const upholdAll2: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: true, reason: "base ok" }));
+  const escTrack: SkepticFn = async (_c, fs) => { ke = fs.length; return fs.map((_x, i) => ({ index: i, upheld: true, reason: "opus" })); };
+  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded, misclassified]); // grounded=bidder_controls, misclassified=bidder_cannot_move
+  ok("knife-edge: disqualifying bar escalates to Opus even when base upholds it", ke, 1);
+  ke = -1;
+  await makeTieredSkeptic(upholdAll2, escTrack)(ctx, [grounded]); // pure bidder_controls, base upholds → nothing decisive
+  ok("no bar + no overturn → no Opus spend (knife-edge bounded)", ke, -1);
+
   console.log(`verifier gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }
   console.log("✅ ALL PASS — re-grounding + adversarial overturn + honest-fail on incomplete/failed challenge.");

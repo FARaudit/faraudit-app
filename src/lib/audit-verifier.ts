@@ -51,11 +51,21 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
  *  high-stakes call) — are re-judged by the ESCALATION skeptic (Opus). Opus is spent only where the verdict is
  *  contested, never on the easy majority. Cost-bounded: at most one extra call, over the contested subset.
  *  (Knife-edge verdict-level escalation — BID↔CAUTION etc. — is a follow-on; this triggers on skeptic-overturn.) */
+/** A finding sits on a verdict KNIFE-EDGE iff its classification, if wrong, would move the verdict off BID —
+ *  i.e. it is typed as a disqualifying bar (bidder_cannot_move / no_one_can_move). These are the BID↔CAUTION /
+ *  CAUTION↔NO_BID / →INELIGIBLE drivers (Brain card-44 §4 / card-49); everything else (bidder_controls /
+ *  already_satisfied / boilerplate) can only ever clear, so it is never knife-edge. */
+function isKnifeEdge(f: TypedFinding): boolean {
+  return f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move";
+}
+
 export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): SkepticFn {
   return async (ctx, findings) => {
     const baseVerdicts = await base(ctx, findings);
-    const contestedIdx = baseVerdicts.filter((v) => !v.upheld).map((v) => v.index); // overturns = the consequential calls
-    if (!contestedIdx.length) return baseVerdicts;                                   // no disagreement → no Opus spend
+    const overturned = baseVerdicts.filter((v) => !v.upheld).map((v) => v.index);     // base wants to overturn
+    const knifeEdge = findings.map((f, i) => [f, i] as const).filter(([f]) => isKnifeEdge(f)).map(([, i]) => i); // verdict-decisive bars
+    const contestedIdx = [...new Set([...overturned, ...knifeEdge])].sort((a, b) => a - b); // Opus reviews both, ONLY these
+    if (!contestedIdx.length) return baseVerdicts;                                   // nothing contested/decisive → no Opus spend
     const contested = contestedIdx.map((i) => findings[i]).filter(Boolean);
     const escVerdicts = await escalate(ctx, contested);                             // Opus re-judges ONLY the contested subset
     const escByOrig = new Map<number, SkepticVerdict>();
