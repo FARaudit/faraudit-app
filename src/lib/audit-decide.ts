@@ -175,6 +175,41 @@ export function applyCautionFloor(findings: TypedFinding[], opts?: { enabled?: b
   });
 }
 
+// ── PRECONDITION OVER-TYPE FLOOR (Brain card 92 — Option 1 deterministic guard) ───────────────────────
+// Override-slot guard (same layer as caution-floor, BEFORE deriveVerdict; deriveVerdict UNTOUCHED). A
+// time-curable PRECONDITION (first-article/FAT, source-approval, qualification-testing) is NOT a universal
+// bar — every bidder can perform it; it becomes universal ONLY when its minimum duration EXCEEDS the
+// delivery window, which the deterministic `temporal_conflict` finding DERIVES. A lens that types the BARE
+// precondition `no_one_can_move` — with NO window/duration conflict co-stated in its four corners — has
+// OVER-typed it (a false NO_BID on a feasible package). This guard re-types that finding to
+// `bidder_controls`. It NEVER mutates the `temporal_conflict` finding (the real, derived impossibility),
+// NEVER a structural bar (sole-source/QPL/clearance), and NEVER a finding that co-states a window/duration
+// conflict. Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte (legacy preserved).
+const PRECONDITION_BASIS_RE = /\bfirst[-\s]?article\b|\bFAT\b|source approval|qualification testing|qualification test\b|pre[-\s]?production (?:test|approval|qualification)/i;
+const STRUCTURAL_BAR_RE = /\bsole[-\s]?source\b|named (?:OEM|manufacturer|brand|source)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|security clearance|facility (?:clearance|security|certification)|unobtainable|exclusive (?:license|distributor|dealer)|single authorized/i;
+// A window/duration conflict CO-STATED in the finding's four corners (an ARO/delivery-window duration, or an
+// explicit impossibility phrase). GENEROUS by design — when a conflict is co-stated the guard MUST NOT fire
+// (a real universal bar must never be downgraded → that would re-arm the false BID). A bare precondition
+// finding ("FAT is non-waivable") carries none of these.
+const WINDOW_CONFLICT_RE = /\bARO\b|after receipt of order|delivery within\b|\b\d+[-\s]?day\s+(?:delivery|production|performance)\b|cannot (?:complete|be met|deliver|comply)|no bidder can|universal(?:ly)?\s+(?:impossib|unmeetable|delivery)|exceeds?\b[^.]{0,40}\bwindow|inside\b[^.]{0,40}\bwindow|longer than\b[^.]{0,40}\bwindow/i;
+
+/** Re-type a precondition mis-typed `no_one_can_move` → `bidder_controls` (Brain card 92). Pure → gate-tested.
+ *  FIRES only on a `no_one_can_move` finding whose basis is a time-curable precondition AND which is neither
+ *  the derived `temporal_conflict` finding, nor a structural bar, nor co-states a window/duration conflict.
+ *  Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged (legacy bug preserved)
+  return findings.map((f) => {
+    if (f.controllability !== "no_one_can_move") return f;        // only over-typed universals are candidates
+    if (f.lens === "temporal_conflict") return f;                 // NEVER mutate the derived conflict
+    const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+    if (!PRECONDITION_BASIS_RE.test(hay)) return f;               // not a precondition basis
+    if (STRUCTURAL_BAR_RE.test(hay)) return f;                    // genuine structural bar → leave universal
+    if (WINDOW_CONFLICT_RE.test(hay)) return f;                   // co-states a window conflict → leave universal
+    return { ...f, controllability: "bidder_controls", preconditionOvertypeFloored: true };
+  });
+}
+
 // ── CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81, Step 2) ──────────────────────────────────────
 // Pure, no-model. Consumes the sweep-grounded `fat_precondition` + `delivery_window` findings (Step 1) and
 // detects a UNIVERSAL impossibility: a NON-WAIVABLE First-Article precondition whose minimum duration

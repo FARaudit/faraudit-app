@@ -14,7 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -186,6 +186,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
+
+  // P4.4 — PRECONDITION OVER-TYPE FLOOR (Brain card 92), default-OFF (Rule 61). Re-types a time-curable
+  //      precondition (FAT/source-approval/qualification-testing) that a lens mis-typed no_one_can_move with
+  //      NO co-stated window conflict → bidder_controls, so a feasible precondition with an adequate window is
+  //      not a false universal NO_BID. NEVER touches the temporal_conflict finding or structural bars. Runs
+  //      BEFORE caution-floor; deriveVerdict untouched. Flag off ⇒ findings pass through unchanged.
+  findings = applyPreconditionOvertypeFloor(findings, { enabled: process.env.AUDIT_PRECONDITION_OVERTYPE_FLOOR === "true" });
 
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)

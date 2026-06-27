@@ -61,6 +61,11 @@ export interface TypedFinding {
   // delivery_window | qpl | or_equal) so Step 2 (cross-clause temporal-conflict check) can consume the
   // FAT + delivery findings deterministically.
   sweepArchetype?: string;
+  // PRECONDITION OVER-TYPE FLOOR (Brain card 92) — set when the deterministic guard re-typed a
+  // time-curable precondition (FAT/source-approval/qualification-testing) that a lens had mis-typed
+  // no_one_can_move with NO co-stated window conflict → bidder_controls (so a feasible precondition is
+  // not a false universal bar). Marker only; deriveVerdict reads controllability, not this field.
+  preconditionOvertypeFloored?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,
