@@ -13,6 +13,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/audit-executor";
+import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
+import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { isAnthropicTransient } from "@/lib/anthropic-files";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
@@ -589,6 +591,22 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     }
   }
 
+  // N5 — the auditing firm's capability profile (open-world; socioeconomic certs only).
+  // Mirror the sync route so the eligibility lane fires on the ASYNC/worker path too
+  // (else N5 is inert whenever AUDIT_ASYNC_ENQUEUE is the live path). Only when the
+  // agentic primary owns the report; best-effort → null (unknown firm) on any error.
+  let bidderProfile = null;
+  if (AGENTIC_V3_PRIMARY_ENABLED && row.user_id) {
+    try {
+      const { data: capRow } = await supabase
+        .from("capability_statements")
+        .select("certifications")
+        .eq("user_id", row.user_id)
+        .maybeSingle();
+      bidderProfile = buildBidderProfileFromCapability(capRow);
+    } catch { /* unknown firm on any error — never block the audit */ }
+  }
+
   return {
     solicitation,
     agency: row.agency,
@@ -603,7 +621,8 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
     pdfUnavailableReason,
     attachmentPdfs,
     primaryDocName,
-    ingestion
+    ingestion,
+    bidderProfile
   };
 }
 

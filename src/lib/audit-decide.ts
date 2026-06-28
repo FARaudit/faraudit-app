@@ -224,7 +224,13 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
 //       over-caution). With a known profile (non-null) the existing firmStatus path governs.
 // Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
 const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation methodology|basis (?:for|of) award|source selection|screened (?:by|for) price|\bbest value\b|trade.?off|non-price factor|evaluation factor|technically acceptable|proposals?(?: will| are)? (?:initially )?(?:be )?screened/i;
-const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery/i;
+// Exclusion for the award-basis (a) downgrade: a no_one_can_move finding is NOT an
+// award-basis artifact — and must NEVER be downgraded to bidder_controls — when ANY
+// genuine impossibility/structural language is present, even if an LPTA/evaluation phrase
+// also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
+// real universal show-stopper). Covers delivery/precondition impossibility AND supply/
+// sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
+const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
@@ -241,7 +247,12 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b
     //     (non-curable bar) cannot pre-empt the caution branch. NOT a universal bar (excluded above), NOT a Total-SB pool
     //     (regex), and NOT touched when a real profile is loaded (then firmStatus governs → satisfies/fails as appropriate).
-    if (profile === null && SOCIOECONOMIC_SETASIDE_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
+    // OPEN-WORLD (self-asserted capability statement) is treated like NULL here: it is a
+    // mostly-unknown profile, so the same socioeconomic over-type normalization applies (a
+    // firm WITH a profile must not lose this protection and get a worse verdict than an
+    // unknown firm — panel B-3). A held cert still softens the set-aside to a curable caution
+    // (conservative for self-asserted data); firmStatus governs only CLOSED-WORLD profiles.
+    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
     return f;
   });
@@ -265,7 +276,11 @@ const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8
  *  only if it is a recognized structural impossibility; a clearly compliance/representation item → caution; an
  *  unrecognized one is LEFT (→ human review), never silently BID. Pure → gate-tested. Flag-gated; OFF ⇒ unchanged. */
 export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
-  if (!opts?.enabled || profile !== null) return findings; // OFF, or a real profile loaded ⇒ firmStatus governs (unchanged)
+  // Apply under a NULL profile OR an OPEN-WORLD (self-asserted) profile — both are
+  // mostly-unknown, so the over-type whitelist must still fire (panel B-3: a firm with a
+  // capability statement must not bypass this protection). Skip ONLY for a CLOSED-WORLD
+  // (trusted/complete) profile, where firmStatus genuinely governs.
+  if (!opts?.enabled || (profile !== null && !profile.openWorld)) return findings;
   return findings.map((f) => {
     if (f.controllability !== "bidder_cannot_move" || f.curableInWindow !== false) return f; // only non-curable bars
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
@@ -356,7 +371,13 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
 // standard"). The set-aside token must not let a firm silently erase the structural/size
 // dimension bundled into the same bar (panel Finding 2). Such a bar falls through to
 // "unknown" → human review, never a canonical self-clear.
-const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|incumbent\b|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|affiliat|annual receipts|average annual|\bemployees\b/i;
+// PRECISE discriminators only (panel A2-1/A2-2): each term unambiguously marks a
+// structural / sole-source / SIZE-STANDARD bar — NOT incidental prose. Bare tokens that
+// over-blocked legitimate pure set-asides (incumbent / employees / affiliat / "average
+// annual") were dropped in favor of size-specific phrases, so a pure 8(a)/SDVOSB set-aside
+// still self-clears, while "8(a) AND small (business) under NAICS / size standard / N
+// employees / annual receipts" does not.
+const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
 
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
