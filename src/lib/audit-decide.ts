@@ -230,7 +230,7 @@ const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation 
 // also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
 // real universal show-stopper). Covers delivery/precondition impossibility AND supply/
 // sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
-const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b/i;
+const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
@@ -240,8 +240,15 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
-    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(hay) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
-      return { ...f, controllability: "bidder_controls", awardBasisGuard: true }; // (a) award basis is never a universal bar
+    // (a) award basis is never a universal bar. ROBUST altitude (panel B-1 + re-verify): the
+    // award-basis trigger matches the REQUIREMENT (the lens's own characterization of WHAT the
+    // bar is) — NOT the verbatim excerpt, which can incidentally quote LPTA/best-value language
+    // while describing a genuine supply/structural impossibility. The impossibility exclusion is
+    // kept on requirement+excerpt as belt-and-suspenders. So a real impossibility (proprietary /
+    // sole-source / discontinued / capacity) is never downgraded by an excerpt coincidence; only
+    // a finding the lens itself typed as an evaluation-methodology bar is.
+    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
+      return { ...f, controllability: "bidder_controls", awardBasisGuard: true };
     // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
     //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
     //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b

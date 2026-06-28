@@ -29,6 +29,13 @@ eq("B1 · supply impossibility w/ LPTA-in-excerpt → NOT downgraded (stays no_o
 const soleSourceImposs = tf({ requirement: "sole source to the named OEM", excerpt: "...evaluated using best value trade-off and non-price factors...", controllability: "no_one_can_move", lens: "ko" });
 eq("B1 · sole-source impossibility w/ best-value-in-excerpt → NOT downgraded",
   applyAwardBasisOvertypeGuard([soleSourceImposs], null, ON)[0].controllability, "no_one_can_move");
+// Re-verifier residual: SYNONYM impossibilities (proprietary data / TDP / no-other-firm) must also resist.
+const proprietaryImposs = tf({ requirement: "item is proprietary; the technical data package is restricted and no other firm can produce a conforming unit", excerpt: "Award on a lowest price technically acceptable basis; evaluation factor is price.", controllability: "no_one_can_move", lens: "ko" });
+eq("B1 · proprietary/TDP impossibility w/ LPTA-in-excerpt → NOT downgraded (synonym class)",
+  applyAwardBasisOvertypeGuard([proprietaryImposs], null, ON)[0].controllability, "no_one_can_move");
+const capacityImposs = tf({ requirement: "required quantity exceeds total industry production capacity within the period", excerpt: "best value trade-off among non-price factors", controllability: "no_one_can_move", lens: "ko" });
+eq("B1 · capacity-exceeded impossibility w/ best-value-in-excerpt → NOT downgraded",
+  applyAwardBasisOvertypeGuard([capacityImposs], null, ON)[0].controllability, "no_one_can_move");
 // Gold-preserving: a GENUINE award-basis mis-type (requirement IS the methodology) still downgrades.
 const realAwardBasis = tf({ requirement: "award on a lowest price technically acceptable (LPTA) evaluation methodology", excerpt: "The Government will award to the LPTA offeror.", controllability: "no_one_can_move", lens: "ko" });
 eq("B1 · genuine LPTA award-basis mis-type → still downgraded (gold preserved)",
