@@ -5,6 +5,7 @@ import { fetchAttachmentManifest, classifySectionRoles, planDocumentOrder, type 
 import { extractText } from "@/lib/pdf-text-extractor";
 import { detectSections } from "@/lib/section-boundary-detector";
 import { anthropic } from "@/lib/anthropic";
+import { samFetchWithKey } from "@/lib/sam-url-guard";
 
 // Synchronous resolve+manifest endpoint backing the Run Audit front door
 // (fix/run-audit-frontdoor-static). It answers ONE question — "what does the
@@ -18,6 +19,12 @@ import { anthropic } from "@/lib/anthropic";
 // invented docs / counts / agency / coverage. SAM unreachable → sam_unavailable.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// The synchronous door does at most: SAM search + manifest + ONE primary-doc
+// download+parse. A cold function + SAM latency on a combined RFP can approach
+// the inner 20s download budget below; give the function room above it so a slow
+// combined-body read completes (and shows §C/§L/§M present) instead of being cut
+// off and falling back to the conservative "unverified" state.
+export const maxDuration = 30;
 
 // Mirror the manifest/search timeout budget already used across sam.ts (15s on
 // the search) + sam-attachments.ts (30s on the manifest). The handler does at
@@ -49,13 +56,16 @@ function fail(reason: string, status: number): NextResponse {
 // whole resolve stays within a few seconds. On ANY failure (cap / timeout /
 // not-a-PDF / image-only / parse failure) we return null and the caller falls
 // back to the prior, honest name-based coverage — never hang, never error.
-// P1-e (2026-06-21): raised 8s → 13s. On N4008526R0065 the §L/§M sections live
-// INLINE in the 2.57MB conformed-solicitation body; if the download+extract of a
-// large combined RFP exceeds the timeout, content-detection returns null and we
-// fall back to name-based coverage — which can't see inline sections, so the front
-// door falsely reported "§L/§M not in posted package." 13s gives a real combined
-// body time to download+parse while still bounding the synchronous resolve wait.
-const PRIMARY_DOWNLOAD_TIMEOUT_MS = 13000;
+// Raised 8s → 13s → 20s. On combined RFPs the §C/§L/§M sections live INLINE in
+// the solicitation body; if the download+extract exceeds the timeout, content
+// detection returns null and the door falls back to the conservative "unverified"
+// state — which previously surfaced to the customer as a false "package partially
+// retrieved." A 13s budget proved too tight on a cold serverless function + SAM
+// latency (1240LP26Q0067, a 570KB/14-page combined RFQ that reads fine offline),
+// so it now gets 20s (under the 30s maxDuration ceiling above). Even on a timeout
+// the door no longer alarms — the UI proceeds confidently and the full audit reads
+// the sections — but a successful in-budget read lets it show "present" up front.
+const PRIMARY_DOWNLOAD_TIMEOUT_MS = 20000;
 const PRIMARY_MAX_BYTES = 15 * 1024 * 1024; // ~15MB — skip text-extraction above this.
 
 // Sections we can credit from the primary doc TEXT (real, not name-based).
@@ -111,16 +121,12 @@ async function detectPrimarySectionsFromText(
   // entirely for an oversized primary.
   if (primary.sizeBytes != null && primary.sizeBytes > PRIMARY_MAX_BYTES) return null;
 
-  const url = primary.url.includes("api_key=")
-    ? primary.url
-    : `${primary.url}${primary.url.includes("?") ? "&" : "?"}api_key=${apiKey}`;
-
   let buf: Buffer;
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(PRIMARY_DOWNLOAD_TIMEOUT_MS)
-    });
+    // SSRF + key-leak guard (shared with the audit pipeline): host-allowlist the
+    // untrusted manifest URL before the key is appended; manual redirect with
+    // per-hop revalidation. Same fix applied to fetchPdfFromSamUrl / downloadPdf.
+    const res = await samFetchWithKey(primary.url, apiKey, PRIMARY_DOWNLOAD_TIMEOUT_MS);
     if (!res.ok) return null;
     // Guard against an oversized body even when the manifest size was unknown:
     // honor a Content-Length header before reading the bytes.
