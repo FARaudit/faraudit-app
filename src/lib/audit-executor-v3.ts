@@ -73,6 +73,22 @@ export async function executeAgenticPrimary(
   const res = await auditPackage({ fullSource, bidderProfile: null });
   const generatedAt = new Date().toISOString();
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
+
+  // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,
+  // carried by both the sync route and the worker). This is the deterministic
+  // "all files fetched" guarantee the report surfaces: complete only when every
+  // posted document was ingested; otherwise the missing files are named loudly.
+  const ing = input.ingestion;
+  payload.documents = ing
+    ? {
+        posted: ing.files_total,
+        read: ing.files_ingested,
+        complete: ing.files_ingested >= ing.files_total && !ing.overflow,
+        missing: (ing.files ?? []).filter((f) => !f.ingested).map((f) => ({ name: f.name, ...(f.reason ? { reason: f.reason } : {}) })),
+        ...(ing.overflow ? { note: ing.overflow } : {}),
+      }
+    : null;
+  const docsIncomplete = !!payload.documents && !payload.documents.complete;
   const recommendation = verdictToRecommendation(res.decision.verdict);
   const honestFail = HONEST_FAIL.has(res.decision.verdict);
 
@@ -98,6 +114,10 @@ export async function executeAgenticPrimary(
       engine: "agentic_v3",
       analysis_phase: "done",
       honest_fail: honestFail,
+      // Deterministic manifest-reconciliation flag — false when a posted SAM
+      // document could not be ingested (the report flags it loudly; whether a
+      // partial package should also cap the verdict/charge is a domain decision).
+      documents_complete: !docsIncomplete,
       generated_at: generatedAt,
       source_chars: fullSource.length,
       doc_count: docs.length,
@@ -107,7 +127,7 @@ export async function executeAgenticPrimary(
 
   const { error } = await supabase.from("audits").update(completeUpdate).eq("id", auditId);
   if (error) throw new Error(`agentic persist failed: ${error.message}`);
-  console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} findings=${res.findings.length} docs=${docs.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
+  console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${!docsIncomplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
 
   return { recommendation, compliance_score: null, bid_recommendation: completeUpdate.bid_recommendation };
 }

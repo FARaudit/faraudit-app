@@ -32,6 +32,17 @@ export interface V3ReportPayload {
   showStoppers: FindingLite[];
   findings: FindingLite[];
   coverage: { required: string[]; covered: string[]; missing: string[] };
+  // Document-manifest reconciliation vs SAM (the fail-safe for "all files fetched"):
+  // posted = what SAM's manifest listed; read = what we actually ingested. complete
+  // is the deterministic guarantee the customer can trust. missing names every
+  // posted file we could NOT pull. null = no manifest (upload / single-doc arm).
+  documents?: {
+    posted: number;
+    read: number;
+    complete: boolean;
+    missing: Array<{ name: string; reason?: string }>;
+    note?: string;
+  } | null;
   generatedAt?: string;
 }
 
@@ -120,6 +131,16 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   // showStoppers is the verdict-driver set; fall back to any disqualifying findings.
   const stoppers = payload.showStoppers.length ? payload.showStoppers : inlineStoppers;
 
+  // Document-manifest reconciliation banner — the customer-facing fail-safe for
+  // "all files fetched." A COMPLETE package is confirmed in green; a PARTIAL one is
+  // flagged loudly (named missing files) directly under the verdict, never silent.
+  const d = payload.documents;
+  const docsBanner = d
+    ? (d.complete
+        ? `<div class="docs ok">✓ Retrieved and read all ${d.posted} document${d.posted === 1 ? "" : "s"} the agency posted to SAM.gov — the audit covers the complete posted package.</div>`
+        : `<div class="docs warn"><b>⚠ Partial package — read ${d.read} of ${d.posted} document${d.posted === 1 ? "" : "s"} the agency posted to SAM.gov.</b>${d.missing.length ? ` Could not retrieve: ${d.missing.map((m) => escapeHtml(m.name)).join("; ")}.` : ""}${d.note ? ` ${escapeHtml(d.note)}` : ""} This verdict reflects only the documents we could read — add the missing files for a complete audit.</div>`)
+    : "";
+
   const coveredSet = new Set(payload.coverage.covered);
   const coverageChips = payload.coverage.required.map((s) => {
     const ok = coveredSet.has(s);
@@ -155,6 +176,10 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   dl.meta .m { display:flex; flex-direction:column; }
   dl.meta dt { font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
   dl.meta dd { margin:2px 0 0; font-weight:600; }
+  .docs { border-radius:12px; padding:13px 16px; margin-bottom:16px; font-size:13.5px; line-height:1.5; }
+  .docs.ok { background:#d1e7dd; color:#0f5132; border:1px solid #b6dfc7; }
+  .docs.warn { background:#f8d7da; color:#842029; border:1px solid #f1c2c7; }
+  .docs b { font-weight:800; }
   .cov { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:24px; }
   .cov h3 { margin:0 0 4px; font-size:14px; }
   .cov .state { font-size:13px; font-weight:700; }
@@ -179,6 +204,7 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
 </style></head><body><div class="wrap">
   <div class="topbar"><div class="brand">FARaudit · Agentic Verification Engine</div><a href="/audit">← Back to audits</a></div>
   <div class="verdict"><div class="v">${escapeHtml(vs.label)}</div><div class="s">${escapeHtml(vs.sub)}</div></div>
+  ${docsBanner}
   ${metaRows ? `<dl class="meta">${metaRows}</dl>` : ""}
   <div class="reason"><b>Verdict basis</b>${escapeHtml(payload.reason)}</div>
   <div class="cov"><h3>Coverage <span class="state ${coverageComplete ? "ok" : "no"}">${coverageComplete ? "COMPLETE" : "INCOMPLETE"}</span></h3>
