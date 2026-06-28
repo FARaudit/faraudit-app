@@ -696,7 +696,7 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement\.meaning">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement.meaning}$2`
+      `$1${esc(v.work_statement.meaning)}$2`
     );
     out = out.replace(
       /(<span class="ev-cite" data-field="work_statement\.evidence">)[\s\S]*?(<\/span>)/,
@@ -704,7 +704,7 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="wst-t" data-field="work_statement\.bid_strategy">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement.bid_strategy}$2`
+      `$1${esc(v.work_statement.bid_strategy)}$2`
     );
     return out;
   }
@@ -725,11 +725,11 @@ function renderWorkStatement(html: string, v: V2RenderInput): string {
     );
     out = out.replace(
       /(<p class="ws-mean" data-field="work_statement_unknown\.reason">)[\s\S]*?(<\/p>)/,
-      `$1${v.work_statement_unknown.reason}$2`
+      `$1${esc(v.work_statement_unknown.reason)}$2`
     );
     out = out.replace(
       /(<span class="wsi-t" data-field="work_statement_unknown\.action">)[\s\S]*?(<\/span>)/,
-      `$1${v.work_statement_unknown.action}$2`
+      `$1${esc(v.work_statement_unknown.action)}$2`
     );
     return out;
   }
@@ -1000,7 +1000,13 @@ export function renderIngestionBannerFromAudit(html: string, audit: Record<strin
   const analyzed = new Set<string>();
   if (Array.isArray(comp?.evaluation_factors) && (comp!.evaluation_factors as unknown[]).length > 0) analyzed.add("M");
   if (Array.isArray(comp?.submission_requirements) && (comp!.submission_requirements as unknown[]).length > 0) analyzed.add("L");
-  return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput, analyzed);
+  // Stage 3 — the agentic MAP's completeness is the authoritative coverage signal when the
+  // agentic-primary path ran (persisted under compliance_json.v2_shadow.extraction). null
+  // off that path → the banner is unchanged. A binding doc the MAP could not read in full
+  // must never render as "All sources read in full".
+  const ext = (comp?.v2_shadow as Record<string, unknown> | undefined)?.extraction as Record<string, unknown> | undefined;
+  const agenticComplete = typeof ext?.agentic_coverage_complete === "boolean" ? (ext.agentic_coverage_complete as boolean) : null;
+  return renderIngestionBanner(html, { ingestion: readIngestion(comp) } as V2RenderInput, analyzed, agenticComplete);
 }
 
 // Densify port (Design 2026-06-21): normalize a raw SAM filename into a clean
@@ -1051,7 +1057,35 @@ function docRowHtml(f: IngestionRender["files"][number], tags: string): string {
 // coverage chip + "View sources". Expanded body: "Read in full" (per file, by
 // §-section/role) and "Indexed — not deep-read" (grouped by reason, one reason
 // chip per group). Raw filename preserved in each row's title attribute.
-function renderIngestionBanner(html: string, v: V2RenderInput, analyzedSections: Set<string> = new Set()): string {
+/** Decide the coverage chip (class + text). Pure + exported so the gate proves the
+ *  honesty rule without HTML fixtures. The agentic MAP's completeness is AUTHORITATIVE:
+ *  when it is false the chip MUST warn and never claim "read in full", even if the file
+ *  manifest shows every file ingested — the MAP found a binding doc it could not actually
+ *  read (Stage 3 honest-fail). null agenticComplete (the normal, non-agentic path) leaves
+ *  the prior §-section / file-level logic untouched. */
+export function decideCoverageChip(args: {
+  detected: Set<string>;
+  allIngested: boolean;
+  filesRead: number;
+  filesTotal: number;
+  agenticComplete: boolean | null;
+}): { covClass: "ok" | "warn"; covText: string } {
+  if (args.agenticComplete === false) {
+    return { covClass: "warn", covText: "Partial coverage — some binding documents could not be read in full" };
+  }
+  const { detected, allIngested, filesRead, filesTotal } = args;
+  if (detected.size > 0) {
+    const present = ["C", "H", "L", "M", "F"].filter((c) => detected.has(c));
+    const missingCore = ["C", "L", "M"].filter((c) => !detected.has(c));
+    return missingCore.length === 0
+      ? { covClass: "ok", covText: `Core sections present · ${present.map((c) => `§${c}`).join(" ")}` }
+      : { covClass: "warn", covText: `${missingCore.map((c) => `§${c}`).join(" · ")} not detected` };
+  }
+  if (allIngested) return { covClass: "ok", covText: "All sources read in full" };
+  return { covClass: "warn", covText: `${filesRead} of ${filesTotal} read · rest indexed` };
+}
+
+function renderIngestionBanner(html: string, v: V2RenderInput, analyzedSections: Set<string> = new Set(), agenticComplete: boolean | null = null): string {
   const ing = v.ingestion;
   // No manifest → strip the banner. Always-on when files exist; never faked.
   if (!ing || ing.files.length === 0) return stripIfEmpty(html, "ingestion", true);
@@ -1067,29 +1101,17 @@ function renderIngestionBanner(html: string, v: V2RenderInput, analyzedSections:
     `<span class="mc-sep"></span>` +
     `<span class="mc idx"><span class="mc-n">${esc(String(ing.files_indexed))}</span><span class="mc-k">indexed</span></span>`;
 
-  // Coverage chip — TRUE §-section coverage when §-roles detected, else file-level.
+  // Coverage chip — TRUE §-section coverage when §-roles detected, else file-level,
+  // with the agentic MAP's completeness as the AUTHORITATIVE override (Stage 3).
   const allIngested = ing.files_total > 0 && ing.files_read >= ing.files_total;
   const detected = new Set<string>();
   ing.files.forEach((f) => (f.section_roles ?? []).forEach((s) => detected.add(s)));
   // FA-INGEST4b: merge in sections the ENGINE analyzed from the primary doc's text
   // (combined RFPs carry §L/§M inside the solicitation, not as named files).
   analyzedSections.forEach((s) => detected.add(s));
-  let covClass: "ok" | "warn";
-  let covText: string;
-  if (detected.size > 0) {
-    const present = ["C", "H", "L", "M", "F"].filter((c) => detected.has(c));
-    const missingCore = ["C", "L", "M"].filter((c) => !detected.has(c));
-    covClass = missingCore.length === 0 ? "ok" : "warn";
-    covText = missingCore.length === 0
-      ? `Core sections present · ${present.map((c) => `§${c}`).join(" ")}`
-      : `${missingCore.map((c) => `§${c}`).join(" · ")} not detected`;
-  } else if (allIngested) {
-    covClass = "ok";
-    covText = "All sources read in full";
-  } else {
-    covClass = "warn";
-    covText = `${ing.files_read} of ${ing.files_total} read · rest indexed`;
-  }
+  const { covClass, covText } = decideCoverageChip({
+    detected, allIngested, filesRead: ing.files_read, filesTotal: ing.files_total, agenticComplete,
+  });
   const okSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
   const warnSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>`;
   const covChip = `<span class="man-cov ${covClass}">${covClass === "ok" ? okSvg : warnSvg}${esc(covText)}</span>`;

@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "1240LP26Q0067",
+  "_title": "BGNF Mini-Excavator (Disaster/Post Elk Fire) — USDA Forest Service, Bighorn NF",
+  "_suiteRole": "CLEAN-BID test: FAR Part 12 commercial, minimal gates, planted award-basis contradiction. Verifies the engine does NOT invent disqualifiers and reports a routine buy as a clean BID.",
+  "_authoringMethod": "blind three-way human-adjudicated (Brain cold read + Gemini 3.1 Pro Extended + ChatGPT 5.5 Thinking; CEO adjudicated)",
+  "acquisitionPart": "PART_12",
+  "bidderProfile": null,
+  "expectedVerdict": {
+    "verdict": "BID",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "Generic small business with a conforming machine is not structurally barred. All requirements are comply-to-win, not unusual-risk barriers. Designated clean-bid anchor."
+  },
+  "namedGates": [
+    {
+      "id": "award-basis-lpta",
+      "token": "Lowest-Priced Technically Acceptable",
+      "aliases": [
+        "LPTA",
+        "lowest-priced quote that meets all technical requirements"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "isTrap": true,
+      "note": "Planted contradiction (page 8): one sentence says 'best value', Evaluation Method says LPTA. LPTA governs. A bidder who reads 'best value' and bids higher on technical strength loses. Survived three blind reads."
+    },
+    {
+      "id": "enclosed-cab-mandatory",
+      "token": "fully enclosed, factory-installed operator cab",
+      "aliases": [
+        "enclosed cab",
+        "factory-installed cab",
+        "ROPS",
+        "NOT acceptable: open-sided"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Specs p.3: factory-enclosed cab required; open-sided ROPS with soft-sides/curtains and aftermarket/dealer-installed cab kits expressly NOT acceptable. Non-conforming cab = technically unacceptable."
+    },
+    {
+      "id": "oem-traceability-coc",
+      "token": "Certificate of Conformance",
+      "aliases": [
+        "52.246-15",
+        "traceability to the manufacturer",
+        "OEM"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Solicitation p.3: COC per FAR 52.246-15 plus complete auditable OEM paper trail; non-OEM vendors must show traceability."
+    },
+    {
+      "id": "product-brochure-exact-machine",
+      "token": "product brochure of EXACT Mini-Excavator machine quoted",
+      "aliases": [
+        "brochure or product literature for the exact machine",
+        "to be considered responsive"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Solicitation pp.3, 8: brochure for the exact machine required to be considered responsive and evaluated."
+    },
+    {
+      "id": "price-all-line-items",
+      "token": "submit pricing for all items",
+      "aliases": [
+        "price all individual line items",
+        "excluded from further consideration"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "note": "Solicitation pp.7-8: failure to price all line items may result in exclusion. Responsiveness gate."
+    },
+    {
+      "id": "delivery-by-deadline-fob-dest",
+      "token": "Delivery must be included in quoted price",
+      "aliases": [
+        "FOB Destination",
+        "on or before September 1, 2026",
+        "09/01/2026"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "unmet",
+      "note": "Specs p.3 / Solicitation p.9: FOB Destination; delivery charges in quoted price; deliver to 1353 Fort Road, Sheridan, WY 82801 by 01 Sep 2026."
+    },
+    {
+      "id": "buy-american-supplies",
+      "token": "Buy American",
+      "aliases": [
+        "52.225-1",
+        "52.225-2",
+        "Buy American Certificate"
+      ],
+      "mustRaise": false,
+      "expectedDisposition": "unmet",
+      "note": "Compliance/certification gate. Caution-level."
+    }
+  ],
+  "showStoppers": [],
+  "cautionItems": [
+    {
+      "id": "sam-registration-active",
+      "description": "Active SAM registration required (52.204-7). Bidder-side obligation; caution, never auto-ineligible per eligibility doctrine."
+    },
+    {
+      "id": "quote-firm-90-days",
+      "description": "Quoter must hold prices firm 90 calendar days (amended 52.212-1). Submission-compliance caution."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "dei-certification-agar",
+      "token": "Anti-Discrimination and Diversity, Equity, and Inclusion",
+      "aliases": [
+        "452.203-70",
+        "452.203-71",
+        "DEI"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Sounds high-stakes (False Claims Act, termination for default) but is a baseline certification, not a structural barrier. Gemini + GPT both classified as decoy."
+    },
+    {
+      "id": "unenforceable-supplier-terms",
+      "token": "Unenforceable Supplier Terms",
+      "aliases": [
+        "452.203-72",
+        "supplier terms"
+      ],
+      "kind": "boilerplate",
+      "mustNotRaiseAtAll": true,
+      "note": "Multi-page government-protective clause voiding conflicting vendor terms. Pure boilerplate; not a bidder risk."
+    },
+    {
+      "id": "small-business-set-aside",
+      "token": "100% set aside",
+      "aliases": [
+        "Small Business",
+        "NAICS 333120",
+        "size standard 1,250"
+      ],
+      "kind": "absent",
+      "mustNotRaiseAtAll": false,
+      "note": "SF-1449 block 10: plain Small Business set-aside (NOT WOSB — Gemini misread checkbox). With bidderProfile null, caution only, never auto-INELIGIBLE per eligibility doctrine. mustNotRaiseAtAll=false because a caution mention is acceptable; raising it as a disqualifier is the error."
+    }
+  ],
+  "_tina": {
+    "applies": false,
+    "rationale": "Commercial (Part 12) + competitive + below threshold; price evaluated fair-and-reasonable under FAR 12.204. Certified cost/pricing data not required. Not a gate."
+  },
+  "adjudication": {
+    "authoredBlind": true,
+    "adjudicatedBy": [
+      "CEO",
+      "Brain"
+    ],
+    "frozenAt": "2026-06-26T18:00:00Z",
+    "sourceSha256": "2f87d62338e61567c5ac8139acc0b95fc39586dca41574dc260c7d42f317f40b",
+    "keySha256": "5649b42152fe6765cb345eca0c4f7b6e2e4e515b0a9af47979ebb565d31b66ea"
+  }
+}

@@ -28,7 +28,11 @@ if (missing.length > 0) {
 
 // FA-124 — boot logs the effective env so deploy verification doesn't depend
 // on dashboard screenshots. Flag values are printed; secrets are presence-only.
-const flags = ["CLAUDE_TIMEOUT_MS", "AUDIT_ENGINE_V2", "AUDIT_ASYNC_ENQUEUE", "WORKER_POLL_MS"] as const;
+// Includes the agentic flags so a deploy can CONFIRM the agentic-primary path is
+// actually ON (a mistyped/unset flag silently runs the old V2 single-pass path and
+// the run would otherwise look fine). AUDIT_MAP_MODEL is printed too — a stray Opus
+// override there would re-introduce the per-doc cost bleed.
+const flags = ["CLAUDE_TIMEOUT_MS", "AUDIT_ENGINE_V2", "AUDIT_AGENTIC", "AUDIT_AGENTIC_PRIMARY", "AUDIT_MAP_MODEL", "AUDIT_ASYNC_ENQUEUE", "WORKER_POLL_MS"] as const;
 console.log(
   "[audit-worker] effective env ·",
   flags.map((k) => `${k}=${process.env[k] ?? "(unset)"}`).join(" · "),

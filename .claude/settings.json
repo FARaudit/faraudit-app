@@ -1,7 +1,6 @@
 {
   "model": "opusplan",
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Edit",
       "Write",
@@ -84,7 +83,14 @@
       "Bash(vercel inspect:*)",
       "Bash(vercel list:*)",
       "Bash(vercel ls:*)",
-      "Bash(vercel logs:*)"
+      "Bash(vercel logs:*)",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Gmail__search_threads",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -92,6 +98,98 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push --force-with-lease:*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/checkpoint-reminder.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/relay-reminder.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$HOME/faraudit-app}\" && python3 ceo/build-board.py >/dev/null 2>&1; bash ceo/update-digest.sh >/dev/null 2>&1",
+            "statusMessage": "Syncing CEO board + digest…",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/session-continuity.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/session-save.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-env.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(*.ts)|Write(*.ts)",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/typecheck.sh",
+            "statusMessage": "Type-checking…",
+            "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/design-board-sync.sh",
+            "statusMessage": "Syncing design board…",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/secret-redact.py"
+          }
+        ]
+      }
     ]
   }
 }

@@ -29,6 +29,7 @@ import {
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
 import { MAX_DOCS, classifySectionRoles, type IngestionMeta } from "@/lib/sam-attachments";
+import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED, resolveAgenticCoverageComplete } from "@/lib/agentic-executor";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -194,13 +195,15 @@ const ATTACHMENT_SET_MAX = MAX_DOCS;
 // (catch → fallback) or fails (propagate). Mirrors the inline V2 race already
 // in this file; factored out so all three budget sites share one timer-cleanup-
 // correct implementation (the timer is always cleared, win or lose).
-async function withBudget<T>(work: Promise<T>, budgetMs: number, label: string): Promise<T> {
+async function withBudget<T>(workFactory: (signal: AbortSignal) => Promise<T>, budgetMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
   try {
     return await Promise.race([
-      work,
+      workFactory(controller.signal),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(label)), budgetMs);
+        // Abort the in-flight work on timeout so it stops spending, THEN reject.
+        timer = setTimeout(() => { controller.abort(); reject(new Error(label)); }, budgetMs);
       }),
     ]);
   } finally {
@@ -307,7 +310,7 @@ export async function executeAudit(
       // "leave facts to extraction / honest-unknown" below). Best-effort fact
       // enrichment, never a blocker.
       const samFacts = await withBudget(
-        fetchSolicitationByNoticeId(solNum),
+        () => fetchSolicitationByNoticeId(solNum),
         FACTS_SAM_BUDGET_MS,
         `FACTS SAM cross-ref budget (${FACTS_SAM_BUDGET_MS / 1000}s) exceeded`
       ).catch((e) => {
@@ -420,7 +423,7 @@ export async function executeAudit(
       // the attempt cap). Converts a silent multi-minute stall into a prompt,
       // diagnosable terminal failure the report page can exit to.
       result = await withBudget(
-        runAudit({
+        () => runAudit({
           solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason,
           attachmentPdfs: step.attachments,
           primaryDocName: input.primaryDocName ?? null
@@ -660,7 +663,7 @@ export async function executeAudit(
     } catch { /* diagnostic write best-effort */ }
   }
   if (AUDIT_V2_ENABLED && v2Buffer) {
-    const v2Start = Date.now();
+    let v2Start = Date.now();
     try {
       // FA-131 — V1 vision output + SAM notice metadata are both in scope
       // here; pass them so V2's judgment never sees "unknown" for a fact
@@ -718,6 +721,43 @@ export async function executeAudit(
       // the Claude timeout / a transient overload. Without a retry, a single
       // slow response silently dropped the ENTIRE agentic layer (agency,
       // work-statement, Capture Play). Retry once, then surface loudly.
+      // ━━ AGENTIC PRIMARY (AUDIT_AGENTIC_PRIMARY=true) ━━━━━━━━━━━━━━━━━━━━━━━
+      // Produce full-coverage facts via the per-document MAP (every doc model-read,
+      // no overflow, coverage ledger) and feed them to runAuditV2 as factsOverride,
+      // so every rendered V2 surface reflects the agentic extraction. OFF by default.
+      // BOUNDED (own wall-clock budget) + non-fatal: timeout/error → null → V2 falls
+      // back to its own single-pass extractor (a paid audit can never break or hang
+      // on the agentic path). Uses attachmentPdfs (the RC7-capped set), not the
+      // uncapped pre-degrade set. The V2 budget clock is RESET after, so the MAP's
+      // time is not charged against runAuditV2's 4-min budget.
+      let agenticMap: Awaited<ReturnType<typeof buildAgenticFacts>> = null;
+      if (AGENTIC_PRIMARY_ENABLED) {
+        const mapBudgetMs = Number(process.env.AGENTIC_MAP_BUDGET_MS) || 300000;
+        try {
+          agenticMap = await withBudget(
+            (signal) => buildAgenticFacts({
+              auditId,
+              solicitation,
+              agency,
+              primaryName: input.primaryDocName ?? "primary solicitation",
+              primaryBytes: v2Buffer,
+              primaryText: extractedText ?? null,
+              // FULL pre-degrade set (not the RC7-capped attachmentPdfs): the agentic
+              // engine is DESIGNED to read every doc via the cheap per-document MAP
+              // with no overflow — capping it would defeat the full-coverage premise
+              // and make the coverage ledger report "partial". Cost/wall-clock are
+              // bounded by the MAP budget above + Haiku's cheap per-doc rate.
+              attachments: inputAttachments,
+            }, signal),
+            mapBudgetMs,
+            `agentic MAP budget (${mapBudgetMs / 60000}min) exceeded`
+          );
+        } catch (e) {
+          console.error(`[AGENTIC-PRIMARY] ${auditId} MAP bounded-abort (non-fatal, V2 fallback):`, e instanceof Error ? e.message : e);
+          agenticMap = null;
+        }
+        v2Start = Date.now(); // give runAuditV2 its full budget; don't charge it the MAP time
+      }
       let v2Result: Awaited<ReturnType<typeof runAuditV2>> | null = null;
       let v2LastErr: unknown = null;
       // FA-E2E re-verify Fix E (2026-06-18): HARD overall budget on the V2
@@ -740,7 +780,9 @@ export async function executeAudit(
             runAuditV2(
               v2Buffer,
               v2External,
-              attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null
+              attachmentPdfs?.map((a) => ({ name: a.name, buffer: a.buffer })) ?? null,
+              agenticMap?.facts ?? null, // AGENTIC PRIMARY: full-coverage facts drive the V2 surfaces
+              agenticMap?.assembledText ?? null // ground V2's fabrication guards against the MAP's text
             ),
             new Promise<never>((_, reject) => {
               budgetTimer = setTimeout(
@@ -787,6 +829,18 @@ export async function executeAudit(
           missing_sections: v2Result.sectionBag.missingSections,
           warnings: v2Result.warnings,
           extraction_warnings: v2Result.facts.extractionWarnings,
+          // AGENTIC PRIMARY: the honest coverage line (Audited N of M · superseded ·
+          // skipped · read failures) — null when not on the agentic-primary path.
+          agentic_coverage: agenticMap?.coverage.statement ?? null,
+          // Structured completeness signal the ingestion banner + verdict safety-gate consult
+          // (Stage 3): a boolean is unambiguous where parsing the statement string would be brittle.
+          // Hole-B fix (2026-06-25): when the agentic-primary path is ON but the MAP ABORTED
+          // (budget/exception → agenticMap===null), coverage is NOT guaranteed — V2 silently ran as
+          // the plain single-pass path. That MUST report `false` (→ verdict suppression), never the
+          // pre-fix `null` that read as "feature off → render confidently". null only when the feature
+          // is genuinely OFF (behave exactly as before). Pure → gate-testable.
+          agentic_coverage_complete: resolveAgenticCoverageComplete(AGENTIC_PRIMARY_ENABLED, agenticMap),
+          agentic_facts_source: agenticMap ? "agentic_map" : null,
         },
         rendered_at: new Date().toISOString(),
         engine_ms: Date.now() - v2Start,
@@ -975,6 +1029,49 @@ export async function executeAudit(
     }
   } catch {
     /* silent — corpus is best-effort */
+  }
+
+  // ━━ Agentic engine SHADOW (AUDIT_AGENTIC=true) — non-fatal, never affects the
+  //    live result. Runs the agentic path on the FULL package (inputAttachments,
+  //    pre-degrade — agentic handles large sets without the ladder), logs its
+  //    honest coverage line, and earns its way to primary behind the review gate.
+  // Mutual exclusion: suppress the shadow ONLY when the PRIMARY path actually ran
+  // the MAP — i.e. primary flag AND the V2 arm executed (AUDIT_V2_ENABLED && v2Buffer).
+  // If primary is flagged but V2 was off / no buffer (image/text-only arms), the
+  // primary MAP never ran, so the shadow must still cover it (no double-MAP, no gap).
+  const _primaryRanMap = AGENTIC_PRIMARY_ENABLED && AUDIT_V2_ENABLED && !!v2Buffer;
+  if (AGENTIC_SHADOW_ENABLED && !_primaryRanMap) {
+    const primaryBytes = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
+    // BOUNDED + non-fatal: the shadow makes live model calls, so it gets the same
+    // wall-clock ceiling as the V1/V2 engines. An unbounded await here could hang
+    // executeAudit past the worker timeout → DegradedRunError replay → the exact
+    // full-Opus retry cost-bleed the V1 budget exists to prevent. The report is
+    // already marked complete above, so a shadow timeout never affects the result.
+    // 600s default (Stage 3 right-size): the shadow runs MAP (per-doc, cheap) → compact
+    // matrix → lenses + the Opus cross-doc pass. On a large package (27+ docs) that chain
+    // is ~9 min, so a 300s budget aborted the cross-doc mid-generation (Stage 2: 1 abort /
+    // 2 clean — latency, not a hang). The live audit path is the Railway audit-worker,
+    // which has NO platform request cap, so 600s is safe there; on the Vercel fallback
+    // route (maxDuration=300) the function ends first, but the shadow is non-fatal — the
+    // report is already marked complete above. Env-overridable for per-package tuning.
+    const shadowBudgetMs = Number(process.env.AGENTIC_SHADOW_BUDGET_MS) || 600000;
+    try {
+      await withBudget(
+        (signal) => runAgenticShadow({
+          auditId,
+          solicitation,
+          agency,
+          primaryName: input.primaryDocName ?? "primary solicitation",
+          primaryBytes,
+          primaryText: extractedText ?? null,
+          attachments: inputAttachments,
+        }, signal),
+        shadowBudgetMs,
+        `agentic shadow budget (${shadowBudgetMs / 60000}min) exceeded`
+      );
+    } catch (e) {
+      console.error(`[AGENTIC-SHADOW] ${auditId} bounded-abort (non-fatal):`, e instanceof Error ? e.message : e);
+    }
   }
 
   return {

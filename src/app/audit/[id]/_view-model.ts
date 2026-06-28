@@ -3126,7 +3126,21 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // (single-doc, upload arm, pre-FA-136 rows) → never flags.
     ...((): { ingestion_incomplete: boolean; ingestion_note: string } => {
       const ing = compJson.ingestion as { files_total?: number; files_ingested?: number; form_identified?: boolean; form_name?: string | null; overflow?: string; portfolio_detected?: boolean; files?: Array<{ ingested?: boolean; reason?: string; name?: string }> } | null | undefined;
-      if (!ing || typeof ing.files_total !== "number") return { ingestion_incomplete: false, ingestion_note: "" };
+      // SAFETY GATE (2026-06-25): when the agentic MAP reported INCOMPLETE coverage (read-failures /
+      // partial / superseded-not-resolved), the verdict must NOT render confidently — the report
+      // re-uses this existing ingestion-incomplete suppression (renderer hides the verdict block +
+      // shows the amber caveat). Closes the live-engine false-confidence the re-review found: prior to
+      // this, agentic_coverage_complete only flipped the ingestion banner, never the verdict. null off
+      // the agentic-primary path → behaves exactly as before. CEO law: never present a confident
+      // verdict over partially-read content.
+      const _v2s = (compJson.v2_shadow ?? {}) as { extraction?: { agentic_coverage_complete?: boolean | null; agentic_coverage?: string | null } };
+      const agenticIncomplete = _v2s.extraction?.agentic_coverage_complete === false;
+      const agenticNote = agenticIncomplete
+        ? (_v2s.extraction?.agentic_coverage?.trim().replace(/\.$/, "") || "the full document set was not read — coverage is partial; verify the solicitation before relying on this assessment")
+        : "";
+      const orAgentic = (r: { ingestion_incomplete: boolean; ingestion_note: string }) =>
+        agenticIncomplete && !r.ingestion_incomplete ? { ingestion_incomplete: true, ingestion_note: `${agenticNote}.` } : r;
+      if (!ing || typeof ing.files_total !== "number") return orAgentic({ ingestion_incomplete: false, ingestion_note: "" });
       const formless = ing.form_identified !== true;
       // FA-report-batch: business-language, accuracy-honest disclosure (no internal
       // mechanics — no token/page/MB budgets, no "ingested"). Classify the skipped
@@ -3139,17 +3153,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       const isBenign = (r?: string) => /near-duplicate|duplicate|superseded/i.test(r || "");
       const realDrops = skipped.filter((f) => !isBenign(f.reason));
       if (realDrops.length === 0 && !formless && !ing.portfolio_detected) {
-        // All unique documents reviewed; only duplicate copies set aside → no warning.
-        return { ingestion_incomplete: false, ingestion_note: "" };
+        // All unique documents reviewed; only duplicate copies set aside → no warning (unless the
+        // agentic MAP itself reported partial coverage — that still suppresses the verdict).
+        return orAgentic({ ingestion_incomplete: false, ingestion_note: "" });
       }
       const parts: string[] = [];
+      if (agenticIncomplete) parts.push(agenticNote); // lead with the coverage caveat when the MAP was partial
       if (formless) parts.push("the primary solicitation document could not be identified in the posted set — findings are based on the documents that were reviewed");
       if (realDrops.length > 0) {
         const names = realDrops.map((f) => (f.name || "").trim()).filter(Boolean).slice(0, 4).join(", ");
         parts.push(`${realDrops.length} document${realDrops.length === 1 ? " was" : "s were"} too large to analyze in full — the core solicitation and key sections were prioritized${names ? `; review ${names} in the full solicitation before finalizing your bid` : ""}`);
       }
       if (ing.portfolio_detected) parts.push("the primary file is a document portfolio whose embedded files were not expanded — review them in the full solicitation");
-      if (parts.length === 0) return { ingestion_incomplete: false, ingestion_note: "" };
+      if (parts.length === 0) return orAgentic({ ingestion_incomplete: false, ingestion_note: "" });
       return { ingestion_incomplete: true, ingestion_note: `${parts.join("; ")}.` };
     })(),
     verdict_mode: verdictMode,

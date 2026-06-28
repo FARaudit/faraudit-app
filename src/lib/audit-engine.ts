@@ -10,6 +10,7 @@
 // path is the only line that differs between the two engine files — everything
 // from `type ContentBlock` onward is byte-equivalent. See parity header.
 import { deletePdfFromFilesApi } from "@/lib/anthropic-files";
+import { isEnvOn } from "@/lib/env-flags";
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 // Model: Opus 4.8 (CEO decision 2026-06-19) — reverts the May-4 Sonnet swap.
@@ -52,7 +53,7 @@ const CLAUDE_TIMEOUT_MS = Math.min(
 // disables capture. Production code paths never call either, so the engine's
 // runtime behavior is unchanged unless explicitly opted in by a harness.
 let _activeModel: string | null = null;
-let _usageSink: ((u: { model: string; input_tokens: number; output_tokens: number; ms: number }) => void) | null = null;
+let _usageSink: ((u: { model: string; input_tokens: number; output_tokens: number; cache_write?: number; cache_read?: number; ms: number }) => void) | null = null;
 export function setActiveModel(m: string | null) { _activeModel = m; }
 export function setUsageSink(sink: typeof _usageSink) { _usageSink = sink; }
 
@@ -1187,6 +1188,16 @@ const DEFAULT_CONTEXT_LIMIT = 1_000_000;
 // safety pad for tokenizer drift between our count_tokens pre-flight and the
 // actual request (system text, tool schemas, role framing, count skew).
 const TOKEN_SAFETY_PAD = 40_000;
+// ━━ Cache-stability budget (cost fix 2026-06-22) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// The doc/system prefix must be BYTE-IDENTICAL across the 3-4 audit calls or the
+// prompt cache never hits (the $22 bug: each call trimmed the docs to a different
+// size because the trim used the call's own maxTokens, and the volatile userPrompt
+// was counted into the trim). We now trim the cached prefix (system + doc blocks)
+// against a FIXED reserve — the largest output any call uses + a fixed allowance
+// for the volatile per-call userPrompt — so the trimmed docs are identical every
+// call. Proof of a hit is cache_read_input_tokens > 0 on calls 2-4 (now logged).
+const MAX_AUDIT_OUTPUT_TOKENS = 16_000; // largest maxTokens any audit call passes
+const MAX_USERPROMPT_RESERVE = 12_000;  // fixed reserve for the per-call userPrompt (kept OUT of the cached prefix)
 // MIN_TEXT_CHARS_FOR_TEXT_BLOCK + meaningfulCharCount now imported from
 // pdf-text-extractor (single source of truth shared with sam-attachments'
 // page-budget text/vision decision — see that import below).
@@ -1387,50 +1398,72 @@ async function callClaude(
   // the output (maxTokens) + a safety pad. Trim drops/truncates the LOWEST-
   // priority text blocks first (attachments before primary); the primary doc and
   // the userPrompt (which carries §C/§L/§M analysis instructions) are kept.
-  const inputBudget = modelContextLimit(model) - maxTokens - TOKEN_SAFETY_PAD;
-  if (inputBudget > 0) {
-    let count = await countInputTokens(model, systemPrompt, content);
+  // Cost fix (2026-06-22): trim the CACHED PREFIX (system + doc blocks) ONLY,
+  // against a FIXED, call-independent reserve, so the prefix is byte-identical
+  // across all 3-4 calls and the prompt cache actually hits. The volatile
+  // per-call userPrompt is the LAST block (after the cache breakpoint) — it is
+  // excluded from the trim count and given a fixed reserve instead. Previously
+  // the budget used this call's `maxTokens` and counted the userPrompt, so each
+  // call trimmed the docs to a slightly different size → different prefix bytes →
+  // 100% cache miss (the root cause of the ~$22 audit).
+  const inputBudget = modelContextLimit(model) - MAX_AUDIT_OUTPUT_TOKENS - MAX_USERPROMPT_RESERVE - TOKEN_SAFETY_PAD;
+  const docContent = content.slice(0, -1); // message blocks BEFORE userPrompt = the cached prefix (shares block refs with `content`)
+  if (inputBudget > 0 && docContent.length > 0) {
+    let count = await countInputTokens(model, systemPrompt, docContent);
     if (count !== null && count > inputBudget) {
-      console.warn(`[audit-engine] token guard: ${count.toLocaleString()} input tokens > budget ${inputBudget.toLocaleString()} (model=${model}, out=${maxTokens}) — trimming text blocks deterministically`);
-      // Indices of trimmable text DOC blocks (the labelled "--- name ---" text
-      // blocks), in priority order: LAST doc first (lowest tier, since attachments
-      // ride after the primary), primary doc last. The final userPrompt block and
-      // any image/document(vision) blocks are never trimmed here.
-      const docTextIdx = content
+      console.warn(`[audit-engine] token guard: doc prefix ${count.toLocaleString()} tokens > budget ${inputBudget.toLocaleString()} (model=${model}) — trimming docs deterministically (call-independent for cache stability)`);
+      // Trimmable text DOC blocks ("--- name ---"), LAST doc first (lowest tier).
+      // Mutating docContent[idx] mutates content[idx] (shared refs).
+      const docTextIdx = docContent
         .map((b, i) => ({ b, i }))
-        .filter(({ b, i }) => b.type === "text" && i < content.length - 1 && (b as { text: string }).text.startsWith("--- "))
+        .filter(({ b }) => b.type === "text" && (b as { text: string }).text.startsWith("--- "))
         .map(({ i }) => i)
-        .reverse(); // last (lowest-priority) first
-      // Pass 1: hard-truncate each doc text block to a shrinking share until it
-      // fits; drop entirely as a last resort. Re-count after each step.
+        .reverse();
       for (const idx of docTextIdx) {
         if (count === null || count <= inputBudget) break;
-        const block = content[idx] as { type: "text"; text: string; cache_control?: CacheControl };
+        const block = docContent[idx] as { type: "text"; text: string; cache_control?: CacheControl };
         const overflowTokens = count - inputBudget;
         const overflowChars = Math.ceil(overflowTokens * 3.5) + 2000; // pad
         if (block.text.length > overflowChars + 500) {
           const keep = Math.max(500, block.text.length - overflowChars);
           block.text = block.text.slice(0, keep) +
-            `\n\n[… truncated by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+            `\n\n[… truncated to fit the model context — full file on SAM.gov …]`;
         } else {
-          // Block is smaller than the overflow — drop its content wholesale.
           const label = (block.text.split("\n", 1)[0] || "--- document ---");
-          block.text = `${label}\n[… omitted by the per-call token guard to fit the model context — full file on SAM.gov …]`;
+          block.text = `${label}\n[… omitted to fit the model context — full file on SAM.gov …]`;
         }
-        count = await countInputTokens(model, systemPrompt, content);
+        count = await countInputTokens(model, systemPrompt, docContent);
       }
       if (count !== null && count > inputBudget) {
-        // Even after trimming every attachment + the primary doc text we still
-        // don't fit (pathological: a single image-only PDF's vision tokens, or a
-        // giant userPrompt). Throw so the executor's trim-and-run ladder takes
-        // over with a lower-budget / primary-only assembly.
+        // Even after trimming every doc we still don't fit. Throw so the
+        // executor's trim-and-run ladder takes over with a smaller assembly.
         throw new OversizeInputError(
-          `assembled request is ${count.toLocaleString()} tokens after trim > budget ${inputBudget.toLocaleString()} (model=${model})`,
+          `assembled doc prefix is ${count.toLocaleString()} tokens after trim > budget ${inputBudget.toLocaleString()} (model=${model})`,
           count,
           inputBudget
         );
       }
-      console.log(`[audit-engine] token guard: trimmed to ${count?.toLocaleString() ?? "?"} input tokens (<= ${inputBudget.toLocaleString()})`);
+      console.log(`[audit-engine] token guard: doc prefix trimmed to ${count?.toLocaleString() ?? "?"} tokens (<= ${inputBudget.toLocaleString()})`);
+    }
+  }
+
+  // Total-request safety net (separate from the cache-prefix trim above). The
+  // userPrompt is the LAST block (after the cache breakpoint), excluded from the
+  // doc-prefix trim so the cached prefix stays byte-identical across calls. But it
+  // carries the full primary office-doc text (solText), so a large primary can push
+  // the REAL request (prefix + userPrompt + output) past the context window even when
+  // the doc prefix fit. We can't trim the userPrompt without diverging it per call
+  // (cache miss), so route oversize to the executor's trim-and-run ladder instead of
+  // letting it 400. (The pre-cache-fix guard counted the userPrompt; this restores it.)
+  {
+    const totalBudget = modelContextLimit(model) - MAX_AUDIT_OUTPUT_TOKENS - TOKEN_SAFETY_PAD;
+    const totalCount = await countInputTokens(model, systemPrompt, content);
+    if (totalCount !== null && totalCount > totalBudget) {
+      throw new OversizeInputError(
+        `total request ${totalCount.toLocaleString()} tokens (incl. userPrompt) > budget ${totalBudget.toLocaleString()} (model=${model})`,
+        totalCount,
+        totalBudget
+      );
     }
   }
 
@@ -1511,11 +1544,19 @@ async function callClaude(
   if (!res) throw new Error("Claude API: no response");
 
   const data = await res.json();
+  const u = data?.usage ?? {};
+  // Cache-visibility log (cost fix 2026-06-22): the proof the prompt cache hits.
+  // Call 1 should show cache_write>0, cache_read=0; calls 2-4 should show
+  // cache_read>0. If cache_read stays 0 across a multi-call audit, the cached
+  // prefix is NOT stable — this log is how we catch that on a real run.
+  console.log(`[audit-engine] usage · model=${model} · in=${u.input_tokens ?? 0} · cache_write=${u.cache_creation_input_tokens ?? 0} · cache_read=${u.cache_read_input_tokens ?? 0} · out=${u.output_tokens ?? 0} · ${Date.now() - t0}ms`);
   if (_usageSink && data?.usage) {
     _usageSink({
       model,
-      input_tokens: data.usage.input_tokens || 0,
-      output_tokens: data.usage.output_tokens || 0,
+      input_tokens: u.input_tokens || 0,
+      output_tokens: u.output_tokens || 0,
+      cache_write: u.cache_creation_input_tokens || 0,
+      cache_read: u.cache_read_input_tokens || 0,
       ms: Date.now() - t0
     });
   }
@@ -2953,8 +2994,20 @@ export async function runAudit(input: AuditInput): Promise<AuditResult> {
   // the SAM metadata so the model sees both via the prompt channel. Image
   // content rides on a separate Anthropic vision block, not the prompt body.
   const metadataText = JSON.stringify(solicitation).slice(0, 4000) + docSetManifest;
-  const rawText = extractedText
-    ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${extractedText}`
+  // Bound the office-doc primary text that rides in the userPrompt. The userPrompt is
+  // the post-cache-breakpoint block, so the doc-prefix trim can't shrink it and the
+  // executor's trim-and-run ladder only drops ATTACHMENTS — a giant DOCX/XLSX/TXT
+  // primary would otherwise overflow the context with no recourse (terminal fail).
+  // Cap deterministically with a visible marker (parity with the doc-prefix trim's
+  // honesty); ~3.5 chars/token ⇒ 700k chars ≈ 200k tokens, well within budget after
+  // metadata + output reserve. PDFs are unaffected (their text rides in a trimmable
+  // doc block, not here).
+  const MAX_PRIMARY_TEXT_CHARS = 700_000;
+  const boundedExtracted = extractedText && extractedText.length > MAX_PRIMARY_TEXT_CHARS
+    ? extractedText.slice(0, MAX_PRIMARY_TEXT_CHARS) + `\n\n[… primary document truncated at ${MAX_PRIMARY_TEXT_CHARS.toLocaleString()} chars to fit the model context — full file on SAM.gov …]`
+    : extractedText;
+  const rawText = boundedExtracted
+    ? `${metadataText}\n\n--- FULL DOCUMENT CONTENT (extracted from ${extractedFormat ?? "office document"}) ---\n${boundedExtracted}`
     : metadataText;
   const { sanitized: solText, redactionCount } = sanitizePdfText(rawText);
   if (redactionCount > 0) {
@@ -3142,6 +3195,16 @@ If the source is too thin to anchor risks to document text, you may emit finding
 
 JSON only — one key: risk_findings.`;
 
+  // Cost fix (2026-06-22): ONE byte-identical system prompt across all 3-4 calls
+  // so the cached doc/system prefix actually HITS. Each call previously used a
+  // different persona in `system`, which renders BEFORE the documents — so the
+  // cumulative cached prefix diverged on every call → 100% cache miss (root cause
+  // of the ~$22 audit). The distinct personas now move into each call's userPrompt
+  // (AFTER the cache breakpoint), preserving their analytical voice at no cache cost.
+  const SHARED_AUDIT_SYSTEM = `${SECURITY_DIRECTIVE}\n\nYou are a senior U.S. federal-contracting analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`;
+  const COMPLIANCE_ROLE = `ROLE: You are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. Extract EVERY clause exhaustively and flag every compliance action required.`;
+  const RISKS_ROLE = `ROLE: You are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. Identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. Be brutal, specific, and actionable.`;
+
   // FA-179/cost (CSV 2026-06-22: ~$45/day was Opus `input_no_cache`): the three
   // calls share the same cache_control'd doc+system prefix, but firing them in one
   // Promise.all made ALL THREE miss the cache (none had been written yet) → each
@@ -3158,7 +3221,7 @@ JSON only — one key: risk_findings.`;
       // parse failed → Opus retry truncated same → engine wrote {} for
       // overview, losing the §09 Q1 measurement field entirely. 4000 tokens
       // (≈16K char capacity) is comfortable headroom even for long §L.
-      `${SECURITY_DIRECTIVE}\n\nYou are a federal contract analyst. You output ONE valid JSON object — nothing before, nothing after, no markdown commentary.`,
+      SHARED_AUDIT_SYSTEM,
       overviewPrompt,
       4000,
       pdfBase64,
@@ -3171,8 +3234,8 @@ JSON only — one key: risk_findings.`;
   // Cache now primed by the overview call — the next two READ the shared prefix.
   const [complianceResult, risksResult] = await Promise.all([
     callWithRetry(
-      `${SECURITY_DIRECTIVE}\n\nYou are a senior FAR/DFARS compliance officer with 20 years of DoD contracting experience. Your audits meet the standard required by prime contractors — Lockheed Martin, Boeing, Raytheon, Northrop Grumman — before subcontractor awards. You extract EVERY clause exhaustively and flag every compliance action required. You output ONE valid JSON object — nothing before, nothing after.`,
-      compliancePrompt,
+      SHARED_AUDIT_SYSTEM,
+      `${COMPLIANCE_ROLE}\n\n${compliancePrompt}`,
       8000,
       pdfBase64,
       "compliance",
@@ -3184,8 +3247,8 @@ JSON only — one key: risk_findings.`;
     // FA-137 — risks uses the validation-driven ladder (structural checks
     // decide the retry, not just parseability) and reports a Call3Outcome.
     callRisksWithValidation(
-      `${SECURITY_DIRECTIVE}\n\nYou are a senior capture manager and proposal director who has won $2B+ in federal contracts for prime and subcontractors. You identify risks that cause small businesses to lose bids, receive cure notices, or face termination for default. You are brutal, specific, and actionable. You output ONE valid JSON object — nothing before, nothing after.`,
-      risksPrompt,
+      SHARED_AUDIT_SYSTEM,
+      `${RISKS_ROLE}\n\n${risksPrompt}`,
       // FA-119 Phase 3 (OUTCOME 1): the risks call had the SMALLEST ceiling
       // (6000) yet needs the most verbose output — on clause-dense solicitations
       // (b91c1ac6: 142 FAR + 83 DFARS) the capture-manager JSON overran 6000 and
@@ -3252,6 +3315,41 @@ JSON only — one key: risk_findings.`;
   });
   complianceJson.pdf_source = pdfSource;
   complianceJson.pdf_unavailable_reason = pdfUnavailableReason;
+
+  // ━━ Clause-completeness guard (Wave-1 G6, 2026-06-22) ━━━━━━━━━━━━━━━━━━━━━━
+  // The moat for a compliance product: a dropped FAR/DFARS clause is a customer-
+  // killing miss. Deterministically scan the INGESTED source for every clause
+  // NUMBER and compare against what the engine extracted. For now this is a
+  // LOGGED + persisted completeness metric (NOT a hard gate yet — the hard-fail
+  // flips on once we measure the false-positive rate from incorporated-by-
+  // reference noise on real exports). It is also the safety net that will make
+  // Stage-2 selective reading safe (never drop a clause silently).
+  try {
+    const clauseRe = /\b(?:52|252)\.\d{3}-\d{1,4}\b/g;
+    const norm = (s: string): string => (s.match(clauseRe)?.[0] ?? s.trim());
+    const inSource = new Set<string>(solText.match(clauseRe) ?? []);
+    const extracted = new Set<string>(
+      [...(complianceJson.far_clauses ?? []), ...(complianceJson.dfars_clauses ?? [])]
+        .map((c) => norm(String(c)))
+        .filter(Boolean)
+    );
+    const missing = [...inSource].filter((c) => !extracted.has(c));
+    const ratio = inSource.size === 0 ? 1 : (inSource.size - missing.length) / inSource.size;
+    (complianceJson as Record<string, unknown>).clause_completeness = {
+      source_count: inSource.size,
+      extracted_count: extracted.size,
+      missing_count: missing.length,
+      missing_sample: missing.slice(0, 25),
+      ratio: Math.round(ratio * 1000) / 1000,
+    };
+    if (missing.length > 0) {
+      console.warn(`[audit-engine] clause-completeness: ${missing.length} clause number(s) in source but NOT in extracted output (${(ratio * 100).toFixed(1)}%) — sample: ${missing.slice(0, 8).join(", ")}`);
+    } else {
+      console.log(`[audit-engine] clause-completeness: 100% (${inSource.size} source clauses all extracted)`);
+    }
+  } catch (e) {
+    console.warn(`[audit-engine] clause-completeness scan skipped: ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   // ━━ Cycle 2 (2026-06-06) — facts-only assembly ━━━━━━━━━━━━━━━━━━━━━━━━━━
   // Call 1 (Overview) now emits raw facts only: eval_basis_text +
@@ -4932,12 +5030,18 @@ export function _v2GroundRiskClauses(
     .replace(/-\s*\n\s*/g, "-") // de-hyphenate line-wraps (52.222-\n50)
     .replace(/\s+/g, " ")
     .toUpperCase();
+  // Degraded-source fallback (parity with _v2GroundClauseList): if the grounding
+  // text has NO clause token at all, the text layer is missing/unreadable (e.g. the
+  // agentic-primary path passed an empty groundingText override). Nulling on text
+  // absence would silently strip valid risk citations — so only the `known` clause
+  // set grounds them in that case; we do NOT null on text-not-found.
+  const sourceHasClauses = !!norm && (norm.match(_V2_CLAUSE_TOKEN_RE) || []).length > 0;
   let nulled = 0;
   for (const r of risks) {
     if (!r || !r.trapClause) continue;
     const toks = r.trapClause.toUpperCase().match(_V2_CLAUSE_TOKEN_RE) || [];
     if (toks.length === 0) continue; // not a clause-number citation — leave as-is
-    const grounded = toks.some((t) => known.has(t) || norm.includes(t));
+    const grounded = toks.some((t) => known.has(t)) || !sourceHasClauses || toks.some((t) => norm.includes(t));
     if (!grounded) {
       r.trapClause = null;
       if ("isDfarsTrap" in r) r.isDfarsTrap = false;
@@ -5016,7 +5120,21 @@ export async function runAuditV2(
   // a provenance separator BEFORE section detection, so both engines see the
   // same assembled input (no arm divergence). Extraction failure on an
   // attachment degrades to a warning, never kills the run.
-  extraDocs?: Array<{ name: string; buffer: Buffer }> | null
+  extraDocs?: Array<{ name: string; buffer: Buffer }> | null,
+  // AGENTIC graduate-to-primary (2026-06-22): when provided, the V2 pipeline runs
+  // its proven reshapers (matrix/checklist/L02/work-statement/judgment) over THESE
+  // facts — produced by the agentic per-document MAP (every doc model-read, full
+  // coverage, no overflow) — instead of the single-pass _v2ExtractAllFacts. Null/
+  // absent = unchanged V2 behavior, so this is inert until the agentic path sets it.
+  factsOverride?: ReturnType<typeof _v2ExtractAllFacts> | null,
+  // AGENTIC graduate-to-primary, grounding fix (2026-06-23): the post-extraction
+  // guards (clause-fabrication, risk-clause fidelity, work-statement promotion)
+  // re-validate facts against text. With factsOverride set, those facts came from
+  // the agentic MAP's text — NOT from this function's own _v2ExtractText(doc) —
+  // so grounding them against doc.rawText would silently DROP clauses the MAP read
+  // from image-only attachments V2 can't see. Pass the MAP's assembled text here
+  // so the guards validate the agentic facts against the text they CAME FROM.
+  groundingTextOverride?: string | null
 ): Promise<AuditV2Result> {
   const doc = await _v2ExtractText(pdfBuffer);
   if (extraDocs && extraDocs.length > 0) {
@@ -5054,13 +5172,28 @@ export async function runAuditV2(
     );
   }
 
-  const facts = _v2ExtractAllFacts(sectionBag.sections);
+  // factsOverride (agentic primary) wins when supplied — the V2 reshapers run over
+  // the agentic full-coverage facts; otherwise the single-pass extractor as before.
+  const facts = factsOverride ?? _v2ExtractAllFacts(sectionBag.sections);
+  if (factsOverride) warnings.push(`[facts] source = agentic MAP (per-document, full coverage)`);
   for (const w of facts.extractionWarnings) warnings.push(`[facts] ${w}`);
+
+  // Grounding source for the fabrication guards below. With agentic facts injected,
+  // validate them against the MAP's assembled text (their actual source); otherwise
+  // V2's own doc.rawText. Prevents the guards from silently dropping agentic clauses
+  // V2's single-pass extractor couldn't read (image-only attachments).
+  // `!= null` (not truthy): an empty override string must NOT silently fall back to
+  // doc.rawText — that would re-prune agentic facts. When the override is empty the
+  // guards' own honest-degradation fallback keeps the list (no spurious drops).
+  const groundingText = (factsOverride && groundingTextOverride != null) ? groundingTextOverride : doc.rawText;
 
   // FA-131 — fill scalar-fact gaps from V1 vision + SAM metadata before the
   // judgment call. The presence map below (FA-113 contradiction filter) reads
   // facts AFTER this fill, so bound facts also suppress contradictory output.
-  const boundSources = bindExternalFacts(facts, external, doc.rawText);
+  // groundingText (= the MAP's text on the agentic path) so the scalar doc-text
+  // fallbacks (NAICS/set-aside/due-date/agency) also read the text the facts came
+  // from; identical to doc.rawText on the normal V2 path.
+  const boundSources = bindExternalFacts(facts, external, groundingText);
 
   // §03 FIX (FA-119) — attachment work-statement fallback. extractScope(s["C"])
   // only reads the in-form Section C; on real solicitations the governing work
@@ -5091,7 +5224,11 @@ export async function runAuditV2(
       /(performance\s*work\s*statement|statement\s*of\s*work|statement\s*of\s*objectives?|scope\s*of\s*work)/i,
       /\b(?:1\.0|2\.0|3\.0|section\s+[1-9])\b[\s\S]{0,80}(scope|background|requirements?|tasks?|objectives?|performance)/i,
     ].filter((re) => re.test(_sectionCBody)).length >= 2;
-  if (!facts.workStatementText || facts.workStatementText.length < 200 || _sectionCLooksLikeWs) {
+  // Agentic-primary: if the MAP already supplied a substantial work statement
+  // (it read the SOW/PWS attachment directly, possibly via OCR V2 can't see),
+  // do NOT let this doc.rawText-based promotion overwrite or blank it.
+  const _agenticHasWs = !!factsOverride && !!facts.workStatementText && facts.workStatementText.length >= 200;
+  if (!_agenticHasWs && (!facts.workStatementText || facts.workStatementText.length < 200 || _sectionCLooksLikeWs)) {
     const isManufacturingSupply = /^3[123]/.test(facts.naicsCode ?? "");
     if (!isManufacturingSupply) {
       // Strong work-statement name signals only (full phrases + boundaried
@@ -5290,14 +5427,16 @@ export async function runAuditV2(
   // of the assembled doc.rawText (same pattern, single source of truth), dedup by
   // normalized clause number, then split by prefix. This becomes the persisted
   // far_clauses / dfars_clauses (AI list kept only as fallback when empty).
-  const _detClauses = _v2BuildDeterministicClauses(facts.clauses, doc.rawText);
+  const _detClauses = _v2BuildDeterministicClauses(facts.clauses, groundingText);
   // Fix #3 — fabrication guard. Drop any clause number not grounded in the
   // normalized source text so the rendered list is 100% source-backed (zero-
   // fabrication law). Honest-degradation fallback keeps the list when the text
   // layer is missing. Same normalization as the risk-clause guard below.
-  const farClausesDet = _v2GroundClauseList(_detClauses.farClausesDet, doc.rawText);
-  const dfarsClausesDet = _v2GroundClauseList(_detClauses.dfarsClausesDet, doc.rawText);
-  const agencyClausesDet = _v2GroundClauseList(_detClauses.agencyClausesDet, doc.rawText);
+  // groundingText = the MAP's text on the agentic path (so agentic clauses ground
+  // against their real source), else doc.rawText.
+  const farClausesDet = _v2GroundClauseList(_detClauses.farClausesDet, groundingText);
+  const dfarsClausesDet = _v2GroundClauseList(_detClauses.dfarsClausesDet, groundingText);
+  const agencyClausesDet = _v2GroundClauseList(_detClauses.agencyClausesDet, groundingText);
   const _droppedClauses =
     (_detClauses.farClausesDet.length - farClausesDet.length) +
     (_detClauses.dfarsClausesDet.length - dfarsClausesDet.length) +
@@ -5319,7 +5458,7 @@ export async function runAuditV2(
 
   // Clause-citation fidelity (Polish B): de-attribute any risk trapClause whose
   // clause number isn't grounded in the extracted clause set or the source text.
-  const _ungroundedClauses = _v2GroundRiskClauses(judgment.risks, doc.rawText, [
+  const _ungroundedClauses = _v2GroundRiskClauses(judgment.risks, groundingText, [
     ...farClausesDet,
     ...dfarsClausesDet,
     ...agencyClausesDet,
@@ -5387,4 +5526,4 @@ export async function runAuditV2(
   };
 }
 
-export const AUDIT_V2_ENABLED = process.env.AUDIT_ENGINE_V2 === "true";
+export const AUDIT_V2_ENABLED = isEnvOn(process.env.AUDIT_ENGINE_V2);

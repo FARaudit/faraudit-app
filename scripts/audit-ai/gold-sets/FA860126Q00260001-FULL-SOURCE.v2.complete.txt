@@ -1,0 +1,1631 @@
+
+
+===== SOLICITATION — FA860126Q00260001 (base, verbatim from SAM; §B grounded + §F superseded) =====
+
+                      SOLICITATION/CONTRACT/ORDER FOR COMMERCIAL PRODUCTS AND COMMERCIAL SERVICES
+                                                                                               1. REQUISITION NUMBER                       PAGE 1 OF
+NOTE: OFFEROR TO COMPLETE BLOCKS 12, 17, 23, 24, AND 30.
+                                                                                                                                           24
+2. CONTRACT NUMBER               3. AWARD/EFFECTIVE DATE          4. ORDER NUMBER              5. SOLICITATION NUMBER                      6. SOLICITATION ISSUE DATE
+                                                                                               FA860126Q00260001                           05 Mar 2026
+
+                                 a. NAME                                                       b. TELEPHONE NUMBER (no collect             8. OFFER DUE DATE/
+7. FOR SOLICITATION              DANARA BARLOW                                                 calls)                                      LOCAL TIME
+INFORMATION CALL:                                                                              937-522-4609                                25 Jun 2026
+                                                                                                                                           12:00 PM
+9. ISSUED BY                                            CODE: FA8601             10. THIS ACQUISITION IS     UNRESTRICTED OR        SET ASIDE:       % FOR:
+                                                                                     SMALL BUSINESS             WOMEN-OWNED SMALL                  NORTH AMERICAN
+FA8601 AFLCMC PZIO                                                                                            BUSINESS (WOSB)                      INDUSTRY
+ADMIN ONLY NO REQTN CP 937 255-8922, 2000 ALLBROOK DRIVE BLDG 2                                                                                    CLASSIFICATION
+WRIGHT PATTERSON AFB, OH 45433-5344                                                                                                                STANDARD (NAICS):
+UNITED STATES                                                                                                                                      334511
+DANARA BARLOW, Email: jessica.stamper.2@us.af.mil Telephone: 937-522-4609          HUBZONE SMALL                 ECONOMICALLY                      SIZE STANDARD:
+Jessica Stamper, Email: jessica.stamper.2@us.af.mil Telephone: 937-522-4609      BUSINESS                     DISADVANTAGED WOMEN-                 1350
+                                                                                                              OWNED SMALL BUSINESS
+                                                                                                              (EDWOSB)
+                                                                                   SERVICE-DISABLED              8(A)
+                                                                                 VETERAN-OWNED SMALL
+                                                                                 BUSINESS (SDVOSB)
+11. DELIVERY FOR FREE ON         12. DISCOUNT TERMS                                13a.THIS CONTRACT IS A          13b. RATING
+BOARD (FOB) DESTINATION                                                          RATED ORDER UNDER                 14. METHOD OF SOLICITATION
+UNLESS BLOCK IS MARKED                                                           THE DEFENSE PRIORITIES              REQUEST FOR   INVITATION               REQUEST FOR
+   SEE SCHEDULE                                                                  AND ALLOCATIONS                   QUOTE (RFQ)   FOR BID (IFB)            PROPOSAL (RFP)
+                                                                                 SYSTEM-DPAS (15 CFR 700)
+15. DELIVER TO                                          CODE: F4F5AL             16. ADMINISTERED BY                                                CODE:
+
+F4F5AL AFIT CZ
+AF BPN NO MLSBLS PROC CP9372556720, 2950 HOBSON WAY BLDG 641 RM
+101J
+WRIGHT PATTERSON AFB, OH 45433-7765
+UNITED STATES
+17a. CONTRACTOR/          CODE                   FACILITY                        18a. PAYMENT WILL BE MADE BY                                       CODE:
+OFFERER                                          CODE:
+
+
+
+
+TELEPHONE NUMBER
+
+  17b. CHECK IF REMITTANCE IS DIFFERENT AND PUT SUCH ADDRESS IN                  18b. SUBMIT INVOICES TO ADDRESS SHOWN IN BLOCK 18a UNLESS BLOCK
+OFFER                                                                            BELOW IS CHECKED      SEE ADDENDUM
+         19.                                          20.                                            21.                22.       23.                      24.
+    ITEM NUMBER                          SCHEDULE OF SUPPLIES/SERVICES                             QUANTITY             UNIT      UNIT                   AMOUNT
+                                                                                                                                 PRICE
+
+                        See Schedule
+                        (Use Reverse and/or Attach Additional Sheets as Necessary)
+25. ACCOUNTING AND APPROPRIATION DATA                                                                      26. TOTAL AWARD AMOUNT (For Government Use Only)
+See Section G - Contract Administration Data
+   27a. SOLICITATION INCORPORATES BY REFERENCE (FEDERAL ACQUISITION REGULATION) FAR 52.212-1, 52.212-4. FAR                         ARE             ARE NOT ATTACHED
+52.212-3 AND 52.212-5 ARE ATTACHED. ADDENDA
+  27b. CONTRACT/PURCHASE ORDER INCORPORATES BY REFERENCE FAR 52.212-4. FAR 52.212-5 IS ATTACHED. ADDENDA                            ARE             ARE NOT ATTACHED
+   28. CONTRACTOR IS REQUIRED TO SIGN THIS DOCUMENT AND RETURN    COPIES TO                      29. AWARD OF CONTRACT: REFERENCE       OFFER DATED    . YOUR
+ISSUING OFFICE. CONTRACTOR AGREES TO FURNISH AND DELIVER ALL ITEMS SET FORTH                   OFFER ON SOLICITATION (BLOCK 5), INCLUDING ANY ADDITIONS OR
+OR OTHERWISE IDENTIFIED ABOVE AND ON ANY ADDITIONAL SHEETS SUBJECT TO THE                      CHANGES WHICH ARE SET FORTH HEREIN, IS ACCEPTED AS TO ITEMS:
+TERMS AND CONDITIONS SPECIFIED
+30a. SIGNATURE OF OFFEROR/CONTRACTOR                                             31a. UNITED STATES OF AMERICA (SIGNATURE OF CONTRACTING OFFICER)
+
+
+
+
+30b. NAME AND TITLE OF SIGNER (Type or print)    30c. DATE SIGNED                31b. NAME OF CONTRACTING OFFICER              31c. DATE SIGNED
+                                                                                 (Type or print)
+
+
+
+
+COMPUTER GENERATED                                                                                                                        STANDARD FORM 1449 (REV. 11/2021)
+PREVIOUS EDITION IS NOT USABLE                                                                                                           Prescribed by GSA - FAR (48 CFR) 53.212
+                                             FA860126Q00260001
+                                             Page 2 of 24
+
+
+
+Solicitation/Contract Form
+AFIT - HDR M700 Thermal Imager
+
+
+AFIT Purchase of a HDR M700 Thermal Imager
+Product Service Code: 5855
+                                                                                  FA860126Q00260001
+                                                                                  Page 3 of 24
+
+
+
+SECTION B — SUPPLIES OR SERVICES AND PRICES/COSTS
+
+Supplies or Services & Prices or Costs
+
+CLIN 0001 (binding supply obligation): The Contractor shall furnish and deliver one (1) each High Dynamic Range Thermal Imaging System in accordance with the Statement of Work (Section C). Product Service Code: 5855. Pricing Arrangement: Firm-Fixed-Price. Quantity: 1 Each. Unit: Each. F.O.B. Destination, Wright-Patterson AFB, OH. The Contractor shall deliver the supplies and the Government shall accept and pay the firm-fixed-price upon final inspection and acceptance.
+Additional Information/Notes
+
+
+
+  Item     Supplies / Services                     Quantity   Unit   Unit Price        Amount
+
+
+           The contractor shall deliver
+           high-speed, high dynamic range,
+           thermal imaging system IAW the
+  0001     Statement of Work.                      1          Each
+
+           Product Service Code: 5855
+           Pricing Arrangement: Firm Fixed Price
+                                              FA860126Q00260001
+                                              Page 4 of 24
+
+
+
+Description/Speciﬁcations/Statement of Work
+
+
+Requirements
+AFIT Purchase of a HDR M700 Thermal Imager
+                                                                                                                         FA860126Q00260001
+                                                                                                                         Page 5 of 24
+
+
+
+Packaging and Marking
+
+Inspection and Acceptance
+
+SECTION F — DELIVERIES OR PERFORMANCE [SYNTHETIC-ADVERSARIAL AMENDMENT — SUPERSEDES BASE §F]
+
+================================================================================
+[SYNTHETIC-ADVERSARIAL PROVENANCE — HUMAN AUTHORING NOTE, NOT THE GOVERNMENT'S SOLICITATION, NOT A BINDING TERM]
+Provenance: Authored by Brain (cards 72 / 75-R1 / 76-R1), 2026-06-27, as a clearly-labeled
+FRONTIER-adversarial Section F that SUPERSEDES and VOIDS all base delivery terms (the base
+§F 90-day schedule and the SOW §IV "8 months" target). Synthetic test artifact; never the
+real solicitation. Everything between these banners is synthetic.
+AUTHORING NOTE (net-effect / derivation — for HUMANS ONLY; deliberately demoted OUT of the
+binding solicitation body per card 76-R1 so the engine must DERIVE the conflict itself, not
+read the conclusion): because F.1 imposes a non-waivable 60-day first-article precondition
+before any delivery and F.2 mandates delivery within 30 days ARO, and 60 > 30, the delivery
+window is universally unmeetable from award by every bidder — a solicitation-side
+impossibility, not a bidder bar. The correct disposition is NO_BID; the offeror stays
+eligible. THIS NET-EFFECT STATEMENT IS NOT PART OF THE SOLICITATION AND IS NOT READ AS A TERM.
+================================================================================
+
+F.1 FIRST ARTICLE APPROVAL — GOVERNMENT TESTING (FAR 52.209-4, ADAPTED) [SYNTHETIC]
+(a) Before producing or delivering any production unit, the Contractor shall deliver one (1)
+first article unit for Government first article testing and approval. First article testing
+is a NON-WAIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT
+waive first article testing under any circumstances and SHALL NOT authorize production,
+shipment, or delivery of any production unit until first article approval is granted in writing.
+(b) The Government will require SIXTY (60) calendar days to conduct first article testing and
+issue the written approval notice, measured from receipt of the first article unit. No
+production delivery may occur before the close of this 60-day Government testing period.
+
+F.2 TIME OF DELIVERY (FAR 52.211-8, ADAPTED) [SYNTHETIC]
+The Contractor shall deliver all production units, F.O.B. destination (Wright-Patterson AFB,
+OH), NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO), i.e., within 30
+calendar days after the date of award. This 30-day production delivery requirement is fixed
+by the Government and is identical for all offerors. It SUPERSEDES and VOIDS the base 90-day
+and 8-month delivery terms.
+
+F.3 DELIVERY SCHEDULE IS BINDING; A NONCONFORMING SCHEDULE IS UNACCEPTABLE [SYNTHETIC]
+The 30-day production delivery schedule in F.2 is a material, binding requirement and a
+condition of award. Any quotation that does not unconditionally commit to delivery within 30
+days ARO, or whose delivery is contingent on a date later than 30 days ARO,
+will be rated UNACCEPTABLE and ineligible for award. The Government will make no tradeoff and
+grant no exception to this delivery schedule. Any quotation contingent on a later date will be rated UNACCEPTABLE.
+================================================================================
+[END SYNTHETIC-ADVERSARIAL SECTION F]
+================================================================================
+
+
+
+
+FAR Clauses Incorporated by Reference
+                                                                                                                                        Variation
+                                                                                                                         Alternate/
+Number        Title                                                                                     Effective Date                  Effective
+                                                                                                                         Deviation
+                                                                                                                                        Date
+52.247-34     F.o.b. Destination.                                                                       Jan 1991
+                                                                                                                                                     FA860126Q00260001
+                                                                                                                                                     Page 6 of 24
+
+
+
+Contract Administration Data
+
+
+DFARS Clauses Incorporated by Reference
+                                                                                                                                                                  Variation
+                                                                                                                                                     Alternate/
+Number            Title                                                                                                             Effective Date                Effective
+                                                                                                                                                     Deviation
+                                                                                                                                                                  Date
+252.232-7003      Electronic Submission of Payment Requests and Receiving Reports.                                                  Dec 2018
+
+
+DFARS Clauses Incorporated by Full Text
+
+252.232-7006      Wide Area WorkFlow Payment Instructions.                                                                          (Jan 2023)
+
+
+WIDE AREA WORKFLOW PAYMENT INSTRUCTIONS (JAN 2023)
+
+
+(a) Deﬁnitions. As used in this clause-
+
+
+"Department of Defense Activity Address Code (DoDAAC)" is a six position code that uniquely identiﬁes a unit, activity, or organization.
+
+
+"Document type" means the type of payment request or receiving report available for creation in Wide Area WorkFlow (WAWF).
+
+
+"Local processing ofﬁce (LPO)" is the ofﬁce responsible for payment certiﬁcation when payment certiﬁcation is done external to the entitlement system.
+
+
+"Payment request" and "receiving report" are deﬁned in the clause at 252.232-7003, Electronic Submission of Payment Requests and Receiving Reports.
+
+
+(b) Electronic invoicing. The WAWF system provides the method to electronically process vendor payment requests and receiving reports, as authorized by Defense
+Federal Acquisition Regulation Supplement (DFARS) 252.232-7003, Electronic Submission of Payment Requests and Receiving Reports.
+
+
+(c) WAWF access. To access WAWF, the Contractor shall-
+
+
+(1) Have a designated electronic business point of contact in the System for Award Management at https://www.sam.gov; and
+
+
+(2) Be registered to use WAWF at https://wawf.eb.mil/ following the step-by-step procedures for self-registration available at this web site.
+
+
+(d) WAWF training. The Contractor should follow the training instructions of the WAWF Web-Based Training Course and use the Practice Training Site before submitting
+payment requests through WAWF. Both can be accessed by selecting the "Web Based Training" link on the WAWF home page at https://wawf.eb.mil/
+
+
+(e) WAWF methods of document submission. Document submissions may be via web entry, Electronic Data Interchange, or File Transfer Protocol.
+
+
+(f) WAWF payment instructions. The Contractor shall use the following information when submitting payment requests and receiving reports in WAWF for this contract or
+task or delivery order:
+
+
+(1) Document type. The Contractor shall submit payment requests using the following document type(s):
+
+
+(i) For cost-type line items, including labor-hour or time-and-materials, submit a cost voucher.
+
+
+(ii) For ﬁxed price line items-
+
+
+(A) That require shipment of a deliverable, submit the invoice and receiving report speciﬁed by the Contracting Ofﬁcer.
+
+
+COMBO
+
+
+(Contracting Ofﬁcer: Insert applicable invoice and receiving report document type(s) for ﬁxed price line items that require shipment of a deliverable.)
+
+
+(B) For services that do not require shipment of a deliverable, submit either the Invoice 2in1, which meets the requirements for the invoice and receiving report, or the
+applicable invoice and receiving report, as speciﬁed by the Contracting Ofﬁcer.
+                                                                                                                                                     FA860126Q00260001
+                                                                                                                                                     Page 7 of 24
+
+____
+
+
+(Contracting Ofﬁcer: Insert either "Invoice 2in1" or the applicable invoice and receiving report document type(s) for ﬁxed price line items for services.)
+
+
+(iii) For customary progress payments based on costs incurred, submit a progress payment request.
+
+
+(iv) For performance based payments, submit a performance based payment request.
+
+
+(v) For commercial ﬁnancing, submit a commercial ﬁnancing request.
+
+
+(2) ) Fast Pay requests are only permitted when Federal Acquisition Regulation (FAR) 52.213-1 is included in the contract.
+
+
+[Note: The Contractor may use a WAWF "combo" document type to create some combinations of invoice and receiving report in one step.]
+
+
+(3) Document routing. The Contractor shall use the information in the Routing Data Table below only to ﬁll in applicable ﬁelds in WAWF when creating payment requests
+and receiving reports in the system.
+
+
+Routing Data Table*
+
+
+           Field Name in WAWF                  Data to be entered in WAWF
+           Pay Ofﬁcial DoDAAC                 F03000
+           Issue By DoDAAC                FA8601
+           Admin DoDAAC                 FA8601
+           Inspect By DoDAAC                  FE2300
+           Ship To Code                F4F5AR
+           Ship From Code               ____
+           Mark For Code               ____
+           Service Approver (DoDAAC)                   ____
+           Service Acceptor (DoDAAC)                   ____
+           Accept at Other DoDAAC                 FE2300
+           LPO DoDAAC                  ____
+           DCAA Auditor DoDAAC                   ____
+           Other DoDAAC(s)                ____
+(*Contracting Ofﬁcer: Insert applicable DoDAAC information. If multiple ship to/acceptance locations apply, insert "See Schedule" or "Not applicable.")
+
+
+(**Contracting Ofﬁcer: If the contract provides for progress payments or performance-based payments, insert the DoDAAC for the contract administration ofﬁce assigned
+the functions under FAR 42.302(a)(13).)
+
+
+(4) Payment request. The Contractor shall ensure a payment request includes documentation appropriate to the type of payment request in accordance with the payment
+clause, contract ﬁnancing clause, or Federal Acquisition Regulation 52.216-7, Allowable Cost and Payment, as applicable.
+
+
+(5) Receiving report. The Contractor shall ensure a receiving report meets the requirements of DFARS Appendix F.
+
+
+(g) WAWF point of contact.
+
+
+(1) The Contractor may obtain clariﬁcation regarding invoicing in WAWF from the following contracting activity's WAWF point of contact.
+
+
+JESSICA.STAMPER.2@US.AF.MIL
+
+
+(Contracting Ofﬁcer: Insert applicable information or "Not applicable.")
+
+
+(2) Contact the WAWF helpdesk at 866-618-5988, if assistance is needed.
+
+
+(End of clause)
+                                                                                                                                FA860126Q00260001
+                                                                                                                                Page 8 of 24
+
+
+
+Special Contract Requirements
+
+Contract Clauses
+
+Ombudsman (AFLCMC/AQ-AZ)
+
+(a) An ombudsman has been appointed to hear and facilitate the resolution of concerns from offerors, potential
+offerors, and others for this acquisition. When requested, the ombudsman will maintain strict conﬁdentiality as to the
+source of the concern. The existence of the ombudsman does not affect the authority of the program manager,
+contracting ofﬁcer, or source selection ofﬁcial. Further, the ombudsman does not participate in the evaluation of
+proposals, the source selection process, or the adjudication of protests or formal contract disputes. The ombudsman
+may refer the interested party to another ofﬁcial who can resolve the concern.
+
+
+
+(b) Before consulting with an ombudsman, interested parties must ﬁrst address their concerns, issues,
+disagreements, and/or recommendations to the contracting ofﬁcer for resolution. Consulting an ombudsman does
+not alter or postpone the timelines for any other processes (e.g., agency level bid protests, GAO bid protests,
+requests for debrieﬁngs, employee-employer actions, contests of OMB Circular A-76 competition performance
+decisions).
+
+
+
+(c) If resolution cannot be made by the contracting ofﬁcer, the interested party may contact the ombudsman, Col(S)
+Paul W. Tinker, Deputy Director, Acquisition Excellence & Program Execution Directorate, AFLCMC/AQ-AZ,
+ASCA@us.af.mil. Concerns, issues, disagreements, and recommendations that cannot be resolved at the Center/
+MAJCOM/DRU/SMC ombudsman level, may be brought by the interested party for further consideration to the Air
+Force ombudsman, Associate Deputy Assistant Secretary (ADAS) (Contracting), SAF/AQC, 1060 Air Force
+Pentagon, Washington DC 20330-1060, phone number (571) 256-2395, facsimile number (571) 256-2431.
+
+
+
+(d) The ombudsman has no authority to render a decision that binds the agency.
+
+
+
+(e) Do not contact the ombudsman to request copies of the solicitation, verify offer due date, or clarify technical
+requirements. Such inquiries shall be directed to the contracting ofﬁcer.
+
+
+
+FAR Clauses Incorporated by Reference
+                                                                                                                                             Variation
+                                                                                                                                Alternate/
+Number        Title                                                                                            Effective Date                Effective
+                                                                                                                                Deviation
+                                                                                                                                             Date
+52.203-19     Prohibition on Requiring Certain Internal Conﬁdentiality Agreements or Statements.               Jan 2017
+52.204-13     System for Award Management-Maintenance. (Deviation 2026-O0038)                                  Feb 2026
+52.209-6      Protecting the Government's Interest When Subcontracting With Contractors Debarred, Suspended,   Feb 2026
+              Proposed for Debarment, or Voluntarily Excluded. (Deviation 2026-O0038)
+52.209-10     Prohibition on Contracting With Inverted Domestic Corporations. (Deviation 2026-O0038)           Feb 2026
+52.212-4      Terms and Conditions-Commercial Products and Commercial Services. (Deviation 2026-O0038)         Feb 2026
+52.222-3      Convict Labor. (Deviation 2026-O0038)                                                            Feb 2026
+                                                                                                                                                       FA860126Q00260001
+                                                                                                                                                       Page 9 of 24
+
+52.222-19           Child Labor-Cooperation with Authorities and Remedies. (Deviation 2026-O0038)                                     Mar 2026
+52.222-35           Equal Opportunity for Veterans. (Deviation 2026-O0038)                                                            Feb 2026
+52.222-36           Equal Opportunity for Workers with Disabilities. (Deviation 2026-O0038)                                           Feb 2026
+52.222-37           Employment Reports on Veterans. (Deviation 2026-O0038)                                                            Feb 2026
+52.222-50           Combating Trafﬁcking in Persons. (Deviation 2026-O0038)                                                           Feb 2026
+52.222-90           Addressing DEI Discrimination by Federal Contractors. (Deviation 2026-O0040, Revision 1)                          Apr 2026
+52.223-23           Sustainable Products. (Deviation 2026-O0038)                                                                      Feb 2026
+52.226-8            Encouraging Contractor Policies to Ban Text Messaging While Driving.                                              May 2024
+52.232-33           Payment by Electronic Funds Transfer-System for Award Management.                                                 Oct 2018
+52.232-40           Providing Accelerated Payments to Small Business Subcontractors.                                                  Mar 2023
+52.233-3            Protest after Award. (Deviation 2026-O0038)                                                                       Feb 2026
+52.233-4            Applicable Law for Breach of Contract Claim. (Deviation 2026-O0038)                                               Feb 2026
+52.240-91           Security Prohibitions and Exclusions. (Deviation 2026-O0038)                                                      Feb 2026
+52.244-6            Subcontracts for Commercial Products and Commercial Services. (Deviation 2026-O0038)                              Apr 2026
+
+
+DFARS Clauses Incorporated by Reference
+                                                                                                                                                                    Variation
+                                                                                                                                                       Alternate/
+Number              Title                                                                                                             Effective Date                Effective
+                                                                                                                                                       Deviation
+                                                                                                                                                                    Date
+252.203-7000        Requirements Relating to Compensation of Former DoD Ofﬁcials.                                                     Sep 2011
+252.203-7002        Requirement to Inform Employees of Whistleblower Rights.                                                          Dec 2022
+252.204-7018        Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services.                       Jan 2023
+252.223-7008        Prohibition of Hexavalent Chromium.                                                                               Jan 2023
+252.225-7001        Buy American and Balance of Payments Program.                                                                     Feb 2024
+252.225-7002        Qualifying Country Sources as Subcontractors.                                                                     Mar 2022
+252.225-7012        Preference for Certain Domestic Commodities.                                                                      Apr 2022
+252.225-7013        Duty-Free Entry.                                                                                                  Aug 2025
+252.225-7056        Prohibition Regarding Business Operations with the Maduro Regime.                                                 Jan 2023
+252.225-7060        Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region.                                   Jun 2023
+252.232-7010        Levies on Contract Payments.                                                                                      Dec 2006
+252.246-7008        Sources of Electronic Parts.                                                                                      Jan 2023
+252.247-7023        Transportation of Supplies by Sea.                                                                                Oct 2024
+
+
+FAR Clauses Incorporated by Full Text
+
+52.212-4            Terms and Conditions-Commercial Products and Commercial Services. (Deviation) (Alternate I)                       (Feb 2026)
+
+
+Alternate I (Feb 2026) (Deviation). When contemplating a time-and-materials or labor-hour contract, substitute the following paragraphs (a), (b), (i), (l), and (m) for those in
+the basic clause.
+
+
+(a) The clause at Federal Acquisition Regulation (FAR) 52.202-1, Deﬁnitions, is incorporated by reference. As used in this clause-
+
+
+Direct materials means those materials that enter directly into the end product, or that are used or consumed directly in connection with the furnishing of the end product or
+service.
+
+
+Hourly rate means the rate(s) prescribed in the contract for payment for labor that meets the labor category qualiﬁcations of a labor category speciﬁed in the contract that
+are-
+
+
+(1) Performed by the contractor;
+
+
+(2) Performed by the subcontractors; or
+
+
+(3) Transferred between divisions, subsidiaries, or afﬁliates of the contractor under a common control.
+
+
+Materials means-
+
+
+(1) Direct materials, including supplies transferred between divisions, subsidiaries, or afﬁliates of the contractor under a common control;
+
+
+(2) Subcontracts for supplies and incidental services for which there is not a labor category speciﬁed in the contract;
+
+
+(3) Other direct costs (e.g., incidental services for which there is not a labor category speciﬁed in the contract, travel, computer usage charges, etc.);
+
+
+(4) The following subcontracts for services which are speciﬁcally excluded from the hourly rate: ____[Insert any subcontracts for services to be excluded from the hourly
+rates prescribed in the schedule.]; and
+
+
+(5) Indirect costs speciﬁcally provided for in this clause.
+                                                                                                                                                      FA860126Q00260001
+                                                                                                                                                      Page 10 of 24
+
+
+Subcontract means any contract, as deﬁned in FAR 2.101, entered into with a subcontractor to furnish supplies or services for performance of the prime contract or a
+subcontract including transfers between divisions, subsidiaries, or afﬁliates of a contractor or subcontractor. It includes, but is not limited to, purchase orders, and changes
+and modiﬁcations to purchase orders.
+
+
+(b) Inspection/Acceptance.
+
+
+(1) The Government has the right to inspect and test all materials furnished and services performed under this contract at all places and times before acceptance. The
+Government will perform inspections and tests in a manner that will not unduly delay the work.
+
+
+(2) If the Government performs inspection or tests on the premises of the Contractor or a subcontractor, the Contractor shall furnish and shall require subcontractors to
+furnish all reasonable facilities and assistance for the safe and convenient performance of these duties.
+
+
+(3) Unless otherwise speciﬁed in the contract, the Government will accept or reject services and materials at the place of delivery as promptly as practicable after delivery,
+and they will be presumed accepted 60 days after the date of delivery, unless accepted earlier.
+
+
+(4) At any time during contract performance, but not later than 6 months (or such other time as may be speciﬁed in the contract) after acceptance of the services or
+materials last delivered under this contract, the Government may require the Contractor to replace or correct services or materials that at time of delivery failed to meet
+contract requirements. Except as otherwise speciﬁed in paragraph (b)(6) of this clause, the cost of replacement or correction shall be determined under paragraph (i) of this
+clause, but the "hourly rate" for labor hours incurred in the replacement or correction shall be reduced to exclude that portion of the rate attributable to proﬁt. Unless
+otherwise speciﬁed below, the portion of the "hourly rate" attributable to proﬁt shall be 10 percent. The Contractor shall not tender for acceptance materials and services
+required to be replaced or corrected without disclosing the former requirement for replacement or correction, and, when required, shall disclose the corrective action taken.
+____[Insert portion of labor rate attributable to proﬁt.]
+
+
+(5)(i) If the Contractor fails to proceed with reasonable promptness to perform required replacement or correction, and if the replacement or correction can be performed
+within the ceiling price (or the ceiling price as increased by the Government), the Government may-
+
+
+(A) By contract or otherwise, perform the replacement or correction, charge to the Contractor any increased cost, or deduct such increased cost from any amounts paid or
+due under this contract; or
+
+
+(B) Terminate this contract for cause.
+
+
+(ii) Failure to agree to the amount of increased cost to be charged to the Contractor shall be a dispute under the Disputes clause of the contract.
+
+
+(6) Notwithstanding paragraphs (b)(4) and (5) of this clause, the Government may, at any time, require the Contractor to remedy by correction or replacement, without cost
+to the Government, any failure by the Contractor to comply with the requirements of this contract, if the failure is due to-
+
+
+(i) Fraud, lack of good faith, or willful misconduct on the part of the Contractor's managerial personnel; or
+
+
+(ii) The conduct of one or more of the Contractor's employees selected or retained by the Contractor after any of the Contractor's managerial personnel has reasonable
+grounds to believe that the employee is habitually careless or unqualiﬁed.
+
+
+(7) This clause applies in the same manner and to the same extent to corrected or replacement materials or services as to materials and services originally delivered under
+this contract.
+
+
+(8) The Contractor has no obligation or liability under this contract to correct or replace materials and services that at time of delivery do not meet contract requirements,
+except as provided in this clause or as may be otherwise speciﬁed in the contract.
+
+
+(9) Unless otherwise speciﬁed in the contract, the Contractor's obligation to correct or replace Government-furnished property shall be governed by the clause pertaining to
+Government property.
+
+
+(i) Payments.
+
+
+(1) Work performed. The Government will pay the Contractor as follows upon the submission of commercial invoices approved by the Contracting Ofﬁcer:
+
+
+(i) Hourly rate.
+
+
+(A) The amounts shall be computed by multiplying the appropriate hourly rates prescribed in the contract by the number of direct labor hours performed. Fractional parts of
+an hour shall be payable on a prorated basis.
+
+
+(B) The rates shall be paid for all labor performed on the contract that meets the labor qualiﬁcations speciﬁed in the contract. Labor hours incurred to perform tasks for
+                                                                                                                                                         FA860126Q00260001
+                                                                                                                                                         Page 11 of 24
+
+which labor qualiﬁcations were speciﬁed in the contract will not be paid to the extent the work is performed by individuals that do not meet the qualiﬁcations speciﬁed in the
+contract, unless speciﬁcally authorized by the Contracting Ofﬁcer.
+
+
+(C) Invoices may be submitted once each month (or at more frequent intervals, if approved by the Contracting Ofﬁcer) to the Contracting Ofﬁcer or the authorized
+representative.
+
+
+(D) When requested by the Contracting Ofﬁcer or the authorized representative, the Contractor shall substantiate invoices (including any subcontractor hours reimbursed at
+the hourly rate in the schedule) by evidence of actual payment, individual daily job timecards, records that verify the employees meet the qualiﬁcations for the labor
+categories speciﬁed in the contract, or other substantiation speciﬁed in the contract.
+
+
+(E) Unless the Schedule prescribes otherwise, the hourly rates in the Schedule shall not be varied by virtue of the Contractor having performed work on an overtime basis.
+
+
+(1) If no overtime rates are provided in the Schedule and the Contracting Ofﬁcer approves overtime work in advance, overtime rates shall be negotiated.
+
+
+(2) Failure to agree upon these overtime rates shall be treated as a dispute under the Disputes clause of this contract.
+
+
+(3) If the Schedule provides rates for overtime, the premium portion of those rates will be reimbursable only to the extent the overtime is approved by the Contracting Ofﬁcer.
+
+
+(ii) Materials.
+
+
+(A) If the Contractor furnishes materials that meet the deﬁnition of a commercial product at FAR 2.101, the price to be paid for such materials shall not exceed the
+Contractor's established catalog or market price, adjusted to reﬂect the-
+
+
+(1) Quantities being acquired; and
+
+
+(2) Any modiﬁcations necessary because of contract requirements.
+
+
+(B) Except as provided for in paragraph (i)(1)(ii)(A) and (D)(2) of this clause, the Government will reimburse the Contractor the actual cost of materials (less any rebates,
+refunds, or discounts received by the contractor that are identiﬁable to the contract) provided the Contractor-
+
+
+(1) Has made payments for materials in accordance with the terms and conditions of the agreement or invoice; or
+
+
+(2) Makes these payments within 30 days of the submission of the Contractor's payment request to the Government and such payment is in accordance with the terms and
+conditions of the agreement or invoice.
+
+
+(C) To the extent able, the Contractor shall-
+
+
+(1) Obtain materials at the most advantageous prices available with due regard to securing prompt delivery of satisfactory materials; and
+
+
+(2) Give credit to the Government for cash and trade discounts, rebates, scrap, commissions, and other amounts that are identiﬁable to the contract.
+
+
+(D) Unless listed below, other direct and indirect costs will not be reimbursed.
+
+
+(1) Other direct costs. The Government will reimburse the Contractor on the basis of actual cost for the following, provided such costs comply with the requirements in
+paragraph (i)(1)(ii)(B) of this clause: ____[Insert each element of other direct costs (e.g., travel, computer usage charges, etc. Insert "None" if no reimbursement for other
+direct costs will be provided. If this is an indeﬁnite delivery contract, the Contracting Ofﬁcer may insert "Each order must list separately the elements of other direct
+charge(s) for that order or, if no reimbursement for other direct costs will be provided, insert 'None'".]
+
+
+(2) Indirect costs (material handling, subcontract administration, etc.). The Government will reimburse the Contractor for indirect costs on a pro-rata basis over the period of
+contract performance at the following ﬁxed price:____[Insert a ﬁxed amount for the indirect costs and payment schedule. Insert "$0" if no ﬁxed price reimbursement for
+indirect costs will be provided. (If this is an indeﬁnite delivery contract, the Contracting Ofﬁcer may insert "Each order must list separately the ﬁxed amount for the indirect
+costs and payment schedule or, if no reimbursement for indirect costs, insert 'None')."]
+
+
+(2) Total cost. The total cost to the Government for the performance of this contract shall not exceed the ceiling price set forth in the Schedule. The Contractor agrees to
+use its best efforts to perform the work speciﬁed in the Schedule and all obligations under this contract within such ceiling price. If at any time the Contractor has reason to
+believe that the hourly rate payments and material costs that will accrue in performing this contract in the next succeeding 30 days, if added to all other payments and costs
+previously accrued, will exceed 85 percent of the ceiling price in the Schedule, the Contractor shall notify the Contracting Ofﬁcer giving a revised estimate of the total price
+to the Government for performing this contract with supporting reasons and documentation. If at any time during the performance of this contract, the Contractor has reason
+to believe that the total price to the Government for performing this contract will be substantially greater or less than the stated ceiling price, the Contractor shall so notify
+the Contracting Ofﬁcer, giving a revised estimate of the total price for performing this contract, with supporting reasons and documentation. If at any time during
+performance of this contract, the Government has reason to believe that the work to be required in performing this contract will be substantially greater or less than the
+                                                                                                                                                      FA860126Q00260001
+                                                                                                                                                      Page 12 of 24
+
+stated ceiling price, the Contracting Ofﬁcer will so advise the Contractor, giving the revised estimate of the total amount of effort to be required under the contract.
+
+
+(3) Ceiling price. The Government will not be obligated to pay the Contractor any amount in excess of the ceiling price in the Schedule, and the Contractor shall not be
+obligated to continue performance if to do so would exceed the ceiling price set forth in the Schedule, unless and until the Contracting Ofﬁcer notiﬁes the Contractor in
+writing that the ceiling price has been increased and speciﬁes in the notice a revised ceiling that shall constitute the ceiling price for performance under this contract. When
+and to the extent that the ceiling price set forth in the Schedule has been increased, any hours expended and material costs incurred by the Contractor in excess of the
+ceiling price before the increase shall be allowable to the same extent as if the hours expended and material costs had been incurred after the increase in the ceiling price.
+
+
+(4) Access to records. At any time before ﬁnal payment under this contract, the Contracting Ofﬁcer (or authorized representative) will have access to the following (access
+shall be limited to the listing below unless otherwise agreed to by the Contractor and the Contracting Ofﬁcer):
+
+
+(i) Records that verify that the employees whose time has been included in any invoice meet the qualiﬁcations for the labor categories speciﬁed in the contract;
+
+
+(ii) For labor hours (including any subcontractor hours reimbursed at the hourly rate in the schedule), when timecards are required as substantiation for payment-
+
+
+(A) The original timecards (paper-based or electronic);
+
+
+(B) The Contractor's timekeeping procedures;
+
+
+(C) Contractor records that show the distribution of labor between jobs or contracts; and
+
+
+(D) Employees whose time has been included in any invoice for the purpose of verifying that these employees have worked the hours shown on the invoices.
+
+
+(iii) For material and subcontract costs that are reimbursed on the basis of actual cost-
+
+
+(A) Any invoices or subcontract agreements substantiating material costs; and
+
+
+(B) Any documents supporting payment of those invoices.
+
+
+(5) Overpayments/Underpayments. Each payment previously made shall be subject to reduction to the extent of amounts, on preceding invoices, that are found by the
+Contracting Ofﬁcer not to have been properly payable and shall also be subject to reduction for overpayments or to increase for underpayments. The Contractor shall
+promptly pay any such reduction within 30 days unless the parties agree otherwise. The Government will pay any such increases within 30 days, unless the parties agree
+otherwise. The Contractor's payment will be made by check. If the Contractor becomes aware of a duplicate invoice payment or that the Government has otherwise
+overpaid on an invoice payment, the Contractor shall-
+
+
+(i) Remit the overpayment amount to the payment ofﬁce cited in the contract along with a description of the overpayment including the-
+
+
+(A) Circumstances of the overpayment (e.g., duplicate payment, erroneous payment, liquidation errors, date(s) of overpayment);
+
+
+(B) Affected contract number and delivery order number, if applicable;
+
+
+(C) Affected line item or subline item, if applicable; and
+
+
+(D) Contractor point of contact.
+
+
+(ii) Provide a copy of the remittance and supporting documentation to the Contracting Ofﬁcer.
+
+
+(6) Interest.
+
+
+(i) All amounts that become payable by the Contractor to the Government under this contract shall bear simple interest from the date due until paid unless paid within 30
+days of becoming due. The interest rate shall be the interest rate established by the Secretary of the Treasury, as provided in 41 U.S.C. 7109, which is applicable to the
+period in which the amount becomes due, and then at the rate applicable for each six-month period as established by the Secretary until the amount is paid.
+
+
+(ii) The Government may issue a demand for payment to the Contractor upon ﬁnding a debt is due under the contract.
+
+
+(iii) The Contracting Ofﬁcer will issue a ﬁnal decision if-
+
+
+(A) The Contracting Ofﬁcer and the Contractor are unable to reach agreement on the existence or amount of a debt in a timely manner;
+
+
+(B) The Contractor fails to liquidate a debt previously demanded by the Contracting Ofﬁcer within the timeline speciﬁed in the demand for payment unless the amounts
+were not repaid because the Contractor has requested an installment payment agreement; or
+                                                                                                                                                        FA860126Q00260001
+                                                                                                                                                        Page 13 of 24
+
+
+(C) The Contractor requests a deferment of collection on a debt previously demanded by the Contracting Ofﬁcer.
+
+
+(iv) If a demand for payment was previously issued for the debt, the demand for payment included in the ﬁnal decision shall identify the same due date as the original
+demand for payment.
+
+
+(v) Amounts shall be due at the earliest of the following dates:
+
+
+(A) The date ﬁxed under this contract.
+
+
+(B) The date of the ﬁrst written demand for payment, including any demand for payment resulting from a default termination.
+
+
+(vi) The interest charge shall be computed for the actual number of calendar days involved beginning on the due date and ending on-
+
+
+(A) The date on which the designated ofﬁce receives payment from the Contractor;
+
+
+(B) The date of issuance of a Government check to the Contractor from which an amount otherwise payable has been withheld as a credit against the contract debt; or
+
+
+(C) The date on which an amount withheld and applied to the contract debt would otherwise have become payable to the Contractor.
+
+
+(vii) The interest charge made under this clause may be reduced under the procedures prescribed in FAR part 32 in effect on the date of this contract.
+
+
+(viii) Upon receipt and approval of the invoice designated by the Contractor as the "completion invoice" and supporting documentation, and upon compliance by the
+Contractor with all terms of this contract, any outstanding balances will be paid within 30 days unless the parties agree otherwise. The completion invoice, and supporting
+documentation, shall be submitted by the Contractor as promptly as practicable following completion of the work under this contract, but in no event later than 1 year (or
+such longer period as the Contracting Ofﬁcer may approve in writing) from the date of completion.
+
+
+(7) Release of claims. The Contractor, and each assignee under an assignment entered into under this contract and in effect at the time of ﬁnal payment under this
+contract, shall execute and deliver, at the time of and as a condition precedent to ﬁnal payment under this contract, a release discharging the Government, its ofﬁcers,
+agents, and employees of and from all liabilities, obligations, and claims arising out of or under this contract, subject only to the following exceptions:
+
+
+(i) Speciﬁed claims in stated amounts, or in estimated amounts if the amounts are not susceptible to exact statement by the Contractor.
+
+
+(ii) Claims, together with reasonable incidental expenses, based upon the liabilities of the Contractor to third parties arising out of performing this contract, that are not
+known to the Contractor on the date of the execution of the release, and of which the Contractor gives notice in writing to the Contracting Ofﬁcer not more than 6 years after
+the date of the release or the date of any notice to the Contractor that the Government is prepared to make ﬁnal payment, whichever is earlier.
+
+
+(iii) Claims for reimbursement of costs (other than expenses of the Contractor by reason of its indemniﬁcation of the Government against patent liability), including
+reasonable incidental expenses, incurred by the Contractor under the terms of this contract relating to patents.
+
+
+(8) Prompt payment. The Government will make payment in accordance with the Prompt Payment Act (31 U.S.C. 3903) and prompt payment regulations at 5 CFR part
+1315.
+
+
+(9) Discount. In connection with any discount offered for early payment, time shall be computed from the date of the invoice. For the purpose of computing the discount
+earned, payment shall be considered to have been made on the date that appears on the payment check or the speciﬁed payment date if an electronic funds transfer
+payment is made.
+
+
+(l) Termination for the Government's convenience. The Government reserves the right to terminate this contract, or any part hereof, for its sole convenience. In the event of
+such termination, the Contractor shall immediately stop all work under this contract and shall immediately cause any and all of its suppliers and subcontractors to cease
+work. Subject to the terms of this contract, the Contractor shall be paid an amount for direct labor hours (as deﬁned in the Schedule of the contract) determined by
+multiplying the number of direct labor hours expended before the effective date of termination by the hourly rate(s) in the contract, less any hourly rate payments already
+made to the Contractor plus reasonable charges the Contractor can demonstrate to the satisfaction of the Government using its standard record keeping system that have
+resulted from the termination. The Contractor shall not be required to comply with the cost accounting standards or contract cost principles for this purpose. This paragraph
+does not give the Government any right to audit the Contractor's records. The Contractor shall not be paid for any work performed or costs incurred that reasonably could
+have been avoided.
+
+
+(m) Termination for cause. The Government may terminate this contract, or any part hereof, for cause in the event of any default by the Contractor, or if the Contractor fails
+to comply with any contract terms and conditions, or fails to provide the Government, upon written request, with adequate assurances of future performance. The
+Government will send a cure notice to the Contractor, unless the reason for the termination is late delivery. Subject to the terms of this contract, the Contractor shall be paid
+an amount computed under paragraph (i), Payments, of this clause, but the "hourly rate" for labor hours expended in furnishing work not delivered to or accepted by the
+Government shall be reduced to exclude that portion of the rate attributable to proﬁt. Unless otherwise speciﬁed in paragraph (b)(4) of this clause, the portion of the "hourly
+                                                                                                                                                       FA860126Q00260001
+                                                                                                                                                       Page 14 of 24
+
+rate" attributable to proﬁt shall be 10 percent. In the event of termination for cause, the Contractor shall be liable to the Government for any and all rights and remedies
+provided by law. If it is determined that the Government improperly terminated this contract for default, such termination shall be deemed a termination for convenience.
+
+
+
+
+DFARS Clauses Incorporated by Full Text
+
+252.211-7003      Item Unique Identiﬁcation and Valuation.                                                                             (Jan 2023)
+
+
+ITEM UNIQUE IDENTIFICATION AND VALUATION (JAN 2023)
+
+
+(a) Deﬁnitions. As used in this clause-
+
+
+"Automatic identiﬁcation device" means a device, such as a reader or interrogator, used to retrieve data encoded on machine-readable media.
+
+
+"Concatenated unique item identiﬁer" means-
+
+
+ (1) For items that are serialized within the enterprise identiﬁer, the linking together of the unique identiﬁer data elements in order of the issuing agency code, enterprise
+identiﬁer, and unique serial number within the enterprise identiﬁer; or
+
+
+(2) For items that are serialized within the original part, lot, or batch number, the linking together of the unique identiﬁer data elements in order of the issuing agency code;
+enterprise identiﬁer; original part, lot, or batch number; and serial number within the original part, lot, or batch number.
+
+
+"Data matrix" means a two-dimensional matrix symbology, which is made up of square or, in some cases, round modules arranged within a perimeter ﬁnder pattern and
+uses the Error Checking and Correction 200 (ECC200) speciﬁcation found within International Standards Organization (ISO)/International Electrotechnical Commission
+(IEC) 16022.
+
+
+"Data qualiﬁer" means a speciﬁed character (or string of characters) that immediately precedes a data ﬁeld that deﬁnes the general category or intended use of the data
+that follows.
+
+
+"DoD recognized unique identiﬁcation equivalent" means a unique identiﬁcation method that is in commercial use and has been recognized by DoD. All DoD recognized
+unique identiﬁcation equivalents are listed at https://www.acq.osd.mil/asda/dpc/ce/ds/unique-id.html.
+
+
+"DoD item unique identiﬁcation" means a system of marking items delivered to DoD with unique item identiﬁers that have machine-readable data elements to distinguish
+an item from all other like and unlike items. For items that are serialized within the enterprise identiﬁer, the unique item identiﬁer shall include the data elements of the
+enterprise identiﬁer and a unique serial number. For items that are serialized within the part, lot, or batch number within the enterprise identiﬁer, the unique item identiﬁer
+shall include the data elements of the enterprise identiﬁer; the original part, lot, or batch number; and the serial number.
+
+
+" Enterprise " means the entity (e.g., a manufacturer or vendor) responsible for assigning unique item identiﬁers to items.
+
+
+" Enterprise identiﬁer" means a code that is uniquely assigned to an enterprise by an issuing agency.
+
+
+"Government's unit acquisition cost" means-
+
+
+(1) For ﬁxed-price type line, subline, or exhibit line items, the unit price identiﬁed in the contract at the time of delivery;
+
+
+(2) For cost-type or undeﬁnitized line, subline, or exhibit line items, the Contractor's estimated fully burdened unit cost to the Government at the time of delivery; and
+
+
+(3) For items produced under a time-and-materials contract, the Contractor's estimated fully burdened unit cost to the Government at the time of delivery.
+
+
+"Issuing agency" means an organization responsible for assigning a globally unique identiﬁer to an enterprise, as indicated in the Register of Issuing Agency Codes for ISO/
+IEC 15459, located at http://www.aimglobal.org/?Reg_Authority15459.
+
+
+"Issuing agency code" means a code that designates the registration (or controlling) authority for the enterprise identiﬁer.
+
+
+"Item" means a single hardware article or a single unit formed by a grouping of subassemblies, components, or constituent parts.
+
+
+" Lot or batch number" means an identifying number assigned by the enterprise to a designated group of items, usually referred to as either a lot or a batch, all of which
+were manufactured under identical conditions.
+                                                                                                                                                      FA860126Q00260001
+                                                                                                                                                      Page 15 of 24
+
+"Machine-readable" means an automatic identiﬁcation technology media, such as bar codes, contact memory buttons, radio frequency identiﬁcation, or optical memory
+cards.
+
+
+"Original part number" means a combination of numbers or letters assigned by the enterprise at item creation to a class of items with the same form, ﬁt, function, and
+interface.
+
+
+"Parent item" means the item assembly, intermediate component, or subassembly that has an embedded item with a unique item identiﬁer or DoD recognized unique
+identiﬁcation equivalent.
+
+
+"Serial number within the enterprise identiﬁer" means a combination of numbers, letters, or symbols assigned by the enterprise to an item that provides for the
+differentiation of that item from any other like and unlike item and is never used again within the enterprise.
+
+
+"Serial number within the part, lot, or batch number" means a combination of numbers or letters assigned by the enterprise to an item that provides for the differentiation of
+that item from any other like item within a part, lot, or batch number assignment.
+
+
+"Serialization within the enterprise identiﬁer" means each item produced is assigned a serial number that is unique among all the tangible items produced by the enterprise
+and is never used again. The enterprise is responsible for ensuring unique serialization within the enterprise identiﬁer.
+
+
+"Serialization within the part, lot, or batch number" means each item of a particular part, lot, or batch number is assigned a unique serial number within that part, lot, or
+batch number assignment. The enterprise is responsible for ensuring unique serialization within the part, lot, or batch number within the enterprise identiﬁer.
+
+
+"Type designation" means a combination of letters and numerals assigned by the Government to a major end item, assembly or subassembly, as appropriate, to provide a
+convenient means of differentiating between items having the same basic name and to indicate modiﬁcations and changes thereto.
+
+
+"Unique item identiﬁer" means a set of data elements marked on items that is globally unique and unambiguous. The term includes a concatenated unique item identiﬁer or
+a DoD recognized unique identiﬁcation equivalent.
+
+
+"Unique item identiﬁer type" means a designator to indicate which method of uniquely identifying a part has been used. The current list of accepted unique item identiﬁer
+types is maintained at https://www.acq.osd.mil/asda/dpc/ce/ds/unique-id.html.
+
+
+(b) The Contractor shall deliver all items under a contract line, subline, or exhibit line item.
+
+
+(c) Unique item identiﬁer.
+
+
+(1) The Contractor shall provide a unique item identiﬁer for the following:
+
+
+(i) Delivered items for which the Government's unit acquisition cost is $5,000 or more, except for the following line items:
+
+
+Contract Line, Subline, or
+
+
+Exhibit Line Item Number Item Description
+
+
+CLIN 0001 ____
+
+
+____ ____
+
+
+____ ____
+
+
+(ii) Items for which the Government's unit acquisition cost is less than $5,000 that are identiﬁed in the Schedule or the following table:
+
+
+Contract Line, Subline, or
+
+
+Exhibit Line Item Number Item Description
+
+
+____ ____
+
+
+____ ____
+
+
+____ ____
+
+
+(If items are identiﬁed in the Schedule, insert "See Schedule in this table.)
+                                                                                                                                                      FA860126Q00260001
+                                                                                                                                                      Page 16 of 24
+
+
+(iii) Subassemblies, components, and parts embedded within delivered items, items with warranty requirements, DoD serially managed reparables and DoD serially
+managed nonreparables as speciﬁed in Attachment Number ____.
+
+
+(iv) Any item of special tooling or special test equipment as deﬁned in FAR 2.101 that have been designated for preservation and storage for a Major Defense Acquisition
+Program as speciﬁed in Attachment Number ____.
+
+
+(v) Any item not included in (i), (ii), (iii), or (iv) for which the contractor creates and marks a unique item identiﬁer for traceability.
+
+
+(2) The unique item identiﬁer assignment and its component data element combination shall not be duplicated on any other item marked or registered in the DoD Item
+Unique Identiﬁcation Registry by the contractor.
+
+
+(3) The unique item identiﬁer component data elements shall be marked on an item using two dimensional data matrix symbology that complies with ISO/IEC International
+Standard 16022, Information technology - International symbology speciﬁcation - Data matrix; ECC200 data matrix speciﬁcation.
+
+
+(4) Data syntax and semantics of unique item identiﬁers. The Contractor shall ensure that-
+
+
+(i) The data elements (except issuing agency code) of the unique item identiﬁer are encoded within the data matrix symbol that is marked on the item using one of the
+following three types of data qualiﬁers, as determined by the Contractor:
+
+
+ (A) Application Identiﬁers (AIs) (Format Indicator 05 of ISO/IEC International Standard 15434), in accordance with ISO/IEC International Standard 15418, Information
+Technology - EAN/UCC Application Identiﬁers and Fact Data Identiﬁers and Maintenance and ANSI MH 10.8.2 Data Identiﬁer and Application Identiﬁer Standard.
+
+
+(B) Data Identiﬁers (DIs) (Format Indicator 06 of ISO/IEC International Standard 15434), in accordance with ISO/IEC International Standard 15418, Information Technology
+- EAN/UCC Application Identiﬁers and Fact Data Identiﬁers and Maintenance and ANSI MH 10.8.2 Data Identiﬁer and Application Identiﬁer Standard.
+
+
+(C) Text Element Identiﬁers (TEIs) (Format Indicator 12 of ISO/IEC International Standard 15434), in accordance with the Air Transport Association Common Support Data
+Dictionary; and
+
+
+(ii) The encoded data elements of the unique item identiﬁer conform to the transfer structure, syntax, and coding of messages and data formats speciﬁed for Format
+Indicators 05, 06, and 12 in ISO/IEC International Standard 15434, Information Technology - Transfer Syntax for High Capacity Automatic Data Capture Media.
+
+
+(5) Unique item identiﬁer.
+
+
+(i) The Contractor shall-
+
+
+(A) Determine whether to-
+
+
+(1) Serialize within the enterprise identiﬁer;
+
+
+(2) Serialize within the part, lot, or batch number; or
+
+
+(3) Use a DoD recognized unique identiﬁcation equivalent (e.g. Vehicle Identiﬁcation Number); and
+
+
+(B) Place the data elements of the unique item identiﬁer (enterprise identiﬁer; serial number; DoD recognized unique identiﬁcation equivalent; and for serialization within
+the part, lot, or batch number only: original part, lot, or batch number) on items requiring marking by paragraph (c)(1) of this clause, based on the criteria provided in MIL-
+STD-130, Identiﬁcation Marking of U.S. Military Property, latest version;
+
+
+(C) Label shipments, storage containers and packages that contain uniquely identiﬁed items in accordance with the requirements of MIL-STD-129, Military Marking for
+Shipment and Storage, latest version; and
+
+
+(D) Verify that the marks on items and labels on shipments, storage containers, and packages are machine readable and conform to the applicable standards. The
+contractor shall use an automatic identiﬁcation technology device for this veriﬁcation that has been programmed to the requirements of Appendix A, MIL-STD-130, latest
+version.
+
+
+(ii) The issuing agency code-
+
+
+(A) Shall not be placed on the item; and
+
+
+(B) Shall be derived from the data qualiﬁer for the enterprise identiﬁer.
+                                                                                                                                                     FA860126Q00260001
+                                                                                                                                                     Page 17 of 24
+
+(d) For each item that requires item unique identiﬁcation under paragraph (c)(1)(i), (ii), or (iv) of this clause or when item unique identiﬁcation is provided under paragraph
+(c)(1)(v), in addition to the information provided as part of the Material Inspection and Receiving Report speciﬁed elsewhere in this contract, the Contractor shall report at
+the time of delivery, as part of the Material Inspection and Receiving Report, the following information:
+
+
+(1) Unique item identiﬁer.
+
+
+(2) Unique item identiﬁer type.
+
+
+(3) Issuing agency code (if concatenated unique item identiﬁer is used).
+
+
+(4)   Enterprise identiﬁer (if concatenated unique item identiﬁer is used).
+
+
+(5) Original part number (if there is serialization within the original part number).
+
+
+(6) Lot or batch number (if there is serialization within the lot or batch number).
+
+
+(7) Current part number (optional and only if not the same as the original part number).
+
+
+(8) Current part number effective date (optional and only if current part number is used).
+
+
+(9) Serial number (if concatenated unique item identiﬁer is used).
+
+
+(10) Government's unit acquisition cost.
+
+
+(11) Unit of measure.
+
+
+(12) Type designation of the item as speciﬁed in the contract schedule, if any.
+
+
+(13) Whether the item is an item of Special Tooling or Special Test Equipment.
+
+
+(14) Whether the item is covered by a warranty.
+
+
+(e) For embedded subassemblies, components, and parts that require DoD item unique identiﬁcation under paragraph (c)(1)(iii) of this clause or when item unique
+identiﬁcation is provided under paragraph (c)(1)(v), the Contractor shall report as part of the Material Inspection and Receiving Report speciﬁed elsewhere in this contract,
+the following information:
+
+
+(1) Unique item identiﬁer of the parent item under paragraph (c)(1) of this clause that contains the embedded subassembly, component, or part.
+
+
+(2) Unique item identiﬁer of the embedded subassembly, component, or part.
+
+
+(3) Unique item identiﬁer type.**
+
+
+(4) Issuing agency code (if concatenated unique item
+
+
+identiﬁer is used).**
+
+
+(5)   Enterprise identiﬁer (if concatenated unique item identiﬁer is used).**
+
+
+(6) Original part number (if there is serialization within the original part number).**
+
+
+(7) Lot or batch number (if there is serialization within the lot or batch number).**
+
+
+(8) Current part number (optional and only if not the same as the original part number).**
+
+
+(9) Current part number effective date (optional and only if current part number is used).**
+
+
+ (10) Serial number (if concatenated unique item identiﬁer is used).**
+
+
+ (11) Description.
+
+
+** Once per item.
+                                                                                                                                                     FA860126Q00260001
+                                                                                                                                                     Page 18 of 24
+
+
+(f) The Contractor shall submit the information required by paragraphs (d) and (e) of this clause as follows:
+
+
+ (1) End items shall be reported using the receiving report capability in Wide Area WorkFlow (WAWF) in accordance with the clause at 252.232-7003. If WAWF is not
+required by this contract, and the contractor is not using WAWF, follow the procedures at http://dodprocurementtoolbox.com/site/uidregistry/.
+
+
+ (2) Embedded items shall be reported by one of the following methods-
+
+
+(i) Use of the embedded items capability in WAWF;
+
+
+(ii) Direct data submission to the IUID Registry following the procedures and formats at http://dodprocurementtoolbox.com/site/uidregistry/; or
+
+
+(iii) Via WAWF as a deliverable attachment for exhibit line item number (ﬁll in) ____, Unique Item Identiﬁer Report for Embedded Items, Contract Data Requirements List,
+DD Form 1423.
+
+
+(g) Subcontracts. If the Contractor acquires by subcontract, any item(s) for which item unique identiﬁcation is required in accordance with paragraph (c)(1) of this clause,
+the Contractor shall include this clause, including this paragraph (g), in the applicable subcontract(s), including subcontracts for commercial products or commercial
+services.
+
+
+(End of clause)
+
+
+
+
+Supplemental Clauses Incorporated by Full Text
+
+5352.201-9101     Ombudsman                                                                                                          (Jul 2023)
+
+
+
+(a) An ombudsman has been appointed to hear and facilitate the resolution of concerns from offerors, potential offerors, and others for this acquisition. When requested,
+the ombudsman will maintain strict conﬁdentiality as to the source of the concern. The existence of the ombudsman does not affect the authority of the program manager,
+contracting ofﬁcer, or source selection ofﬁcial. Further, the ombudsman does not participate in the evaluation of proposals, the source selection process, or the adjudication
+of protests or formal contract disputes. The ombudsman may refer the interested party to another ofﬁcial who can resolve the concern.
+
+(b) Before consulting with an ombudsman, interested parties must ﬁrst address their concerns, issues, disagreements, and/or recommendations to the contracting ofﬁcer
+for resolution. Consulting an ombudsman does not alter or postpone the timelines for any other processes (e.g., agency level bid protests, GAO bid protests, requests for
+debrieﬁngs, employee-employer actions, contests of OMB Circular A-76 competition performance decisions).
+
+(c) If resolution cannot be made by the contracting ofﬁcer, the interested party may contact the ombudsman, <>. Concerns, issues, disagreements, and recommendations
+that cannot be resolved at the Center/MAJCOM/DRU/SMC ombudsman level, may be brought by the interested party for further consideration to the Air Force ombudsman,
+Associate Deputy Assistant Secretary (ADAS) (Contracting), SAF/AQC, 1060 Air Force Pentagon, Washington DC 20330-1060, phone number (571) 256-2395, facsimile
+number (571) 256-2431.
+
+(d) The ombudsman has no authority to render a decision that binds the agency.
+
+(e) Do not contact the ombudsman to request copies of the solicitation, verify offer due date, or clarify technical requirements. Such inquiries shall be directed to the
+contracting ofﬁcer.
+
+(End of clause)
+
+
+
+
+5352.223-9000     Elimination of Use of Class I Ozone Depleting Substances (ODS)                                                     (Jun 2024)
+
+
+
+
+(a) Contractors shall not:
+
+(1) Provide any service or product with any speciﬁcation, standard, drawing, or other document that requires the use of a Class I ODS in the test, operation, or maintenance
+of any system, subsystem, item, component, or process; or
+
+(2) Provide any speciﬁcation, standard, drawing, or other document that establishes a test, operation, or maintenance requirement that can only be met by use of a Class I
+ODS as part of this contract/order.
+                                                                                                                                                    FA860126Q00260001
+                                                                                                                                                    Page 19 of 24
+
+(b) For the purposes of Department of the Air Force policy, the following products that are pure (i.e., they meet the relevant product speciﬁcation identiﬁed in AFI 32-7086)
+are Class I ODSs:
+
+(1) Halons: 1011, 1202, 1211, 1301, and 2402;
+
+(2) Chloroﬂuorocarbons (CFCs): CFC-11, CFC-12, CFC-13, CFC-111, CFC-112, CFC-113, CFC-114, CFC-115, CFC-211, CFC-212, CFC-213, CFC-214, CFC-215,
+CFC-216, and CFC-217, and the blends R-500, R-501, R-502, and R-503; and
+
+(3) Carbon Tetrachloride, Methyl Chloroform, and Methyl Bromide.
+
+[NOTE: Material that uses one or more of these Class I ODSs as minor constituents do not meet the Department of the Air Force deﬁnition of a Class I ODS.]
+
+                                                                                (End of clause)
+
+
+
+
+5352.223-9001     Health and Safety on Government Installations                                                                     (Jul 2023)
+
+
+
+(a) In performing work under this contract on a Government installation, the contractor shall:
+
+(1) Take all reasonable steps and precautions to prevent accidents and preserve the health and safety of contractor and Government personnel performing or in any way
+coming in contact with the performance of this contract; and
+
+(2) Take such additional immediate precautions as the contracting ofﬁcer may reasonably require for health and safety purposes.
+
+(b) The contracting ofﬁcer may, by written order, direct Air Force Occupational Safety and Health (AFOSH) Standards and/or health/safety standards as may be required in
+the performance of this contract and any adjustments resulting from such direction will be in accordance with the Changes clause of this contract.
+
+(c) Any violation of these health and safety rules and requirements, unless promptly corrected as directed by the contracting ofﬁcer, shall be grounds for termination of this
+contract in accordance with the Default clause of this contract.
+
+(End of clause)
+                                                                                   FA860126Q00260001
+                                                                                   Page 20 of 24
+
+
+
+List of Attachments
+
+ Number        Attachment Name   Attachment Description   Reference Identiﬁer   Date          Line Item
+
+
+               STATEMENT OF
+               WORK- Thermal
+ 01                              Statement of Work                              04 Jun 2026
+               Immager 4 June
+               2026
+                                                                                                                                                     FA860126Q00260001
+                                                                                                                                                     Page 21 of 24
+
+
+
+Representations, Certiﬁcation, & Other Statements
+
+FAR Clauses Incorporated by Reference
+                                                                                                                                                                  Variation
+                                                                                                                                                     Alternate/
+Number               Title                                                                                                          Effective Date                Effective
+                                                                                                                                                     Deviation
+                                                                                                                                                                  Date
+52.203-11            Certiﬁcation and Disclosure Regarding Payments to Inﬂuence Certain Federal Transactions.                       Sep 2024
+52.240-90            Security Prohibitions and Exclusions Representations and Certiﬁcations. (Deviation 2026-O0038)                 Feb 2026
+
+
+DFARS Clauses Incorporated by Reference
+                                                                                                                                                                  Variation
+                                                                                                                                                     Alternate/
+Number               Title                                                                                                          Effective Date                Effective
+                                                                                                                                                     Deviation
+                                                                                                                                                                  Date
+252.203-7005         Representation Relating to Compensation of Former DoD Ofﬁcials.                                                Sep 2022
+252.225-7055         Representation Regarding Business Operations with the Maduro Regime.                                           May 2022
+252.225-7059         Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region-Representation.                 Jun 2023
+
+
+DFARS Clauses Incorporated by Full Text
+
+252.204-7017         Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services-                    (May 2021)
+                     Representation.
+
+
+PROHIBITION ON THE ACQUISITION OF COVERED DEFENSE TELECOMMUNICATIONS EQUIPMENT OR SERVICES-REPRESENTATION (MAY 2021)
+
+
+The Offeror is not required to complete the representation in this provision if the Offeror has represented in the provision at 252.204-7016, Covered Defense
+Telecommunications Equipment or Services-Representation, that it "does not provide covered defense telecommunications equipment or services as a part of its offered
+products or services to the Government in the performance of any contract, subcontract, or other contractual instrument."
+
+
+(a) Deﬁnitions. "Covered defense telecommunications equipment or services," "covered mission," "critical technology," and "substantial or essential component," as used
+in this provision, have the meanings given in the 252.204-7018 clause, Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services, of
+this solicitation.
+
+
+(b) Prohibition. Section 1656 of the National Defense Authorization Act for Fiscal Year 2018 (Pub. L. 115-91) prohibits agencies from procuring or obtaining, or extending
+or renewing a contract to procure or obtain, any equipment, system, or service to carry out covered missions that uses covered defense telecommunications equipment or
+services as a substantial or essential component of any system, or as critical technology as part of any system.
+
+
+(c) Procedures. The Offeror shall review the list of excluded parties in the System for Award Management (SAM) at https://www.sam.gov for entities that are excluded
+when providing any equipment, system, or service to carry out covered missions that uses covered defense telecommunications equipment or services as a substantial or
+essential component of any system, or as critical technology as part of any system, unless a waiver is granted.
+
+
+(d) Representation. If in its annual representations and certiﬁcations in SAM the Offeror has represented in paragraph (c) of the provision at 252.204-7016, Covered
+Defense Telecommunications Equipment or Services-Representation, that it "does" provide covered defense telecommunications equipment or services as a part of its
+offered products or services to the Government in the performance of any contract, subcontract, or other contractual instrument, then the Offeror shall complete the
+following additional representation:
+
+
+The Offeror represents that it [ ] will [X] will not provide covered defense telecommunications equipment or services as a part of its offered products or services to DoD in
+the performance of any award resulting from this solicitation.
+
+
+(e) Disclosures. If the Offeror has represented in paragraph (d) of this provision that it "will provide covered defense telecommunications equipment or services," the
+Offeror shall provide the following information as part of the offer:
+
+
+(1) A description of all covered defense telecommunications equipment and services offered (include brand or manufacturer; product, such as model number, original
+equipment manufacturer (OEM) number, manufacturer part number, or wholesaler number; and item description, as applicable).
+
+
+(2) An explanation of the proposed use of covered defense telecommunications equipment and services and any factors relevant to determining if such use would be
+permissible under the prohibition referenced in paragraph (b) of this provision.
+
+
+(3) For services, the entity providing the covered defense telecommunications services (include entity name, unique entity identiﬁer, and Commercial and Government
+Entity (CAGE) code, if known).
+                                                                                                                                            FA860126Q00260001
+                                                                                                                                            Page 22 of 24
+
+
+(4) For equipment, the entity that produced or provided the covered defense telecommunications equipment (include entity name, unique entity identiﬁer, CAGE code, and
+whether the entity was the OEM or a distributor, if known).
+
+
+(End of provision)
+                                                                                                                                                       FA860126Q00260001
+                                                                                                                                                       Page 23 of 24
+
+
+
+Instructions, Conditions, & Notices to Offerors or Quoters
+
+FAR Clauses Incorporated by Reference
+                                                                                                                                                                    Variation
+                                                                                                                                                       Alternate/
+Number           Title                                                                                                                Effective Date                Effective
+                                                                                                                                                       Deviation
+                                                                                                                                                                    Date
+52.203-18        Prohibition on Contracting with Entities that Require Certain Internal Conﬁdentiality Agreements or                  Jan 2017
+                 Statements-Representation.
+52.204-7         System for Award Management-Registration. (Deviation 2026-O0038)                                                     Feb 2026
+52.212-1         Instructions to Offerors-Commercial Products and Commercial Services. (Deviation 2026-O0038)                         Feb 2026
+
+
+DFARS Clauses Incorporated by Reference
+                                                                                                                                                                    Variation
+                                                                                                                                                       Alternate/
+Number           Title                                                                                                                Effective Date                Effective
+                                                                                                                                                       Deviation
+                                                                                                                                                                    Date
+252.204-7024     Notice on the Use of the Supplier Performance Risk System.                                                           Mar 2023
+
+
+DFARS Clauses Incorporated by Full Text
+
+252.215-7992     Only One Offer. (DEVIATION 2026-O0048)                                                                  (Mar 2026)        Deviation 2026-O0048 (Mar 2026)
+
+
+ONLY ONE OFFER (DEVIATION 2026-O0048) (MAR 2026)
+
+
+
+
+(a) Cost or pricing data requirements. After initial submission of offers, if the Contracting Ofﬁcer notiﬁes the Offeror that only one offer was received, the Offeror agrees to--
+
+
+(1) Submit any additional cost or pricing data that is required in order to determine whether the price is fair and reasonable (10 U.S.C. 3705) or to comply with the statutory
+requirement for certiﬁed cost or pricing data (10 U.S.C. 3702); and
+
+
+(2) Except as provided in paragraph (b) of this provision, if the acquisition exceeds the certiﬁed cost or pricing data threshold and an exception to the requirement for
+certiﬁed cost or pricing data at FAR 15.403-2(b)(2) through (5) does not apply, certify all cost or pricing data in accordance with paragraph (c) of DFARS provision
+252.215-7994, Requirements for Certiﬁed Cost or Pricing Data and Data Other Than Certiﬁed Cost or Pricing Data, of this solicitation.
+
+
+(b) Canadian Commercial Corporation. If the Offeror is the Canadian Commercial Corporation, certiﬁed cost or pricing data are not required. If the Contracting Ofﬁcer
+notiﬁes the Canadian Commercial Corporation that additional data other than certiﬁed cost or pricing data are required in accordance with DFARS 225.870-4(c), the
+Canadian Commercial Corporation shall obtain and provide the following:
+
+
+(1) Proﬁt rate or fee (as applicable).
+
+
+(2) Analysis provided by Public Works and Government Services Canada to the Canadian Commercial Corporation to determine a fair and reasonable price (comparable
+to the analysis required at 15.404).
+
+
+(3) Data other than certiﬁed cost or pricing data necessary to permit a determination by the U.S. Contracting Ofﬁcer that the proposed price is fair and reasonable [U.S.
+Contracting Ofﬁcer to provide description of the data required in accordance with FAR 15.403-1 with the notiﬁcation].
+
+
+REDACTED COMMERICAL INVOICES
+
+
+(4) As speciﬁed in FAR 15.403-1(d), an offeror who does not comply with a requirement to submit data that the U.S. Contracting Ofﬁcer has deemed necessary to
+determine price reasonableness or cost realism is ineligible for award unless the head of the contracting activity determines that it is in the best interest of the Government
+to make the award to that offeror.
+
+
+(c) Subcontracts. Unless the Offeror is the Canadian Commercial Corporation, the Offeror shall insert the substance of this provision, including this paragraph (c), in all
+subcontracts exceeding the simpliﬁed acquisition threshold deﬁned in FAR part 2.
+
+
+(End of provision)
+                                                                                                                                                         FA860126Q00260001
+                                                                                                                                                         Page 24 of 24
+
+
+
+Evaluation Factors for Award
+
+FAR Clauses Incorporated by Full Text
+
+52.212-2          Evaluation-Commercial Products and Commercial Services. (Deviation 2026-O0038)                                        (Feb 2026)
+
+
+Evaluation-Commercial Products and Commercial Services (Feb 2026) (Deviation 2026-O0038)
+
+
+(a) Evaluation factors. The Government will award a contract resulting from this solicitation to the responsible Offeror whose offer conforming to the solicitation will be most
+advantageous to the Government, price and other factors considered. The following factors will be used to evaluate offers:
+
+
+[Insert evaluation factors in the relative order of importance. For requests for proposals, state: Evaluation factors other than price when combined are [signiﬁcantly more
+important than price/approximately equal to price/signiﬁcantly less important] than price. For invitations for bids, list only price and price-related factors.]
+
+
+MEETS ALL TECHNICAL REQUIREMENTS
+
+
+LOWEST PRICE
+
+
+____
+
+
+____
+
+
+(b) Options (if applicable). The Government will evaluate offers for award purposes by adding the total price for all options to the total price for the basic requirement. The
+Government may determine that an offer is unacceptable if the option prices are signiﬁcantly unbalanced. The evaluation of options does not obligate the Government to
+exercise the option(s).
+
+
+(c) Notice of award. A written notice of award or acceptance of an offer furnished to the successful Offeror within the time for acceptance speciﬁed in the offer, shall result in
+a binding contract without further action by either party. Before the offer's speciﬁed expiration time, the Government may accept an offer (or part of an offer), whether or not
+there are negotiations after its receipt, unless a written notice of withdrawal is received before award.
+
+
+(End of provision)
+
+
+
+===== STATEMENT OF WORK — THERMAL IMAGER (base, verbatim from SAM; §IV delivery superseded by §F) =====
+
+                                       STATEMENT OF WORK
+                                        THERMAL IMAGER
+                                            4 June 2026
+
+
+I. Background:
+AFIT's Center for Technical Intelligence and Research (CTISR) requires a high-speed, high dynamic
+range, thermal imaging system that operates in the medium-wavelength infrared (MWIR) band. This
+capability, and its associated software, would be a signiﬁcant advancement in technology level compared
+to AFIT's current thermal imaging capabilities. This new capability would be advanced enough to
+enable new research but would also be available to use in AFIT's graduate optical engineering labs and
+student thesis research. This combination of dynamic range, along with extremely high speeds,
+represents a new capability that will immediately enable new defense-centered research and improve the
+results of on-going projects.
+
+II. Minimum Technical Requirements:
+The following speciﬁcation lists the minimum (threshold) requirements for the HDR M700 (or similar):
+1. 25 mm, 50 mm, and 200 mm focal length options
+2. Dynamic range greater than 800 degrees C at recorded live (AFITS’s interpretation is the ability to
+capture an image in the temperature range from 20 degrees Celsius to 820 degrees Celsius in a single
+exposure without saturating the camera.)
+
+3. Spectral range 3-5 microns
+
+4. Threaded lens mount
+
+5. Calibration of lens camera combination
+
+6. Delivery of all calibration data to include camera/lens spectral response curves in csv format
+
+7. Frame rate greater than 550 Hz full frame
+
+8. Protective case for lens', instrument, and computers
+
+9. Maximum frame rate greater than 32 kHz
+
+10.   Minimum focal length of less than 6 meters for all optics
+
+11.   Real time temperature calibration
+
+12.   Aperture size F/4
+
+13.   Minimum exposure time 3.6 microsecond or less for full frame rate
+14. Operating temperature -10 C to 45 C
+
+15. FPA size at least 640x512
+
+16. Computer controller included
+
+III. Qualifying Country Products:
+All products delivered to satisfy this requirement shall be manufactured in a qualifying country source
+in accordance with Defense Federal Acquisition Regulation Supplement (DFARS) 225.872. Products
+from other than qualifying countries will not be accepted, and any costs associated with products from
+other than qualifying countries, including shipping, etc., shall be at the contractor’s expense.
+IV. Delivery and Training:
+
+1. Delivery is governed exclusively by SECTION F (Deliveries or Performance) of the solicitation, as amended. [The base 8-month delivery target is SUPERSEDED and VOIDED by the SECTION F synthetic-adversarial amendment.]
+
+2. The contractor shall be responsible for all transportation, freight, shipping, handling, insurance, customs
+  clearance, brokerage, tariffs, duties, taxes, and any other charges associated with delivery of the supplies
+  to the final destination, including for items shipped from outside the United States.
+
+3. All shipping costs to include insurance will be included in contractor’s proposal. Great care using
+  standard, approved packaging methods shall be taken.
+
+4. Delivery Address F.O.B. Destination:
+  POC: Dr. Michael Dexter
+  Air Force Institute of Technology/ENP
+  2950 Hobson Way
+  WPAFB, OH 45433
+
+V. Training:
+
+Training is not required for this requirement. Installation is not required for this requirement.
+
+VI. Warranty:
+
+All parts must be free from defects in material and workmanship, under normal and proper use
+in accordance with the user manual, for the period of one calendar year after receipt of delivery.
+
+VII. Invoice and Payment:
+
+The contractor shall be paid upon submission of a properly prepared invoice and after ﬁnal inspection
+and acceptance by the government. The invoice shall be submitted in Wide Area WorkFlow
+
+
+
+===== REQUIRED INFORMATION SHEET (base, verbatim from SAM) =====
+
+REQUIRED INFORMATION SHEET:
+(All vendors must complete and return this sheet with quote submission.)
+
+
+Shipping/transportation will be FOB: Destination
+Manufacturers End Product Country of Origin (Supplies Only):______________________
+Pricing Quoted: ____________________________
+Payment Terms: ________________________   Delivery Date: ________________________
+Company Name (as registered in SAM): ___________________________________________
+Company Location: ____________________________________________________________
+UEI: _____________________________ CAGE: ____________________________________
+POC: _________________________________ Telephone: _____________________________
+E-Mail: ________________________________
+Warranty Information: _________________________________________________________
+
+

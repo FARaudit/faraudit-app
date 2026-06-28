@@ -1,0 +1,1331 @@
+{
+  "sol": "FA860126Q00260001",
+  "expected": "NO_BID",
+  "got": "NO_BID",
+  "decision": {
+    "verdict": "NO_BID",
+    "eligible": true,
+    "reason": "Bar(s) that cannot be cleared: First Article Testing is explicitly NON-WAIVABLE: the Contracting Officer SHALL NOT waive first article testing and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.; First Article Testing precondition (duration before any production delivery) (grounded by deterministic high-signal sweep).; Universal delivery impossibility: a non-waivable First Article precondition (min ~60 days) cannot complete inside the production delivery window (~30 days ARO). No bidder can comply, regardless of capacity.",
+    "dispositions": [
+      {
+        "requirement": "One-year warranty: All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery.",
+        "citation": "§M SOW §VI Warranty",
+        "excerpt": "All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Training and installation are explicitly not required.",
+        "citation": "§M SOW §V Training",
+        "excerpt": "Training is not required for this requirement. Installation is not required for this requirement.",
+        "kind": "technical_spec",
+        "controllability": "already_satisfied",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P2",
+        "id": "capture_strategist#1",
+        "disposition": "met"
+      },
+      {
+        "requirement": "CLIN 0001 is a single Firm-Fixed-Price line item for one (1) High Dynamic Range Thermal Imaging System (Product Service Code 5855), FOB Destination, WPAFB, OH.",
+        "citation": "§B CLIN 0001",
+        "excerpt": "CLIN 0001 (binding supply obligation): The Contractor shall furnish and deliver one (1) each High Dynamic Range Thermal Imaging System in accordance with the Statement of Work (Section C). Product Service Code: 5855. Pricing Arrangement: Firm-Fixed-Price. Quantity: 1 Each. Unit: Each. F.O.B. Destination, Wright-Patterson AFB, OH.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "capture_strategist",
+        "severity": "P1",
+        "id": "capture_strategist#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Buy American and Balance of Payments Program (DFARS 252.225-7001) incorporated by reference. Contractor must comply with domestic/qualifying country source requirements for supplies delivered under the contract.",
+        "citation": "§I (DFARS Clauses Incorporated by Reference)",
+        "excerpt": "252.225-7001 Buy American and Balance of Payments Program. Feb 2024",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "DFARS 252.225-7012 (Preference for Certain Domestic Commodities — specialty metals) incorporated by reference. Contractor must ensure specialty metals in delivered items meet domestic/qualifying country source requirements.",
+        "citation": "§I (DFARS Clauses Incorporated by Reference)",
+        "excerpt": "252.225-7012 Preference for Certain Domestic Commodities. Apr 2022",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "DFARS 252.246-7008 (Sources of Electronic Parts) incorporated by reference. Contractor must use trusted or approved sources for electronic parts; traceability obligations apply to thermal imaging system components.",
+        "citation": "§I (DFARS Clauses Incorporated by Reference)",
+        "excerpt": "252.246-7008 Sources of Electronic Parts. Jan 2023",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Prohibition on Contracting with Inverted Domestic Corporations (FAR 52.209-10) incorporated by reference. Offeror must not be an inverted domestic corporation (or subsidiary thereof). This is a standard self-certification representation.",
+        "citation": "§I (FAR Clauses Incorporated by Reference)",
+        "excerpt": "52.209-10 Prohibition on Contracting With Inverted Domestic Corporations. (Deviation 2026-O0038) Feb 2026",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#3",
+        "disposition": "dropped"
+      },
+      {
+        "requirement": "Addressing DEI Discrimination by Federal Contractors (FAR 52.222-90, Deviation 2026-O0040) incorporated by reference in §I. Contractor must comply with prohibition on DEI-related discrimination.",
+        "citation": "§I (FAR Clauses Incorporated by Reference)",
+        "excerpt": "52.222-90 Addressing DEI Discrimination by Federal Contractors. (Deviation 2026-O0040, Revision 1) Apr 2026",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#4",
+        "disposition": "dropped"
+      },
+      {
+        "requirement": "Payment must be by Electronic Funds Transfer via SAM (FAR 52.232-33). Contractor must have valid EFT banking information registered in SAM.",
+        "citation": "§I (FAR Clauses Incorporated by Reference)",
+        "excerpt": "52.232-33 Payment by Electronic Funds Transfer-System for Award Management. Oct 2018",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "contracts_attorney",
+        "id": "contracts_attorney#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "First Article Testing is explicitly NON-WAIVABLE: the Contracting Officer SHALL NOT waive first article testing and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+        "citation": "Section F, F.1(a)",
+        "excerpt": "First article testing is a NON-WAIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT waive first article testing under any circumstances and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "grounded": true,
+        "lens": "former_ko",
+        "curableInWindow": false,
+        "severity": "P0",
+        "id": "former_ko#0",
+        "disposition": "disqualifying"
+      },
+      {
+        "requirement": "Any quotation that does not unconditionally commit to delivery within 30 days ARO will be rated UNACCEPTABLE and ineligible for award — no tradeoff or exception will be granted.",
+        "citation": "Section F, F.3",
+        "excerpt": "The 30-day production delivery schedule in F.2 is a material, binding requirement and a condition of award. Any quotation that does not unconditionally commit to delivery within 30 days ARO, or whose delivery is contingent on a date later than 30 days ARO, will be rated UNACCEPTABLE and ineligible for award. The Government will make no tradeoff and grant no exception to this delivery schedule.",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "curableInWindow": true,
+        "severity": "P0",
+        "id": "former_ko#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "One-year warranty: All parts must be free from defects in material and workmanship under normal and proper use for one calendar year after receipt of delivery.",
+        "citation": "Section M (SOW), Section VI – Warranty",
+        "excerpt": "All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "DFARS 252.204-7018 (Prohibition on Covered Defense Telecommunications Equipment or Services) is incorporated — offeror must represent and comply that it does not provide covered telecommunications equipment/services as a substantial or essential component.",
+        "citation": "Section I, DFARS 252.204-7018",
+        "excerpt": "252.204-7018 Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services. Jan 2023",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "FAR 52.240-91 (Security Prohibitions and Exclusions) is incorporated — offeror must comply with security-related prohibitions and exclusions on certain vendors/products.",
+        "citation": "Section I, FAR 52.240-91",
+        "excerpt": "52.240-91 Security Prohibitions and Exclusions. (Deviation 2026-O0038) Feb 2026",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#4",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "DFARS 252.225-7060 (Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region) is incorporated — no supplies from the XUAR may be included in the delivered product.",
+        "citation": "Section I, DFARS 252.225-7060",
+        "excerpt": "252.225-7060 Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region. Jun 2023",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "former_ko",
+        "severity": "P2",
+        "id": "former_ko#5",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "The solicitation is for a single Firm-Fixed-Price CLIN (0001) for one (1) High Dynamic Range Thermal Imaging System. The offeror must provide a firm unit price and total amount for CLIN 0001 in the quote.",
+        "citation": "§B, CLIN 0001",
+        "excerpt": "CLIN 0001 (binding supply obligation): The Contractor shall furnish and deliver one (1) each High Dynamic Range Thermal Imaging System in accordance with the Statement of Work (Section C). Product Service Code: 5855. Pricing Arrangement: Firm-Fixed-Price. Quantity: 1 Each. Unit: Each. F.O.B. Destination, Wright-Patterson AFB, OH.",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#0",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Offerors must be registered in the System for Award Management (SAM) prior to award. The solicitation incorporates by reference FAR 52.204-7 (Deviation 2026-O0038) requiring SAM registration.",
+        "citation": "§L, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.204-7 System for Award Management-Registration. (Deviation 2026-O0038) Feb 2026",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P1",
+        "id": "proposal_manager#1",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Offerors must submit offers in accordance with FAR 52.212-1 (Instructions to Offerors—Commercial Products and Commercial Services, Deviation 2026-O0038), the primary instruction clause governing quote format, content, and submission method.",
+        "citation": "§L, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.212-1 Instructions to Offerors-Commercial Products and Commercial Services. (Deviation 2026-O0038) Feb 2026",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#2",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Offerors must confirm their offer submission POC. The solicitation identifies the point of contact for submissions as DANARA BARLOW, with email jessica.stamper.2@us.af.mil. The OFFER DUE DATE and LOCAL TIME are specified on the SF form page of the solicitation (exact date/time visible on the face page but not separately extracted in §L text).",
+        "citation": "§L face page / SF form data",
+        "excerpt": "OFFER DUE DATE/ 7. FOR SOLICITATION DANARA BARLOW calls) LOCAL TIME",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "proposal_manager",
+        "severity": "P0",
+        "id": "proposal_manager#3",
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "First Article Testing precondition (duration before any production delivery) (grounded by deterministic high-signal sweep).",
+        "citation": "§F (grounding sweep)",
+        "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "fat_precondition",
+        "id": "deterministic_sweep#0",
+        "curableInWindow": false,
+        "disposition": "disqualifying"
+      },
+      {
+        "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
+        "citation": "§F (grounding sweep)",
+        "excerpt": "F.2 TIME OF DELIVERY (FAR 52.211-8, ADAPTED) [SYNTHETIC]\nThe Contractor shall deliver all production units, F.O.B. destination (Wright-Patterson AFB,\nOH), NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO), i.e., within 30\ncalendar days after the date of award. This 30-day production delivery requirement is fixed\nby the Government and is identical for all offerors. It SUPERSEDES and VOIDS the base 90-day\nand 8-month delivery terms.",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "delivery_window",
+        "id": "deterministic_sweep#1",
+        "curableInWindow": true,
+        "disposition": "gate_to_clear"
+      },
+      {
+        "requirement": "Universal delivery impossibility: a non-waivable First Article precondition (min ~60 days) cannot complete inside the production delivery window (~30 days ARO). No bidder can comply, regardless of capacity.",
+        "citation": "§F (grounding sweep) + §F (grounding sweep) (cross-clause temporal conflict)",
+        "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "curableInWindow": false,
+        "grounded": true,
+        "lens": "temporal_conflict",
+        "id": "temporal_conflict#0",
+        "disposition": "disqualifying"
+      }
+    ],
+    "showStoppers": [
+      {
+        "requirement": "First Article Testing is explicitly NON-WAIVABLE: the Contracting Officer SHALL NOT waive first article testing and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+        "citation": "Section F, F.1(a)",
+        "excerpt": "First article testing is a NON-WAIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT waive first article testing under any circumstances and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "grounded": true,
+        "lens": "former_ko",
+        "curableInWindow": false,
+        "severity": "P0",
+        "id": "former_ko#0",
+        "disposition": "disqualifying"
+      },
+      {
+        "requirement": "First Article Testing precondition (duration before any production delivery) (grounded by deterministic high-signal sweep).",
+        "citation": "§F (grounding sweep)",
+        "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "grounded": true,
+        "lens": "deterministic_sweep",
+        "sweepArchetype": "fat_precondition",
+        "id": "deterministic_sweep#0",
+        "curableInWindow": false,
+        "disposition": "disqualifying"
+      },
+      {
+        "requirement": "Universal delivery impossibility: a non-waivable First Article precondition (min ~60 days) cannot complete inside the production delivery window (~30 days ARO). No bidder can comply, regardless of capacity.",
+        "citation": "§F (grounding sweep) + §F (grounding sweep) (cross-clause temporal conflict)",
+        "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+        "kind": "technical_spec",
+        "controllability": "no_one_can_move",
+        "curableInWindow": false,
+        "grounded": true,
+        "lens": "temporal_conflict",
+        "id": "temporal_conflict#0",
+        "disposition": "disqualifying"
+      }
+    ]
+  },
+  "coverage": {
+    "required": [
+      "B",
+      "C",
+      "H",
+      "I",
+      "L",
+      "M"
+    ],
+    "covered": [
+      "B",
+      "C",
+      "H",
+      "I",
+      "L",
+      "M"
+    ],
+    "missing": [],
+    "attestations": [
+      {
+        "section": "B",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#2",
+          "proposal_manager#0"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "C",
+        "status": "read_no_obligation",
+        "obligations": [],
+        "citedFindingIds": [],
+        "ungrounded": []
+      },
+      {
+        "section": "H",
+        "status": "read_no_obligation",
+        "obligations": [],
+        "citedFindingIds": [],
+        "ungrounded": []
+      },
+      {
+        "section": "I",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "contracts_attorney#0",
+          "contracts_attorney#1",
+          "contracts_attorney#2",
+          "contracts_attorney#3",
+          "contracts_attorney#4",
+          "contracts_attorney#5",
+          "former_ko#3",
+          "former_ko#4",
+          "former_ko#5"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "L",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "proposal_manager#1",
+          "proposal_manager#2"
+        ],
+        "ungrounded": []
+      },
+      {
+        "section": "M",
+        "status": "covered_direct",
+        "obligations": [],
+        "citedFindingIds": [
+          "capture_strategist#0",
+          "capture_strategist#1",
+          "former_ko#2"
+        ],
+        "ungrounded": []
+      }
+    ]
+  },
+  "perLens": {
+    "capture_strategist": 3,
+    "contracts_attorney": 6,
+    "pricing_analyst": 0,
+    "former_ko": 6,
+    "proposal_manager": 4,
+    "deterministic_sweep": 3,
+    "temporal_conflict": 1
+  },
+  "conflict": false,
+  "verifierSound": true,
+  "sectionsRead": [
+    "C",
+    "M",
+    "L",
+    "B",
+    "I",
+    "H",
+    "K",
+    "F"
+  ],
+  "trace": {
+    "capture_strategist": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "C",
+        "M",
+        "L",
+        "B"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "qualifying country"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "HDR M700"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "DFARS 225.872"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "brand name or equal"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "manufactured in a qualifying country"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "or similar"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All products delivered to satisfy this requirement shall be manufactured in a qualifying country source"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "MEETS ALL TECHNICAL REQUIREMENTS"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Frame rate greater than 550 Hz full frame"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Maximum frame rate greater than 32 kHz"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "contracts_attorney": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "I",
+        "H",
+        "K",
+        "B",
+        "L",
+        "M"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "H"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "K"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "set-aside"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "small business"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "qualifying country"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All products delivered to satisfy this requirement shall be manufactured in a qualifying country source"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "System for Award Management"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.204-7"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.219-6"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "252.225-7001"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.240-91"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "252.204-7018"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "252.246-7008"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pricing_analyst": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "B",
+        "L",
+        "M",
+        "I"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Unit Price"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "option"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "unbalanced"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "shipping costs"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All shipping costs to include insurance will be included in contractor's proposal"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "significantly unbalanced"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "shipping costs to include insurance will be included"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "option prices are significantly unbalanced"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "determine that an offer is unacceptable if the option prices are"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Wide Area WorkFlow"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "former_ko": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "B",
+        "C",
+        "L",
+        "M",
+        "I",
+        "F"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "C"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "I"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "F"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "HDR M700"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "qualifying country"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "set-aside"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "small business"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All products delivered to satisfy this requirement shall be manufactured in a qualifying country"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "System for Award Management"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "SIXTY (60) calendar days"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "NON-WAIVABLE precondition"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "THIRTY (30) calendar days After Receipt of Order"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Products from other than qualifying countries will not be accepted"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "252.225-7001"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.204-7"
+              }
+            },
+            {
+              "name": "lookup_clause",
+              "input": {
+                "clause": "52.212-2"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "proposal_manager": {
+      "converged": true,
+      "turns": 8,
+      "sectionsRead": [
+        "L",
+        "B",
+        "M"
+      ],
+      "tools": [
+        {
+          "turn": 1,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "L"
+              }
+            },
+            {
+              "name": "read_section",
+              "input": {
+                "key": "B"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "tools": [
+            {
+              "name": "read_section",
+              "input": {
+                "key": "M"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "due date"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "offers are due"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "quote must be received"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Response Date"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "submit quote"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 5,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "52.212-1"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "Required Information Sheet"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 6,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "All vendors must complete and return this sheet"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "SAM registration"
+              }
+            }
+          ]
+        },
+        {
+          "turn": 7,
+          "tools": [
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "jessica.stamper"
+              }
+            },
+            {
+              "name": "find_in_source",
+              "input": {
+                "phrase": "page limit"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "capture_strategist#0",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "One-year warranty: All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery.",
+      "citation": "§M SOW §VI Warranty",
+      "excerpt": "All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery."
+    },
+    {
+      "id": "capture_strategist#1",
+      "lens": "capture_strategist",
+      "kind": "technical_spec",
+      "controllability": "already_satisfied",
+      "requirement": "Training and installation are explicitly not required.",
+      "citation": "§M SOW §V Training",
+      "excerpt": "Training is not required for this requirement. Installation is not required for this requirement."
+    },
+    {
+      "id": "capture_strategist#2",
+      "lens": "capture_strategist",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "CLIN 0001 is a single Firm-Fixed-Price line item for one (1) High Dynamic Range Thermal Imaging System (Product Service Code 5855), FOB Destination, WPAFB, OH.",
+      "citation": "§B CLIN 0001",
+      "excerpt": "CLIN 0001 (binding supply obligation): The Contractor shall furnish and deliver one (1) each High Dynamic Range Thermal Imaging System in accordance with the Statement of Work (Section C). Product Service Code: 5855. Pricing Arrangement: Firm-Fixed-Price. Quantity: 1 Each. Unit: Each. F.O.B. Destination, Wright-Patterson AFB, OH."
+    },
+    {
+      "id": "contracts_attorney#0",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "Buy American and Balance of Payments Program (DFARS 252.225-7001) incorporated by reference. Contractor must comply with domestic/qualifying country source requirements for supplies delivered under the contract.",
+      "citation": "§I (DFARS Clauses Incorporated by Reference)",
+      "excerpt": "252.225-7001 Buy American and Balance of Payments Program. Feb 2024"
+    },
+    {
+      "id": "contracts_attorney#1",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "DFARS 252.225-7012 (Preference for Certain Domestic Commodities — specialty metals) incorporated by reference. Contractor must ensure specialty metals in delivered items meet domestic/qualifying country source requirements.",
+      "citation": "§I (DFARS Clauses Incorporated by Reference)",
+      "excerpt": "252.225-7012 Preference for Certain Domestic Commodities. Apr 2022"
+    },
+    {
+      "id": "contracts_attorney#2",
+      "lens": "contracts_attorney",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "DFARS 252.246-7008 (Sources of Electronic Parts) incorporated by reference. Contractor must use trusted or approved sources for electronic parts; traceability obligations apply to thermal imaging system components.",
+      "citation": "§I (DFARS Clauses Incorporated by Reference)",
+      "excerpt": "252.246-7008 Sources of Electronic Parts. Jan 2023"
+    },
+    {
+      "id": "contracts_attorney#3",
+      "lens": "contracts_attorney",
+      "kind": "boilerplate",
+      "controllability": "bidder_controls",
+      "requirement": "Prohibition on Contracting with Inverted Domestic Corporations (FAR 52.209-10) incorporated by reference. Offeror must not be an inverted domestic corporation (or subsidiary thereof). This is a standard self-certification representation.",
+      "citation": "§I (FAR Clauses Incorporated by Reference)",
+      "excerpt": "52.209-10 Prohibition on Contracting With Inverted Domestic Corporations. (Deviation 2026-O0038) Feb 2026"
+    },
+    {
+      "id": "contracts_attorney#4",
+      "lens": "contracts_attorney",
+      "kind": "boilerplate",
+      "controllability": "bidder_controls",
+      "requirement": "Addressing DEI Discrimination by Federal Contractors (FAR 52.222-90, Deviation 2026-O0040) incorporated by reference in §I. Contractor must comply with prohibition on DEI-related discrimination.",
+      "citation": "§I (FAR Clauses Incorporated by Reference)",
+      "excerpt": "52.222-90 Addressing DEI Discrimination by Federal Contractors. (Deviation 2026-O0040, Revision 1) Apr 2026"
+    },
+    {
+      "id": "contracts_attorney#5",
+      "lens": "contracts_attorney",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Payment must be by Electronic Funds Transfer via SAM (FAR 52.232-33). Contractor must have valid EFT banking information registered in SAM.",
+      "citation": "§I (FAR Clauses Incorporated by Reference)",
+      "excerpt": "52.232-33 Payment by Electronic Funds Transfer-System for Award Management. Oct 2018"
+    },
+    {
+      "id": "former_ko#0",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "no_one_can_move",
+      "requirement": "First Article Testing is explicitly NON-WAIVABLE: the Contracting Officer SHALL NOT waive first article testing and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+      "citation": "Section F, F.1(a)",
+      "excerpt": "First article testing is a NON-WAIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT waive first article testing under any circumstances and SHALL NOT authorize production, shipment, or delivery of any production unit until first article approval is granted in writing.",
+      "curableInWindow": false
+    },
+    {
+      "id": "former_ko#1",
+      "lens": "former_ko",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Any quotation that does not unconditionally commit to delivery within 30 days ARO will be rated UNACCEPTABLE and ineligible for award — no tradeoff or exception will be granted.",
+      "citation": "Section F, F.3",
+      "excerpt": "The 30-day production delivery schedule in F.2 is a material, binding requirement and a condition of award. Any quotation that does not unconditionally commit to delivery within 30 days ARO, or whose delivery is contingent on a date later than 30 days ARO, will be rated UNACCEPTABLE and ineligible for award. The Government will make no tradeoff and grant no exception to this delivery schedule.",
+      "curableInWindow": true
+    },
+    {
+      "id": "former_ko#2",
+      "lens": "former_ko",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "One-year warranty: All parts must be free from defects in material and workmanship under normal and proper use for one calendar year after receipt of delivery.",
+      "citation": "Section M (SOW), Section VI – Warranty",
+      "excerpt": "All parts must be free from defects in material and workmanship, under normal and proper use in accordance with the user manual, for the period of one calendar year after receipt of delivery."
+    },
+    {
+      "id": "former_ko#3",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "DFARS 252.204-7018 (Prohibition on Covered Defense Telecommunications Equipment or Services) is incorporated — offeror must represent and comply that it does not provide covered telecommunications equipment/services as a substantial or essential component.",
+      "citation": "Section I, DFARS 252.204-7018",
+      "excerpt": "252.204-7018 Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services. Jan 2023"
+    },
+    {
+      "id": "former_ko#4",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "FAR 52.240-91 (Security Prohibitions and Exclusions) is incorporated — offeror must comply with security-related prohibitions and exclusions on certain vendors/products.",
+      "citation": "Section I, FAR 52.240-91",
+      "excerpt": "52.240-91 Security Prohibitions and Exclusions. (Deviation 2026-O0038) Feb 2026"
+    },
+    {
+      "id": "former_ko#5",
+      "lens": "former_ko",
+      "kind": "clause_flowdown",
+      "controllability": "bidder_controls",
+      "requirement": "DFARS 252.225-7060 (Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region) is incorporated — no supplies from the XUAR may be included in the delivered product.",
+      "citation": "Section I, DFARS 252.225-7060",
+      "excerpt": "252.225-7060 Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region. Jun 2023"
+    },
+    {
+      "id": "proposal_manager#0",
+      "lens": "proposal_manager",
+      "kind": "pricing",
+      "controllability": "bidder_controls",
+      "requirement": "The solicitation is for a single Firm-Fixed-Price CLIN (0001) for one (1) High Dynamic Range Thermal Imaging System. The offeror must provide a firm unit price and total amount for CLIN 0001 in the quote.",
+      "citation": "§B, CLIN 0001",
+      "excerpt": "CLIN 0001 (binding supply obligation): The Contractor shall furnish and deliver one (1) each High Dynamic Range Thermal Imaging System in accordance with the Statement of Work (Section C). Product Service Code: 5855. Pricing Arrangement: Firm-Fixed-Price. Quantity: 1 Each. Unit: Each. F.O.B. Destination, Wright-Patterson AFB, OH."
+    },
+    {
+      "id": "proposal_manager#1",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Offerors must be registered in the System for Award Management (SAM) prior to award. The solicitation incorporates by reference FAR 52.204-7 (Deviation 2026-O0038) requiring SAM registration.",
+      "citation": "§L, FAR Clauses Incorporated by Reference",
+      "excerpt": "52.204-7 System for Award Management-Registration. (Deviation 2026-O0038) Feb 2026"
+    },
+    {
+      "id": "proposal_manager#2",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Offerors must submit offers in accordance with FAR 52.212-1 (Instructions to Offerors—Commercial Products and Commercial Services, Deviation 2026-O0038), the primary instruction clause governing quote format, content, and submission method.",
+      "citation": "§L, FAR Clauses Incorporated by Reference",
+      "excerpt": "52.212-1 Instructions to Offerors-Commercial Products and Commercial Services. (Deviation 2026-O0038) Feb 2026"
+    },
+    {
+      "id": "proposal_manager#3",
+      "lens": "proposal_manager",
+      "kind": "submission",
+      "controllability": "bidder_controls",
+      "requirement": "Offerors must confirm their offer submission POC. The solicitation identifies the point of contact for submissions as DANARA BARLOW, with email jessica.stamper.2@us.af.mil. The OFFER DUE DATE and LOCAL TIME are specified on the SF form page of the solicitation (exact date/time visible on the face page but not separately extracted in §L text).",
+      "citation": "§L face page / SF form data",
+      "excerpt": "OFFER DUE DATE/ 7. FOR SOLICITATION DANARA BARLOW calls) LOCAL TIME"
+    },
+    {
+      "id": "deterministic_sweep#0",
+      "lens": "deterministic_sweep",
+      "kind": "technical_spec",
+      "controllability": "no_one_can_move",
+      "requirement": "First Article Testing precondition (duration before any production delivery) (grounded by deterministic high-signal sweep).",
+      "citation": "§F (grounding sweep)",
+      "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+      "curableInWindow": false
+    },
+    {
+      "id": "deterministic_sweep#1",
+      "lens": "deterministic_sweep",
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
+      "citation": "§F (grounding sweep)",
+      "excerpt": "F.2 TIME OF DELIVERY (FAR 52.211-8, ADAPTED) [SYNTHETIC]\nThe Contractor shall deliver all production units, F.O.B. destination (Wright-Patterson AFB,\nOH), NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO), i.e., within 30\ncalendar days after the date of award. This 30-day production delivery requirement is fixed\nby the Government and is identical for all offerors. It SUPERSEDES and VOIDS the base 90-day\nand 8-month delivery terms.",
+      "curableInWindow": true
+    },
+    {
+      "id": "temporal_conflict#0",
+      "lens": "temporal_conflict",
+      "kind": "technical_spec",
+      "controllability": "no_one_can_move",
+      "requirement": "Universal delivery impossibility: a non-waivable First Article precondition (min ~60 days) cannot complete inside the production delivery window (~30 days ARO). No bidder can comply, regardless of capacity.",
+      "citation": "§F (grounding sweep) + §F (grounding sweep) (cross-clause temporal conflict)",
+      "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
+      "curableInWindow": false
+    }
+  ]
+}

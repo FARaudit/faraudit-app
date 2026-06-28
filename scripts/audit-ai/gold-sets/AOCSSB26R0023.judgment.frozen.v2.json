@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "full-verdict-1.0",
+  "packageId": "AOCSSB26R0023",
+  "_title": "AOC President's Room Ceiling S-216 — Conservation/Stabilization of Plaster & Decorative Paint — IN-SCOPE services CAUTION key",
+  "_suiteRole": "IN-SCOPE services CAUTION anchor. Refills the CAUTION verdict pole vacated when #5 (true construction) reclassified to oos_detection. The WORK is construction-flavored conservation but the PROCUREMENT is professional services (NAICS 541990). Authored against the certified-complete source per Brain #4 in-scope ruling 2026-06-26 (cards 66/68); supersedes the card-64 construction reclassification, which conflated a construction-flavored SOW with an out-of-engine-scope construction procurement. Caution basis source-verified (card 67): the card-66 Davis-Bacon reason was REFUTED by source and corrected.",
+  "key_type": "full_verdict",
+  "acquisitionPart": "PART_15",
+  "bidderProfile": null,
+  "expectedVerdict": {
+    "verdict": "BID_WITH_CAUTION",
+    "eligible": true,
+    "maxShowStoppers": 0,
+    "reason": "Unrestricted professional-services (NAICS 541990) conservation procurement with no disqualifying bar under null bidderProfile. Caution is driven by demanding specialized-conservator qualification gates (verify-status, not structural). NOT INELIGIBLE: the acquisition does not establish a set-aside, so eligibility is an open field. No prevailing-wage standard applies (Davis-Bacon AND SCA both explicitly excluded) — a wage-determination flag must NOT be raised."
+  },
+  "caution_reasons": [
+    {
+      "id": "specialized-conservator-qualifications",
+      "role": "PRIMARY (grade-driving)",
+      "controllability": "bidder_side_qualification",
+      "curableInWindow": true,
+      "source_citations": [
+        "Senior Conservators shall have a minimum of twenty (20) years of successful [experience]",
+        "Conservators shall have a minimum Ten (10) years of successful [experience]",
+        "Fine Art Painting Conservator/Project Director",
+        "Architectural Conservator, (AC) shall review reference documents, survey the existing"
+      ],
+      "note": "Demanding specialized-experience gates for key personnel. Under null bidderProfile the bidder's ability to field qualified conservators is UNKNOWN → CAUTION, not a structural bar (Norfolk doctrine: bidder-side qualification = caution). This is the dominant, grade-driving caution."
+    },
+    {
+      "id": "naics-541990-services-classification",
+      "role": "NOTE (informational, NOT grade-driving)",
+      "source_citations": [
+        "The North American Industry Classification System (NAICS) codes for this requirement is 541990 All Other Professional, Scientific, and Technical Services"
+      ],
+      "note": "Construction-flavored conservation scope is procured as PROFESSIONAL SERVICES (541990), not construction (FAR Part 36). Determines which clauses/limits attach. No binding subcontracting-percentage claim is asserted (52.219-14 / 50% limit does NOT bind on this unrestricted, no-set-aside buy and is not in source)."
+    }
+  ],
+  "decoys": [
+    {
+      "id": "wage-determination-not-applicable",
+      "token": "wage determination",
+      "kind": "must_not_raise",
+      "mustNotRaiseAtAll": true,
+      "source_citations": [
+        "Davis Bacon Act IS NOT applicable as this requirement is being classified [as services]",
+        "The McNamara-O'Hara Service Contract Act (SCA) IS NOT applicable to this procurement"
+      ],
+      "note": "NO prevailing-wage standard applies — BOTH Davis-Bacon and SCA are explicitly excluded in source. The engine must NOT raise any wage-determination / Davis-Bacon / SCA flag. Raising one is a FALSE POSITIVE (same shape as #5's funds-not-available decoy). This corrects the card-66 reason that wrongly asserted Davis-Bacon applies."
+    }
+  ],
+  "eligibility": {
+    "eligible": true,
+    "basis": "unrestricted — open field",
+    "source_citations": ["does NOT establish a set-aside"],
+    "note": "No set-aside restriction → no eligibility bar → NOT INELIGIBLE. Over-escalation to INELIGIBLE on this unrestricted buy is a grade failure."
+  },
+  "grade_pass_iff": "verdict==BID_WITH_CAUTION AND specialized-qualification caution raised AND eligible==true AND NO wage-determination flag raised",
+  "grade_fail_subtypes": [
+    "OUT_OF_SCOPE_fire: construction detector regression (must NOT fire — NAICS 541990 services)",
+    "INELIGIBLE: over-escalation on an unrestricted (no set-aside) buy",
+    "wage_determination_false_positive: raises Davis-Bacon/SCA that the source explicitly excludes",
+    "missing_specialized_qualification_caution: fails to surface the 20yr/10yr conservator gates"
+  ],
+  "source_sha256": "0793d44a9ec0c06afbdf3dede97be652eb152ab759dc85ef69d0c7c6f5aca3b7",
+  "source_bytes": 730676,
+  "source_completeness": "certified-complete",
+  "authored_against": "scripts/audit-ai/gold-sets/AOCSSB26R0023-FULL-SOURCE.complete.txt",
+  "supersedes": {
+    "path": "scripts/audit-ai/gold-sets/AOCSSB26R0023.judgment.frozen.json",
+    "source_sha256": "9e39ce4c617c747dc7fc019a424a79d3bee583d7a9f29ba7e1d886631a4545f7",
+    "reason": "partial source (missing HazMat/Lead Work attachments); restored to full_verdict CAUTION against certified-complete source per #4 in-scope ruling 2026-06-26 — supersedes card-64 construction reclassification, which conflated a construction-flavored SOW with an out-of-engine-scope construction procurement"
+  },
+  "adjudication": {
+    "verdict_and_doctrine_by": ["Brain", "CEO"],
+    "transcribed_and_source_cited_by": "Code",
+    "authoredAt": "2026-06-26",
+    "rulingRef": "Brain cards 66/68; caution-basis correction card 67 (Davis-Bacon reason refuted by source, corrected)"
+  }
+}

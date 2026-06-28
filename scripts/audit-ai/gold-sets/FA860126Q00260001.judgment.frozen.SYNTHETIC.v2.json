@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "0.3-concept-presence",
+  "packageId": "FA860126Q00260001",
+  "_title": "HDR MWIR Thermal Imaging System (AFIT/AFLCMC) — NO_BID anchor via a LABELED SYNTHETIC-ADVERSARIAL delivery contradiction (gradeable JudgmentKey schema; v2 — synthetic mod re-placed in §F per card 75-R1)",
+  "_suiteRole": "NO_BID verdict pole — the last missing verdict type (Brain card 72, CEO-chosen labeled-adversarial-mod path; mechanism re-designed by Brain to a Government-controlled First Article contradiction, four-corners gradeable). A REAL unrestricted commercial base package (FA860126Q00260001, fetched from SAM) carries a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod that makes delivery UNIVERSALLY unmeetable from award (60-day non-waivable First Article precondition vs 30-day-ARO binding production delivery). Distinct from the INELIGIBLE pole (#3): that bar is bidder-specific; this is a solicitation-side impossibility that defeats EVERY bidder. eligible stays true. V2 (card 75-R1): the synthetic delivery contradiction is re-placed inside a recognized SECTION F (supersedes base §F 90-day + SOW §IV 8-month) and §B is grounded from the real CLIN, so the agentic engine attributes + grounds it. CONTENT-identical to v1 (verdict/gates/showStopper/decoy/verbatim cites unchanged); only the source LOCATION/structure changed. v1's source placed the mod as a trailing unattributed AMENDMENT → graduation run derived INCOMPLETE (engine never saw it).",
+  "key_type": "full_verdict",
+  "bidderProfile": null,
+  "acquisitionPart": "PART_12",
+  "_acquisitionPart_basis": "source-grounded (NOT assumed): FAR Part 12 Commercial Products/Services buy — 52.212-1/-2/-3/-4/-5 all present in the base solicitation; §M is '52.212-2 Evaluation-Commercial Products and Commercial Services'; notice type = Combined Synopsis/Solicitation. No FAR Part 15 'contracting by negotiation' / 52.215-x negotiated clauses (the 52.215-7992/7994 present are AF local ombudsman provisions, not negotiated-procurement clauses).",
+  "expectedVerdict": {
+    "verdict": "NO_BID",
+    "eligible": true,
+    "maxShowStoppers": 1,
+    "reason": "A single Government-controlled, four-corners delivery contradiction makes performance physically impossible for EVERY offeror: the [SYNTHETIC-ADVERSARIAL] mod imposes a NON-WAIVABLE 60-day First Article testing precondition before any production delivery (Synthetic Clause 1) while mandating production delivery within 30 days ARO (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3). 60 > 30, so no bidder can comply regardless of capability — a universal walk-away (NO_BID), NOT a bidder-specific bar (which would be INELIGIBLE, the pole already anchored by #3). eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the defeat is the schedule, not eligibility. A wage-determination or set-aside/eligibility flag must NOT be raised."
+  },
+  "namedGates": [
+    {
+      "token": "delivery window physically unmeetable from award",
+      "scope": "universal",
+      "aliases": [
+        "first article testing",
+        "first article approval",
+        "non-waivable",
+        "60 calendar days",
+        "30 calendar days",
+        "30 days ARO",
+        "physically unmeetable",
+        "physically impossible",
+        "impossible to deliver",
+        "no offeror can",
+        "cannot deliver within 30 days",
+        "precondition to production and delivery"
+      ],
+      "mustRaise": true,
+      "expectedDisposition": "unmet",
+      "sourceCite": "First article testing is a NON-WAIVABLE precondition to production and delivery ... The Government will require SIXTY (60) calendar days to conduct first article testing ... No production delivery may occur before the close of this 60-day Government testing period (F.1). The Contractor shall deliver all production units ... NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO) (F.2). [Binding inputs only per card 76-R1; the conclusion is demoted to the provenance banner and the engine derives the conflict from F.1 and F.2.]"
+    }
+  ],
+  "showStoppers": [
+    {
+      "description": "Government-controlled, four-corners delivery contradiction: a non-waivable 60-day First Article testing precondition (Synthetic Clause 1) cannot fit inside the binding 30-day-ARO production delivery requirement (Synthetic Clauses 2-3). The window is universally unmeetable, so the solicitation is unbiddable by any offeror.",
+      "scope": "universal",
+      "sourceCite": "First article testing is a NON-WAIVABLE precondition to production and delivery; the Government will require SIXTY (60) calendar days to conduct first article testing; the Contractor shall deliver all production units NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO); any quotation contingent on a later date will be rated UNACCEPTABLE.",
+      "disqualifiesBecause": "solicitation-defect"
+    }
+  ],
+  "cautionItems": [],
+  "decoys": [
+    {
+      "token": "small business set-aside",
+      "kind": "absent",
+      "scope": "eligibility-decoy",
+      "mustNotRaiseAtAll": true,
+      "aliases": [
+        "set-aside",
+        "set aside",
+        "SDVOSB",
+        "WOSB",
+        "EDWOSB",
+        "HUBZone",
+        "8(a)",
+        "socioeconomic",
+        "small business eligibility",
+        "not eligible",
+        "ineligible offeror"
+      ]
+    }
+  ],
+  "_decoy_basis": "Source: block 10 'THIS ACQUISITION IS UNRESTRICTED' + SAM 'No Set aside used'. There is NO set-aside or socioeconomic eligibility gate — raising any set-aside / small-business eligibility / offeror-ineligibility flag is a false positive AND would mis-type the NO_BID as a bidder-specific INELIGIBLE problem (the wrong pole). The defeat is the universal schedule impossibility, not eligibility; eligible:true. Must-not-raise-at-all decoy.",
+  "_provenance_note": "SYNTHETIC-ADVERSARIAL key, v2 (card 75-R1). Base FA860126Q00260001 (HDR MWIR thermal imager, AFIT/AFLCMC, NAICS 334511, unrestricted, Combined Synopsis/Solicitation) is REAL — fetched from SAM.gov 2026-06-26. The delivery contradiction is now a clearly-labeled [SYNTHETIC-ADVERSARIAL] SECTION F (header 'SECTION F — DELIVERIES OR PERFORMANCE [SYNTHETIC-ADVERSARIAL AMENDMENT — SUPERSEDES BASE §F]', fenced + banner-delimited, never blended) that the section detector attributes to §F. The base 90-day §F schedule and the SOW §IV '8 months' target are SUPERSEDED/VOIDED so no meetable delivery term competes. §B is grounded from the real CLIN 0001 (FFP, 1 each, PSC 5855) so coverage completes. Verbatim binding clause wording (60-day non-waivable FAT / 30-day ARO / UNACCEPTABLE) preserved → key sourceCites still resolve. DFARS 225.872 qualifying-country, 1-yr warranty, FOB-destination are real base terms (provenance, not gates/decoys).",
+  "source_sha256": "70251625279fb7177b4abf6e3195f89cd5f61f359bb64452f9fa2820803112e2",
+  "source_bytes": 96502,
+  "source_completeness": "base-real-from-SAM + labeled-synthetic-§F-amendment (v2; supersedes base delivery terms)",
+  "authored_against": "scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt",
+  "supersedes": [
+    {
+      "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.json",
+      "key_type": "full_verdict",
+      "status": "candidate-supersede (pending CEO ratification — registry NOT yet flipped)",
+      "retired_sha256": "47b9f7a239e48e12e404149ede4771bb2757da742789acf7d6cbd29fd3b85042",
+      "reason": "card 75-R1: v1 source placed the synthetic mod as a trailing unattributed AMENDMENT block; the section detector never assigned it to §F so the agentic engine never grounded the impossibility (graduation run #38 derived INCOMPLETE). v2 re-places it as a recognized §F that supersedes base delivery terms + grounds §B. Judgment content identical."
+    }
+  ],
+  "adjudication": {
+    "authoredBlind": false,
+    "verdict_and_doctrine_by": [
+      "Brain",
+      "CEO"
+    ],
+    "transcribed_and_source_cited_by": "Code",
+    "authoredAt": "2026-06-27",
+    "rulingRef": "Brain card 72 (NO_BID via labeled FRONTIER-adversarial mod; base FA860126Q00260001 ratified; mechanism re-designed to a Government-controlled First Article contradiction, four-corners gradeable) · card 75-R1 (rebuild source: synthetic mod → recognized §F supersede + §B grounded) · card 76-R1 (substance-derivation guard: net-effect conclusion demoted to provenance banner; body keeps only binding inputs F.1/F.2/F.3; namedGate cite re-pointed to binding inputs; engine must derive 60>30)",
+    "sourceSha256": "70251625279fb7177b4abf6e3195f89cd5f61f359bb64452f9fa2820803112e2",
+    "keySha256": "d08c3017a4570330a98ed9f79c8ea9b80bde46158cf9b9d265b9271a16d5a55d",
+    "candidate": true
+  }
+}

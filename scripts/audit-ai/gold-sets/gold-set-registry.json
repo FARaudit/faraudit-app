@@ -1,0 +1,79 @@
+{
+  "_comment": "GOLD-SET REGISTRY — single source of truth for which key is LIVE per sol (sol -> active_version + key_type). Nothing else guesses liveness. Authored by Code per Brain card-64 Q2 (whole-set registry). key_type enum = {full_verdict, oos_detection}. Construction packages are oos_detection (engine honest-fails OUT_OF_SCOPE, no verdict); discrete supply/repair/services are full_verdict.",
+  "schemaVersion": "1.0",
+  "authoredBy": "Code (per Brain cards 64/66/68, 2026-06-26)",
+  "authoredAt": "2026-06-26",
+  "keyTypeEnum": ["full_verdict", "oos_detection"],
+  "keys": {
+    "N4008526R0065": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "CAUTION",
+      "file": "N4008526R0065.judgment.frozen.json"
+    },
+    "1240LP26Q0067": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "BID",
+      "file": "1240LP26Q0067.judgment.frozen.json"
+    },
+    "SPRDL125Q0030": {
+      "active_version": "v1",
+      "key_type": "full_verdict",
+      "pole": "INELIGIBLE",
+      "file": "SPRDL125Q0030.judgment.frozen.json"
+    },
+    "AOCSSB26R0023": {
+      "active_version": "v3",
+      "key_type": "full_verdict",
+      "pole": "CAUTION",
+      "file": "AOCSSB26R0023.judgment.frozen.v3.json",
+      "supersedes": [
+        {
+          "file": "AOCSSB26R0023.judgment.frozen.v2.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "f6aab8724d025f29156a9496ffb728bbe527f7bb9c9a7c9c52a9e10e78304067",
+          "reason": "same CONTENT, wrong SCHEMA — caution_reasons shape was un-gradeable by scoreJudgment (card-71 finding); re-expressed as v3 in the JudgmentKey/namedGates schema. Retired byte-identical."
+        },
+        {
+          "file": "AOCSSB26R0023.judgment.frozen.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "9e39ce4c617c747dc7fc019a424a79d3bee583d7a9f29ba7e1d886631a4545f7",
+          "reason": "partial source (pre-complete); restored to full_verdict CAUTION against certified-complete source per #4 in-scope ruling (cards 66/68); caution basis source-corrected (card 67)."
+        }
+      ]
+    },
+    "FA667024R0001": {
+      "active_version": "v2",
+      "key_type": "oos_detection",
+      "file": "FA667024R0001.judgment.frozen.v2.json",
+      "supersedes": {
+        "file": "FA667024R0001.judgment.frozen.json",
+        "key_type": "full_verdict",
+        "status": "retired",
+        "retired_sha256": "86b4331350d6916ca27a51bced9604c319ae5ce7b110019b638fc5de26cc7b26",
+        "reason": "reclassified full_verdict->oos_detection per construction honest-fail ruling 2026-06-26; old key retired in place, byte-identical, content untouched"
+      }
+    },
+    "FA860126Q00260001": {
+      "active_version": "v2",
+      "key_type": "full_verdict",
+      "pole": "NO_BID",
+      "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.v2.json",
+      "synthetic": true,
+      "_synthetic_note": "Real unrestricted commercial base package (fetched from SAM, source of record) + a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod imposing a Government-controlled First Article contradiction (60-day non-waivable FAT precondition vs 30-day-ARO binding delivery) → NO_BID. v2 (cards 75-R1/76-R1): the mod lives in a recognized SECTION F (supersedes base §F 90-day + SOW §IV 8-month) so the agentic engine grounds it; §B grounded from the real CLIN; the 60>30 net-effect conclusion is demoted to the §F provenance banner (human authoring note, NOT lens-readable body) so the engine must DERIVE the conflict. keySha d08c3017.",
+      "supersedes": [
+        {
+          "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "47b9f7a239e48e12e404149ede4771bb2757da742789acf7d6cbd29fd3b85042",
+          "reason": "card 75-R1/76-R1 + CEO ratify (77-R1): v1 placed the synthetic mod as a trailing unattributed AMENDMENT block → the section detector never assigned it to §F → the agentic engine never grounded the impossibility (graduation run #38 derived INCOMPLETE). v2 re-places it as a recognized §F (supersedes base delivery terms), grounds §B, and demotes the conclusion to the provenance banner. Retired byte-identical; v1 frozen artifact NOT mutated."
+        }
+      ]
+    }
+  },
+  "held": {}
+}

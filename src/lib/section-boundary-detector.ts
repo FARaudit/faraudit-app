@@ -82,7 +82,11 @@ const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
   F: /^(Deliveries\s+or\s+Performance|Period\s+of\s+Performance)/im,
   G: /^(Contract\s+Administration\s+Data)/im,
   H: /^(Special\s+Contract\s+Requirements)/im,
-  I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference)/im,
+  // §I — UCF "Contract Clauses" OR COMMERCIAL forms: FAR 52.212-4 (Contract Terms & Conditions—Commercial)
+  //   and 52.212-5 (Terms & Conditions Required to Implement Statutes) ARE the §I clause section of a
+  //   Part-12 combined RFQ; they appear as headings / clause-number-prefixed lines. Line-anchored (^) so a
+  //   prose mention can't false-fire. Coverage-depth (Brain card 40): §I was undetected on commercial #2.
+  I: /^(Contract\s+Clauses|Clauses\s+Incorporated\s+by\s+Reference|Contract\s+Terms\s+and\s+Conditions|(?:ADDENDUM\s+TO\s+)?(?:FAR\s+)?5?2\.212-[45])\b/im,
   J: /^(List\s+of\s+Attachments)/im,
   K: /^(Representations,?\s+Cert|Other\s+Statements\s+of\s+Offerors)/im,
   // §L — UCF titles OR COMMERCIAL forms: FAR 52.212-1 IS the commercial "Instructions to Offerors"
@@ -147,6 +151,13 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     for (const pat of UCF_HEADER_PATTERNS) {
       const m = pat.exec(line);
       if (m && m[1]) {
+        // CANDIDATE #1 (Brain card 104/105) — UCF UPPERCASE GUARD, DEFAULT-ON (Brain card 105 flip; set ="false" to disable). The generic
+        // pattern #0 (/^SECTION\s+([A-M])\b/im) is case-INSENSITIVE on the captured letter, so a CBA/attachment's
+        // internal "Section l" (Article §1 — the numeral "1" rendered as a lowercase "l") false-matches as a §L
+        // boundary and (with equal high confidence + lower line) beats the REAL "Section L" header in dedup. Reject
+        // a LOWERCASE captured letter on pattern #0 only; uppercase "SECTION L"/"Section L" still matches. Patterns
+        // #1 (dash/colon) and #2 (PART I) are untouched. Flag OFF ⇒ behavior is byte-identical to the prior detector.
+        if (process.env.AUDIT_UCF_UPPERCASE_GUARD !== "false" && pat === UCF_HEADER_PATTERNS[0] && !/[A-M]/.test(m[1])) continue;
         const key = m[1].toUpperCase();
         if (UCF_SECTIONS[key]) {
           boundaries.push({ key, lineIdx: i, confidence: "high", matchedPattern: pat.source });
@@ -250,4 +261,71 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     missingSections,
     warnings,
   };
+}
+
+// ─── Construction out-of-scope detector (Brain construction ruling 2026-06-26) ──────────────
+//
+// The engine's domain is DISCRETE-DOCUMENT supply / repair / services solicitations. CONSTRUCTION
+// (FAR Part 36) is the known structural-incompatibility class. Rather than render a degraded verdict
+// it isn't designed for (which would be the "false/partial report a customer bids on" the honest-
+// failure law forbids), the engine DETECTS construction and HONEST-FAILS out-of-scope BEFORE any paid
+// model call — no charge. Outcome = OUT_OF_SCOPE, reason = "out_of_scope:construction".
+//
+// Detection is DETERMINISTIC and reads EXISTING fields (Brain Q3 ruling: no re-parsing, PSC deferred —
+// PSC-Y/Z would be the next lever but PSC is not a captured field today, so it is documented, not used):
+//   HARD (any one):     NAICS sector 23 (naicsCode /^23\d{4}$/)  OR  SF-1442 construction form header.
+//   BOUNDARY (>=2):      Davis-Bacon construction-wage standard  AND  CSI MasterFormat multi-division spec.
+// Symmetric-risk lean (Brain): UNDER-fire over false-positive — an in-scope facility-REPAIR/services sol
+// (e.g. SCA wage determination, NAICS 336/541) must NEVER trip. Davis-Bacon is construction-specific
+// (distinct from SCA service-contract wages); a single boundary signal is NOT enough.
+
+export type ConstructionTier = "hard" | "boundary";
+export interface ConstructionDetection {
+  outOfScope: true;
+  outcome: "OUT_OF_SCOPE";
+  reason: "out_of_scope:construction";
+  tier: ConstructionTier;
+  /** Objective, citable signals that fired — NOT a verdict (Rule 64). */
+  matchedSignals: string[];
+}
+
+// SF-1442 = "Solicitation, Offer and Award (Construction, Alteration, or Repair)" — the construction
+// counterpart to SF-1449 (commercial). Anchored to the form id / its construction title.
+const SF1442_HEADER_RE = /\bSF[-\s]?1442\b|STANDARD\s+FORM\s+1442|SOLICITATION[\/,\s]+OFFER[\/,\s]+(?:AND\s+)?AWARD\s*\(?\s*CONSTRUCTION/i;
+// Davis-Bacon CONSTRUCTION wage standard (FAR 52.222-6 family) — deliberately NOT matching SCA service
+// wages (52.222-41), which are the in-scope-services case.
+const DAVIS_BACON_RE = /\b52\.222-6\b|davis[\s-]?bacon|construction\s+wage\s+rate/i;
+// CSI MasterFormat section codes ("NN NN NN") — only construction specs/drawings use these.
+const CSI_SECTION_RE = /\bSECTION\s+\d{2}\s+\d{2}\s+\d{2}\b/gi;
+
+/**
+ * Deterministic construction out-of-scope detector. Returns the OUT_OF_SCOPE signal when the package
+ * is construction, or null when it is in-scope (or undetermined → let the normal pipeline run).
+ * Pure → gate-testable; runs at the pre-paid classify stage and short-circuits before any model call.
+ */
+export function detectConstructionOutOfScope(opts: {
+  naicsCode?: string | null;
+  fullText: string;
+}): ConstructionDetection | null {
+  const naics = (opts.naicsCode ?? "").trim();
+  const text = opts.fullText ?? "";
+
+  // ── HARD tier (any one fires) ──
+  const hard: string[] = [];
+  if (/^23\d{4}$/.test(naics)) hard.push(`NAICS ${naics} (Construction, sector 23)`);
+  if (SF1442_HEADER_RE.test(text)) hard.push("SF-1442 (Solicitation/Offer/Award for Construction)");
+  if (hard.length >= 1) {
+    return { outOfScope: true, outcome: "OUT_OF_SCOPE", reason: "out_of_scope:construction", tier: "hard", matchedSignals: hard };
+  }
+
+  // ── BOUNDARY tier (>=2 together) ──
+  const boundary: string[] = [];
+  if (DAVIS_BACON_RE.test(text)) boundary.push("Davis-Bacon construction wage rate (FAR 52.222-6 / construction WD)");
+  const csiSections = new Set((text.match(CSI_SECTION_RE) ?? []).map((s) => s.toUpperCase()));
+  if (csiSections.size >= 2) boundary.push(`CSI MasterFormat multi-division spec (${csiSections.size} section codes)`);
+  if (boundary.length >= 2) {
+    return { outOfScope: true, outcome: "OUT_OF_SCOPE", reason: "out_of_scope:construction", tier: "boundary", matchedSignals: boundary };
+  }
+
+  return null;
 }

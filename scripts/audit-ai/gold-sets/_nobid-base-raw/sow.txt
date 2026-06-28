@@ -1,0 +1,86 @@
+                                       STATEMENT OF WORK
+                                        THERMAL IMAGER
+                                            4 June 2026
+
+
+I. Background:
+AFIT's Center for Technical Intelligence and Research (CTISR) requires a high-speed, high dynamic
+range, thermal imaging system that operates in the medium-wavelength infrared (MWIR) band. This
+capability, and its associated software, would be a signiﬁcant advancement in technology level compared
+to AFIT's current thermal imaging capabilities. This new capability would be advanced enough to
+enable new research but would also be available to use in AFIT's graduate optical engineering labs and
+student thesis research. This combination of dynamic range, along with extremely high speeds,
+represents a new capability that will immediately enable new defense-centered research and improve the
+results of on-going projects.
+
+II. Minimum Technical Requirements:
+The following speciﬁcation lists the minimum (threshold) requirements for the HDR M700 (or similar):
+1. 25 mm, 50 mm, and 200 mm focal length options
+2. Dynamic range greater than 800 degrees C at recorded live (AFITS’s interpretation is the ability to
+capture an image in the temperature range from 20 degrees Celsius to 820 degrees Celsius in a single
+exposure without saturating the camera.)
+
+3. Spectral range 3-5 microns
+
+4. Threaded lens mount
+
+5. Calibration of lens camera combination
+
+6. Delivery of all calibration data to include camera/lens spectral response curves in csv format
+
+7. Frame rate greater than 550 Hz full frame
+
+8. Protective case for lens', instrument, and computers
+
+9. Maximum frame rate greater than 32 kHz
+
+10.   Minimum focal length of less than 6 meters for all optics
+
+11.   Real time temperature calibration
+
+12.   Aperture size F/4
+
+13.   Minimum exposure time 3.6 microsecond or less for full frame rate
+14. Operating temperature -10 C to 45 C
+
+15. FPA size at least 640x512
+
+16. Computer controller included
+
+III. Qualifying Country Products:
+All products delivered to satisfy this requirement shall be manufactured in a qualifying country source
+in accordance with Defense Federal Acquisition Regulation Supplement (DFARS) 225.872. Products
+from other than qualifying countries will not be accepted, and any costs associated with products from
+other than qualifying countries, including shipping, etc., shall be at the contractor’s expense.
+IV. Delivery and Training:
+
+1. Delivery is required by the earliest possible delivery date, not to exceed 8 months after receipt of
+  Award.
+
+2. The contractor shall be responsible for all transportation, freight, shipping, handling, insurance, customs
+  clearance, brokerage, tariffs, duties, taxes, and any other charges associated with delivery of the supplies
+  to the final destination, including for items shipped from outside the United States.
+
+3. All shipping costs to include insurance will be included in contractor’s proposal. Great care using
+  standard, approved packaging methods shall be taken.
+
+4. Delivery Address F.O.B. Destination:
+  POC: Dr. Michael Dexter
+  Air Force Institute of Technology/ENP
+  2950 Hobson Way
+  WPAFB, OH 45433
+
+V. Training:
+
+Training is not required for this requirement. Installation is not required for this requirement.
+
+VI. Warranty:
+
+All parts must be free from defects in material and workmanship, under normal and proper use
+in accordance with the user manual, for the period of one calendar year after receipt of delivery.
+
+VII. Invoice and Payment:
+
+The contractor shall be paid upon submission of a properly prepared invoice and after ﬁnal inspection
+and acceptance by the government. The invoice shall be submitted in Wide Area WorkFlow
+

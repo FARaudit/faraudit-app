@@ -34,6 +34,21 @@ export interface ClauseItem {
   trapReason: string | null;
 }
 
+/** Canonical FAR/DFARS clause-number key — the SINGLE normalizer shared by the §I enumerator and the
+ *  gold scorer so they never drift (Brain substrate fix 2d, 2026-06-25). Normalizes unicode, maps every
+ *  hyphen/dash variant (en-dash, em-dash, minus, non-breaking) to ASCII "-", strips ALL whitespace, and
+ *  lowercases — so "52.219 ‑6" / "52.219–6" / "52.219-6" all compare equal. Pure. */
+export function normClause(s: string): string {
+  return s.normalize("NFKC").replace(/[‐-―−﹣－]/g, "-").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+/** Canonical FAR/DFARS clause-number pattern (FAR 52.xxx-x · DFARS 252.xxx-xxxx), tolerant of en-dash /
+ *  OCR hyphen variants. The SINGLE source of truth (review 2026-06-25 flagged the regex triplicated across
+ *  the enumerator + scorer + rescore). Exported as a SOURCE string so each call site builds its own /g
+ *  instance — a shared /g RegExp is stateful (lastIndex) and unsafe to reuse. */
+export const CLAUSE_NUMBER_PATTERN = "\\b2?52\\.\\d{3}[-‐‑‒–—―−﹣－]\\d{1,4}\\b";
+export const clauseNumberRegex = (): RegExp => new RegExp(CLAUSE_NUMBER_PATTERN, "g");
+
 export interface SubmissionRequirement {
   bucket: "deadline" | "format" | "mandatory_doc" | "representation" | "registration" | "other";
   text: string;
@@ -45,6 +60,26 @@ export interface EvaluationFactor {
   factor: string;
   weight: string | null;
   method: "LPTA" | "best_value" | "other" | null;
+}
+
+// SOW/PWS/SOO prose obligations. The agentic MAP gives these a structured home so
+// performance requirements buried in work-statement prose are no longer dropped on
+// the floor (they used to land only in free-text workStatementText, which
+// findingCount ignored → "0 findings" on prose-heavy packages).
+export interface PerformanceRequirement {
+  text: string;
+  category: "scope" | "frequency" | "standard" | "deliverable" | "personnel" | "other" | null;
+  sourceSection: string | null;
+  isCritical: boolean;
+}
+
+// SF-30 amendment deltas (Item-14 "describe the change"). Captured so an amendment
+// that changes a date / quantity / scope line is a first-class finding, not prose
+// the judge has to re-discover.
+export interface AmendmentChange {
+  amendmentNumber: string | null;
+  change: string;
+  affectedSection: string | null;
 }
 
 export interface ExtractedFacts {
@@ -65,6 +100,11 @@ export interface ExtractedFacts {
   /** Verbatim PoP / base+option term (e.g. "12-mo base + 4 option years"). V1-bound,
    *  threaded into V2 so the judgment doesn't flatten the term to a single CLIN's base. */
   periodOfPerformance?: string | null;
+  /** SOW/PWS/SOO prose obligations (agentic MAP). Structured so the judge sees
+   *  performance requirements directly instead of re-parsing workStatementText. */
+  performanceRequirements?: PerformanceRequirement[];
+  /** SF-30 amendment deltas resolved during the agentic MAP. */
+  amendmentChanges?: AmendmentChange[];
 }
 
 // ── DFARS trap clause list (matches engine DFARS_TRAPS) ───────────────────
