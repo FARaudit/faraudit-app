@@ -87,9 +87,17 @@ eq("directed/non-competitive incumbent 8(a) bar → NOT self-cleared", firmStatu
 const empCap8a = f({ requirement: "8(a) and fewer than 500 employees", requiredAttribute: "setaside:8a", excerpt: "Offeror must be 8(a) with fewer than 500 employees (average annual).", curableInWindow: true });
 eq("8(a)+employee-count size cap → NOT self-cleared", firmStatus(empCap8a, prof8a), "unknown");
 
+// A2-2 evasion: bundled "small business under NAICS" with no explicit "size standard" word.
+const sizeEvade8a = f({ requirement: "8(a) and small business under NAICS 541330", requiredAttribute: "setaside:8a", excerpt: "Offeror must be 8(a) and a small business under NAICS 541330.", curableInWindow: true });
+eq("8(a)+'small business under NAICS' (no trigger word) → NOT self-cleared", firmStatus(sizeEvade8a, prof8a), "unknown");
+
 // A PURE set-aside bar (no structural/size language) IS still cleared — the benefit survives.
 const pure8a = f({ requirement: "set aside for 8(a) participants", requiredAttribute: "setaside:8a", excerpt: "This acquisition is set aside for 8(a) program participants.", curableInWindow: true });
 eq("PURE 8(a) set-aside bar + 8(a) firm → cleared (benefit preserved)", firmStatus(pure8a, prof8a), "satisfies");
+// A2-1 over-block fix: a pure set-aside whose excerpt incidentally says "incumbent"/"employees"
+// must STILL clear (bare tokens no longer over-block → N5 benefit preserved on common phrasing).
+const pureWithIncidental = f({ requirement: "set aside for SDVOSB", requiredAttribute: "setaside:sdvosb", excerpt: "Set aside for SDVOSB; this is a follow-on to the incumbent and the firm's employees perform on site.", curableInWindow: true });
+eq("pure SDVOSB set-aside whose excerpt mentions incumbent/employees → STILL cleared (no over-block)", firmStatus(pureWithIncidental, profSDVOSB), "satisfies");
 
 // ── code-review #3 fix — closed-world NON-exact socioeconomic string does NOT canonical-flip ──
 const wosbBarExact = f({ requirement: "WOSB set-aside", requiredAttribute: "WOSB", curableInWindow: true });

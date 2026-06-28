@@ -239,9 +239,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   findings = applyCautionFloor(findings, { enabled: process.env.AUDIT_CAUTION_FLOOR !== "false" });
 
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
-  //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment
-  //      is capped to INCOMPLETE (bar-found verdicts are not capped).
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) && (opts.manifestComplete ?? true) };
+  //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment,
+  //      an over-budget source, OR a MISSING CORE UCF SECTION (panel B-2) is capped to INCOMPLETE — the
+  //      engine cannot confidently BID over evaluation factors / §C / §L it never found. `coreMissing` is
+  //      already FORMAT-AWARE (UCF only; commercial/simplified state these inline → empty), so this never
+  //      caps a legitimately-inline commercial buy. Bar-found verdicts (NO_BID/INELIGIBLE) are NOT capped.
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) && (opts.manifestComplete ?? true) && coreMissing.length === 0 };
   const decision = deriveVerdict(inputs);
 
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace };

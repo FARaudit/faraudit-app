@@ -10,8 +10,11 @@
 // is surfaced transparently as the verdict — never a false green. Two flags carry
 // completeness to the consumers that gate on it: compliance_json.honest_fail and
 // compliance_json.documents_complete are read by shouldGateExport (blocks PDF/web
-// export of an incomplete report) and by the watcher email palette (an honest-fail
-// auto-audit renders amber CAUTION, never green "Strong fit").
+// export of an incomplete report). The watcher email ALSO fails safe to amber on
+// these flags (defense-in-depth) — but note the watcher AUTO-AUDIT currently runs the
+// LEGACY V1 engine (watcher-tick.ts → runAudit), NOT this agentic path, so it does not
+// yet set these flags; the amber-forcing activates only if the watcher is migrated to
+// executeAgenticPrimary. The customer-initiated sync + worker paths DO run this engine.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";

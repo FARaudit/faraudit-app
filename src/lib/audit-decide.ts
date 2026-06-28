@@ -203,7 +203,11 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
     if (f.controllability !== "no_one_can_move") return f;        // only over-typed universals are candidates
     if (f.lens === "temporal_conflict") return f;                 // NEVER mutate the derived conflict
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-    if (!PRECONDITION_BASIS_RE.test(hay)) return f;               // not a precondition basis
+    // Altitude (uniform with the other downgrade arms): the precondition basis must be in the
+    // lens's REQUIREMENT, not the verbatim excerpt — else an excerpt coincidentally quoting
+    // "first article"/"FAT" downgrades a genuine universal impossibility. STRUCTURAL/WINDOW
+    // exclusions stay on `hay` (keeping a bar universal is the conservative direction).
+    if (!PRECONDITION_BASIS_RE.test(f.requirement)) return f;     // not a precondition basis (requirement-driven)
     if (STRUCTURAL_BAR_RE.test(hay)) return f;                    // genuine structural bar → leave universal
     if (WINDOW_CONFLICT_RE.test(hay)) return f;                   // co-states a window conflict → leave universal
     return { ...f, controllability: "bidder_controls", preconditionOvertypeFloored: true };
@@ -224,7 +228,13 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
 //       over-caution). With a known profile (non-null) the existing firmStatus path governs.
 // Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
 const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation methodology|basis (?:for|of) award|source selection|screened (?:by|for) price|\bbest value\b|trade.?off|non-price factor|evaluation factor|technically acceptable|proposals?(?: will| are)? (?:initially )?(?:be )?screened/i;
-const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery/i;
+// Exclusion for the award-basis (a) downgrade: a no_one_can_move finding is NOT an
+// award-basis artifact — and must NEVER be downgraded to bidder_controls — when ANY
+// genuine impossibility/structural language is present, even if an LPTA/evaluation phrase
+// also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
+// real universal show-stopper). Covers delivery/precondition impossibility AND supply/
+// sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
+const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
@@ -234,14 +244,32 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
-    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(hay) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
-      return { ...f, controllability: "bidder_controls", awardBasisGuard: true }; // (a) award basis is never a universal bar
+    // (a) award basis is never a universal bar. ROBUST altitude (panel B-1 + re-verify): the
+    // award-basis trigger matches the REQUIREMENT (the lens's own characterization of WHAT the
+    // bar is) — NOT the verbatim excerpt, which can incidentally quote LPTA/best-value language
+    // while describing a genuine supply/structural impossibility. The impossibility exclusion is
+    // kept on requirement+excerpt as belt-and-suspenders. So a real impossibility (proprietary /
+    // sole-source / discontinued / capacity) is never downgraded by an excerpt coincidence; only
+    // a finding the lens itself typed as an evaluation-methodology bar is.
+    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
+      return { ...f, controllability: "bidder_controls", awardBasisGuard: true };
     // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
     //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
     //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b
     //     (non-curable bar) cannot pre-empt the caution branch. NOT a universal bar (excluded above), NOT a Total-SB pool
     //     (regex), and NOT touched when a real profile is loaded (then firmStatus governs → satisfies/fails as appropriate).
-    if (profile === null && SOCIOECONOMIC_SETASIDE_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
+    // OPEN-WORLD (self-asserted capability statement) is treated like NULL here: it is a
+    // mostly-unknown profile, so the same socioeconomic over-type normalization applies (a
+    // firm WITH a profile must not lose this protection and get a worse verdict than an
+    // unknown firm — panel B-3). A held cert still softens the set-aside to a curable caution
+    // (conservative for self-asserted data); firmStatus governs only CLOSED-WORLD profiles.
+    // Same altitude discipline as (a): the set-aside identity must be in the REQUIREMENT (the
+    // lens's characterization), NOT the verbatim excerpt — else an uncontrolled excerpt quoting
+    // a set-aside line softens a genuine non-curable STRUCTURAL bar (clearance / sole-source) to
+    // an exportable caution (final-greenlight EXPLOIT-3). AND a structural-bar exclusion (the same
+    // NON_SELF_CLEARABLE_BAR_RE firmStatus uses) so a clearance/sole-source/size bar is never
+    // softened even if it names a set-aside; a PURE set-aside (no structural language) still softens.
+    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
     return f;
   });
@@ -265,12 +293,19 @@ const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8
  *  only if it is a recognized structural impossibility; a clearly compliance/representation item → caution; an
  *  unrecognized one is LEFT (→ human review), never silently BID. Pure → gate-tested. Flag-gated; OFF ⇒ unchanged. */
 export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
-  if (!opts?.enabled || profile !== null) return findings; // OFF, or a real profile loaded ⇒ firmStatus governs (unchanged)
+  // Apply under a NULL profile OR an OPEN-WORLD (self-asserted) profile — both are
+  // mostly-unknown, so the over-type whitelist must still fire (panel B-3: a firm with a
+  // capability statement must not bypass this protection). Skip ONLY for a CLOSED-WORLD
+  // (trusted/complete) profile, where firmStatus genuinely governs.
+  if (!opts?.enabled || (profile !== null && !profile.openWorld)) return findings;
   return findings.map((f) => {
     if (f.controllability !== "bidder_cannot_move" || f.curableInWindow !== false) return f; // only non-curable bars
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;                                            // genuine structural impossibility → KEEP
-    if (COMPLIANCE_REP_RE.test(hay)) return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, structuralWhitelistGuard: true }; // bidder-resolvable → caution
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;                                            // genuine structural impossibility → KEEP (excerpt OK: keeping a bar is conservative)
+    // DOWNGRADE triggers on the REQUIREMENT only (same altitude as the award-basis guard): an
+    // uncontrolled excerpt that merely quotes NAICS/registration/set-aside text must not soften a
+    // genuine non-curable bar. A bar the lens itself characterized as compliance/representation → caution.
+    if (COMPLIANCE_REP_RE.test(f.requirement)) return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, structuralWhitelistGuard: true }; // bidder-resolvable → caution
     return f;                                                                                 // SAFETY: unrecognized → leave (→ human review), never silently BID
   });
 }
@@ -356,7 +391,13 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
 // standard"). The set-aside token must not let a firm silently erase the structural/size
 // dimension bundled into the same bar (panel Finding 2). Such a bar falls through to
 // "unknown" → human review, never a canonical self-clear.
-const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|incumbent\b|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|affiliat|annual receipts|average annual|\bemployees\b/i;
+// PRECISE discriminators only (panel A2-1/A2-2): each term unambiguously marks a
+// structural / sole-source / SIZE-STANDARD bar — NOT incidental prose. Bare tokens that
+// over-blocked legitimate pure set-asides (incumbent / employees / affiliat / "average
+// annual") were dropped in favor of size-specific phrases, so a pure 8(a)/SDVOSB set-aside
+// still self-clears, while "8(a) AND small (business) under NAICS / size standard / N
+// employees / annual receipts" does not.
+const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
 
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
