@@ -1080,7 +1080,11 @@ var __fdPartialNoticeId=null;
   function driveComplete(data){
     var sub=$('fdCompleteSub'),docsBox=$('fdCompleteDocs');
     var solBit=data.solNumber?('<b>'+escapeHtml(data.solNumber)+'</b>'+(data.agency?(' · '+escapeHtml(data.agency)):'')):(data.agency?escapeHtml(data.agency):'');
-    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' ingested. <b>§C, §L and §M</b> all present.';
+    // When the fast door confirmed the sections, say so. When it could not read
+    // them in its time budget (unverified), do NOT imply a gap — they are read
+    // from the combined solicitation during the full audit (the authoritative read).
+    var secLine=data.complete?'<b>§C, §L and §M</b> all present.':'<b>§C, §L and §M</b> are read in full from the combined solicitation during the audit.';
+    if(sub)sub.innerHTML=(solBit?(solBit+' — '):'')+escapeHtml(String(data.filesTotal))+' posted document'+(data.filesTotal===1?'':'s')+' ingested. '+secLine;
     if(docsBox)docsBox.innerHTML=(data.docs||[]).map(function(d){
       var roles=(d.sectionRoles&&d.sectionRoles.length)?d.sectionRoles.map(function(r){return '<span class="sb2 sb-sec">§'+escapeHtml(r)+'</span>';}).join(''):'';
       return '<div class="frow"><span class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="fmeta"><span class="fname">'+escapeHtml(d.name)+'</span><span class="fsub">'+roles+(d.sizeBytes?('<span class="fsize">'+fmtSize(d.sizeBytes)+'</span>'):'')+'</span></span></div>';
@@ -1127,7 +1131,17 @@ var __fdPartialNoticeId=null;
       .then(function(out){
         var d=out.data||{};
         if(!d.ok){showError(REASONS[d.reason]||'We couldn’t resolve that on SAM.gov. Check the number, or upload the files directly.');return;}
-        if(d.complete){driveComplete(d);}else{drivePartial(d);}
+        // A section the fast door could not READ in time (unverified) is NOT a gap —
+        // the full agentic audit reads §C/§L/§M inside the combined solicitation. Only
+        // a CONFIRMED-absent core section (door read the body, section genuinely not
+        // there) or a missing main solicitation is a real gap that should pause. Every
+        // other case proceeds confidently (combined RFQs no longer show a false "partial").
+        var absentCore=(d.absentCore||[]).slice();
+        if(!absentCore.length && !(d.unverifiedCore||[]).length && (d.missingCore||[]).length){
+          (d.missingCore||[]).forEach(function(k){ if(k!=='MAIN') absentCore.push(k); }); // back-compat: pre-3-state API
+        }
+        var mainMissing=d.coverage&&d.coverage.main===false;
+        if(d.complete||(!absentCore.length&&!mainMissing)){driveComplete(d);}else{drivePartial(d);}
       })
       .catch(function(err){showError('Network error reaching SAM.gov — '+(err&&err.message?err.message:String(err))+'. Try again, or upload the files directly.');});
   }
