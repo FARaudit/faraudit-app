@@ -80,6 +80,13 @@ eq("8(a) SOLE-SOURCE bar + 8(a) firm → NOT self-cleared (unknown → human rev
 eq("8(a) sole-source bar → verdict is NOT a clean BID", deriveVerdict(inp([soleSource8a], prof8a)).verdict !== "BID", true);
 const bundledSize8a = f({ requirement: "8(a) and small under the NAICS size standard", requiredAttribute: "setaside:8a", excerpt: "Offeror must be 8(a) AND small under the applicable size standard.", curableInWindow: true });
 eq("8(a)+size-standard bundled bar → NOT self-cleared (size never self-asserted)", firmStatus(bundledSize8a, prof8a), "unknown");
+// Hardened-regex evasions (re-verifier): "directed / non-competitive award to the incumbent"
+// and employee-count size caps must also stay un-self-cleared.
+const directedIncumbent = f({ requirement: "non-competitive directed award to the incumbent 8(a) firm", requiredAttribute: "setaside:8a", excerpt: "This is a directed, non-competitive award to the incumbent 8(a) participant.", curableInWindow: false });
+eq("directed/non-competitive incumbent 8(a) bar → NOT self-cleared", firmStatus(directedIncumbent, prof8a), "unknown");
+const empCap8a = f({ requirement: "8(a) and fewer than 500 employees", requiredAttribute: "setaside:8a", excerpt: "Offeror must be 8(a) with fewer than 500 employees (average annual).", curableInWindow: true });
+eq("8(a)+employee-count size cap → NOT self-cleared", firmStatus(empCap8a, prof8a), "unknown");
+
 // A PURE set-aside bar (no structural/size language) IS still cleared — the benefit survives.
 const pure8a = f({ requirement: "set aside for 8(a) participants", requiredAttribute: "setaside:8a", excerpt: "This acquisition is set aside for 8(a) program participants.", curableInWindow: true });
 eq("PURE 8(a) set-aside bar + 8(a) firm → cleared (benefit preserved)", firmStatus(pure8a, prof8a), "satisfies");
