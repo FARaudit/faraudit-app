@@ -121,12 +121,17 @@ async function detectPrimarySectionsFromText(
   // entirely for an oversized primary.
   if (primary.sizeBytes != null && primary.sizeBytes > PRIMARY_MAX_BYTES) return null;
 
+  // ONE shared wall-clock budget for the WHOLE door read (download + any vision
+  // pass), so they can't run back-to-back fresh timeouts and blow past maxDuration.
+  const deadline = Date.now() + PRIMARY_DOWNLOAD_TIMEOUT_MS;
+  const remainingMs = () => Math.max(1000, deadline - Date.now());
+
   let buf: Buffer;
   try {
     // SSRF + key-leak guard (shared with the audit pipeline): host-allowlist the
     // untrusted manifest URL before the key is appended; manual redirect with
     // per-hop revalidation. Same fix applied to fetchPdfFromSamUrl / downloadPdf.
-    const res = await samFetchWithKey(primary.url, apiKey, PRIMARY_DOWNLOAD_TIMEOUT_MS);
+    const res = await samFetchWithKey(primary.url, apiKey, remainingMs());
     if (!res.ok) return null;
     // Guard against an oversized body even when the manifest size was unknown:
     // honor a Content-Length header before reading the bytes.
@@ -155,7 +160,7 @@ async function detectPrimarySectionsFromText(
   // authoritative read. Never block the door on a big vision call.
   const imageOnly = doc.extractionMethod === "fallback" || doc.warnings.some((w) => w.startsWith("LOW_TEXT_YIELD"));
   if (imageOnly) {
-    if (doc.pageCount >= 1 && doc.pageCount < 5) return await detectPrimarySectionsViaVision(buf);
+    if (doc.pageCount >= 1 && doc.pageCount < 5) return await detectPrimarySectionsViaVision(buf, remainingMs());
     return null; // too large to read synchronously at the door — unverified; the MAP confirms
   }
 
@@ -171,7 +176,7 @@ async function detectPrimarySectionsFromText(
 // bounded so the door never hangs. Returns null on any failure (→ unverified, the MAP confirms). Brain
 // guard: best-effort only; this is a fast-path hint, NOT the authoritative coverage (that is the MAP).
 const VISION_COVERAGE_MODEL = "claude-haiku-4-5";
-async function detectPrimarySectionsViaVision(buf: Buffer): Promise<ContentSections | null> {
+async function detectPrimarySectionsViaVision(buf: Buffer, budgetMs: number): Promise<ContentSections | null> {
   if (!anthropic) return null;
   try {
     const resp = await anthropic.messages.create(
@@ -199,7 +204,7 @@ async function detectPrimarySectionsViaVision(buf: Buffer): Promise<ContentSecti
           }
         ]
       },
-      { signal: AbortSignal.timeout(PRIMARY_DOWNLOAD_TIMEOUT_MS) }
+      { signal: AbortSignal.timeout(budgetMs) }
     );
     const text = resp.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
     const m = text.match(/\{[^}]*\}/);
