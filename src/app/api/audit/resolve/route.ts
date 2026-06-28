@@ -112,7 +112,8 @@ function pickContentPrimary(plan: DocumentPlanEntry[]): DocumentPlanEntry | null
 // and treats an image-only / unparsable PDF as null (honest — we couldn't read
 // it, so we don't claim sections from it).
 async function detectPrimarySectionsFromText(
-  primary: DocumentPlanEntry
+  primary: DocumentPlanEntry,
+  requestDeadline: number
 ): Promise<ContentSections | null> {
   const apiKey = process.env.SAM_API_KEY;
   if (!apiKey) return null;
@@ -122,8 +123,12 @@ async function detectPrimarySectionsFromText(
   if (primary.sizeBytes != null && primary.sizeBytes > PRIMARY_MAX_BYTES) return null;
 
   // ONE shared wall-clock budget for the WHOLE door read (download + any vision
-  // pass), so they can't run back-to-back fresh timeouts and blow past maxDuration.
-  const deadline = Date.now() + PRIMARY_DOWNLOAD_TIMEOUT_MS;
+  // pass), CLAMPED to the overall request deadline (limit d) so search + manifest +
+  // read can't run three back-to-back fresh timeouts and blow past maxDuration=30.
+  // If the earlier phases already ate the budget, skip the read entirely → the door
+  // falls back to the honest name-based "unverified" state (never blocks/half-kills).
+  const deadline = Math.min(Date.now() + PRIMARY_DOWNLOAD_TIMEOUT_MS, requestDeadline);
+  if (deadline - Date.now() < 2000) return null; // <2s left — don't start a read we can't finish
   const remainingMs = () => Math.max(1000, deadline - Date.now());
 
   let buf: Buffer;
@@ -239,6 +244,13 @@ export async function GET(req: NextRequest) {
     return fail("missing_ref", 400);
   }
 
+  // ONE overall request deadline (limit d) — bounds the whole door (search +
+  // manifest + primary read) against maxDuration=30. The content-read phase clamps
+  // its budget to what remains here, so a slow search/manifest can't push the read
+  // past the function ceiling and get hard-killed mid-write; instead the read is
+  // shortened or skipped and coverage degrades to the honest name-based state.
+  const requestDeadline = Date.now() + 28000;
+
   // ━━ Step 1: ref → a lookup token ━━
   //   • SAM opportunity URL → the 32-hex notice id in its /opp/<id>/ path.
   //   • raw 32-hex notice id → used directly.
@@ -325,7 +337,7 @@ export async function GET(req: NextRequest) {
   const primaryDoc = pickContentPrimary(plan);
   let coverageBasis: "content" | "name_only" = "name_only";
   if (primaryDoc) {
-    const textSections = await detectPrimarySectionsFromText(primaryDoc);
+    const textSections = await detectPrimarySectionsFromText(primaryDoc, requestDeadline);
     if (textSections) {
       coverageBasis = "content";
       // UNION — text-detected presence is REAL; never un-set a name-based hit.

@@ -210,6 +210,42 @@ export function assembleFullSource(docs: AgenticDoc[]): string {
     .trim();
 }
 
+// Safety ceiling for the assembled engine source (limit N3). The proven gold set
+// tops out ~946KB; this default sits comfortably above it (~350k tokens) while
+// bounding a pathological multi-megabyte package's memory / boundary-scan /
+// find_in_source cost. CONFIGURABLE via env so it can be tuned without a deploy.
+export const MAX_FULLSOURCE_CHARS = Number(process.env.AGENTIC_MAX_FULLSOURCE_CHARS) || 1_400_000;
+
+export interface AssembledSource {
+  source: string;
+  truncated: boolean;       // a binding doc was dropped OR a single doc exceeds the ceiling
+  keptDocs: number;
+  droppedDocs: string[];    // named, never silent
+}
+
+/** Budgeted assembly (limit N3/N4). Keeps WHOLE docs in order until the next would
+ *  exceed the char ceiling, then DROPS the remaining docs — a complete-but-fewer-docs
+ *  DEGRADE, never a silent mid-document cut (the never-silent-trim doctrine). The
+ *  `truncated` flag flows into documents_complete=false so an over-budget package is
+ *  surfaced as honest-incomplete (export gated), never presented as a full read.
+ *  The first doc is always kept (we never emit an empty source); a single doc larger
+ *  than the ceiling is kept whole AND flags truncated (the chunk path owns true giants). */
+export function assembleFullSourceBudgeted(docs: AgenticDoc[], maxChars: number = MAX_FULLSOURCE_CHARS): AssembledSource {
+  const kept: AgenticDoc[] = [];
+  const droppedDocs: string[] = [];
+  let used = 0;
+  for (const d of docs) {
+    const piece = docs.length > 1 ? `\n\n==== DOCUMENT: ${d.name} ====\n\n${d.text}` : d.text;
+    if (kept.length > 0 && used + piece.length > maxChars) { droppedDocs.push(d.name); continue; }
+    kept.push(d);
+    used += piece.length;
+  }
+  const finalDocs = kept.length ? kept : docs.slice(0, 1);
+  const source = assembleFullSource(finalDocs);
+  const truncated = droppedDocs.length > 0 || source.length > maxChars;
+  return { source, truncated, keptDocs: finalDocs.length, droppedDocs };
+}
+
 /** Compact, persistable summary of the proven engine's Decision — enough to
  *  compare vs V1 and eyeball the verdict pole, without dumping full findings. */
 export interface V3ShadowResult {

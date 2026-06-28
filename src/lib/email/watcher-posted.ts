@@ -85,9 +85,24 @@ function fmtDate(iso: string | null | undefined): string {
 
 function verdictPalette(rec: string | null, score: number | null) {
   const r = String(rec || "").toUpperCase();
-  if (r === "DECLINE" || (score != null && score < 50)) return { palette: COLOR_DECLINE, word: r || "DECLINE", caption: "Hard pass" };
-  if (r === "CAUTION" || (score != null && score < 80)) return { palette: COLOR_CAUTION, word: r || "CAUTION", caption: "Workable" };
-  return { palette: COLOR_GO, word: r || "GO", caption: "Strong fit" };
+  // Match BOTH vocabularies that can reach this column: the email's original
+  // GO/CAUTION/DECLINE mock AND the agentic-V3 engine's PROCEED /
+  // PROCEED_WITH_CAUTION / DECLINE (plus the raw verdict poles). The lethal bug
+  // this guards: PROCEED_WITH_CAUTION — the bucket honest-fail (INCOMPLETE /
+  // NEEDS_HUMAN_REVIEW) maps to — used to miss `=== "CAUTION"` and, with a null
+  // agentic score, fall through to the green "Strong fit" tile. So we substring-
+  // match CAUTION, name the honest-fail poles explicitly, and DEFAULT TO CAUTION
+  // for any unrecognized/blank verdict — never green. Display word is normalized
+  // to the mock's GO/CAUTION/DECLINE so "PROCEED_WITH_CAUTION" never renders raw.
+  if (r === "DECLINE" || r === "NO_BID" || r === "INELIGIBLE" || (score != null && score < 50))
+    return { palette: COLOR_DECLINE, word: "DECLINE", caption: "Hard pass" };
+  if (r === "PROCEED" || r === "GO" || r === "BID" || (score != null && score >= 80))
+    return { palette: COLOR_GO, word: "GO", caption: "Strong fit" };
+  // Everything else — PROCEED_WITH_CAUTION, BID_WITH_CAUTION, NEEDS_HUMAN_REVIEW,
+  // INCOMPLETE, mid-band scores, or an unrecognized/blank string — fails SAFE to
+  // amber. A watched RFP the engine could not confidently judge is "Workable",
+  // never a false green opportunity.
+  return { palette: COLOR_CAUTION, word: "CAUTION", caption: "Workable" };
 }
 
 function priorTypeLabel(prior: string | null, current: string | null): string {

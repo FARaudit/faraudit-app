@@ -155,6 +155,19 @@ runBool("T24 · live finalizing → export GATED", shouldGateExport(live), true)
 runBool("T25 · STALLED past backstop (no shadow) → export GATED (the closed gap)", shouldGateExport(stalled), true);
 runBool("T26 · plain V1 done (no V2 arm) → export OPEN", shouldGateExport(noV2), false);
 
+// AGENTIC V3 — the graduated engine owns the report; its completeness axis is
+// honest_fail + documents_complete (analysis_phase is always "done"). Gate on
+// BOTH (CEO 2026-06-28). These rows carry engine:"agentic_v3" so they take the
+// new branch and never the V1 finalizing rules.
+const v3Clean = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: false, documents_complete: true } };
+const v3HonestFail = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: true, documents_complete: true } };
+const v3PartialDocs = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: false, documents_complete: false } };
+const v3Both = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: true, documents_complete: false } };
+runBool("T32 · agentic grounded + complete docs → export OPEN", shouldGateExport(v3Clean), false);
+runBool("T33 · agentic honest_fail (INCOMPLETE/NHR) → export GATED", shouldGateExport(v3HonestFail), true);
+runBool("T34 · agentic incomplete documents → export GATED", shouldGateExport(v3PartialDocs), true);
+runBool("T35 · agentic honest_fail AND incomplete docs → export GATED", shouldGateExport(v3Both), true);
+
 console.log("\n── FIX 5 · live spinner (isV2Finalizing) — only while genuinely in flight ──");
 runBool("T27 · complete → not live (no spinner)", isV2Finalizing(complete), false);
 runBool("T28 · errored → not live (no infinite spinner)", isV2Finalizing(errored), false);

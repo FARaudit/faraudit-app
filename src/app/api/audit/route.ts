@@ -5,6 +5,7 @@ import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
+import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { getAdminClient } from "@/lib/supabase-admin";
 import {
@@ -483,6 +484,19 @@ export async function POST(req: NextRequest) {
   // resident audit-worker runs the identical code. Behavior preserved,
   // including the historical persist-failure contract (500 with auditId,
   // row left in 'processing' — see AuditPersistError).
+  // N5 — the auditing firm's capability profile (open-world; socioeconomic certs only)
+  // for the agentic eligibility lane. Best-effort: any error → null (unknown firm,
+  // the conservative path). Only the agentic-V3 primary engine consults it.
+  let bidderProfile = null;
+  try {
+    const { data: capRow } = await supabase
+      .from("capability_statements")
+      .select("certifications")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    bidderProfile = buildBidderProfileFromCapability(capRow);
+  } catch { /* unknown firm on any error — never block the audit */ }
+
   try {
     const execResult = await executeAudit(supabase, audit.id, {
       solicitation,
@@ -498,7 +512,8 @@ export async function POST(req: NextRequest) {
       pdfUnavailableReason,
       attachmentPdfs,
       primaryDocName,
-      ingestion
+      ingestion,
+      bidderProfile
     });
 
     return NextResponse.json(

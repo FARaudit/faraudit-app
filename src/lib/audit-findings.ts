@@ -83,6 +83,12 @@ export interface TypedFinding {
  *  never INELIGIBLE (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine). */
 export interface BidderProfile {
   satisfiedAttributes: string[]; // qualifications the firm HOLDS (NAICS-small codes, certs, clearances) — matched against requiredAttribute
+  // OPEN-WORLD profile (limit N5). A self-asserted, possibly-incomplete profile (e.g. a
+  // capability statement): a HELD attribute may CLEAR a bar, but a not-listed attribute is
+  // NOT proof the firm fails — it may simply be unstated → "unknown" (caution / human
+  // review), NEVER a false INELIGIBLE. Default/absent = false = CLOSED-WORLD trusted
+  // profile (the gold path), where a not-held attribute IS proof of failure.
+  openWorld?: boolean;
 }
 
 /** Everything the deterministic decision layer reads. Each field is a FACT (LLM-asserted, grounded) or a

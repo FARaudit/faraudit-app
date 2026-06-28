@@ -332,9 +332,38 @@ export function disposeFinding(f: TypedFinding): Disposition {
  *    "fails"     — profile PROVES the firm lacks it → a show-stopper (NO_BID / INELIGIBLE driver).
  *    "unknown"   — null profile or no concrete attribute to check → cannot prove either → residual caution.
  *  Pure. */
+// Closed SOCIOECONOMIC vocabulary (limit N5) — the ONLY attribute class a self-asserted
+// capability statement may use to CLEAR an eligibility bar, normalized so the model's
+// free-form requiredAttribute and the firm's certs match in canonical space rather than
+// by brittle exact string. NAICS-SIZE, clearance, OEM/sole-source, QPL/QML and every
+// STRUCTURAL bar are deliberately ABSENT: a firm cannot self-clear those (they require
+// independent confirmation), so they never canonicalize → stay "unknown" → human review.
+// Order matters — the most specific pattern first (EDWOSB before WOSB, SDVOSB before VOSB).
+export function canonicalizeEligibilityAttr(raw: string): string | null {
+  const s = raw.toLowerCase();
+  if (/\b8\s*\(?\s*a\s*\)?\b/.test(s) || /section\s*8\s*a/.test(s)) return "se:8a";
+  if (/hubzone/.test(s)) return "se:hubzone";
+  if (/service.?disabled.?veteran|\bsdvosb\b/.test(s)) return "se:sdvosb";
+  if (/economically.?disadvantaged.?wom|\bedwosb\b/.test(s)) return "se:edwosb";
+  if (/wom[ae]n.?owned|\bwosb\b/.test(s)) return "se:wosb";
+  if (/veteran.?owned|\bvosb\b/.test(s)) return "se:vosb";
+  return null;
+}
+
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
-  return profile.satisfiedAttributes.includes(f.requiredAttribute) ? "satisfies" : "fails";
+  // Exact attribute match (trusted/gold closed-world profile) — unchanged.
+  if (profile.satisfiedAttributes.includes(f.requiredAttribute)) return "satisfies";
+  // Canonical SOCIOECONOMIC match — both sides normalized into the closed se: vocab. This
+  // is the ONLY additional way a self-asserted (open-world) profile can CLEAR a bar, and it
+  // can only ever fire on a recognized socioeconomic set-aside, never a structural bar.
+  const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
+  if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) return "satisfies";
+  // OPEN-WORLD (self-asserted/partial profile): a not-held attribute is NOT proof the firm
+  // fails — it may simply be unstated → "unknown" (caution / human review), never a false
+  // INELIGIBLE. CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails.
+  if (profile.openWorld) return "unknown";
+  return "fails";
 }
 
 const mk = (verdict: Verdict, eligible: boolean, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>

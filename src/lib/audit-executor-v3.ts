@@ -7,12 +7,15 @@
 // GATE verdict onto the columns the list/email read → persist the engine's
 // grounded output under compliance_json.v3 with an `engine:"agentic_v3"` marker
 // the report + PDF routes branch on. Honest-fail (INCOMPLETE / NEEDS_HUMAN_REVIEW)
-// is surfaced transparently as the verdict — never a false green, flagged
-// honest_fail so downstream billing can skip it.
+// is surfaced transparently as the verdict — never a false green. Two flags carry
+// completeness to the consumers that gate on it: compliance_json.honest_fail and
+// compliance_json.documents_complete are read by shouldGateExport (blocks PDF/web
+// export of an incomplete report) and by the watcher email palette (an honest-fail
+// auto-audit renders amber CAUTION, never green "Strong fit").
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
-import { buildAgenticDocs, assembleFullSource } from "./agentic-executor";
+import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
 import { isEnvOn } from "./env-flags";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
@@ -59,6 +62,7 @@ export async function executeAgenticPrimary(
   input: AuditExecutionInput,
   solicitation: AuditExecutionInput["solicitation"],
   agency: string | null,
+  signal?: AbortSignal,
 ): Promise<AuditExecutionResult> {
   await markStage(supabase, auditId, "extraction");
 
@@ -71,7 +75,14 @@ export async function executeAgenticPrimary(
     primaryText: input.extractedText ?? null,
     attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
   });
-  const fullSource = assembleFullSource(docs);
+  // Budgeted assembly (limit N3/N4) — bounds a pathological multi-MB package by
+  // dropping WHOLE overflow docs (named, never a silent mid-doc cut). `truncated`
+  // feeds documents_complete=false below so an over-budget read is honest-incomplete.
+  const assembled = assembleFullSourceBudgeted(docs);
+  const fullSource = assembled.source;
+  if (assembled.truncated) {
+    console.warn(`[AGENTIC-V3-PRIMARY] ${auditId}: source over budget — kept ${assembled.keptDocs}/${docs.length} docs, dropped [${assembled.droppedDocs.join(", ")}] → documents_complete=false`);
+  }
   if (fullSource.replace(/\s/g, "").length < 200) {
     // Nothing readable was ingested — honest hard-fail (no false report). Throw
     // so the worker routes it to a terminal 'failed' the report page exits to.
@@ -80,9 +91,26 @@ export async function executeAgenticPrimary(
 
   await markStage(supabase, auditId, "verdict");
 
-  // GAP B — run the proven engine. bidderProfile null = unknown firm (the live
-  // customer path carries no firm attributes) → residual caution, never a blind bar.
-  const res = await auditPackage({ fullSource, bidderProfile: null });
+  // GAP B — run the proven engine. bidderProfile is the firm's OPEN-WORLD capability
+  // profile (N5; socioeconomic certs only) when the auditing user has a capability
+  // statement, else null = unknown firm. Open-world means a listed cert can CLEAR a
+  // matching set-aside bar, but silence never proves "fails" → never a false INELIGIBLE.
+  const bidderProfile = input.bidderProfile ?? null;
+  // N8 — feed the DETERMINISTIC manifest-reconciliation truth into the verdict (not just
+  // the post-hoc export gate). false (a posted SAM doc went unfetched, or the source was
+  // over-budget-truncated) caps a no-bar BID/CAUTION to INCOMPLETE — the engine's own
+  // honest output, never a confident verdict on a read it knows was partial. Only the
+  // strong signal (a present manifest that's genuinely short, or truncation) caps; an
+  // upload / no-manifest case stays uncapped (true) and is handled by the export gate.
+  const ingForCap = input.ingestion;
+  const manifestComplete = !assembled.truncated && (
+    ingForCap ? (ingForCap.files_total > 0 && ingForCap.files_ingested >= ingForCap.files_total && !ingForCap.overflow) : true
+  );
+  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete });
+  // If the overall budget aborted mid-run, never write a "complete" row — that late
+  // write would overwrite the terminal-failed status the wrapper already set and strand
+  // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
+  if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row");
   const generatedAt = new Date().toISOString();
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
@@ -112,7 +140,13 @@ export async function executeAgenticPrimary(
     : isSamSol
       ? { reconciled: false, posted: docs.length, read: docs.length, complete: false, missing: [] }
       : null;
-  const docsIncomplete = !!payload.documents && (!payload.documents.reconciled || !payload.documents.complete);
+  // An over-budget source (whole docs dropped) is ALSO an incomplete read — fold it
+  // in so documents_complete=false and the dropped docs surface in the report banner.
+  if (assembled.truncated && payload.documents) {
+    payload.documents.complete = false;
+    for (const name of assembled.droppedDocs) payload.documents.missing.push({ name, reason: "dropped: source over size budget" });
+  }
+  const docsIncomplete = assembled.truncated || (!!payload.documents && (!payload.documents.reconciled || !payload.documents.complete));
   const recommendation = verdictToRecommendation(res.decision.verdict);
   const honestFail = HONEST_FAIL.has(res.decision.verdict);
 
@@ -139,12 +173,15 @@ export async function executeAgenticPrimary(
       analysis_phase: "done",
       honest_fail: honestFail,
       // Deterministic manifest-reconciliation flag — false when a posted SAM
-      // document could not be ingested (the report flags it loudly; whether a
-      // partial package should also cap the verdict/charge is a domain decision).
+      // document could not be ingested (the report flags it loudly). CEO 2026-06-28:
+      // a partial package ALSO gates export (shouldGateExport reads this) — a report
+      // we couldn't fully ground never leaves as a clean PDF.
       documents_complete: !docsIncomplete,
       generated_at: generatedAt,
       source_chars: fullSource.length,
       doc_count: docs.length,
+      source_truncated: assembled.truncated,
+      ...(assembled.droppedDocs.length ? { dropped_docs: assembled.droppedDocs } : {}),
       v3: payload,
     },
   };
