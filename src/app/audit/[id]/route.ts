@@ -12,6 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
+import { renderAgenticReportFromRow } from "@/lib/audit-v3-report";
 import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
 import { injectRail } from "@/lib/nav/rail";
@@ -400,6 +401,21 @@ export async function GET(
     .eq("user_id", user.id)
     .maybeSingle();
   if (!capErr) hasCapabilityStatement = !!capRow;
+
+  // AGENTIC V3 — when the graduated engine produced this audit it OWNS the
+  // entire report: render its self-contained grounded report instead of the V1
+  // view-model/template. Branch is keyed off the persisted engine marker, so V1
+  // audits are byte-for-byte unchanged.
+  if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
+    // Self-contained report (its own full HTML doc) — NOT injectRail'd: the rail
+    // assumes the site's grid layout and would float a misplaced sidebar onto a
+    // centered single-column report. A "back to audits" link in the report header
+    // covers navigation; full site-shell embedding is a Design follow-up.
+    return new Response(renderAgenticReportFromRow(audit), {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
 
   const vm = buildViewModel(audit, { isWatching, hasCapabilityStatement });
 

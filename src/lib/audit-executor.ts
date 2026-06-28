@@ -29,7 +29,8 @@ import {
 import { fetchNaicsAppealAnchor, UNKNOWN_ANCHOR } from "@/lib/sam-history";
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
 import { MAX_DOCS, classifySectionRoles, type IngestionMeta } from "@/lib/sam-attachments";
-import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED, resolveAgenticCoverageComplete } from "@/lib/agentic-executor";
+import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED, resolveAgenticCoverageComplete, runDeriveVerdictShadow, AGENTIC_V3_SHADOW_ENABLED } from "@/lib/agentic-executor";
+import { executeAgenticPrimary, AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -354,6 +355,18 @@ export async function executeAudit(
         console.log(`[FACTS] no SAM record for ${solNum} — leaving facts to extraction / honest-unknown`);
       }
     }
+  }
+
+  // ━━ AGENTIC V3 PRIMARY — the graduated engine OWNS the entire report ━━━━━━━
+  // When enabled, V1's runAudit (and the whole V1/V2 pipeline below) is RETIRED
+  // for this audit: control hands off to the self-contained agentic executor,
+  // which runs the proven auditPackage engine and persists its grounded output +
+  // an engine="agentic_v3" marker the report/PDF routes branch on. Fully isolated
+  // → the legacy path carries zero risk. Default-OFF (flag); requires
+  // AUDIT_AGENTIC_V3=true too (auditPackage's own gate). Facts-first enrichment
+  // above has already run, so the report masthead facts are populated.
+  if (AGENTIC_V3_PRIMARY_ENABLED) {
+    return await executeAgenticPrimary(supabase, auditId, input, solicitation, agency);
   }
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
@@ -1071,6 +1084,57 @@ export async function executeAudit(
       );
     } catch (e) {
       console.error(`[AGENTIC-SHADOW] ${auditId} bounded-abort (non-fatal):`, e instanceof Error ? e.message : e);
+    }
+  }
+
+  // ━━ V3 PROVEN-ENGINE SHADOW (AUDIT_AGENTIC_V3_SHADOW=true) — non-fatal ━━━━━━━
+  // Runs the GRADUATED engine (auditPackage → deriveVerdict, 6/6 gold) over the
+  // full intake package and persists its GATE verdict to compliance_json.v3_shadow
+  // ALONGSIDE the V1 recommendation — a side-by-side for the CEO to compare before
+  // the engine is ever allowed to own the customer verdict. ZERO impact on the V1
+  // response (already returned-shape below; report still renders from V1 columns).
+  // Bounded like the other shadows so a stall can never hang executeAudit past the
+  // worker timeout. Also requires AUDIT_AGENTIC_V3=true (auditPackage's own gate);
+  // without it the engine throws and the shadow records null (no accidental spend).
+  if (AGENTIC_V3_SHADOW_ENABLED) {
+    const primaryBytes = pdfBuffer ?? (pdfBase64 ? Buffer.from(pdfBase64, "base64") : null);
+    const v3BudgetMs = Number(process.env.AGENTIC_V3_SHADOW_BUDGET_MS) || 600000;
+    try {
+      const v3 = await withBudget(
+        () => runDeriveVerdictShadow({
+          auditId,
+          primaryName: input.primaryDocName ?? "primary solicitation",
+          primaryBytes,
+          primaryText: extractedText ?? null,
+          attachments: inputAttachments,
+        }),
+        v3BudgetMs,
+        `v3 shadow budget (${v3BudgetMs / 60000}min) exceeded`
+      );
+      if (v3) {
+        const v3Shadow = {
+          ...v3,
+          at: new Date().toISOString(),
+          // V1 ↔ V3 comparison surface (the whole point of shadow mode).
+          v1_recommendation: result.recommendation,
+          v1_bid_recommendation: result.bid_recommendation,
+          v1_compliance_score: result.compliance_score,
+        };
+        // Re-read the row's current compliance_json so we MERGE onto whatever the
+        // V2 shadow block already persisted (v2_shadow / analysis_phase) — spreading
+        // the stale in-memory persistedComplianceJson would clobber those writes.
+        const { data: curRow } = await supabase
+          .from("audits").select("compliance_json").eq("id", auditId).single();
+        const baseCj = (curRow?.compliance_json as Record<string, unknown> | null) ?? persistedComplianceJson;
+        const { error: v3Err } = await supabase
+          .from("audits")
+          .update({ compliance_json: { ...baseCj, v3_shadow: v3Shadow } })
+          .eq("id", auditId);
+        if (v3Err) console.error("[V3-SHADOW] db update failed (non-fatal):", v3Err.message);
+        else console.log(`[V3-SHADOW] stored for audit ${auditId}: V3=${v3.verdict} vs V1=${result.recommendation}`);
+      }
+    } catch (e) {
+      console.error(`[V3-SHADOW] ${auditId} bounded-abort (non-fatal):`, e instanceof Error ? e.message : e);
     }
   }
 

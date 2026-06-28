@@ -27,6 +27,7 @@
 
 import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extractor";
 import { extractText, MIN_TEXT_CHARS_FOR_TEXT_BLOCK, meaningfulCharCount } from "./pdf-text-extractor";
+import { samFetchWithKey } from "./sam-url-guard";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
@@ -644,8 +645,10 @@ async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null>
 
 async function downloadPdf(url: string, name = ""): Promise<Buffer | null> {
   try {
-    const u = url.includes("api_key=") ? url : `${url}${url.includes("?") ? "&" : "?"}api_key=${SAM_API_KEY}`;
-    const res = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!SAM_API_KEY) return null;
+    // SSRF + key-leak guard (shared with sam-pdf.ts): host-allowlist the untrusted
+    // attachment URL before the key is appended; manual redirect with revalidation.
+    const res = await samFetchWithKey(url, SAM_API_KEY, FETCH_TIMEOUT_MS);
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     // %PDF magic byte → native PDF; else route .docx/.xlsx through extraction.

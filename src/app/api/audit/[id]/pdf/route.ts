@@ -22,6 +22,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
 import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
+import { renderAgenticReportFromRow } from "@/lib/audit-v3-report";
 import { displaySolicitationId, shouldGateExport } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
@@ -108,17 +109,24 @@ export async function GET(
   if (!capErr) hasCapabilityStatement = !!capRow;
 
   // Build the same view model + render the same HTML the web route serves.
-  const vm = buildViewModel(audit, { hasCapabilityStatement });
-  const templatePath = path.join(
-    process.cwd(),
-    "src",
-    "app",
-    "audit",
-    "[id]",
-    "_template.html"
-  );
-  const template = await readFile(templatePath, "utf8");
-  const html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
+  // AGENTIC V3 — agentic-engine audits render their own self-contained report
+  // (same branch as the web route), so the exported PDF matches what's on screen.
+  let html: string;
+  if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
+    html = renderAgenticReportFromRow(audit as Record<string, unknown>);
+  } else {
+    const vm = buildViewModel(audit, { hasCapabilityStatement });
+    const templatePath = path.join(
+      process.cwd(),
+      "src",
+      "app",
+      "audit",
+      "[id]",
+      "_template.html"
+    );
+    const template = await readFile(templatePath, "utf8");
+    html = renderAuditReportComplete(template, vm, audit as Record<string, unknown>);
+  }
 
   // Trailing-blank-page guard (Jun 11 renders, USAF pg 12): .frame carries
   // min-height:100vh which survives into print — Chromium pads the document
