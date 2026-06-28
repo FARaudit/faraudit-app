@@ -54,6 +54,7 @@ import sharp from "sharp";
 // for the asymmetry rationale (these constants are the one allowed cross-import).
 import { kSamNonPdfError, kImageResizeError } from "../../agents/audit-ai/pdf";
 import { uploadPdfToFilesApi } from "./anthropic-files";
+import { samFetchWithKey } from "./sam-url-guard";
 
 export { kSamNonPdfError, kImageResizeError };
 
@@ -283,12 +284,9 @@ async function classifyAndReturn(buf: Buffer, filename: string | null): Promise<
 
 export async function fetchPdfFromSamUrl(url: string): Promise<DocumentFetchResult> {
   if (!SAM_API_KEY) throw new Error("SAM_API_KEY required to fetch from SAM.gov");
-  const sep = url.includes("?") ? "&" : "?";
-  const authedUrl = `${url}${sep}api_key=${SAM_API_KEY}`;
-  const res = await fetch(authedUrl, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(30000)
-  });
+  // SSRF + key-leak guard: validate the (untrusted) resourceLink host before the
+  // key is appended, follow SAM's S3 redirect manually with per-hop revalidation.
+  const res = await samFetchWithKey(url, SAM_API_KEY, 30000);
   if (!res.ok) throw new Error(`SAM PDF fetch ${res.status}: ${url}`);
   const filename = parseContentDispositionFilename(res.headers.get("content-disposition"));
   const buf = Buffer.from(await res.arrayBuffer());

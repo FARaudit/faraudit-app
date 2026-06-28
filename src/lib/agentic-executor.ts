@@ -12,6 +12,7 @@
 import { extractText } from "./pdf-text-extractor";
 import { isEnvOn } from "./env-flags";
 import { runAgenticAudit, runAgenticMap, type ScalarFacts, type AgenticAuditResult, type AgenticMapResult, type AgenticDoc } from "./agentic-orchestrator";
+import { auditPackage } from "./audit-package";
 
 /** Structural view of the SAM solicitation fields we need — kept minimal so any
  *  solicitation object satisfies it without coupling to the full type. */
@@ -186,6 +187,103 @@ export async function buildAgenticFacts(params: {
     return null;
   }
 }
+
+// ── V3 PROVEN-ENGINE SHADOW (auditPackage → deriveVerdict) ──────────────────
+// The GRADUATED engine (6/6 gold, Brain-ratified) takes ONE fullSource string
+// and emits a GATE verdict (BID / BID_WITH_CAUTION / NO_BID / INELIGIBLE /
+// NEEDS_HUMAN_REVIEW / INCOMPLETE) with NO compliance score — a different shape
+// than V1's recommendation/score. This shadow assembles fullSource from the
+// live intake docs and runs the engine NON-FATALLY alongside V1, persisting a
+// compact decision block for side-by-side comparison vs the live V1
+// recommendation. It NEVER owns the customer verdict — that is a later gate,
+// once the shadow is seen to agree with V1 on a real corpus.
+
+/** GAP A — assemble the engine's single `fullSource` string from the doc set.
+ *  Raw concatenation matches the gold `*-FULL-SOURCE.complete.txt` format the
+ *  engine graduated on (pdftotext dump of every doc). The per-doc banner is
+ *  plain text with NO "SECTION X" token, so it cannot perturb the UCF section
+ *  boundary detector the engine reads. */
+export function assembleFullSource(docs: AgenticDoc[]): string {
+  return docs
+    .map((d) => (docs.length > 1 ? `\n\n==== DOCUMENT: ${d.name} ====\n\n${d.text}` : d.text))
+    .join("\n\n")
+    .trim();
+}
+
+/** Compact, persistable summary of the proven engine's Decision — enough to
+ *  compare vs V1 and eyeball the verdict pole, without dumping full findings. */
+export interface V3ShadowResult {
+  verdict: string;
+  eligible: boolean;
+  reason: string;
+  showStoppers: number;
+  coverageComplete: boolean;
+  coverageMissing: string[];
+  findings: number;
+  conflict: boolean;
+  sourceChars: number;
+  docCount: number;
+  engineMs: number;
+}
+
+/** GAP B+D — run the proven `auditPackage` engine as a NON-FATAL shadow. Returns
+ *  a compact decision summary, or null on any error (logged, never thrown) so it
+ *  can never affect the live audit. Honest-fail surfaces as INCOMPLETE /
+ *  NEEDS_HUMAN_REVIEW in the persisted verdict, never a fabricated green. Note:
+ *  `auditPackage` is itself hard-gated behind AUDIT_AGENTIC_V3=true (it throws
+ *  otherwise) — so this shadow only does real work when BOTH that flag and
+ *  AGENTIC_V3_SHADOW_ENABLED are set; otherwise it logs the throw and returns
+ *  null (belt-and-suspenders against an accidental paid run). */
+export async function runDeriveVerdictShadow(params: {
+  auditId: string;
+  primaryName: string;
+  primaryBytes: Buffer | null;
+  primaryText: string | null;
+  attachments: Array<{ name: string; base64: string }> | null;
+}): Promise<V3ShadowResult | null> {
+  const t0 = Date.now();
+  try {
+    const docs = await buildAgenticDocs({
+      primaryName: params.primaryName,
+      primaryBytes: params.primaryBytes,
+      primaryText: params.primaryText,
+      attachments: params.attachments,
+    });
+    const fullSource = assembleFullSource(docs);
+    if (fullSource.replace(/\s/g, "").length < 200) {
+      console.warn(`[V3-SHADOW] ${params.auditId}: fullSource too thin (${fullSource.length} chars) — skipping`);
+      return null;
+    }
+    // bidderProfile null = unknown firm (the live customer path carries no firm
+    // attributes); the engine returns residual caution rather than a blind bar.
+    const res = await auditPackage({ fullSource, bidderProfile: null });
+    const out: V3ShadowResult = {
+      verdict: res.decision.verdict,
+      eligible: res.decision.eligible,
+      reason: res.decision.reason,
+      showStoppers: res.decision.showStoppers.length,
+      coverageComplete: res.coverage.missing.length === 0,
+      coverageMissing: res.coverage.missing,
+      findings: res.findings.length,
+      conflict: res.conflict,
+      sourceChars: fullSource.length,
+      docCount: docs.length,
+      engineMs: Date.now() - t0,
+    };
+    console.log(
+      `[V3-SHADOW] ${params.auditId}: verdict=${out.verdict} eligible=${out.eligible} ` +
+      `showStoppers=${out.showStoppers} coverage=${out.coverageComplete ? "COMPLETE" : `INCOMPLETE(${out.coverageMissing.join(",")})`} ` +
+      `findings=${out.findings} docs=${out.docCount} src=${(out.sourceChars / 1024).toFixed(0)}KB ms=${out.engineMs}`
+    );
+    return out;
+  } catch (e) {
+    console.error(`[V3-SHADOW] ${params.auditId} failed (non-fatal):`, e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+/** Flag-gate — proven-engine (deriveVerdict) shadow runs only when enabled. */
+export const AGENTIC_V3_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_V3_SHADOW);
 
 /** Flag-gate — agentic shadow runs only when explicitly enabled. */
 export const AGENTIC_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
