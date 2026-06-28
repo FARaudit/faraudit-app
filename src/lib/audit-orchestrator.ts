@@ -41,7 +41,7 @@ export interface AuditResult {
   decision: Decision;
   inputs: VerdictInputs;
   findings: TypedFinding[];
-  coverage: { required: string[]; covered: string[]; missing: string[]; attestations: SectionAttestation[] };
+  coverage: { required: string[]; covered: string[]; missing: string[]; attestations: SectionAttestation[]; coreMissing: string[] };
   perLens: Record<string, number>;
   conflict: boolean;
   sectionsRead: string[];                                                                 // union across all agents (pure-observer)
@@ -190,6 +190,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
 
+  // CORE-PRESENCE (panel blocker): buildManifest/`required` only contains sections
+  // DETECTED PRESENT, so a genuinely-absent §C/§L/§M never appears in `missing` and
+  // an unanalyzed core section could render a clean BID. Compute the core sections
+  // NOT present in the package so the report can disclose them loudly. This does NOT
+  // change the verdict (a simplified acquisition legitimately lacks a separate §M);
+  // it makes the gap unmissable to the customer rather than silently invisible.
+  const CORE_SECTIONS = ["C", "L", "M"];
+  const coreMissing = CORE_SECTIONS.filter((k) => !readSection(ctx, k).present);
+
   // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108), default-OFF (Rule 61). Re-types an award-basis /
   //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (the award basis is never a
   //      universal bar — fixes the #1 false-NO_BID), and marks a specific socioeconomic set-aside (8(a)/HUBZone/
@@ -223,5 +232,5 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) };
   const decision = deriveVerdict(inputs);
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations }, perLens, conflict, sectionsRead: [...sectionsRead], trace };
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace };
 }

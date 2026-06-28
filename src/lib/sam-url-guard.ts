@@ -20,7 +20,12 @@
 // audit-worker — run on the Node runtime.
 
 const SAM_INITIAL_HOST_RE  = /(^|\.)sam\.gov$/i;
-const SAM_REDIRECT_HOST_RE = /(^|\.)(sam\.gov|amazonaws\.com)$/i;
+// Redirect targets: sam.gov OR an S3 host specifically (SAM's presigned downloads
+// land on S3, incl. GovCloud regional + bucket-style). Tightened from a blanket
+// *.amazonaws.com so an attacker-controlled non-S3 AWS host (e.g. an EC2 box at
+// evil.amazonaws.com) can't be a redirect target. The key is never replayed past
+// the first sam.gov hop, so this is defense-in-depth on content integrity.
+const SAM_REDIRECT_HOST_RE = /(^|\.)sam\.gov$|(^|\.)s3[a-z0-9.\-]*\.amazonaws\.com$/i;
 const MAX_SAM_REDIRECTS = 5;
 
 export function assertAllowedSamUrl(raw: string, kind: "initial" | "redirect"): URL {
@@ -52,10 +57,16 @@ export async function samFetchWithKey(
   const initial = assertAllowedSamUrl(url, "initial");
   initial.searchParams.set("api_key", apiKey);
 
+  // ONE wall-clock budget shared across ALL redirect hops (not a fresh per-hop
+  // timeout) — a chain of slow-but-allowlisted redirects can't blow past the
+  // caller's ceiling (the resolve door relies on this to stay under maxDuration).
+  const deadline = Date.now() + timeoutMs;
   let currentUrl = initial.toString();
   let res: Response | null = null;
   for (let hop = 0; hop <= MAX_SAM_REDIRECTS; hop++) {
-    res = await fetch(currentUrl, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("SAM fetch exceeded its total time budget");
+    res = await fetch(currentUrl, { redirect: "manual", signal: AbortSignal.timeout(remaining) });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) break;

@@ -31,12 +31,16 @@ export interface V3ReportPayload {
   reason: string;
   showStoppers: FindingLite[];
   findings: FindingLite[];
-  coverage: { required: string[]; covered: string[]; missing: string[] };
+  // coreMissing = core UCF sections (C/L/M) NOT present in the package at all. The
+  // verdict says nothing about these — they must be disclosed loudly, never hidden.
+  coverage: { required: string[]; covered: string[]; missing: string[]; coreMissing?: string[] };
   // Document-manifest reconciliation vs SAM (the fail-safe for "all files fetched"):
-  // posted = what SAM's manifest listed; read = what we actually ingested. complete
-  // is the deterministic guarantee the customer can trust. missing names every
-  // posted file we could NOT pull. null = no manifest (upload / single-doc arm).
+  // reconciled = we HAD SAM's manifest to compare against (false = manifest-assembly
+  // failed → single-doc fallback → cannot claim completeness). posted/read = manifest
+  // count vs what we ingested. complete = the deterministic guarantee. missing names
+  // every posted file we could NOT pull. null = genuine upload (no SAM manifest).
   documents?: {
+    reconciled: boolean;
     posted: number;
     read: number;
     complete: boolean;
@@ -71,7 +75,7 @@ export function escapeHtml(s: unknown): string {
  *  Used by both the live executor and the $0 gold-proof render. */
 export function buildV3Payload(
   decision: Decision,
-  coverage: { required: string[]; covered: string[]; missing: string[] },
+  coverage: { required: string[]; covered: string[]; missing: string[]; coreMissing?: string[] },
   rawFindings: Array<{ requirement: string; citation: string; excerpt?: string; kind?: string; controllability?: string }>,
   generatedAt?: string,
 ): V3ReportPayload {
@@ -88,7 +92,7 @@ export function buildV3Payload(
     reason: decision.reason,
     showStoppers: decision.showStoppers.map(lite),
     findings: rawFindings.map(lite),
-    coverage: { required: coverage.required, covered: coverage.covered, missing: coverage.missing },
+    coverage: { required: coverage.required, covered: coverage.covered, missing: coverage.missing, coreMissing: coverage.coreMissing ?? [] },
     generatedAt,
   };
 }
@@ -135,10 +139,26 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   // "all files fetched." A COMPLETE package is confirmed in green; a PARTIAL one is
   // flagged loudly (named missing files) directly under the verdict, never silent.
   const d = payload.documents;
-  const docsBanner = d
-    ? (d.complete
-        ? `<div class="docs ok">✓ Retrieved and read all ${d.posted} document${d.posted === 1 ? "" : "s"} the agency posted to SAM.gov — the audit covers the complete posted package.</div>`
-        : `<div class="docs warn"><b>⚠ Partial package — read ${d.read} of ${d.posted} document${d.posted === 1 ? "" : "s"} the agency posted to SAM.gov.</b>${d.missing.length ? ` Could not retrieve: ${d.missing.map((m) => escapeHtml(m.name)).join("; ")}.` : ""}${d.note ? ` ${escapeHtml(d.note)}` : ""} This verdict reflects only the documents we could read — add the missing files for a complete audit.</div>`)
+  let docsBanner = "";
+  if (d) {
+    if (!d.reconciled) {
+      // Manifest-assembly failed → single-document fallback. We cannot claim the full
+      // set was read, so we say so loudly rather than render a silent "complete."
+      docsBanner = `<div class="docs warn"><b>⚠ Document set not confirmed.</b> We read ${d.read} document${d.read === 1 ? "" : "s"}, but could not reconcile against SAM's posted manifest — the agency may have posted more. Verify the complete package on SAM.gov before bidding.</div>`;
+    } else if (d.complete) {
+      docsBanner = `<div class="docs ok">✓ Retrieved and read every document the agency posted to SAM.gov (${d.posted} file${d.posted === 1 ? "" : "s"}).</div>`;
+    } else {
+      docsBanner = `<div class="docs warn"><b>⚠ Partial package — read ${d.read} of ${d.posted} document${d.posted === 1 ? "" : "s"} the agency posted to SAM.gov.</b>${d.missing.length ? ` Could not retrieve: ${d.missing.map((m) => escapeHtml(m.name)).join("; ")}.` : ""}${d.note ? ` ${escapeHtml(d.note)}` : ""} This verdict reflects only the documents we could read — add the missing files for a complete audit.</div>`;
+    }
+  }
+
+  // Core-section presence disclosure — a core UCF section ABSENT from the package
+  // was not analyzed and the verdict does not reflect it. Surface it as loudly as
+  // the document banner so it can never be silently invisible (panel blocker).
+  const coreMissing = payload.coverage.coreMissing ?? [];
+  const CORE_LABEL: Record<string, string> = { C: "§C Statement of Work / specifications", L: "§L Instructions to offerors", M: "§M Evaluation factors" };
+  const coreBanner = coreMissing.length
+    ? `<div class="docs warn"><b>⚠ Core section${coreMissing.length === 1 ? "" : "s"} not found in the posted package:</b> ${coreMissing.map((k) => escapeHtml(CORE_LABEL[k] || `§${k}`)).join("; ")}. ${coreMissing.length === 1 ? "It was" : "They were"} not analyzed — this verdict does not reflect ${coreMissing.length === 1 ? "it" : "them"}. Confirm whether the agency posted ${coreMissing.length === 1 ? "this section" : "these sections"} on SAM.gov.</div>`
     : "";
 
   const coveredSet = new Set(payload.coverage.covered);
@@ -146,7 +166,9 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
     const ok = coveredSet.has(s);
     return `<span class="chip ${ok ? "ok" : "miss"}">§${escapeHtml(s)} ${ok ? "✓" : "✕"}</span>`;
   }).join(" ");
-  const coverageComplete = payload.coverage.missing.length === 0;
+  // "Complete" requires BOTH: every present binding section grounded AND no core
+  // UCF section absent from the package (a missing §M is not "complete" coverage).
+  const coverageComplete = payload.coverage.missing.length === 0 && coreMissing.length === 0;
 
   const metaRows = [
     ["Solicitation", meta.solicitationNumber],
@@ -205,6 +227,7 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   <div class="topbar"><div class="brand">FARaudit · Agentic Verification Engine</div><a href="/audit">← Back to audits</a></div>
   <div class="verdict"><div class="v">${escapeHtml(vs.label)}</div><div class="s">${escapeHtml(vs.sub)}</div></div>
   ${docsBanner}
+  ${coreBanner}
   ${metaRows ? `<dl class="meta">${metaRows}</dl>` : ""}
   <div class="reason"><b>Verdict basis</b>${escapeHtml(payload.reason)}</div>
   <div class="cov"><h3>Coverage <span class="state ${coverageComplete ? "ok" : "no"}">${coverageComplete ? "COMPLETE" : "INCOMPLETE"}</span></h3>

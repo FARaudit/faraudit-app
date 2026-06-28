@@ -290,14 +290,44 @@ export async function fetchDocumentFromPath(filePath: string): Promise<DocumentF
   return classifyAndReturn(buf, "local", basename(filePath));
 }
 
+// SSRF + key-leak guard, VENDORED here because this Railway-rooted package cannot
+// import src/lib/sam-url-guard. Mirrors that module exactly: host-allowlist the
+// untrusted `url` (resourceLinks[0]) before the key is appended, follow SAM's S3
+// redirect MANUALLY with per-hop revalidation, never replay the key past the first
+// sam.gov hop, one shared time budget across hops. Keep in sync with sam-url-guard.ts.
+const SAM_INITIAL_HOST_RE = /(^|\.)sam\.gov$/i;
+const SAM_REDIRECT_HOST_RE = /(^|\.)sam\.gov$|(^|\.)s3[a-z0-9.\-]*\.amazonaws\.com$/i;
+const SAM_MAX_REDIRECTS = 5;
+function assertAllowedSamUrl(raw: string, kind: "initial" | "redirect"): URL {
+  let parsed: URL;
+  try { parsed = new URL(raw); } catch { throw new Error(`SAM fetch blocked: ${kind} target is not a valid absolute URL`); }
+  if (parsed.protocol !== "https:") throw new Error(`SAM fetch blocked: ${kind} target must be https`);
+  const re = kind === "initial" ? SAM_INITIAL_HOST_RE : SAM_REDIRECT_HOST_RE;
+  if (!re.test(parsed.hostname)) throw new Error(`SAM fetch blocked: ${kind} host "${parsed.hostname}" not in allowlist`);
+  return parsed;
+}
+
 export async function fetchDocumentFromSam(url: string): Promise<DocumentFetchResult> {
   if (!SAM_API_KEY) throw new Error("SAM_API_KEY required to fetch from SAM.gov");
-  const sep = url.includes("?") ? "&" : "?";
-  const authedUrl = `${url}${sep}api_key=${SAM_API_KEY}`;
-  const res = await fetch(authedUrl, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(30000)
-  });
+  const initial = assertAllowedSamUrl(url, "initial");
+  initial.searchParams.set("api_key", SAM_API_KEY);
+  const deadline = Date.now() + 30000;
+  let currentUrl = initial.toString();
+  let res: Response | null = null;
+  for (let hop = 0; hop <= SAM_MAX_REDIRECTS; hop++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("SAM PDF fetch exceeded its total time budget");
+    res = await fetch(currentUrl, { redirect: "manual", signal: AbortSignal.timeout(remaining) });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) break;
+      currentUrl = assertAllowedSamUrl(new URL(location, currentUrl).toString(), "redirect").toString();
+      continue;
+    }
+    break;
+  }
+  if (!res) throw new Error(`SAM PDF fetch produced no response: ${url}`);
+  if (res.status >= 300 && res.status < 400) throw new Error(`SAM PDF fetch exceeded ${SAM_MAX_REDIRECTS} redirects: ${url}`);
   if (!res.ok) throw new Error(`SAM PDF fetch ${res.status}: ${url}`);
   const filename = parseContentDispositionFilename(res.headers.get("content-disposition"));
   const buf = Buffer.from(await res.arrayBuffer());
