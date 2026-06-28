@@ -6,7 +6,7 @@
 // single stuffed call. The tools read the already-extracted source (no network, no model) — so grounding
 // is a fact the harness can verify, not something the model asserts.
 
-import { detectSections } from "./section-boundary-detector";
+import { detectSections, type FormatType } from "./section-boundary-detector";
 import { makeClauseSourceChecker } from "./agentic-sections";
 
 const asDoc = (text: string) => ({
@@ -31,6 +31,15 @@ const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {
 
 const CLAUSE_RE = /\b2?52\.\d{3}-\d{1,4}\b/;
 const norm = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase();
+
+/** The procurement FORMAT of the assembled package. Negotiated full-UCF mandates
+ *  §C/§L/§M as SEPARATE sections; commercial (SF-1449) / simplified (SF-18) /
+ *  combined-synopsis state specs + 52.212-1/-2 INLINE or by reference, so an absent
+ *  separate section there is expected, not a gap. Used to avoid a false "core
+ *  section not found" scare on commercial/simplified RFQs. */
+export function detectFormat(ctx: AuditToolContext): FormatType {
+  try { return detectSections(asDoc(ctx.fullSource)).formatDetected; } catch { return "unknown"; }
+}
 
 /** Tool — read a UCF section's text. The expert reads only what it needs (just-in-time), never a stuffed dump. */
 export function readSection(ctx: AuditToolContext, key: string): { key: string; present: boolean; text: string } {

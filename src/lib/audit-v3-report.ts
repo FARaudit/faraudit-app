@@ -141,7 +141,10 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
   const d = payload.documents;
   let docsBanner = "";
   if (d) {
-    if (!d.reconciled) {
+    // Gate on `=== false` (not `!d.reconciled`): a row persisted before `reconciled`
+    // existed has it undefined — that must fall through to the complete/partial
+    // branches, NOT show a false "not confirmed" warning on an already-complete audit.
+    if (d.reconciled === false) {
       // Manifest-assembly failed → single-document fallback. We cannot claim the full
       // set was read, so we say so loudly rather than render a silent "complete."
       docsBanner = `<div class="docs warn"><b>⚠ Document set not confirmed.</b> We read ${d.read} document${d.read === 1 ? "" : "s"}, but could not reconcile against SAM's posted manifest — the agency may have posted more. Verify the complete package on SAM.gov before bidding.</div>`;

@@ -100,7 +100,9 @@ export async function executeAgenticPrimary(
   const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
   payload.documents = ing
     ? {
-        reconciled: true,
+        // A 0-file manifest can't be reconciled — route it to the "not confirmed"
+        // banner rather than the incoherent "read N of 0 documents" partial copy.
+        reconciled: ing.files_total > 0,
         posted: ing.files_total,
         read: ing.files_ingested,
         complete: ing.files_total > 0 && ing.files_ingested >= ing.files_total && !ing.overflow,

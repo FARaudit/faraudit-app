@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, type AuditToolContext } from "./audit-tools";
+import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
@@ -192,12 +192,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // CORE-PRESENCE (panel blocker): buildManifest/`required` only contains sections
   // DETECTED PRESENT, so a genuinely-absent §C/§L/§M never appears in `missing` and
-  // an unanalyzed core section could render a clean BID. Compute the core sections
-  // NOT present in the package so the report can disclose them loudly. This does NOT
-  // change the verdict (a simplified acquisition legitimately lacks a separate §M);
-  // it makes the gap unmissable to the customer rather than silently invisible.
+  // an unanalyzed core section could render a clean BID. Disclose the absent core
+  // sections so the report can flag them — but ONLY for negotiated full-UCF
+  // procurements, where C/L/M are mandatorily SEPARATE sections and an absent one is
+  // genuinely anomalous. Commercial (SF-1449) / simplified (SF-18) / combined-synopsis
+  // RFQs state specs + 52.212-1/-2 INLINE or by reference, so an absent SEPARATE
+  // section there is EXPECTED — flagging it would be a false "missing section" scare
+  // (re-panel finding). For those formats the document-reconciliation banner + the
+  // engine's grounded findings are the safety net. Disclosure only; verdict unchanged.
   const CORE_SECTIONS = ["C", "L", "M"];
-  const coreMissing = CORE_SECTIONS.filter((k) => !readSection(ctx, k).present);
+  const coreMissing = detectFormat(ctx) === "UCF"
+    ? CORE_SECTIONS.filter((k) => !readSection(ctx, k).present)
+    : [];
 
   // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108), default-OFF (Rule 61). Re-types an award-basis /
   //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (the award basis is never a
