@@ -203,7 +203,11 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
     if (f.controllability !== "no_one_can_move") return f;        // only over-typed universals are candidates
     if (f.lens === "temporal_conflict") return f;                 // NEVER mutate the derived conflict
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-    if (!PRECONDITION_BASIS_RE.test(hay)) return f;               // not a precondition basis
+    // Altitude (uniform with the other downgrade arms): the precondition basis must be in the
+    // lens's REQUIREMENT, not the verbatim excerpt — else an excerpt coincidentally quoting
+    // "first article"/"FAT" downgrades a genuine universal impossibility. STRUCTURAL/WINDOW
+    // exclusions stay on `hay` (keeping a bar universal is the conservative direction).
+    if (!PRECONDITION_BASIS_RE.test(f.requirement)) return f;     // not a precondition basis (requirement-driven)
     if (STRUCTURAL_BAR_RE.test(hay)) return f;                    // genuine structural bar → leave universal
     if (WINDOW_CONFLICT_RE.test(hay)) return f;                   // co-states a window conflict → leave universal
     return { ...f, controllability: "bidder_controls", preconditionOvertypeFloored: true };
