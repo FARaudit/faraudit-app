@@ -24,7 +24,7 @@ export interface ModelTurn { toolCalls: Array<{ id: string; name: string; input:
 /** A completed tool exchange — carries the original call (id/name/input) AND its result so the production
  *  model wrapper can reconstruct a PROTOCOL-VALID Anthropic transcript (assistant tool_use → user tool_result). */
 export interface ToolResult { id: string; name: string; input: Record<string, unknown>; result: unknown; }
-export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][]; forceSubmit?: boolean }) => Promise<ModelTurn>;
+export type CallModel = (args: { system: string; userTask: string; priorToolResults: ToolResult[][]; forceSubmit?: boolean; signal?: AbortSignal }) => Promise<ModelTurn>;
 
 export interface ExpertSpec { key: string; system: string; }
 
@@ -40,7 +40,7 @@ export function isGrounded(ctx: AuditToolContext, f: RawFinding): boolean {
 export async function runAgenticExpert(
   spec: ExpertSpec,
   ctx: AuditToolContext,
-  opts: { callModel: CallModel; maxTurns?: number },
+  opts: { callModel: CallModel; maxTurns?: number; signal?: AbortSignal },
 ): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean; sectionsRead: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
   const maxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
@@ -56,9 +56,13 @@ export async function runAgenticExpert(
     "kind, controllability), never a verdict.";
 
   for (let turn = 1; turn <= maxTurns; turn++) {
+    // Wall-clock budget breach (overall withBudget aborted the signal) → throw so the
+    // WHOLE audit rejects to a clean terminal failure. Never fall through to an empty
+    // findings return, which would masquerade as a real INCOMPLETE/no-charge verdict.
+    if (opts.signal?.aborted) throw new Error("agentic expert aborted: overall budget exceeded");
     // On the final allowed turn, FORCE submit_findings so a thorough expert that kept reading still produces
     // its findings instead of exhausting the turn cap with nothing (the 0-findings/INCOMPLETE failure mode).
-    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns });
+    const out = await opts.callModel({ system: spec.system, userTask, priorToolResults, forceSubmit: turn === maxTurns, signal: opts.signal });
     if (out.findings) {
       let dropped = 0;
       const findings: TypedFinding[] = [];
@@ -92,7 +96,7 @@ export const SUBMIT_FINDINGS_TOOL = {
 
 type SdkBlock = { type: string; id?: string; name?: string; input?: Record<string, unknown> };
 type SdkUsage = { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
-type SdkClient = { messages: { create: (a: Record<string, unknown>) => Promise<{ content: SdkBlock[]; stop_reason?: string; usage?: SdkUsage }> } };
+type SdkClient = { messages: { create: (a: Record<string, unknown>, opts?: { signal?: AbortSignal }) => Promise<{ content: SdkBlock[]; stop_reason?: string; usage?: SdkUsage }> } };
 
 /** Opt-in usage capture for the expert tool-loop (mirrors anthropic-structured's setStructuredUsageSink so
  *  a proof run can total cost across BOTH the SDK expert loop AND the structured skeptic). NULL in prod. */
@@ -108,7 +112,7 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
 export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string }): CallModel {
-  return async ({ system, userTask, priorToolResults, forceSubmit }) => {
+  return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
       messages.push({ role: "assistant", content: batch.map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input })) });
@@ -116,7 +120,9 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     }
     const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages };
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
-    const resp = await client.messages.create(req);
+    // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
+    // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
+    const resp = await client.messages.create(req, signal ? { signal } : undefined);
     if (_expertUsageSink && resp.usage) _expertUsageSink({ model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 });
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");

@@ -134,6 +134,18 @@ export const V2_FINALIZING_MAX_MS = 6 * 60 * 1000; // backstop: stop waiting if 
 // is the rule the CEO expects: greyed until the report is 100% complete.
 export function shouldGateExport(audit: Record<string, unknown>): boolean {
   const comp = (audit.compliance_json ?? {}) as Record<string, unknown>;
+  // AGENTIC V3 — the graduated engine OWNS the report. Its completeness axis is
+  // ORTHOGONAL to V1's "v2_shadow finalizing" lifecycle (analysis_phase is always
+  // "done" here), so the V1 rules below would wrongly open export on every agentic
+  // row. Gate whenever the engine honest-failed (INCOMPLETE / NEEDS_HUMAN_REVIEW)
+  // OR could not confirm it read every posted document. A report the engine
+  // refused to fully stand behind must never leave the building as a clean PDF.
+  // (CEO 2026-06-28: gate on BOTH honest_fail AND incomplete documents.)
+  if (comp.engine === "agentic_v3") {
+    if (comp.honest_fail === true) return true; // INCOMPLETE / NEEDS_HUMAN_REVIEW → gate
+    if (comp.documents_complete === false) return true; // didn't read the full posted set → gate
+    return false; // grounded verdict over a confirmed-complete document set → export ON
+  }
   if (comp.v2_shadow) return false; // deep layer landed → complete → export ON
   if (comp.v2_error) return true; // errored/timed-out → incomplete → gate
   if (comp.analysis_phase !== "finalizing") return false; // no V2 arm → plain V1 done → export ON

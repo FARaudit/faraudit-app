@@ -30,12 +30,15 @@ export interface AuditPackageInput {
   skepticBaseModel?: string;                // P2 base adversary — default modelFor("lens") (Sonnet)
   skepticEscalateModel?: string;            // P2 escalation on contested findings — default modelFor("judge") (Opus)
   maxTurns?: number;                        // per-expert react-loop bound (default 8)
+  signal?: AbortSignal;                     // overall wall-clock budget — cancels in-flight paid calls on breach (no-op if absent)
+  manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
 }
 
-/** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. */
-function structuredAdapter(apiKey: string) {
+/** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
+ *  budget `signal` (if any) is closed over so an overall-budget breach also cancels the skeptic's calls. */
+function structuredAdapter(apiKey: string, signal?: AbortSignal) {
   return async (args: { model: string; system: string; user: string; schema: Record<string, unknown> }): Promise<{ verdicts: SkepticVerdict[] }> => {
-    const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096 });
+    const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal });
     try { return JSON.parse(res.text) as { verdicts: SkepticVerdict[] }; } catch { return { verdicts: [] }; }
   };
 }
@@ -50,7 +53,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
   const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"));
   // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
-  const adapt = structuredAdapter(apiKey);
+  const adapt = structuredAdapter(apiKey, input.signal);
   const skeptic = makeTieredSkeptic(
     makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
@@ -64,5 +67,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     verify,
     bidderProfile: input.bidderProfile ?? null,
     maxTurns: input.maxTurns,
+    signal: input.signal,
+    manifestComplete: input.manifestComplete,
   });
 }

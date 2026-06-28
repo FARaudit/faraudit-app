@@ -35,6 +35,12 @@ export interface OrchestratorInput {
   bidderProfile?: BidderProfile | null;
   verify?: VerifyFn;        // P2 — defaults to grounding-only soundness (no extra model) if absent
   maxTurns?: number;
+  signal?: AbortSignal;     // overall wall-clock budget — aborts in-flight lens calls on breach (no-op if absent)
+  // N8 — an EXTERNAL manifest-reconciliation signal (the deterministic "every posted SAM
+  // doc was ingested" truth the executor holds), AND-combined with the internal page-count
+  // heuristic. false → caps a no-bar BID/CAUTION to INCOMPLETE (asymmetry). Default/absent
+  // = true (no external constraint → rely on the heuristic alone, unchanged behavior).
+  manifestComplete?: boolean;
 }
 
 export interface AuditResult {
@@ -133,7 +139,7 @@ const groundingOnlyVerify: VerifyFn = async (_ctx, findings, _opts) => ({ sound:
 
 /** Run the full agentic audit cycle and DERIVE the verdict. Pure orchestration over injected model/verify. */
 export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditResult> {
-  const { ctx, experts, callModel, bidderProfile = null, maxTurns } = opts;
+  const { ctx, experts, callModel, bidderProfile = null, maxTurns, signal } = opts;
   const verify = opts.verify ?? groundingOnlyVerify;
 
   // P0 — manifest of binding sections present in this package.
@@ -144,7 +150,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const perLens: Record<string, number> = {};
   const trace: AuditResult["trace"] = {};
   const sectionsRead = new Set<string>();
-  const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns })));
+  const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
   let findings: TypedFinding[] = [];
   experts.forEach((spec, i) => {
     runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
@@ -235,7 +241,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
   //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment
   //      is capped to INCOMPLETE (bar-found verdicts are not capped).
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) };
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) && (opts.manifestComplete ?? true) };
   const decision = deriveVerdict(inputs);
 
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace };

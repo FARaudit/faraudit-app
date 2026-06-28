@@ -31,6 +31,7 @@ import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from
 import { MAX_DOCS, classifySectionRoles, type IngestionMeta } from "@/lib/sam-attachments";
 import { runAgenticShadow, AGENTIC_SHADOW_ENABLED, buildAgenticFacts, AGENTIC_PRIMARY_ENABLED, resolveAgenticCoverageComplete, runDeriveVerdictShadow, AGENTIC_V3_SHADOW_ENABLED } from "@/lib/agentic-executor";
 import { executeAgenticPrimary, AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
+import type { BidderProfile } from "@/lib/audit-findings";
 
 export class AuditPersistError extends Error {
   constructor(message: string) {
@@ -98,6 +99,10 @@ export interface AuditExecutionInput {
   attachmentPdfs?: Array<{ name: string; base64: string; buffer: Buffer }> | null;
   primaryDocName?: string | null;
   ingestion?: IngestionMeta | null;
+  // N5 — the auditing firm's self-asserted capability profile (open-world; socioeconomic
+  // certs only) for the agentic eligibility lane. null/absent = unknown firm (conservative
+  // path, unchanged). ONLY consulted by the agentic-V3 primary engine.
+  bidderProfile?: BidderProfile | null;
 }
 
 export interface AuditExecutionResult {
@@ -366,7 +371,19 @@ export async function executeAudit(
   // AUDIT_AGENTIC_V3=true too (auditPackage's own gate). Facts-first enrichment
   // above has already run, so the report masthead facts are populated.
   if (AGENTIC_V3_PRIMARY_ENABLED) {
-    return await executeAgenticPrimary(supabase, auditId, input, solicitation, agency);
+    // OVERALL WALL-CLOCK BUDGET (limit d/N2). The agentic engine returns HERE, above
+    // every V1/V2 budget wrapper, so without this it ran unbounded: a stalled 5-lens ×
+    // 8-turn Opus panel would be hard-killed by the platform (maxDuration=300) AFTER the
+    // paid work, the persist would be lost, and the worker would re-claim and RE-SPEND the
+    // whole panel. withBudget aborts the signal on breach → threaded into auditPackage →
+    // lenses + skeptic cancel their in-flight calls → a clean terminal Error (NOT a
+    // re-runnable DegradedRunError) the report page exits to. Default 270s < maxDuration.
+    const agenticBudgetMs = Number(process.env.AGENTIC_V3_PRIMARY_BUDGET_MS) || 270000;
+    return await withBudget(
+      (signal) => executeAgenticPrimary(supabase, auditId, input, solicitation, agency, signal),
+      agenticBudgetMs,
+      `agentic V3 primary overall budget (${agenticBudgetMs / 1000}s) exceeded — engine stalled`
+    );
   }
 
   // ━━ Run three-call audit (engine sanitizes text + applies SECURITY_DIRECTIVE) ━━
