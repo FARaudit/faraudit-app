@@ -15,8 +15,10 @@ function allowed(url: string, kind: "initial" | "redirect"): boolean {
 // ── POSITIVES — must pass ──────────────────────────────────────────────
 ok(allowed("https://sam.gov/api/prod/opps/v3/opportunities/abc/resources/download/1", "initial"), "sam.gov initial");
 ok(allowed("https://api.sam.gov/prod/opportunities/v3/resources/files/x/download", "initial"), "api.sam.gov initial");
-ok(allowed("https://falextracts.s3.amazonaws.com/Attachment/x?X-Amz-Expires=9", "redirect"), "S3 presigned redirect");
+ok(allowed("https://falextracts.s3.amazonaws.com/Attachment/x?X-Amz-Expires=9", "redirect"), "S3 presigned redirect (bucket-style)");
 ok(allowed("https://s3.us-gov-west-1.amazonaws.com/bucket/key?sig=1", "redirect"), "GovCloud S3 redirect");
+ok(allowed("https://s3.amazonaws.com/b/k", "redirect"), "plain s3.amazonaws.com redirect");
+ok(allowed("https://mybucket.s3.us-east-1.amazonaws.com/k", "redirect"), "regional bucket-style S3 redirect");
 ok(allowed("https://sam.gov/path", "redirect"), "sam.gov also valid as redirect target");
 
 // ── LOAD-BEARING NEGATIVES — must ALL be blocked ───────────────────────
@@ -38,6 +40,9 @@ ok(!allowed("https://falextracts.s3.amazonaws.com/x", "initial"), "NEG: S3 not a
 ok(!allowed("https://attacker.com/x", "redirect"), "NEG: arbitrary redirect target blocked");
 ok(!allowed("http://falextracts.s3.amazonaws.com/x", "redirect"), "NEG: http S3 redirect blocked");
 ok(!allowed("https://amazonaws.com.evil.com/x", "redirect"), "NEG: amazonaws suffix-spoof blocked");
+ok(!allowed("https://evil.amazonaws.com/x", "redirect"), "NEG: non-S3 amazonaws host blocked (tightened allowlist)");
+ok(!allowed("https://ec2-1-2-3-4.compute.amazonaws.com/x", "redirect"), "NEG: EC2 compute amazonaws host blocked");
+ok(!allowed("https://falextracts.s3.amazonaws.com/x", "initial"), "NEG: S3 still not allowed as INITIAL host");
 
 console.log(`\nsam-url-guard: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

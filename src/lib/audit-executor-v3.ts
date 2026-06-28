@@ -21,15 +21,27 @@ import { buildV3Payload } from "./audit-v3-report";
  *  Also requires AUDIT_AGENTIC_V3=true (auditPackage's own gate). */
 export const AGENTIC_V3_PRIMARY_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_V3_PRIMARY);
 
-/** Map the engine's GATE verdict onto V1's GO/CAUTION/DECLINE column the list,
- *  search, and watcher email key off. Honest-fail poles → CAUTION (non-committal);
- *  the report itself shows the true verdict banner. */
-function verdictToRecommendation(v: string): "GO" | "CAUTION" | "DECLINE" {
+// Two-flag dependency guard: PRIMARY routes audits into auditPackage, which itself
+// hard-throws unless AUDIT_AGENTIC_V3=true. Setting one without the other would
+// hard-fail EVERY audit at the engine gate — warn loudly at boot rather than let it
+// surface only as per-audit failures.
+if (AGENTIC_V3_PRIMARY_ENABLED && !isEnvOn(process.env.AUDIT_AGENTIC_V3)) {
+  console.error("[AGENTIC-V3-PRIMARY] MISCONFIG: AUDIT_AGENTIC_V3_PRIMARY is ON but AUDIT_AGENTIC_V3 is OFF — every audit will hard-fail at the engine gate. Set AUDIT_AGENTIC_V3=true.");
+}
+
+/** Map the engine's GATE verdict onto the EXACT recommendation vocabulary V1 writes
+ *  to the `audits.recommendation` column — PROCEED / PROCEED_WITH_CAUTION / DECLINE —
+ *  so every downstream consumer (home dashboard pill, Past-Audits list, Telegram
+ *  pipeline count, bidding kanban, watcher email) renders agentic verdicts correctly.
+ *  (Using GO/CAUTION/DECLINE mis-rendered a BID as amber and dropped it from counts.)
+ *  Honest-fail poles → PROCEED_WITH_CAUTION (non-committal; the report shows the true
+ *  INCOMPLETE/NEEDS_HUMAN_REVIEW banner, and compliance_json.honest_fail is persisted). */
+function verdictToRecommendation(v: string): "PROCEED" | "PROCEED_WITH_CAUTION" | "DECLINE" {
   switch (v) {
-    case "BID": return "GO";
+    case "BID": return "PROCEED";
     case "NO_BID":
     case "INELIGIBLE": return "DECLINE";
-    default: return "CAUTION"; // BID_WITH_CAUTION · NEEDS_HUMAN_REVIEW · INCOMPLETE
+    default: return "PROCEED_WITH_CAUTION"; // BID_WITH_CAUTION · NEEDS_HUMAN_REVIEW · INCOMPLETE
   }
 }
 
@@ -75,20 +87,30 @@ export async function executeAgenticPrimary(
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
   // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,
-  // carried by both the sync route and the worker). This is the deterministic
-  // "all files fetched" guarantee the report surfaces: complete only when every
-  // posted document was ingested; otherwise the missing files are named loudly.
+  // carried by both the sync route and the worker). The deterministic "all files
+  // fetched" guarantee the report surfaces. THREE cases, none silent:
+  //   • manifest present  → reconcile; complete only when every posted doc was read,
+  //                         else the missing files are named loudly.
+  //   • SAM sol, NO manifest → manifest-assembly failed and we fell back to a single
+  //                         document; we CANNOT claim completeness → reconciled:false,
+  //                         a loud "could not confirm the full set" banner (this was the
+  //                         silent-partial hole the panel caught).
+  //   • genuine upload    → no SAM manifest expected → no banner (null).
   const ing = input.ingestion;
+  const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
   payload.documents = ing
     ? {
+        reconciled: true,
         posted: ing.files_total,
         read: ing.files_ingested,
-        complete: ing.files_ingested >= ing.files_total && !ing.overflow,
+        complete: ing.files_total > 0 && ing.files_ingested >= ing.files_total && !ing.overflow,
         missing: (ing.files ?? []).filter((f) => !f.ingested).map((f) => ({ name: f.name, ...(f.reason ? { reason: f.reason } : {}) })),
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
-    : null;
-  const docsIncomplete = !!payload.documents && !payload.documents.complete;
+    : isSamSol
+      ? { reconciled: false, posted: docs.length, read: docs.length, complete: false, missing: [] }
+      : null;
+  const docsIncomplete = !!payload.documents && (!payload.documents.reconciled || !payload.documents.complete);
   const recommendation = verdictToRecommendation(res.decision.verdict);
   const honestFail = HONEST_FAIL.has(res.decision.verdict);
 
@@ -125,8 +147,18 @@ export async function executeAgenticPrimary(
     },
   };
 
-  const { error } = await supabase.from("audits").update(completeUpdate).eq("id", auditId);
-  if (error) throw new Error(`agentic persist failed: ${error.message}`);
+  // Retry the persist in-process: the agentic run already SUCCEEDED (paid Opus/Sonnet
+  // work). A transient DB blip must not discard a finished audit — retry the write
+  // rather than fail the run (which would re-spend the engine on the worker's re-run).
+  let persistErr: string | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const { error } = await supabase.from("audits").update(completeUpdate).eq("id", auditId);
+    if (!error) { persistErr = null; break; }
+    persistErr = error.message;
+    console.warn(`[AGENTIC-V3-PRIMARY] persist attempt ${attempt}/3 failed for ${auditId}: ${error.message}`);
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+  if (persistErr) throw new Error(`agentic persist failed after 3 attempts: ${persistErr}`);
   console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${!docsIncomplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
 
   return { recommendation, compliance_score: null, bid_recommendation: completeUpdate.bid_recommendation };
