@@ -56,5 +56,30 @@ for (const c of cases) {
   if (!ok) console.log(`        word "${c.word}" present:${wordOk} · caption "${c.caption}" present:${capOk}`);
 }
 
+// ── code-review F1 — a caution verdict with a high V1 score must NOT go green ──
+const wordOf = (rec: string | null, score: number | null, incomplete?: boolean) => {
+  const { html } = buildWatcherPostedEmail({ ...base, recommendation: rec, score, incomplete });
+  const m = html.match(/<span class="vw">([^<]+)<\/span>/);
+  return m ? m[1] : "?";
+};
+const scoreCase = (label: string, rec: string | null, score: number | null, want: string) => {
+  const got = wordOf(rec, score); const ok = got === want;
+  if (ok) pass++; else fail++;
+  console.log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${label}${ok ? "" : ` — got ${got} want ${want}`}`);
+};
+scoreCase("F1 · PROCEED_WITH_CAUTION + score 85 → CAUTION (caution dominates score)", "PROCEED_WITH_CAUTION", 85, "CAUTION");
+scoreCase("F1 · NEEDS_HUMAN_REVIEW + score 92 → CAUTION (not green)", "NEEDS_HUMAN_REVIEW", 92, "CAUTION");
+scoreCase("F1 · INCOMPLETE + score 88 → CAUTION (not green)", "INCOMPLETE", 88, "CAUTION");
+scoreCase("F1 · genuine PROCEED + score 85 → still GO (no false amber)", "PROCEED", 85, "GO");
+
+// ── Defense-in-depth — incomplete flag forces amber regardless of recommendation ──
+const dd = (label: string, rec: string, want: string) => {
+  const got = wordOf(rec, null, true); const ok = got === want;
+  if (ok) pass++; else fail++;
+  console.log(`${ok ? "✓ PASS" : "✗ FAIL"}  ${label}${ok ? "" : ` — got ${got} want ${want}`}`);
+};
+dd("DD1 · incomplete=true + PROCEED → CAUTION (no false-green on a partial read)", "PROCEED", "CAUTION");
+dd("DD2 · incomplete=true + GO → CAUTION", "GO", "CAUTION");
+
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

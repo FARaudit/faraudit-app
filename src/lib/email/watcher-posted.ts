@@ -23,6 +23,10 @@ export interface WatcherPostedEmailInput {
   // Verdict
   score: number | null;
   recommendation: string | null; // GO | CAUTION | DECLINE (case-insensitive)
+  // Defense-in-depth: the row honest-failed (INCOMPLETE/NEEDS_HUMAN_REVIEW) or could not
+  // confirm the full document set. When true the email renders amber regardless of
+  // recommendation — a watched RFP we couldn't fully judge is NEVER a green opportunity.
+  incomplete?: boolean;
   complianceFlagsCount: number;
   risksFlagsCount: number;
 
@@ -96,10 +100,14 @@ function verdictPalette(rec: string | null, score: number | null) {
   // to the mock's GO/CAUTION/DECLINE so "PROCEED_WITH_CAUTION" never renders raw.
   if (r === "DECLINE" || r === "NO_BID" || r === "INELIGIBLE" || (score != null && score < 50))
     return { palette: COLOR_DECLINE, word: "DECLINE", caption: "Hard pass" };
+  // Caution / honest-fail poles ALWAYS amber — a recognized caution verdict DOMINATES the
+  // numeric score, so a borderline-high V1 score can never paint a caution verdict green
+  // (code-review F1). Checked BEFORE the score>=80 green branch on purpose.
+  if (r.includes("CAUTION") || r === "NEEDS_HUMAN_REVIEW" || r === "INCOMPLETE")
+    return { palette: COLOR_CAUTION, word: "CAUTION", caption: "Workable" };
   if (r === "PROCEED" || r === "GO" || r === "BID" || (score != null && score >= 80))
     return { palette: COLOR_GO, word: "GO", caption: "Strong fit" };
-  // Everything else — PROCEED_WITH_CAUTION, BID_WITH_CAUTION, NEEDS_HUMAN_REVIEW,
-  // INCOMPLETE, mid-band scores, or an unrecognized/blank string — fails SAFE to
+  // Everything else — mid-band scores or an unrecognized/blank string — fails SAFE to
   // amber. A watched RFP the engine could not confidently judge is "Workable",
   // never a false green opportunity.
   return { palette: COLOR_CAUTION, word: "CAUTION", caption: "Workable" };
@@ -113,7 +121,11 @@ function priorTypeLabel(prior: string | null, current: string | null): string {
 }
 
 export function buildWatcherPostedEmail(input: WatcherPostedEmailInput): WatcherPostedEmailOutput {
-  const v = verdictPalette(input.recommendation, input.score);
+  // An honest-fail / unconfirmed-documents row is forced to amber BEFORE the palette can
+  // read recommendation+score — so even a PROCEED row over an incomplete read can't go green.
+  const v = input.incomplete
+    ? { palette: COLOR_CAUTION, word: "CAUTION", caption: "Audit incomplete — verify" }
+    : verdictPalette(input.recommendation, input.score);
   const typeBadge = priorTypeLabel(input.priorNoticeType, input.noticeType);
   const daysDue = daysBetween(input.responseDeadline);
   const dueDateStr = fmtDate(input.responseDeadline);

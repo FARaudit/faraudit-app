@@ -19,6 +19,7 @@ import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor
 import { isEnvOn } from "./env-flags";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
+import type { IngestionMeta } from "./sam-attachments";
 
 /** Flag-gate — the agentic engine OWNS the report (V1 retired) only when set.
  *  Also requires AUDIT_AGENTIC_V3=true (auditPackage's own gate). */
@@ -49,6 +50,23 @@ function verdictToRecommendation(v: string): "PROCEED" | "PROCEED_WITH_CAUTION" 
 }
 
 const HONEST_FAIL = new Set(["INCOMPLETE", "NEEDS_HUMAN_REVIEW"]);
+
+/** Pre-run manifest-completeness for the VERDICT cap (limit N8 + the null-SAM false-green
+ *  BLOCKER the panel caught). MUST agree with the documents-path completeness below, else
+ *  the verdict column + watcher email go green while the report banner says "partial":
+ *   • truncation (whole docs dropped)        → false (incomplete);
+ *   • manifest present                       → complete iff every posted doc ingested + no overflow;
+ *   • null ingestion + SAM sol               → false (manifest assembly FAILED → single-doc fallback);
+ *   • null ingestion + genuine upload        → true  (user supplied the docs; no manifest expected). */
+export function agenticManifestComplete(
+  ingestion: IngestionMeta | null | undefined,
+  truncated: boolean,
+  isSamSol: boolean,
+): boolean {
+  if (truncated) return false;
+  if (ingestion) return ingestion.files_total > 0 && ingestion.files_ingested >= ingestion.files_total && !ingestion.overflow;
+  return !isSamSol;
+}
 
 async function markStage(supabase: SupabaseClient, auditId: string, stage: string): Promise<void> {
   try {
@@ -96,16 +114,20 @@ export async function executeAgenticPrimary(
   // statement, else null = unknown firm. Open-world means a listed cert can CLEAR a
   // matching set-aside bar, but silence never proves "fails" → never a false INELIGIBLE.
   const bidderProfile = input.bidderProfile ?? null;
-  // N8 — feed the DETERMINISTIC manifest-reconciliation truth into the verdict (not just
-  // the post-hoc export gate). false (a posted SAM doc went unfetched, or the source was
-  // over-budget-truncated) caps a no-bar BID/CAUTION to INCOMPLETE — the engine's own
-  // honest output, never a confident verdict on a read it knows was partial. Only the
-  // strong signal (a present manifest that's genuinely short, or truncation) caps; an
-  // upload / no-manifest case stays uncapped (true) and is handled by the export gate.
-  const ingForCap = input.ingestion;
-  const manifestComplete = !assembled.truncated && (
-    ingForCap ? (ingForCap.files_total > 0 && ingForCap.files_ingested >= ingForCap.files_total && !ingForCap.overflow) : true
-  );
+  // A SAM solicitation (32-hex notice id) vs a genuine upload. Decisive for the cap below:
+  // a null ingestion means OPPOSITE things for the two — upload = user supplied the docs
+  // (complete); SAM = manifest assembly FAILED → single-doc fallback (INCOMPLETE).
+  const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
+  // N8 — feed the DETERMINISTIC manifest-reconciliation truth into the VERDICT (not just
+  // the post-hoc export gate). false → caps a no-bar BID/CAUTION to INCOMPLETE — the
+  // engine's own honest output, never a confident verdict on a read it knows was partial.
+  // This MUST match the documents-path completeness logic below (else the verdict column
+  // and watcher email go green while the report banner says "partial" — the panel BLOCKER):
+  //   • manifest present → complete only if every posted doc ingested + no overflow;
+  //   • SAM sol, NO manifest → assembly failed → single-doc fallback → INCOMPLETE (!isSamSol=false);
+  //   • genuine upload (no manifest expected) → complete (!isSamSol=true);
+  //   • any over-budget truncation → INCOMPLETE.
+  const manifestComplete = agenticManifestComplete(input.ingestion, assembled.truncated, isSamSol);
   const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete });
   // If the overall budget aborted mid-run, never write a "complete" row — that late
   // write would overwrite the terminal-failed status the wrapper already set and strand
@@ -125,7 +147,6 @@ export async function executeAgenticPrimary(
   //                         silent-partial hole the panel caught).
   //   • genuine upload    → no SAM manifest expected → no banner (null).
   const ing = input.ingestion;
-  const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
   payload.documents = ing
     ? {
         // A 0-file manifest can't be reconciled — route it to the "not confirmed"
@@ -189,6 +210,10 @@ export async function executeAgenticPrimary(
   // Retry the persist in-process: the agentic run already SUCCEEDED (paid Opus/Sonnet
   // work). A transient DB blip must not discard a finished audit — retry the write
   // rather than fail the run (which would re-spend the engine on the worker's re-run).
+  // Re-check the budget IMMEDIATELY before the persist write: the abort can fire during
+  // the awaited markStage("assembly")/payload work above. Without this a run aborted at
+  // ~270s could still write a "complete" row over the terminal-failed status (code-review #2).
+  if (signal?.aborted) throw new Error("agentic engine aborted before persist (overall budget) — not writing a late-complete row");
   let persistErr: string | null = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const { error } = await supabase.from("audits").update(completeUpdate).eq("id", auditId);

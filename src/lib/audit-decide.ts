@@ -350,19 +350,35 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
   return null;
 }
 
+// A bar whose text carries STRUCTURAL / SOLE-SOURCE / SIZE-STANDARD language can NEVER be
+// cleared by a self-asserted socioeconomic cert — even if the bar also mentions a set-aside
+// (e.g. an 8(a) SOLE-SOURCE to a named firm, or "8(a) AND small under the NAICS size
+// standard"). The set-aside token must not let a firm silently erase the structural/size
+// dimension bundled into the same bar (panel Finding 2). Such a bar falls through to
+// "unknown" → human review, never a canonical self-clear.
+const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|affiliat/i;
+
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
   // Exact attribute match (trusted/gold closed-world profile) — unchanged.
   if (profile.satisfiedAttributes.includes(f.requiredAttribute)) return "satisfies";
-  // Canonical SOCIOECONOMIC match — both sides normalized into the closed se: vocab. This
-  // is the ONLY additional way a self-asserted (open-world) profile can CLEAR a bar, and it
-  // can only ever fire on a recognized socioeconomic set-aside, never a structural bar.
-  const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
-  if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) return "satisfies";
-  // OPEN-WORLD (self-asserted/partial profile): a not-held attribute is NOT proof the firm
-  // fails — it may simply be unstated → "unknown" (caution / human review), never a false
-  // INELIGIBLE. CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails.
-  if (profile.openWorld) return "unknown";
+  // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
+  // Restricted to open-world so a closed-world/gold profile is never flipped fails→satisfies
+  // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
+  // carries structural/sole-source/size language (Finding 2) — a self-asserted set-aside cert
+  // may clear a PURE set-aside eligibility bar, never a bundled structural/size show-stopper.
+  if (profile.openWorld) {
+    const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
+    if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
+      const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+      if (!NON_SELF_CLEARABLE_BAR_RE.test(hay)) return "satisfies";
+      // bundled structural/size bar → don't self-clear; fall through to unknown (human review).
+    }
+    // OPEN-WORLD: a not-held attribute is NOT proof the firm fails — it may simply be
+    // unstated → "unknown" (caution / human review), never a false INELIGIBLE.
+    return "unknown";
+  }
+  // CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails.
   return "fails";
 }
 

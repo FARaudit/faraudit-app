@@ -6,6 +6,7 @@ import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFrom
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
+import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { getAdminClient } from "@/lib/supabase-admin";
 import {
@@ -486,16 +487,19 @@ export async function POST(req: NextRequest) {
   // row left in 'processing' — see AuditPersistError).
   // N5 — the auditing firm's capability profile (open-world; socioeconomic certs only)
   // for the agentic eligibility lane. Best-effort: any error → null (unknown firm,
-  // the conservative path). Only the agentic-V3 primary engine consults it.
+  // the conservative path). ONLY the agentic-V3 primary engine consults it, so skip the
+  // Supabase round-trip entirely when that flag is off (the legacy V1 path ignores it).
   let bidderProfile = null;
-  try {
-    const { data: capRow } = await supabase
-      .from("capability_statements")
-      .select("certifications")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    bidderProfile = buildBidderProfileFromCapability(capRow);
-  } catch { /* unknown firm on any error — never block the audit */ }
+  if (AGENTIC_V3_PRIMARY_ENABLED) {
+    try {
+      const { data: capRow } = await supabase
+        .from("capability_statements")
+        .select("certifications")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      bidderProfile = buildBidderProfileFromCapability(capRow);
+    } catch { /* unknown firm on any error — never block the audit */ }
+  }
 
   try {
     const execResult = await executeAudit(supabase, audit.id, {

@@ -311,6 +311,11 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           const risksFlagsCount = Array.isArray((audit.risks.json as { items?: unknown[] })?.items)
             ? ((audit.risks.json as { items: unknown[] }).items.length)
             : 0;
+          // Defense-in-depth false-green guard: an agentic honest-fail (INCOMPLETE /
+          // NEEDS_HUMAN_REVIEW) or an unconfirmed document set forces the email amber,
+          // independent of recommendation. No-op for legacy rows (fields absent).
+          const cjForEmail = (persistedComplianceJson ?? {}) as Record<string, unknown>;
+          const incomplete = cjForEmail.honest_fail === true || cjForEmail.documents_complete === false;
           const out = await sendWatcherPostedEmail({
             toEmail,
             title: solicitation.title ?? row.title ?? "Your tracked notice",
@@ -321,6 +326,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
             noticeType: solicitation.type,
             score: audit.compliance_score,
             recommendation: audit.recommendation ?? null,
+            incomplete,
             complianceFlagsCount,
             risksFlagsCount,
             responseDeadline: solicitation.responseDeadLine,

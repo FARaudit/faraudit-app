@@ -218,7 +218,7 @@ export const MAX_FULLSOURCE_CHARS = Number(process.env.AGENTIC_MAX_FULLSOURCE_CH
 
 export interface AssembledSource {
   source: string;
-  truncated: boolean;       // a binding doc was dropped OR a single doc exceeds the ceiling
+  truncated: boolean;       // at least one WHOLE doc was dropped to fit the budget (never a mid-doc cut)
   keptDocs: number;
   droppedDocs: string[];    // named, never silent
 }
@@ -228,8 +228,11 @@ export interface AssembledSource {
  *  DEGRADE, never a silent mid-document cut (the never-silent-trim doctrine). The
  *  `truncated` flag flows into documents_complete=false so an over-budget package is
  *  surfaced as honest-incomplete (export gated), never presented as a full read.
- *  The first doc is always kept (we never emit an empty source); a single doc larger
- *  than the ceiling is kept whole AND flags truncated (the chunk path owns true giants). */
+ *  The first doc is always kept (we never emit an empty source); a single doc larger than
+ *  the ceiling is kept WHOLE and is NOT flagged truncated — nothing was dropped, it IS the
+ *  complete content (a true multi-MB single giant is the chunk path's concern, separate).
+ *  `truncated` therefore means strictly "≥1 whole doc was dropped", never "the source is big"
+ *  (else a fully-read 1.4MB single solicitation would be a false honest-fail). */
 export function assembleFullSourceBudgeted(docs: AgenticDoc[], maxChars: number = MAX_FULLSOURCE_CHARS): AssembledSource {
   const kept: AgenticDoc[] = [];
   const droppedDocs: string[] = [];
@@ -242,7 +245,7 @@ export function assembleFullSourceBudgeted(docs: AgenticDoc[], maxChars: number 
   }
   const finalDocs = kept.length ? kept : docs.slice(0, 1);
   const source = assembleFullSource(finalDocs);
-  const truncated = droppedDocs.length > 0 || source.length > maxChars;
+  const truncated = droppedDocs.length > 0;
   return { source, truncated, keptDocs: finalDocs.length, droppedDocs };
 }
 

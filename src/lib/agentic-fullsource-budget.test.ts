@@ -36,12 +36,13 @@ const check = (label: string, ok: boolean, detail = "") => {
   check("T7 · over budget → at least the first doc survives", r.keptDocs >= 1 && r.source.includes("keep1.pdf"), `kept=${r.keptDocs}`);
 }
 
-// 3 — a single doc larger than the ceiling → kept whole (never empty) AND flagged truncated
+// 3 — a single doc larger than the ceiling → kept WHOLE; NOT truncated (it is the complete
+//     content — nothing was dropped; a false honest-fail on a fully-read doc is the bug).
 {
   const docs = [mk("giant.pdf", 5000)];
   const r = assembleFullSourceBudgeted(docs, 1000);
   check("T8 · single oversized doc → kept whole (non-empty source)", r.source.length >= 5000, `len=${r.source.length}`);
-  check("T9 · single oversized doc → truncated flagged (chunk path owns true giants)", r.truncated === true, `truncated=${r.truncated}`);
+  check("T9 · single oversized doc → NOT truncated (kept whole = complete, no false honest-fail)", r.truncated === false, `truncated=${r.truncated}`);
   check("T10 · single oversized doc → nothing named-dropped (only one doc)", r.droppedDocs.length === 0, `dropped=${r.droppedDocs.length}`);
 }
 

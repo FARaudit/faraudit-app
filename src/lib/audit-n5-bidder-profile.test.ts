@@ -73,6 +73,21 @@ eq("builder: null input → null", buildBidderProfileFromCapability(null), null)
   eq("builder: mixed certs → only socioeconomic tokens", multi.satisfiedAttributes.sort().join(","), "se:8a,se:hubzone");
 }
 
+// ── Finding 2 fix — a self-asserted cert can NOT clear a BUNDLED / sole-source bar ──
+const prof8a = buildBidderProfileFromCapability({ certifications: ["8(a)"] })!;
+const soleSource8a = f({ requirement: "8(a) sole-source award to a named firm", requiredAttribute: "setaside:8a", excerpt: "This requirement is a sole source to the named 8(a) firm.", curableInWindow: false });
+eq("8(a) SOLE-SOURCE bar + 8(a) firm → NOT self-cleared (unknown → human review)", firmStatus(soleSource8a, prof8a), "unknown");
+eq("8(a) sole-source bar → verdict is NOT a clean BID", deriveVerdict(inp([soleSource8a], prof8a)).verdict !== "BID", true);
+const bundledSize8a = f({ requirement: "8(a) and small under the NAICS size standard", requiredAttribute: "setaside:8a", excerpt: "Offeror must be 8(a) AND small under the applicable size standard.", curableInWindow: true });
+eq("8(a)+size-standard bundled bar → NOT self-cleared (size never self-asserted)", firmStatus(bundledSize8a, prof8a), "unknown");
+// A PURE set-aside bar (no structural/size language) IS still cleared — the benefit survives.
+const pure8a = f({ requirement: "set aside for 8(a) participants", requiredAttribute: "setaside:8a", excerpt: "This acquisition is set aside for 8(a) program participants.", curableInWindow: true });
+eq("PURE 8(a) set-aside bar + 8(a) firm → cleared (benefit preserved)", firmStatus(pure8a, prof8a), "satisfies");
+
+// ── code-review #3 fix — closed-world NON-exact socioeconomic string does NOT canonical-flip ──
+const wosbBarExact = f({ requirement: "WOSB set-aside", requiredAttribute: "WOSB", curableInWindow: true });
+eq("closed-world non-exact cert string → still 'fails' (no canonical flip; gold intact)", firmStatus(wosbBarExact, { satisfiedAttributes: ["women-owned small business"] }), "fails");
+
 // ── CLOSED-WORLD (gold) regression: unchanged ──
 const dillonBar = f({ requirement: "sole-source named OEM", requiredAttribute: "oem:dillon-approved-source", curableInWindow: false });
 eq("closed-world empty profile → fails (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: [] }), "fails");
