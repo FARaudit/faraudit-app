@@ -259,7 +259,13 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // firm WITH a profile must not lose this protection and get a worse verdict than an
     // unknown firm — panel B-3). A held cert still softens the set-aside to a curable caution
     // (conservative for self-asserted data); firmStatus governs only CLOSED-WORLD profiles.
-    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
+    // Same altitude discipline as (a): the set-aside identity must be in the REQUIREMENT (the
+    // lens's characterization), NOT the verbatim excerpt — else an uncontrolled excerpt quoting
+    // a set-aside line softens a genuine non-curable STRUCTURAL bar (clearance / sole-source) to
+    // an exportable caution (final-greenlight EXPLOIT-3). AND a structural-bar exclusion (the same
+    // NON_SELF_CLEARABLE_BAR_RE firmStatus uses) so a clearance/sole-source/size bar is never
+    // softened even if it names a set-aside; a PURE set-aside (no structural language) still softens.
+    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
     return f;
   });
@@ -291,8 +297,11 @@ export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: B
   return findings.map((f) => {
     if (f.controllability !== "bidder_cannot_move" || f.curableInWindow !== false) return f; // only non-curable bars
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
-    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;                                            // genuine structural impossibility → KEEP
-    if (COMPLIANCE_REP_RE.test(hay)) return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, structuralWhitelistGuard: true }; // bidder-resolvable → caution
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;                                            // genuine structural impossibility → KEEP (excerpt OK: keeping a bar is conservative)
+    // DOWNGRADE triggers on the REQUIREMENT only (same altitude as the award-basis guard): an
+    // uncontrolled excerpt that merely quotes NAICS/registration/set-aside text must not soften a
+    // genuine non-curable bar. A bar the lens itself characterized as compliance/representation → caution.
+    if (COMPLIANCE_REP_RE.test(f.requirement)) return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, structuralWhitelistGuard: true }; // bidder-resolvable → caution
     return f;                                                                                 // SAFETY: unrecognized → leave (→ human review), never silently BID
   });
 }

@@ -41,6 +41,14 @@ const realAwardBasis = tf({ requirement: "award on a lowest price technically ac
 eq("B1 · genuine LPTA award-basis mis-type → still downgraded (gold preserved)",
   applyAwardBasisOvertypeGuard([realAwardBasis], null, ON)[0].controllability, "bidder_controls");
 
+// ── B-1b (final-greenlight EXPLOIT-3) — set-aside in the EXCERPT must not soften a structural bar ──
+const clearanceSetasideExcerpt = tf({ requirement: "Offeror must possess a Top Secret facility security clearance prior to award", excerpt: "...set aside for SDVOSB concerns. The contractor facility must hold a Top Secret clearance.", controllability: "bidder_cannot_move", curableInWindow: false, kind: "eligibility_bar" });
+eq("B1b · clearance bar w/ set-aside-in-EXCERPT → NOT softened (stays bidder_cannot_move)",
+  applyAwardBasisOvertypeGuard([clearanceSetasideExcerpt], null, ON)[0].controllability, "bidder_cannot_move");
+const soleSrcSetasideExcerpt = tf({ requirement: "Award is a sole-source directed award to the named incumbent", excerpt: "set aside for 8(a) participants; sole source to the incumbent", controllability: "bidder_cannot_move", curableInWindow: false, kind: "eligibility_bar" });
+eq("B1b · sole-source bar w/ set-aside-in-excerpt → NOT softened",
+  applyAwardBasisOvertypeGuard([soleSrcSetasideExcerpt], null, ON)[0].controllability, "bidder_cannot_move");
+
 // ── B-3 — open-world profile gets the over-type guards (not bypassed) ──
 const openWorld: BidderProfile = { satisfiedAttributes: ["se:wosb"], openWorld: true };
 const closedWorld: BidderProfile = { satisfiedAttributes: ["se:wosb"] };
