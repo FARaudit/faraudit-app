@@ -256,7 +256,7 @@ const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabl
 // ("or equal not permitted", "substitutions prohibited", "no exceptions", "will not be accepted"), AND the literal
 // no-substitution/brand-only tokens — EXCLUDING the bare "brand name" token (which is permissive in or-equal
 // context). Conservative by construction: when in doubt it keeps the bar (never a false BID). Adversarial-hardened.
-const OREQUAL_RESTRICTIVE_RE = /\bno\s+(?:acceptable\s+)?substitut|\bsole.?source\b|brand.?name\s+only\b|\bno\s+(?:or.?)?equals?\b|\bno\s+equivalent|\bonly\b[^.\n]{0,25}\b(?:brand|named|manufacturer|oem|source|product|model|part)|\b(?:brand|named|manufacturer|oem|source|product|model)\b[^.\n]{0,25}\bonly\b|\bor[-\s]equal\b[^.\n]{0,30}\b(?:not\s+(?:permitted|allowed|authorized|accepted|acceptable|considered)|prohibit|will\s+not)|\bsubstitut\w*[^.\n]{0,20}\b(?:prohibit|not\s+(?:permitted|allowed|accepted|acceptable|authorized))|\b(?:prohibited|not\s+permitted|not\s+authorized|not\s+acceptable|will\s+not\s+be\s+(?:accepted|considered))\b|\bno\s+exceptions?\b|\bno\s+deviation|\b(?:mandatory|designated|required|directed)\s+source\b|non.?competit|directed\s+award|\bproprietary\b|\bQPL\b|\bQML\b|qualified\s+(?:products?|manufacturers?)\s+list|technical\s+data\s+package|\bTDP\b|security\s+clearance|facility\s+(?:clearance|security|certification)|\bunobtainable\b|single\s+(?:source|authorized|approved)|exclusive\s+(?:license|distributor|dealer)|approved\s+(?:source|manufactur)|named\s+(?:oem|manufacturer|source|dealer)|no\s+longer\s+(?:manufactured|available|produced|in\s+production)|out\s+of\s+production|discontinu/i;
+const OREQUAL_RESTRICTIVE_RE = /\bno\s+(?:acceptable\s+)?substitut|\bsole[-\s]?source\b|brand[-\s]?name\s+only\b|\bno\s+(?:or.?)?equals?\b|\bno\s+equivalent|\bonly\b[^.\n]{0,25}\b(?:brand|named|manufacturer|oem|source|product|model|part)|\b(?:brand|named|manufacturer|oem|source|product|model)\b[^.\n]{0,25}\bonly\b|\bor[-\s]equal\b[^.\n]{0,30}\b(?:not\s+(?:permitted|allowed|authorized|accepted|acceptable|considered)|prohibit|will\s+not)|\bsubstitut\w*[^.\n]{0,20}\b(?:prohibit|not\s+(?:permitted|allowed|accepted|acceptable|authorized))|\b(?:prohibited|not\s+permitted|not\s+authorized|not\s+acceptable|will\s+not\s+be\s+(?:accepted|considered))\b|\bno\s+exceptions?\b|\bno\s+deviation|\b(?:mandatory|designated|required|directed)\s+source\b|non[-\s]?competit|directed\s+award|\bproprietary\b|\bQPL\b|\bQML\b|qualified\s+(?:products?|manufacturers?)\s+list|technical\s+data\s+package|\bTDP\b|security\s+clearance|facility\s+(?:clearance|security|certification)|\bunobtainable\b|single\s+(?:source|authorized|approved)|exclusive\s+(?:license|distributor|dealer)|approved\s+(?:source|manufactur)|named\s+(?:oem|manufacturer|source|dealer)|no\s+longer\s+(?:manufactured|available|produced|in\s+production)|out\s+of\s+production|discontinu/i;
 export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f): TypedFinding => {
@@ -539,7 +539,10 @@ const UNPARSED_DUR_G = /\b\d{1,3}\s*-\s*(?:days?|weeks?|months?|years?|quarters?
 const VOIDED_G = /supersede\w*|voids?|hereby\s+(?:deleted|replaced|struck)|is\s+replaced|no\s+longer\s+(?:applies|applicable|in\s+effect)/gi; // EXPLICIT supersession only — never a bare "base period"
 // SUB-DEADLINE words: a day-count co-located with these is NOT the production window — it's a notice/sample/data-item
 // deadline (round-4/6: the recurring false-NO_BID cause was a small sub-deadline mistaken for the window).
-const SUBDEADLINE_G = /notice|advance|inspection|sample|\bplan\b|\bCDRL\b|data\s+item|\breport\b|submit|prior\s+to\s+each|kick[\s-]?off|readiness|first[\s-]?article|first\s+lot|\blot\s+\d|initial\s+deliver|interim|increment|partial\s+shipment|prototype|pre-?production|demonstration\s+unit|mobiliz/gi;
+// Word-boundary-anchored (card 146 polish): leading \b on bare tokens so they don't substring-hit (e.g. \bmobiliz
+// no longer matches "immobilize"; \badvance\b no longer matches "advanced"). Conservative direction — narrows the
+// sub-deadline exclusion only; the temporal arm is CAUTION-only either way, so no false NO_BID surface is created.
+const SUBDEADLINE_G = /\bnotice|\badvance\b|\binspection|\bsample|\bplan\b|\bCDRL\b|data\s+item|\breport\b|\bsubmit|prior\s+to\s+each|kick[\s-]?off|\breadiness|first[\s-]?article|first\s+lot|\blot\s+\d|initial\s+deliver|\binterim|\bincrement|partial\s+shipment|\bprototype|pre-?production|demonstration\s+unit|\bmobiliz/gi;
 // Competing NON-DAY window FORMS (round-6): the real window stated as a calendar date / fiscal year / ordering or
 // option period / attachment reference / unit-less ARO number — none parse as a day-count, so their presence (next
 // to a lone small day-count) means the window is unprovable ⇒ CAUTION. NOT an estimate — a refusal to guess.
@@ -565,15 +568,20 @@ function deliveryWindowDays(excerpt: string): number | null {
   for (const m of excerpt.matchAll(NONDAY_WINDOW_G)) if (!isVoided(m.index ?? 0)) return null; // a non-day window FORM competes ⇒ unprovable ⇒ CAUTION
   return dayVals.size === 1 ? [...dayVals][0] : null;
 }
+// Gate anchors are TESTING-specific. Bare "evaluat*" was DROPPED (round-5: a source-selection "evaluation period
+// is ninety (90) days" was admitted as a phantom gate) — only first-article/test evaluation counts.
+// Hoisted to a module constant (card 146 polish) — compiled once, not per gateDays() call. matchAll clones the
+// regex internally per spec, so reuse across calls is stateless/safe. Behavior byte-identical.
+const GATE_ANCHOR_G = /requires?|conduct|testing|to\s+complete|to\s+process|government\s+testing|approval\s+notice|first\s+article\s+(?:approval|evaluat\w*|test)/gi;
+// CLIN / line-item token matcher — hoisted to a module constant (card 146 polish); same matchAll-clone safety.
+const CLIN_G = /\b(?:CLIN|SUBCLIN|line\s+item|item)\s*#?\s*([A-Z]?\d{2,4})\b/gi;
 /** The GATE duration: the day-count co-located (±NEAR) with gate/testing language. Fire only when UNAMBIGUOUS =
  *  exactly ONE distinct gate-anchored value (so an unrelated number near a gate word — a field-evaluation period,
  *  a quantity — cannot OVER-state the gate via MAX and cause a FALSE fire; multiple distinct ⇒ CAUTION). Anchored
  *  (not global) so a warranty/sub-step duration elsewhere in the excerpt is ignored. null ⇒ CAUTION. Pure. */
 function gateDays(excerpt: string): number | null {
   const anchors: number[] = [];
-  // Gate anchors are TESTING-specific. Bare "evaluat*" was DROPPED (round-5: a source-selection "evaluation period
-  // is ninety (90) days" was admitted as a phantom gate) — only first-article/test evaluation counts.
-  for (const m of excerpt.matchAll(/requires?|conduct|testing|to\s+complete|to\s+process|government\s+testing|approval\s+notice|first\s+article\s+(?:approval|evaluat\w*|test)/gi)) anchors.push(m.index ?? 0);
+  for (const m of excerpt.matchAll(GATE_ANCHOR_G)) anchors.push(m.index ?? 0);
   const vals = new Set<number>();
   for (const c of dayCountsWithPos(excerpt)) if (anchors.some((a) => Math.abs(a - c.i) <= NEAR)) vals.add(c.v);
   return vals.size === 1 ? [...vals][0] : null;
@@ -581,7 +589,7 @@ function gateDays(excerpt: string): number | null {
 /** CLIN / line-item tokens named in an excerpt (for the same-deliverable guard). Pure. */
 function clinSet(excerpt: string): Set<string> {
   const s = new Set<string>();
-  for (const m of excerpt.matchAll(/\b(?:CLIN|SUBCLIN|line\s+item|item)\s*#?\s*([A-Z]?\d{2,4})\b/gi)) s.add(m[1].toUpperCase());
+  for (const m of excerpt.matchAll(CLIN_G)) s.add(m[1].toUpperCase());
   return s;
 }
 
