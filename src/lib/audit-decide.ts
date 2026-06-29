@@ -240,6 +240,34 @@ const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabl
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
  *  bidder_controls (never the temporal_conflict finding or a real delivery/precondition impossibility);
  *  (b) a specific socioeconomic set-aside under a NULL profile → cautionFloor. Flag-gated; OFF ⇒ unchanged. */
+// ── OR-EQUAL CARVE-OUT (Brain card 139 — Step 6) ──────────────────────────────────────────────────────────
+// A "brand name OR EQUAL" line is PERMISSIVE — the bidder furnishes an approved equal meeting the salient
+// characteristics → bidder_controls, NEVER a structural bar. But it matches the structural patterns
+// (DELIVERY_IMPOSSIBILITY_RE / STRUCTURAL_BAR_RE_114 / NON_SELF_CLEARABLE_BAR_RE) via the bare "brand name"
+// token, so a lens that typed it a bar would survive every downstream structural gate → a false NO_BID/INELIGIBLE.
+// This carve-out runs FIRST (ahead of those gates) and re-types such a bar to bidder_controls + cautionFloor.
+// NEGATION-AWARE: a restrictive qualifier co-stated on the finding (only / no substitution / sole source / no
+// equal) VETOES the carve-out — those stay structural bars (restrictive wins; conservative, never clears a real
+// bar). Re-types controllability only; invents no findings; never touches a non-brand-name bar (QPL/QML/clearance,
+// which don't match OREQUAL_RE). Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+// The VETO — any token here means the line is NOT a permissive or-equal carve-out and STAYS a bar. It must model
+// the structural-bar vocabulary the carve-out runs ahead of (proprietary/QPL/TDP/clearance/sole-source/single-
+// authorized/discontinued/named-OEM), trailing-AND-leading prohibitive negation of or-equal/substitution
+// ("or equal not permitted", "substitutions prohibited", "no exceptions", "will not be accepted"), AND the literal
+// no-substitution/brand-only tokens — EXCLUDING the bare "brand name" token (which is permissive in or-equal
+// context). Conservative by construction: when in doubt it keeps the bar (never a false BID). Adversarial-hardened.
+const OREQUAL_RESTRICTIVE_RE = /\bno\s+(?:acceptable\s+)?substitut|\bsole.?source\b|brand.?name\s+only\b|\bno\s+(?:or.?)?equals?\b|\bno\s+equivalent|\bonly\b[^.\n]{0,25}\b(?:brand|named|manufacturer|oem|source|product|model|part)|\b(?:brand|named|manufacturer|oem|source|product|model)\b[^.\n]{0,25}\bonly\b|\bor[-\s]equal\b[^.\n]{0,30}\b(?:not\s+(?:permitted|allowed|authorized|accepted|acceptable|considered)|prohibit|will\s+not)|\bsubstitut\w*[^.\n]{0,20}\b(?:prohibit|not\s+(?:permitted|allowed|accepted|acceptable|authorized))|\b(?:prohibited|not\s+permitted|not\s+authorized|not\s+acceptable|will\s+not\s+be\s+(?:accepted|considered))\b|\bno\s+exceptions?\b|\bno\s+deviation|\b(?:mandatory|designated|required|directed)\s+source\b|non.?competit|directed\s+award|\bproprietary\b|\bQPL\b|\bQML\b|qualified\s+(?:products?|manufacturers?)\s+list|technical\s+data\s+package|\bTDP\b|security\s+clearance|facility\s+(?:clearance|security|certification)|\bunobtainable\b|single\s+(?:source|authorized|approved)|exclusive\s+(?:license|distributor|dealer)|approved\s+(?:source|manufactur)|named\s+(?:oem|manufacturer|source|dealer)|no\s+longer\s+(?:manufactured|available|produced|in\s+production)|out\s+of\s+production|discontinu/i;
+export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f): TypedFinding => {
+    if (f.controllability !== "bidder_cannot_move" && f.controllability !== "no_one_can_move") return f; // only bars
+    const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`; // read requiredAttribute too (sibling-guard parity)
+    if (!OREQUAL_RE.test(hay) || OREQUAL_RESTRICTIVE_RE.test(hay)) return f; // not or-equal, OR a restrictive/structural token present → stays a bar
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, orEqualCarveout: true,
+      requirement: `${f.requirement} — furnish an approved equal meeting the stated salient characteristics; price the equal` };
+  });
+}
+
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {

@@ -82,6 +82,11 @@ export interface TypedFinding {
   // caution; 52.246-15 Certificate of Conformance = non-blocking). Keyed on the finding's own grounded `citation`
   // field (exact clause-number match), CAP-ONLY. Marker only; deriveVerdict reads controllability/cautionFloor.
   clauseSemanticsGuard?: boolean;
+  // OR-EQUAL CARVE-OUT (Brain card 139, Step 6) — set when the deterministic carve-out re-typed a "brand name OR
+  // EQUAL" / salient-characteristics finding (mis-typed a structural bar via bare "brand name") → bidder_controls
+  // + cautionFloor (furnish an approved equal). NEVER fires when a restrictive qualifier (only / no substitution /
+  // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
+  orEqualCarveout?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

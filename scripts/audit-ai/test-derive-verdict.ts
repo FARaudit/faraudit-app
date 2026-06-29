@@ -2,7 +2,7 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard, applyOrEqualCarveout } from "@/lib/audit-decide";
 import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
@@ -209,6 +209,54 @@ if (G5) {
   const generic = cf("FAR 52.204-7", { requirement: "the offeror shall comply with the referenced provision at award", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
   eq("5a(v) whitelist ALONE leaves generic 52.204-7 a bar (precision gap)", applyStructuralBarWhitelist([generic], null, { enabled: true })[0].controllability, "bidder_cannot_move");
   eq("5a(v) clause guard BEFORE whitelist → capped (authoritative)", applyStructuralBarWhitelist([on(generic)], null, { enabled: true })[0].controllability, "bidder_controls");
+}
+
+// ── Step 6: OR-EQUAL CARVE-OUT (Brain card 139) ──
+const cfb = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding =>
+  ({ requirement: o.requirement ?? "requirement", citation: "FAR 52.211-6", excerpt: o.excerpt ?? "", grounded: true, lens: "x",
+     kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow });
+// OFF inert (unconditional): a brand-name-or-equal bar is unchanged when the flag is off.
+{
+  const bar = cfb({ requirement: "brand name or equal: ACME widget", kind: "technical_spec", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+  eq("6 OFF: carve-out inert (no opts) → byte-identical", JSON.stringify(applyOrEqualCarveout([bar])[0]), JSON.stringify(bar));
+}
+const G6 = process.env.AUDIT_OREQUAL_CARVEOUT === "true";
+if (G6) {
+  const on = (x: TypedFinding) => applyOrEqualCarveout([x], { enabled: true })[0];
+  // (i) "brand name or equal" bar → bidder_controls + caution; deriveVerdict NEVER NO_BID/INELIGIBLE.
+  const oe = on(cfb({ requirement: "brand name or equal: ACME widget", excerpt: "brand name or equal", kind: "technical_spec", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false }));
+  eq("6(i) or-equal → bidder_controls + cautionFloor", [oe.controllability, oe.cautionFloor], ["bidder_controls", true]);
+  eq("6(i) or-equal via deriveVerdict → BID_WITH_CAUTION (never NO_BID/INELIGIBLE)", deriveVerdict(inp([oe])).verdict, "BID_WITH_CAUTION");
+  // (ii) LOAD-BEARING: restrictive qualifier co-stated → carve-out VETOED → STILL a bar.
+  const onlyBar = on(cfb({ requirement: "brand name only — no substitutions accepted", excerpt: "brand name only; no substitution", kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false }));
+  eq("6(ii) 'brand name only / no substitution' → STILL a bar (untouched)", onlyBar.controllability, "no_one_can_move");
+  const orEqualButRestrictive = on(cfb({ requirement: "brand name or equal, but no substitutions will be accepted", excerpt: "or equal ... no substitutions", kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false }));
+  eq("6(ii) or-equal WITH restrictive qualifier → VETOED → STILL a bar", orEqualButRestrictive.controllability, "no_one_can_move");
+  // (ii-hardened) the false-CLEAR phrasings the adversarial review found — each is a REAL bar that must STAY a bar
+  // (carve-out must NEVER produce a false BID). OREQUAL_RE fires on all of them; the veto must hold.
+  const stays = (req: string, exc = "") => on(cfb({ requirement: req, excerpt: exc, kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false })).controllability;
+  for (const [label, req] of [
+    ["or equal not permitted", "Brand name; or equal not permitted"],
+    ["substitutions prohibited", "Or-equal substitutions are prohibited"],
+    ["will not be accepted", "Or equal products will not be accepted"],
+    ["no exceptions", "Brand name or equal — no exceptions"],
+    ["not authorized", "or equal is not authorized"],
+    ["salient + proprietary", "Salient characteristics are proprietary to the OEM"],
+    ["salient + QPL", "Item must meet the salient characteristics and appear on the Qualified Products List"],
+    ["approved equal + single authorized", "approved equal must come from the single authorized source"],
+    ["salient + discontinued", "salient characteristics — the part is no longer manufactured"],
+  ] as const) {
+    eq(`6(ii-hard) '${label}' → STILL a bar (no false clear)`, stays(req), "no_one_can_move");
+  }
+  // and the restrictive token hiding in requiredAttribute must also veto.
+  eq("6(ii-attr) restrictive in requiredAttribute → STILL a bar", on(cfb({ requirement: "brand name or equal", kind: "technical_spec", controllability: "no_one_can_move", requiredAttribute: "sole source / no substitution", curableInWindow: false })).controllability, "no_one_can_move");
+
+  // (iii) genuine sole-source/named-OEM with NO "or equal" → UNTOUCHED.
+  const ss = cfb({ requirement: "sole source to ACME; no other manufacturer can supply", kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false });
+  eq("6(iii) genuine sole-source (no 'or equal') → UNTOUCHED", JSON.stringify(on(ss)), JSON.stringify(ss));
+  // (iv) a QPL/QML or clearance bar → UNTOUCHED (scope: not a brand-name-or-equal line).
+  const qpl = cfb({ requirement: "item must be on the Qualified Products List (QPL)", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "qpl", curableInWindow: false });
+  eq("6(iv) QPL bar → UNTOUCHED by carve-out", JSON.stringify(on(qpl)), JSON.stringify(qpl));
 }
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──
