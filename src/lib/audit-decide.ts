@@ -19,7 +19,7 @@ export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
 export interface DecidedFinding extends TypedFinding { disposition: Disposition; }
 export interface Decision {
   verdict: Verdict;
-  eligible: boolean;
+  eligible: boolean | null;  // null = "not determined" (honest-fail under AUDIT_ELIGIBLE_TRISTATE) — never false on an undetermined verdict (doctrine #6)
   reason: string;
   dispositions: DecidedFinding[];      // every finding with its derived disposition
   showStoppers: DecidedFinding[];      // disqualifying bars the firm PROVABLY fails (the only NO_BID/INELIGIBLE drivers)
@@ -423,8 +423,15 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   return "fails";
 }
 
-const mk = (verdict: Verdict, eligible: boolean, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
+const mk = (verdict: Verdict, eligible: boolean | null, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
   ({ verdict, eligible, reason, dispositions, showStoppers });
+
+// Doctrine #6 (Brain card 125) — an honest-fail verdict (INCOMPLETE / verifier-unsound NHR) must NOT assert
+// eligible:false; "false" is an affirmative ineligibility claim and is itself false when the truth is
+// "undetermined." Flag DEFAULT-OFF (=== "true"): ON → null ("not determined"); OFF → false, byte-identical to
+// pre-flag behavior. A TRUE firm-credential bar (INELIGIBLE) always emits false and is NOT routed through here.
+const honestFailEligible = (): boolean | null =>
+  process.env.AUDIT_ELIGIBLE_TRISTATE === "true" ? null : false;
 
 /** Derive the verdict deterministically from typed grounded findings. The LLM experts supply the FACTS
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
@@ -435,11 +442,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
   if (!inp.coverageComplete)
-    return mk("INCOMPLETE", false, "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
-    return mk("NEEDS_HUMAN_REVIEW", false, "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
 
   // 3. Show-stoppers → the only NO_BID / INELIGIBLE drivers. Two kinds (Brain card-45 typing guard):
   //    (a) UNIVERSAL impossibilities (no_one_can_move) — disqualify EVERY bidder regardless of profile, so
@@ -498,7 +505,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
   const floored = dispositions.filter((f) => f.cautionFloor === true);
   if (residual.length || floored.length) {
-    if (manifestIncomplete) return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
+    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
     const reasons = [
       residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
       floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
@@ -509,6 +516,6 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
   //    was incomplete (then we cannot assert "no bar found").
   if (manifestIncomplete)
-    return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
   return mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);
 }

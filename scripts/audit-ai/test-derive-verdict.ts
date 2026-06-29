@@ -92,6 +92,13 @@ eq("CAUTION + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(curab
 eq("INELIGIBLE + manifest incomplete → STILL INELIGIBLE (asymmetry)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "INELIGIBLE");
 eq("NO_BID + manifest incomplete → STILL NO_BID (asymmetry)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NO_BID");
 
+// ── Doctrine #6 (Step 1, AUDIT_ELIGIBLE_TRISTATE) — honest-fail eligible is tri-state, flag-gated DEFAULT-OFF.
+//    OFF: byte-identical to HEAD (false). ON: INCOMPLETE & verifier-unsound NHR → null; INELIGIBLE → false (invariant). ──
+const TRI = process.env.AUDIT_ELIGIBLE_TRISTATE === "true";
+eq(`INCOMPLETE → eligible ${TRI ? "null" : "false"} (flag ${TRI ? "ON" : "OFF"})`, deriveVerdict(inp(two, { coverage: false })).eligible, TRI ? null : false);
+eq(`NHR(verifier-unsound) → eligible ${TRI ? "null" : "false"}`, deriveVerdict(inp(two, { sound: false })).eligible, TRI ? null : false);
+eq("INELIGIBLE → eligible false (flag-INVARIANT — true firm-credential bar)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).eligible, false);
+
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──
 const baseline = JSON.stringify(deriveVerdict(inp(two)));
 let drift = 0;
