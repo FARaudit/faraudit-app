@@ -127,7 +127,10 @@ export async function executeAgenticPrimary(
   //   • genuine upload (no manifest expected) → complete (!isSamSol=true);
   //   • any over-budget truncation → INCOMPLETE.
   const manifestComplete = agenticManifestComplete(input.ingestion, assembled.truncated, isSamSol);
-  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete });
+  // Step 4a (plumb-only) — carry the SAM-resolved scalar FACTS into the engine so the gate pipeline can
+  // read them downstream (Step 4: Nonmanufacturer Rule). naicsCode/typeOfSetAside are already resolved
+  // upstream (audit-executor.ts SAM cross-ref). Uploads have no SAM NAICS → null → NMR stays silent.
+  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete, naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null });
   // If the overall budget aborted mid-run, never write a "complete" row — that late
   // write would overwrite the terminal-failed status the wrapper already set and strand
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.

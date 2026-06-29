@@ -41,6 +41,12 @@ export interface OrchestratorInput {
   // heuristic. false → caps a no-bar BID/CAUTION to INCOMPLETE (asymmetry). Default/absent
   // = true (no external constraint → rely on the heuristic alone, unchanged behavior).
   manifestComplete?: boolean;
+  // Step 4a (plumb-only) — SAM-resolved scalar FACTS carried into the gate-pipeline scope so a
+  // future deterministic gate (Step 4: Nonmanufacturer Rule) can read them WITHOUT regexing source
+  // (Rule 64: fact, never AI-derived). Absent → null (honest silence; uploads have no SAM NAICS).
+  // NOTHING reads these yet — adding them changes no verdict (a data plumb that moves a verdict is a bug).
+  naics?: string | null;
+  setAside?: string | null;
 }
 
 export interface AuditResult {
