@@ -26,7 +26,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { runAudit, type PdfSource } from "@/lib/audit-engine";
+import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
+import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -201,52 +202,50 @@ export async function POST(
     }
   }
 
-  // ━━ Run the audit ━━
+  // ━━ Run the audit — the agentic V3 engine (same path as the main customer POST),
+  // NOT the retired V1 runAudit. executeAudit fills the row in place (verdict +
+  // engine='agentic_v3' marker + honest_fail/documents_complete). A tighter budget
+  // leaves the 300s route headroom for the SAM/PDF prologue above. ━━
+  const input: AuditExecutionInput = {
+    solicitation,
+    agency: resolveAgency(solicitation) || (audit.agency as string | null),
+    pdfBuffer: null,
+    pdfBase64,
+    pdfFileId,
+    imageBase64,
+    imageMediaType,
+    extractedText,
+    extractedFormat,
+    pdfSource,
+    pdfUnavailableReason,
+    agenticBudgetMs: 200_000
+  };
   let result;
   try {
-    result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+    result = await executeAudit(supabase, audit.id as string, input);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // ━━ Update the audits row (replace, not new) ━━
-  const persistedComplianceJson = {
-    ...result.compliance.json,
-    score_confidence: result.score_confidence ?? null,
-    is_not_solicitation: result.is_not_solicitation ?? false,
-    notice_type: solicitation.type ?? compJson.notice_type ?? null,
-    last_refetched_at: new Date().toISOString()
-  };
-
-  const refreshedAgency = resolveAgency(solicitation) || (audit.agency as string | null);
-  // FA-151: keep the prior leaf if SAM omits the full path on refetch.
-  const refreshedOfficeLeaf = resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null);
-  const { error: updateError } = await supabase
-    .from("audits")
-    .update({
-      overview_summary: result.overview.summary,
-      overview_json: result.overview.json,
-      compliance_summary: result.compliance.summary,
-      compliance_json: persistedComplianceJson,
-      risks_summary: result.risks.summary,
-      risks_json: result.risks.json,
-      compliance_score: result.compliance_score,
-      recommendation: result.recommendation,
-      bid_recommendation: result.bid_recommendation,
-      document_type: result.classification.document_type,
-      document_type_rationale: result.classification.rationale,
-      document_type_confidence: result.classification.confidence,
-      agency: refreshedAgency,
-      office_leaf: refreshedOfficeLeaf,
-      title: solicitation.title ?? audit.title,
-      response_deadline: solicitation.responseDeadLine ?? audit.response_deadline,
-      status: "complete",
-      completed_at: new Date().toISOString()
-    })
-    .eq("id", audit.id);
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  // executeAudit replaced compliance_json with the V3 payload — merge back the refetch
+  // bookkeeping the idempotency cache + UI read (last_refetched_at, pdf_source), and
+  // refresh office_leaf (FA-151: keep the prior leaf if SAM omits the full path).
+  {
+    const { data: fresh } = await supabase.from("audits").select("compliance_json").eq("id", audit.id).single();
+    const freshCj = (fresh?.compliance_json as Record<string, unknown> | null) ?? {};
+    const { error: mergeErr } = await supabase
+      .from("audits")
+      .update({
+        compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource },
+        office_leaf: resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null)
+      })
+      .eq("id", audit.id);
+    if (mergeErr) {
+      // The audit itself succeeded; only the refetch bookkeeping failed. Surface but
+      // don't fail the request — the report is already correct.
+      console.warn(`[refetch] compliance_json merge-back failed for ${audit.id}: ${mergeErr.message}`);
+    }
   }
 
   return NextResponse.json({
