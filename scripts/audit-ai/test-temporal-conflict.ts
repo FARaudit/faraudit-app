@@ -17,7 +17,7 @@ const frozen = (file: string) => (JSON.parse(readFileSync(`${FROZEN}/${file}`, "
 // mis-typed no_one_can_move so a feasible precondition (no co-stated window) is not a false NO_BID; the
 // derived temporal_conflict finding survives to drive a REAL universal impossibility.
 const decideFx = (findings: TypedFinding[]) => {
-  let f = applyTemporalConflict(findings, { enabled: true });
+  let f = applyTemporalConflict(findings, { enabled: true, sharedAroGate: true }); // Option 1: temporal nets to CAUTION, never NO_BID
   f = applyPreconditionOvertypeFloor(f, { enabled: true });
   f = applyCautionFloor(f, { enabled: true });
   const inp: VerdictInputs = { findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true };
@@ -31,14 +31,15 @@ ok(parseDays("NOT LATER THAN THIRTY (30) calendar days After Receipt of Order") 
 ok(parseDays("within 30 days, or 90 days max") === 30, "smallest binding minimum picked (30 from 30/90)");
 ok(parseDays("no day count here") === null, "no duration → null");
 
-// ── B. NO_BID precondition × window — STATED invariants (Brain card 90), over FROZEN fixtures ──
-console.log("\n[#6 FA860126Q00260001 — frozen fixtures]");
+// ── B. Option-1 invariants (Brain card 141/143) over FROZEN fixtures: the FAT-gate-vs-window tension nets to a
+// HIGH-confidence KO-clarify CAUTION, NEVER NO_BID. #6 complete = the temporal-CAUTION anchor. ──
+console.log("\n[#6 FA860126Q00260001 — frozen fixtures · Option-1 temporal CAUTION]");
 const fxComplete = frozen("fa8601-complete.json");
 const fxNoPre = frozen("fa8601-no-precondition.json");
 const fxNoWin = frozen("fa8601-no-window.json");
-ok(decideFx(fxComplete) === "NO_BID", `complete (non-waivable precondition + impossible window) → ${decideFx(fxComplete)} (stated NO_BID)`);
-ok(decideFx(fxNoPre) !== "NO_BID", `no-precondition (FAT precondition removed, window kept) → ${decideFx(fxNoPre)} (stated ≠NO_BID)`);
-ok(decideFx(fxNoWin) !== "NO_BID", `no-window (precondition kept, window removed) → ${decideFx(fxNoWin)} (stated ≠NO_BID)`);
+ok(decideFx(fxComplete) === "BID_WITH_CAUTION", `complete (non-waivable gate + window tension) → ${decideFx(fxComplete)} (Option-1: high-confidence temporal CAUTION, NEVER NO_BID)`);
+ok(decideFx(fxNoPre) !== "NO_BID", `no-precondition (FAT precondition removed, window kept) → ${decideFx(fxNoPre)} (≠NO_BID)`);
+ok(decideFx(fxNoWin) !== "NO_BID", `no-window (precondition kept, window removed) → ${decideFx(fxNoWin)} (≠NO_BID)`);
 
 // ── #4 — regression: temporal-conflict must NOT affect it (no FAT precondition) → stays CAUTION ──
 const fx4 = frozen("aocssb-with-qual.json");
@@ -59,6 +60,200 @@ ok(fires("NON-WAIVABLE first article testing SIXTY (60) calendar days before del
 ok(!fires("first article testing of SIXTY (60) calendar days; the CO may waive at its discretion", "deliver within THIRTY (30) days ARO"), "WAIVABLE 60 vs 30 → does NOT fire (CO can waive → not universal)");
 ok(!fires("NON-WAIVABLE first article testing of TWENTY (20) calendar days", "deliver within THIRTY (30) days ARO"), "non-waivable 20 ≤ 30 → does NOT fire (fits in window)");
 
+// ── Step 7 (Brain card 140, AUDIT_TEMPORAL_SHARED_ARO) — OPTION B order-referenced SEQUENTIAL-GATE narrowing ──
+// Proven via EXPLICIT opts (sharedAroGate: true) so the logic is tested deterministically regardless of env, and
+// via the REAL gold #6 sweep so the genuine impossibility is preserved through the LIVE pipeline (not pre-baked).
+console.log("\n[Step 7 — Option B sequential-gate narrowing]");
+const firesB = (fat: string, del: string) =>
+  applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true }).some((f) => f.controllability === "no_one_can_move");
+// PROTECTIVE (not vacuous): a poisoned / ambiguous-window / non-order-referenced input must NOT ESCALATE — i.e.
+// 0 no_one_can_move AND the high-confidence temporal_conflict CAUTION is NOT added (the FAT is merely floored). If
+// deliveryWindowDays/gateDays regress and wrongly fire the four prongs, a temporal_conflict finding appears → this
+// FAILS. (The old form — "some cautionFloor present" — was structurally always-true since the soften branch also
+// floors the FAT; it guarded nothing. card 143 adversarial round.)
+const cautionsB = (fat: string, del: string) => {
+  const out = applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true });
+  return !out.some((f) => f.controllability === "no_one_can_move") &&
+    !out.some((f) => f.lens === "temporal_conflict");
+};
+// Option 1: a GENUINE order-referenced impossibility ADDS a HIGH-confidence temporal_conflict CAUTION
+// (bidder_controls + cautionFloor), never a no_one_can_move. This replaces the Option-B "firesB" (NO_BID) checks.
+const tempCautionB = (fat: string, del: string) => {
+  const out = applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true });
+  return !out.some((f) => f.controllability === "no_one_can_move") &&
+    out.some((f) => f.lens === "temporal_conflict" && f.controllability === "bidder_controls" && f.cautionFloor === true && f.temporalSharedAroGuard === true);
+};
+
+// (ii) LOAD-BEARING — REAL gold #6 source through the live highSignalSweep → Option B STILL fires (genuine
+//      impossibility preserved; the literal "both share an ARO token" test would have WRONGLY declawed it).
+const gold6src = readFileSync("scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt", "utf8");
+const sweep6 = applyTemporalConflict(highSignalSweep(gold6src), { enabled: true, sharedAroGate: true });
+ok(!sweep6.some((f) => f.controllability === "no_one_can_move") &&
+   sweep6.some((f) => f.lens === "temporal_conflict" && f.controllability === "bidder_controls" && f.cautionFloor === true),
+  "(ii) gold #6 REAL sweep (F.1 post-order gate forecloses delivery; F.2 30-day ARO window) → Option-1 HIGH-confidence temporal CAUTION (0 no_one_can_move)");
+
+// (i) CLEAN NEGATIVE CONTROL (T-38) — no FAT precondition in the set → temporal pass emits NOTHING (no SS, no caution)
+const t38 = applyTemporalConflict([mkDel("deliver within THIRTY (30) calendar days ARO")], { enabled: true, sharedAroGate: true });
+ok(t38.length === 1 && !t38.some((f) => f.controllability === "no_one_can_move") && !t38.some((f) => f.cautionFloor),
+  "(i) T-38 clean negative (no FAT) → emits nothing (no NO_BID, no caution)");
+
+// (iii) relative-scheduling "N days BEFORE delivery" (a bidder-side schedule, not an order-referenced gate) → CAUTION
+ok(!firesB("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"),
+  "(iii) relative-scheduling 'before delivery' → does NOT fire NO_BID");
+ok(cautionsB("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"),
+  "(iii) relative-scheduling → KO-clarify CAUTION (cautionFloor + temporalSharedAroGuard)");
+
+// (iv) "mandatory"-only (no explicit non-waiver) → CAUTION (tightened NONWAIVABLE drops bare 'mandatory')
+const mandFat = "First article testing is mandatory. The Government will require SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before the close of this period.";
+ok(!firesB(mandFat, "deliver within THIRTY (30) calendar days ARO"), "(iv) 'mandatory'-only → does NOT fire NO_BID");
+ok(cautionsB(mandFat, "deliver within THIRTY (30) calendar days ARO"), "(iv) 'mandatory'-only → KO-clarify CAUTION");
+
+// (v) prong-4 UNPROVEN — sequential gate present but a duration is NOT parseable → CAUTION (never estimate)
+const noDaysFat = "First article testing is a NON-WAIVABLE precondition measured from receipt of the first article unit; no production delivery may occur before first article approval is granted in writing.";
+ok(!firesB(noDaysFat, "deliver within THIRTY (30) calendar days ARO"), "(v) gate present, gate-duration unparseable → does NOT fire NO_BID");
+ok(cautionsB(noDaysFat, "deliver within THIRTY (30) calendar days ARO"), "(v) unparseable gate-duration → CAUTION");
+ok(cautionsB("NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval", "deliver promptly ARO"),
+  "(v) window unparseable → CAUTION (never estimates the window)");
+
+// (vi) a non-FAT genuine impossibility (pre-typed by a lens, no sweepArchetype) → UNTOUCHED by Option B
+const lensImposs: TypedFinding = { requirement: "sole source to the named OEM; no other firm can produce a conforming unit", citation: "§C", excerpt: "sole source to the named OEM", kind: "technical_spec", controllability: "no_one_can_move", grounded: true, lens: "former_ko" };
+const vi = applyTemporalConflict([lensImposs, mkFat("NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval"), mkDel("deliver within THIRTY (30) calendar days ARO")], { enabled: true, sharedAroGate: true });
+const viLens = vi.find((f) => f.lens === "former_ko")!;
+ok(viLens.controllability === "no_one_can_move" && !viLens.cautionFloor,
+  "(vi) non-FAT lens-typed no_one_can_move → UNCHANGED (Option B touches only the FAT sweep finding)");
+
+// SAFETY — flag OFF (no sharedAroGate) still LEGACY-fires on the SAME relative-scheduling input ⇒ the flag is the only behavior change
+ok(fires("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"),
+  "OFF (legacy) fires on the same input → narrowing is gated entirely by sharedAroGate");
+
+// ── Step 7 ADVERSARIAL-HARDENED regressions (Brain card 141) — the false-NO_BID + declaw classes the panel found ──
+console.log("\n[Step 7 — adversarial-hardened regressions (card 141)]");
+// (R1) FALSE NO_BID via global-min poisoning — an incidental SMALLER day-count must NOT be read as the window.
+ok(cautionsB("First article testing is non-waivable and is measured from receipt of the first article unit; it requires thirty (30) days. No units shall be delivered before first article approval.", "Deliver all production units within ninety (90) days ARO. The contractor shall submit a notice of shipment within five (5) days."),
+  "(R1-a) shipment-notice sub-deadline (5d) does NOT poison the 90d window → CAUTION, not NO_BID");
+ok(cautionsB("First article approval is non-waivable and runs from receipt of the first article unit; allow sixty (60) days for testing. Government will not approve shipment until first article approval.", "First article sample due within ten (10) days after award; production quantity delivered 120 days ARO."),
+  "(R1-b) first-article SAMPLE due-date (10d) does NOT poison the 120d window → CAUTION, not NO_BID");
+ok(cautionsB("CLIN0001 first article is non-waivable, measured from receipt of the first article; ninety (90) days required. No delivery before first article approval.", "CLIN0002 spare parts delivered within forty (40) days ARO. CLIN0001 production units delivered within one hundred (100) days ARO."),
+  "(R1-c) cross-CLIN — gate on CLIN0001 (100d window) not the 40d CLIN0002 spares window → CAUTION, not NO_BID");
+// (R2) DECLAW — a GENUINE impossibility re-worded in common federal language must STILL produce the high-confidence
+// temporal CAUTION via the semantic-class prongs (Option 1: CAUTION, never NO_BID).
+ok(tempCautionB("First article testing is NON-WAIVABLE; the Government requires sixty (60) calendar days for testing, measured from issuance of the task order. No production delivery may occur before first article approval.", "deliver within THIRTY (30) calendar days ARO"),
+  "(R2-a) gate anchored 'from issuance of the task order' → high-confidence temporal CAUTION");
+ok(tempCautionB("First article testing is NON-WAIVABLE; sixty (60) calendar days required, measured from receipt of the first article. Government acceptance of the first article is a condition precedent to delivery of any production unit.", "deliver within THIRTY (30) calendar days ARO"),
+  "(R2-b) foreclosure 'condition precedent to delivery' → high-confidence temporal CAUTION");
+ok(tempCautionB("First article testing is NON-WAIVABLE; sixty (60) calendar days required, measured from receipt of the first article. Production and shipment of any unit is prohibited prior to first article approval.", "deliver within THIRTY (30) calendar days ARO"),
+  "(R2-c) foreclosure 'prohibited prior to approval' → high-confidence temporal CAUTION");
+ok(tempCautionB("First article testing cannot be waived; sixty (60) calendar days required, measured from receipt of the first article; no production delivery may occur before approval.", "deliver within THIRTY (30) calendar days ARO"),
+  "(R2-d) non-waiver 'cannot be waived' → high-confidence temporal CAUTION");
+// (R3) gateDays MAX must not be over-stated by an unrelated WARRANTY duration in the windowed excerpt (real gate 20d < 30d window).
+ok(cautionsB("First article testing is NON-WAIVABLE; the Government requires twenty (20) calendar days for testing, measured from receipt of the first article; no production delivery may occur before approval. Parts carry a warranty period of three hundred sixty (360) days.", "deliver within THIRTY (30) calendar days ARO"),
+  "(R3) warranty '360 days' in excerpt does NOT over-state the 20d gate → 20≤30 → CAUTION, not NO_BID");
+
+// ── Step 7 ROUND-2 hardening regressions (card 141) — residual false-NO_BID + over-broad-regex classes ──
+console.log("\n[Step 7 — round-2 hardening regressions (card 141)]");
+// (A) End-to-end via the REAL sweep: a flattened Section-F table where the real window (120) is anchor-detached and
+// an inspection-notice sub-deadline (5d) sits by 'within' — the ambiguous-window rule must refuse to fire.
+{
+  const fatSrc = "First article testing is non-waivable. The Government requires thirty (30) days to complete testing, measured from receipt of the first article. No production delivery may occur before first article approval.";
+  const delSrc = "Delivery Schedule (ARO). CLIN 0001, Tactical Radio Assembly, Quantity 1200 each, required delivery 120 days. The Contractor shall provide advance inspection notice within five (5) days prior to each shipment.";
+  const sweep = applyTemporalConflict(highSignalSweep(fatSrc + "\n\n" + delSrc), { enabled: true, sharedAroGate: true });
+  ok(!sweep.some((f) => f.controllability === "no_one_can_move"),
+    "(A) flattened-table notice sub-deadline (5d) does NOT poison the 120d window → no false NO_BID through the real sweep");
+}
+// (B1) 'Government approval of the invoice' (a payment term) is NOT a first-article post-order anchor → CAUTION.
+ok(cautionsB("First article testing; sixty (60) days for testing; no delivery before approval. Payment is subject to Government approval of the invoice.", "deliver within THIRTY (30) days ARO"),
+  "(B1) invoice 'Government approval' is not a post-order gate → CAUTION, not NO_BID");
+// (B2) benign 'no production delays before delivery' is NOT a delivery foreclosure → CAUTION.
+ok(cautionsB("First article testing is NON-WAIVABLE, sixty (60) days for testing measured from receipt of the first article. The contractor shall ensure no production delays occur before the scheduled delivery date.", "deliver within THIRTY (30) days ARO"),
+  "(B2) 'no production delays before…' is not a foreclosure → CAUTION, not NO_BID");
+// (B3) bidder-controlled 'delivery may not be scheduled until the contractor completes…' → CAUTION (actor-agnostic alt dropped).
+ok(cautionsB("Delivery may not be scheduled until the contractor completes internal qualification testing, which requires sixty (60) days after receipt of order; this requirement shall not be waived.", "deliver within THIRTY (30) days ARO"),
+  "(B3) bidder-controlled 'until the contractor completes…' → CAUTION, not NO_BID");
+
+// ── Step 7 ROUND-3 hardening regressions (card 141) — the real window is in a NON-PARSING unit; a parsed notice
+// sub-deadline must NOT be mistaken for the window. The gold control still fires (its hyphenated 30-day restates
+// the SAME 30-day window; its 90-day/8-month alternates are explicitly VOIDED). ──
+console.log("\n[Step 7 — round-3 hardening regressions (card 141)]");
+const fat30 = "First article testing is non-waivable. The Government requires thirty (30) days to complete testing, measured from receipt of the first article. No production delivery may occur before first article approval.";
+ok(cautionsB(fat30, "Deliveries shall be made within a 120-day delivery schedule after receipt of order (ARO). The contractor shall provide advance shipment notice no less than 5 calendar days prior to each delivery."),
+  "(R3-a) hyphenated '120-day' real window + 5d notice → window unprovable → CAUTION, not NO_BID");
+{
+  const delA = "Deliveries shall be made within a 120-day delivery schedule after receipt of order (ARO). The contractor shall provide advance shipment notice no less than 5 calendar days prior to each delivery.";
+  const sw = applyTemporalConflict(highSignalSweep(fat30 + "\n\n" + delA), { enabled: true, sharedAroGate: true });
+  ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R3-a) end-to-end via real sweep → no false NO_BID");
+}
+ok(cautionsB(fat30, "Deliver within 16 weeks ARO. Advance inspection notice within five (5) calendar days prior to each shipment."),
+  "(R3-b) '16 weeks' real window + 5d notice → CAUTION, not NO_BID");
+ok(cautionsB(fat30, "Delivery within four months after the date of award. Advance shipment notice within five (5) working days prior to delivery."),
+  "(R3-c) 'four months' real window + 5d notice → CAUTION, not NO_BID");
+ok(!tempCautionB(fat30, "deliver within 120 calendar days ARO"), "(R3-d) clean 120d window, 30d gate → performable → NO high-confidence temporal CAUTION (and never NO_BID)");
+
+// ── Step 7 ROUND-4 hardening regressions (card 141) — a NON-NOTICE data-deliverable sub-deadline (CDRL/plan) must
+// not be mistaken for the production window; "Base period" PoP is NOT a voided alternate. Positive-uniqueness rule. ──
+console.log("\n[Step 7 — round-4 hardening regressions (card 141)]");
+const fatCP = "First article testing is non-waivable, a condition precedent to delivery. The Government requires sixty (60) calendar days, measured from receipt of the first article, to conduct first article testing. No production units shall be delivered before first article approval.";
+ok(cautionsB(fatCP, "The Contractor shall deliver the Production Readiness Plan (CDRL A001) no later than ten (10) days ARO. Base period: 4 months for delivery of all production units."),
+  "(R4-a) CDRL/plan 10d sub-deadline + '4 months' real window → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "The Contractor shall deliver a production readiness plan within 5 days ARO. Base period: 4 months for delivery of all production units."),
+  "(R4-b) 'Base period: 4 months' is NOT a voided alternate (no bare-'base' over-exemption) → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Deliver a readiness plan within 10 days ARO. Production units shall be completed in 200 days."),
+  "(R4-c) plan 10d + larger plain-day window (200) → ambiguous → CAUTION, not NO_BID");
+// genuine-spread sanity: the gate must still fire on a range of realistic impossibility phrasings (not inert).
+const genuine: Array<[string, string, string]> = [
+  ["G2 issuance-of-order + condition-precedent", "First article testing is NON-WAIVABLE; sixty (60) calendar days for testing, measured from issuance of the task order. Government acceptance of the first article is a condition precedent to delivery.", "deliver within THIRTY (30) calendar days ARO"],
+  ["G3 after-the-date-of-award + cannot-be-waived", "First article testing cannot be waived; sixty (60) calendar days for testing, measured from receipt of the first article; no production delivery may occur before approval.", "deliver all units within THIRTY (30) calendar days after the date of award"],
+  ["G4 parenthetical 90d gate vs 60d window", "First article testing is NON-WAIVABLE; the Government requires NINETY (90) calendar days to conduct testing, measured from receipt of the first article. No unit shall be delivered before first article approval.", "deliver within SIXTY (60) calendar days ARO"],
+  ["G5 withheld-until foreclosure", "First article testing is NON-WAIVABLE; sixty (60) calendar days for testing, measured from receipt of the first article. Delivery is withheld until first article approval.", "deliver within THIRTY (30) calendar days ARO"],
+];
+for (const [label, f, d] of genuine) ok(tempCautionB(f, d), `genuine-spread ${label} → high-confidence temporal CAUTION (Option 1: never NO_BID)`);
+
+// ── Step 7 ROUND-5 hardening regressions (card 141) — non-day window UNITS (year/annual/quarter) and a phantom
+// source-selection "evaluation period" gate. ──
+console.log("\n[Step 7 — round-5 hardening regressions (card 141)]");
+ok(cautionsB(fatCP, "Deliver within one year after receipt of order (ARO). Advance notice within five (5) days."),
+  "(R5-a) 'one year' window + 5d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Deliveries on an annual basis after receipt of order (ARO). Inspection notice within 10 days."),
+  "(R5-b) 'annual basis' window + 10d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Deliveries shall be made quarterly after receipt of order (ARO) within 10 days notice."),
+  "(R5-c) 'quarterly' window + 10d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Deliver within two years after receipt of order (ARO). Notice within five (5) days."),
+  "(R5-d) 'two years' window + 5d notice → CAUTION, not NO_BID");
+{
+  const fatPhantom = "First article testing is NON-WAIVABLE; measured from receipt of the first article. The Government's source-selection evaluation period is ninety (90) days. No production delivery before first article approval.";
+  ok(cautionsB(fatPhantom, "deliver within SIXTY (60) calendar days ARO"),
+    "(R5-e) phantom source-selection 'evaluation period 90 days' is NOT the gate → no gate duration → CAUTION, not NO_BID");
+}
+
+// ── Step 7 ROUND-6 hardening regressions (card 141) — the real window stated as a NON-DAY FORM (calendar date /
+// fiscal year / ordering period / attachment ref / unit-less ARO number) must not let a small notice be the window. ──
+console.log("\n[Step 7 — round-6 hardening regressions (card 141)]");
+{
+  const delDate = "Delivery of all production units shall be completed no later than 30 September 2027. Contractor shall provide advance shipment notice within 5 days after receipt of order (ARO).";
+  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delDate), { enabled: true, sharedAroGate: true });
+  ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R6-a) calendar-date window + 5d notice (real sweep) → no false NO_BID");
+}
+ok(cautionsB(fatCP, "Delivery quantity 1200 each: 120 ARO. The contractor shall provide advance shipment notice within 5 days after receipt of order (ARO)."),
+  "(R6-b) unit-less '120 ARO' window + 5d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Delivery of all production units shall be made by the end of FY27, with advance shipment notice within 10 days after receipt of order (ARO)."),
+  "(R6-c) 'FY27' window + 10d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Delivery shall occur throughout the base ordering period, with advance shipment notice within 5 days after receipt of order (ARO)."),
+  "(R6-d) 'ordering period' window + 5d notice → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Delivery in accordance with the delivery schedule in Attachment 2; advance shipment notice within 10 days after receipt of order (ARO)."),
+  "(R6-e) 'Attachment 2' window ref + 10d notice → CAUTION, not NO_BID");
+
+// ── Step 7 ROUND-7 hardening regressions (card 141) — the FAT-unit / interim-delivery deadline (idiomatic beside a
+// FAT gate) must not be read as the production window; reversed/aliased window forms (performance period, RDD). ──
+console.log("\n[Step 7 — round-7 hardening regressions (card 141)]");
+{
+  const delFA = "The Contractor shall deliver the first article test unit within 30 days after receipt of order (ARO). Production units shall be delivered by contract completion.";
+  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delFA), { enabled: true, sharedAroGate: true });
+  ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R7-a) first-article-unit 30d submission deadline + 'by contract completion' window (real sweep) → no false NO_BID");
+}
+ok(cautionsB(fatCP, "Deliver the first lot within 5 days ARO. The full production quantity shall be delivered within the performance period."),
+  "(R7-b) 'first lot' 5d + 'performance period' window → CAUTION, not NO_BID");
+ok(cautionsB(fatCP, "Initial delivery shall be made within 10 days ARO. Balance delivered on or before the required delivery date (RDD)."),
+  "(R7-c) 'initial delivery' 10d + 'RDD' window → CAUTION, not NO_BID");
+
 // ── ANCHOR (Brain card 90): decide(complete frozen fixture) == the registry-resolved FROZEN GOLD-KEY verdict (#6) ──
 const reg = JSON.parse(readFileSync("scripts/audit-ai/gold-sets/gold-set-registry.json", "utf8"));
 const goldVerdict = (sol: string): string =>
@@ -68,4 +263,4 @@ ok(decideFx(fxComplete) === goldVerdict("FA860126Q00260001"), `#6 decideFx(compl
 
 console.log("");
 if (fail) { console.error(`✗ ${fail} check(s) FAILED`); process.exit(1); }
-console.log("✓ STEP 2 GREEN — temporal-conflict emits no_one_can_move ⇒ NO_BID flips (sweep+temporal); #4 stays CAUTION, #2 stays BID; non-waivable + duration-math guards hold. $0.");
+console.log("✓ STEP 7 OPTION-1 GREEN — the temporal arm nets the FAT-gate-vs-window tension to a HIGH-confidence KO-clarify CAUTION (bidder_controls+cautionFloor), NEVER NO_BID; #6 = BID_WITH_CAUTION anchor; #4 stays CAUTION, #2 stays BID; OFF (legacy) byte-identical still fires; all 7 adversarial classes → 0 no_one_can_move. $0.");

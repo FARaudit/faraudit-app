@@ -87,6 +87,12 @@ export interface TypedFinding {
   // + cautionFloor (furnish an approved equal). NEVER fires when a restrictive qualifier (only / no substitution /
   // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
   orEqualCarveout?: boolean;
+  // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
+  // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
+  // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal
+  // tension is present (FAT precondition + delivery window grounded) but it is NOT a proven order-referenced
+  // sequential gate. Marker only; deriveVerdict reads controllability/cautionFloor, not this field.
+  temporalSharedAroGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

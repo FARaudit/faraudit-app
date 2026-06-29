@@ -2,7 +2,7 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard, applyOrEqualCarveout } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard, applyOrEqualCarveout, applyTemporalConflict } from "@/lib/audit-decide";
 import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
@@ -257,6 +257,36 @@ if (G6) {
   // (iv) a QPL/QML or clearance bar → UNTOUCHED (scope: not a brand-name-or-equal line).
   const qpl = cfb({ requirement: "item must be on the Qualified Products List (QPL)", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "qpl", curableInWindow: false });
   eq("6(iv) QPL bar → UNTOUCHED by carve-out", JSON.stringify(on(qpl)), JSON.stringify(qpl));
+}
+
+// ── Doctrine (Step 7, AUDIT_TEMPORAL_SHARED_ARO) — Option-1: the temporal arm nets the FAT-gate-vs-window tension
+// to a HIGH-confidence KO-clarify CAUTION (bidder_controls + cautionFloor), NEVER NO_BID (Brain card 141/143).
+// OFF inert (unconditional): no sharedAroGate ⇒ legacy Step-2 path still fires no_one_can_move (byte-identical).
+{
+  const sg = (excerpt: string): TypedFinding => ({ requirement: "FAT", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "fat_precondition" });
+  const dw = (excerpt: string): TypedFinding => ({ requirement: "delivery", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "delivery_window" });
+  const genFat = "NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval";
+  const genDel = "deliver within THIRTY (30) calendar days ARO";
+  eq("7 OFF: legacy temporal still fires on a genuine gate (byte-identical)",
+    applyTemporalConflict([sg(genFat), dw(genDel)], { enabled: true }).some((x) => x.controllability === "no_one_can_move"), true);
+}
+const G7 = process.env.AUDIT_TEMPORAL_SHARED_ARO === "true";
+if (G7) {
+  const sg = (excerpt: string): TypedFinding => ({ requirement: "FAT", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "fat_precondition" });
+  const dw = (excerpt: string): TypedFinding => ({ requirement: "delivery", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "delivery_window" });
+  const onB = (fat: string, del: string) => applyTemporalConflict([sg(fat), dw(del)], { enabled: true, sharedAroGate: true });
+  const genFat = "NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval";
+  const genDel = "deliver within THIRTY (30) calendar days ARO";
+  // (a) genuine order-referenced sequential gate → HIGH-confidence temporal CAUTION (bidder_controls+cautionFloor), NEVER NO_BID (Option 1).
+  const fired = onB(genFat, genDel);
+  eq("7(a) genuine sequential gate → high-confidence temporal_conflict CAUTION (0 no_one_can_move)",
+    fired.some((x) => x.lens === "temporal_conflict" && x.controllability === "bidder_controls" && x.cautionFloor === true) && !fired.some((x) => x.controllability === "no_one_can_move"), true);
+  eq("7(a) genuine sequential gate via deriveVerdict → BID_WITH_CAUTION (never NO_BID)", deriveVerdict(inp(fired)).verdict, "BID_WITH_CAUTION");
+  // (b) relative-scheduling 'N days before delivery' → CAUTION (cautionFloor + guard marker), never NO_BID.
+  const rel = onB("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", genDel);
+  eq("7(b) relative-scheduling → no NO_BID (no no_one_can_move added)", rel.some((x) => x.controllability === "no_one_can_move"), false);
+  eq("7(b) relative-scheduling → cautionFloor + temporalSharedAroGuard", rel.some((x) => x.cautionFloor === true && x.temporalSharedAroGuard === true), true);
+  eq("7(b) relative-scheduling via deriveVerdict → never NO_BID", deriveVerdict(inp(rel)).verdict !== "NO_BID", true);
 }
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──

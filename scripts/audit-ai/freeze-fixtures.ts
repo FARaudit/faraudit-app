@@ -9,6 +9,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { isCautionArchetype } from "../../src/lib/audit-decide";
+import { highSignalSweep } from "../../src/lib/audit-grounding-sweep";
 import { parseGoldSet } from "./gold-set-score";
 import { normClause } from "../../src/lib/section-extractors";
 import type { TypedFinding } from "../../src/lib/audit-findings";
@@ -29,7 +30,12 @@ write("aocssb-with-qual.json", { ...p4, findings: f4 });                 // as-i
 write("aocssb-no-qual.json", { ...p4, findings: f4NoQual });             // quals removed → floor fires 0 → BID
 write("aocssb-sweep-novel.json", { ...p4, findings: f4NoQual });         // no-floor-fire base; sweep surfaces the novel caution
 
-console.log("── B. #6 FA860126Q00260001 (NO_BID precondition × window) ──");
+// Brain card 141/143 (Option 1): the temporal arm nets the FAT-gate-vs-window tension to a HIGH-confidence CAUTION,
+// NEVER NO_BID. fa8601-complete.json was REGENERATED post-capture (the synthetic temporal_conflict no_one_can_move
+// artifact removed; stale sweep findings replaced with a fresh deterministic highSignalSweep of the gold source,
+// sweepArchetype-tagged) so the ANCHOR DERIVES to BID_WITH_CAUTION live. Re-running this generator from ceo/proofs/
+// re-snapshots the PRE-Option-1 proof — re-apply that regeneration before trusting the output.
+console.log("── B. #6 FA860126Q00260001 (Option-1: high-confidence temporal CAUTION, never NO_BID) ──");
 const p6 = readProof("v3-FA860126Q00260001-result.json");
 const f6 = findings(p6);
 const isNoMove = (f: TypedFinding) => f.controllability === "no_one_can_move";
@@ -41,7 +47,14 @@ const nomoveIdx = f6.map((f, i) => (isNoMove(f) ? i : -1)).filter((i) => i >= 0)
 const windowIdx = f6.map((f, i) => ((isWindow(f) || isTemporal(f)) ? i : -1)).filter((i) => i >= 0);
 console.log(`  no_one_can_move findings (precondition+conflict): [${nomoveIdx.join(", ")}]`);
 console.log(`  window+temporal-conflict findings: [${windowIdx.join(", ")}]`);
-write("fa8601-complete.json", { ...p6, findings: f6 });                                    // as-is → NO_BID
+// Option-1 (Brain card 141/143) IN-BAND regeneration — reproducible, $0: keep the genuine PANEL (model-lens)
+// findings, DROP the synthetic deterministic_sweep + temporal_conflict no_one_can_move artifacts, and re-ground the
+// deterministic sweep from the gold SOURCE (sweepArchetype-tagged, bidder_controls). The temporal_conflict CAUTION
+// is then DERIVED live by applyTemporalConflict(sharedAroGate) at decide time → ANCHOR = BID_WITH_CAUTION.
+const SRC6 = "scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt";
+const panel6 = f6.filter((f) => f.lens !== "deterministic_sweep" && f.lens !== "temporal_conflict");
+const sweep6 = highSignalSweep(readFileSync(SRC6, "utf8")).map((f, i) => ({ id: `deterministic_sweep#${i}`, ...f }));
+write("fa8601-complete.json", { ...p6, findings: [...panel6, ...sweep6] });                // Option-1 → decide() = BID_WITH_CAUTION
 write("fa8601-no-precondition.json", { ...p6, findings: f6.filter((f) => !isNoMove(f)) }); // drop all FAT-precondition show-stoppers → ≠NO_BID
 write("fa8601-no-window.json", { ...p6, findings: f6.filter((f) => !(isWindow(f) || isTemporal(f))) }); // keep precondition, drop window+conflict
 

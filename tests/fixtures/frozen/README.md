@@ -24,12 +24,18 @@ the live engine outputs.
 | `aocssb-with-qual.json` | #4 as-is | floor fires ≥1 · decide()=BID_WITH_CAUTION |
 | `aocssb-no-qual.json` | #4 minus the conservator-qual finding (isCautionArchetype hit, idx 37) | floor fires 0 · decide()=BID |
 | `aocssb-sweep-novel.json` | = no-qual base (no-floor-fire state) | +sweep → CAUTION · no-sweep → BID |
-| `fa8601-complete.json` | #6 as-is (3 `no_one_can_move` precondition/conflict) | decide()=NO_BID |
-| `fa8601-no-precondition.json` | #6 minus all 3 `no_one_can_move` | decide()≠NO_BID |
-| `fa8601-no-window.json` | #6 minus window+temporal-conflict, precondition kept | decide()≠NO_BID |
+| `fa8601-complete.json` | #6 genuine panel findings + regenerated deterministic sweep (Option 1; synthetic temporal_conflict `no_one_can_move` artifact removed) | decide()=BID_WITH_CAUTION (temporal arm nets to high-confidence CAUTION, never NO_BID — Brain card 141/143) |
+| `fa8601-no-precondition.json` | #6 minus the FAT precondition show-stoppers | decide()≠NO_BID |
+| `fa8601-no-window.json` | #6 minus window, precondition kept | decide()≠NO_BID |
 | `1240lp-bid.json` | #2 as-is | floor fires 0 · decide()=BID |
 | `n4008-matrix-complete.json` | #1 matrix as-is | enumerator POST==PRE==100% |
 | `n4008-matrix-decimated.json` | #1 matrix minus K binding clauses (in `_decimatedBinding`) | POST>PRE · POST==100% |
 
 ANCHOR: each complete fixture's `decide()` is asserted equal to the registry-resolved
-frozen gold-key verdict (#4=BID_WITH_CAUTION, #6=NO_BID).
+frozen gold-key verdict (#4=BID_WITH_CAUTION, #6=BID_WITH_CAUTION).
+
+DOCTRINE (Brain card 141/143, Option 1): the cross-clause temporal check (FAT gate vs delivery window) NEVER
+escalates to NO_BID. Deterministic identification of the production-delivery window from messy §F text proved
+unreliable across 7 adversarial rounds, so a temporal impossibility surfaces as a HIGH-confidence KO-clarify
+CAUTION (confirm the binding window vs the non-waivable FAT gate); NO_BID stays reserved for cleanly-named hard
+gates. #6 is retained as the high-confidence temporal-CAUTION anchor.

@@ -234,7 +234,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         to disable.
   if (process.env.AUDIT_TEMPORAL_CONFLICT !== "false") {
     const before = findings.length;
-    findings = applyTemporalConflict(findings, { enabled: true });
+    findings = applyTemporalConflict(findings, { enabled: true, sharedAroGate: process.env.AUDIT_TEMPORAL_SHARED_ARO === "true" }); // Step 7 (Brain card 140): default-OFF order-referenced sequential-gate narrowing
     if (findings.length > before) { findings[findings.length - 1].id = "temporal_conflict#0"; perLens["temporal_conflict"] = 1; }
   }
 
