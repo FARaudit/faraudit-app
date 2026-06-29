@@ -18,6 +18,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
+import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
@@ -94,15 +95,17 @@ async function fetchEmailForUser(admin: SupabaseClient, userId: string): Promise
   return data.user.email ?? null;
 }
 
-// Build the executeAudit input from a posted SAM solicitation. The fetch/ingest is
-// unchanged from the old V1 path; the difference is the RETURN — the audit now runs
-// through executeAudit() (→ the agentic V3 engine), NOT the retired V1 runAudit, so
-// it inherits the engine="agentic_v3" marker + honest-fail gate the customer path uses.
+// Build the executeAudit input from a posted SAM solicitation. Assembles the FULL
+// form-first document set (ingestion + attachments) like the main customer POST and the
+// refetch route, then runs through executeAudit() (→ the agentic V3 engine), so a watcher
+// audit is a REAL complete audit (not single-doc/forced-incomplete) and inherits the
+// engine="agentic_v3" marker + honest-fail gate the customer path uses.
 async function buildWatcherAuditInput(
   solicitation: Solicitation,
   agency: string | null,
   bidderProfile: ReturnType<typeof buildBidderProfileFromCapability>
 ): Promise<{ ok: true; input: AuditExecutionInput; pdfSource: PdfSource } | { ok: false; error: string }> {
+  let pdfBuffer: Buffer | null = null;
   let pdfBase64: string | null = null;
   let pdfFileId: string | null = null;
   let imageBase64: string | null = null;
@@ -111,30 +114,55 @@ async function buildWatcherAuditInput(
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  let primaryDocName: string | null = null;
+  let ingestion: IngestionMeta | null = null;
 
-  try {
-    const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
-    if (fetched.bytes > MAX_PDF_BYTES) {
-      pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
-    } else if (fetched.kind === "pdf") {
-      if (fetched.fileId) {
-        pdfFileId = fetched.fileId;
-        pdfSource = "sam_pdf_via_files_api";
-      } else {
-        pdfBase64 = fetched.base64;
-        pdfSource = "sam_fetched";
-      }
-    } else if (fetched.kind === "image") {
-      imageBase64 = fetched.base64;
-      imageMediaType = fetched.mediaType;
-      pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
-    } else {
-      extractedText = fetched.extractedText;
-      extractedFormat = fetched.format;
-      pdfSource = "sam_text_extracted";
+  // Full form-first multi-attachment assembly — identical to the main customer POST and
+  // the refetch route. The watcher decrements a real audit-quota unit, so the customer
+  // gets a REAL complete audit; without the manifest the engine would force
+  // documents_complete=false on every multi-attachment notice. Manifest failure / no
+  // primary falls through to the single-doc path below (honest-fail stays the degrade).
+  if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    if (assembled?.primary) {
+      pdfBase64 = assembled.primary.base64;
+      pdfBuffer = assembled.primary.buffer;
+      pdfSource = "sam_fetched";
+      attachmentPdfs = assembled.attachments;
+      primaryDocName = assembled.primary.name;
+      ingestion = assembled.ingestion;
+    } else if (assembled) {
+      ingestion = assembled.ingestion;
     }
-  } catch (err) {
-    pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+  }
+
+  if (!pdfBase64 && !pdfFileId) {
+    try {
+      const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
+      if (fetched.bytes > MAX_PDF_BYTES) {
+        pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
+      } else if (fetched.kind === "pdf") {
+        if (fetched.fileId) {
+          pdfFileId = fetched.fileId;
+          pdfBuffer = fetched.buffer ?? null;
+          pdfSource = "sam_pdf_via_files_api";
+        } else {
+          pdfBase64 = fetched.base64;
+          pdfSource = "sam_fetched";
+        }
+      } else if (fetched.kind === "image") {
+        imageBase64 = fetched.base64;
+        imageMediaType = fetched.mediaType;
+        pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
+      } else {
+        extractedText = fetched.extractedText;
+        extractedFormat = fetched.format;
+        pdfSource = "sam_text_extracted";
+      }
+    } catch (err) {
+      pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+    }
   }
 
   if (!pdfBase64 && !pdfFileId && !imageBase64 && !extractedText) {
@@ -157,7 +185,7 @@ async function buildWatcherAuditInput(
     input: {
       solicitation,
       agency,
-      pdfBuffer: null,
+      pdfBuffer,
       pdfBase64,
       pdfFileId,
       imageBase64,
@@ -166,6 +194,9 @@ async function buildWatcherAuditInput(
       extractedFormat,
       pdfSource,
       pdfUnavailableReason,
+      attachmentPdfs,
+      primaryDocName,
+      ingestion,
       bidderProfile,
       agenticBudgetMs: WATCHER_AGENTIC_BUDGET_MS
     }
@@ -387,6 +418,11 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       const recommendation = (persisted?.recommendation as string | null) ?? null;
       const complianceScore = (persisted?.compliance_score as number | null) ?? null;
       const cjForEmail = (persisted?.compliance_json ?? {}) as Record<string, unknown>;
+      // Defense-in-depth false-green guard, shared by the in-app notification AND the
+      // email: an agentic honest-fail (INCOMPLETE / NEEDS_HUMAN_REVIEW) or an unconfirmed
+      // document set must NOT be presented as a clean "complete · verdict" on EITHER
+      // surface — independent of recommendation.
+      const incomplete = cjForEmail.honest_fail === true || cjForEmail.documents_complete === false;
 
       // Flip watched_notices → audited (audit_id already linked above). Check the
       // error: the audit is complete + paid, so a lost flip would leave the row in
@@ -413,14 +449,17 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           user_id: row.user_id,
           kind: "watcher_posted",
           title: `${row.title || "Your tracked notice"} just posted`,
-          body: `Auto-audit complete · ${String(recommendation ?? "").replace(/_/g, " ").toUpperCase() || "verdict ready"}`,
+          body: incomplete
+            ? "Auto-audit needs your review — couldn't confirm a complete read"
+            : `Auto-audit complete · ${String(recommendation ?? "").replace(/_/g, " ").toUpperCase() || "verdict ready"}`,
           link: `/audit/${newAuditId}`,
           meta: {
             audit_id: newAuditId,
             notice_id: row.notice_id,
             watched_id: row.id,
             score: complianceScore,
-            recommendation
+            recommendation,
+            incomplete
           }
         });
       }
@@ -434,10 +473,6 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
           const complianceFlagsCount = 0;
           const rj = (persisted?.risks_json ?? {}) as { show_stoppers?: number };
           const risksFlagsCount = typeof rj.show_stoppers === "number" ? rj.show_stoppers : 0;
-          // Defense-in-depth false-green guard: an agentic honest-fail (INCOMPLETE /
-          // NEEDS_HUMAN_REVIEW) or an unconfirmed document set forces the email amber,
-          // independent of recommendation.
-          const incomplete = cjForEmail.honest_fail === true || cjForEmail.documents_complete === false;
           const out = await sendWatcherPostedEmail({
             toEmail,
             title: solicitation.title ?? row.title ?? "Your tracked notice",

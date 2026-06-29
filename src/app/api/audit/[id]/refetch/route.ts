@@ -15,10 +15,12 @@
 //      explicit user-triggered re-run always re-invokes the current engine.
 //      The auto-watcher tick (POST with no body) still gets the cache.
 //   3. Rate limit (shares the existing audit:<user.id> bucket — 10/hr).
-//   4. fetchSolicitationByNoticeId() + fetchPdfFromSamUrl() to re-pull the
-//      SAM resource. If still no resourceLinks → 422 ("not fetchable").
-//   5. runAudit() with the new pdfBase64 / pdfFileId / image / text.
-//   6. UPDATE the audits row in place (replace, not new row — same id).
+//   4. fetchSolicitationByNoticeId() + assembleSamDocumentSet() to re-pull the
+//      FULL form-first document set (ingestion meta + attachments), falling back
+//      to a single fetchPdfFromSamUrl() doc. If no resourceLinks → 422.
+//   5. executeAudit() (agentic V3) with the assembled manifest + primary doc.
+//   6. UPDATE the audits row in place (replace, not new row — same id), refreshing
+//      the SAM facts (title/agency/deadline/NAICS/set-aside) the masthead reads.
 //   7. Return JSON the client uses to redirect / reload.
 
 import { NextResponse } from "next/server";
@@ -26,6 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
+import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
 import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -140,7 +143,8 @@ export async function POST(
     );
   }
 
-  // ━━ Re-pull the PDF ━━
+  // ━━ Re-pull the document SET ━━
+  let pdfBuffer: Buffer | null = null;
   let pdfBase64: string | null = null;
   let pdfFileId: string | null = null;
   let imageBase64: string | null = null;
@@ -149,29 +153,56 @@ export async function POST(
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
-  try {
-    const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
-    if (fetched.bytes > MAX_PDF_BYTES) {
-      pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
-    } else if (fetched.kind === "pdf") {
-      if (fetched.fileId) {
-        pdfFileId = fetched.fileId;
-        pdfSource = "sam_pdf_via_files_api";
-      } else {
-        pdfBase64 = fetched.base64;
-        pdfSource = "sam_fetched";
-      }
-    } else if (fetched.kind === "image") {
-      imageBase64 = fetched.base64;
-      imageMediaType = fetched.mediaType;
-      pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
-    } else {
-      extractedText = fetched.extractedText;
-      extractedFormat = fetched.format;
-      pdfSource = "sam_text_extracted";
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  let primaryDocName: string | null = null;
+  let ingestion: IngestionMeta | null = null;
+
+  // R1 — assemble the FULL form-first multi-attachment set, identical to the main
+  // customer POST. Without the manifest the agentic engine has no document set to
+  // reconcile, so it forces documents_complete=false on every SAM refetch and
+  // export-gates an otherwise clean report. Manifest failure / no primary falls
+  // through to the legacy single-doc path below.
+  if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    if (assembled?.primary) {
+      pdfBase64 = assembled.primary.base64;
+      pdfBuffer = assembled.primary.buffer;
+      pdfSource = "sam_fetched";
+      attachmentPdfs = assembled.attachments;
+      primaryDocName = assembled.primary.name;
+      ingestion = assembled.ingestion;
+    } else if (assembled) {
+      ingestion = assembled.ingestion;
     }
-  } catch (err) {
-    pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+  }
+
+  // Fallback — single primary doc (mirrors the main route) when assembly yields no primary.
+  if (!pdfBase64 && !pdfFileId) {
+    try {
+      const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
+      if (fetched.bytes > MAX_PDF_BYTES) {
+        pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
+      } else if (fetched.kind === "pdf") {
+        if (fetched.fileId) {
+          pdfFileId = fetched.fileId;
+          pdfBuffer = fetched.buffer ?? null;
+          pdfSource = "sam_pdf_via_files_api";
+        } else {
+          pdfBase64 = fetched.base64;
+          pdfSource = "sam_fetched";
+        }
+      } else if (fetched.kind === "image") {
+        imageBase64 = fetched.base64;
+        imageMediaType = fetched.mediaType;
+        pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
+      } else {
+        extractedText = fetched.extractedText;
+        extractedFormat = fetched.format;
+        pdfSource = "sam_text_extracted";
+      }
+    } catch (err) {
+      pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+    }
   }
 
   // If still no usable content, mark and return — the panel stays in fetch
@@ -209,7 +240,7 @@ export async function POST(
   const input: AuditExecutionInput = {
     solicitation,
     agency: resolveAgency(solicitation) || (audit.agency as string | null),
-    pdfBuffer: null,
+    pdfBuffer,
     pdfBase64,
     pdfFileId,
     imageBase64,
@@ -218,6 +249,9 @@ export async function POST(
     extractedFormat,
     pdfSource,
     pdfUnavailableReason,
+    attachmentPdfs,
+    primaryDocName,
+    ingestion,
     agenticBudgetMs: 200_000
   };
   let result;
@@ -238,6 +272,15 @@ export async function POST(
       .from("audits")
       .update({
         compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource },
+        // R1 — refresh the SAM facts an amendment can move; the masthead reads these
+        // columns, so a refetch-after-amendment must update them (fall back to the
+        // prior value when SAM omits a field, never null out a known good value).
+        title: solicitation.title || (audit.title as string | null),
+        agency: input.agency,
+        naics_code: solicitation.naicsCode ?? (audit.naics_code as string | null),
+        set_aside: solicitation.typeOfSetAside ?? (audit.set_aside as string | null),
+        posted_date: solicitation.postedDate ?? (audit.posted_date as string | null),
+        response_deadline: solicitation.responseDeadLine ?? (audit.response_deadline as string | null),
         office_leaf: resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null)
       })
       .eq("id", audit.id);
