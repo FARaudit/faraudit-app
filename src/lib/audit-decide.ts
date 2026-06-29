@@ -300,6 +300,85 @@ export function applySetAsideFirmStatusGate(findings: TypedFinding[], profile: B
   });
 }
 
+// ── NONMANUFACTURER RULE GATE (Brain card 132 — Step 4; the never-missed deterministic floor) ─────────────
+// The frequently-missed obligation: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING acquisition, an
+// offeror that does not itself manufacture the end item must (FAR 52.219-1 / 13 CFR 121.406) be small AND have
+// ≤500 employees AND supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505
+// / SBA class waiver applies. Most small firms fail the "supply a small-business manufacturer's product" prong
+// and lose the award. The product promise: we catch it EVERY TIME on a supply set-aside.
+//
+// PURE FACT-RULE (Rule 64) — fires off DETERMINISTIC scalar facts (SAM-resolved set-aside + NAICS sector), never
+// a model claim or a source regex (that would be the Part-15 trap). Sector is deterministic arithmetic off the
+// code's first two digits (31/32/33 manufacturing · 42 wholesale · 44/45 retail = the supply sectors; services /
+// construction → silent). NAICS absent → HONEST SILENCE (uploads carry null), never a guess.
+//
+// EMIT gate (like temporal_conflict): ADDS one finding, never removes/re-types. Disposition is card-132:
+// bidder_controls + cautionFloor → disposeFinding = gate_to_clear (NEVER a show-stopper, profile-INDEPENDENT),
+// floors a clean BID to BID_WITH_CAUTION in deriveVerdict; reached only after every disqualifying/human-review
+// branch, so it never downgrades a NO_BID/INELIGIBLE. NON-DUPLICATION: if an NMR finding (cites FAR 52.219-1, or
+// lens === "nonmanufacturer_rule") is already present, do NOT double-emit — the small-business-counsel lens's own
+// NMR analysis wins the slot. NMR (52.219-1) ≠ Limitations-on-Subcontracting (52.219-14), so a LoS finding never
+// blocks this and the two never false-merge. Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+// The audit row stores the SAM.gov set-aside CODE (e.g. "8A", "SBA", "HZC" — _view-model.ts:3078), NOT the
+// description, so the trigger must match CODES first. These are the SBA socioeconomic programs FAR 52.219-1
+// governs — total/partial SB · 8(a) · HUBZone · SDVOSB · WOSB/EDWOSB, incl. their sole-source variants.
+// DELIBERATELY EXCLUDED (open Brain-ruling — see card): NONE/full-&-open, Local-Area (LAS), and the Buy-Indian
+// programs (IEE/ISBEE), whose NMR applicability rides different authority. Conservative scope by construction.
+const NMR_SB_SETASIDE_CODES = new Set([
+  "SBA", "SBP",          // Total / Partial Small Business Set-Aside
+  "8A", "8AN",           // 8(a) Set-Aside / Sole Source
+  "HZC", "HZS",          // HUBZone Set-Aside / Sole Source
+  "SDVOSBC", "SDVOSBS",  // SDVOSB Set-Aside / Sole Source
+  "WOSB", "WOSBSS",      // WOSB Set-Aside / Sole Source
+  "EDWOSB", "EDWOSBSS",  // EDWOSB Set-Aside / Sole Source
+]);
+// Friendly-name fallback — for doc-text-extracted uploads or descriptive values (not the SAM code path).
+const NMR_SB_SETASIDE_RE = /total small business|partial small business|small business set.?aside|8\(a\)|hubzone|\bsdvosb\b|service.?disabled veteran|\bwosb\b|\bedwosb\b|women.?owned small/i;
+const NMR_SUPPLY_SECTORS = new Set(["31", "32", "33", "42", "44", "45"]);
+// A finding that ALREADY addresses the Nonmanufacturer Rule — by the gate's own lens, by an NMR-SPECIFIC
+// authority (52.219-1 · 13 CFR 121.406 · FAR 19.505 waiver), or by naming the rule in its requirement text.
+// Used for non-duplication so a small-business-counsel lens's own NMR analysis wins the slot. HARD CONSTRAINT:
+// never key on 52.219-6 (the set-aside NOTICE clause present on nearly every SB set-aside) — that would suppress
+// the floor on almost every audit, the false-negative that defeats "catch every time". 52.219-14 (Limitations on
+// Subcontracting) is a DISTINCT obligation and is intentionally NOT matched (52\.219-1 lookahead excludes -14).
+const NMR_ADDRESSED_RE = /52\.219-1(?!\d)|121\.406|\b19\.505\b/i;
+function addressesNmr(f: TypedFinding): boolean {
+  return f.lens === "nonmanufacturer_rule" || NMR_ADDRESSED_RE.test(f.citation) || /non-?manufacturer/i.test(f.requirement);
+}
+/** The two-digit NAICS sector iff the code is a real ≥2-digit numeric (a genuine SAM / SF-1449 Block-10 code).
+ *  null otherwise (absent / malformed) → the caller stays silent. Pure deterministic arithmetic, no lookup. */
+export function naicsSector(naics: string | null | undefined): string | null {
+  const m = (naics ?? "").trim().match(/^(\d{2})\d{0,4}$/);
+  return m ? m[1] : null;
+}
+/** Emit the NMR caution when (set-aside is a SB program) AND (NAICS is a supply/manufacturing sector). Pure →
+ *  gate-tested. Additive + floor-only; profile-independent (card 132). Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyNonmanufacturerRuleGate(
+  findings: TypedFinding[],
+  facts: { naics?: string | null; setAside?: string | null },
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                                          // Rule 61 default-off ⇒ byte-identical
+  const naics = (facts.naics ?? "").trim();
+  const sector = naicsSector(naics);
+  if (!sector || !NMR_SUPPLY_SECTORS.has(sector)) return findings;             // services/construction/absent NAICS → silent (honest)
+  const sa = (facts.setAside ?? "").trim();
+  const code = sa.toUpperCase().replace(/[^A-Z0-9]/g, "");                     // "8(a) Set-Aside" → "8ASETASIDE"; "8A" → "8A"
+  if (!sa || !(NMR_SB_SETASIDE_CODES.has(code) || NMR_SB_SETASIDE_RE.test(sa))) return findings; // not an SBA-program set-aside → NMR N/A (full-&-open / NONE / Indian / local-area → silent)
+  if (findings.some(addressesNmr)) return findings; // non-duplication — a lens NMR analysis (under ANY NMR authority) wins the slot; 52.219-6/-14 never suppress it
+  const nmr: TypedFinding = {
+    requirement: `Nonmanufacturer Rule (FAR 52.219-1): this ${sa} is a supply acquisition under NAICS ${naics} (sector ${sector}). If your firm does NOT manufacture the end item, to be eligible you must (1) be small under the size standard, (2) have no more than 500 employees, and (3) supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505 / SBA class waiver applies. Confirm your manufacturing status and, if a nonmanufacturer, all three prongs before relying on award eligibility.`,
+    citation: "FAR 52.219-1",
+    excerpt: `NAICS ${naics} · set-aside "${sa}" (deterministic SAM-resolved facts — supply sector ${sector})`,
+    kind: "submission",
+    controllability: "bidder_controls",
+    cautionFloor: true,
+    grounded: true,
+    lens: "nonmanufacturer_rule",
+  };
+  return [...findings, nmr];
+}
+
 // ── STRUCTURAL-BAR WHITELIST (Brain card 114 — the general rule the per-pattern guards were special cases of) ──
 // A non-curable `bidder_cannot_move` bar under a NULL (unknown) profile routes to NEEDS_HUMAN_REVIEW (step 5b).
 // The lenses STOCHASTICALLY over-type bidder-RESOLVABLE compliance/representation/clarification items as such bars

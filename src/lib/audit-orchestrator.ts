@@ -14,7 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -231,6 +231,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      eligibility_bar. Runs AFTER the award-basis guard so a socioeconomic set-aside (already re-typed) is not
   //      double-processed. Flag off ⇒ findings pass through unchanged.
   findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" });
+
+  // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132, Step 4), default-OFF (=== "true"). The never-missed
+  //      deterministic FLOOR: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING NAICS (sector 31-33/42/44/45),
+  //      EMIT a bidder_controls + cautionFloor caution that a nonmanufacturer must supply a small-business
+  //      manufacturer's U.S.-made product (FAR 52.219-1) — the prong most small firms miss. Fires off the
+  //      DETERMINISTIC SAM facts (opts.naics + opts.setAside), never a source regex; NAICS absent → silent (honest).
+  //      Runs POST-VERIFY so the adversarial skeptic can never cull the floor; non-duplicating vs a lens NMR
+  //      finding (52.219-1 ≠ 52.219-14). Flag off ⇒ findings pass through unchanged.
+  {
+    const before = findings.length;
+    findings = applyNonmanufacturerRuleGate(findings, { naics: opts.naics, setAside: opts.setAside }, { enabled: process.env.AUDIT_NONMANUFACTURER_RULE_GATE === "true" });
+    if (findings.length > before) { findings[findings.length - 1].id = "nonmanufacturer_rule#0"; perLens["nonmanufacturer_rule"] = 1; }
+  }
 
   // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
   //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept
