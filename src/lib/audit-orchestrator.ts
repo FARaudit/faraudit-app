@@ -14,7 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -217,6 +217,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
   //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
   findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false" });
+
+  // P4.3a — SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1), default-OFF (=== "true"). The
+  //      Total-Small-Business / size pool the award-basis guard leaves untouched: a set-aside a lens vouched
+  //      already_satisfied is MET only when the profile PROVES it (firmStatus==='satisfies'); a null/unverified
+  //      profile → unverified caution gate (never a green vouch — the #1 legal-exposure); a closed-world FAIL →
+  //      eligibility_bar. Runs AFTER the award-basis guard so a socioeconomic set-aside (already re-typed) is not
+  //      double-processed. Flag off ⇒ findings pass through unchanged.
+  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" });
 
   // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
   //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept

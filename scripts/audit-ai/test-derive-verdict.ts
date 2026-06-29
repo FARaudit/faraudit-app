@@ -2,7 +2,7 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict, enforceVerdictWordInvariant } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor } from "@/lib/audit-decide";
 import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
@@ -125,6 +125,40 @@ if (INV) {
   eq("inv(ii)-prod: reason tagged", routed.reason, "invariant_violation:ineligible_without_eligibility_bar");
   // (iii) requirement-side impossibility (kind != eligibility_bar) → NO_BID, never INELIGIBLE
   eq("inv(iii): req-side impossibility → NO_BID not INELIGIBLE", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+}
+
+// ── Doctrine #1 (Step 3, AUDIT_SETASIDE_FIRMSTATUS_GATE) — a set-aside vouched already_satisfied is MET only
+//    when the profile PROVES it; null/unverified → caution GATE; closed-world FAIL → eligibility_bar. Default-OFF.
+//    Step 3 is an ORCHESTRATOR pass (not in deriveVerdict), so it is proven by invoking the pass directly. ──
+const GATE3 = process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true";
+if (GATE3) {
+  const sa = () => f({ requirement: "100% Total Small Business set-aside — firm qualifies", kind: "eligibility_bar", controllability: "already_satisfied", requiredAttribute: "naics:333120-small" });
+  const gate = (p: BidderProfile | null) => applySetAsideFirmStatusGate([sa()], p, { enabled: true })[0];
+  // null profile → unverified caution GATE, never met
+  const nullP = gate(null);
+  eq("step3: null profile → bidder_controls (gate, not met)", nullP.controllability, "bidder_controls");
+  eq("step3: null profile → cautionFloor set", nullP.cautionFloor, true);
+  eq("step3: null profile → NEVER already_satisfied", nullP.controllability === "already_satisfied", false);
+  // satisfies-profile (closed-world holds the size attr) → keep met
+  eq("step3: satisfies-profile → stays already_satisfied (met)", gate({ satisfiedAttributes: ["naics:333120-small"] }).controllability, "already_satisfied");
+  // fails-profile (closed-world lacks it) → eligibility_bar → INELIGIBLE
+  const failsF = gate({ satisfiedAttributes: [] });
+  eq("step3: fails-profile → bidder_cannot_move (bar)", failsF.controllability, "bidder_cannot_move");
+  const fv = deriveVerdict(inp([failsF], { profile: { satisfiedAttributes: [] } }));
+  eq("step3: fails-profile → INELIGIBLE", fv.verdict, "INELIGIBLE");
+  eq("step3: fails INELIGIBLE carries eligibility_bar (invariant-safe)", fv.showStoppers.some((s) => s.kind === "eligibility_bar"), true);
+  // ── INTERACTION — the three ordering constraints ──
+  // (1) award-basis handles an 8(a) socioeconomic set-aside ONCE → Step-3 no-ops (no double-caution)
+  const ab = applyAwardBasisOvertypeGuard([f({ requirement: "8(a) set-aside — firm qualifies", kind: "eligibility_bar", controllability: "already_satisfied" })], null, { enabled: true })[0];
+  eq("compose(1): 8(a) Step-3 no-op after award-basis (handled once)", JSON.stringify(applySetAsideFirmStatusGate([ab], null, { enabled: true })[0]), JSON.stringify(ab));
+  // (2) fails-bar survives the whitelist (no-op on a loaded profile) → INELIGIBLE un-downgraded
+  const afterWL = applyStructuralBarWhitelist([failsF], { satisfiedAttributes: [] }, { enabled: true })[0];
+  eq("compose(2): fails-bar survives whitelist (loaded-profile no-op)", afterWL.controllability, "bidder_cannot_move");
+  eq("compose(2): → INELIGIBLE un-downgraded", deriveVerdict(inp([afterWL], { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+  // (3) fails-bar is NOT caution-floored (caution-floor skips bar-class)
+  const afterCF = applyCautionFloor([failsF], { enabled: true })[0];
+  eq("compose(3): fails-bar NOT caution-floored", afterCF.cautionFloor ?? false, false);
+  eq("compose(3): fails-bar stays bidder_cannot_move", afterCF.controllability, "bidder_cannot_move");
 }
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──

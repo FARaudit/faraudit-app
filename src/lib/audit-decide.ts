@@ -275,6 +275,31 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
   });
 }
 
+// ── SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1) ──
+// The Total-Small-Business / size pool the award-basis guard deliberately leaves untouched (it handles only the
+// SPECIFIC socioeconomic set-asides). A set-aside/size finding a lens vouched `already_satisfied` ("firm qualifies")
+// is a green MET vouch ONLY when the bidder profile PROVES it (firmStatus==='satisfies'); under a null/unverified
+// profile it becomes an UNVERIFIED caution gate (the #1 legal-exposure — a false vouch invites a size protest / FCA);
+// a closed-world profile that PROVES the firm fails → a real eligibility_bar (→ INELIGIBLE via the single producer,
+// Step-2 invariant satisfied). Mirrors the award-basis guard; the orchestrator runs it AFTER that guard so a
+// socioeconomic set-aside (already re-typed away from already_satisfied) is never double-processed. Default-OFF.
+const SETASIDE_SIZE_RE = /small business set.?aside|total small business|set.?aside for small|small business concern|size standard|small under (?:the )?naics|\bNAICS\b.{0,24}\bsize\b|\b8\(a\)|\bHUBZone\b|\bSDVOSB\b|\bWOSB\b|\bEDWOSB\b/i;
+export function applySetAsideFirmStatusGate(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;  // default-OFF → byte-identical
+  return findings.map((f): TypedFinding => {
+    // Only a set-aside/size finding a lens vouched already_satisfied. (Socioeconomic set-asides the award-basis
+    // guard already re-typed are no longer already_satisfied → skipped here: no double-caution, #1 constraint.)
+    if (f.kind !== "eligibility_bar" || f.controllability !== "already_satisfied" || f.cautionFloor === true || !SETASIDE_SIZE_RE.test(f.requirement)) return f;
+    const fs = firmStatus(f, profile);
+    if (fs === "satisfies") return f;  // profile PROVES the firm qualifies → keep already_satisfied (met)
+    if (fs === "fails")                // profile PROVES the firm does NOT → a real eligibility_bar (→ INELIGIBLE)
+      return { ...f, controllability: "bidder_cannot_move", curableInWindow: false };
+    // unknown (null/unverified profile, or no requiredAttribute) → unverified caution gate, never a green met vouch
+    return { ...f, controllability: "bidder_controls", cautionFloor: true,
+      requirement: `${f.requirement} — confirm your firm's size/eligibility under the solicitation's NAICS before relying on this` };
+  });
+}
+
 // ── STRUCTURAL-BAR WHITELIST (Brain card 114 — the general rule the per-pattern guards were special cases of) ──
 // A non-curable `bidder_cannot_move` bar under a NULL (unknown) profile routes to NEEDS_HUMAN_REVIEW (step 5b).
 // The lenses STOCHASTICALLY over-type bidder-RESOLVABLE compliance/representation/clarification items as such bars
