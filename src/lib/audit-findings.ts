@@ -77,6 +77,11 @@ export interface TypedFinding {
   // (a bidder-resolvable compliance / representation / clarification — size-standard, OCI, reps&certs,
   // registration) → bidder_controls + cautionFloor. Marker only.
   structuralWhitelistGuard?: boolean;
+  // KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135, Step 5a) — set when the deterministic clause→disposition map
+  // re-typed a finding mis-typed as a bar for a clause whose legal meaning is settled (52.204-7 SAM = curable
+  // caution; 52.246-15 Certificate of Conformance = non-blocking). Keyed on the finding's own grounded `citation`
+  // field (exact clause-number match), CAP-ONLY. Marker only; deriveVerdict reads controllability/cautionFloor.
+  clauseSemanticsGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

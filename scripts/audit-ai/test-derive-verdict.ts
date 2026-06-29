@@ -2,7 +2,7 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard } from "@/lib/audit-decide";
 import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
@@ -159,6 +159,56 @@ if (GATE3) {
   const afterCF = applyCautionFloor([failsF], { enabled: true })[0];
   eq("compose(3): fails-bar NOT caution-floored", afterCF.cautionFloor ?? false, false);
   eq("compose(3): fails-bar stays bidder_cannot_move", afterCF.controllability, "bidder_cannot_move");
+}
+
+// ── Step 5a: KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135) ──
+// `f()` hardcodes citation, so build clause findings with an explicit citation field here.
+const cf = (citation: string, o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding =>
+  ({ requirement: o.requirement ?? "requirement", citation, excerpt: "verbatim", grounded: true, lens: "x",
+     kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow });
+// OFF/inert is unconditional (default-off → byte-identical) — calling with omitted opts returns the input.
+{
+  const bar = cf("FAR 52.204-7", { requirement: "register in SAM", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "sam:registered", curableInWindow: false });
+  eq("5a OFF: guard inert (no opts) → byte-identical", JSON.stringify(applyClauseSemanticsGuard([bar])[0]), JSON.stringify(bar));
+}
+const G5 = process.env.AUDIT_CLAUSE_SEMANTICS_GUARD === "true";
+if (G5) {
+  const on = (x: TypedFinding) => applyClauseSemanticsGuard([x], { enabled: true })[0];
+  // (i) 52.204-7 mis-typed bar/INELIGIBLE → curable caution, NEVER a show-stopper.
+  const sam = on(cf("FAR 52.204-7", { requirement: "offeror must be registered in SAM", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "sam:registered", curableInWindow: false }));
+  eq("5a(i) 52.204-7 → bidder_controls", sam.controllability, "bidder_controls");
+  eq("5a(i) 52.204-7 → curable caution", [sam.curableInWindow, sam.cautionFloor], [true, true]);
+  eq("5a(i) 52.204-7 via deriveVerdict → BID_WITH_CAUTION (never a show-stopper)", deriveVerdict(inp([sam])).verdict, "BID_WITH_CAUTION");
+  // (ii) 52.246-15 mis-typed bar → cleared to non-blocking (no caution floor).
+  const coc = on(cf("FAR 52.246-15", { requirement: "Certificate of Conformance required", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "coc", curableInWindow: false }));
+  eq("5a(ii) 52.246-15 → bidder_controls", coc.controllability, "bidder_controls");
+  eq("5a(ii) 52.246-15 → NOT caution-floored (informational)", coc.cautionFloor ?? false, false);
+  eq("5a(ii) 52.246-15 alone via deriveVerdict → BID (non-blocking)", deriveVerdict(inp([coc])).verdict, "BID");
+  // (i-b) CAP-ONLY: a 52.204-7 finding that is ALREADY satisfied/controllable → UNTOUCHED (never downgrade a met).
+  const satisfied = cf("FAR 52.204-7", { requirement: "registered in SAM", kind: "eligibility_bar", controllability: "already_satisfied", requiredAttribute: "sam:registered" });
+  eq("5a(i-b) already_satisfied 52.204-7 → UNTOUCHED (cap-only)", JSON.stringify(on(satisfied)), JSON.stringify(satisfied));
+  const ctrl = cf("FAR 52.204-7", { requirement: "confirm SAM registration", kind: "submission", controllability: "bidder_controls" });
+  eq("5a(i-b) bidder_controls 52.204-7 → UNTOUCHED (never elevated)", JSON.stringify(on(ctrl)), JSON.stringify(ctrl));
+  // (iii) LOAD-BEARING: a genuine structural bar (sole-source/OEM/QPL, not in the map) → UNTOUCHED.
+  const ss = cf("FAR 52.211-6", { requirement: "sole-source to named OEM; QPL listing required", kind: "technical_spec", controllability: "bidder_cannot_move", requiredAttribute: "qpl:listed", curableInWindow: false });
+  eq("5a(iii) genuine structural bar UNTOUCHED", JSON.stringify(on(ss)), JSON.stringify(ss));
+  // (iv) exact-match discipline: 52.204-13 / 52.246-2 / DFARS 252.204-7012 NOT matched.
+  const o13 = cf("FAR 52.204-13", { requirement: "SAM maintenance", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+  eq("5a(iv) 52.204-13 NOT matched", JSON.stringify(on(o13)), JSON.stringify(o13));
+  const o2 = cf("FAR 52.246-2", { requirement: "inspection of supplies", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+  eq("5a(iv) 52.246-2 NOT matched", JSON.stringify(on(o2)), JSON.stringify(o2));
+  const dfars = cf("DFARS 252.204-7012", { requirement: "covered defense information safeguarding", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+  eq("5a(iv) DFARS 252.204-7012 NOT matched (digit-boundary)", JSON.stringify(on(dfars)), JSON.stringify(dfars));
+  // trailing-digit boundary the lookahead exists to protect (52.204-70, 52.204-8, 52.246-150, 52.246-23).
+  for (const c of ["FAR 52.204-70", "FAR 52.204-8", "FAR 52.246-150", "FAR 52.246-23"]) {
+    const b = cf(c, { requirement: "x", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+    eq(`5a(iv) ${c} NOT matched (digit-boundary)`, JSON.stringify(on(b)), JSON.stringify(b));
+  }
+  // (v) PRECEDENCE: a 52.204-7 finding the whitelist ALONE would not cap (generic requirement, no SAM keyword)
+  //     is capped by the clause guard run BEFORE the whitelist → authoritative, not just safe.
+  const generic = cf("FAR 52.204-7", { requirement: "the offeror shall comply with the referenced provision at award", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "x", curableInWindow: false });
+  eq("5a(v) whitelist ALONE leaves generic 52.204-7 a bar (precision gap)", applyStructuralBarWhitelist([generic], null, { enabled: true })[0].controllability, "bidder_cannot_move");
+  eq("5a(v) clause guard BEFORE whitelist → capped (authoritative)", applyStructuralBarWhitelist([on(generic)], null, { enabled: true })[0].controllability, "bidder_controls");
 }
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──

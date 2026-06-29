@@ -379,6 +379,53 @@ export function applyNonmanufacturerRuleGate(
   return [...findings, nmr];
 }
 
+// ── KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135 — Step 5a; verified clause→disposition map) ──────────────
+// CAP-ONLY guard keyed on the finding's OWN `citation` field (Rule-64 grounded; exact clause-number match with
+// digit-boundary lookarounds — NOT a fullSource keyword scan, which would be the surface-keyword trap). For a
+// SMALL set of clauses whose legal meaning is SETTLED (a clause-level fact, not a solicitation-specific
+// adjudication), a lens that mis-types the clause as a bar/eligibility show-stopper is corrected to the clause's
+// true disposition. CAPS ONLY — never elevates; acts ONLY on a finding currently typed as a bar
+// (bidder_cannot_move / no_one_can_move / eligibility_bar); a finding already bidder_controls/met is untouched.
+// Runs BEFORE the structural-bar whitelist so for THESE verified clauses the precise map is AUTHORITATIVE over
+// the whitelist's generic fail-safe. Exact-match discipline: 52.204-7 ≠ 52.204-8/-13; 52.246-15 ≠ 52.246-2/-23;
+// 252.204-7xxx (DFARS) never matches. Map structured to EXTEND later (new entries gate on the same verification
+// bar). Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+//
+// VERIFIED ENTRIES (exactly two):
+//   52.204-7  System for Award Management — a CURABLE administrative prerequisite (any firm can register in SAM);
+//             never an eligibility bar → bidder_controls + curable caution ("confirm active SAM registration…").
+//   52.246-15 Certificate of Conformance — a quality/inspection ACCEPTANCE mechanism (FAR 46.315 / 46.504),
+//             contractor-favorable, NOT a proposal/eligibility gate → cleared to a NON-BLOCKING bidder_controls.
+// A finding that currently BLOCKS — i.e. disposeFinding(f) === "disqualifying". Keyed on controllability ONLY:
+// kind "eligibility_bar" is NOT sufficient, because an eligibility_bar that is already_satisfied (met) or
+// bidder_controls (gate-to-clear) is NOT a bar — capping it would downgrade a clean verdict (cap-only violation).
+const clauseIsBar = (f: TypedFinding): boolean =>
+  f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move";
+const CLAUSE_SEMANTICS: ReadonlyArray<{ re: RegExp; apply: (f: TypedFinding) => TypedFinding }> = [
+  { re: /(?<!\d)52\.204-7(?!\d)/, apply: (f) => ({
+      ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, kind: "submission",
+      requiredAttribute: undefined,
+      requirement: /confirm active sam registration/i.test(f.requirement)
+        ? f.requirement
+        : `${f.requirement} — confirm active SAM registration at offer submission and at award`,
+      clauseSemanticsGuard: true }) },
+  { re: /(?<!\d)52\.246-15(?!\d)/, apply: (f) => ({
+      ...f, controllability: "bidder_controls", curableInWindow: true, kind: "submission",
+      requiredAttribute: undefined, clauseSemanticsGuard: true }) },
+];
+/** Re-type a bar-mis-typed known clause to its settled disposition (Brain card 135). Pure → gate-tested. CAP-ONLY
+ *  (never elevates a non-bar); exact citation match only. Flag-gated; OFF (default) ⇒ findings unchanged. */
+export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;                                          // Rule 61 default-off ⇒ byte-identical
+  return findings.map((f): TypedFinding => {
+    for (const c of CLAUSE_SEMANTICS) {
+      if (!c.re.test(f.citation)) continue;
+      return clauseIsBar(f) ? c.apply(f) : f;                                   // cap-only: never re-type a non-bar
+    }
+    return f;
+  });
+}
+
 // ── STRUCTURAL-BAR WHITELIST (Brain card 114 — the general rule the per-pattern guards were special cases of) ──
 // A non-curable `bidder_cannot_move` bar under a NULL (unknown) profile routes to NEEDS_HUMAN_REVIEW (step 5b).
 // The lenses STOCHASTICALLY over-type bidder-RESOLVABLE compliance/representation/clarification items as such bars

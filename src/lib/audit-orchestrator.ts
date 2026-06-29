@@ -14,7 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -244,6 +244,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     findings = applyNonmanufacturerRuleGate(findings, { naics: opts.naics, setAside: opts.setAside }, { enabled: process.env.AUDIT_NONMANUFACTURER_RULE_GATE === "true" });
     if (findings.length > before) { findings[findings.length - 1].id = "nonmanufacturer_rule#0"; perLens["nonmanufacturer_rule"] = 1; }
   }
+
+  // P4.3a-ter — KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135, Step 5a), default-OFF (=== "true"). CAP-ONLY map
+  //      keyed on the finding's grounded citation field (exact clause match): 52.204-7 (SAM) → curable caution;
+  //      52.246-15 (Certificate of Conformance) → non-blocking. Runs BEFORE the structural-bar whitelist so the
+  //      verified per-clause disposition is AUTHORITATIVE over the whitelist's generic fail-safe. Flag off ⇒ unchanged.
+  findings = applyClauseSemanticsGuard(findings, { enabled: process.env.AUDIT_CLAUSE_SEMANTICS_GUARD === "true" });
 
   // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
   //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept
