@@ -410,7 +410,7 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
 
       // Re-read the persisted verdict for the notification + email (executeAudit
       // owns the row write; the watcher reads it back rather than re-deriving).
-      const { data: persisted } = await admin
+      const { data: persisted, error: persistedErr } = await admin
         .from("audits")
         .select("recommendation, compliance_score, compliance_json, risks_json")
         .eq("id", newAuditId)
@@ -422,7 +422,10 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
       // email: an agentic honest-fail (INCOMPLETE / NEEDS_HUMAN_REVIEW) or an unconfirmed
       // document set must NOT be presented as a clean "complete · verdict" on EITHER
       // surface — independent of recommendation.
-      const incomplete = cjForEmail.honest_fail === true || cjForEmail.documents_complete === false;
+      // Fail SAFE: if the verdict re-read failed (no row / DB blip), we can't confirm the
+      // audit is complete, so treat it as incomplete rather than presenting a false "complete
+      // · verdict" on either surface. (Fail-open bug found by the pre-deploy gate.)
+      const incomplete = !persisted || persistedErr != null || cjForEmail.honest_fail === true || cjForEmail.documents_complete === false;
 
       // Flip watched_notices → audited (audit_id already linked above). Check the
       // error: the audit is complete + paid, so a lost flip would leave the row in

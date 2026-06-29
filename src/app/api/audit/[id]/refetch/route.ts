@@ -32,6 +32,7 @@ import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta }
 import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
 import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
+import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -233,6 +234,20 @@ export async function POST(
     }
   }
 
+  // N5 — the firm's capability profile for the agentic eligibility lane (socioeconomic
+  // certs). Mirrors the main POST so a re-run can't diverge from the original verdict
+  // (e.g. a cert that cleared a set-aside bar must still clear it on refetch). Best-effort:
+  // any error → null (unknown firm, the conservative path). User is the RLS-scoped owner.
+  let bidderProfile = null;
+  try {
+    const { data: capRow } = await supabase
+      .from("capability_statements")
+      .select("certifications")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    bidderProfile = buildBidderProfileFromCapability(capRow);
+  } catch { /* unknown firm on any error — never block the re-run */ }
+
   // ━━ Run the audit — the agentic V3 engine (same path as the main customer POST),
   // NOT the retired V1 runAudit. executeAudit fills the row in place (verdict +
   // engine='agentic_v3' marker + honest_fail/documents_complete). A tighter budget
@@ -252,6 +267,7 @@ export async function POST(
     attachmentPdfs,
     primaryDocName,
     ingestion,
+    bidderProfile,
     agenticBudgetMs: 200_000
   };
   let result;
@@ -268,21 +284,26 @@ export async function POST(
   {
     const { data: fresh } = await supabase.from("audits").select("compliance_json").eq("id", audit.id).single();
     const freshCj = (fresh?.compliance_json as Record<string, unknown> | null) ?? {};
+    // R1 — refresh ONLY the facts the LIVE SAM record actually provides, so an
+    // amendment's new values land WITHOUT clobbering executeAudit's deterministic FACTS
+    // cross-ref (which may have already backfilled a column the live record left sparse)
+    // and never nulling a known-good value. Facts-vs-analysis law: never overwrite a
+    // good fact with a stale/empty one. (Bug found by the pre-deploy gate.)
+    const factRefresh: Record<string, unknown> = {
+      compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource }
+    };
+    const freshAgency = resolveAgency(solicitation);
+    const freshOffice = resolveOfficeLeaf(solicitation);
+    if (solicitation.title) factRefresh.title = solicitation.title;
+    if (freshAgency) factRefresh.agency = freshAgency;
+    if (solicitation.naicsCode) factRefresh.naics_code = solicitation.naicsCode;
+    if (solicitation.typeOfSetAside) factRefresh.set_aside = solicitation.typeOfSetAside;
+    if (solicitation.postedDate) factRefresh.posted_date = solicitation.postedDate;
+    if (solicitation.responseDeadLine) factRefresh.response_deadline = solicitation.responseDeadLine;
+    if (freshOffice) factRefresh.office_leaf = freshOffice;
     const { error: mergeErr } = await supabase
       .from("audits")
-      .update({
-        compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource },
-        // R1 — refresh the SAM facts an amendment can move; the masthead reads these
-        // columns, so a refetch-after-amendment must update them (fall back to the
-        // prior value when SAM omits a field, never null out a known good value).
-        title: solicitation.title || (audit.title as string | null),
-        agency: input.agency,
-        naics_code: solicitation.naicsCode ?? (audit.naics_code as string | null),
-        set_aside: solicitation.typeOfSetAside ?? (audit.set_aside as string | null),
-        posted_date: solicitation.postedDate ?? (audit.posted_date as string | null),
-        response_deadline: solicitation.responseDeadLine ?? (audit.response_deadline as string | null),
-        office_leaf: resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null)
-      })
+      .update(factRefresh)
       .eq("id", audit.id);
     if (mergeErr) {
       // The audit itself succeeded; only the refetch bookkeeping failed. Surface but
