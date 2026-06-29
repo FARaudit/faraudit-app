@@ -139,13 +139,45 @@ function groundedBy(obligation: string, findings: TypedFinding[]): string[] {
  *       ELSEWHERE by a verbatim n-gram match, with the specific finding IDs cited (silence ≠ coverage);
  *       a read section that carries no obligation sentence is covered (genuinely thin).
  *  Returns per-section attestations so the trace can be adjudicated (thin vs miss) before BID is accepted. */
-export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
+// 5b §M evaluation-DEPTH tokens (Brain card 137) — a genuine award BASIS carries at least one of these. Two
+// non-criteria text sources must NOT satisfy the check: (a) the §M TITLE ("…EVALUATION FACTORS FOR AWARD") that
+// readSection includes — so the literal "evaluation factor(s)" is excluded; (b) TRAILING content — §M is the last
+// UCF section so its text bleeds to EOF, dragging in appended attachments. So bare generic words ("acceptable",
+// "weight", "past performance") are excluded — only award-BASIS-specific phrases remain, which a wage determination
+// or past-performance form won't carry. The scan is ALSO region-bounded (criteria sit right under the heading).
+const EVAL_FACTOR_RE = /\bLPTA\b|lowest[\s-]priced|technically\s+acceptable|best\s+(?:overall\s+)?value|greatest\s+(?:overall\s+)?value|\btrade[\s-]?off|highest[\s-]?rated/i;
+// §M is the LAST UCF section, so readSection("M").text bleeds to EOF, dragging in appended attachments. Delimit the
+// real CRITERIA region: lines under the heading up to the first document-structure boundary. Both the token check
+// AND the thinness check run on THIS — so a trailing past-performance/wage attachment can neither satisfy the token
+// check nor inflate the word count (which would otherwise defeat the "thin" condition). Heuristic; "thin" = a small
+// word count. Mechanism is deliberately simple — final calibration deferred to the regen/re-panel stage (card 137).
+const M_BOUNDARY_RE = /^\s*(?:ATTACHMENT|EXHIBIT|APPENDIX|ANNEX|ADDENDUM|WAGE\s+DETERMINATION|PAST\s+PERFORMANCE\s+QUESTIONNAIRE|SECTION\s+[A-Z]\b)/i;
+function sectionMCriteria(text: string): string {
+  const lines = text.split("\n"); const out: string[] = [];
+  for (let i = 1; i < lines.length; i++) { if (M_BOUNDARY_RE.test(lines[i])) break; out.push(lines[i]); }
+  return out.join("\n").slice(0, 2000);
+}
+const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).length < 12;
+
+export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
   for (const sec of required) {
     const text = readSection(ctx, sec).text; const nText = norm(text);
     if (!sectionsRead.has(sec)) { attestations.push({ section: sec, status: "unread", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
     const direct = findings.filter((f) => f.excerpt && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
+    // 5b §M DEPTH — REFINED (Brain card 137 ruling), flag-gated, §M ONLY (never §L/§C or the coreMissing path).
+    // Fire "not evaluated" ONLY when ALL THREE hold: (1) NO direct grounded finding (the covered_direct check
+    // above already returned for that case), (2) NO award-basis token in the criteria region, AND (3) the criteria
+    // region is genuinely THIN (a stub). So a POPULATED non-token §M (weighted/adjectival) is NOT flagged
+    // (condition 3 fails) — false-negative closed. Both checks run on the boundary-delimited criteria region, so a
+    // trailing attachment can neither false-PASS (token) nor inflate the word count (thin). OFF ⇒ identical.
+    if (opts?.sectionMDepth && sec === "M") {
+      const crit = sectionMCriteria(text);
+      if (!EVAL_FACTOR_RE.test(crit) && isThin(crit)) {
+        attestations.push({ section: sec, status: "obligations_ungrounded", obligations: ["evaluation criteria not found / not evaluated"], citedFindingIds: [], ungrounded: ["evaluation criteria not found / not evaluated"] }); continue;
+      }
+    }
     const obligations = obligationsOf(text);
     if (!obligations.length) { attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
     const cited = new Set<string>(); const ungrounded: string[] = [];
@@ -217,7 +249,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
-  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
+  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true" });
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
 
   // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
