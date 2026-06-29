@@ -27,7 +27,7 @@ export interface FindingLite {
  *  the report + PDF routes. Self-contained: everything the renderer needs. */
 export interface V3ReportPayload {
   verdict: string;
-  eligible: boolean;
+  eligible: boolean | null;
   reason: string;
   showStoppers: FindingLite[];
   findings: FindingLite[];

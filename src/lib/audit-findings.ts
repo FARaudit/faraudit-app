@@ -77,6 +77,22 @@ export interface TypedFinding {
   // (a bidder-resolvable compliance / representation / clarification — size-standard, OCI, reps&certs,
   // registration) → bidder_controls + cautionFloor. Marker only.
   structuralWhitelistGuard?: boolean;
+  // KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135, Step 5a) — set when the deterministic clause→disposition map
+  // re-typed a finding mis-typed as a bar for a clause whose legal meaning is settled (52.204-7 SAM = curable
+  // caution; 52.246-15 Certificate of Conformance = non-blocking). Keyed on the finding's own grounded `citation`
+  // field (exact clause-number match), CAP-ONLY. Marker only; deriveVerdict reads controllability/cautionFloor.
+  clauseSemanticsGuard?: boolean;
+  // OR-EQUAL CARVE-OUT (Brain card 139, Step 6) — set when the deterministic carve-out re-typed a "brand name OR
+  // EQUAL" / salient-characteristics finding (mis-typed a structural bar via bare "brand name") → bidder_controls
+  // + cautionFloor (furnish an approved equal). NEVER fires when a restrictive qualifier (only / no substitution /
+  // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
+  orEqualCarveout?: boolean;
+  // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
+  // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
+  // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal
+  // tension is present (FAT precondition + delivery window grounded) but it is NOT a proven order-referenced
+  // sequential gate. Marker only; deriveVerdict reads controllability/cautionFloor, not this field.
+  temporalSharedAroGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

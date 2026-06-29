@@ -33,6 +33,8 @@ export interface AuditPackageInput {
   maxTurns?: number;                        // per-expert react-loop bound (default 8)
   signal?: AbortSignal;                     // overall wall-clock budget — cancels in-flight paid calls on breach (no-op if absent)
   manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
+  naics?: string | null;                    // Step 4a (plumb-only) — SAM-resolved NAICS fact, forwarded to the gate pipeline; null when absent
+  setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
 }
 
 /** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
@@ -68,5 +70,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     maxTurns: input.maxTurns,
     signal: input.signal,
     manifestComplete: input.manifestComplete,
+    naics: input.naics ?? null,             // Step 4a — forward the fact; no consumer yet (verdict unchanged)
+    setAside: input.setAside ?? null,
   });
 }

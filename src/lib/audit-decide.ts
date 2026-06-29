@@ -19,7 +19,7 @@ export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
 export interface DecidedFinding extends TypedFinding { disposition: Disposition; }
 export interface Decision {
   verdict: Verdict;
-  eligible: boolean;
+  eligible: boolean | null;  // null = "not determined" (honest-fail under AUDIT_ELIGIBLE_TRISTATE) — never false on an undetermined verdict (doctrine #6)
   reason: string;
   dispositions: DecidedFinding[];      // every finding with its derived disposition
   showStoppers: DecidedFinding[];      // disqualifying bars the firm PROVABLY fails (the only NO_BID/INELIGIBLE drivers)
@@ -240,6 +240,34 @@ const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabl
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
  *  bidder_controls (never the temporal_conflict finding or a real delivery/precondition impossibility);
  *  (b) a specific socioeconomic set-aside under a NULL profile → cautionFloor. Flag-gated; OFF ⇒ unchanged. */
+// ── OR-EQUAL CARVE-OUT (Brain card 139 — Step 6) ──────────────────────────────────────────────────────────
+// A "brand name OR EQUAL" line is PERMISSIVE — the bidder furnishes an approved equal meeting the salient
+// characteristics → bidder_controls, NEVER a structural bar. But it matches the structural patterns
+// (DELIVERY_IMPOSSIBILITY_RE / STRUCTURAL_BAR_RE_114 / NON_SELF_CLEARABLE_BAR_RE) via the bare "brand name"
+// token, so a lens that typed it a bar would survive every downstream structural gate → a false NO_BID/INELIGIBLE.
+// This carve-out runs FIRST (ahead of those gates) and re-types such a bar to bidder_controls + cautionFloor.
+// NEGATION-AWARE: a restrictive qualifier co-stated on the finding (only / no substitution / sole source / no
+// equal) VETOES the carve-out — those stay structural bars (restrictive wins; conservative, never clears a real
+// bar). Re-types controllability only; invents no findings; never touches a non-brand-name bar (QPL/QML/clearance,
+// which don't match OREQUAL_RE). Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+// The VETO — any token here means the line is NOT a permissive or-equal carve-out and STAYS a bar. It must model
+// the structural-bar vocabulary the carve-out runs ahead of (proprietary/QPL/TDP/clearance/sole-source/single-
+// authorized/discontinued/named-OEM), trailing-AND-leading prohibitive negation of or-equal/substitution
+// ("or equal not permitted", "substitutions prohibited", "no exceptions", "will not be accepted"), AND the literal
+// no-substitution/brand-only tokens — EXCLUDING the bare "brand name" token (which is permissive in or-equal
+// context). Conservative by construction: when in doubt it keeps the bar (never a false BID). Adversarial-hardened.
+const OREQUAL_RESTRICTIVE_RE = /\bno\s+(?:acceptable\s+)?substitut|\bsole.?source\b|brand.?name\s+only\b|\bno\s+(?:or.?)?equals?\b|\bno\s+equivalent|\bonly\b[^.\n]{0,25}\b(?:brand|named|manufacturer|oem|source|product|model|part)|\b(?:brand|named|manufacturer|oem|source|product|model)\b[^.\n]{0,25}\bonly\b|\bor[-\s]equal\b[^.\n]{0,30}\b(?:not\s+(?:permitted|allowed|authorized|accepted|acceptable|considered)|prohibit|will\s+not)|\bsubstitut\w*[^.\n]{0,20}\b(?:prohibit|not\s+(?:permitted|allowed|accepted|acceptable|authorized))|\b(?:prohibited|not\s+permitted|not\s+authorized|not\s+acceptable|will\s+not\s+be\s+(?:accepted|considered))\b|\bno\s+exceptions?\b|\bno\s+deviation|\b(?:mandatory|designated|required|directed)\s+source\b|non.?competit|directed\s+award|\bproprietary\b|\bQPL\b|\bQML\b|qualified\s+(?:products?|manufacturers?)\s+list|technical\s+data\s+package|\bTDP\b|security\s+clearance|facility\s+(?:clearance|security|certification)|\bunobtainable\b|single\s+(?:source|authorized|approved)|exclusive\s+(?:license|distributor|dealer)|approved\s+(?:source|manufactur)|named\s+(?:oem|manufacturer|source|dealer)|no\s+longer\s+(?:manufactured|available|produced|in\s+production)|out\s+of\s+production|discontinu/i;
+export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f): TypedFinding => {
+    if (f.controllability !== "bidder_cannot_move" && f.controllability !== "no_one_can_move") return f; // only bars
+    const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`; // read requiredAttribute too (sibling-guard parity)
+    if (!OREQUAL_RE.test(hay) || OREQUAL_RESTRICTIVE_RE.test(hay)) return f; // not or-equal, OR a restrictive/structural token present → stays a bar
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, orEqualCarveout: true,
+      requirement: `${f.requirement} — furnish an approved equal meeting the stated salient characteristics; price the equal` };
+  });
+}
+
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
@@ -271,6 +299,157 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // softened even if it names a set-aside; a PURE set-aside (no structural language) still softens.
     if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
+    return f;
+  });
+}
+
+// ── SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1) ──
+// The Total-Small-Business / size pool the award-basis guard deliberately leaves untouched (it handles only the
+// SPECIFIC socioeconomic set-asides). A set-aside/size finding a lens vouched `already_satisfied` ("firm qualifies")
+// is a green MET vouch ONLY when the bidder profile PROVES it (firmStatus==='satisfies'); under a null/unverified
+// profile it becomes an UNVERIFIED caution gate (the #1 legal-exposure — a false vouch invites a size protest / FCA);
+// a closed-world profile that PROVES the firm fails → a real eligibility_bar (→ INELIGIBLE via the single producer,
+// Step-2 invariant satisfied). Mirrors the award-basis guard; the orchestrator runs it AFTER that guard so a
+// socioeconomic set-aside (already re-typed away from already_satisfied) is never double-processed. Default-OFF.
+const SETASIDE_SIZE_RE = /small business set.?aside|total small business|set.?aside for small|small business concern|size standard|small under (?:the )?naics|\bNAICS\b.{0,24}\bsize\b|\b8\(a\)|\bHUBZone\b|\bSDVOSB\b|\bWOSB\b|\bEDWOSB\b/i;
+export function applySetAsideFirmStatusGate(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;  // default-OFF → byte-identical
+  return findings.map((f): TypedFinding => {
+    // Only a set-aside/size finding a lens vouched already_satisfied. (Socioeconomic set-asides the award-basis
+    // guard already re-typed are no longer already_satisfied → skipped here: no double-caution, #1 constraint.)
+    if (f.kind !== "eligibility_bar" || f.controllability !== "already_satisfied" || f.cautionFloor === true || !SETASIDE_SIZE_RE.test(f.requirement)) return f;
+    const fs = firmStatus(f, profile);
+    if (fs === "satisfies") return f;  // profile PROVES the firm qualifies → keep already_satisfied (met)
+    if (fs === "fails")                // profile PROVES the firm does NOT → a real eligibility_bar (→ INELIGIBLE)
+      return { ...f, controllability: "bidder_cannot_move", curableInWindow: false };
+    // unknown (null/unverified profile, or no requiredAttribute) → unverified caution gate, never a green met vouch
+    return { ...f, controllability: "bidder_controls", cautionFloor: true,
+      requirement: `${f.requirement} — confirm your firm's size/eligibility under the solicitation's NAICS before relying on this` };
+  });
+}
+
+// ── NONMANUFACTURER RULE GATE (Brain card 132 — Step 4; the never-missed deterministic floor) ─────────────
+// The frequently-missed obligation: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING acquisition, an
+// offeror that does not itself manufacture the end item must (FAR 52.219-1 / 13 CFR 121.406) be small AND have
+// ≤500 employees AND supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505
+// / SBA class waiver applies. Most small firms fail the "supply a small-business manufacturer's product" prong
+// and lose the award. The product promise: we catch it EVERY TIME on a supply set-aside.
+//
+// PURE FACT-RULE (Rule 64) — fires off DETERMINISTIC scalar facts (SAM-resolved set-aside + NAICS sector), never
+// a model claim or a source regex (that would be the Part-15 trap). Sector is deterministic arithmetic off the
+// code's first two digits (31/32/33 manufacturing · 42 wholesale · 44/45 retail = the supply sectors; services /
+// construction → silent). NAICS absent → HONEST SILENCE (uploads carry null), never a guess.
+//
+// EMIT gate (like temporal_conflict): ADDS one finding, never removes/re-types. Disposition is card-132:
+// bidder_controls + cautionFloor → disposeFinding = gate_to_clear (NEVER a show-stopper, profile-INDEPENDENT),
+// floors a clean BID to BID_WITH_CAUTION in deriveVerdict; reached only after every disqualifying/human-review
+// branch, so it never downgrades a NO_BID/INELIGIBLE. NON-DUPLICATION: if an NMR finding (cites FAR 52.219-1, or
+// lens === "nonmanufacturer_rule") is already present, do NOT double-emit — the small-business-counsel lens's own
+// NMR analysis wins the slot. NMR (52.219-1) ≠ Limitations-on-Subcontracting (52.219-14), so a LoS finding never
+// blocks this and the two never false-merge. Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+// The audit row stores the SAM.gov set-aside CODE (e.g. "8A", "SBA", "HZC" — _view-model.ts:3078), NOT the
+// description, so the trigger must match CODES first. These are the SBA socioeconomic programs FAR 52.219-1
+// governs — total/partial SB · 8(a) · HUBZone · SDVOSB · WOSB/EDWOSB, incl. their sole-source variants.
+// DELIBERATELY EXCLUDED (open Brain-ruling — see card): NONE/full-&-open, Local-Area (LAS), and the Buy-Indian
+// programs (IEE/ISBEE), whose NMR applicability rides different authority. Conservative scope by construction.
+const NMR_SB_SETASIDE_CODES = new Set([
+  "SBA", "SBP",          // Total / Partial Small Business Set-Aside
+  "8A", "8AN",           // 8(a) Set-Aside / Sole Source
+  "HZC", "HZS",          // HUBZone Set-Aside / Sole Source
+  "SDVOSBC", "SDVOSBS",  // SDVOSB Set-Aside / Sole Source
+  "WOSB", "WOSBSS",      // WOSB Set-Aside / Sole Source
+  "EDWOSB", "EDWOSBSS",  // EDWOSB Set-Aside / Sole Source
+]);
+// Friendly-name fallback — for doc-text-extracted uploads or descriptive values (not the SAM code path).
+const NMR_SB_SETASIDE_RE = /total small business|partial small business|small business set.?aside|8\(a\)|hubzone|\bsdvosb\b|service.?disabled veteran|\bwosb\b|\bedwosb\b|women.?owned small/i;
+const NMR_SUPPLY_SECTORS = new Set(["31", "32", "33", "42", "44", "45"]);
+// A finding that ALREADY addresses the Nonmanufacturer Rule — by the gate's own lens, by an NMR-SPECIFIC
+// authority (52.219-1 · 13 CFR 121.406 · FAR 19.505 waiver), or by naming the rule in its requirement text.
+// Used for non-duplication so a small-business-counsel lens's own NMR analysis wins the slot. HARD CONSTRAINT:
+// never key on 52.219-6 (the set-aside NOTICE clause present on nearly every SB set-aside) — that would suppress
+// the floor on almost every audit, the false-negative that defeats "catch every time". 52.219-14 (Limitations on
+// Subcontracting) is a DISTINCT obligation and is intentionally NOT matched (52\.219-1 lookahead excludes -14).
+const NMR_ADDRESSED_RE = /52\.219-1(?!\d)|121\.406|\b19\.505\b/i;
+function addressesNmr(f: TypedFinding): boolean {
+  return f.lens === "nonmanufacturer_rule" || NMR_ADDRESSED_RE.test(f.citation) || /non-?manufacturer/i.test(f.requirement);
+}
+/** The two-digit NAICS sector iff the code is a real ≥2-digit numeric (a genuine SAM / SF-1449 Block-10 code).
+ *  null otherwise (absent / malformed) → the caller stays silent. Pure deterministic arithmetic, no lookup. */
+export function naicsSector(naics: string | null | undefined): string | null {
+  const m = (naics ?? "").trim().match(/^(\d{2})\d{0,4}$/);
+  return m ? m[1] : null;
+}
+/** Emit the NMR caution when (set-aside is a SB program) AND (NAICS is a supply/manufacturing sector). Pure →
+ *  gate-tested. Additive + floor-only; profile-independent (card 132). Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyNonmanufacturerRuleGate(
+  findings: TypedFinding[],
+  facts: { naics?: string | null; setAside?: string | null },
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                                          // Rule 61 default-off ⇒ byte-identical
+  const naics = (facts.naics ?? "").trim();
+  const sector = naicsSector(naics);
+  if (!sector || !NMR_SUPPLY_SECTORS.has(sector)) return findings;             // services/construction/absent NAICS → silent (honest)
+  const sa = (facts.setAside ?? "").trim();
+  const code = sa.toUpperCase().replace(/[^A-Z0-9]/g, "");                     // "8(a) Set-Aside" → "8ASETASIDE"; "8A" → "8A"
+  if (!sa || !(NMR_SB_SETASIDE_CODES.has(code) || NMR_SB_SETASIDE_RE.test(sa))) return findings; // not an SBA-program set-aside → NMR N/A (full-&-open / NONE / Indian / local-area → silent)
+  if (findings.some(addressesNmr)) return findings; // non-duplication — a lens NMR analysis (under ANY NMR authority) wins the slot; 52.219-6/-14 never suppress it
+  const nmr: TypedFinding = {
+    requirement: `Nonmanufacturer Rule (FAR 52.219-1): this ${sa} is a supply acquisition under NAICS ${naics} (sector ${sector}). If your firm does NOT manufacture the end item, to be eligible you must (1) be small under the size standard, (2) have no more than 500 employees, and (3) supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505 / SBA class waiver applies. Confirm your manufacturing status and, if a nonmanufacturer, all three prongs before relying on award eligibility.`,
+    citation: "FAR 52.219-1",
+    excerpt: `NAICS ${naics} · set-aside "${sa}" (deterministic SAM-resolved facts — supply sector ${sector})`,
+    kind: "submission",
+    controllability: "bidder_controls",
+    cautionFloor: true,
+    grounded: true,
+    lens: "nonmanufacturer_rule",
+  };
+  return [...findings, nmr];
+}
+
+// ── KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135 — Step 5a; verified clause→disposition map) ──────────────
+// CAP-ONLY guard keyed on the finding's OWN `citation` field (Rule-64 grounded; exact clause-number match with
+// digit-boundary lookarounds — NOT a fullSource keyword scan, which would be the surface-keyword trap). For a
+// SMALL set of clauses whose legal meaning is SETTLED (a clause-level fact, not a solicitation-specific
+// adjudication), a lens that mis-types the clause as a bar/eligibility show-stopper is corrected to the clause's
+// true disposition. CAPS ONLY — never elevates; acts ONLY on a finding currently typed as a bar
+// (bidder_cannot_move / no_one_can_move / eligibility_bar); a finding already bidder_controls/met is untouched.
+// Runs BEFORE the structural-bar whitelist so for THESE verified clauses the precise map is AUTHORITATIVE over
+// the whitelist's generic fail-safe. Exact-match discipline: 52.204-7 ≠ 52.204-8/-13; 52.246-15 ≠ 52.246-2/-23;
+// 252.204-7xxx (DFARS) never matches. Map structured to EXTEND later (new entries gate on the same verification
+// bar). Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
+//
+// VERIFIED ENTRIES (exactly two):
+//   52.204-7  System for Award Management — a CURABLE administrative prerequisite (any firm can register in SAM);
+//             never an eligibility bar → bidder_controls + curable caution ("confirm active SAM registration…").
+//   52.246-15 Certificate of Conformance — a quality/inspection ACCEPTANCE mechanism (FAR 46.315 / 46.504),
+//             contractor-favorable, NOT a proposal/eligibility gate → cleared to a NON-BLOCKING bidder_controls.
+// A finding that currently BLOCKS — i.e. disposeFinding(f) === "disqualifying". Keyed on controllability ONLY:
+// kind "eligibility_bar" is NOT sufficient, because an eligibility_bar that is already_satisfied (met) or
+// bidder_controls (gate-to-clear) is NOT a bar — capping it would downgrade a clean verdict (cap-only violation).
+const clauseIsBar = (f: TypedFinding): boolean =>
+  f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move";
+const CLAUSE_SEMANTICS: ReadonlyArray<{ re: RegExp; apply: (f: TypedFinding) => TypedFinding }> = [
+  { re: /(?<!\d)52\.204-7(?!\d)/, apply: (f) => ({
+      ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, kind: "submission",
+      requiredAttribute: undefined,
+      requirement: /confirm active sam registration/i.test(f.requirement)
+        ? f.requirement
+        : `${f.requirement} — confirm active SAM registration at offer submission and at award`,
+      clauseSemanticsGuard: true }) },
+  { re: /(?<!\d)52\.246-15(?!\d)/, apply: (f) => ({
+      ...f, controllability: "bidder_controls", curableInWindow: true, kind: "submission",
+      requiredAttribute: undefined, clauseSemanticsGuard: true }) },
+];
+/** Re-type a bar-mis-typed known clause to its settled disposition (Brain card 135). Pure → gate-tested. CAP-ONLY
+ *  (never elevates a non-bar); exact citation match only. Flag-gated; OFF (default) ⇒ findings unchanged. */
+export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings;                                          // Rule 61 default-off ⇒ byte-identical
+  return findings.map((f): TypedFinding => {
+    for (const c of CLAUSE_SEMANTICS) {
+      if (!c.re.test(f.citation)) continue;
+      return clauseIsBar(f) ? c.apply(f) : f;                                   // cap-only: never re-type a non-bar
+    }
     return f;
   });
 }
@@ -328,16 +507,157 @@ export function parseDays(excerpt: string): number | null {
   return vals.length ? Math.min(...vals) : null;
 }
 
+// ── Step 7 (Brain card 140/141) ANCHORED-DURATION parsing — the Step-2 `parseDays` global-MIN is unsafe for the
+// Option-B arithmetic prong: an incidental smaller day-count (a shipment-notice sub-deadline, a first-article
+// SAMPLE due-date, another CLIN's window) poisons the delivery window into a FALSE impossibility. These helpers
+// pin each duration to its GOVERNING anchor by proximity, so the arithmetic compares the gate duration to the
+// DELIVERY window — not two unrelated numbers. Pure. (Used ONLY by Option B; the legacy path keeps parseDays.)
+/** Every day-count (digit, parenthetical, spelled) with its source offset — so a duration can be matched to its
+ *  governing phrase by proximity rather than a blind global min. Pure. */
+function dayCountsWithPos(excerpt: string): Array<{ v: number; i: number }> {
+  const out: Array<{ v: number; i: number }> = [];
+  for (const m of excerpt.matchAll(/\(\s*(\d{1,3})\s*\)\s*(?:calendar\s+|business\s+|working\s+)?days?/gi)) out.push({ v: parseInt(m[1], 10), i: m.index ?? 0 });
+  for (const m of excerpt.matchAll(/\b(\d{1,3})\s*(?:calendar\s+|business\s+|working\s+)?days?\b/gi)) out.push({ v: parseInt(m[1], 10), i: m.index ?? 0 });
+  for (const m of excerpt.matchAll(/\b(ten|fifteen|twenty-five|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|one hundred)\b\s*(?:\(\s*\d{1,3}\s*\)\s*)?(?:calendar\s+|business\s+|working\s+)?days?/gi)) out.push({ v: SPELLED_DAYS[m[1].toLowerCase()], i: m.index ?? 0 });
+  return out;
+}
+const NEAR = 40; // chars: a duration is "governed by" an anchor when within NEAR of it
+// Window identification — POSITIVE UNIQUENESS (card 141 rounds 2-4). FOUR rounds of adversarial review each found a
+// FALSE NO_BID where a SMALL incidental sub-deadline (shipment/inspection notice, first-article sample due-date,
+// CDRL/plan data-item, another CLIN's window) was mistaken for the production-delivery window while the REAL (larger)
+// window was unparsed ("120-day", "16 weeks", "four months") or anchor-detached in a flattened §F table. A denylist of
+// "notice-type" phrasings is open-ended (round-4 broke it with a non-notice "deliver the Plan" verb). ROOT FIX: stop
+// guessing WHICH duration is the window — fire ONLY when the delivery excerpt carries exactly ONE distinct unvoided
+// duration SIGNAL of any kind. Any second distinct duration (parsed-days, weeks, months, hyphenated-day) ⇒ the window
+// is unprovable ⇒ CAUTION ("PROVEN arithmetic — never estimate"). Explicitly VOIDED/superseded alternates are removed
+// first (a "base 90-day / 8-month" term struck by "SUPERSEDES and VOIDS"); a bare "base period" is NOT treated as
+// voided (round-4: that wrongly dropped a legitimate PoP window). prong1 separately requires the window be order-anchored.
+// ANY non-day time unit (weeks/months/years/quarters) or recurrence (annual/quarterly/per-period) — a window the
+// day-parser can't compare to a gate in days ⇒ unprovable window ⇒ CAUTION (round-5: year/annual/quarterly were the
+// missing units). Days require a HYPHEN here ("30-day") since bare "N days" is already covered by dayCountsWithPos.
+const UNPARSED_DUR_G = /\b\d{1,3}\s*-\s*(?:days?|weeks?|months?|years?|quarters?)\b|\b\d{1,3}\s+(?:weeks?|months?|years?|quarters?)\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:weeks?|months?|years?|quarters?)\b|\bannual(?:ly)?\b|\bsemi-?annual(?:ly)?\b|\bbiannual(?:ly)?\b|\bquarterly\b|\bper\s+(?:year|quarter|annum|month|week)\b/gi;
+const VOIDED_G = /supersede\w*|voids?|hereby\s+(?:deleted|replaced|struck)|is\s+replaced|no\s+longer\s+(?:applies|applicable|in\s+effect)/gi; // EXPLICIT supersession only — never a bare "base period"
+// SUB-DEADLINE words: a day-count co-located with these is NOT the production window — it's a notice/sample/data-item
+// deadline (round-4/6: the recurring false-NO_BID cause was a small sub-deadline mistaken for the window).
+const SUBDEADLINE_G = /notice|advance|inspection|sample|\bplan\b|\bCDRL\b|data\s+item|\breport\b|submit|prior\s+to\s+each|kick[\s-]?off|readiness|first[\s-]?article|first\s+lot|\blot\s+\d|initial\s+deliver|interim|increment|partial\s+shipment|prototype|pre-?production|demonstration\s+unit|mobiliz/gi;
+// Competing NON-DAY window FORMS (round-6): the real window stated as a calendar date / fiscal year / ordering or
+// option period / attachment reference / unit-less ARO number — none parse as a day-count, so their presence (next
+// to a lone small day-count) means the window is unprovable ⇒ CAUTION. NOT an estimate — a refusal to guess.
+const NONDAY_WINDOW_G = /\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\bFY\s?\d{2,4}\b|\bfiscal\s+year\b|period\s+of\s+performance|\bordering\s+period\b|\boption\s+period\b|throughout\s+the\b[^.]{0,30}\bperiod\b|in\s+accordance\s+with[^.]{0,40}attachment|delivery\s+schedule\s+in\s+(?:attachment|exhibit)|see\s+(?:attachment|exhibit)|\b\d{1,3}\s+(?:ARO\b|after\s+receipt\s+of\s+order)|contract\s+completion|contract\s+end|\bperformance\s+period\b|required\s+delivery\s+date|\bRDD\b|project\s+completion|\bmonth\s+\d{1,2}\b|master\s+production\s+schedule|\bby\s+20\d{2}\b/gi;
+function indicesOf(excerpt: string, reG: RegExp): number[] { const o: number[] = []; for (const m of excerpt.matchAll(reG)) o.push(m.index ?? 0); return o; }
+/** The DELIVERY-WINDOW duration — or null (⇒ CAUTION) unless the window is UNAMBIGUOUS. Fire only when: exactly ONE
+ *  distinct unvoided, NON-sub-deadline parsed day-value remains, AND there is NO competing duration the parser can't
+ *  compare (weeks/months/years/quarters/annual) AND NO competing non-day window FORM (calendar date / FY / period /
+ *  attachment / unit-less-ARO number). Any competing signal ⇒ the real window may be the one we can't read ⇒ CAUTION.
+ *  This is the ROOT fix after 6 adversarial rounds: never trust a lone small day-count as the production window. Pure. */
+function deliveryWindowDays(excerpt: string): number | null {
+  const voided = indicesOf(excerpt, VOIDED_G), subdl = indicesOf(excerpt, SUBDEADLINE_G);
+  const isVoided = (i: number) => voided.some((v) => Math.abs(v - i) <= 60);
+  const isSubdeadline = (i: number) => subdl.some((s) => Math.abs(s - i) <= NEAR);
+  const dayVals = new Set<number>();
+  for (const c of dayCountsWithPos(excerpt)) if (!isVoided(c.i) && !isSubdeadline(c.i)) dayVals.add(c.v);
+  for (const m of excerpt.matchAll(UNPARSED_DUR_G)) {                  // a competing duration the day-parser can't compare ⇒ unprovable window
+    const i = m.index ?? 0; if (isVoided(i)) continue;
+    const num = m[0].match(/\d{1,3}/);
+    if (/day/i.test(m[0]) && num != null && dayVals.has(parseInt(num[0], 10))) continue; // hyphenated restatement of an existing day window (e.g. "30-day")
+    return null;
+  }
+  for (const m of excerpt.matchAll(NONDAY_WINDOW_G)) if (!isVoided(m.index ?? 0)) return null; // a non-day window FORM competes ⇒ unprovable ⇒ CAUTION
+  return dayVals.size === 1 ? [...dayVals][0] : null;
+}
+/** The GATE duration: the day-count co-located (±NEAR) with gate/testing language. Fire only when UNAMBIGUOUS =
+ *  exactly ONE distinct gate-anchored value (so an unrelated number near a gate word — a field-evaluation period,
+ *  a quantity — cannot OVER-state the gate via MAX and cause a FALSE fire; multiple distinct ⇒ CAUTION). Anchored
+ *  (not global) so a warranty/sub-step duration elsewhere in the excerpt is ignored. null ⇒ CAUTION. Pure. */
+function gateDays(excerpt: string): number | null {
+  const anchors: number[] = [];
+  // Gate anchors are TESTING-specific. Bare "evaluat*" was DROPPED (round-5: a source-selection "evaluation period
+  // is ninety (90) days" was admitted as a phantom gate) — only first-article/test evaluation counts.
+  for (const m of excerpt.matchAll(/requires?|conduct|testing|to\s+complete|to\s+process|government\s+testing|approval\s+notice|first\s+article\s+(?:approval|evaluat\w*|test)/gi)) anchors.push(m.index ?? 0);
+  const vals = new Set<number>();
+  for (const c of dayCountsWithPos(excerpt)) if (anchors.some((a) => Math.abs(a - c.i) <= NEAR)) vals.add(c.v);
+  return vals.size === 1 ? [...vals][0] : null;
+}
+/** CLIN / line-item tokens named in an excerpt (for the same-deliverable guard). Pure. */
+function clinSet(excerpt: string): Set<string> {
+  const s = new Set<string>();
+  for (const m of excerpt.matchAll(/\b(?:CLIN|SUBCLIN|line\s+item|item)\s*#?\s*([A-Z]?\d{2,4})\b/gi)) s.add(m[1].toUpperCase());
+  return s;
+}
+
 /** Emit a `no_one_can_move` show-stopper when a NON-WAIVABLE FAT precondition's minimum duration EXCEEDS the
  *  delivery window (Brain card 81 Step 2). FLOOR-of-severity guard: only fires on a non-waivable precondition
  *  (a waivable one isn't universal — the CO could waive it). Adds a finding; never removes/downgrades. Pure.
  *  Default-OFF. */
 const NONWAIVABLE_RE = /\bnon-?waivable\b|shall not (?:waive|authorize|approve)|may not be waived|\bmandatory\b|must (?:complete|elapse|first)/i;
-export function applyTemporalConflict(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+// ── Step 7 (Brain card 140, AUDIT_TEMPORAL_SHARED_ARO) — OPTION B order-referenced SEQUENTIAL-GATE narrowing ──
+// The Step-2 universal-impossibility (no_one_can_move → NO_BID) is doctrinally correct ONLY for a genuine
+// ORDER-REFERENCED sequential gate — NOT for a relative-scheduling term ("N days before delivery", a bidder-side
+// schedule) nor for an unproven duration. The gold #6 source (FA860126Q00260001) proves a literal "both share an
+// ARO token" test is WRONG: its delivery (F.2) is ARO-anchored but its FAT gate (F.1) is anchored to "receipt of
+// the first article unit" (a post-order event, no ARO token) — yet it IS a genuine universal impossibility. What
+// makes it universal is a non-waivable POST-ORDER gate whose duration is foreclosed against delivery and exceeds
+// the window. So Option B fires no_one_can_move ONLY when ALL FOUR prongs hold; else KO-clarify CAUTION
+// (cautionFloor on the FAT finding), never NO_BID. Default-OFF flag ⇒ legacy Step-2 path (byte-identical to 63e777f).
+// Prong 3 — explicit NON-WAIVER (bare \bmandatory\b DROPPED: force/obligation ≠ immovability). Semantic class:
+// genuine non-waiver synonyms (cannot/will-not/may-not be waived, waiver not permitted) so realistic phrasings
+// aren't false-softened. Whitespace is \s+ (pdftotext breaks fixed phrases across newlines).
+const NONWAIVABLE_TIGHT_RE = /\bnon-?waivable\b|shall\s+not\s+(?:waive|authorize|approve)|(?:may|will|can|shall)\s*not\s+be\s+waived|cannot\s+be\s+waived|waiver\s+(?:is\s+not\s+permitted|will\s+not\s+be\s+(?:granted|permitted))|not\s+subject\s+to\s+waiver|must\s+(?:complete|elapse|first)/i;
+// Prong 1 — the DELIVERY window is order-anchored (fixed start ⇒ a window identical for all offerors). Semantic
+// order-anchor class. NOTE (card 141): the upstream highSignalSweep grounds `delivery_window` ONLY on an ARO-class
+// token, so non-ARO order anchors here are forward-compatible (not yet reachable until the sweep is broadened).
+const DELIVERY_ORDER_ANCHOR_RE = /\bARO\b|after\s+receipt\s+of\s+(?:order|award)|(?:after|from)\s+(?:the\s+)?(?:date\s+of\s+)?(?:contract\s+)?award|(?:after|from)\s+issuance\s+of\s+(?:the\s+)?(?:task\s+|delivery\s+)?order|after\s+(?:the\s+)?effective\s+date\s+of\s+the\s+contract|after\s+notice\s+to\s+proceed|\bNTP\b/i;
+// Prong 2a — the gate duration is measured from a POST-ORDER event (Government-side, not bidder-schedulable).
+// Semantic class: receipt/acceptance/approval of a first article/sample, OR any order/award/NTP/commencement anchor.
+// "government acceptance/approval" is REQUIRED to be OF a first article / sample (round-2 B-1: bare "Government
+// approval of the invoice" is a payment term, NOT a post-order gate). FAR-canonical notification/return synonyms
+// added (round-2 A-2). `\bARO\b`/after-receipt-of-order remain — the upstream sweep grounds fat_precondition ONLY
+// on a first-article clause (FAT_RE), so the gate is inherently Government-conducted, not bidder-internal.
+const POST_ORDER_GATE_ANCHOR_RE = /receipt\s+of\s+(?:the\s+)?(?:first\s+article|first\s+production|production\s+sample|test\s+sample)|government'?s?\s+(?:receipt|(?:written\s+)?notification)|government\s+(?:acceptance|approval)\s+of\s+(?:the\s+)?(?:first\s+article|first\s+production|production\s+sample|test\s+sample)|acceptance\s+of\s+the\s+(?:first\s+article|test\s+sample)|return\s+of\s+the\s+approved\s+first\s+article|after\s+receipt\s+of\s+(?:order|award)|(?:after|from)\s+(?:the\s+)?(?:date\s+of\s+)?(?:contract\s+)?award|issuance\s+of\s+(?:the\s+)?(?:task\s+|delivery\s+)?order|notice\s+to\s+proceed|\bNTP\b|effective\s+date\s+of\s+the\s+contract|contract\s+commencement|\bARO\b/i;
+// Prong 2b — delivery is explicitly FORECLOSED until the gate closes (sequential, NOT a parallel/relative schedule).
+// Semantic foreclosure class: prohibition / contingency / condition-precedent / withheld-until family. Each `[^.]{0,80}`
+// gap is bounded to one sentence (no cross-sentence spurious match; also bounds backtracking). Round-2 fixes: the
+// foreclosure object is DELIVER/SHIP only — NOT bare "produc" (B-2: "no production delays before…" is benign) — and
+// the actor-agnostic "delivery … shall not … until" alt is DROPPED (B-3: it matched bidder-controlled scheduling).
+const DELIVERY_FORECLOSE_RE = /\bno\b[^.]{0,80}\b(?:deliver|ship)[^.]{0,80}\b(?:before|until|prior)\b|(?:shall|may|will)\s+not[^.]{0,80}(?:authorize|approve|ship|deliver)[^.]{0,80}\buntil\b|until\s+first\s+article\s+approval|condition\s+precedent\s+to\s+(?:delivery|shipment)|contingent\s+upon[^.]{0,80}approval|(?:prohibited|not\s+permitted)\s+(?:prior\s+to|before|until)[^.]{0,80}approval|withheld\s+until[^.]{0,80}approval/i;
+export function applyTemporalConflict(findings: TypedFinding[], opts?: { enabled?: boolean; sharedAroGate?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ unchanged
   const fat = findings.find((f) => f.sweepArchetype === "fat_precondition");
   const delivery = findings.find((f) => f.sweepArchetype === "delivery_window");
   if (!fat || !delivery) return findings;
+
+  if (opts.sharedAroGate) {
+    // ── OPTION B (Brain card 140/141, AUDIT_TEMPORAL_SHARED_ARO) — fire NO_BID only on a PROVEN sequential gate ──
+    const gDays = gateDays(fat.excerpt), winDays = deliveryWindowDays(delivery.excerpt);              // ANCHORED durations (no global-min poisoning)
+    const prong1 = DELIVERY_ORDER_ANCHOR_RE.test(delivery.excerpt);                                   // delivery is order-anchored
+    const prong2 = POST_ORDER_GATE_ANCHOR_RE.test(fat.excerpt) && DELIVERY_FORECLOSE_RE.test(fat.excerpt); // post-order gate + delivery foreclosure (rejects relative scheduling)
+    const prong3 = NONWAIVABLE_TIGHT_RE.test(fat.excerpt);                                            // explicit non-waiver (mandatory-only is NOT enough)
+    const prong4 = gDays != null && winDays != null && gDays > winDays;                               // PROVEN arithmetic on anchored durations (never estimate)
+    // same-deliverable guard: if BOTH excerpts name CLIN/line items and the sets are DISJOINT, the gate and the
+    // window concern DIFFERENT deliverables ⇒ not a universal impossibility for either ⇒ do not fire (→ CAUTION).
+    const fatClins = clinSet(fat.excerpt), delClins = clinSet(delivery.excerpt);
+    const crossDeliverable = fatClins.size > 0 && delClins.size > 0 && ![...fatClins].some((c) => delClins.has(c));
+    if (prong1 && prong2 && prong3 && prong4 && !crossDeliverable) {
+      // OPTION 1 (Brain card 141 ruling): the temporal arm NEVER escalates to NO_BID — deterministic identification
+      // of the production-delivery window from messy §F text is open-ended (7 adversarial rounds), so a false NO_BID
+      // is a structural risk and NO_BID stays reserved for cleanly-named hard gates. The four-prong trigger now routes
+      // to a HIGH-confidence KO-clarify CAUTION (bidder_controls + cautionFloor) — surfacing the tension, never asserting
+      // universal impossibility. deriveVerdict floors this to BID_WITH_CAUTION; it can never produce NO_BID/INELIGIBLE.
+      const caution: TypedFinding = {
+        requirement: `Likely universally unmeetable delivery schedule — CONFIRM the binding production window against the non-waivable First Article gate before bidding: a non-waivable, order-referenced FAT precondition (min ~${gDays} days, measured from a post-order event and foreclosing delivery until it closes) appears to exceed the production delivery window (~${winDays} days ARO).`,
+        citation: `${fat.citation} + ${delivery.citation} (cross-clause temporal conflict)`,
+        excerpt: fat.excerpt, // verbatim-grounded binding term (the FAT clause)
+        kind: "technical_spec", controllability: "bidder_controls", curableInWindow: true,
+        cautionFloor: true, temporalSharedAroGuard: true, grounded: true, lens: "temporal_conflict",
+      };
+      return [...findings, caution];
+    }
+    // Any prong fails / ambiguous arithmetic / cross-deliverable ⇒ a temporal tension is present but NOT proven →
+    // KO-clarify CAUTION (cautionFloor on the FAT finding), NEVER no_one_can_move/NO_BID.
+    return findings.map((f) => (f === fat ? { ...f, cautionFloor: true, temporalSharedAroGuard: true } : f));
+  }
+
+  // ── legacy Step-2 path (flag OFF) — byte-identical to 63e777f ──
   if (!NONWAIVABLE_RE.test(fat.excerpt)) return findings;                 // waivable precondition ⇒ not universal
   const fatDays = parseDays(fat.excerpt), winDays = parseDays(delivery.excerpt);
   if (fatDays == null || winDays == null || fatDays <= winDays) return findings; // no conflict
@@ -423,8 +743,32 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   return "fails";
 }
 
-const mk = (verdict: Verdict, eligible: boolean, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
+const mk = (verdict: Verdict, eligible: boolean | null, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
   ({ verdict, eligible, reason, dispositions, showStoppers });
+
+// Doctrine #6 (Brain card 125) — an honest-fail verdict (INCOMPLETE / verifier-unsound NHR) must NOT assert
+// eligible:false; "false" is an affirmative ineligibility claim and is itself false when the truth is
+// "undetermined." Flag DEFAULT-OFF (=== "true"): ON → null ("not determined"); OFF → false, byte-identical to
+// pre-flag behavior. A TRUE firm-credential bar (INELIGIBLE) always emits false and is NOT routed through here.
+const honestFailEligible = (): boolean | null =>
+  process.env.AUDIT_ELIGIBLE_TRISTATE === "true" ? null : false;
+
+// Doctrine #2 (Brain card 125) — VERDICT-WORD INVARIANT (defensive backstop). INELIGIBLE asserts a FIRM-
+// credential failure; it may stand ONLY when a real eligibility_bar show-stopper exists. A requirement-side
+// impossibility (sole-source / brand-name-or-equal / universal supply) must route to NO_BID / NHR, never wear
+// the credential label. Default-OFF (=== "true"). At the natural anchor the rule is tautologically satisfied
+// (elig is derived from the same predicate); the value is catching a FUTURE refactor or any OTHER path that
+// emits eligible:false. Exported for a $0 unit-proof against a crafted violation.
+export function enforceVerdictWordInvariant(d: Decision): Decision {
+  if (process.env.AUDIT_VERDICT_WORD_INVARIANT !== "true") return d;  // flag OFF → invariant does not run (byte-identical)
+  if (d.eligible === false && !d.showStoppers.some((s) => s.kind === "eligibility_bar")) {
+    if (process.env.NODE_ENV !== "production")
+      throw new Error("invariant_violation:ineligible_without_eligibility_bar");  // dev/test: loud — catches the refactor
+    // Production must NEVER crash a customer audit — refuse the INELIGIBLE label, route to human review.
+    return { ...d, verdict: "NEEDS_HUMAN_REVIEW", eligible: null, reason: "invariant_violation:ineligible_without_eligibility_bar" };
+  }
+  return d;
+}
 
 /** Derive the verdict deterministically from typed grounded findings. The LLM experts supply the FACTS
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
@@ -435,11 +779,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
   if (!inp.coverageComplete)
-    return mk("INCOMPLETE", false, "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
-    return mk("NEEDS_HUMAN_REVIEW", false, "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
 
   // 3. Show-stoppers → the only NO_BID / INELIGIBLE drivers. Two kinds (Brain card-45 typing guard):
   //    (a) UNIVERSAL impossibilities (no_one_can_move) — disqualify EVERY bidder regardless of profile, so
@@ -452,8 +796,8 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const showStoppers = [...universal, ...provenFails];
   if (showStoppers.length) {
     const elig = !showStoppers.some((s) => s.kind === "eligibility_bar");
-    return mk(elig ? "NO_BID" : "INELIGIBLE", elig,
-      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
+    return enforceVerdictWordInvariant(mk(elig ? "NO_BID" : "INELIGIBLE", elig,
+      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers));
   }
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
@@ -498,7 +842,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const residual = unknownBars.filter((f) => f.curableInWindow === true);
   const floored = dispositions.filter((f) => f.cautionFloor === true);
   if (residual.length || floored.length) {
-    if (manifestIncomplete) return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
+    if (manifestIncomplete) return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'caution' (no-bar) verdict cannot stand on an incomplete read.", dispositions, []);
     const reasons = [
       residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
       floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
@@ -509,6 +853,6 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
   //    was incomplete (then we cannot assert "no bar found").
   if (manifestIncomplete)
-    return mk("INCOMPLETE", false, "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
   return mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);
 }

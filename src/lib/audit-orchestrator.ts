@@ -13,8 +13,8 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, type Decision } from "./audit-decide";
+import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -41,6 +41,12 @@ export interface OrchestratorInput {
   // heuristic. false → caps a no-bar BID/CAUTION to INCOMPLETE (asymmetry). Default/absent
   // = true (no external constraint → rely on the heuristic alone, unchanged behavior).
   manifestComplete?: boolean;
+  // Step 4a (plumb-only) — SAM-resolved scalar FACTS carried into the gate-pipeline scope so a
+  // future deterministic gate (Step 4: Nonmanufacturer Rule) can read them WITHOUT regexing source
+  // (Rule 64: fact, never AI-derived). Absent → null (honest silence; uploads have no SAM NAICS).
+  // NOTHING reads these yet — adding them changes no verdict (a data plumb that moves a verdict is a bug).
+  naics?: string | null;
+  setAside?: string | null;
 }
 
 export interface AuditResult {
@@ -68,6 +74,24 @@ export function manifestComplete(ctx: AuditToolContext): boolean {
   let maxPages = 0;
   for (const m of ctx.fullSource.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) maxPages = Math.max(maxPages, parseInt(m[1], 10));
   return !(maxPages * 1000 > ctx.fullSource.length); // a single named attachment can't exceed the whole source → unfetched
+}
+
+/** Format-aware CORE-section honest-fail (fail-safe #10 — Brain card 135, Step 8). Part-15 UCF: any of §C/§L/§M
+ *  absent → cap (UNCHANGED). Part-12 commercial (SF-1449/SF-18/combined-synopsis): the core EQUIVALENTS are the
+ *  instructions (52.212-1 ≡ §L) and the evaluation / basis-for-award (52.212-2 ≡ §M); cap ONLY when BOTH are
+ *  absent (a single missing one is plausibly inline/by-reference — no false scare). The commercial path is
+ *  flag-gated via `commercialHonestFail`; OFF ⇒ commercial returns [] (today's free pass, byte-identical).
+ *  procurementPart(ctx) is the SINGLE deterministic format source — this EXTENDS fail-safe #10, never a parallel
+ *  surface. Pure → $0 gate-testable with a fullSource string. Commercial "changes WHAT counts as core, not
+ *  WHETHER a core set is required" — honest-fail preserved both ways. */
+export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestFail?: boolean }): string[] {
+  const part = procurementPart(ctx);
+  if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !readSection(ctx, k).present);
+  if (opts?.commercialHonestFail && part === "part12-commercial")
+    // Label the disclosure by the COMMERCIAL clause numbers (not §L/§M) so the gap reads honestly. Cap fires
+    // ONLY when BOTH are absent — a single one missing is plausibly inline/by-reference (no false scare).
+    return (!readSection(ctx, "L").present && !readSection(ctx, "M").present) ? ["52.212-1", "52.212-2"] : [];
+  return [];
 }
 
 /** P3 — dedup identical findings across lenses, preserving the first seen. The key INCLUDES controllability:
@@ -115,13 +139,45 @@ function groundedBy(obligation: string, findings: TypedFinding[]): string[] {
  *       ELSEWHERE by a verbatim n-gram match, with the specific finding IDs cited (silence ≠ coverage);
  *       a read section that carries no obligation sentence is covered (genuinely thin).
  *  Returns per-section attestations so the trace can be adjudicated (thin vs miss) before BID is accepted. */
-export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
+// 5b §M evaluation-DEPTH tokens (Brain card 137) — a genuine award BASIS carries at least one of these. Two
+// non-criteria text sources must NOT satisfy the check: (a) the §M TITLE ("…EVALUATION FACTORS FOR AWARD") that
+// readSection includes — so the literal "evaluation factor(s)" is excluded; (b) TRAILING content — §M is the last
+// UCF section so its text bleeds to EOF, dragging in appended attachments. So bare generic words ("acceptable",
+// "weight", "past performance") are excluded — only award-BASIS-specific phrases remain, which a wage determination
+// or past-performance form won't carry. The scan is ALSO region-bounded (criteria sit right under the heading).
+const EVAL_FACTOR_RE = /\bLPTA\b|lowest[\s-]priced|technically\s+acceptable|best\s+(?:overall\s+)?value|greatest\s+(?:overall\s+)?value|\btrade[\s-]?off|highest[\s-]?rated/i;
+// §M is the LAST UCF section, so readSection("M").text bleeds to EOF, dragging in appended attachments. Delimit the
+// real CRITERIA region: lines under the heading up to the first document-structure boundary. Both the token check
+// AND the thinness check run on THIS — so a trailing past-performance/wage attachment can neither satisfy the token
+// check nor inflate the word count (which would otherwise defeat the "thin" condition). Heuristic; "thin" = a small
+// word count. Mechanism is deliberately simple — final calibration deferred to the regen/re-panel stage (card 137).
+const M_BOUNDARY_RE = /^\s*(?:ATTACHMENT|EXHIBIT|APPENDIX|ANNEX|ADDENDUM|WAGE\s+DETERMINATION|PAST\s+PERFORMANCE\s+QUESTIONNAIRE|SECTION\s+[A-Z]\b)/i;
+function sectionMCriteria(text: string): string {
+  const lines = text.split("\n"); const out: string[] = [];
+  for (let i = 1; i < lines.length; i++) { if (M_BOUNDARY_RE.test(lines[i])) break; out.push(lines[i]); }
+  return out.join("\n").slice(0, 2000);
+}
+const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).length < 12;
+
+export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
   for (const sec of required) {
     const text = readSection(ctx, sec).text; const nText = norm(text);
     if (!sectionsRead.has(sec)) { attestations.push({ section: sec, status: "unread", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
     const direct = findings.filter((f) => f.excerpt && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
+    // 5b §M DEPTH — REFINED (Brain card 137 ruling), flag-gated, §M ONLY (never §L/§C or the coreMissing path).
+    // Fire "not evaluated" ONLY when ALL THREE hold: (1) NO direct grounded finding (the covered_direct check
+    // above already returned for that case), (2) NO award-basis token in the criteria region, AND (3) the criteria
+    // region is genuinely THIN (a stub). So a POPULATED non-token §M (weighted/adjectival) is NOT flagged
+    // (condition 3 fails) — false-negative closed. Both checks run on the boundary-delimited criteria region, so a
+    // trailing attachment can neither false-PASS (token) nor inflate the word count (thin). OFF ⇒ identical.
+    if (opts?.sectionMDepth && sec === "M") {
+      const crit = sectionMCriteria(text);
+      if (!EVAL_FACTOR_RE.test(crit) && isThin(crit)) {
+        attestations.push({ section: sec, status: "obligations_ungrounded", obligations: ["evaluation criteria not found / not evaluated"], citedFindingIds: [], ungrounded: ["evaluation criteria not found / not evaluated"] }); continue;
+      }
+    }
     const obligations = obligationsOf(text);
     if (!obligations.length) { attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
     const cited = new Set<string>(); const ungrounded: string[] = [];
@@ -178,7 +234,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //         to disable.
   if (process.env.AUDIT_TEMPORAL_CONFLICT !== "false") {
     const before = findings.length;
-    findings = applyTemporalConflict(findings, { enabled: true });
+    findings = applyTemporalConflict(findings, { enabled: true, sharedAroGate: process.env.AUDIT_TEMPORAL_SHARED_ARO === "true" }); // Step 7 (Brain card 140): default-OFF order-referenced sequential-gate narrowing
     if (findings.length > before) { findings[findings.length - 1].id = "temporal_conflict#0"; perLens["temporal_conflict"] = 1; }
   }
 
@@ -193,23 +249,23 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
-  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
+  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true" });
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
 
-  // CORE-PRESENCE (panel blocker): buildManifest/`required` only contains sections
-  // DETECTED PRESENT, so a genuinely-absent §C/§L/§M never appears in `missing` and
-  // an unanalyzed core section could render a clean BID. Disclose the absent core
-  // sections so the report can flag them — but ONLY for negotiated full-UCF
-  // procurements, where C/L/M are mandatorily SEPARATE sections and an absent one is
-  // genuinely anomalous. Commercial (SF-1449) / simplified (SF-18) / combined-synopsis
-  // RFQs state specs + 52.212-1/-2 INLINE or by reference, so an absent SEPARATE
-  // section there is EXPECTED — flagging it would be a false "missing section" scare
-  // (re-panel finding). For those formats the document-reconciliation banner + the
-  // engine's grounded findings are the safety net. Disclosure only; verdict unchanged.
-  const CORE_SECTIONS = ["C", "L", "M"];
-  const coreMissing = detectFormat(ctx) === "UCF"
-    ? CORE_SECTIONS.filter((k) => !readSection(ctx, k).present)
-    : [];
+  // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
+  // PRESENT, so a genuinely-absent core section never appears in `missing` and an unanalyzed one could render a
+  // clean BID. coreMissingFor discloses absent core sections FORMAT-AWARELY off procurementPart (the single
+  // deterministic source — Step 8): Part-15 UCF → §C/§L/§M (unchanged); Part-12 commercial → honest-fail ONLY if
+  // BOTH the 52.212-1≡§L instructions AND the 52.212-2≡§M evaluation are absent (flag-gated; off ⇒ commercial
+  // unchanged = today's free pass). Disclosure only; verdict unchanged except the manifest cap below.
+  const coreMissing = coreMissingFor(ctx, { commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" });
+
+  // P4.2b — OR-EQUAL CARVE-OUT (Brain card 139, Step 6), default-OFF (=== "true"). Runs FIRST among the re-typing
+  //      gates: a "brand name OR EQUAL" / salient-characteristics bar (mis-typed structural via bare "brand name")
+  //      → bidder_controls + cautionFloor (furnish an approved equal). A co-stated restrictive qualifier (only /
+  //      no substitution / sole source) VETOES it → stays a bar. Once re-typed, every downstream structural gate
+  //      and firmStatus skips it. NEVER touches a non-brand-name bar (QPL/clearance). Flag off ⇒ unchanged.
+  findings = applyOrEqualCarveout(findings, { enabled: process.env.AUDIT_OREQUAL_CARVEOUT === "true" });
 
   // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108), default-OFF (Rule 61). Re-types an award-basis /
   //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (the award basis is never a
@@ -217,6 +273,33 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
   //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
   findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false" });
+
+  // P4.3a — SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1), default-OFF (=== "true"). The
+  //      Total-Small-Business / size pool the award-basis guard leaves untouched: a set-aside a lens vouched
+  //      already_satisfied is MET only when the profile PROVES it (firmStatus==='satisfies'); a null/unverified
+  //      profile → unverified caution gate (never a green vouch — the #1 legal-exposure); a closed-world FAIL →
+  //      eligibility_bar. Runs AFTER the award-basis guard so a socioeconomic set-aside (already re-typed) is not
+  //      double-processed. Flag off ⇒ findings pass through unchanged.
+  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" });
+
+  // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132, Step 4), default-OFF (=== "true"). The never-missed
+  //      deterministic FLOOR: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING NAICS (sector 31-33/42/44/45),
+  //      EMIT a bidder_controls + cautionFloor caution that a nonmanufacturer must supply a small-business
+  //      manufacturer's U.S.-made product (FAR 52.219-1) — the prong most small firms miss. Fires off the
+  //      DETERMINISTIC SAM facts (opts.naics + opts.setAside), never a source regex; NAICS absent → silent (honest).
+  //      Runs POST-VERIFY so the adversarial skeptic can never cull the floor; non-duplicating vs a lens NMR
+  //      finding (52.219-1 ≠ 52.219-14). Flag off ⇒ findings pass through unchanged.
+  {
+    const before = findings.length;
+    findings = applyNonmanufacturerRuleGate(findings, { naics: opts.naics, setAside: opts.setAside }, { enabled: process.env.AUDIT_NONMANUFACTURER_RULE_GATE === "true" });
+    if (findings.length > before) { findings[findings.length - 1].id = "nonmanufacturer_rule#0"; perLens["nonmanufacturer_rule"] = 1; }
+  }
+
+  // P4.3a-ter — KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135, Step 5a), default-OFF (=== "true"). CAP-ONLY map
+  //      keyed on the finding's grounded citation field (exact clause match): 52.204-7 (SAM) → curable caution;
+  //      52.246-15 (Certificate of Conformance) → non-blocking. Runs BEFORE the structural-bar whitelist so the
+  //      verified per-clause disposition is AUTHORITATIVE over the whitelist's generic fail-safe. Flag off ⇒ unchanged.
+  findings = applyClauseSemanticsGuard(findings, { enabled: process.env.AUDIT_CLAUSE_SEMANTICS_GUARD === "true" });
 
   // P4.3b — STRUCTURAL-BAR WHITELIST (Brain card 114), default-OFF (Rule 61). The general rule the award-basis /
   //      set-aside guards were special cases of: a non-curable bidder_cannot_move bar under a NULL profile is kept

@@ -1299,33 +1299,36 @@
     },
     {
       "id": "deterministic_sweep#0",
-      "lens": "deterministic_sweep",
-      "kind": "technical_spec",
-      "controllability": "no_one_can_move",
       "requirement": "First Article Testing precondition (duration before any production delivery) (grounded by deterministic high-signal sweep).",
       "citation": "§F (grounding sweep)",
       "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
-      "curableInWindow": false
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "grounded": true,
+      "lens": "deterministic_sweep",
+      "sweepArchetype": "fat_precondition"
     },
     {
       "id": "deterministic_sweep#1",
-      "lens": "deterministic_sweep",
-      "kind": "technical_spec",
-      "controllability": "bidder_controls",
       "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
       "citation": "§F (grounding sweep)",
       "excerpt": "F.2 TIME OF DELIVERY (FAR 52.211-8, ADAPTED) [SYNTHETIC]\nThe Contractor shall deliver all production units, F.O.B. destination (Wright-Patterson AFB,\nOH), NOT LATER THAN THIRTY (30) calendar days After Receipt of Order (ARO), i.e., within 30\ncalendar days after the date of award. This 30-day production delivery requirement is fixed\nby the Government and is identical for all offerors. It SUPERSEDES and VOIDS the base 90-day\nand 8-month delivery terms.",
-      "curableInWindow": true
+      "kind": "technical_spec",
+      "controllability": "bidder_controls",
+      "grounded": true,
+      "lens": "deterministic_sweep",
+      "sweepArchetype": "delivery_window"
     },
     {
-      "id": "temporal_conflict#0",
-      "lens": "temporal_conflict",
+      "id": "deterministic_sweep#2",
+      "requirement": "Production delivery window after receipt of order/award (grounded by deterministic high-signal sweep).",
+      "citation": "§F (grounding sweep)",
+      "excerpt": "F.3 DELIVERY SCHEDULE IS BINDING; A NONCONFORMING SCHEDULE IS UNACCEPTABLE [SYNTHETIC]\nThe 30-day production delivery schedule in F.2 is a material, binding requirement and a\ncondition of award. Any quotation that does not unconditionally commit to delivery within 30\ndays ARO, or whose delivery is contingent on a date later than 30 days ARO,\nwill be rated UNACCEPTABLE and ineligible for award. The Government will make no tradeoff and\ngrant no exception to this delivery schedule. Any quotation contingent on a later date will be rated UNACCEPTABLE.\n============",
       "kind": "technical_spec",
-      "controllability": "no_one_can_move",
-      "requirement": "Universal delivery impossibility: a non-waivable First Article precondition (min ~60 days) cannot complete inside the production delivery window (~30 days ARO). No bidder can comply, regardless of capacity.",
-      "citation": "§F (grounding sweep) + §F (grounding sweep) (cross-clause temporal conflict)",
-      "excerpt": "AIVABLE precondition to production and delivery. The Contracting Officer SHALL NOT\nwaive first article testing under any circumstances and SHALL NOT authorize production,\nshipment, or delivery of any production unit until first article approval is granted in writing.\n(b) The Government will require SIXTY (60) calendar days to conduct first article testing and\nissue the written approval notice, measured from receipt of the first article unit. No\nproduction delivery may occur before the close of this 60-day Government testing period.",
-      "curableInWindow": false
+      "controllability": "bidder_controls",
+      "grounded": true,
+      "lens": "deterministic_sweep",
+      "sweepArchetype": "delivery_window"
     }
   ]
 }

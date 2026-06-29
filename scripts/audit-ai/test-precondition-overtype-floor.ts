@@ -10,7 +10,8 @@
  * Run: npx tsx scripts/audit-ai/test-precondition-overtype-floor.ts
  */
 import { readFileSync } from "node:fs";
-import { applyPreconditionOvertypeFloor, applyCautionFloor, deriveVerdict } from "../../src/lib/audit-decide";
+import { applyTemporalConflict, applyPreconditionOvertypeFloor, applyCautionFloor, deriveVerdict } from "../../src/lib/audit-decide";
+import { highSignalSweep } from "../../src/lib/audit-grounding-sweep";
 import type { TypedFinding, VerdictInputs } from "../../src/lib/audit-findings";
 
 let fail = 0;
@@ -18,9 +19,12 @@ const ok = (c: boolean, m: string) => { console.log(`  [${c ? "PASS" : "FAIL"}] 
 const FROZEN = "tests/fixtures/frozen";
 const frozen = (file: string) => (JSON.parse(readFileSync(`${FROZEN}/${file}`, "utf8")).findings as TypedFinding[]).map((f) => ({ ...f, grounded: true }));
 
-// decide with the guard at a chosen flag state, then caution-floor, then derive.
+// decide: DERIVE the temporal arm (Option-1, sharedAroGate ON → high-confidence CAUTION, never NO_BID) → overtype
+// guard at the chosen flag state → caution-floor → derive. The temporal_conflict basis is now DERIVED live from the
+// regenerated sweep findings (not baked into the fixture), matching the orchestrator order P1.6 → P4.4 → P4.5.
 const decide = (findings: TypedFinding[], preOn: boolean): string => {
-  let f = applyPreconditionOvertypeFloor(findings, { enabled: preOn });
+  let f = applyTemporalConflict(findings, { enabled: true, sharedAroGate: true });
+  f = applyPreconditionOvertypeFloor(f, { enabled: preOn });
   f = applyCautionFloor(f, { enabled: true });
   const inp: VerdictInputs = { findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true };
   return deriveVerdict(inp).verdict;
@@ -35,16 +39,21 @@ const mk = (over: Partial<TypedFinding>): TypedFinding => ({
 const complete = frozen("fa8601-complete.json");
 const noWin = frozen("fa8601-no-window.json");
 
-console.log("[flag ON — the fix]");
-ok(decide(complete, true) === "NO_BID", `complete → ${decide(complete, true)} (must stay NO_BID — via the derived conflict, not the bare precondition)`);
-const surv = survivingNoMove(complete, true);
-ok(surv.length >= 1 && surv.every((f) => f.lens === "temporal_conflict"),
-  `surviving no_one_can_move basis is temporal_conflict ONLY → [${[...new Set(surv.map((f) => f.lens))].join(", ")}] (the bare precondition [9]/[19] were downgraded)`);
-ok(decide(noWin, true) !== "NO_BID", `no-window → ${decide(noWin, true)} (FIXED: feasible precondition + adequate window is no longer a false NO_BID)`);
+console.log("[overtype ON — the fix · Option-1 doctrine: temporal nets to high-confidence CAUTION, never NO_BID]");
+ok(decide(complete, true) === "BID_WITH_CAUTION", `complete → ${decide(complete, true)} (BID_WITH_CAUTION — the bare precondition is downgraded; the surviving basis is the DERIVED temporal CAUTION, not a NO_BID)`);
+// the bare precondition (former_ko) is downgraded by overtype → 0 surviving no_one_can_move; the surviving BASIS is
+// the DERIVED temporal_conflict, now bidder_controls + cautionFloor (the Option-1 high-confidence CAUTION floor).
+const survAfterOvertype = survivingNoMove(complete, true);
+ok(survAfterOvertype.length === 0,
+  `bare precondition downgraded → 0 surviving no_one_can_move after overtype → [${[...new Set(survAfterOvertype.map((f) => f.lens))].join(", ") || "none"}]`);
+const tcBasis = applyTemporalConflict(complete, { enabled: true, sharedAroGate: true }).filter((f) => f.lens === "temporal_conflict");
+ok(tcBasis.length >= 1 && tcBasis.every((f) => f.controllability === "bidder_controls" && f.cautionFloor === true),
+  `surviving CAUTION basis = DERIVED temporal_conflict (bidder_controls + cautionFloor) → keeps complete at BID_WITH_CAUTION, never NO_BID`);
+ok(decide(noWin, true) !== "NO_BID", `no-window → ${decide(noWin, true)} (feasible precondition + no window → not NO_BID)`);
 
-console.log("[flag OFF — legacy preserved byte-for-byte]");
-ok(decide(complete, false) === "NO_BID", `complete → ${decide(complete, false)} (NO_BID)`);
-ok(decide(noWin, false) === "NO_BID", `no-window → ${decide(noWin, false)} (legacy bug preserved until deliberate flip)`);
+console.log("[overtype OFF — bare precondition NOT downgraded → its model-asserted no_one_can_move surfaces as the legacy false-NO_BID]");
+ok(decide(complete, false) === "NO_BID", `complete → ${decide(complete, false)} (overtype OFF leaves the former_ko bare precondition no_one_can_move → NO_BID; the temporal CAUTION alone cannot floor a surviving show-stopper — this is exactly why overtype is needed)`);
+ok(decide(noWin, false) === "NO_BID", `no-window → ${decide(noWin, false)} (overtype OFF → bare precondition false-NO_BID preserved)`);
 
 // ── PREDICATE / BOUNDARY (synthetic findings — predicate tests, NOT verdict fixtures) ─────────────────
 console.log("[predicate + boundary]");
@@ -74,7 +83,26 @@ const fixtureStructural = [complete, noWin, frozen("aocssb-with-qual.json"), fro
 console.log(`[structural-bar fixture availability] frozen no_one_can_move structural bars found: ${fixtureStructural.length}`);
 if (fixtureStructural.length === 0) console.log("  → NO structural-bar fixture available — flag-ON negative control proven on synthetic predicate findings above (not fabricated as a verdict fixture, per card 92).");
 
-// ── ANCHOR: decide(complete) == registry-resolved frozen gold-key verdict (#6 = NO_BID) ──
+// ── ORDERING GUARD (Brain Ruling 1) — HARD-asserted (this gated suite process.exits on failure). Overtype WITHOUT
+// the temporal arm FALSE-BIDs an uncertain-window package; the temporal arm must fire BEFORE/WITH overtype to
+// establish the CAUTION floor. Under Option 1 only the FLOOR moved (NO_BID → CAUTION) — the guard is NOT moot. ──
+console.log("[ordering guard — Ruling 1]");
+{
+  const src6 = readFileSync("scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt", "utf8");
+  const sweep6 = highSignalSweep(src6);                                  // fat_precondition(60) + delivery_window(30), $0
+  const bareFat = complete.find((f) => f.lens === "former_ko" && f.controllability === "no_one_can_move")!;
+  const pkg = [bareFat, ...sweep6];
+  const decideTO = (findings: TypedFinding[], temporalOn: boolean, overtypeOn: boolean): string => {
+    let f = applyTemporalConflict(findings, { enabled: temporalOn, sharedAroGate: temporalOn });
+    f = applyPreconditionOvertypeFloor(f, { enabled: overtypeOn });
+    f = applyCautionFloor(f, { enabled: true });
+    return deriveVerdict({ findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true } as VerdictInputs).verdict;
+  };
+  ok(decideTO(pkg, false, true) === "BID", `overtype-ON + temporal-OFF → ${decideTO(pkg, false, true)} (the FALSE-BID an uncertain-window package would slip through — exactly what the ordering guards against)`);
+  ok(decideTO(pkg, true, true) === "BID_WITH_CAUTION", `overtype-ON + temporal-ON → ${decideTO(pkg, true, true)} (temporal establishes the CAUTION floor — Ruling 1; guard NOT moot, floor moved NO_BID→CAUTION)`);
+}
+
+// ── ANCHOR: decide(complete) == registry-resolved frozen gold-key verdict (#6 = BID_WITH_CAUTION under Option 1) ──
 const reg = JSON.parse(readFileSync("scripts/audit-ai/gold-sets/gold-set-registry.json", "utf8"));
 const goldVerdict = (sol: string): string => JSON.parse(readFileSync(`scripts/audit-ai/gold-sets/${reg.keys[sol].file}`, "utf8")).expectedVerdict.verdict;
 console.log("[anchor]");
@@ -82,5 +110,5 @@ ok(decide(complete, true) === goldVerdict("FA860126Q00260001"), `#6 decide(compl
 
 console.log("");
 if (fail) { console.error(`✗ ${fail} check(s) FAILED`); process.exit(1); }
-console.log("✓ ALL GREEN — precondition-overtype-floor: bare precondition downgraded (fix), temporal_conflict survives to keep complete NO_BID, structural/co-stated-conflict bars NEVER downgraded, temporal_conflict never mutated, flag-OFF legacy preserved, anchor holds. $0.");
+console.log("✓ ALL GREEN — precondition-overtype-floor (Option-1): bare precondition downgraded (fix), the DERIVED temporal_conflict CAUTION (bidder_controls+cautionFloor) keeps complete at BID_WITH_CAUTION (never NO_BID), structural/co-stated-conflict MODEL bars NEVER downgraded (still NO_BID — model judgment, not the deterministic temporal arm), temporal_conflict never mutated, overtype-OFF legacy false-NO_BID preserved, anchor = BID_WITH_CAUTION. $0.");
 process.exit(0);
