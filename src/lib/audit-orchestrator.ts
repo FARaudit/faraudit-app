@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, detectFormat, type AuditToolContext } from "./audit-tools";
+import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
@@ -74,6 +74,24 @@ export function manifestComplete(ctx: AuditToolContext): boolean {
   let maxPages = 0;
   for (const m of ctx.fullSource.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) maxPages = Math.max(maxPages, parseInt(m[1], 10));
   return !(maxPages * 1000 > ctx.fullSource.length); // a single named attachment can't exceed the whole source → unfetched
+}
+
+/** Format-aware CORE-section honest-fail (fail-safe #10 — Brain card 135, Step 8). Part-15 UCF: any of §C/§L/§M
+ *  absent → cap (UNCHANGED). Part-12 commercial (SF-1449/SF-18/combined-synopsis): the core EQUIVALENTS are the
+ *  instructions (52.212-1 ≡ §L) and the evaluation / basis-for-award (52.212-2 ≡ §M); cap ONLY when BOTH are
+ *  absent (a single missing one is plausibly inline/by-reference — no false scare). The commercial path is
+ *  flag-gated via `commercialHonestFail`; OFF ⇒ commercial returns [] (today's free pass, byte-identical).
+ *  procurementPart(ctx) is the SINGLE deterministic format source — this EXTENDS fail-safe #10, never a parallel
+ *  surface. Pure → $0 gate-testable with a fullSource string. Commercial "changes WHAT counts as core, not
+ *  WHETHER a core set is required" — honest-fail preserved both ways. */
+export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestFail?: boolean }): string[] {
+  const part = procurementPart(ctx);
+  if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !readSection(ctx, k).present);
+  if (opts?.commercialHonestFail && part === "part12-commercial")
+    // Label the disclosure by the COMMERCIAL clause numbers (not §L/§M) so the gap reads honestly. Cap fires
+    // ONLY when BOTH are absent — a single one missing is plausibly inline/by-reference (no false scare).
+    return (!readSection(ctx, "L").present && !readSection(ctx, "M").present) ? ["52.212-1", "52.212-2"] : [];
+  return [];
 }
 
 /** P3 — dedup identical findings across lenses, preserving the first seen. The key INCLUDES controllability:
@@ -202,20 +220,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead);
   const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
 
-  // CORE-PRESENCE (panel blocker): buildManifest/`required` only contains sections
-  // DETECTED PRESENT, so a genuinely-absent §C/§L/§M never appears in `missing` and
-  // an unanalyzed core section could render a clean BID. Disclose the absent core
-  // sections so the report can flag them — but ONLY for negotiated full-UCF
-  // procurements, where C/L/M are mandatorily SEPARATE sections and an absent one is
-  // genuinely anomalous. Commercial (SF-1449) / simplified (SF-18) / combined-synopsis
-  // RFQs state specs + 52.212-1/-2 INLINE or by reference, so an absent SEPARATE
-  // section there is EXPECTED — flagging it would be a false "missing section" scare
-  // (re-panel finding). For those formats the document-reconciliation banner + the
-  // engine's grounded findings are the safety net. Disclosure only; verdict unchanged.
-  const CORE_SECTIONS = ["C", "L", "M"];
-  const coreMissing = detectFormat(ctx) === "UCF"
-    ? CORE_SECTIONS.filter((k) => !readSection(ctx, k).present)
-    : [];
+  // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
+  // PRESENT, so a genuinely-absent core section never appears in `missing` and an unanalyzed one could render a
+  // clean BID. coreMissingFor discloses absent core sections FORMAT-AWARELY off procurementPart (the single
+  // deterministic source — Step 8): Part-15 UCF → §C/§L/§M (unchanged); Part-12 commercial → honest-fail ONLY if
+  // BOTH the 52.212-1≡§L instructions AND the 52.212-2≡§M evaluation are absent (flag-gated; off ⇒ commercial
+  // unchanged = today's free pass). Disclosure only; verdict unchanged except the manifest cap below.
+  const coreMissing = coreMissingFor(ctx, { commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" });
 
   // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108), default-OFF (Rule 61). Re-types an award-basis /
   //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (the award basis is never a

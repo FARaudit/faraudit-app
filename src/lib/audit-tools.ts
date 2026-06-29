@@ -41,6 +41,25 @@ export function detectFormat(ctx: AuditToolContext): FormatType {
   try { return detectSections(asDoc(ctx.fullSource)).formatDetected; } catch { return "unknown"; }
 }
 
+/** The procurement PART — the single deterministic format classification, derived OFF detectFormat (the one
+ *  source; no parallel surface). Part-12 (commercial: SF-1449 / SF-18 / combined-synopsis) states instructions +
+ *  evaluation via 52.212-1/-2 INLINE or by reference; Part-15 (UCF) mandates §C/§L/§M as SEPARATE sections.
+ *  Brain card 135 Step 8 — coreMissing keys off THIS, extending fail-safe #10 (never a parallel format surface). */
+export type ProcurementPart = "part12-commercial" | "part15-ucf" | "unknown";
+export function procurementPart(ctx: AuditToolContext): ProcurementPart {
+  switch (detectFormat(ctx)) {
+    case "UCF": return "part15-ucf";
+    case "SF-1449-RFQ":
+    case "SF-18":
+    case "combined-synopsis": return "part12-commercial"; // NB: detectSections does not currently EMIT
+                                                           // "combined-synopsis" (only SF-1449/SF-18/UCF/unknown),
+                                                           // so a bare combined synopsis lacking those markers
+                                                           // falls to `unknown` → free pass. Closing that gap is a
+                                                           // detectSections branch (FAR 12.603 header) — a separate step.
+    default: return "unknown";
+  }
+}
+
 /** Tool — read a UCF section's text. The expert reads only what it needs (just-in-time), never a stuffed dump. */
 export function readSection(ctx: AuditToolContext, key: string): { key: string; present: boolean; text: string } {
   const s = sectionsOf(ctx)[(key || "").toUpperCase()] ?? "";
