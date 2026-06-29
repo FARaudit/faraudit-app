@@ -433,6 +433,23 @@ const mk = (verdict: Verdict, eligible: boolean | null, reason: string, disposit
 const honestFailEligible = (): boolean | null =>
   process.env.AUDIT_ELIGIBLE_TRISTATE === "true" ? null : false;
 
+// Doctrine #2 (Brain card 125) — VERDICT-WORD INVARIANT (defensive backstop). INELIGIBLE asserts a FIRM-
+// credential failure; it may stand ONLY when a real eligibility_bar show-stopper exists. A requirement-side
+// impossibility (sole-source / brand-name-or-equal / universal supply) must route to NO_BID / NHR, never wear
+// the credential label. Default-OFF (=== "true"). At the natural anchor the rule is tautologically satisfied
+// (elig is derived from the same predicate); the value is catching a FUTURE refactor or any OTHER path that
+// emits eligible:false. Exported for a $0 unit-proof against a crafted violation.
+export function enforceVerdictWordInvariant(d: Decision): Decision {
+  if (process.env.AUDIT_VERDICT_WORD_INVARIANT !== "true") return d;  // flag OFF → invariant does not run (byte-identical)
+  if (d.eligible === false && !d.showStoppers.some((s) => s.kind === "eligibility_bar")) {
+    if (process.env.NODE_ENV !== "production")
+      throw new Error("invariant_violation:ineligible_without_eligibility_bar");  // dev/test: loud — catches the refactor
+    // Production must NEVER crash a customer audit — refuse the INELIGIBLE label, route to human review.
+    return { ...d, verdict: "NEEDS_HUMAN_REVIEW", eligible: null, reason: "invariant_violation:ineligible_without_eligibility_bar" };
+  }
+  return d;
+}
+
 /** Derive the verdict deterministically from typed grounded findings. The LLM experts supply the FACTS
  *  (requirement + grounded excerpt + kind + controllability); this code makes the DECISION. The ladder is
  *  the same one that used to live in the chief-judge prompt — relocated from prose to TypeScript so it is
@@ -459,8 +476,8 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const showStoppers = [...universal, ...provenFails];
   if (showStoppers.length) {
     const elig = !showStoppers.some((s) => s.kind === "eligibility_bar");
-    return mk(elig ? "NO_BID" : "INELIGIBLE", elig,
-      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
+    return enforceVerdictWordInvariant(mk(elig ? "NO_BID" : "INELIGIBLE", elig,
+      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers));
   }
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.

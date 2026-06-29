@@ -2,7 +2,8 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant } from "@/lib/audit-decide";
+import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
 const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding => ({
@@ -98,6 +99,33 @@ const TRI = process.env.AUDIT_ELIGIBLE_TRISTATE === "true";
 eq(`INCOMPLETE → eligible ${TRI ? "null" : "false"} (flag ${TRI ? "ON" : "OFF"})`, deriveVerdict(inp(two, { coverage: false })).eligible, TRI ? null : false);
 eq(`NHR(verifier-unsound) → eligible ${TRI ? "null" : "false"}`, deriveVerdict(inp(two, { sound: false })).eligible, TRI ? null : false);
 eq("INELIGIBLE → eligible false (flag-INVARIANT — true firm-credential bar)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).eligible, false);
+
+// ── Doctrine #2 (Step 2, AUDIT_VERDICT_WORD_INVARIANT) — INELIGIBLE requires a real eligibility_bar.
+//    Default-OFF (byte-identical). ON: real INELIGIBLE silent · crafted violation throws(dev)/routes-NHR(prod) ·
+//    requirement-side impossibility → NO_BID, never INELIGIBLE. ──
+const INV = process.env.AUDIT_VERDICT_WORD_INVARIANT === "true";
+if (INV) {
+  // (i) real INELIGIBLE (firm provably fails an eligibility_bar) → unchanged, invariant silent
+  const realInelig = deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } }));
+  eq("inv(i): real INELIGIBLE stays INELIGIBLE", realInelig.verdict, "INELIGIBLE");
+  eq("inv(i): real INELIGIBLE eligible:false", realInelig.eligible, false);
+  // (ii) crafted state — eligible:false with ZERO eligibility_bar (a requirement-side bar mislabeled)
+  const craftedSS = { ...f({ requirement: "req-side impossibility", kind: "clause_flowdown", controllability: "no_one_can_move" }), disposition: "disqualifying" } as DecidedFinding;
+  const crafted = { verdict: "INELIGIBLE", eligible: false, reason: "crafted", dispositions: [] as DecidedFinding[], showStoppers: [craftedSS] } as Decision;
+  let threw = false;
+  try { enforceVerdictWordInvariant(crafted); } catch (e) { threw = /invariant_violation/.test((e as Error).message); }
+  eq("inv(ii)-dev: crafted violation throws", threw, true);
+  const env = process.env as Record<string, string | undefined>;  // NODE_ENV is readonly in the project's types
+  const prevEnv = env.NODE_ENV;
+  env.NODE_ENV = "production";
+  const routed = enforceVerdictWordInvariant(crafted);
+  if (prevEnv === undefined) delete env.NODE_ENV; else env.NODE_ENV = prevEnv;
+  eq("inv(ii)-prod: routes NEEDS_HUMAN_REVIEW", routed.verdict, "NEEDS_HUMAN_REVIEW");
+  eq("inv(ii)-prod: eligible null", routed.eligible, null);
+  eq("inv(ii)-prod: reason tagged", routed.reason, "invariant_violation:ineligible_without_eligibility_bar");
+  // (iii) requirement-side impossibility (kind != eligibility_bar) → NO_BID, never INELIGIBLE
+  eq("inv(iii): req-side impossibility → NO_BID not INELIGIBLE", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+}
 
 // ── DETERMINISM (Brain card-42 §4): identical input → identical verdict across 50 runs. ──
 const baseline = JSON.stringify(deriveVerdict(inp(two)));
