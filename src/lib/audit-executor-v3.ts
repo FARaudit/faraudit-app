@@ -19,22 +19,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
 import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
-import { isEnvOn } from "./env-flags";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import type { IngestionMeta } from "./sam-attachments";
 
-/** Flag-gate — the agentic engine OWNS the report (V1 retired) only when set.
- *  Also requires AUDIT_AGENTIC_V3=true (auditPackage's own gate). */
-export const AGENTIC_V3_PRIMARY_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_V3_PRIMARY);
-
-// Two-flag dependency guard: PRIMARY routes audits into auditPackage, which itself
-// hard-throws unless AUDIT_AGENTIC_V3=true. Setting one without the other would
-// hard-fail EVERY audit at the engine gate — warn loudly at boot rather than let it
-// surface only as per-audit failures.
-if (AGENTIC_V3_PRIMARY_ENABLED && !isEnvOn(process.env.AUDIT_AGENTIC_V3)) {
-  console.error("[AGENTIC-V3-PRIMARY] MISCONFIG: AUDIT_AGENTIC_V3_PRIMARY is ON but AUDIT_AGENTIC_V3 is OFF — every audit will hard-fail at the engine gate. Set AUDIT_AGENTIC_V3=true.");
-}
+/** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
+ *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
+ *  `executeAgenticPrimary` unconditionally. This constant stays only because the report route +
+ *  worker gate the bidder-profile fetch on it; it is permanently `true`. The old
+ *  AUDIT_AGENTIC_V3 / AUDIT_AGENTIC_V3_PRIMARY / AUDIT_LEGACY_FALLBACK env vars are inert and
+ *  may be removed from the deployment. */
+export const AGENTIC_V3_PRIMARY_ENABLED = true;
+console.log("[ENGINE] agentic V3 is the SOLE engine (V1/V2 deleted; no fallback).");
 
 /** Map the engine's GATE verdict onto the EXACT recommendation vocabulary V1 writes
  *  to the `audits.recommendation` column — PROCEED / PROCEED_WITH_CAUTION / DECLINE —

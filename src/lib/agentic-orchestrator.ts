@@ -13,10 +13,9 @@
 
 import type { ExtractedFacts } from "./section-extractors";
 import type { AuditJudgment } from "./audit-judgment";
-import { runJudgment } from "./audit-judgment";
-import { buildCoverageLedger, resolveAmendments, classifyBindingContent, type CoverageLedger, type ResolvedLedger, type PackageFileInput } from "./agentic-ingest";
-import { mapDocument, mergeExtracts, selectMapTargets, type MappedFacts, type MapCoverage, type DocExtract, type DocExtractCache } from "./agentic-map";
-import { buildCompactMatrix, selectBindingExcerpts, runLenses, type LensSurfaces } from "./agentic-lenses";
+import { classifyBindingContent, type CoverageLedger, type ResolvedLedger } from "./agentic-ingest";
+import { type MappedFacts, type MapCoverage, type DocExtract, type DocExtractCache } from "./agentic-map";
+import { type LensSurfaces } from "./agentic-lenses";
 
 export type ScalarFacts = Partial<
   Pick<ExtractedFacts, "contractType" | "setAside" | "naicsCode" | "solicitorNumber" | "offerDueDate" | "issuingOffice" | "periodOfPerformance">
@@ -248,69 +247,7 @@ export async function mapWithResilience<T extends { name: string }>(
   return { extracts, failures };
 }
 
-export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMapResult> {
-  // 1) manifest + coverage ledger (deterministic)
-  const files: PackageFileInput[] = input.docs.map((d) => ({ name: d.name, bytes: d.bytes }));
-  const baseLedger = buildCoverageLedger(files);
-
-  // 2) amendment-resolution (flag-only; supersedes nothing — all versions read)
-  const ledger = resolveAmendments(baseLedger, input.amendmentText ?? deriveAmendmentText(input, baseLedger));
-
-  // 3) MAP — read each operative/unresolved doc in its own context (cheap model).
-  //    selectMapTargets is the single source of truth for the selection rule.
-  //    Resilient per-doc: a read failure is FLAGGED (coverage partial), never hidden.
-  const { read: readEntries, skipped } = selectMapTargets(ledger);
-  const readNames = new Set(readEntries.map((e) => e.name));
-  const readDocs = input.docs.filter((d) => readNames.has(d.name));
-  const extracts: DocExtract[] = [];
-  const readFailures: string[] = [];
-  // A doc with no extractable text (silent OCR failure that didn't throw) is a
-  // READ FAILURE, not a success — it must NEVER count toward "Audited N of N in
-  // full." Filter those into readFailures before the model ever sees them.
-  const MIN_TEXT_CHARS = 50;
-  const mappable = readDocs.filter((d) => {
-    const ok = d.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS;
-    if (!ok) readFailures.push(d.name);
-    return ok;
-  });
-  // Resilient MAP: concurrent burst → SERIAL retry of first-pass failures → only then a read-failure.
-  // See mapWithResilience. (Injectable + deterministically gate-tested — no live spend to prove it.)
-  const { extracts: mapExtracts, failures: mapFailures } = await mapWithResilience(
-    mappable,
-    (d) => mapDocument(d.name, d.text, input.mapModel, input.signal, input.docCache),
-    { concurrency: 4, aborted: () => !!input.signal?.aborted },
-  );
-  extracts.push(...mapExtracts);
-  readFailures.push(...mapFailures);
-  // VACUOUS-BINDING GUARD (Stage 3 honest-fail) — see partitionVacuousBindings. A binding
-  // doc that returned a zero-content extract is an extraction failure, not a "read in full";
-  // demote it to a read-failure so coverage reports PARTIAL / no-charge.
-  const docTextByName = new Map(mappable.map((d) => [d.name, d.text]));
-  const { valid: validExtracts, vacuousBindingNames } = partitionVacuousBindings(extracts, docTextByName);
-  readFailures.push(...vacuousBindingNames);
-
-  const merged = mergeExtracts(validExtracts);
-  // read = docs that ACTUALLY produced a NON-VACUOUS extract — never `mappable`, which
-  // still includes docs whose MAP call later failed OR returned an empty binding extract
-  // (those are in readFailures; counting them as read too would double-count and inflate
-  // the "N of N" headline).
-  const mapCoverage: MapCoverage = { read: validExtracts.map((e) => e.docName), skipped };
-  // Docs that produced an extract but were over the char cap (trimmed) — read, but
-  // NOT in full; they keep coverage from claiming completeness.
-  const truncatedDocs = validExtracts.filter((e) => e.truncated).map((e) => e.docName);
-
-  // 4) compose facts (deterministic SAM scalars + mapped analysis) + coverage report
-  const facts = composeExtractedFacts(input.scalars, merged);
-  const coverage = buildCoverageReport(ledger, mapCoverage, readFailures, truncatedDocs);
-  // assembled MAP text = the text of docs that ACTUALLY produced an extract (the
-  // grounding source for V2's fabrication guards on the agentic-primary path). Built
-  // from `extracts`, NOT `mappable` — mappable still includes docs whose MAP call
-  // failed; including their text would let V2 surface clauses from a doc the agentic
-  // facts don't cover, widening the facts↔grounding mismatch.
-  const extractNames = new Set(validExtracts.map((e) => e.docName));
-  const assembledText = mappable.filter((d) => extractNames.has(d.name)).map((d) => d.text).join("\n\n");
-  return { facts, coverage, ledger, assembledText, provenance: merged.provenance };
-}
+// [V1/shadow purged 2026-06-28 — A4] runAgenticMap() removed — engine is 100% agentic (executeAgenticPrimary → auditPackage). See git history.
 
 /** Run a full agentic audit: MAP → compact matrix → LENSES + cross-doc (Stage 2) and
  *  the JUDGE (call 4, unchanged) in parallel. Live. Behind the review gate.
@@ -321,38 +258,5 @@ export async function runAgenticMap(input: AgenticAuditInput): Promise<AgenticMa
  *  restores the cross-document reasoning the per-doc MAP can't see — at a fraction of
  *  the cost and with ~zero context rot. The matrix is the shared CACHED prefix across
  *  the four lens calls (prime-then-parallel inside runLenses). */
-export async function runAgenticAudit(input: AgenticAuditInput): Promise<AgenticAuditResult> {
-  const { facts, coverage, ledger, provenance } = await runAgenticMap(input);
+// [V1/shadow purged 2026-06-28 — A4] runAgenticAudit() removed — engine is 100% agentic (executeAgenticPrimary → auditPackage). See git history.
 
-  // Build the compact matrix (deterministic, $0) the lenses consume.
-  const matrix = buildCompactMatrix(facts, {
-    provenance,
-    coverageStatement: coverage.statement,
-    warnings: facts.extractionWarnings,
-  });
-  // The cross-doc pass reads the few BINDING docs together (bounded) — not the package.
-  const { text: bindingExcerpts } = selectBindingExcerpts(
-    input.docs.map((d) => ({ name: d.name, text: d.text }))
-  );
-
-  // Lenses (over the matrix) and the judge (over the compact facts) are independent —
-  // run them concurrently. The judge is unchanged (the already-correct call 4).
-  const [surfaces, judgment] = await Promise.all([
-    runLenses({
-      matrix,
-      bindingExcerpts,
-      lensModel: input.lensModel,
-      crossDocModel: input.crossDocModel,
-      signal: input.signal,
-    }),
-    runJudgment(facts, undefined, input.judgeModel),
-  ]);
-
-  return { judgment, facts, ledger, coverage, surfaces, matrix };
-}
-
-/** ⚠ Exported but currently CONSUMED BY NOBODY (re-review 2026-06-25): the live shadow path reads
- *  AUDIT_AGENTIC independently as AGENTIC_SHADOW_ENABLED in agentic-executor.ts, so this constant is
- *  inert and must NOT be read as a readiness signal. Kept (not deleted) to avoid breaking any future
- *  import; consolidate the AUDIT_AGENTIC reads when the agentic engine graduates. */
-export const AGENTIC_ORCHESTRATOR_ENABLED = process.env.AUDIT_AGENTIC === "true";

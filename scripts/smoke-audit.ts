@@ -10,7 +10,7 @@
  * Test stages:
  *   1) Module presence: lib/audit-engine, lib/sam, api/audit, api/ko-email,
  *      schema migrations
- *   2) Surface area: classifyDocument, runAudit, parseDFARSTraps
+ *   2) Surface area: classifyDocument, executeAudit (agentic entry), parseDFARSTraps
  *   3) DFARS trap configuration: 252.223-7008, 252.204-7018, 252.204-7021
  *   4) Live classifier round-trip if ANTHROPIC_API_KEY is set
  *
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   if (await exists("src/lib/audit-engine.ts")) {
     const engine = await read("src/lib/audit-engine.ts");
     check("classifyDocument exported", /export\s+async\s+function\s+classifyDocument/.test(engine));
-    check("runAudit exported", /export\s+async\s+function\s+runAudit/.test(engine));
+    check("executeAudit (agentic entry) exported", /export\s+async\s+function\s+executeAudit/.test(await read("src/lib/audit-executor.ts")));
     check("parseDFARSTraps exported", /export\s+function\s+parseDFARSTraps/.test(engine));
     check("DFARS 252.223-7008 trap", engine.includes("252.223-7008"));
     check("DFARS 252.204-7018 trap", engine.includes("252.204-7018"));

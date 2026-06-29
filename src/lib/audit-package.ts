@@ -6,9 +6,10 @@
 //   • the ORCHESTRATOR (audit-orchestrator) running P0→P5 and DERIVING the verdict (audit-decide, pure).
 // Models bind through the role registry (model-registry) — never a literal ID in engine logic.
 //
-// HOLD (Brain card 43 + Rule 20): this is the PAID path. Nothing in the customer flow calls it yet — wiring
-// to the front door is a SEPARATE gate after the gold-set proof. The guard below makes the hold explicit:
-// the entrypoint refuses to run unless AUDIT_AGENTIC_V3=true is set, so it cannot fire by accident.
+// LIVE (2026-06-28): this is the SOLE production engine. executeAudit (audit-executor.ts) routes every
+// customer audit here UNCONDITIONALLY — there is no engine selector, no fallback, and no escape-hatch env
+// flag. The legacy V1 path (runAudit/runAuditV2) was fully purged from the codebase (A4); the only
+// alternative to a complete agentic report is an honest, no-charge failure.
 
 import { anthropic } from "./anthropic";
 import { callStructuredClaude } from "./anthropic-structured";
@@ -43,10 +44,8 @@ function structuredAdapter(apiKey: string, signal?: AbortSignal) {
   };
 }
 
-/** Run the full agentic audit over a package and DERIVE the verdict. PAID. Held behind AUDIT_AGENTIC_V3. */
+/** Run the full agentic audit over a package and DERIVE the verdict. PAID. The SOLE engine (V1/V2 deleted). */
 export async function auditPackage(input: AuditPackageInput): Promise<AuditResult> {
-  if (process.env.AUDIT_AGENTIC_V3 !== "true")
-    throw new Error("agentic engine v3 is HELD (Brain card 43): set AUDIT_AGENTIC_V3=true to enable the paid path after the gold-set proof.");
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the agentic engine.");
 

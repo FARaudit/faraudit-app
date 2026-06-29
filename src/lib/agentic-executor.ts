@@ -10,8 +10,7 @@
 // engine uses (native text first; OCR for image-only).
 
 import { extractText } from "./pdf-text-extractor";
-import { isEnvOn } from "./env-flags";
-import { runAgenticAudit, runAgenticMap, type ScalarFacts, type AgenticAuditResult, type AgenticMapResult, type AgenticDoc } from "./agentic-orchestrator";
+import { type ScalarFacts, type AgenticDoc } from "./agentic-orchestrator";
 import { auditPackage } from "./audit-package";
 
 /** Structural view of the SAM solicitation fields we need — kept minimal so any
@@ -85,108 +84,13 @@ export async function buildAgenticDocs(opts: {
 
 /** Run the agentic engine as a non-fatal shadow. Returns the result, or null on
  *  any error (logged, never thrown) so it can never affect the live audit. */
-export async function runAgenticShadow(params: {
-  auditId: string;
-  solicitation: SolScalarSource | null | undefined;
-  agency?: string | null;
-  primaryName: string;
-  primaryBytes: Buffer | null;
-  primaryText: string | null;
-  attachments: Array<{ name: string; base64: string }> | null;
-}, signal?: AbortSignal): Promise<AgenticAuditResult | null> {
-  try {
-    const docs = await buildAgenticDocs({
-      primaryName: params.primaryName,
-      primaryBytes: params.primaryBytes,
-      primaryText: params.primaryText,
-      attachments: params.attachments,
-    });
-    if (docs.length === 0) {
-      console.warn(`[AGENTIC-SHADOW] ${params.auditId}: no docs assembled — skipping`);
-      return null;
-    }
-    const scalars = scalarsFromSolicitation(params.solicitation, params.agency);
-    const result = await runAgenticAudit({
-      docs,
-      scalars,
-      mapModel: process.env.AUDIT_MAP_MODEL,
-      judgeModel: process.env.AUDIT_MODEL,
-      signal, // abort the shadow MAP on budget timeout (parity with the primary path)
-    });
-    console.log(
-      `[AGENTIC-SHADOW] ${params.auditId}: ${result.coverage.complete ? "COMPLETE" : "PARTIAL"} · ` +
-      `${result.coverage.read.length} read · ${result.coverage.superseded.length} superseded · ` +
-      `${result.coverage.unresolvedVersionGroups} unresolved-version-groups · ${result.coverage.readFailures.length} read-failures`
-    );
-    console.log(`[AGENTIC-SHADOW] ${params.auditId}: ${result.coverage.statement}`);
-    return result;
-  } catch (e) {
-    console.error(`[AGENTIC-SHADOW] ${params.auditId} failed (non-fatal):`, e instanceof Error ? e.message : e);
-    return null;
-  }
-}
+// [V1/shadow purged 2026-06-28 — A4] runAgenticShadow() removed — engine is 100% agentic (executeAgenticPrimary → auditPackage). See git history.
 
 /** Build the agentic FACTS (+ coverage) for the graduate-to-primary path — the MAP
  *  only, NO judgment (the V2 pipeline judges these facts via runAuditV2's
  *  factsOverride). Non-fatal: returns null on any error so the caller falls back to
  *  the V2 single-pass extractor — the agentic path can never break a paid audit. */
-export async function buildAgenticFacts(params: {
-  auditId: string;
-  solicitation: SolScalarSource | null | undefined;
-  agency?: string | null;
-  primaryName: string;
-  primaryBytes: Buffer | null;
-  primaryText: string | null;
-  attachments: Array<{ name: string; base64: string }> | null;
-}, signal?: AbortSignal): Promise<AgenticMapResult | null> {
-  try {
-    const docs = await buildAgenticDocs({
-      primaryName: params.primaryName,
-      primaryBytes: params.primaryBytes,
-      primaryText: params.primaryText,
-      attachments: params.attachments,
-    });
-    if (docs.length === 0) {
-      console.warn(`[AGENTIC-PRIMARY] ${params.auditId}: no docs assembled — V2 extractor fallback`);
-      return null;
-    }
-    const scalars = scalarsFromSolicitation(params.solicitation, params.agency);
-    const result = await runAgenticMap({ docs, scalars, mapModel: process.env.AUDIT_MAP_MODEL, signal });
-    console.log(`[AGENTIC-PRIMARY] ${params.auditId}: ${result.coverage.statement}`);
-    // Vacuous-facts guard: returning empty facts as factsOverride makes runAuditV2
-    // SKIP its own extractor and render an EMPTY report stamped from those facts. Fall
-    // back to V2's single-pass extraction (which can still read doc.rawText) when the
-    // MAP read ZERO docs (all per-doc calls failed) OR read docs but extracted nothing
-    // usable (readable-but-noise OCR text the map can't pull facts from).
-    const f = result.facts;
-    const mapEmpty =
-      f.clauses.length === 0 && f.clins.length === 0 && f.delivery.length === 0 &&
-      f.submissionRequirements.length === 0 && f.evaluationFactors.length === 0 &&
-      (f.performanceRequirements?.length ?? 0) === 0 && (f.amendmentChanges?.length ?? 0) === 0 &&
-      !f.workStatementText;
-    // Coverage-ratio floor: a MAP that read only a small fraction of the operative
-    // docs (e.g. 2 of 31) still produces SOME facts, so mapEmpty is false — but using
-    // those thin facts as factsOverride would render a near-empty report the banner
-    // could present as authoritative. Below the floor, fall back to V2's single-pass
-    // extractor (reads every doc's text) rather than ship a thin partial as primary.
-    const readN = result.coverage.read.length;
-    const failN = result.coverage.readFailures.length;
-    const total = readN + failN;
-    const coverageRatio = total > 0 ? readN / total : 0;
-    const MIN_COVERAGE_RATIO = 0.5;
-    if (readN === 0 || mapEmpty || coverageRatio < MIN_COVERAGE_RATIO) {
-      console.warn(
-        `[AGENTIC-PRIMARY] ${params.auditId}: MAP coverage too thin for primary ` +
-        `(read ${readN}/${total} = ${(coverageRatio * 100).toFixed(0)}%, empty=${mapEmpty}) — V2 extractor fallback`
-      );
-      return null;
-    }
-    return result;
-  } catch (e) {
-    console.error(`[AGENTIC-PRIMARY] ${params.auditId} facts build failed (non-fatal, V2 fallback):`, e instanceof Error ? e.message : e);
-    return null;
-  }
-}
+// [V1/shadow purged 2026-06-28 — A4] buildAgenticFacts() removed — engine is 100% agentic (executeAgenticPrimary → auditPackage). See git history.
 
 // ── V3 PROVEN-ENGINE SHADOW (auditPackage → deriveVerdict) ──────────────────
 // The GRADUATED engine (6/6 gold, Brain-ratified) takes ONE fullSource string
@@ -273,61 +177,7 @@ export interface V3ShadowResult {
  *  otherwise) — so this shadow only does real work when BOTH that flag and
  *  AGENTIC_V3_SHADOW_ENABLED are set; otherwise it logs the throw and returns
  *  null (belt-and-suspenders against an accidental paid run). */
-export async function runDeriveVerdictShadow(params: {
-  auditId: string;
-  primaryName: string;
-  primaryBytes: Buffer | null;
-  primaryText: string | null;
-  attachments: Array<{ name: string; base64: string }> | null;
-}): Promise<V3ShadowResult | null> {
-  const t0 = Date.now();
-  try {
-    const docs = await buildAgenticDocs({
-      primaryName: params.primaryName,
-      primaryBytes: params.primaryBytes,
-      primaryText: params.primaryText,
-      attachments: params.attachments,
-    });
-    const fullSource = assembleFullSource(docs);
-    if (fullSource.replace(/\s/g, "").length < 200) {
-      console.warn(`[V3-SHADOW] ${params.auditId}: fullSource too thin (${fullSource.length} chars) — skipping`);
-      return null;
-    }
-    // bidderProfile null = unknown firm (the live customer path carries no firm
-    // attributes); the engine returns residual caution rather than a blind bar.
-    const res = await auditPackage({ fullSource, bidderProfile: null });
-    const out: V3ShadowResult = {
-      verdict: res.decision.verdict,
-      eligible: res.decision.eligible,
-      reason: res.decision.reason,
-      showStoppers: res.decision.showStoppers.length,
-      coverageComplete: res.coverage.missing.length === 0,
-      coverageMissing: res.coverage.missing,
-      findings: res.findings.length,
-      conflict: res.conflict,
-      sourceChars: fullSource.length,
-      docCount: docs.length,
-      engineMs: Date.now() - t0,
-    };
-    console.log(
-      `[V3-SHADOW] ${params.auditId}: verdict=${out.verdict} eligible=${out.eligible} ` +
-      `showStoppers=${out.showStoppers} coverage=${out.coverageComplete ? "COMPLETE" : `INCOMPLETE(${out.coverageMissing.join(",")})`} ` +
-      `findings=${out.findings} docs=${out.docCount} src=${(out.sourceChars / 1024).toFixed(0)}KB ms=${out.engineMs}`
-    );
-    return out;
-  } catch (e) {
-    console.error(`[V3-SHADOW] ${params.auditId} failed (non-fatal):`, e instanceof Error ? e.message : e);
-    return null;
-  }
-}
-
-/** Flag-gate — proven-engine (deriveVerdict) shadow runs only when enabled. */
-export const AGENTIC_V3_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_V3_SHADOW);
-
-/** Flag-gate — agentic shadow runs only when explicitly enabled. */
-export const AGENTIC_SHADOW_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC);
-/** Flag-gate — agentic PRIMARY (facts feed the rendered V2 report) when enabled. */
-export const AGENTIC_PRIMARY_ENABLED = isEnvOn(process.env.AUDIT_AGENTIC_PRIMARY);
+// [V1/shadow purged 2026-06-28 — A4] runDeriveVerdictShadow() removed — engine is 100% agentic (executeAgenticPrimary → auditPackage). See git history.
 
 /** Hole-B fix — the honest coverage-complete signal the verdict safety-gate consults.
  *   • feature OFF              → null  (no agentic claim; the renderer behaves exactly as pre-agentic)

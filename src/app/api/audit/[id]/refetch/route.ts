@@ -15,10 +15,12 @@
 //      explicit user-triggered re-run always re-invokes the current engine.
 //      The auto-watcher tick (POST with no body) still gets the cache.
 //   3. Rate limit (shares the existing audit:<user.id> bucket — 10/hr).
-//   4. fetchSolicitationByNoticeId() + fetchPdfFromSamUrl() to re-pull the
-//      SAM resource. If still no resourceLinks → 422 ("not fetchable").
-//   5. runAudit() with the new pdfBase64 / pdfFileId / image / text.
-//   6. UPDATE the audits row in place (replace, not new row — same id).
+//   4. fetchSolicitationByNoticeId() + assembleSamDocumentSet() to re-pull the
+//      FULL form-first document set (ingestion meta + attachments), falling back
+//      to a single fetchPdfFromSamUrl() doc. If no resourceLinks → 422.
+//   5. executeAudit() (agentic V3) with the assembled manifest + primary doc.
+//   6. UPDATE the audits row in place (replace, not new row — same id), refreshing
+//      the SAM facts (title/agency/deadline/NAICS/set-aside) the masthead reads.
 //   7. Return JSON the client uses to redirect / reload.
 
 import { NextResponse } from "next/server";
@@ -26,8 +28,11 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { runAudit, type PdfSource } from "@/lib/audit-engine";
+import { assembleSamDocumentSet, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
+import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V1 runAudit is RETIRED here
+import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
+import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { MAX_PDF_BYTES } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -139,7 +144,8 @@ export async function POST(
     );
   }
 
-  // ━━ Re-pull the PDF ━━
+  // ━━ Re-pull the document SET ━━
+  let pdfBuffer: Buffer | null = null;
   let pdfBase64: string | null = null;
   let pdfFileId: string | null = null;
   let imageBase64: string | null = null;
@@ -148,29 +154,56 @@ export async function POST(
   let extractedFormat: "docx" | "xlsx" | "doc" | "txt" | null = null;
   let pdfSource: PdfSource = "sam_unavailable";
   let pdfUnavailableReason: string | null = null;
-  try {
-    const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
-    if (fetched.bytes > MAX_PDF_BYTES) {
-      pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
-    } else if (fetched.kind === "pdf") {
-      if (fetched.fileId) {
-        pdfFileId = fetched.fileId;
-        pdfSource = "sam_pdf_via_files_api";
-      } else {
-        pdfBase64 = fetched.base64;
-        pdfSource = "sam_fetched";
-      }
-    } else if (fetched.kind === "image") {
-      imageBase64 = fetched.base64;
-      imageMediaType = fetched.mediaType;
-      pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
-    } else {
-      extractedText = fetched.extractedText;
-      extractedFormat = fetched.format;
-      pdfSource = "sam_text_extracted";
+  let attachmentPdfs: Array<{ name: string; base64: string; buffer: Buffer }> | null = null;
+  let primaryDocName: string | null = null;
+  let ingestion: IngestionMeta | null = null;
+
+  // R1 — assemble the FULL form-first multi-attachment set, identical to the main
+  // customer POST. Without the manifest the agentic engine has no document set to
+  // reconcile, so it forces documents_complete=false on every SAM refetch and
+  // export-gates an otherwise clean report. Manifest failure / no primary falls
+  // through to the legacy single-doc path below.
+  if (/^[a-f0-9]{32}$/i.test(solicitation.noticeId)) {
+    const assembled: AssembledDocumentSet | null = await assembleSamDocumentSet(solicitation.noticeId, solicitation.solicitationNumber).catch(() => null);
+    if (assembled?.primary) {
+      pdfBase64 = assembled.primary.base64;
+      pdfBuffer = assembled.primary.buffer;
+      pdfSource = "sam_fetched";
+      attachmentPdfs = assembled.attachments;
+      primaryDocName = assembled.primary.name;
+      ingestion = assembled.ingestion;
+    } else if (assembled) {
+      ingestion = assembled.ingestion;
     }
-  } catch (err) {
-    pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+  }
+
+  // Fallback — single primary doc (mirrors the main route) when assembly yields no primary.
+  if (!pdfBase64 && !pdfFileId) {
+    try {
+      const fetched = await fetchPdfFromSamUrl(solicitation.resourceLinks[0]);
+      if (fetched.bytes > MAX_PDF_BYTES) {
+        pdfUnavailableReason = `oversize (${(fetched.bytes / 1024 / 1024).toFixed(1)}MB > ${MAX_PDF_BYTES / 1024 / 1024}MB)`;
+      } else if (fetched.kind === "pdf") {
+        if (fetched.fileId) {
+          pdfFileId = fetched.fileId;
+          pdfBuffer = fetched.buffer ?? null;
+          pdfSource = "sam_pdf_via_files_api";
+        } else {
+          pdfBase64 = fetched.base64;
+          pdfSource = "sam_fetched";
+        }
+      } else if (fetched.kind === "image") {
+        imageBase64 = fetched.base64;
+        imageMediaType = fetched.mediaType;
+        pdfSource = fetched.resized ? "sam_image_resized" : "sam_image_extracted";
+      } else {
+        extractedText = fetched.extractedText;
+        extractedFormat = fetched.format;
+        pdfSource = "sam_text_extracted";
+      }
+    } catch (err) {
+      pdfUnavailableReason = err instanceof Error ? err.message.slice(0, 200) : "unknown fetch error";
+    }
   }
 
   // If still no usable content, mark and return — the panel stays in fetch
@@ -201,52 +234,82 @@ export async function POST(
     }
   }
 
-  // ━━ Run the audit ━━
+  // N5 — the firm's capability profile for the agentic eligibility lane (socioeconomic
+  // certs). Mirrors the main POST so a re-run can't diverge from the original verdict
+  // (e.g. a cert that cleared a set-aside bar must still clear it on refetch). Best-effort:
+  // any error → null (unknown firm, the conservative path). User is the RLS-scoped owner.
+  let bidderProfile = null;
+  try {
+    const { data: capRow } = await supabase
+      .from("capability_statements")
+      .select("certifications")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    bidderProfile = buildBidderProfileFromCapability(capRow);
+  } catch { /* unknown firm on any error — never block the re-run */ }
+
+  // ━━ Run the audit — the agentic V3 engine (same path as the main customer POST),
+  // NOT the retired V1 runAudit. executeAudit fills the row in place (verdict +
+  // engine='agentic_v3' marker + honest_fail/documents_complete). A tighter budget
+  // leaves the 300s route headroom for the SAM/PDF prologue above. ━━
+  const input: AuditExecutionInput = {
+    solicitation,
+    agency: resolveAgency(solicitation) || (audit.agency as string | null),
+    pdfBuffer,
+    pdfBase64,
+    pdfFileId,
+    imageBase64,
+    imageMediaType,
+    extractedText,
+    extractedFormat,
+    pdfSource,
+    pdfUnavailableReason,
+    attachmentPdfs,
+    primaryDocName,
+    ingestion,
+    bidderProfile,
+    agenticBudgetMs: 200_000
+  };
   let result;
   try {
-    result = await runAudit({ solicitation, pdfBase64, pdfFileId, imageBase64, imageMediaType, extractedText, extractedFormat, pdfSource, pdfUnavailableReason });
+    result = await executeAudit(supabase, audit.id as string, input);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // ━━ Update the audits row (replace, not new) ━━
-  const persistedComplianceJson = {
-    ...result.compliance.json,
-    score_confidence: result.score_confidence ?? null,
-    is_not_solicitation: result.is_not_solicitation ?? false,
-    notice_type: solicitation.type ?? compJson.notice_type ?? null,
-    last_refetched_at: new Date().toISOString()
-  };
-
-  const refreshedAgency = resolveAgency(solicitation) || (audit.agency as string | null);
-  // FA-151: keep the prior leaf if SAM omits the full path on refetch.
-  const refreshedOfficeLeaf = resolveOfficeLeaf(solicitation) ?? (audit.office_leaf as string | null);
-  const { error: updateError } = await supabase
-    .from("audits")
-    .update({
-      overview_summary: result.overview.summary,
-      overview_json: result.overview.json,
-      compliance_summary: result.compliance.summary,
-      compliance_json: persistedComplianceJson,
-      risks_summary: result.risks.summary,
-      risks_json: result.risks.json,
-      compliance_score: result.compliance_score,
-      recommendation: result.recommendation,
-      bid_recommendation: result.bid_recommendation,
-      document_type: result.classification.document_type,
-      document_type_rationale: result.classification.rationale,
-      document_type_confidence: result.classification.confidence,
-      agency: refreshedAgency,
-      office_leaf: refreshedOfficeLeaf,
-      title: solicitation.title ?? audit.title,
-      response_deadline: solicitation.responseDeadLine ?? audit.response_deadline,
-      status: "complete",
-      completed_at: new Date().toISOString()
-    })
-    .eq("id", audit.id);
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  // executeAudit replaced compliance_json with the V3 payload — merge back the refetch
+  // bookkeeping the idempotency cache + UI read (last_refetched_at, pdf_source), and
+  // refresh office_leaf (FA-151: keep the prior leaf if SAM omits the full path).
+  {
+    const { data: fresh } = await supabase.from("audits").select("compliance_json").eq("id", audit.id).single();
+    const freshCj = (fresh?.compliance_json as Record<string, unknown> | null) ?? {};
+    // R1 — refresh ONLY the facts the LIVE SAM record actually provides, so an
+    // amendment's new values land WITHOUT clobbering executeAudit's deterministic FACTS
+    // cross-ref (which may have already backfilled a column the live record left sparse)
+    // and never nulling a known-good value. Facts-vs-analysis law: never overwrite a
+    // good fact with a stale/empty one. (Bug found by the pre-deploy gate.)
+    const factRefresh: Record<string, unknown> = {
+      compliance_json: { ...freshCj, last_refetched_at: new Date().toISOString(), pdf_source: pdfSource }
+    };
+    const freshAgency = resolveAgency(solicitation);
+    const freshOffice = resolveOfficeLeaf(solicitation);
+    if (solicitation.title) factRefresh.title = solicitation.title;
+    if (freshAgency) factRefresh.agency = freshAgency;
+    if (solicitation.naicsCode) factRefresh.naics_code = solicitation.naicsCode;
+    if (solicitation.typeOfSetAside) factRefresh.set_aside = solicitation.typeOfSetAside;
+    if (solicitation.postedDate) factRefresh.posted_date = solicitation.postedDate;
+    if (solicitation.responseDeadLine) factRefresh.response_deadline = solicitation.responseDeadLine;
+    if (freshOffice) factRefresh.office_leaf = freshOffice;
+    const { error: mergeErr } = await supabase
+      .from("audits")
+      .update(factRefresh)
+      .eq("id", audit.id);
+    if (mergeErr) {
+      // The audit itself succeeded; only the refetch bookkeeping failed. Surface but
+      // don't fail the request — the report is already correct.
+      console.warn(`[refetch] compliance_json merge-back failed for ${audit.id}: ${mergeErr.message}`);
+    }
   }
 
   return NextResponse.json({
