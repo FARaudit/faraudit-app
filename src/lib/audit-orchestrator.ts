@@ -272,7 +272,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      universal bar — fixes the #1 false-NO_BID), and marks a specific socioeconomic set-aside (8(a)/HUBZone/
   //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
   //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
-  findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false" });
+  findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, { enabled: process.env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false", normalizeNoOneCanMoveSetAside: process.env.AUDIT_SETASIDE_OVERTYPE_GUARD === "true" }); // card 164/167 guard-fix (default-OFF): a mis-typed no_one_can_move pure set-aside → curable caution, never false INELIGIBLE
 
   // P4.3a — SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1), default-OFF (=== "true"). The
   //      Total-Small-Business / size pool the award-basis guard leaves untouched: a set-aside a lens vouched
