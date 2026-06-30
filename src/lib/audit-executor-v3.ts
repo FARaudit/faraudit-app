@@ -21,6 +21,7 @@ import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor
 import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
+import { isHonestFail, billable, decrementAuditQuota } from "./audit-billing";
 import type { IngestionMeta } from "./sam-attachments";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
@@ -47,8 +48,6 @@ function verdictToRecommendation(v: string): "PROCEED" | "PROCEED_WITH_CAUTION" 
     default: return "PROCEED_WITH_CAUTION"; // BID_WITH_CAUTION · NEEDS_HUMAN_REVIEW · INCOMPLETE
   }
 }
-
-const HONEST_FAIL = new Set(["INCOMPLETE", "NEEDS_HUMAN_REVIEW"]);
 
 /** Pre-run manifest-completeness for the VERDICT cap (limit N8 + the null-SAM false-green
  *  BLOCKER the panel caught). MUST agree with the documents-path completeness below, else
@@ -171,7 +170,11 @@ export async function executeAgenticPrimary(
   }
   const docsIncomplete = assembled.truncated || (!!payload.documents && (!payload.documents.reconciled || !payload.documents.complete));
   const recommendation = verdictToRecommendation(res.decision.verdict);
-  const honestFail = HONEST_FAIL.has(res.decision.verdict);
+  // SINGLE source of truth for honest-fail (Step 9). ORs all four signals → one persisted field read by
+  // billing, the report banner, and the watcher email. In the LIVE engine path only `verdict` is produced
+  // (INCOMPLETE / NEEDS_HUMAN_REVIEW); outOfScope + panelHonestFailure live in the not-yet-wired
+  // agentic-panel-runner and default false here — the predicate is ready for them once that path is wired.
+  const honestFail = isHonestFail({ verdict: res.decision.verdict });
 
   await markStage(supabase, auditId, "assembly");
 
@@ -225,6 +228,16 @@ export async function executeAgenticPrimary(
     if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
   }
   if (persistErr) throw new Error(`agentic persist failed after 3 attempts: ${persistErr}`);
+
+  // STEP 9 (AUDIT_HONESTFAIL_NO_CHARGE, default-OFF) — USAGE LEDGER (Brain schema B). Append ONE usage_events
+  // row per COMPLETED audit, with `billable` stamped at decision time: a customer is charged ONLY for a delivered
+  // COMMITTAL verdict; with the flag ON an honest-fail (the single honest_fail field above) stamps billable=false
+  // (no charge). Flag OFF ⇒ billable always true ⇒ every row billable=true (byte-identical: the table is absent
+  // pre-migration ⇒ the insert is a logged no-op). Shared by the customer POST and the watcher (both route here).
+  // Idempotent + FAILS SAFE (never throws) ⇒ runs AFTER a successful persist and can never block an audit.
+  const isBillable = billable(honestFail);
+  await decrementAuditQuota(supabase, auditId, { billable: isBillable, honestFail, verdict: res.decision.verdict });
+
   console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${!docsIncomplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
 
   return { recommendation, compliance_score: null, bid_recommendation: completeUpdate.bid_recommendation };
