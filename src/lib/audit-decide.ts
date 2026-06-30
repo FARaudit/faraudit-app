@@ -268,7 +268,7 @@ export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?
   });
 }
 
-export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
@@ -297,7 +297,14 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // an exportable caution (final-greenlight EXPLOIT-3). AND a structural-bar exclusion (the same
     // NON_SELF_CLEARABLE_BAR_RE firmStatus uses) so a clearance/sole-source/size bar is never
     // softened even if it names a set-aside; a PURE set-aside (no structural language) still softens.
-    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
+    //     GUARD-FIX (card 164/167, AUDIT_SETASIDE_OVERTYPE_GUARD, default-OFF): a lens may MIS-TYPE a pure
+    //     socioeconomic set-aside as `no_one_can_move` (a who-can-win bar is never truly universal). Under the
+    //     new opt, include `no_one_can_move` in the softened set so it normalizes to a curable caution like the
+    //     bidder_cannot_move path — never a false INELIGIBLE under a null/open-world profile (zero-contract-loss).
+    //     PER-FINDING: this re-types ONLY the matched set-aside finding; a coexisting genuine universal bar
+    //     (sole-source/brand-name — excluded by NON_SELF_CLEARABLE_BAR_RE, never matches SOCIOECONOMIC_SETASIDE_RE)
+    //     is untouched and still reaches Step 3. Opt false ⇒ this clause is byte-identical to before.
+    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move" || (opts?.normalizeNoOneCanMoveSetAside === true && f.controllability === "no_one_can_move")))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
     return f;
   });
