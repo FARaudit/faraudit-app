@@ -6,7 +6,7 @@
 // new opt `normalizeNoOneCanMoveSetAside` on applyAwardBasisOvertypeGuard (flag AUDIT_SETASIDE_OVERTYPE_GUARD,
 // default-OFF). Pure functions, no engine calls, flag INJECTED via the opt (no env mutation).
 import { readFileSync } from "node:fs";
-import { applyAwardBasisOvertypeGuard, deriveVerdict } from "./audit-decide";
+import { applyAwardBasisOvertypeGuard, deriveVerdict, setAsideOvertypeGuardOpts } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
 import { keySha256, type JudgmentKey } from "../../scripts/audit-ai/judgment-score";
 
@@ -137,6 +137,44 @@ console.log("── 7 · CARD 185 FROZEN NEGATIVE ANCHOR (SP3300-26-Q-0165, real
 
   // 7c · structural regression: SPRDL125Q0030-shape sole-source bar stays INELIGIBLE even in nhr mode — covered green by test #6 above.
   console.log("   (7c structural-regression: SPRDL125Q0030-shape stays INELIGIBLE in nhr mode — asserted green in block #6)");
+}
+
+console.log("── 8 · CARD 187 ORCHESTRATOR WIRING: setAsideOvertypeGuardOpts(env) — env → opts → verdict (the exact helper the orchestrator calls, no env mutation) ──");
+{
+  // The orchestrator gate (audit-orchestrator.ts) is a one-liner:
+  //   applyAwardBasisOvertypeGuard(findings, profile, setAsideOvertypeGuardOpts(process.env))
+  // so testing this pure helper + the guard + deriveVerdict against the frozen fixture is the orchestrator-level
+  // proof of the wiring. env is passed as a plain object — no process.env mutation.
+  const frozen = JSON.parse(readFileSync("scripts/audit-ai/gold-sets/SP3300-26-Q-0165-setaside-overtype-neg.judgment.frozen.json", "utf8")) as { injectedFinding: TypedFinding & { _mark?: string } };
+  const { _mark, ...f } = frozen.injectedFinding; void _mark;
+  const injected = f as TypedFinding;
+
+  // 8a · flag "true" → opts carry HARDCODED "nhr", NO normalize key; end-to-end → NEEDS_HUMAN_REVIEW, eligible not false.
+  {
+    const opts = setAsideOvertypeGuardOpts({ AUDIT_SETASIDE_OVERTYPE_GUARD: "true" });
+    assert(opts.setAsideOvertypeDisposition === "nhr", `flag ON → opts.setAsideOvertypeDisposition = "nhr" (got ${opts.setAsideOvertypeDisposition})`);
+    assert(!("normalizeNoOneCanMoveSetAside" in opts), "flag ON → NO normalizeNoOneCanMoveSetAside key");
+    assert(opts.enabled === true, "flag ON → enabled true (AWARDBASIS default-ON)");
+    const d = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, opts), ...base });
+    assert(d.verdict === "NEEDS_HUMAN_REVIEW" && d.eligible !== false, `flag ON end-to-end → NEEDS_HUMAN_REVIEW, eligible not false (got ${d.verdict}/${d.eligible})`);
+  }
+
+  // 8b · flag unset AND flag="false" → opts byte-identical to pre-card-187 ({ enabled, normalizeNoOneCanMoveSetAside:false },
+  //      NO disposition key); end-to-end → INELIGIBLE (inert / current behavior).
+  for (const env of [{}, { AUDIT_SETASIDE_OVERTYPE_GUARD: "false" }] as Record<string, string | undefined>[]) {
+    const opts = setAsideOvertypeGuardOpts(env);
+    const label = "AUDIT_SETASIDE_OVERTYPE_GUARD" in env ? `="${(env as Record<string,string>).AUDIT_SETASIDE_OVERTYPE_GUARD}"` : "unset";
+    assert(opts.setAsideOvertypeDisposition === undefined && opts.normalizeNoOneCanMoveSetAside === false && opts.enabled === true,
+      `flag ${label} → opts identical to pre-change { enabled:true, normalizeNoOneCanMoveSetAside:false }, no disposition`);
+    const d = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, opts), ...base });
+    assert(d.verdict === "INELIGIBLE", `flag ${label} end-to-end → INELIGIBLE (inert) (got ${d.verdict})`);
+  }
+
+  // 8c · enabled honors AUDIT_AWARDBASIS_OVERTYPE_GUARD="false" (whole guard disabled → findings pass through).
+  {
+    const opts = setAsideOvertypeGuardOpts({ AUDIT_AWARDBASIS_OVERTYPE_GUARD: "false", AUDIT_SETASIDE_OVERTYPE_GUARD: "true" });
+    assert(opts.enabled === false, "AUDIT_AWARDBASIS_OVERTYPE_GUARD=false → opts.enabled false (guard off entirely)");
+  }
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`} — guard-fix (AUDIT_SETASIDE_OVERTYPE_GUARD).`);
