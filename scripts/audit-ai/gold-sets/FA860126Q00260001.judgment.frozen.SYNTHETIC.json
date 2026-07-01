@@ -8,10 +8,10 @@
   "acquisitionPart": "PART_12",
   "_acquisitionPart_basis": "source-grounded (NOT assumed): FAR Part 12 Commercial Products/Services buy — 52.212-1/-2/-3/-4/-5 all present in the base solicitation; §M is '52.212-2 Evaluation-Commercial Products and Commercial Services'; notice type = Combined Synopsis/Solicitation. No FAR Part 15 'contracting by negotiation' / 52.215-x negotiated clauses (the 52.215-7992/7994 present are AF local ombudsman provisions, not negotiated-procurement clauses).",
   "expectedVerdict": {
-    "verdict": "BID_WITH_CAUTION",
+    "verdict": "NO_BID",
     "eligible": true,
-    "maxShowStoppers": 0,
-    "reason": "Under the Option-1 temporal doctrine (Brain card 141/143), a Government-controlled four-corners delivery tension — a NON-WAIVABLE ~60-day First Article testing precondition before any production delivery (Synthetic Clause 1) vs a 30-day-ARO production window (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3) — surfaces as a HIGH-CONFIDENCE KO-clarify CAUTION (confirm the binding production window against the non-waivable FAT gate before bidding), NOT an automatic NO_BID. Deterministic identification of the production window from messy Section-F text proved unreliable across 7 adversarial rounds, so the temporal arm never escalates to NO_BID (reserved for cleanly-named hard gates); the tension is floored to BID_WITH_CAUTION. eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the surfaced item is the schedule tension, routed to caution not disqualification."
+    "maxShowStoppers": 1,
+    "reason": "A single Government-controlled, four-corners delivery contradiction makes performance physically impossible for EVERY offeror: the [SYNTHETIC-ADVERSARIAL] mod imposes a NON-WAIVABLE 60-day First Article testing precondition before any production delivery (Synthetic Clause 1) while mandating production delivery within 30 days ARO (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3). 60 > 30, so no bidder can comply regardless of capability — a universal walk-away (NO_BID), NOT a bidder-specific bar (which would be INELIGIBLE, the pole already anchored by #3). eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the defeat is the schedule, not eligibility. A wage-determination or set-aside/eligibility flag must NOT be raised."
   },
   "namedGates": [
     {
