@@ -5,8 +5,10 @@
 // must normalize to a CURABLE CAUTION (BID_WITH_CAUTION), never INELIGIBLE — zero-contract-loss. The fix is the
 // new opt `normalizeNoOneCanMoveSetAside` on applyAwardBasisOvertypeGuard (flag AUDIT_SETASIDE_OVERTYPE_GUARD,
 // default-OFF). Pure functions, no engine calls, flag INJECTED via the opt (no env mutation).
+import { readFileSync } from "node:fs";
 import { applyAwardBasisOvertypeGuard, deriveVerdict } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
+import { keySha256, type JudgmentKey } from "../../scripts/audit-ai/judgment-score";
 
 let failures = 0;
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
@@ -94,6 +96,47 @@ console.log("── 6 · SCOPE-GUARD (SPRDL125Q0030-shape): structural sole-sour
   const d = deriveVerdict({ findings: g, ...base });
   assert(d.verdict === "INELIGIBLE", `structural bar still drives INELIGIBLE (got ${d.verdict})`);
   assert(d.eligible === false, `eligible === false (got ${d.eligible})`);
+}
+
+console.log("── 7 · CARD 185 FROZEN NEGATIVE ANCHOR (SP3300-26-Q-0165, real WOSB doc + synthetic-adversarial injected finding) ──");
+{
+  // Load the FROZEN fixture (card 185) — NOT an inline hand-built shape. Real card-183 doc identity in
+  // `manifest`; the ONE injected finding is a synthetic-adversarial mis-type (WOSB set-aside typed no_one_can_move).
+  const KEY_PATH = "scripts/audit-ai/gold-sets/SP3300-26-Q-0165-setaside-overtype-neg.judgment.frozen.json";
+  const frozen = JSON.parse(readFileSync(KEY_PATH, "utf8")) as JudgmentKey & {
+    injectedFinding: TypedFinding & { _mark?: string };
+    guardConfig: { setAsideOvertypeDisposition: "nhr" | "caution" };
+    expectedVerdict: { verdict: string };
+  };
+  // 7.0 tamper check — recompute == stamped (frozen key is immutable; uses the SAME keySha256 the stamp used).
+  assert(keySha256(frozen) === frozen.adjudication?.keySha256, `frozen key tamper-hash recompute == stamped (${(frozen.adjudication?.keySha256 ?? "").slice(0, 12)}…)`);
+  assert(frozen.bidderProfile === null, "frozen anchor profile is null (open-world)");
+
+  const { _mark, ...finding } = frozen.injectedFinding; void _mark;
+  const injected = finding as TypedFinding;
+
+  // 7a · flag ON + disposition "nhr" (from guardConfig) → terminal NEEDS_HUMAN_REVIEW, eligible not false.
+  {
+    const disp = frozen.guardConfig.setAsideOvertypeDisposition;
+    const g = applyAwardBasisOvertypeGuard([injected], null, { enabled: true, setAsideOvertypeDisposition: disp });
+    assert(g[0].controllability === "bidder_cannot_move" && g[0].curableInWindow === false, "nhr disposition → non-curable bidder_cannot_move bar");
+    const d = deriveVerdict({ findings: g, ...base });
+    assert(d.verdict === "NEEDS_HUMAN_REVIEW", `verdict = NEEDS_HUMAN_REVIEW (got ${d.verdict})`);
+    assert(d.verdict === frozen.expectedVerdict.verdict, `matches frozen expectedVerdict.verdict (${frozen.expectedVerdict.verdict})`);
+    assert(d.eligible !== false, `eligible !== false (got ${d.eligible})`);
+  }
+
+  // 7b · flag OFF, and opt/disposition UNSET → byte-identical current behavior (finding falls through unchanged → INELIGIBLE).
+  {
+    const flagOff = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: false, setAsideOvertypeDisposition: frozen.guardConfig.setAsideOvertypeDisposition }), ...base });
+    const optUnset = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: true }), ...base });
+    const raw = deriveVerdict({ findings: [injected], ...base });
+    assert(flagOff.verdict === raw.verdict && optUnset.verdict === raw.verdict, `flag OFF & opt unset both byte-identical to raw (${raw.verdict})`);
+    assert(raw.verdict === "INELIGIBLE", `current behavior = INELIGIBLE (got ${raw.verdict}) — proves disposition is load-bearing`);
+  }
+
+  // 7c · structural regression: SPRDL125Q0030-shape sole-source bar stays INELIGIBLE even in nhr mode — covered green by test #6 above.
+  console.log("   (7c structural-regression: SPRDL125Q0030-shape stays INELIGIBLE in nhr mode — asserted green in block #6)");
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`} — guard-fix (AUDIT_SETASIDE_OVERTYPE_GUARD).`);
