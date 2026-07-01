@@ -7,7 +7,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { detectConstructionOutOfScope } from "../../src/lib/section-boundary-detector";
 
-const GOLD_DIR = "scripts/audit-ai/gold-sets";
+export const GOLD_DIR = "scripts/audit-ai/gold-sets";
 
 export type GoldKeyType = "full_verdict" | "oos_detection";
 export interface ResolvedGoldKey { solId: string; keyType: GoldKeyType; activeVersion: string; file: string; path: string; }
@@ -22,11 +22,18 @@ export function resolveGoldKey(solId: string): ResolvedGoldKey {
   return { solId, keyType: e.key_type, activeVersion: e.active_version, file: e.file, path: path.join(GOLD_DIR, e.file) };
 }
 
+/** Canonical source-of-record PATH for a sol — certified-complete if present, else the plain dump.
+ *  The ONE notion of "the source file for a sol" (card 190): loaders/verifiers resolve through here
+ *  instead of hand-rolling their own candidate lists. */
+export function goldSourcePath(solId: string, dir: string = GOLD_DIR): string {
+  const complete = path.join(dir, `${solId}-FULL-SOURCE.complete.txt`);
+  const plain = path.join(dir, `${solId}-FULL-SOURCE.txt`);
+  return existsSync(complete) ? complete : plain;
+}
+
 /** Source-of-record text for a sol — certified-complete if present, else the plain dump. */
 export function goldSource(solId: string): string {
-  const complete = path.join(GOLD_DIR, `${solId}-FULL-SOURCE.complete.txt`);
-  const plain = path.join(GOLD_DIR, `${solId}-FULL-SOURCE.txt`);
-  return readFileSync(existsSync(complete) ? complete : plain, "utf8");
+  return readFileSync(goldSourcePath(solId), "utf8");
 }
 
 /** $0 grade of an oos_detection key: run the deterministic detector over the source, expect OUT_OF_SCOPE
