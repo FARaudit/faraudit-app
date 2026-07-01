@@ -100,7 +100,10 @@
       "sourceSha256": "82f0bbad2fa0d4c1cd0eb96ba93bf71eafbbd8de647453863511bf3dee28923a",
       "keySha256": "b8b00b0036e9e9d0ca9d47d6e574c92e446b3b8ea5d59f21182d3785521d6c48",
       "ruling": "Brain card 177 (nhr disposition, PR#111 8567260) + card 185 (author+freeze)",
-      "note": "Negative anchor: proves a pure socioeconomic set-aside mis-typed no_one_can_move, under null profile, flag ON + nhr → NEEDS_HUMAN_REVIEW (honest-fail, eligible not false), never a false INELIGIBLE. Flag OFF / opt unset → INELIGIBLE (disposition is load-bearing). Structural bars (NON_SELF_CLEARABLE_BAR_RE) untouched. Flag+opt remain OFF/unwired in prod."
+      "note": "Negative anchor: proves a pure socioeconomic set-aside mis-typed no_one_can_move, under null profile, flag ON + nhr → NEEDS_HUMAN_REVIEW (honest-fail, eligible not false), never a false INELIGIBLE. Flag OFF / opt unset → INELIGIBLE (disposition is load-bearing). Structural bars (NON_SELF_CLEARABLE_BAR_RE) untouched. Flag+opt remain OFF/unwired in prod.",
+      "scope": "deriveVerdict-unit",
+      "pipeline_live_scope_note": "Live-pipeline reproduction requires coverageComplete=true, which is UNREACHABLE on this Part-12 commercial combined RFQ under current coverage rules (card 192 run evidence 2026-07-01: live verdict INCOMPLETE — honest-fail no-charge proven live, quota NOT decremented; the set-aside→NHR disposition is pre-empted at the coverage gate before deriveVerdict step-5b). expected_verdict remains VALID at deriveVerdict-unit scope (src/lib/audit-decide-setaside-overtype.test.ts). Frozen artifacts untouched.",
+      "card": "192 (paid run 2026-07-01) + 193 (scope annotation)"
     }
   }
 }
