@@ -268,7 +268,7 @@ export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?
   });
 }
 
-export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean }): TypedFinding[] {
+export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" | "caution" }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
@@ -304,8 +304,23 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     //     PER-FINDING: this re-types ONLY the matched set-aside finding; a coexisting genuine universal bar
     //     (sole-source/brand-name — excluded by NON_SELF_CLEARABLE_BAR_RE, never matches SOCIOECONOMIC_SETASIDE_RE)
     //     is untouched and still reaches Step 3. Opt false ⇒ this clause is byte-identical to before.
-    if ((profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay) && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move" || (opts?.normalizeNoOneCanMoveSetAside === true && f.controllability === "no_one_can_move")))
+    const setAsideSoftenable = (profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay);
+    // already_satisfied / bidder_cannot_move socioeconomic set-aside → curable caution (unchanged, opt-independent).
+    if (setAsideSoftenable && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
+    // CARD 177 RULING: a mis-typed `no_one_can_move` socioeconomic set-aside (a who-can-win bar is never truly
+    // universal) routes per the CALLER'S disposition — an honest-fail choice, opt-gated (still behind the
+    // default-OFF AUDIT_SETASIDE_OVERTYPE_GUARD via `enabled`). NHR is the conservative default for the pole:
+    //   "nhr"     → non-curable bidder_cannot_move bar → deriveVerdict step-5b → NEEDS_HUMAN_REVIEW (never a
+    //               false INELIGIBLE, never a silent BID) — zero-contract-loss.
+    //   "caution" (or legacy normalizeNoOneCanMoveSetAside===true) → curable caution like the bidder_cannot_move path.
+    //   neither set → UNTOUCHED (byte-identical to pre-ruling — the finding falls through unchanged).
+    if (setAsideSoftenable && f.controllability === "no_one_can_move") {
+      if (opts?.setAsideOvertypeDisposition === "nhr")
+        return { ...f, controllability: "bidder_cannot_move", curableInWindow: false, awardBasisGuard: true };
+      if (opts?.setAsideOvertypeDisposition === "caution" || opts?.normalizeNoOneCanMoveSetAside === true)
+        return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
+    }
     return f;
   });
 }

@@ -70,5 +70,31 @@ console.log("── 4 · flag-OFF byte-identical: guard output identical with op
   assert(a.controllability === "bidder_controls" && b.controllability === "bidder_controls", "existing bidder_cannot_move set-aside path unchanged by the opt");
 }
 
+console.log("── 5 · CARD 177 RULING: nhr disposition — mis-typed no_one_can_move SDVOSB + null → NEEDS_HUMAN_REVIEW (honest-fail, NOT INELIGIBLE) ──");
+{
+  const g = applyAwardBasisOvertypeGuard([setAside()], null, { enabled: true, setAsideOvertypeDisposition: "nhr" });
+  assert(g[0].controllability === "bidder_cannot_move" && g[0].curableInWindow === false, "nhr disposition → non-curable bidder_cannot_move bar (not universal, not curable)");
+  const d = deriveVerdict({ findings: g, ...base });
+  assert(d.verdict === "NEEDS_HUMAN_REVIEW", `verdict = NEEDS_HUMAN_REVIEW (got ${d.verdict})`);
+  assert(d.eligible !== false, `eligible !== false (got ${d.eligible})`);
+}
+
+console.log("── 6 · SCOPE-GUARD (SPRDL125Q0030-shape): structural sole-source bar UNTOUCHED → stays INELIGIBLE, even in nhr mode ──");
+{
+  // Carries an 8(a) token AND sole-source / named-firm / no-substitute STRUCTURAL language — NON_SELF_CLEARABLE_BAR_RE
+  // must win so the guard never softens (nor NHRs) a genuine structural bar the way it does a PURE set-aside.
+  const structural = (): TypedFinding => ({
+    requirement: "This 8(a) award is a sole-source directed to named firm ABC Corp; no substitute or alternate will be accepted.",
+    citation: "§B / approved-source", excerpt: "sole source, no substitute, directed to named firm",
+    kind: "eligibility_bar", controllability: "no_one_can_move", grounded: true, lens: "former_ko",
+    requiredAttribute: "se:8a", curableInWindow: false,
+  });
+  const g = applyAwardBasisOvertypeGuard([structural()], null, { enabled: true, setAsideOvertypeDisposition: "nhr" });
+  assert(g[0].controllability === "no_one_can_move", "structural bar LEFT UNTOUCHED (NON_SELF_CLEARABLE_BAR_RE exclusion wins over the 8(a) token)");
+  const d = deriveVerdict({ findings: g, ...base });
+  assert(d.verdict === "INELIGIBLE", `structural bar still drives INELIGIBLE (got ${d.verdict})`);
+  assert(d.eligible === false, `eligible === false (got ${d.eligible})`);
+}
+
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`} — guard-fix (AUDIT_SETASIDE_OVERTYPE_GUARD).`);
 process.exit(failures === 0 ? 0 : 1);
