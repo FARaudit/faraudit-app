@@ -325,6 +325,19 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
   });
 }
 
+/** Card 187: the orchestrator's env → opts mapping for the setaside-overtype guard, factored out so the wiring
+ *  is unit-testable and cannot drift from the orchestrator gate (which calls this exact helper). Rule 61: flag
+ *  AUDIT_SETASIDE_OVERTYPE_GUARD OFF/unset → byte-identical to pre-card-187 ({ enabled, normalizeNoOneCanMoveSetAside:
+ *  false }, NO disposition key). Flag === "true" → HARDCODED "nhr" disposition (Brain card 177/187 ruling — a
+ *  mis-typed no_one_can_move socioeconomic set-aside → NEEDS_HUMAN_REVIEW); there is no env knob for the disposition
+ *  itself. `enabled` continues to honor AUDIT_AWARDBASIS_OVERTYPE_GUARD (default-ON) unchanged. Pure. */
+export function setAsideOvertypeGuardOpts(env: Record<string, string | undefined>): { enabled: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" } {
+  const enabled = env.AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false";
+  return env.AUDIT_SETASIDE_OVERTYPE_GUARD === "true"
+    ? { enabled, setAsideOvertypeDisposition: "nhr" }
+    : { enabled, normalizeNoOneCanMoveSetAside: false };
+}
+
 // ── SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1) ──
 // The Total-Small-Business / size pool the award-basis guard deliberately leaves untouched (it handles only the
 // SPECIFIC socioeconomic set-asides). A set-aside/size finding a lens vouched `already_satisfied` ("firm qualifies")
