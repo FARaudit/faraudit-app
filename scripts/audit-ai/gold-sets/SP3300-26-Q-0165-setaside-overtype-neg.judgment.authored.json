@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "0.5-setaside-overtype-anchor",
+  "packageId": "SP3300-26-Q-0165",
+  "keyName": "SP3300-26-Q-0165-setaside-overtype-neg",
+  "key_type": "full_verdict",
+  "_title": "Office chairs (HON or-equal) — DLA Distribution — 100% WOSB set-aside [SETASIDE-OVERTYPE NEGATIVE ANCHOR]",
+  "_provenance": "DUAL. (1) DOCUMENT = REAL: base solicitation SP3300-26-Q-0165 fetched from SAM.gov (DLA Distribution, DDSP office chairs, NAICS 337214), card 183 socioeconomic-set-aside pull (2026-07-01). Raw source of record: scripts/audit-ai/gold-sets/SP3300-26-Q-0165-FULL-SOURCE.txt. Doc-verified qualifying per card 183: body-prose set-aside statement (line 172, verbatim below), operative WOSB clause 52.219-30 present (line 295), 52.219-6 Total-SB ABSENT (pure WOSB, no Total-SB ambiguity), no coexisting structural bar (the only brand reference is 'Similar or equal to HON Model#' = or-equal, competition open). RULE 64 satisfied at card 183 — NOT re-litigated here. (2) INJECTED FINDING = SYNTHETIC / FRONTIER-ADVERSARIAL: the single injectedFinding below is NOT extracted from the document — it is a deliberately MIS-TYPED shape (a lens erroneously typing this pure who-can-win set-aside as no_one_can_move + eligibility_bar). A who-can-win socioeconomic set-aside is never a truly universal bar; the mistype is the adversarial condition under test.",
+  "_purpose": "Negative anchor for AUDIT_SETASIDE_OVERTYPE_GUARD disposition \"nhr\" (Brain card 177 ruling, merged dormant PR#111 8567260). Proves: a pure socioeconomic set-aside MIS-TYPED no_one_can_move, under a NULL profile, with the flag ON + disposition \"nhr\", routes to NEEDS_HUMAN_REVIEW (honest-fail, eligible NOT false) — NEVER a false INELIGIBLE and never a silent BID. Zero-contract-loss.",
+  "_suiteRole": "SETASIDE-OVERTYPE negative anchor. Runnable GUARD fixture (fed through applyAwardBasisOvertypeGuard → deriveVerdict), NOT a live-engine concept-presence JudgmentKey. Registered under gold-set-registry.json → setasideOvertypeAnchors (a dedicated section), NOT the active `keys` block — it is flag+disposition-dependent and would NOT reproduce NEEDS_HUMAN_REVIEW under default flags, so it must never enter the live graduation/grade set.",
+  "_authoringMethod": "Code materializes Brain's card-185 spec against the card-183 doc-verified source. Code does NOT author judgment; the expected disposition is Brain's card-177 ruling.",
+  "_schema_note": "0.5-setaside-overtype-anchor: a guard-anchor variant. Carries a `manifest` (real doc identity + verbatim cite), a single `injectedFinding` (TypedFinding shape, synthetic-adversarial), a `guardConfig` (the flag+opt under test), and an `expectedVerdict`. It deliberately OMITS the concept-presence arrays (namedGates/showStoppers/cautionItems/decoys) of the 0.3/0.4 live-grade keys because it is not graded against a live engine run. keySha256 hashes the whole key minus the adjudication block, exactly like the 0.3/0.4 keys.",
+  "asOfProcurementLawDate": "2026-07-01",
+  "acquisitionPart": "PART_12",
+  "bidderProfile": null,
+  "manifest": {
+    "solicitationNumber": "SP3300-26-Q-0165",
+    "noticeId": "54b5cc3260de4a169709781df7d80281",
+    "title": "DDSP Office Chairs - SP3300-26-Q-0165",
+    "issuingAgency": "DEPT OF DEFENSE.DEFENSE LOGISTICS AGENCY.DLA DISTRIBUTION.DLA DISTRIBUTION",
+    "naics": "337214",
+    "psc": "7110",
+    "type": "Combined Synopsis/Solicitation",
+    "setAsideDocVerified": "100% Women-Owned Small Business (WOSB)",
+    "setAsideVerbatimCite": "SP3300-26-Q-0165-FULL-SOURCE.txt line 172: \"This acquisition is being solicited as a 100% women-owned small business set-aside (WOSB).\"",
+    "operativeClause": "FAR 52.219-30 (Notice of Set-Aside for, or Sole Source Award to, WOSB concerns eligible under the WOSB Program) — present at FULL-SOURCE line 295; FAR 52.219-6 (Total Small Business) ABSENT.",
+    "structuralBarScreen": "CLEAN — no sole-source/brand-name-only/QPL/QML/clearance/size-restriction bar. Only brand reference is \"Similar or equal to HON Model#\" (or-equal, competition open).",
+    "card183": "Card 183 (Code → Brain) shortlist — recommended primary negative anchor; RULE 64 doc-verified qualifying."
+  },
+  "injectedFinding": {
+    "_mark": "SYNTHETIC / FRONTIER-ADVERSARIAL — NOT extracted from the document. Deliberate mis-type: pure WOSB who-can-win set-aside typed as no_one_can_move + eligibility_bar. Matches SOCIOECONOMIC_SETASIDE_RE (women-owned / WOSB) on `requirement`; does NOT match NON_SELF_CLEARABLE_BAR_RE on requirement+excerpt (no structural language; size-standard/employee text deliberately excluded so the structural exclusion cannot fire).",
+    "requirement": "This acquisition is being solicited as a 100% women-owned small business set-aside (WOSB); award is restricted to women-owned small business concerns.",
+    "citation": "FAR 52.219-30",
+    "excerpt": "This acquisition is being solicited as a 100% women-owned small business set-aside (WOSB).",
+    "kind": "eligibility_bar",
+    "controllability": "no_one_can_move",
+    "grounded": true,
+    "lens": "contracts_attorney",
+    "requiredAttribute": "se:wosb",
+    "curableInWindow": false
+  },
+  "guardConfig": {
+    "flag": "AUDIT_SETASIDE_OVERTYPE_GUARD",
+    "enabled": true,
+    "setAsideOvertypeDisposition": "nhr"
+  },
+  "expectedVerdict": {
+    "verdict": "NEEDS_HUMAN_REVIEW",
+    "eligibleAssertion": "!== false",
+    "maxShowStoppers": 0,
+    "honestFailClass": true,
+    "quotaCharge": false,
+    "reason": "Flag ON + disposition \"nhr\": applyAwardBasisOvertypeGuard re-types the mis-typed no_one_can_move socioeconomic set-aside to a non-curable bidder_cannot_move bar (controllability=bidder_cannot_move, curableInWindow=false); deriveVerdict step-5b under a null profile → NEEDS_HUMAN_REVIEW, eligible not false. Honest-fail (no quota charge). Flag OFF or disposition unset → byte-identical current behavior: the finding falls through unchanged (no_one_can_move eligibility_bar) → INELIGIBLE — which is why the disposition is load-bearing."
+  }
+}

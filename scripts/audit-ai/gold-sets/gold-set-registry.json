@@ -75,5 +75,25 @@
       ]
     }
   },
-  "held": {}
+  "held": {},
+  "setasideOvertypeAnchors": {
+    "_comment": "Flag+disposition-dependent GUARD anchors — deliberately NOT in the active `keys` block (they would NOT reproduce their expected verdict under default flags, so they must never enter the live graduation/grade set). Runnable through applyAwardBasisOvertypeGuard → deriveVerdict in src/lib/audit-decide-setaside-overtype.test.ts. Frozen-key convention (tamper hash + dual provenance) still applies.",
+    "SP3300-26-Q-0165-setaside-overtype-neg": {
+      "key_type": "full_verdict",
+      "kind": "setaside_overtype_negative_anchor",
+      "file": "SP3300-26-Q-0165-setaside-overtype-neg.judgment.frozen.json",
+      "source_file": "SP3300-26-Q-0165-FULL-SOURCE.txt",
+      "document_provenance": "REAL (SAM.gov, DLA Distribution, card 183 pull 2026-07-01, doc-verified WOSB set-aside, verbatim cite line 172)",
+      "injected_finding_provenance": "SYNTHETIC / FRONTIER-adversarial (WOSB set-aside deliberately mis-typed no_one_can_move + eligibility_bar)",
+      "guard": { "flag": "AUDIT_SETASIDE_OVERTYPE_GUARD", "enabled": true, "setAsideOvertypeDisposition": "nhr" },
+      "expected_verdict": "NEEDS_HUMAN_REVIEW",
+      "expected_eligible": "!== false",
+      "honest_fail_class": true,
+      "quota_charge": false,
+      "sourceSha256": "82f0bbad2fa0d4c1cd0eb96ba93bf71eafbbd8de647453863511bf3dee28923a",
+      "keySha256": "b8b00b0036e9e9d0ca9d47d6e574c92e446b3b8ea5d59f21182d3785521d6c48",
+      "ruling": "Brain card 177 (nhr disposition, PR#111 8567260) + card 185 (author+freeze)",
+      "note": "Negative anchor: proves a pure socioeconomic set-aside mis-typed no_one_can_move, under null profile, flag ON + nhr → NEEDS_HUMAN_REVIEW (honest-fail, eligible not false), never a false INELIGIBLE. Flag OFF / opt unset → INELIGIBLE (disposition is load-bearing). Structural bars (NON_SELF_CLEARABLE_BAR_RE) untouched. Flag+opt remain OFF/unwired in prod."
+    }
+  }
 }
