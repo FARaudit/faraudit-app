@@ -8,7 +8,8 @@
     "start": "next start",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "verify:render-determinism": "tsx test/verify-render-determinism.ts"
+    "verify:render-determinism": "tsx test/verify-render-determinism.ts",
+    "verify:gold-integrity": "tsx scripts/audit-ai/verify-gold-integrity.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

@@ -58,19 +58,26 @@
       }
     },
     "FA860126Q00260001": {
-      "active_version": "v2",
+      "active_version": "v3",
       "key_type": "full_verdict",
-      "pole": "NO_BID",
-      "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.v2.json",
+      "pole": "CAUTION",
+      "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.v3.json",
       "synthetic": true,
-      "_synthetic_note": "Real unrestricted commercial base package (fetched from SAM, source of record) + a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod imposing a Government-controlled First Article contradiction (60-day non-waivable FAT precondition vs 30-day-ARO binding delivery) → NO_BID. v2 (cards 75-R1/76-R1): the mod lives in a recognized SECTION F (supersedes base §F 90-day + SOW §IV 8-month) so the agentic engine grounds it; §B grounded from the real CLIN; the 60>30 net-effect conclusion is demoted to the §F provenance banner (human authoring note, NOT lens-readable body) so the engine must DERIVE the conflict. keySha d08c3017.",
+      "_synthetic_note": "Real unrestricted commercial base package (fetched from SAM, source of record) + a clearly-labeled [SYNTHETIC-ADVERSARIAL] SECTION-F First Article contradiction. v3 (Brain card 188 custody repair): the RATIFIED Step-7 BID_WITH_CAUTION judgment (Option-1 temporal doctrine, cards 141/143) re-frozen through the real stamp tooling with a VALID keySha256 (444a9818). Supersedes v2 (NO_BID, keySha d08c3017) which commit 7974b2c mutated IN PLACE without re-stamping; v2 restored to its frozen bytes and retired. Source unchanged (FA860126Q00260001-FULL-SOURCE.v2.complete.txt, 70251625).",
       "supersedes": [
+        {
+          "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.v2.json",
+          "key_type": "full_verdict",
+          "status": "retired",
+          "retired_sha256": "10d21a9184d56e1bddb289496142736cf6fffc548f3d3d24a29f06d357923be7",
+          "reason": "card 188 chain-of-custody repair: v2 was the properly-frozen NO_BID pole (keySha d08c3017, recompute==stamped once restored). Commit 7974b2c (2026-06-29, Step 7 Option 1 — demote temporal arm to CAUTION-only) mutated this FROZEN v2 IN PLACE — edited expectedVerdict NO_BID to BID_WITH_CAUTION and stripped the trailing newline — WITHOUT re-running the stamp tooling, so content drifted from its stamp (recompute 76b4f66c not equal to stamped d08c3017). Card 188 git-restored v2 to its d08c3017-era frozen bytes (this retired_sha256) and retired it; the ratified CAUTION judgment is re-frozen as v3 under a valid stamp."
+        },
         {
           "file": "FA860126Q00260001.judgment.frozen.SYNTHETIC.json",
           "key_type": "full_verdict",
           "status": "retired",
           "retired_sha256": "47b9f7a239e48e12e404149ede4771bb2757da742789acf7d6cbd29fd3b85042",
-          "reason": "card 75-R1/76-R1 + CEO ratify (77-R1): v1 placed the synthetic mod as a trailing unattributed AMENDMENT block → the section detector never assigned it to §F → the agentic engine never grounded the impossibility (graduation run #38 derived INCOMPLETE). v2 re-places it as a recognized §F (supersedes base delivery terms), grounds §B, and demotes the conclusion to the provenance banner. Retired byte-identical; v1 frozen artifact NOT mutated."
+          "reason": "card 75-R1/76-R1 + CEO ratify (77-R1): v1 placed the synthetic mod as a trailing unattributed AMENDMENT block → the section detector never assigned it to §F → the agentic engine never grounded the impossibility (graduation run #38 derived INCOMPLETE). v2 re-places it as a recognized §F (supersedes base delivery terms), grounds §B, and demotes the conclusion to the provenance banner. Retired byte-identical; v1 frozen artifact NOT mutated. [CORRECTION 2026-07-01 (Brain card 188): the 'v1 frozen artifact NOT mutated' claim above was FALSIFIED by commit 7974b2c (2026-06-29, Step 7), which mutated this RETIRED v1 IN PLACE (NO_BID to CAUTION, newline stripped) yielding 9fe099bf. Card 188 git-restored v1 to its 47b9f7a2 retirement bytes (this retired_sha256). Original note preserved above per no-delete discipline.]"
         }
       ]
     }

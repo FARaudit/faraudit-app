@@ -1,17 +1,17 @@
 {
   "schemaVersion": "0.3-concept-presence",
   "packageId": "FA860126Q00260001",
-  "_title": "HDR MWIR Thermal Imaging System (AFIT/AFLCMC) — NO_BID anchor via a LABELED SYNTHETIC-ADVERSARIAL delivery contradiction (gradeable JudgmentKey schema; v2 — synthetic mod re-placed in §F per card 75-R1)",
+  "_title": "HDR MWIR Thermal Imaging System (AFIT/AFLCMC) — NO_BID anchor via a LABELED SYNTHETIC-ADVERSARIAL delivery contradiction (gradeable JudgmentKey schema; v2 — synthetic mod re-placed in §F per card 75-R1) [v3 — custody-repaired per card 188]",
   "_suiteRole": "NO_BID verdict pole — the last missing verdict type (Brain card 72, CEO-chosen labeled-adversarial-mod path; mechanism re-designed by Brain to a Government-controlled First Article contradiction, four-corners gradeable). A REAL unrestricted commercial base package (FA860126Q00260001, fetched from SAM) carries a clearly-labeled [SYNTHETIC-ADVERSARIAL] mod that makes delivery UNIVERSALLY unmeetable from award (60-day non-waivable First Article precondition vs 30-day-ARO binding production delivery). Distinct from the INELIGIBLE pole (#3): that bar is bidder-specific; this is a solicitation-side impossibility that defeats EVERY bidder. eligible stays true. V2 (card 75-R1): the synthetic delivery contradiction is re-placed inside a recognized SECTION F (supersedes base §F 90-day + SOW §IV 8-month) and §B is grounded from the real CLIN, so the agentic engine attributes + grounds it. CONTENT-identical to v1 (verdict/gates/showStopper/decoy/verbatim cites unchanged); only the source LOCATION/structure changed. v1's source placed the mod as a trailing unattributed AMENDMENT → graduation run derived INCOMPLETE (engine never saw it).",
   "key_type": "full_verdict",
   "bidderProfile": null,
   "acquisitionPart": "PART_12",
   "_acquisitionPart_basis": "source-grounded (NOT assumed): FAR Part 12 Commercial Products/Services buy — 52.212-1/-2/-3/-4/-5 all present in the base solicitation; §M is '52.212-2 Evaluation-Commercial Products and Commercial Services'; notice type = Combined Synopsis/Solicitation. No FAR Part 15 'contracting by negotiation' / 52.215-x negotiated clauses (the 52.215-7992/7994 present are AF local ombudsman provisions, not negotiated-procurement clauses).",
   "expectedVerdict": {
-    "verdict": "NO_BID",
+    "verdict": "BID_WITH_CAUTION",
     "eligible": true,
-    "maxShowStoppers": 1,
-    "reason": "A single Government-controlled, four-corners delivery contradiction makes performance physically impossible for EVERY offeror: the [SYNTHETIC-ADVERSARIAL] mod imposes a NON-WAIVABLE 60-day First Article testing precondition before any production delivery (Synthetic Clause 1) while mandating production delivery within 30 days ARO (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3). 60 > 30, so no bidder can comply regardless of capability — a universal walk-away (NO_BID), NOT a bidder-specific bar (which would be INELIGIBLE, the pole already anchored by #3). eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the defeat is the schedule, not eligibility. A wage-determination or set-aside/eligibility flag must NOT be raised."
+    "maxShowStoppers": 0,
+    "reason": "Under the Option-1 temporal doctrine (Brain card 141/143), a Government-controlled four-corners delivery tension — a NON-WAIVABLE ~60-day First Article testing precondition before any production delivery (Synthetic Clause 1) vs a 30-day-ARO production window (Synthetic Clause 2), binding and Unacceptable-if-missed (Synthetic Clause 3) — surfaces as a HIGH-CONFIDENCE KO-clarify CAUTION (confirm the binding production window against the non-waivable FAT gate before bidding), NOT an automatic NO_BID. Deterministic identification of the production window from messy Section-F text proved unreliable across 7 adversarial rounds, so the temporal arm never escalates to NO_BID (reserved for cleanly-named hard gates); the tension is floored to BID_WITH_CAUTION. eligible:true — the buy is unrestricted with no set-aside, so the offeror is eligible; the surfaced item is the schedule tension, routed to caution not disqualification."
   },
   "namedGates": [
     {
@@ -81,17 +81,5 @@
       "reason": "card 75-R1: v1 source placed the synthetic mod as a trailing unattributed AMENDMENT block; the section detector never assigned it to §F so the agentic engine never grounded the impossibility (graduation run #38 derived INCOMPLETE). v2 re-places it as a recognized §F that supersedes base delivery terms + grounds §B. Judgment content identical."
     }
   ],
-  "adjudication": {
-    "authoredBlind": false,
-    "verdict_and_doctrine_by": [
-      "Brain",
-      "CEO"
-    ],
-    "transcribed_and_source_cited_by": "Code",
-    "authoredAt": "2026-06-27",
-    "rulingRef": "Brain card 72 (NO_BID via labeled FRONTIER-adversarial mod; base FA860126Q00260001 ratified; mechanism re-designed to a Government-controlled First Article contradiction, four-corners gradeable) · card 75-R1 (rebuild source: synthetic mod → recognized §F supersede + §B grounded) · card 76-R1 (substance-derivation guard: net-effect conclusion demoted to provenance banner; body keeps only binding inputs F.1/F.2/F.3; namedGate cite re-pointed to binding inputs; engine must derive 60>30)",
-    "sourceSha256": "70251625279fb7177b4abf6e3195f89cd5f61f359bb64452f9fa2820803112e2",
-    "keySha256": "d08c3017a4570330a98ed9f79c8ea9b80bde46158cf9b9d265b9271a16d5a55d",
-    "candidate": true
-  }
+  "_v3_custody_note": "v3 (Brain card 188): the RATIFIED Step-7 BID_WITH_CAUTION judgment (Option-1 temporal doctrine, cards 141/143) re-frozen through the real stamp tooling with a fresh keySha256/sourceSha256. Supersedes v2. Root cause repaired: commit 7974b2c (2026-06-29) mutated the frozen v2 (…SYNTHETIC.v2.json) IN PLACE (NO_BID→BID_WITH_CAUTION) without re-stamping — a chain-of-custody break. v2 has been git-restored to its d08c3017-era frozen bytes and retired; this v3 carries the identical graded judgment (expectedVerdict/namedGates/showStoppers/decoys unchanged from the ratified content) under a valid stamp."
 }
