@@ -5,12 +5,21 @@
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local", quiet: true });
 import fs from "fs";
+import type { UsageCall } from "./cost-ledger"; // type-only — erased at compile, no module load
 // NB: audit-package (→ anthropic.ts) builds the API client from process.env AT MODULE-LOAD. Static ESM imports
 // are hoisted ABOVE dotenv.config() above, so the client would see no key. Import it DYNAMICALLY inside main(),
 // after config() has populated process.env.
 async function main() {
   const { auditPackage } = await import("../../src/lib/audit-package");
   const { isHonestFail, billable, HONEST_FAIL_VERDICTS } = await import("../../src/lib/audit-billing");
+  const { setExpertUsageSink } = await import("../../src/lib/audit-expert");
+  const { setStructuredUsageSink } = await import("../../src/lib/anthropic-structured");
+  const { aggregate, appendLedgerRow } = await import("./cost-ledger");
+  // Attach the (already-built, prod-null) usage sinks so this run self-records its token cost to the ledger
+  // the cost cockpit reads. Covers BOTH the expert tool-loop AND the structured skeptic.
+  const usageCalls: UsageCall[] = [];
+  setExpertUsageSink((u) => usageCalls.push(u));
+  setStructuredUsageSink((u) => usageCalls.push(u));
   const guard = process.env.AUDIT_SETASIDE_OVERTYPE_GUARD;
   const noCharge = process.env.AUDIT_HONESTFAIL_NO_CHARGE;
   console.log("run-env flags →", { AUDIT_SETASIDE_OVERTYPE_GUARD: guard, AUDIT_HONESTFAIL_NO_CHARGE: noCharge });
@@ -32,6 +41,23 @@ async function main() {
   const eligible = res.decision.eligible;
   const honestFail = isHonestFail({ verdict });
   const bill = billable(honestFail, true); // flag ON
+
+  // ── Record this run's token cost to the cost ledger (source=code → R&D, not COGS). Detach sinks first. ──
+  setExpertUsageSink(null); setStructuredUsageSink(null);
+  const { perModel, totals } = aggregate(usageCalls);
+  const ledRow = {
+    id: `card191-sp3300-live-${Date.now()}`,
+    ts: new Date().toISOString(),
+    source: "code" as const,
+    cogs: false,
+    sol: "SP3300-26-Q-0165",
+    verdict, eligible, billable: bill,
+    perModel, totals,
+    console_usd: null as number | null,
+    note: `Live code run (card 191 harness). wallClock ${secs}s. Token-derived $${totals.usd.toFixed(4)} (${totals.calls} calls${totals.unpriced_calls ? `, ${totals.unpriced_calls} UNPRICED` : ""}).`,
+  };
+  appendLedgerRow(ledRow);
+  console.log(`\n[LEDGER] appended ${ledRow.id} · ${totals.calls} calls · token-derived $${totals.usd.toFixed(4)} · verdict ${verdict}`);
 
   console.log("\n──────── RESULT ────────");
   console.log(JSON.stringify({
