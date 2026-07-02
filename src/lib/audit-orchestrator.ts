@@ -16,6 +16,7 @@ import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-exper
 import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, type Decision } from "./audit-decide";
+import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -318,6 +319,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     const before = findings.length;
     findings = applyNonmanufacturerRuleGate(findings, { naics: opts.naics, setAside: opts.setAside }, { enabled: process.env.AUDIT_NONMANUFACTURER_RULE_GATE === "true" });
     if (findings.length > before) { findings[findings.length - 1].id = "nonmanufacturer_rule#0"; perLens["nonmanufacturer_rule"] = 1; }
+  }
+
+  // P4.3a-quater — KEY-FACT DETECTOR (Brain card 215 Fork B), default-OFF (=== "true"). Surfaces the three
+  //      high-value facts the substantive lenses under-cover (quote DEADLINE · DELIVERY schedule · NON-
+  //      MANUFACTURER RULE), source-grounded + dedup'd vs lens findings. deadline/delivery are verdict-INERT
+  //      (bidder_controls, no requiredAttribute); NMR is an eligibility_bar+requiredAttribute+bidder_controls
+  //      that rides the card-206-A unverified-gate path (committal + null profile → eligible=null verify-caution;
+  //      NEVER a show-stopper, NEVER flips eligible false). POST-VERIFY (skeptic can't cull). Flag off ⇒ unchanged.
+  {
+    const before = findings.length;
+    findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true" });
+    for (let k = before; k < findings.length; k++) { findings[k].id = `keyfact_detector#${k - before}`; }
+    if (findings.length > before) perLens["keyfact_detector"] = findings.length - before;
   }
 
   // P4.3a-ter — KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135, Step 5a), default-OFF (=== "true"). CAP-ONLY map

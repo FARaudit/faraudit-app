@@ -26,7 +26,7 @@ for t in $(find src -name "*.test.ts" | sort); do
 done
 
 line "3) flag-gate scripts (deterministic, \$0)"
-for g in test-eligible-tristate test-procedural-coverage test-procurement-sections test-combined-synopsis-emit test-replay-harness test-precondition-overtype-floor test-flag-stack-interaction; do
+for g in test-eligible-tristate test-procedural-coverage test-procedural-truncation test-keyfact-detector test-procurement-sections test-combined-synopsis-emit test-replay-harness test-precondition-overtype-floor test-flag-stack-interaction; do
   P="scripts/audit-ai/$g.ts"
   [ -f "$P" ] || { echo "  MISSING $g"; continue; }
   OUT=$(npx tsx "$P" 2>&1)

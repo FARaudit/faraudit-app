@@ -33,16 +33,55 @@ const OBLIGATION_VERB_RE = /\b(shall|must|provide|submit|furnish|required|quote|
 // Rule-64 gate could still fail covered_direct downstream (code-review: no dash-folding divergence).
 const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
-/** Deterministic default extractor — obligation sentences (≥4 words, obligation verb), verbatim from §L/§M.
+// ── OBLIGATION SEGMENTATION (Brain card-215 Fork A — truncation defect fix) ───────────────────────────
+// The prior extractor split on /(?<=[.;\n])/ → truncated obligations at decimals ("$1.04"), email/URL tokens
+// ("michael.s.french@dla.mil"), and mid-sentence PDF soft line-wraps. Fix (Brain-ruled): segment on
+// LIST-MARKERS + NEWLINES first (the source is (1)/(2)/(3) numbered), REJOINING soft line-wraps WITHIN a unit
+// so each numbered obligation stays whole; a guarded sentence-splitter is the FALLBACK for non-list prose.
+// The guard set is a FROZEN, VERSIONED constant with one test per class — future additions bump the version
+// (supersede), never silently append (Brain card 215).
+export const PROCEDURAL_SENTENCE_GUARDS = {
+  version: 1,
+  decimal: /(\d)\.(\d)/g,                                                                         // 1.04 · $1.039
+  emailUrl: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?:\/\/\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:gov|mil|com|org|net|edu)\b/gi,
+  abbrev: /\b(?:U\.S\.?|Nos?\.|Inc\.|Corp\.|Ltd\.|Co\.|e\.g\.|i\.e\.|etc\.|vs\.|Mr\.|Mrs\.|Ms\.|Dr\.|St\.|Jr\.|Sr\.|Fig\.|Sec\.|Art\.|No\.|para\.|approx\.|Dept\.)/gi,
+} as const;
+
+const GUARD_DOT = ""; // U+E000 Private Use Area — cannot occur in real solicitation text (code-review card 215) // a period temporarily masked inside a guarded token; restored after splitting
+/** Split prose into sentences WITHOUT breaking guarded tokens (decimals · abbreviations · email/URL). */
+export function splitSentencesGuarded(text: string): string[] {
+  let m = text.replace(PROCEDURAL_SENTENCE_GUARDS.decimal, (_x, a, b) => `${a}${GUARD_DOT}${b}`);
+  m = m.replace(PROCEDURAL_SENTENCE_GUARDS.emailUrl, (t) => t.replace(/\./g, GUARD_DOT));
+  m = m.replace(PROCEDURAL_SENTENCE_GUARDS.abbrev, (t) => t.replace(/\./g, GUARD_DOT));
+  return m.split(/(?<=[.!?])\s+(?=[A-Z("'])/).map((p) => p.split(GUARD_DOT).join(".").trim()).filter(Boolean);
+}
+
+const LIST_MARKER = /\n[ \t]*(?:\((?:\d{1,2}|[a-z]|[ivxlcdm]+)\)|\d{1,2}\.|[a-z]\.)[ \t]+/gi;
+const STARTS_WITH_MARKER = /^\s*(?:\((?:\d{1,2}|[a-z]|[ivxlcdm]+)\)|\d{1,2}\.|[a-z]\.)\s/i;
+/** Segment a section into obligation units: list-markers primary (each numbered/lettered item kept WHOLE,
+ *  soft line-wraps rejoined into one line), guarded-sentence fallback for the non-list prose runs. */
+export function segmentObligations(text: string): string[] {
+  const SB = ""; // U+E001 Private Use Area — cannot occur in real solicitation text (code-review card 215) // unit boundary inserted before each line-start list marker
+  const marked = text.replace(LIST_MARKER, (mk) => SB + mk.replace(/^\n[ \t]*/, ""));
+  const units: string[] = [];
+  for (const chunk of marked.split(SB)) {
+    const unwrapped = chunk.replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim();
+    if (!unwrapped) continue;
+    if (STARTS_WITH_MARKER.test(unwrapped)) units.push(unwrapped);           // whole numbered/lettered obligation
+    else units.push(...splitSentencesGuarded(unwrapped));                    // prose fallback
+  }
+  return units;
+}
+
+/** Deterministic default extractor — obligation UNITS (≥4 words, obligation verb), verbatim from §L/§M.
  *  A NEW self-contained extractor (does NOT touch the frozen obligationsOf); it only proposes verbatim quotes
- *  which the pass then Rule-64-grounds. Mirrors obligationsOf's predicate so it targets the same sentences
- *  completenessOf checks. */
+ *  which the pass then Rule-64-grounds. Units are whole (list-marker segmentation) — no mid-sentence truncation. */
 export const deterministicProceduralExtractor: ProceduralExtractor = async (sections) => {
   const out: ProceduralCandidate[] = [];
   for (const s of sections)
-    for (const sent of s.text.split(/(?<=[.;\n])/).map((x) => x.trim())
+    for (const unit of segmentObligations(s.text)
       .filter((x) => x.split(/\s+/).filter(Boolean).length >= 4 && OBLIGATION_VERB_RE.test(x)).slice(0, 40))
-      out.push({ section: s.key, quote: sent });
+      out.push({ section: s.key, quote: unit });
   return out;
 };
 
@@ -81,8 +120,11 @@ export async function proceduralCoveragePass(ctx: AuditToolContext, opts?: { ext
     const nq = norm(q);
     if (!secNormCache.get(sec.key)!.includes(nq)) continue;          // Rule-64: must be VERBATIM in the section
     if (seen.has(nq)) continue; seen.add(nq);
+    const label = c.label || q;
+    // Display cap at a WORD boundary + ellipsis (never a mid-word/mid-sentence cut — the excerpt below stays whole).
+    const disp = label.length > 150 ? label.slice(0, 150).replace(/\s+\S*$/, "") + "…" : label;
     out.push({
-      requirement: `Procedural obligation (§${sec.key}): ${(c.label || q).slice(0, 120)}`,
+      requirement: `Procedural obligation (§${sec.key}): ${disp}`,
       citation: `§${sec.key} (procedural coverage)`,
       excerpt: q,                                                     // verbatim span → completenessOf covered_direct fires
       kind: "procedural_obligation",
