@@ -849,6 +849,15 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (!inp.verifierSound)
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);
 
+  // 2b. VERIFIED-FLOOR (Brain card 224 fork 1) — coverage is complete and verification reported sound, yet ZERO
+  //     findings survive to decide over (none raised, or every one overturned). A committal verdict CANNOT rest
+  //     on an empty verified set: the default ladder below would fall through to a clean BID that is
+  //     byte-indistinguishable from a genuinely clean package. Fail honest → NEEDS_HUMAN_REVIEW (no charge),
+  //     never a default BID. Defense-in-depth: makeAgenticVerifier already returns sound=false on an empty
+  //     survivor set (caught at step 2); this guard also covers grounding-only / non-adversarial verify paths.
+  if (dispositions.length === 0)
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No findings survived adversarial verification over complete coverage — a clean BID cannot rest on an empty verified set. Human review required.", dispositions, []);
+
   // 3. Show-stoppers → the only NO_BID / INELIGIBLE drivers. Two kinds (Brain card-45 typing guard):
   //    (a) UNIVERSAL impossibilities (no_one_can_move) — disqualify EVERY bidder regardless of profile, so
   //        they are PROVEN show-stoppers even under a null profile (do NOT soften to human-review); and

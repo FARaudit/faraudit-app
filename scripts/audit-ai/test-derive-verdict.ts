@@ -33,6 +33,10 @@ eq("#2 set-aside met", deriveVerdict(inp(two)).dispositions.find((d) => d.requir
 eq("incomplete coverage → INCOMPLETE", deriveVerdict(inp(two, { coverage: false })).verdict, "INCOMPLETE");
 eq("verifier unsound → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { sound: false })).verdict, "NEEDS_HUMAN_REVIEW");
 eq("conflict → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { conflict: true })).verdict, "NEEDS_HUMAN_REVIEW");
+// VERIFIED-FLOOR (Brain card 224 fork 1) — coverage complete + verifier sound + ZERO surviving findings must
+// NOT fall through to a default BID (the false-BID hole). Empty verified set ⇒ NEEDS_HUMAN_REVIEW, no charge.
+eq("verified-floor: empty findings + complete coverage → NEEDS_HUMAN_REVIEW (never default BID)", deriveVerdict(inp([])).verdict, "NEEDS_HUMAN_REVIEW");
+eq("verified-floor: empty findings does NOT emit BID", deriveVerdict(inp([])).verdict !== "BID", true);
 
 // ── Brain card-44 §2: curability splits the old blanket "unknown → CAUTION" branch. ──
 // 5a. UNTYPED bar (bidder_cannot_move, no requiredAttribute / no curableInWindow) → FAIL CLOSED to human review.

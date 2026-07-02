@@ -31,7 +31,11 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     const grounded = findings.filter((f) => f.excerpt && findInSource(ctx, f.excerpt).hits.length > 0);
     const droppedUngrounded = findings.filter((f) => !grounded.includes(f));
 
-    if (grounded.length === 0) return { sound: true, survived: [], rejected: droppedUngrounded };
+    // VERIFIED-FLOOR positive precondition (Brain card 224 fork 1): soundness requires that ≥1 finding
+    // SURVIVE a real challenge — not merely that the skeptic "ruled on every finding". Zero grounded findings
+    // means nothing was verified (extraction produced nothing / every excerpt failed re-grounding), so the run
+    // is NOT sound → deriveVerdict routes to NEEDS_HUMAN_REVIEW, never a default BID over an empty set.
+    if (grounded.length === 0) return { sound: false, survived: [], rejected: droppedUngrounded };
 
     // (2) knife-edge selection (deterministic, over the SAME grounded array the skeptic sees — no index drift)
     //     + adversarial challenge. The skeptic re-types / overturns; the proven deriveVerdict runs downstream.
@@ -49,7 +53,10 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
       else if (v && !v.upheld) rejected.push(f);                                                                  // overturned → drop
       else survived.push(f);                                                                                      // upheld as-is
     });
-    return { sound: complete, survived, rejected };
+    // SOUND iff the skeptic ruled on every finding (challenge completed) AND ≥1 survived. Total-overturn
+    // (survived=[]) is NOT sound — soundness is "the skeptic confirmed at least one finding stands", never
+    // "the skeptic ruled on every finding and killed them all" (the false-BID hole). Brain card 224 fork 1.
+    return { sound: complete && survived.length > 0, survived, rejected };
   };
 }
 
