@@ -125,5 +125,29 @@ Brain Fork-A ruled order executed on both surfaces (Vercel `faraudit-app` prod +
 
 Parity holds (Rule 17). Rollback per flag = `unset <FLAG>` on both surfaces + redeploy → byte-identical default-OFF (no migration coupling).
 
-## SMOKE-READINESS (step 4 + paid smoke = SEPARATE CEO checkpoints — NOT executed here)
-Expected on a part-12 doc under PROD ENV (three flags ON, NO inline flags): **BID_WITH_CAUTION · eligible=null · mandatory verify-caution · billable=true · ≤ $2**. Do NOT flip `AUDIT_PROCUREMENT_TYPE_SECTIONS` until after the paid smoke; the smoke is a CEO spend greenlight.
+## SMOKE-READINESS (superseded below — smoke run + step 4 executed 2026-07-02)
+Expected on a part-12 doc under PROD ENV (three flags ON, NO inline flags): **BID_WITH_CAUTION · eligible=null · mandatory verify-caution · billable=true · ≤ $2**.
+
+---
+
+# CARD 214 — PAID SMOKE + STEP 4 **EXECUTED** (2026-07-02, CEO-greenlit "execute")
+
+## PAID SMOKE — PASSED (real spend $1.089, ≤ $2 cap)
+ONE live paid audit via `paid-run.ts` on `SP3300-26-Q-0165-FULL-SOURCE.txt` under a faithful **prod-env replication** — the 3 rung flags ON + `AUDIT_TEMPORAL_SHARED_ARO=true` (prod-set); `AUDIT_PROCUREMENT_TYPE_SECTIONS` + `AUDIT_HONESTFAIL_NO_CHARGE` OFF (matching prod). Result matched the card-210 live proof exactly:
+- **verdict=BID_WITH_CAUTION · eligible=null · billable=true · honestFail=false · coverageComplete=true** · 40 findings · reason = mandatory "⚠ ELIGIBILITY NOT VERIFIED — confirm setaside:WOSB…" verify-caution · wall-clock 108s · **cost $1.089** (token-derived, appended to `ceo/cost-ledger.json`).
+- Record persisted → `scripts/audit-ai/run-records/SP3300-26-Q-0165-card214-smoke.2026-07-02T16-41-10-846Z.run-record.json` (replayable at $0).
+- **Prod-state note (out of card-214 scope):** `AUDIT_HONESTFAIL_NO_CHARGE` is OFF in prod (default-OFF, unset both surfaces) — the honest-fail *no-charge* protection is NOT active in prod. Committal verdicts bill regardless, so the smoke outcome is unaffected; flagged for a future CEO decision.
+
+## STEP 4 — AUDIT_PROCUREMENT_TYPE_SECTIONS flipped prod-ON (post-smoke)
+Set on both surfaces (Vercel prod + Railway `audit-worker`), parity confirmed, Vercel redeploy `dpl_CsxiehGk7yF5cQBeEJ8rMRmEP3hC` READY. Step-4 greens with **all four flags ON**: tsc ✓ · 17 `*.test.ts` ✓ · flag-gates ✓ · gold-integrity 18/ALL-PASS ✓ · card-210 replay reproduces BID_WITH_CAUTION/eligible=null (drift none) ✓ · graduated family undisturbed ✓. Effect (per Rule-61 rider): adds honest-fails only (bare combined-synopsis → part12; commercial doc missing BOTH §L+§M cores → INCOMPLETE); never turns a bar into a non-bar.
+
+## FINAL PROD FLAG STATE (all four Part-12 arc flags ON — verified 2026-07-02)
+| Flag | Vercel prod | Railway worker | Effective |
+|---|---|---|---|
+| AUDIT_ELIGIBLE_TRISTATE | SET=true | SET=true | **ON** ✓ |
+| AUDIT_SETASIDE_OVERTYPE_GUARD | SET=true | SET=true | **ON** ✓ |
+| AUDIT_PROCEDURAL_COVERAGE_LENS | SET=true | SET=true | **ON** ✓ |
+| AUDIT_PROCUREMENT_TYPE_SECTIONS | SET=true | SET=true | **ON** ✓ (step 4) |
+| Graduated family (GS/TC/AwardBasis/Whitelist/CautionFloor) | UNSET | UNSET | **ON** (code-default, undisturbed) ✓ |
+
+**Part-12 arc fully prod-live. Parity holds (Rule 17). Rollback per flag = `unset` both surfaces + redeploy (no migration coupling).**
