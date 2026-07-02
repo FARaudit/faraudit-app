@@ -105,6 +105,15 @@ const UCF_TITLE_PATTERNS: Record<string, RegExp> = {
 // Format detection patterns.
 const SF1449_HEADER_RE = /SF\s*1449|SOLICITATION\/CONTRACT\/ORDER\s+FOR\s+COMMERCIAL/i;
 const SF18_HEADER_RE = /\bSF[-\s]?18\b|REQUEST\s+FOR\s+QUOTATION/i;
+// FAR 12.603 combined synopsis/solicitation — the DEFINITIONAL statement a Part-12 combined notice must carry
+// ("This is a combined synopsis/solicitation…") OR the 12.6-format boilerplate ("…prepared in accordance with
+// the format in Subpart 12.6"). This anchors a commercial Part-12 classification for a BARE combined-synopsis
+// notice that lacks the SF-1449 form header (which, when present, ALREADY wins above — SP3300 is that case).
+// Both alternatives are specific FAR boilerplate, not prose a UCF Part-15 doc would carry. Gate: only consulted
+// under AUDIT_PROCUREMENT_TYPE_SECTIONS (default-OFF) so prod stays byte-identical until proven on a real
+// bare-combined-synopsis anchor. Placed AFTER SF-1449/SF-18 and BEFORE UCF (a combined synopsis is narrative,
+// not §A–M), so it can never steal a form-headed commercial doc nor a genuine UCF doc.
+const COMBINED_SYNOPSIS_RE = /combined\s+synopsis\s*\/?\s*solicitation|format\s+(?:prescribed\s+)?in\s+(?:FAR\s+)?subpart\s+12\.6/i;
 
 function confidenceRank(c: SectionConfidence): number {
   return { high: 3, medium: 2, low: 1, missing: 0 }[c];
@@ -133,6 +142,12 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     formatConfidence = "high";
   } else if (SF18_HEADER_RE.test(fullText)) {
     formatDetected = "SF-18";
+    formatConfidence = "high";
+  } else if (process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" && COMBINED_SYNOPSIS_RE.test(fullText)) {
+    // Bare Part-12 combined synopsis/solicitation (no SF-1449 form header). Flag-gated default-OFF ⇒ when the
+    // flag is unset this branch is skipped and the doc falls through to UCF/unknown exactly as before (prod
+    // byte-identical). procurementPart() maps "combined-synopsis" → part12-commercial.
+    formatDetected = "combined-synopsis";
     formatConfidence = "high";
   } else if (UCF_HEADER_PATTERNS.some((p) => p.test(fullText))) {
     formatDetected = "UCF";
