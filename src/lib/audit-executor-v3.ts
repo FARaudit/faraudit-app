@@ -21,7 +21,8 @@ import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor
 import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
-import { isHonestFail, billable, decrementAuditQuota } from "./audit-billing";
+import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
+import { aggregate, type UsageCall } from "./audit-cost";
 import type { IngestionMeta } from "./sam-attachments";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
@@ -129,7 +130,9 @@ export async function executeAgenticPrimary(
   // Step 4a (plumb-only) — carry the SAM-resolved scalar FACTS into the engine so the gate pipeline can
   // read them downstream (Step 4: Nonmanufacturer Rule). naicsCode/typeOfSetAside are already resolved
   // upstream (audit-executor.ts SAM cross-ref). Uploads have no SAM NAICS → null → NMR stays silent.
-  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete, naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null });
+  // Per-run token tally (concurrency-safe — this array is local to THIS audit, unlike the global usage sinks).
+  const usageCalls: UsageCall[] = [];
+  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete, naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null, onUsage: (u) => usageCalls.push(u) });
   // If the overall budget aborted mid-run, never write a "complete" row — that late
   // write would overwrite the terminal-failed status the wrapper already set and strand
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
@@ -237,6 +240,13 @@ export async function executeAgenticPrimary(
   // Idempotent + FAILS SAFE (never throws) ⇒ runs AFTER a successful persist and can never block an audit.
   const isBillable = billable(honestFail);
   await decrementAuditQuota(supabase, auditId, { billable: isBillable, honestFail, verdict: res.decision.verdict });
+
+  // COST cockpit (fa195) — DECOUPLED + fail-safe: record what this audit's tokens cost, from the per-run tally.
+  // No-ops safely if the fa195 cost columns aren't applied yet. Never throws (recordAuditCost swallows all).
+  // source="customer": prod front-door path (the CEO's own dogfood runs also route here; a ceo-vs-customer
+  // split by user_id is a later refinement — cogs=true either way). The Cost/Audit ledger reads these via a pull.
+  const { perModel, totals } = aggregate(usageCalls);
+  await recordAuditCost(supabase, auditId, { perModel, totals, source: "customer" });
 
   console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${!docsIncomplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
 

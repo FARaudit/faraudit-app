@@ -32,6 +32,9 @@ export interface StructuredCallOpts {
    *  the prefix is under the model minimum (~1024 tok Sonnet / 2048 Haiku), so passing
    *  a short prefix is safe — it just isn't cached. */
   cachedSystemPrefix?: string;
+  /** Per-run usage tally (concurrency-safe — each audit owns its own callback). Emitted alongside the legacy
+   *  global sink. Best-effort: a throw here never affects the call result. */
+  onUsage?: (u: StructuredUsage) => void;
 }
 
 export interface StructuredCallResult {
@@ -118,17 +121,20 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
     }
     if (res.ok) {
       const data = await res.json();
-      if (_usageSink && data?.usage) {
-        const u = data.usage as Record<string, number | undefined>;
-        _usageSink({
+      if (data?.usage) {
+        const raw = data.usage as Record<string, number | undefined>;
+        const u = {
           label,
           model,
-          input_tokens: u.input_tokens ?? 0,
-          output_tokens: u.output_tokens ?? 0,
-          cache_write: u.cache_creation_input_tokens ?? 0,
-          cache_read: u.cache_read_input_tokens ?? 0,
+          input_tokens: raw.input_tokens ?? 0,
+          output_tokens: raw.output_tokens ?? 0,
+          cache_write: raw.cache_creation_input_tokens ?? 0,
+          cache_read: raw.cache_read_input_tokens ?? 0,
           ms: Date.now() - t0,
-        });
+        };
+        // Per-run tally (opts.onUsage, concurrency-safe) AND the legacy global sink (null in prod).
+        try { opts.onUsage?.(u); } catch { /* never let cost capture break a call */ }
+        if (_usageSink) _usageSink(u);
       }
       // Defensive: take the first block that actually carries text (structured outputs
       // surface the JSON in a text block, but don't hard-require type==="text" — a
@@ -143,12 +149,16 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
     // from the error body when present so the sink isn't a silent undercount on failure paths.
     // (Aborts/timeouts return NO body → unknowable client-side; the Anthropic Console CSV remains
     // the authoritative actualization — the sink is a lower-bound estimate.)
-    if (_usageSink) {
-      try {
-        const eu = (JSON.parse(errBody) as { usage?: Record<string, number | undefined> }).usage;
-        if (eu) _usageSink({ label, model, input_tokens: eu.input_tokens ?? 0, output_tokens: eu.output_tokens ?? 0, cache_write: eu.cache_creation_input_tokens ?? 0, cache_read: eu.cache_read_input_tokens ?? 0, ms: Date.now() - t0 });
-      } catch { /* error body not JSON / carries no usage — nothing to capture */ }
-    }
+    try {
+      const eu = (JSON.parse(errBody) as { usage?: Record<string, number | undefined> }).usage;
+      if (eu) {
+        // Same per-run + global emit as the success path — else a failed/retried call's billed tokens
+        // undercount the per-run cost tally (opts.onUsage), reintroducing the very undercount 6E guards against.
+        const u = { label, model, input_tokens: eu.input_tokens ?? 0, output_tokens: eu.output_tokens ?? 0, cache_write: eu.cache_creation_input_tokens ?? 0, cache_read: eu.cache_read_input_tokens ?? 0, ms: Date.now() - t0 };
+        try { opts.onUsage?.(u); } catch { /* never let cost capture break a call */ }
+        if (_usageSink) _usageSink(u);
+      }
+    } catch { /* error body not JSON / carries no usage — nothing to capture */ }
     if (RETRYABLE.has(res.status) && attempt < MAX_RETRIES && !opts.signal?.aborted) {
       const backoffMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
       console.warn(`[anthropic-structured] ${label} ${res.status} transient — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);

@@ -6,6 +6,7 @@
 // ($0) in audit-billing.test.ts. Operationalizes the zero-contract-loss doctrine on the billing side:
 // erring toward caution (an honest-fail) is FREE to the customer.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PerModelCost, Totals } from "./audit-cost";
 
 /** Deterministic-engine verdicts that are non-committal honest-fails (audit-decide.ts verdict enum). */
 export const HONEST_FAIL_VERDICTS: ReadonlySet<string> = new Set(["INCOMPLETE", "NEEDS_HUMAN_REVIEW"]);
@@ -74,5 +75,34 @@ export async function decrementAuditQuota(
     console.log(`[BILLING] ${auditId}: usage_events recorded billable=${opts.billable} verdict=${opts.verdict} honest_fail=${opts.honestFail}.`);
   } catch (e) {
     console.warn(`[BILLING] ${auditId}: usage_events record threw (fail-safe, audit unaffected): ${(e as Error)?.message ?? String(e)}`);
+  }
+}
+
+/** COST-RECORDING seam — DECOUPLED from billing (never shares a code path with the billing insert). Best-effort
+ *  UPDATE of the usage_events row's cost columns for a completed audit (per-run token tally → $), read by the
+ *  Cost cockpit. FAILS SAFE: any error (cost columns not yet migrated, row absent, table absent) is caught +
+ *  logged and returns — NEVER throws, NEVER blocks an audit, NEVER affects billing. Written by executeAgenticPrimary
+ *  AFTER decrementAuditQuota (fa195 cost columns). If the fa195 migration isn't applied yet, this simply no-ops. */
+export async function recordAuditCost(
+  supabase: SupabaseClient,
+  auditId: string,
+  data: { perModel: PerModelCost[]; totals: Totals; source: "ceo" | "customer" },
+): Promise<void> {
+  try {
+    const t = data.totals;
+    const { error } = await supabase.from("usage_events").update({
+      input_tokens: t.input_tokens,
+      output_tokens: t.output_tokens,
+      cache_write_tokens: t.cache_write,
+      cache_read_tokens: t.cache_read,
+      cost_usd: Number(t.usd.toFixed(6)),
+      model_breakdown: data.perModel,
+      cost_source: data.source,
+      cost_recorded_at: new Date().toISOString(),
+    }).eq("audit_id", auditId);
+    if (error) { console.warn(`[COST] ${auditId}: usage_events cost update skipped (fail-safe): ${error.message}`); return; }
+    console.log(`[COST] ${auditId}: recorded $${t.usd.toFixed(4)} (${t.calls} calls${t.unpriced_calls ? `, ${t.unpriced_calls} unpriced` : ""}) source=${data.source}.`);
+  } catch (e) {
+    console.warn(`[COST] ${auditId}: cost record threw (fail-safe, audit unaffected): ${(e as Error)?.message ?? String(e)}`);
   }
 }
