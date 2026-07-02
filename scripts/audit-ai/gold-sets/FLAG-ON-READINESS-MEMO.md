@@ -91,3 +91,39 @@ After all four flips: ONE CEO-greenlit paid run on a part-12 doc (SP3300 or a fr
 | AUDIT_TEMPORAL_SHARED_ARO | `=== "true"` (default-OFF) | SET=true | SET=true | ON (Step-7, explicit) ✓ |
 
 **Graduated guard family confirmed STILL prod-ON and undisturbed** (via code default; env-unset is correct — the only way to disable one is to explicitly set it `="false"`, which neither surface does). Vercel↔Railway parity holds (Rule 17). Railway engine flags (AGENTIC / V3 / ENGINE_V2 = true) are the engine selection, unrelated to the guard families.
+
+---
+
+# CARD 214 — PROD FLIP LADDER **EXECUTED** (2026-07-02, $0 env-only, STOP-ON-ANY-FAILURE, Rule-17 parity)
+
+Brain Fork-A ruled order executed on both surfaces (Vercel `faraudit-app` prod + Railway `audit-worker`). Each rung: set flag both surfaces → verify parity → Vercel git-source redeploy to READY (Railway auto-restarts on var change) → per-rung greens → card-210 replay (print branch) → graduated-family untouched. All three rungs GREEN. **STEP 4 (`AUDIT_PROCUREMENT_TYPE_SECTIONS`) and the paid smoke are HELD** (separate CEO checkpoints).
+
+## EXECUTED STEPS (canonical order — TRISTATE → OVERTYPE_GUARD → PROCEDURAL_LENS)
+| # | Flag | Vercel deploy (READY) | Per-rung greens | Card-210 replay branch |
+|---|---|---|---|---|
+| 1 | `AUDIT_ELIGIBLE_TRISTATE` | `dpl_85vrs8bVN7gKC93eTPhEUwKhUq4C` | tsc ✓ · 17 `*.test.ts` ✓ · flag-gates ✓ · gold-integrity 18/ALL-PASS ✓ | BID_WITH_CAUTION · **eligible flips true→null** · reproduced=true · no drift |
+| 2 | `AUDIT_SETASIDE_OVERTYPE_GUARD` | `dpl_BKnHH3fBo8uTqP9atTHW5Wfp1oxx` | all green (as above) | BID_WITH_CAUTION · eligible=null · reproduced=true · no drift (overtype is upstream; frozen inputs unchanged) |
+| 3 | `AUDIT_PROCEDURAL_COVERAGE_LENS` | `dpl_2PUAc9FMED6W5LaSf5vftEFz1CFy` | all green (as above) | BID_WITH_CAUTION · eligible=null · reproduced=true · no drift — **prod now = card-210 combo** |
+
+- **Replay branch print (Rule 67):** at flags-OFF the card-210 record replays `eligible=TRUE` (the card-205 zero-loss exposure); rung-1 tristate closes it to `eligible=null` and it holds through rungs 2–3. Verdict `BID_WITH_CAUTION` reproduced at every rung, `drift: none`.
+- **Test-harness fix (in this change):** `test-eligible-tristate.ts` + `test-procedural-coverage.ts` picked the newest SP3300 run-record via `.sort().pop()`, which now grabs the card-210 record (§L/§M pre-grounded, captured tristate-ON) and masked the INCOMPLETE/ungrounded B-leg cases (28/30 & 16/20 at baseline). **Pinned by captured-flag to the pre-tristate card-202 authoring record** → restored 30/30 & 20/20. Deterministic-fixture fix only; no engine change.
+
+## FORK-B RECONCILIATION RECORD (card 214 step 2 — archaeology closed)
+`AUDIT_SETASIDE_OVERTYPE_GUARD` carried two apparent trails; both now reconciled and closed:
+- **Trail A (June-30 "normalize-era" flip evidence):** the June-30 graduation flipped the *guard family* via a **code default** (`!== "false"`), NOT via any env var. `AUDIT_SETASIDE_OVERTYPE_GUARD` uses `=== "true"` (default-OFF) and was **never** part of that code-default family.
+- **Trail B (July-02 unset state):** confirmed default-OFF/inert on BOTH surfaces at card 210 and card 213 pre-flip (git `c6d45dd`, card 187 origin).
+- **Supersede:** card 214 is the FIRST time this flag is prod-ON, set explicitly as an env var here (rung 2). The "June-30 flip" was the code-default guard family — a distinct mechanism — so no contradiction. Both trails closed.
+
+## AFTER-STATE FLAG TABLE (Rule 67, verified 2026-07-02 post-ladder)
+| Flag | Read pattern | Vercel prod | Railway worker | Effective |
+|---|---|---|---|---|
+| AUDIT_ELIGIBLE_TRISTATE | `=== "true"` | **SET=true** | **SET=true** | **ON** ✓ (rung 1) |
+| AUDIT_SETASIDE_OVERTYPE_GUARD | `=== "true"` | **SET=true** | **SET=true** | **ON** ✓ (rung 2) |
+| AUDIT_PROCEDURAL_COVERAGE_LENS | `=== "true"` | **SET=true** | **SET=true** | **ON** ✓ (rung 3) |
+| AUDIT_PROCUREMENT_TYPE_SECTIONS | `=== "true"` | UNSET | UNSET | **OFF** ✓ (step 4 HELD) |
+| Graduated family (GS/TC/AwardBasis/Whitelist/CautionFloor) | `!== "false"` | UNSET | UNSET | **ON** (undisturbed) ✓ |
+
+Parity holds (Rule 17). Rollback per flag = `unset <FLAG>` on both surfaces + redeploy → byte-identical default-OFF (no migration coupling).
+
+## SMOKE-READINESS (step 4 + paid smoke = SEPARATE CEO checkpoints — NOT executed here)
+Expected on a part-12 doc under PROD ENV (three flags ON, NO inline flags): **BID_WITH_CAUTION · eligible=null · mandatory verify-caution · billable=true · ≤ $2**. Do NOT flip `AUDIT_PROCUREMENT_TYPE_SECTIONS` until after the paid smoke; the smoke is a CEO spend greenlight.
