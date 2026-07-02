@@ -111,7 +111,7 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  Extended thinking is intentionally OMITTED here: the loop reconstructs assistant turns from normalized
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
-export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string }): CallModel {
+export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string; onUsage?: (u: ExpertUsage) => void }): CallModel {
   return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
@@ -123,7 +123,13 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
     const resp = await client.messages.create(req, signal ? { signal } : undefined);
-    if (_expertUsageSink && resp.usage) _expertUsageSink({ model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 });
+    if (resp.usage) {
+      // Per-run tally (opts.onUsage, concurrency-safe — each audit owns its own) AND the legacy global sink
+      // (null in prod; kept for single-run proofs). Both are best-effort — never affects the returned findings.
+      const u = { model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 };
+      try { opts?.onUsage?.(u); } catch { /* never let cost capture break an audit */ }
+      if (_expertUsageSink) _expertUsageSink(u);
+    }
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
     if (submit) return { toolCalls: [], findings: (submit.input?.findings as RawFinding[]) ?? [] };

@@ -18,6 +18,7 @@ import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
+import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
 import type { ExpertSpec } from "./audit-expert";
@@ -35,13 +36,14 @@ export interface AuditPackageInput {
   manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
   naics?: string | null;                    // Step 4a (plumb-only) — SAM-resolved NAICS fact, forwarded to the gate pipeline; null when absent
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
+  onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
 }
 
 /** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
  *  budget `signal` (if any) is closed over so an overall-budget breach also cancels the skeptic's calls. */
-function structuredAdapter(apiKey: string, signal?: AbortSignal) {
+function structuredAdapter(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void) {
   return async (args: { model: string; system: string; user: string; schema: Record<string, unknown> }): Promise<{ verdicts: SkepticVerdict[] }> => {
-    const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal });
+    const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal, onUsage });
     try { return JSON.parse(res.text) as { verdicts: SkepticVerdict[] }; } catch { return { verdicts: [] }; }
   };
 }
@@ -52,9 +54,9 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the agentic engine.");
 
   const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
-  const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"));
+  const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"), { onUsage: input.onUsage });
   // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
-  const adapt = structuredAdapter(apiKey, input.signal);
+  const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
   const skeptic = makeTieredSkeptic(
     makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
