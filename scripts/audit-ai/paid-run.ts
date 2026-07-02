@@ -96,6 +96,14 @@ async function main() {
   console.log(`\n[LEDGER] appended ${ledRow.id} · ${totals.calls} calls · token-derived $${totals.usd.toFixed(4)}`);
   console.log(`[RUN-RECORD] persisted → ${recPath}`);
   console.log(`   diagnose at $0:  npx tsx scripts/audit-ai/replay-run-record.ts ${recPath}`);
+
+  // POST-RUN QUALITY GATE ($0, deterministic — card 214 follow-up). Grounding/fabrication · truncation ·
+  // key-fact omission. Does NOT block billing (the audit already ran); it flags whether the DELIVERABLE is
+  // customer-ready or needs human eyes. The panel review (row-by-row vs source) remains the deep layer.
+  const { verifyRunQuality, formatRunQuality } = await import("./verify-run-quality");
+  const rq = verifyRunQuality(rec);
+  console.log("\n" + formatRunQuality(rec, rq));
+  if (!rq.pass) console.log(`   full CLI:  npx tsx scripts/audit-ai/verify-run-quality.ts ${recPath}`);
   process.exit(0);
 }
 
