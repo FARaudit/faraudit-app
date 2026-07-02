@@ -14,6 +14,7 @@
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
+import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, type Decision } from "./audit-decide";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
@@ -47,6 +48,9 @@ export interface OrchestratorInput {
   // NOTHING reads these yet — adding them changes no verdict (a data plumb that moves a verdict is a bug).
   naics?: string | null;
   setAside?: string | null;
+  // Card 208-B — optional cheap-tier extractor for the Part-12 procedural-coverage pass. Absent ⇒ the pass uses
+  // its deterministic default (the shipped path). Only consulted when AUDIT_PROCEDURAL_COVERAGE_LENS is on.
+  proceduralExtract?: ProceduralExtractor;
 }
 
 export interface AuditResult {
@@ -246,6 +250,24 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
   const ver = await verify(ctx, findings, { bidderProfile });
   findings = ver.survived;
+
+  // P2.5 — PART-12 PROCEDURAL-COVERAGE PASS (Brain card 208-B), flag-gated AUDIT_PROCEDURAL_COVERAGE_LENS,
+  //         default-OFF (⇒ findings byte-identical). Added AFTER verify (deterministic verbatim grounding needs no
+  //         adversarial check, and post-verify placement guarantees the §L/§M procedural obligations reach
+  //         completenessOf). COVERAGE-ONLY / inert: bidder_controls + kind procedural_obligation → never a bar,
+  //         never an eligibility gate (invisible to the 206-A guarantee). part12-commercial gate is inside the pass.
+  if (process.env.AUDIT_PROCEDURAL_COVERAGE_LENS === "true") {
+    const proc = await proceduralCoveragePass(ctx, { extract: opts.proceduralExtract });
+    proc.forEach((f, j) => { f.id = `procedural_coverage#${j}`; });
+    if (proc.length) {
+      perLens["procedural_coverage"] = proc.length;
+      findings.push(...proc);
+      // The pass READ §L/§M and grounded their obligations — mark those sections read so completenessOf
+      // evaluates covered_direct (it gates an 'unread' section out BEFORE the direct-finding match, so a
+      // grounded finding in a section no expert lens happened to read would otherwise be skipped — code-review).
+      for (const f of proc) { const m = f.citation.match(/§([A-M])\b/); if (m) sectionsRead.add(m[1]); }
+    }
+  }
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
