@@ -51,11 +51,11 @@ export function procurementPart(ctx: AuditToolContext): ProcurementPart {
     case "UCF": return "part15-ucf";
     case "SF-1449-RFQ":
     case "SF-18":
-    case "combined-synopsis": return "part12-commercial"; // NB: detectSections does not currently EMIT
-                                                           // "combined-synopsis" (only SF-1449/SF-18/UCF/unknown),
-                                                           // so a bare combined synopsis lacking those markers
-                                                           // falls to `unknown` → free pass. Closing that gap is a
-                                                           // detectSections branch (FAR 12.603 header) — a separate step.
+    case "combined-synopsis": return "part12-commercial"; // detectSections EMITS "combined-synopsis" for a BARE
+                                                           // combined synopsis (FAR 12.603 boilerplate) under the
+                                                           // AUDIT_PROCUREMENT_TYPE_SECTIONS flag (default-OFF ⇒ falls
+                                                           // to `unknown`, prod byte-identical). A form-headed
+                                                           // commercial doc still classifies via SF-1449/SF-18 above.
     default: return "unknown";
   }
 }
