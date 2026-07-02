@@ -3,6 +3,7 @@
 // with the prod executor's recordAuditCost) and is re-exported here for existing callers.
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 export { PRICE, CACHE_WRITE, CACHE_READ, priceKeyFor, costForCall, aggregate } from "../../src/lib/audit-cost";
 export type { UsageCall, PerModelCost, Totals } from "../../src/lib/audit-cost";
 import type { PerModelCost, Totals } from "../../src/lib/audit-cost";
@@ -32,5 +33,13 @@ export function appendLedgerRow(row: LedgerRow, ledgerPath = LEDGER_PATH): { row
   if (led.rows.some((r) => r.id === row.id)) return led; // idempotent
   led.rows.push(row);
   fs.writeFileSync(ledgerPath, JSON.stringify(led, null, 2) + "\n");
+  // AUTO-LINK: re-bake the cost views so a new row propagates to the cockpit with zero manual steps.
+  // Best-effort — a bake failure must never break recording. The idempotent early-return above skips duplicates.
+  try {
+    const baker = path.join(path.dirname(ledgerPath), "bake-cost-ledger.mjs");
+    if (fs.existsSync(baker)) execFileSync("node", [baker], { stdio: "ignore" });
+  } catch {
+    /* bake is best-effort; the recorded row is still authoritative */
+  }
   return led;
 }
