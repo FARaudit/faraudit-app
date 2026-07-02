@@ -818,7 +818,27 @@ export function enforceVerdictWordInvariant(d: Decision): Decision {
  *  the same one that used to live in the chief-judge prompt — relocated from prose to TypeScript so it is
  *  stable, reproducible, and auditable. */
 export function deriveVerdict(inp: VerdictInputs): Decision {
+  // ── NULL-PROFILE ELIGIBILITY GUARANTEE (Brain card 206-A), single flag AUDIT_ELIGIBLE_TRISTATE, default-OFF.
+  //    Graduates the tristate + adds two paired behaviors — ONE guarantee: the engine never asserts a firm is
+  //    ELIGIBLE for an eligibility gate it could not VERIFY (null/unverified profile). Flag OFF ⇒ every branch
+  //    below is byte-identical to pre-card behavior (guarded). Grounding rules untouched.
+  const tristate = process.env.AUDIT_ELIGIBLE_TRISTATE === "true";
+  // (a) MANDATORY FIRM-STATUS TYPING lives in the ORCHESTRATOR guard chain (applySetAsideFirmStatusGate, now also
+  //     enabled by AUDIT_ELIGIBLE_TRISTATE) so the re-typed finding propagates to BOTH the persisted/rendered
+  //     findings grid AND this decision — never a grid-vs-verdict divergence (code-review #1). So by here a
+  //     null-profile already_satisfied set-aside is ALREADY a bidder_controls verify-caution.
   const dispositions: DecidedFinding[] = inp.findings.map((f) => ({ ...f, disposition: disposeFinding(f) }));
+  // (b/c) UNVERIFIED ELIGIBILITY GATES — a PROFILE-DEPENDENT eligibility gate (kind eligibility_bar carrying a
+  //     specific requiredAttribute credential to check) the profile does not PROVE the firm satisfies. On a
+  //     committal verdict these force eligible=null ("not determined", never a false green) + a mandatory
+  //     verify-caution. requiredAttribute is REQUIRED so an attribute-less/bidder-controllable eligibility item
+  //     (e.g. generic SAM registration) never false-fires a "not determined" on a verified firm (code-review #3/#4).
+  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile) !== "satisfies");
+  const committalEligible = (): boolean | null => (tristate && unverifiedGates.length ? null : true);
+  const committalCaution = (): string => (tristate && unverifiedGates.length
+    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ")} before relying on award eligibility (bidder profile not provided). `
+    : "");
+  const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
   if (!inp.coverageComplete)
@@ -845,7 +865,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)
-    return mk("NEEDS_HUMAN_REVIEW", true, "Unresolved material conflict between experts.", dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), "Unresolved material conflict between experts.", dispositions, []);
 
   // 5. Disqualifying bars whose firm-status is UNKNOWN (null profile, or no attribute to check). The old
   //    ladder blanket-routed these to BID_WITH_CAUTION — a hole (Brain card-44 §2): a NON-CURABLE structural
@@ -858,7 +878,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // 5a. UNTYPED disqualifying bar (missing requiredAttribute or curableInWindow) → fail CLOSED to human review.
   const untyped = unknownBars.filter((f) => !f.requiredAttribute || f.curableInWindow === undefined);
   if (untyped.length)
-    return mk("NEEDS_HUMAN_REVIEW", true,
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
       `Disqualifying bar(s) missing required typing (requiredAttribute / curableInWindow) — fail closed to human review, never a silent caution: ${names(untyped)}`, dispositions, untyped);
 
   // 5b. NON-CURABLE structural bar (curableInWindow === false) under unknown status. Top-line verdict is
@@ -867,7 +887,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     gets the call, not mush (Brain card-45 refinement): hold-it-or-walk.
   const nonCurable = unknownBars.filter((f) => f.curableInWindow === false);
   if (nonCurable.length)
-    return mk("NEEDS_HUMAN_REVIEW", true,
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
       `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`, dispositions, nonCurable);
 
   // ASYMMETRY CAP (Brain card-58): a "no-bar" verdict (CAUTION/BID) is valid only if the read was COMPLETE.
@@ -890,12 +910,16 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
       residual.length ? `residual curable risk(s) to confirm within the window: ${names(residual)}` : "",
       floored.length ? `qualification caution(s) to verify: ${names(floored)}` : "",
     ].filter(Boolean).join("; ");
-    return mk("BID_WITH_CAUTION", true, `Eligible; ${reasons}`, dispositions, []);
+    return committalEligible() === null
+      ? mk("BID_WITH_CAUTION", null, `${committalCaution()}Eligibility not determined; ${reasons}`, dispositions, [])
+      : mk("BID_WITH_CAUTION", true, `Eligible; ${reasons}`, dispositions, []);
   }
 
   // 6. Default — open, eligible, every unmet item is a bidder-controllable gate-to-clear → BID — UNLESS the read
   //    was incomplete (then we cannot assert "no bar found").
   if (manifestIncomplete)
     return mk("INCOMPLETE", honestFailEligible(), "A manifest-named attachment went unfetched — a 'no bar found' (BID) verdict cannot stand on an incomplete read.", dispositions, []);
-  return mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);
+  return committalEligible() === null
+    ? mk("BID", null, `${committalCaution()}Open; eligibility not determined — verify the eligibility gate(s) above; all other unmet items are bidder-controllable gates to clear.`, dispositions, [])
+    : mk("BID", true, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding).", dispositions, []);
 }
