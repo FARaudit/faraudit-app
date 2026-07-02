@@ -74,3 +74,7 @@ test/pdfs/
 supabase/.temp/
 
 .claude/worktrees/
+
+# Paid-run diagnostic records (card 197) — contain real solicitation source; never commit
+scripts/audit-ai/run-records/*
+!scripts/audit-ai/run-records/.gitkeep
