@@ -1,0 +1,106 @@
+// ── KEY-FACT DETECTOR (Brain card 215 Fork B) ────────────────────────────────────────────────────────
+// Surfaces three high-value facts the substantive lenses systematically under-cover on SF-1449/Part-12 buys
+// (found by the card-214 run-quality panel, missed on the SP3300 smoke): the QUOTE DEADLINE, the DELIVERY
+// schedule / PoP, and the NON-MANUFACTURER RULE (FAR 52.219-33). Deterministic, source-grounded (Rule-64:
+// every excerpt is a VERBATIM span of the source), dedup vs any lens finding that already covers the fact.
+//
+// TYPINGS (Brain-ruled, card 215 Fork B):
+//   • deadline  → kind "submission", bidder_controls, NO requiredAttribute/cautionFloor → coverage/context ONLY,
+//                 verdict-INERT. (Expired-deadline logic is OUT OF SCOPE this card — a stored doc may be stale
+//                 vs. amendments; needs its own doctrine session. Do NOT infer expiry.)
+//   • delivery  → kind "technical_spec", bidder_controls, inert → a performance/responsibility obligation, NOT
+//                 an eligibility gate. verdict-INERT.
+//   • NMR       → kind "eligibility_bar" + requiredAttribute "nonmanufacturer:compliant" + bidder_controls
+//                 (→ disposeFinding gate_to_clear, NEVER a show-stopper). On a committal under a null/unverified
+//                 profile it rides the EXISTING card-206-A unverified-gate path → eligible=null + verify-caution;
+//                 it can NEVER flip eligible to false (not disqualifying) and never alters a sibling (e.g. WOSB)
+//                 caution — it only ADDS itself to the unverified-gate list. Caution wording is PATH-AWARE and
+//                 attribution-verified against the primary source (13 CFR 121.406 / FAR 52.219-33 — see
+//                 scripts/audit-ai/gold-sets/NMR-52.219-33-PRIMARY-SOURCE.md, Rule-64 freeze).
+//
+// Ships behind ONE default-OFF flag AUDIT_KEYFACT_DETECTOR (=== "true"); OFF ⇒ findings byte-identical.
+
+import type { TypedFinding } from "./audit-findings";
+
+// Ratified caution string (primary-source-verified; the 500-employee ceiling + waivers are sourced to
+// 13 CFR 121.406, NOT the 52.219-33 clause text — see NMR-52.219-33-PRIMARY-SOURCE.md). PATH-AWARE: the
+// 500 ceiling applies ONLY on the nonmanufacturer/reseller path and does NOT replace the solicitation's
+// stated NAICS size standard for a manufacturer offeror. Conditional — never asserts the firm IS ineligible.
+export const NMR_CAUTION =
+  "Non-Manufacturer Rule (FAR 52.219-33): if supplying another manufacturer's product (nonmanufacturer), the offeror must not exceed 500 employees (SBA nonmanufacturer size standard, 13 CFR 121.406(b)) and must supply the end item of a small U.S. manufacturer, unless SBA grants a class or individual waiver.";
+
+/** First verbatim span of `src` matching `re`. Starts at the enclosing line and, ONLY if the matched line
+ *  ends mid-sentence (PDF soft-wrap), extends across the immediate continuation to the sentence end — bounded
+ *  so it never runs into the next numbered item, a blank line, or an all-caps header. Rule-64: the returned
+ *  string is copied EXACTLY from the source (may include a soft-wrap newline → still a raw substring, so
+ *  `src.includes(excerpt)` holds). Never grabs a leading list-number period ("4.") as the sentence end. */
+function verbatimSpan(src: string, re: RegExp, maxLen = 260): string | null {
+  const m = src.match(re);
+  if (!m) return null;
+  const i = src.indexOf(m[0]);
+  const start = src.lastIndexOf("\n", i) + 1;                 // enclosing line start
+  let end = i + m[0].length;                                  // end of the matched physical line
+  const cont = src.slice(end, Math.min(src.length, start + maxLen)); // soft-wrap continuation window
+  const stop = cont.search(/\n\s*\n|\n\s*\(?\d{1,2}[.)]|\n\s*[A-Z]{3,}/); // next item / blank line / caps header
+  const window = stop >= 0 ? cont.slice(0, stop) : cont;
+  const sentRel = window.search(/[.!?](?:\s|$)/);             // sentence end within the continuation only
+  if (sentRel >= 0) end += sentRel + 1;
+  return src.slice(start, end).replace(/\s+$/, "").trim() || m[0].trim();
+}
+
+export function applyKeyfactDetector(
+  findings: TypedFinding[],
+  fullSource: string | undefined,
+  opts?: { enabled?: boolean },
+): TypedFinding[] {
+  if (!opts?.enabled) return findings;                        // default-OFF ⇒ byte-identical
+  const src = fullSource || "";
+  if (!src) return findings;
+  const covers = (re: RegExp) => findings.some((f) => re.test(`${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""} ${f.citation ?? ""}`));
+  const add: TypedFinding[] = [];
+
+  // NMR applicability (Brain card-132 doctrine, sourced from the DOCUMENT since SAM naics/setAside may be null):
+  // the Non-Manufacturer Rule only governs a SMALL-BUSINESS SET-ASIDE for a SUPPLY/MANUFACTURING buy. Gate the
+  // eligibility_bar on BOTH signals present in the source — otherwise an incidentally-incorporated 52.219-33 in a
+  // full-clause matrix (services / full-and-open) would falsely downgrade eligible to null (code-review card 215).
+  const setAsideCtx = /\bset-?aside\b|women-?owned|\bWOSB\b|\bEDWOSB\b|service-disabled|\bSDVOSB\b|\bHUBZone\b|8\(a\)|small business (?:set-?aside|concern)/i.test(src);
+  const supplyCtx = /NAICS\D{0,12}(?:3[1-3]\d{3}|42\d{3}|4[45]\d{3})|schedule of supplies|manufactured|nonmanufacturer|non-manufacturer/i.test(src);
+
+  // 1) QUOTE DEADLINE — submission, verdict-inert. Require an inline DATE so a bare SF-1449 form label
+  //    ("OFFER DUE DATE/LOCAL TIME") is never grabbed — lock onto the meaningful "Closing Response Date: <date>".
+  //    Dedup is deadline-SPECIFIC (a §M sentence like "response prior to closing" must NOT count as coverage).
+  if (!covers(/closing response date|offer due date|(?:quote|offer|response)[^.\n]{0,20}(?:due date|deadline|due by|due no later)/i)) {
+    const span = verbatimSpan(src, /[^\n]*(?:closing response date|offer due date|quote[^\n]{0,15}due)[^\n]*\b\d{1,2}\/\d{1,2}\/\d{2,4}\b[^\n]*/i)
+      || verbatimSpan(src, /Closing Response Date:[^\n]*/i);
+    if (span) add.push({
+      requirement: "Quote submission deadline — submit the quote by the stated closing date/time (see excerpt) or it risks non-consideration.",
+      citation: "SF-1449 Block 8 / Notice to Offerors (closing date)",
+      excerpt: span, kind: "submission", controllability: "bidder_controls", grounded: true, lens: "keyfact_detector",
+    });
+  }
+
+  // 2) DELIVERY SCHEDULE / PoP — technical_spec (performance), verdict-inert.
+  if (!covers(/delivery schedule|days aro|period of performance/i)) {
+    const span = verbatimSpan(src, /Delivery Schedule:[^\n]*|[^\n]*\b\d+\s*days?\s*ARO\b[^\n]*|Period of Performance[^\n]*/i);
+    if (span) add.push({
+      requirement: "Delivery / performance schedule — the offeror must be able to perform within the stated timeline (see excerpt).",
+      citation: "Notice to Offerors (delivery schedule)",
+      excerpt: span, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "keyfact_detector",
+    });
+  }
+
+  // 3) NON-MANUFACTURER RULE (FAR 52.219-33) — eligibility_bar + requiredAttribute, bidder_controls (gate_to_clear).
+  //    Rides the card-206-A unverified-gate path: committal + null profile → eligible=null + verify-caution; can
+  //    NEVER be a show-stopper (bidder_controls) and NEVER flips eligible to false.
+  if (setAsideCtx && supplyCtx && !covers(/non-?manufacturer|52\.219-33/i)) {
+    const span = verbatimSpan(src, /[^\n]*(?:non-?manufacturer rule|52\.219-33)[^\n]*/i);
+    if (span) add.push({
+      requirement: NMR_CAUTION,
+      citation: "FAR 52.219-33 (source clause list) · 13 CFR 121.406(b)",
+      excerpt: span, kind: "eligibility_bar", controllability: "bidder_controls",
+      requiredAttribute: "nonmanufacturer:compliant", curableInWindow: true, grounded: true, lens: "keyfact_detector",
+    });
+  }
+
+  return add.length ? [...findings, ...add] : findings;
+}
