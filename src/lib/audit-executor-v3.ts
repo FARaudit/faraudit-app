@@ -1,20 +1,17 @@
-// AGENTIC V3 PRIMARY — the graduated engine OWNS the entire customer report.
-//
-// When AUDIT_AGENTIC_V3_PRIMARY=true, executeAudit early-returns into THIS
-// function and V1's runAudit never executes ("V1 retired here"). Fully
-// self-contained so the legacy path carries zero risk: build one fullSource
-// string from the intake docs → run the proven auditPackage engine → map its
-// GATE verdict onto the columns the list/email read → persist the engine's
-// grounded output under compliance_json.v3 with an `engine:"agentic_v3"` marker
-// the report + PDF routes branch on. Honest-fail (INCOMPLETE / NEEDS_HUMAN_REVIEW)
-// is surfaced transparently as the verdict — never a false green. Two flags carry
+// AGENTIC V3 PRIMARY — the graduated engine OWNS the entire customer report, and it is the SOLE engine:
+// V1/V2 are DELETED (2026-06-28), `executeAudit` calls `executeAgenticPrimary` UNCONDITIONALLY, and no env
+// flag can switch engines (see AGENTIC_V3_PRIMARY_ENABLED below). Fully self-contained: build one fullSource
+// string from the intake docs → run the proven auditPackage engine → map its GATE verdict onto the columns
+// the list/email read → persist the engine's grounded output under compliance_json.v3 with an
+// `engine:"agentic_v3"` marker the report + PDF routes branch on. Honest-fail (INCOMPLETE /
+// NEEDS_HUMAN_REVIEW) is surfaced transparently as the verdict — never a false green. Two flags carry
 // completeness to the consumers that gate on it: compliance_json.honest_fail and
-// compliance_json.documents_complete are read by shouldGateExport (blocks PDF/web
-// export of an incomplete report). The watcher email ALSO fails safe to amber on
-// these flags (defense-in-depth) — but note the watcher AUTO-AUDIT currently runs the
-// LEGACY V1 engine (watcher-tick.ts → runAudit), NOT this agentic path, so it does not
-// yet set these flags; the amber-forcing activates only if the watcher is migrated to
-// executeAgenticPrimary. The customer-initiated sync + worker paths DO run this engine.
+// compliance_json.documents_complete are read by shouldGateExport (blocks PDF/web export of an incomplete
+// report), and the watcher email fails safe to amber on them (defense-in-depth). EVERY entrypoint —
+// customer sync, async worker, refetch, and the watcher auto-audit (watcher-tick.ts → executeAudit) — enters
+// through executeAudit and therefore runs THIS engine and sets these flags. (Corrected card-221 follow-up:
+// the prior note claiming the watcher ran the LEGACY V1 engine was FALSE — watcher-tick.ts:401 calls
+// executeAudit, which runs executeAgenticPrimary; V1's runAudit no longer exists.)
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";

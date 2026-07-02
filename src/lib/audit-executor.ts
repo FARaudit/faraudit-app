@@ -1,25 +1,24 @@
 // FA-116 — shared audit execution core.
 //
-// Extracted verbatim from src/app/api/audit/route.ts's try-block so the sync
-// route and the resident audit-worker run the IDENTICAL pipeline: V1 3-call
-// engine → persist complete → V2 shadow (inline-bytes or metadata-only,
-// errors swallowed) → best-effort corpus inserts. Any future change to audit
-// persistence lands in both consumers automatically — the alternative
-// (worker re-implementing the block) is the V2-drift class that bit
-// agents/audit-ai/audit-engine.ts (vendored copy lacks runAuditV2).
+// Extracted from src/app/api/audit/route.ts's try-block so every entrypoint — the sync route, the resident
+// audit-worker, the refetch route, and the watcher auto-audit — runs the IDENTICAL pipeline: FACTS SAM
+// cross-ref → executeAgenticPrimary (the SOLE agentic V3 engine; V1/V2 are DELETED 2026-06-28, no fallback,
+// no engine-selector flag) → persist complete → best-effort corpus inserts. Any change to audit persistence
+// lands in all consumers automatically — the alternative (each re-implementing the block) is the drift class
+// this extraction exists to prevent.
 //
 // Error contract:
 //   - Engine/SAM/content errors THROW — caller marks the audits row failed.
 //   - The complete-update persist failure throws AuditPersistError — the sync
 //     route preserves its historical behavior (500 with auditId, row left in
 //     'processing'); the worker treats it like any failure.
-//   - V2 shadow + corpus failures are swallowed (parity with route).
+//   - Corpus-insert failures are swallowed (parity with route).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
 import { type PdfSource } from "@/lib/audit-engine"; // shared type only — V1 runAudit/runAuditV2 are RETIRED
 import { isNoticedescUrl, resolveSamDescription, type ResolvedDescription } from "@/lib/sam-description";
-import { MAX_DOCS, type IngestionMeta } from "@/lib/sam-attachments";
+import { type IngestionMeta } from "@/lib/sam-attachments";
 import { executeAgenticPrimary } from "@/lib/audit-executor-v3";
 import type { BidderProfile } from "@/lib/audit-findings";
 
@@ -121,78 +120,23 @@ async function markStage(
   }
 }
 
-// ━━ RC7 PART B (2026-06-19) — WALL-CLOCK BUDGETS for the pre-V2 phases ━━
+// ━━ WALL-CLOCK BUDGET for the pre-engine FACTS phase (RC7 Part B, 2026-06-19) ━━
 //
-// PROBLEM (panel-diagnosed): audit #2 (AOCSSB26R0039, the most-attachment run)
-// took ~13-14 min and FELT broken. The V2 agentic layer already has a hard
-// 4-min Promise.race budget (V2_OVERALL_BUDGET_MS, below). But total wall-clock
-// also includes the PRE-V2 phases — and those had NO ceiling:
-//   • the FACTS SAM cross-ref call (fetchSolicitationByNoticeId) — one network
-//     round-trip with no timeout; a hung SAM endpoint stalls the whole run.
-//   • the V1 three-call engine (runAudit) — the three calls run in PARALLEL
-//     (Promise.all), each AbortSignal.timeout(CLAUDE_TIMEOUT_MS≈300s) with a
-//     Sonnet→Opus retry, so the realistic worst case is ~one timeout + one
-//     retry ≈ up to ~600s for the slowest call. Pathological (overloaded API +
-//     full retries) it can sit near that ceiling, contributing the bulk of the
-//     "feels dead" wait with only a frozen spinner on screen.
-//
-// FIX: mirror the existing V2 Promise.race pattern and put a sane ceiling on
-// each pre-V2 phase. Budgets are deliberately set ABOVE the normal success
-// envelope so a currently-succeeding audit can NEVER be made to fail — they cap
-// only the pathological long tail. What's dropped is LOGGED + flagged, never
-// silent.
-//
-//   FACTS_SAM_BUDGET_MS — one SAM call. Normal latency is ~1-15s; 30s is a
-//     generous ceiling. On breach we degrade EXACTLY like the pre-existing
-//     `.catch(() => null)` path already does (proceed without SAM facts → leave
-//     them to extraction / honest-unknown). Pure win: a hang now degrades
-//     gracefully instead of stalling.
-//
-//   V1_OVERALL_BUDGET_MS — the parallel three-call runAudit. A clean run lands
-//     in ~1-3 min; with one slow call + Opus retry it can reach ~9-10 min. 11
-//     min is above even that retry-heavy envelope, so a normal/slow-but-
-//     succeeding run never trips it. A run still in V1 past 11 min is genuinely
-//     pathological (stuck/abandoned upstream call), NOT "succeeding" — so a
-//     breach throws a plain Error → the worker's decideRunFailureMode routes it
-//     to terminal 'fail' (NOT DegradedRunError, which would RE-RUN the same
-//     pathological hang up to the 3-attempt cap). This converts a silent
-//     multi-minute (effectively forever) stall into a prompt, diagnosable
-//     terminal failure the report page can exit to.
-//
-// NOTE / HONEST SCOPE LIMIT: the heavy multi-file INGESTION
-// (assembleSamDocumentSet — many fetch + Files-API uploads, genuinely
-// unbounded) runs UPSTREAM of executeAudit, in src/app/api/audit/route.ts and
-// agents/audit-worker/worker.ts — neither in this task's edit scope. By the
-// time bytes reach executeAudit they are already in input.attachmentPdfs. What
-// executeAudit CAN bound is the cost those already-fetched attachments impose
-// on the phases it owns (V1 + V2 each process every attachment): see the
-// ATTACHMENT_SET degrade below. The true network-ingestion ceiling must be
-// added at those two upstream call sites (flagged for follow-up).
+// The FACTS SAM cross-ref (fetchSolicitationByNoticeId) is one network round-trip with no built-in
+// timeout — a hung SAM endpoint would otherwise stall the whole run behind a frozen spinner. Cap it:
+// normal latency is ~1-15s, so 30s is a generous ceiling set ABOVE the success envelope (a succeeding
+// run can never be made to fail). On breach we degrade EXACTLY like the pre-existing `.catch(() => null)`
+// path (proceed without SAM facts → leave them to extraction / honest-unknown), so a hang degrades
+// gracefully instead of stalling. The agentic engine that runs AFTER carries its own overall budget
+// (AGENTIC_V3_PRIMARY_BUDGET_MS, applied via withBudget below). The heavy multi-file INGESTION runs
+// UPSTREAM of executeAudit (src/app/api/audit/route.ts + agents/audit-worker/worker.ts) and is bounded
+// there — by the time bytes reach executeAudit they are already in input.attachmentPdfs.
 const FACTS_SAM_BUDGET_MS = 30 * 1000;
-const V1_OVERALL_BUDGET_MS = 11 * 60 * 1000;
-
-// Attachment-set degrade ceiling. The V1 engine + V2 shadow each ingest EVERY
-// member of input.attachmentPdfs; an abnormally large set is the in-executor
-// half of the long-tail cost. assembleSamDocumentSet already applies a doc /
-// byte / page budget upstream (MAX_DOCS etc.), so under normal operation the
-// set is already small and this NEVER trips. It's a defensive backstop against
-// a pathological set slipping through: keep the first N (deterministic order is
-// preserved upstream — form first, then tier order), drop the rest, and flag it
-// LOUDLY on compliance_json.ingestion (no silent truncation).
-//
-// P0 fix (2026-06-20): MUST stay AT/ABOVE the upstream attachment count so this
-// backstop never re-truncates a normal set. Upstream MAX_DOCS bounds TOTAL docs
-// (primary + attachments); the primary is split out before this runs, so a
-// normal set carries up to MAX_DOCS-1 attachments. Pinning the backstop to
-// MAX_DOCS keeps it strictly above that (was hardcoded 8 — which, after MAX_DOCS
-// rose to 12, would have silently dropped the very ELIN/SOW/SLS docs the upstream
-// ranking fix just promoted).
-const ATTACHMENT_SET_MAX = MAX_DOCS;
 
 // Race a promise against a wall-clock budget. On breach the returned promise
 // REJECTS with `new Error(label)` — callers decide whether that degrades
-// (catch → fallback) or fails (propagate). Mirrors the inline V2 race already
-// in this file; factored out so all three budget sites share one timer-cleanup-
+// (catch → fallback) or fails (propagate). Factored out so both budget sites (the
+// FACTS SAM cross-ref and the agentic overall budget) share one timer-cleanup-
 // correct implementation (the timer is always cleared, win or lose).
 async function withBudget<T>(workFactory: (signal: AbortSignal) => Promise<T>, budgetMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
