@@ -280,7 +280,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      profile → unverified caution gate (never a green vouch — the #1 legal-exposure); a closed-world FAIL →
   //      eligibility_bar. Runs AFTER the award-basis guard so a socioeconomic set-aside (already re-typed) is not
   //      double-processed. Flag off ⇒ findings pass through unchanged.
-  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" });
+  // Enabled by its own flag OR by AUDIT_ELIGIBLE_TRISTATE (card 206-A): the null-profile eligibility guarantee's
+  // mandatory firm-status typing (behavior a) — placed HERE, in the guard chain, so the re-typed finding is the one
+  // both persisted/rendered AND handed to deriveVerdict (no grid-vs-verdict divergence). Idempotent if both on.
+  findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" || process.env.AUDIT_ELIGIBLE_TRISTATE === "true" });
 
   // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132, Step 4), default-OFF (=== "true"). The never-missed
   //      deterministic FLOOR: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING NAICS (sector 31-33/42/44/45),
