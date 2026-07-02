@@ -25,7 +25,13 @@ const withEnv = <T>(env: Record<string, string | undefined>, fn: () => T): T => 
 const orch = (fs: TypedFinding[], profile: any) => applySetAsideFirmStatusGate(fs, profile, { enabled: process.env.AUDIT_ELIGIBLE_TRISTATE === "true" });
 const vin = (fs: TypedFinding[], cov: boolean): VerdictInputs => ({ findings: fs, bidderProfile: null, coverageComplete: cov, verifierSound: true, conflict: false, manifestComplete: true });
 
-const rf = readdirSync("scripts/audit-ai/run-records").filter((x) => x.includes("SP3300") && x.endsWith(".json")).sort().pop();
+// Pin to the card-202 authoring fixture (PRE-tristate): its §L/§M are NOT pre-grounded, so the procedural-OFF
+// INCOMPLETE cases stay meaningful. The card-210 record (AUDIT_ELIGIBLE_TRISTATE=true) has §L/§M pre-grounded;
+// a bare `.sort().pop()` would grab it and mask the ungrounded cases. Pin by captured-flag.
+const rf = readdirSync("scripts/audit-ai/run-records")
+  .filter((x) => x.includes("SP3300") && x.endsWith(".json"))
+  .filter((x) => JSON.parse(readFileSync("scripts/audit-ai/run-records/" + x, "utf8")).meta?.flags?.AUDIT_ELIGIBLE_TRISTATE !== "true")
+  .sort().pop();
 if (!rf) { console.log("⚠ no SP3300 run record — run paid-run.ts first. Cannot gate."); process.exit(1); }
 const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/" + rf, "utf8"));
 const ctx: AuditToolContext = { fullSource: rec.input.fullSource };

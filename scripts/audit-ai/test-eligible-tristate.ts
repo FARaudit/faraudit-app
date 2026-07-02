@@ -66,7 +66,13 @@ withFlag(true, () => { const d = decide([samNote()], null, true); eq("U5b ON att
 withFlag(false, () => eq("U6 OFF BID reason unchanged", decide([wosb()], null, true).reason, "Open, eligible; all unmet items are bidder-controllable gates to clear (the work of bidding)."));
 
 // ── REPLAY (persisted card-202 record) ──────────────────────────────────────────
-const rf = readdirSync("scripts/audit-ai/run-records").filter((x) => x.includes("SP3300") && x.endsWith(".json")).sort().pop();
+// card-202 authoring fixture (PRE-tristate): its §L/§M are NOT pre-grounded, so the INCOMPLETE/ungrounded B-leg
+// cases stay meaningful. The card-210 record (captured with AUDIT_ELIGIBLE_TRISTATE=true) has §L/§M pre-grounded;
+// a bare `.sort().pop()` would grab it and mask B2/INCOMPLETE. Pin by captured-flag to the pre-tristate record.
+const rf = readdirSync("scripts/audit-ai/run-records")
+  .filter((x) => x.includes("SP3300") && x.endsWith(".json"))
+  .filter((x) => JSON.parse(readFileSync("scripts/audit-ai/run-records/" + x, "utf8")).meta?.flags?.AUDIT_ELIGIBLE_TRISTATE !== "true")
+  .sort().pop();
 if (!rf) { console.log("⚠ no SP3300 run record — skipping replay leg (run paid-run.ts first). Unit legs still gate."); }
 else {
   const rec = JSON.parse(readFileSync("scripts/audit-ai/run-records/" + rf, "utf8"));
