@@ -170,6 +170,7 @@ export function isCautionArchetype(f: TypedFinding): { fires: boolean; archetype
 export function applyCautionFloor(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
+    if (f.kind === "procedural_obligation") return f; // card 208-B: coverage-only, never floored — keeps the class inert even if a §L/§M span contains a caution archetype
     if (f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move") return f; // already ≥caution — never downgrade
     return isCautionArchetype(f).fires ? { ...f, cautionFloor: true } : f;
   });

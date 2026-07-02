@@ -18,6 +18,9 @@ export type RequirementKind =
   | "past_performance"  // a past-performance requirement
   | "clause_flowdown"   // an incorporated clause obligation (FAR/DFARS by reference)
   | "boilerplate"       // routine standard FAR boilerplate (EEO/DEI, standard commercial T&C) — NOT a gate
+  | "procedural_obligation" // Part-12 §L/§M submission-mechanics + evaluation-methodology obligation, grounded by the
+                            // procedural-coverage pass (card 208-B). COVERAGE-ONLY: always bidder_controls, never a bar/
+                            // showstopper, never an eligibility gate — invisible to the verdict + the 206-A eligibility logic.
   | "other";
 
 /** WHO controls satisfaction — the single field that decides gate-to-clear vs disqualifying (Brain card 41).
