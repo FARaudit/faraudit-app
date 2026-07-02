@@ -51,7 +51,8 @@ const isService = (psc: string | null) => typeof psc === "string" && /^[A-Z]/i.t
 interface Cand { code: string; label: string; noticeId: string; sol: string | null; title: string; agency: string; isDoD: boolean; naics: string | null; psc: string | null; type: string | null; posted: string | null; deadline: string | null; }
 
 async function searchWindow(days: number): Promise<Cand[]> {
-  const to = new Date(); const from = new Date(to.getTime() - days * 86400_000);
+  // SAM v2 opportunities search rejects a postedFrom→postedTo span >1yr with HTTP 400 — clamp to 364d.
+  const to = new Date(); const from = new Date(to.getTime() - Math.min(days, 364) * 86400_000);
   const cands: Cand[] = [];
   for (const [code, label] of SETASIDES) {
     const params = new URLSearchParams({ api_key: KEY!, typeOfSetAside: code, postedFrom: fmt(from), postedTo: fmt(to), limit: "200", offset: "0", ptype: "o,k" });
@@ -149,7 +150,7 @@ async function gate(c: Cand): Promise<Gated> {
 }
 
 async function main() {
-  const STAGES: [string, number][] = [["A", 120], ["B", 240], ["C", 365]];
+  const STAGES: [string, number][] = [["A", 120], ["B", 240], ["C", 364]];
   let stageReached = ""; let viable: Gated[] = []; let disq: Gated[] = []; const stageCounts: string[] = [];
 
   for (const [name, days] of STAGES) {
