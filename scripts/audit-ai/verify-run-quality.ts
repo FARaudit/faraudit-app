@@ -12,6 +12,14 @@
 // Exit 0 = clean. Exit 1 = at least one signal flags → the run needs human eyes BEFORE customer ship.
 // Deterministic; no model, no spend. Called automatically at the end of every paid-run.ts (post-run gate).
 import fs from "fs";
+// isTruncated lives in the engine (audit-excerpt-repair) as THE single truncation detector, shared with the
+// card-221 repair pass so the gate and the repair use the SAME definition of "clipped". The card-221 fix
+// tightened the address-cut branch (requires a colon) so a clean sentence ending "…to Government." is no
+// longer a false positive. NOTE: the gate checks BOTH excerpt and requirement; the repair pass re-grounds
+// only the EXCERPT (a verbatim source span). A truncated `requirement` is a model SYNTHESIS with no source
+// span to re-ground to — it is (correctly) NOT auto-repaired: STEP-1 retry prevents it at generation time,
+// and a stored one honestly fails the gate for human review rather than being model-completed (Rule 64).
+import { isTruncatedExcerpt } from "@/lib/audit-excerpt-repair";
 
 const norm = (s: string) => (s || "").toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/[^a-z0-9 '"$%./-]/g, "").trim();
 
@@ -26,17 +34,7 @@ function coverageRatio(excerpt: string, source: string): number {
   return total ? covered / total : 0;
 }
 
-// A stored obligation is "truncated" if it ends mid-thought. Catches the observed period-split failures:
-//   decimal cut: "…whole cents ($1."   email cut: "…via email at: michael."   dangling: "…date specified for"
-function isTruncated(text: string): boolean {
-  const t = (text || "").trim();
-  if (!t) return false;
-  if (/\$\d+\.$/.test(t)) return true;                       // decimal split ("$1.")
-  if (/\b(?:at|to|via|email)[:]?\s+[a-z0-9]+\.$/i.test(t)) return true; // email/address cut ("at: michael.")
-  const danglers = /\b(for|to|the|of|a|an|and|or|in|on|at|with|from|by|that|which|per|as|is|are|be|shall|must|will|no|not|date|specified)$/i;
-  if (danglers.test(t.replace(/[)\]\s]+$/, ""))) return true; // ends on a preposition/dangling word, no terminator
-  return false;
-}
+const isTruncated = isTruncatedExcerpt; // shared detector (see import) — gate flags exactly what repair repairs
 
 // High-value facts every real BD deliverable needs. sourceRe = present in solicitation; findingRe = surfaced.
 const KEY_FACTS: Array<{ label: string; sourceRe: RegExp; findingRe: RegExp; severity: "HIGH" | "MED" }> = [

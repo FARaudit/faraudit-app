@@ -15,6 +15,7 @@
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
+import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { highSignalSweep } from "./audit-grounding-sweep";
@@ -268,6 +269,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       // grounded finding in a section no expert lens happened to read would otherwise be skipped — code-review).
       for (const f of proc) { const m = f.citation.match(/§([A-M])\b/); if (m) sectionsRead.add(m[1]); }
     }
+  }
+
+  // P2.6 — EXCERPT RE-GROUNDING REPAIR (Brain card 221). Deterministic, no flag (Fork-A precedent). A model
+  //         expert lens whose LAST finding's `excerpt` was clipped by a max_tokens stop (valid JSON, silently
+  //         truncated) is re-grounded to the VERBATIM source span, extended to its natural boundary. Scoped to
+  //         model lenses (procedural_coverage/sweep/temporal emit verbatim by construction → skipped, so a
+  //         pre-Fork-A record stays byte-stable). Never model-completes, never drops; an unrepairable clip
+  //         stays clipped and the run-quality gate fails as today. Runs AFTER procedural coverage so the
+  //         repaired (longer, grounded) excerpt feeds completenessOf's covered_direct.
+  const repair = repairClippedExcerpts(findings, ctx.fullSource);
+  if (repair.repaired || repair.unrepairable) {
+    console.log(`[orchestrator] excerpt-repair: re-grounded ${repair.repaired} clipped excerpt(s)${repair.unrepairable ? `, ${repair.unrepairable} unrepairable (left clipped)` : ""}` +
+      (repair.changes.length ? ` — ${repair.changes.map((c) => c.id ?? c.lens).join(", ")}` : ""));
   }
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
