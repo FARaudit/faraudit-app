@@ -91,11 +91,17 @@ eq("same bar, firm qualifies → BID", deriveVerdict(inp(eligBar, { profile: { s
 const noBid = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
 eq("uncontrollable non-elig bar firm fails → NO_BID", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
 
-// ── Brain card-58 ASYMMETRY CAP: an unfetched manifest attachment caps no-bar verdicts, NOT bar-found. ──
+// ── Manifest-incomplete cap. Card-58 capped no-bar verdicts (BID/CAUTION) to INCOMPLETE. Brain card 224 fork 4
+//    EXTENDS the cap to show-stoppers: a findings-derived hard NO_BID/INELIGIBLE on an INCOMPLETE read → NHR
+//    (an unfetched amendment could waive/moot the bar — zero-contract-loss), carrying the conditional bar. ──
 eq("BID + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(two, { manifest: false })).verdict, "INCOMPLETE");
 eq("CAUTION + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(curable, { manifest: false })).verdict, "INCOMPLETE");
-eq("INELIGIBLE + manifest incomplete → STILL INELIGIBLE (asymmetry)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "INELIGIBLE");
-eq("NO_BID + manifest incomplete → STILL NO_BID (asymmetry)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NO_BID");
+eq("INELIGIBLE + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NO_BID + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NHR-capped show-stopper still NAMES the conditional bar", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).showStoppers.length, 1);
+// complete read → the hard pole still stands (cap does NOT fire on a confirmed-complete read)
+eq("INELIGIBLE + manifest COMPLETE → still INELIGIBLE (un-capped on a full read)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+eq("NO_BID + manifest COMPLETE → still NO_BID (un-capped on a full read)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
 
 // ── Doctrine #6 (Step 1, AUDIT_ELIGIBLE_TRISTATE) — honest-fail eligible is tri-state, flag-gated DEFAULT-OFF.
 //    OFF: byte-identical to HEAD (false). ON: INCOMPLETE & verifier-unsound NHR → null; INELIGIBLE → false (invariant). ──

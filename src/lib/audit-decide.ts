@@ -316,11 +316,19 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     //               false INELIGIBLE, never a silent BID) — zero-contract-loss.
     //   "caution" (or legacy normalizeNoOneCanMoveSetAside===true) → curable caution like the bidder_cannot_move path.
     //   neither set → UNTOUCHED (byte-identical to pre-ruling — the finding falls through unchanged).
+    // BRAIN CARD 224 FORK 3 — PROMOTED TO AN ALWAYS-RUN DOCTRINE INVARIANT (no longer gated behind the
+    // default-OFF AUDIT_SETASIDE_OVERTYPE_GUARD). A who-can-win socioeconomic set-aside is NEVER a universal
+    // impossibility, so a mis-typed no_one_can_move set-aside must NEVER reach step-3 as no_one_can_move
+    // (→ false INELIGIBLE/NO_BID under a null/open-world profile — THE catastrophic zero-contract-loss error).
+    // When the award-basis guard runs (enabled, default-ON), ALWAYS re-type it off no_one_can_move. Default pole
+    // = NHR (bidder_cannot_move, non-curable → deriveVerdict step-5b → NEEDS_HUMAN_REVIEW); a caller may elect
+    // the softer "caution" disposition. Structural bars are already excluded above (NON_SELF_CLEARABLE_BAR_RE),
+    // so this only ever touches a PURE set-aside. (The flag's default-ON flip for the REMAINING guard behavior
+    // stays a separate CEO checkpoint — Rule 61; this invariant supersedes what the flag did for this case.)
     if (setAsideSoftenable && f.controllability === "no_one_can_move") {
-      if (opts?.setAsideOvertypeDisposition === "nhr")
-        return { ...f, controllability: "bidder_cannot_move", curableInWindow: false, awardBasisGuard: true };
       if (opts?.setAsideOvertypeDisposition === "caution" || opts?.normalizeNoOneCanMoveSetAside === true)
         return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
+      return { ...f, controllability: "bidder_cannot_move", curableInWindow: false, awardBasisGuard: true };
     }
     return f;
   });
@@ -868,6 +876,15 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const provenFails = disqualifying.filter((f) => f.controllability !== "no_one_can_move" && firmStatus(f, inp.bidderProfile) === "fails");
   const showStoppers = [...universal, ...provenFails];
   if (showStoppers.length) {
+    // ASYMMETRY-CAP EXTENSION (Brain card 224 fork 4) — a findings-derived hard NO_BID/INELIGIBLE may NOT stand
+    // on an INCOMPLETE manifest read: an unfetched amendment could WAIVE or moot the bar, so committing to the
+    // catastrophic pole over content we KNOW we did not fully read is the zero-contract-loss error. Downgrade the
+    // top-line to NEEDS_HUMAN_REVIEW carrying the CONDITIONAL bar (named, so the customer still gets the call —
+    // hold-it-or-walk pending the missing docs). Un-capped NO_BID/INELIGIBLE is reserved for confirmed-complete
+    // reads. (Supersedes card-58, which left show-stoppers un-capped; card 224 extends the cap to them.)
+    if (inp.manifestComplete === false)
+      return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
+        `CONDITIONAL bar(s) on an INCOMPLETE read — a manifest-named document went unfetched and could waive or moot the following; confirm against the full package before treating as disqualifying: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
     const elig = !showStoppers.some((s) => s.kind === "eligibility_bar");
     return enforceVerdictWordInvariant(mk(elig ? "NO_BID" : "INELIGIBLE", elig,
       `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers));
