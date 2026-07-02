@@ -60,18 +60,30 @@ async function panelCall<T>(p: {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — panel call cannot proceed");
   let maxTokens = p.maxTokens;
+  let bumpedForValidTruncation = false;
   for (;;) {
     const res = await callStructuredClaude({
       apiKey, model: p.model, system: p.system, cachedSystemPrefix: p.cachedSystemPrefix,
       userPrompt: p.userPrompt, schema: p.schema, maxTokens, timeoutMs: p.timeoutMs,
       label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal,
     });
+    let parsed: T;
     try {
-      return JSON.parse(res.text) as T;
+      parsed = JSON.parse(res.text) as T;
     } catch (e) {
       if (res.stopReason === "max_tokens" && maxTokens < p.ceiling) { maxTokens = Math.min(maxTokens * 2, p.ceiling); continue; }
       throw new Error(`${p.label}: structured output not valid JSON${res.stopReason === "max_tokens" ? ` — truncated at ${maxTokens}` : ""}: ${(e as Error).message}`);
     }
+    // STEP 1 (Brain card 221) — VALID JSON but a max_tokens stop is still SUSPECT: the trailing field (e.g. a
+    // panelist's excerpt) may be clipped even though the JSON parses. Retry ONCE at the ceiling so the model
+    // can emit full excerpts, then accept. Logs both attempts' stop_reasons (the first is max_tokens).
+    if (res.stopReason === "max_tokens" && maxTokens < p.ceiling && !bumpedForValidTruncation) {
+      console.log(`[panel] ${p.label}: valid-JSON max_tokens retry — attempt1=max_tokens, bumping ${maxTokens}→${p.ceiling}`);
+      maxTokens = p.ceiling;
+      bumpedForValidTruncation = true;
+      continue;
+    }
+    return parsed;
   }
 }
 

@@ -122,13 +122,27 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.
-    const resp = await client.messages.create(req, signal ? { signal } : undefined);
-    if (resp.usage) {
-      // Per-run tally (opts.onUsage, concurrency-safe — each audit owns its own) AND the legacy global sink
-      // (null in prod; kept for single-run proofs). Both are best-effort — never affects the returned findings.
-      const u = { model, input_tokens: resp.usage.input_tokens ?? 0, output_tokens: resp.usage.output_tokens ?? 0, cache_write: resp.usage.cache_creation_input_tokens ?? 0, cache_read: resp.usage.cache_read_input_tokens ?? 0 };
+    // Per-run tally (opts.onUsage, concurrency-safe — each audit owns its own) AND the legacy global sink
+    // (null in prod; kept for single-run proofs). Both are best-effort — never affects the returned findings.
+    const tally = (r: { usage?: SdkUsage }) => {
+      if (!r.usage) return;
+      const u = { model, input_tokens: r.usage.input_tokens ?? 0, output_tokens: r.usage.output_tokens ?? 0, cache_write: r.usage.cache_creation_input_tokens ?? 0, cache_read: r.usage.cache_read_input_tokens ?? 0 };
       try { opts?.onUsage?.(u); } catch { /* never let cost capture break an audit */ }
       if (_expertUsageSink) _expertUsageSink(u);
+    };
+    let resp = await client.messages.create(req, signal ? { signal } : undefined);
+    tally(resp);
+    // STEP 1 (Brain card 221) — a max_tokens stop is SUSPECT output even when the tool JSON parses: the last
+    // finding's `excerpt` may be clipped mid-clause (a valid-JSON trailing field). Retry the SAME request ONCE
+    // at the 8k ceiling so the model has room to emit full excerpts. Both attempts' stop_reasons are logged
+    // for cost/diagnostics; usage from BOTH is tallied. The deterministic P2.6 repair pass is the backstop for
+    // any excerpt still clipped after the retry.
+    const EXPERT_TOKEN_CEILING = 8000;
+    if (resp.stop_reason === "max_tokens" && (req.max_tokens as number) < EXPERT_TOKEN_CEILING) {
+      const resp2 = await client.messages.create({ ...req, max_tokens: EXPERT_TOKEN_CEILING }, signal ? { signal } : undefined);
+      tally(resp2);
+      console.log(`[expert] max_tokens retry: attempt1=max_tokens attempt2=${resp2.stop_reason ?? "?"} (max_tokens ${req.max_tokens as number}→${EXPERT_TOKEN_CEILING})`);
+      resp = resp2;
     }
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
