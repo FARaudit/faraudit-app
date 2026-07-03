@@ -101,6 +101,12 @@ export interface TypedFinding {
   // tension is present (FAT precondition + delivery window grounded) but it is NOT a proven order-referenced
   // sequential gate. Marker only; deriveVerdict reads controllability/cautionFloor, not this field.
   temporalSharedAroGuard?: boolean;
+  // TEMPORAL EVIDENCE (Brain card 226 Fork-1) — the parsed arithmetic behind a temporal KO-clarify CAUTION,
+  // surfaced as a structured field so the human adjudicates the FAT-gate-vs-window tension from the numbers, not
+  // prose. Populated on BOTH temporal outputs: the fired four-prong caution (all prongs hold) AND the soft-floor
+  // FAT finding (tension present but not proven) — gate duration (days, post-order-anchored), delivery window
+  // (days, order-anchored), and whether the gate provably exceeds the window. The temporal arm NEVER emits NO_BID.
+  temporalEvidence?: { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean };
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

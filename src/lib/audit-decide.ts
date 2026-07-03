@@ -555,7 +555,8 @@ export function parseDays(excerpt: string): number | null {
 // Option-B arithmetic prong: an incidental smaller day-count (a shipment-notice sub-deadline, a first-article
 // SAMPLE due-date, another CLIN's window) poisons the delivery window into a FALSE impossibility. These helpers
 // pin each duration to its GOVERNING anchor by proximity, so the arithmetic compares the gate duration to the
-// DELIVERY window — not two unrelated numbers. Pure. (Used ONLY by Option B; the legacy path keeps parseDays.)
+// DELIVERY window — not two unrelated numbers. Pure. (The verdict path uses ONLY these anchored helpers; the
+// legacy global-min `parseDays` path is RETIRED (Fork-1) — `parseDays` remains only as a unit-tested string util.)
 /** Every day-count (digit, parenthetical, spelled) with its source offset — so a duration can be matched to its
  *  governing phrase by proximity rather than a blind global min. Pure. */
 function dayCountsWithPos(excerpt: string): Array<{ v: number; i: number }> {
@@ -637,12 +638,8 @@ function clinSet(excerpt: string): Set<string> {
   return s;
 }
 
-/** Emit a `no_one_can_move` show-stopper when a NON-WAIVABLE FAT precondition's minimum duration EXCEEDS the
- *  delivery window (Brain card 81 Step 2). FLOOR-of-severity guard: only fires on a non-waivable precondition
- *  (a waivable one isn't universal — the CO could waive it). Adds a finding; never removes/downgrades. Pure.
- *  Default-OFF. */
-const NONWAIVABLE_RE = /\bnon-?waivable\b|shall not (?:waive|authorize|approve)|may not be waived|\bmandatory\b|must (?:complete|elapse|first)/i;
-// ── Step 7 (Brain card 140, AUDIT_TEMPORAL_SHARED_ARO) — OPTION B order-referenced SEQUENTIAL-GATE narrowing ──
+// ── Step 7 (Brain card 140) → FORK-1 (Brain card 226) — order-referenced SEQUENTIAL-GATE narrowing, now the ──
+// ── ONLY temporal path (legacy no_one_can_move emitter + NONWAIVABLE_RE removed; four-prong CAUTION-only). ──
 // The Step-2 universal-impossibility (no_one_can_move → NO_BID) is doctrinally correct ONLY for a genuine
 // ORDER-REFERENCED sequential gate — NOT for a relative-scheduling term ("N days before delivery", a bidder-side
 // schedule) nor for an unproven duration. The gold #6 source (FA860126Q00260001) proves a literal "both share an
@@ -672,55 +669,42 @@ const POST_ORDER_GATE_ANCHOR_RE = /receipt\s+of\s+(?:the\s+)?(?:first\s+article|
 // foreclosure object is DELIVER/SHIP only — NOT bare "produc" (B-2: "no production delays before…" is benign) — and
 // the actor-agnostic "delivery … shall not … until" alt is DROPPED (B-3: it matched bidder-controlled scheduling).
 const DELIVERY_FORECLOSE_RE = /\bno\b[^.]{0,80}\b(?:deliver|ship)[^.]{0,80}\b(?:before|until|prior)\b|(?:shall|may|will)\s+not[^.]{0,80}(?:authorize|approve|ship|deliver)[^.]{0,80}\buntil\b|until\s+first\s+article\s+approval|condition\s+precedent\s+to\s+(?:delivery|shipment)|contingent\s+upon[^.]{0,80}approval|(?:prohibited|not\s+permitted)\s+(?:prior\s+to|before|until)[^.]{0,80}approval|withheld\s+until[^.]{0,80}approval/i;
-export function applyTemporalConflict(findings: TypedFinding[], opts?: { enabled?: boolean; sharedAroGate?: boolean }): TypedFinding[] {
-  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ unchanged
+export function applyTemporalConflict(findings: TypedFinding[]): TypedFinding[] {
+  // ── FORK-1 (Brain card 226) — the temporal arm NEVER emits NO_BID; four-prong CAUTION-only is the ALWAYS-RUN
+  // default (no flag). The legacy `no_one_can_move → NO_BID` Step-2 emitter is RETIRED: deterministic ID of the
+  // production-delivery window from messy §F text proved open-ended across 7 adversarial rounds, so a false NO_BID
+  // is a structural (zero-contract-loss) risk. This path produces ONLY a KO-clarify CAUTION (four prongs hold on
+  // proven anchored arithmetic) or a soft cautionFloor (tension present, not proven) — never a show-stopper. ──
   const fat = findings.find((f) => f.sweepArchetype === "fat_precondition");
   const delivery = findings.find((f) => f.sweepArchetype === "delivery_window");
   if (!fat || !delivery) return findings;
 
-  if (opts.sharedAroGate) {
-    // ── OPTION B (Brain card 140/141, AUDIT_TEMPORAL_SHARED_ARO) — fire NO_BID only on a PROVEN sequential gate ──
-    const gDays = gateDays(fat.excerpt), winDays = deliveryWindowDays(delivery.excerpt);              // ANCHORED durations (no global-min poisoning)
-    const prong1 = DELIVERY_ORDER_ANCHOR_RE.test(delivery.excerpt);                                   // delivery is order-anchored
-    const prong2 = POST_ORDER_GATE_ANCHOR_RE.test(fat.excerpt) && DELIVERY_FORECLOSE_RE.test(fat.excerpt); // post-order gate + delivery foreclosure (rejects relative scheduling)
-    const prong3 = NONWAIVABLE_TIGHT_RE.test(fat.excerpt);                                            // explicit non-waiver (mandatory-only is NOT enough)
-    const prong4 = gDays != null && winDays != null && gDays > winDays;                               // PROVEN arithmetic on anchored durations (never estimate)
-    // same-deliverable guard: if BOTH excerpts name CLIN/line items and the sets are DISJOINT, the gate and the
-    // window concern DIFFERENT deliverables ⇒ not a universal impossibility for either ⇒ do not fire (→ CAUTION).
-    const fatClins = clinSet(fat.excerpt), delClins = clinSet(delivery.excerpt);
-    const crossDeliverable = fatClins.size > 0 && delClins.size > 0 && ![...fatClins].some((c) => delClins.has(c));
-    if (prong1 && prong2 && prong3 && prong4 && !crossDeliverable) {
-      // OPTION 1 (Brain card 141 ruling): the temporal arm NEVER escalates to NO_BID — deterministic identification
-      // of the production-delivery window from messy §F text is open-ended (7 adversarial rounds), so a false NO_BID
-      // is a structural risk and NO_BID stays reserved for cleanly-named hard gates. The four-prong trigger now routes
-      // to a HIGH-confidence KO-clarify CAUTION (bidder_controls + cautionFloor) — surfacing the tension, never asserting
-      // universal impossibility. deriveVerdict floors this to BID_WITH_CAUTION; it can never produce NO_BID/INELIGIBLE.
-      const caution: TypedFinding = {
-        requirement: `Likely universally unmeetable delivery schedule — CONFIRM the binding production window against the non-waivable First Article gate before bidding: a non-waivable, order-referenced FAT precondition (min ~${gDays} days, measured from a post-order event and foreclosing delivery until it closes) appears to exceed the production delivery window (~${winDays} days ARO).`,
-        citation: `${fat.citation} + ${delivery.citation} (cross-clause temporal conflict)`,
-        excerpt: fat.excerpt, // verbatim-grounded binding term (the FAT clause)
-        kind: "technical_spec", controllability: "bidder_controls", curableInWindow: true,
-        cautionFloor: true, temporalSharedAroGuard: true, grounded: true, lens: "temporal_conflict",
-      };
-      return [...findings, caution];
-    }
-    // Any prong fails / ambiguous arithmetic / cross-deliverable ⇒ a temporal tension is present but NOT proven →
-    // KO-clarify CAUTION (cautionFloor on the FAT finding), NEVER no_one_can_move/NO_BID.
-    return findings.map((f) => (f === fat ? { ...f, cautionFloor: true, temporalSharedAroGuard: true } : f));
+  const gDays = gateDays(fat.excerpt), winDays = deliveryWindowDays(delivery.excerpt);              // ANCHORED durations (no global-min poisoning)
+  const prong1 = DELIVERY_ORDER_ANCHOR_RE.test(delivery.excerpt);                                   // delivery is order-anchored
+  const prong2 = POST_ORDER_GATE_ANCHOR_RE.test(fat.excerpt) && DELIVERY_FORECLOSE_RE.test(fat.excerpt); // post-order gate + delivery foreclosure (rejects relative scheduling)
+  const prong3 = NONWAIVABLE_TIGHT_RE.test(fat.excerpt);                                            // explicit non-waiver (mandatory-only is NOT enough)
+  const prong4 = gDays != null && winDays != null && gDays > winDays;                               // PROVEN arithmetic on anchored durations (never estimate)
+  // same-deliverable guard: if BOTH excerpts name CLIN/line items and the sets are DISJOINT, the gate and the
+  // window concern DIFFERENT deliverables ⇒ not a universal tension for either ⇒ do not fire (→ soft floor).
+  const fatClins = clinSet(fat.excerpt), delClins = clinSet(delivery.excerpt);
+  const crossDeliverable = fatClins.size > 0 && delClins.size > 0 && ![...fatClins].some((c) => delClins.has(c));
+  // EVIDENCE the human adjudicates from — the parsed arithmetic, never silent (Brain card 226).
+  const evidence = { gateDays: gDays, windowDays: winDays, gateExceedsWindow: prong4 };
+  if (prong1 && prong2 && prong3 && prong4 && !crossDeliverable) {
+    // Four prongs hold on PROVEN anchored arithmetic → a HIGH-confidence KO-clarify CAUTION (bidder_controls +
+    // cautionFloor), CARRYING the evidence. deriveVerdict floors this to BID_WITH_CAUTION; never NO_BID/INELIGIBLE.
+    const caution: TypedFinding = {
+      requirement: `Likely universally unmeetable delivery schedule — CONFIRM the binding production window against the non-waivable First Article gate before bidding: a non-waivable, order-referenced FAT precondition (min ~${gDays} days, measured from a post-order event and foreclosing delivery until it closes) appears to exceed the production delivery window (~${winDays} days ARO).`,
+      citation: `${fat.citation} + ${delivery.citation} (cross-clause temporal conflict)`,
+      excerpt: fat.excerpt, // verbatim-grounded binding term (the FAT clause)
+      kind: "technical_spec", controllability: "bidder_controls", curableInWindow: true,
+      cautionFloor: true, temporalSharedAroGuard: true, temporalEvidence: evidence, grounded: true, lens: "temporal_conflict",
+    };
+    return [...findings, caution];
   }
-
-  // ── legacy Step-2 path (flag OFF) — byte-identical to 63e777f ──
-  if (!NONWAIVABLE_RE.test(fat.excerpt)) return findings;                 // waivable precondition ⇒ not universal
-  const fatDays = parseDays(fat.excerpt), winDays = parseDays(delivery.excerpt);
-  if (fatDays == null || winDays == null || fatDays <= winDays) return findings; // no conflict
-  const ss: TypedFinding = {
-    requirement: `Universal delivery impossibility: a non-waivable First Article precondition (min ~${fatDays} days) cannot complete inside the production delivery window (~${winDays} days ARO). No bidder can comply, regardless of capacity.`,
-    citation: `${fat.citation} + ${delivery.citation} (cross-clause temporal conflict)`,
-    excerpt: fat.excerpt, // verbatim-grounded binding term (the FAT clause)
-    kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: false,
-    grounded: true, lens: "temporal_conflict",
-  };
-  return [...findings, ss];
+  // Any prong fails / ambiguous arithmetic / cross-deliverable ⇒ a temporal tension is present but NOT proven → soft
+  // KO-clarify floor (cautionFloor on the FAT finding, carrying whatever parsed), NEVER no_one_can_move/NO_BID.
+  return findings.map((f) => (f === fat ? { ...f, cautionFloor: true, temporalSharedAroGuard: true, temporalEvidence: evidence } : f));
 }
 
 /** Disposition is a PURE function of controllability + kind — the Brain card-41 rule as CODE (was prose).

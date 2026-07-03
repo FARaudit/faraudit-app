@@ -23,7 +23,7 @@ const frozen = (file: string) => (JSON.parse(readFileSync(`${FROZEN}/${file}`, "
 // guard at the chosen flag state → caution-floor → derive. The temporal_conflict basis is now DERIVED live from the
 // regenerated sweep findings (not baked into the fixture), matching the orchestrator order P1.6 → P4.4 → P4.5.
 const decide = (findings: TypedFinding[], preOn: boolean): string => {
-  let f = applyTemporalConflict(findings, { enabled: true, sharedAroGate: true });
+  let f = applyTemporalConflict(findings);
   f = applyPreconditionOvertypeFloor(f, { enabled: preOn });
   f = applyCautionFloor(f, { enabled: true });
   const inp: VerdictInputs = { findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true };
@@ -46,14 +46,14 @@ ok(decide(complete, true) === "BID_WITH_CAUTION", `complete → ${decide(complet
 const survAfterOvertype = survivingNoMove(complete, true);
 ok(survAfterOvertype.length === 0,
   `bare precondition downgraded → 0 surviving no_one_can_move after overtype → [${[...new Set(survAfterOvertype.map((f) => f.lens))].join(", ") || "none"}]`);
-const tcBasis = applyTemporalConflict(complete, { enabled: true, sharedAroGate: true }).filter((f) => f.lens === "temporal_conflict");
+const tcBasis = applyTemporalConflict(complete).filter((f) => f.lens === "temporal_conflict");
 ok(tcBasis.length >= 1 && tcBasis.every((f) => f.controllability === "bidder_controls" && f.cautionFloor === true),
   `surviving CAUTION basis = DERIVED temporal_conflict (bidder_controls + cautionFloor) → keeps complete at BID_WITH_CAUTION, never NO_BID`);
 ok(decide(noWin, true) !== "NO_BID", `no-window → ${decide(noWin, true)} (feasible precondition + no window → not NO_BID)`);
 
-console.log("[overtype OFF — bare precondition NOT downgraded → its model-asserted no_one_can_move surfaces as the legacy false-NO_BID]");
-ok(decide(complete, false) === "NO_BID", `complete → ${decide(complete, false)} (overtype OFF leaves the former_ko bare precondition no_one_can_move → NO_BID; the temporal CAUTION alone cannot floor a surviving show-stopper — this is exactly why overtype is needed)`);
-ok(decide(noWin, false) === "NO_BID", `no-window → ${decide(noWin, false)} (overtype OFF → bare precondition false-NO_BID preserved)`);
+console.log("[overtype OFF — bare precondition NOT downgraded → its model-asserted no_one_can_move survives to the hard pole; under Fork-2 default-deny that pole is NHR (an unmarked no_one_can_move under null is never a committal NO_BID — zero-contract-loss), migrated from the pre-Fork-2 NO_BID]");
+ok(decide(complete, false) === "NEEDS_HUMAN_REVIEW", `complete → ${decide(complete, false)} (overtype OFF leaves the former_ko bare precondition no_one_can_move → NHR under Fork-2; overtype is still what turns it into a floorable CAUTION when ON [line 43])`);
+ok(decide(noWin, false) === "NEEDS_HUMAN_REVIEW", `no-window → ${decide(noWin, false)} (overtype OFF → surviving model no_one_can_move → NHR, was NO_BID pre-Fork-2)`);
 
 // ── PREDICATE / BOUNDARY (synthetic findings — predicate tests, NOT verdict fixtures) ─────────────────
 console.log("[predicate + boundary]");
@@ -62,11 +62,11 @@ ok(applyPreconditionOvertypeFloor([barePre], { enabled: true })[0].controllabili
 
 const conflictPre = mk({ requirement: "First article testing minimum SIXTY (60) calendar days cannot complete inside the THIRTY (30) day delivery window ARO — no bidder can comply.", excerpt: "60-day FAT cannot complete inside the 30-day delivery window ARO." });
 ok(applyPreconditionOvertypeFloor([conflictPre], { enabled: true })[0].controllability === "no_one_can_move", "DOES NOT FIRE: precondition that CO-STATES a window conflict → NOT downgraded");
-ok(decide([conflictPre], true) === "NO_BID", "co-stated-conflict precondition STILL drives NO_BID (guard does not over-reach)");
+ok(decide([conflictPre], true) === "NEEDS_HUMAN_REVIEW", "co-stated-conflict precondition STILL drives the hard pole (guard does not over-reach); a MODEL no_one_can_move (four-prong-processed=false) → NHR under Fork-2 default-deny (was NO_BID pre-Fork-2)");
 
 const qpl = mk({ requirement: "Qualified Products List (QPL) membership is required and the qualification lead time exceeds the response window.", excerpt: "QPL listing required; lead time exceeds the window.", curableInWindow: false });
 ok(applyPreconditionOvertypeFloor([qpl], { enabled: true })[0].controllability === "no_one_can_move", "DOES NOT FIRE: QPL structural bar → NOT downgraded");
-ok(decide([qpl], true) === "NO_BID", "QPL structural bar STILL NO_BID");
+ok(decide([qpl], true) === "NEEDS_HUMAN_REVIEW", "QPL who-can-win/structural bar STILL drives the hard pole → NHR under Fork-2 default-deny (was NO_BID pre-Fork-2; consistent with the card-231 QPL who-can-win→NHR ruling)");
 
 const soleSource = mk({ requirement: "Sole-source to the named OEM DGMT1002; no substitute or or-equal is permitted.", excerpt: "Sole source to named OEM; no substitute permitted.", curableInWindow: false });
 ok(applyPreconditionOvertypeFloor([soleSource], { enabled: true })[0].controllability === "no_one_can_move", "DOES NOT FIRE: sole-source-to-named-OEM structural bar → NOT downgraded");
@@ -83,23 +83,24 @@ const fixtureStructural = [complete, noWin, frozen("aocssb-with-qual.json"), fro
 console.log(`[structural-bar fixture availability] frozen no_one_can_move structural bars found: ${fixtureStructural.length}`);
 if (fixtureStructural.length === 0) console.log("  → NO structural-bar fixture available — flag-ON negative control proven on synthetic predicate findings above (not fabricated as a verdict fixture, per card 92).");
 
-// ── ORDERING GUARD (Brain Ruling 1) — HARD-asserted (this gated suite process.exits on failure). Overtype WITHOUT
-// the temporal arm FALSE-BIDs an uncertain-window package; the temporal arm must fire BEFORE/WITH overtype to
-// establish the CAUTION floor. Under Option 1 only the FLOOR moved (NO_BID → CAUTION) — the guard is NOT moot. ──
-console.log("[ordering guard — Ruling 1]");
+// ── ORDERING GUARD (Brain Ruling 1 → Fork-1) — temporal is now UNCONDITIONALLY always-run (both flags retired), so
+// the former "temporal-OFF FALSE-BID" assert is DELETED (Brain card-235 ruling: the OFF world is retired). What
+// remains: with overtype ON, the always-on temporal arm establishes the CAUTION floor over the downgraded bare
+// precondition → BID_WITH_CAUTION. (The always-on temporal→CAUTION path is ALSO covered by test-temporal-conflict.ts
+// — the #6 anchor `decideFx(fxComplete) === "BID_WITH_CAUTION"` + the tempCautionB genuine-gate checks.) ──
+console.log("[ordering guard — Ruling 1 (temporal always-on, Fork-1)]");
 {
   const src6 = readFileSync("scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt", "utf8");
   const sweep6 = highSignalSweep(src6);                                  // fat_precondition(60) + delivery_window(30), $0
   const bareFat = complete.find((f) => f.lens === "former_ko" && f.controllability === "no_one_can_move")!;
   const pkg = [bareFat, ...sweep6];
-  const decideTO = (findings: TypedFinding[], temporalOn: boolean, overtypeOn: boolean): string => {
-    let f = applyTemporalConflict(findings, { enabled: temporalOn, sharedAroGate: temporalOn });
+  const decideTO = (findings: TypedFinding[], overtypeOn: boolean): string => {
+    let f = applyTemporalConflict(findings);
     f = applyPreconditionOvertypeFloor(f, { enabled: overtypeOn });
     f = applyCautionFloor(f, { enabled: true });
     return deriveVerdict({ findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true } as VerdictInputs).verdict;
   };
-  ok(decideTO(pkg, false, true) === "BID", `overtype-ON + temporal-OFF → ${decideTO(pkg, false, true)} (the FALSE-BID an uncertain-window package would slip through — exactly what the ordering guards against)`);
-  ok(decideTO(pkg, true, true) === "BID_WITH_CAUTION", `overtype-ON + temporal-ON → ${decideTO(pkg, true, true)} (temporal establishes the CAUTION floor — Ruling 1; guard NOT moot, floor moved NO_BID→CAUTION)`);
+  ok(decideTO(pkg, true) === "BID_WITH_CAUTION", `overtype-ON + temporal(always-on) → ${decideTO(pkg, true)} (temporal establishes the CAUTION floor over the downgraded bare precondition — Ruling 1)`);
 }
 
 // ── ANCHOR: decide(complete) == registry-resolved frozen gold-key verdict (#6 = BID_WITH_CAUTION under Option 1) ──
@@ -110,5 +111,5 @@ ok(decide(complete, true) === goldVerdict("FA860126Q00260001"), `#6 decide(compl
 
 console.log("");
 if (fail) { console.error(`✗ ${fail} check(s) FAILED`); process.exit(1); }
-console.log("✓ ALL GREEN — precondition-overtype-floor (Option-1): bare precondition downgraded (fix), the DERIVED temporal_conflict CAUTION (bidder_controls+cautionFloor) keeps complete at BID_WITH_CAUTION (never NO_BID), structural/co-stated-conflict MODEL bars NEVER downgraded (still NO_BID — model judgment, not the deterministic temporal arm), temporal_conflict never mutated, overtype-OFF legacy false-NO_BID preserved, anchor = BID_WITH_CAUTION. $0.");
+console.log("✓ ALL GREEN — precondition-overtype-floor (Fork-1 migrated, Brain card-235): bare precondition downgraded (fix), the DERIVED temporal_conflict CAUTION (bidder_controls+cautionFloor) keeps complete at BID_WITH_CAUTION (never NO_BID); structural/co-stated-conflict/QPL MODEL no_one_can_move bars NEVER downgraded → survive to the hard pole = NHR under Fork-2 default-deny (was NO_BID pre-Fork-2 — zero-contract-loss migration); temporal_conflict never mutated; the retired temporal-OFF FALSE-BID assert DELETED (always-on covered by test-temporal-conflict #6); anchor = BID_WITH_CAUTION. $0.");
 process.exit(0);

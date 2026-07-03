@@ -11,7 +11,7 @@ import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-fin
 const FROZEN = "tests/fixtures/frozen";
 const frozen = (file: string) => (JSON.parse(readFileSync(`${FROZEN}/${file}`, "utf8")).findings as TypedFinding[]).map((f) => ({ ...f, grounded: true }));
 const decideFx = (findings: TypedFinding[], profile: BidderProfile | null = null): string => {
-  let f = applyTemporalConflict(findings, { enabled: true, sharedAroGate: true });
+  let f = applyTemporalConflict(findings);
   f = applyPreconditionOvertypeFloor(f, { enabled: true });
   f = applyCautionFloor(f, { enabled: true });
   const inp: VerdictInputs = { findings: f, bidderProfile: profile, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true };
