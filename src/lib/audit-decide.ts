@@ -269,10 +269,62 @@ export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?
   });
 }
 
+// ── POSITIVE SET-ASIDE DETECTOR (Brain card 226 Fork-3, RATIFIED) ────────────────────────────────────
+// A socioeconomic / small-business set-aside is a WHO-CAN-WIN restriction — NEVER a universal impossibility,
+// in ANY profile mode. It is classified POSITIVELY, over requirement AND excerpt (P-5: an excerpt-only set-aside
+// must not escape detection because the requirement field happens to be silent), and it SUBORDINATES the §K/size
+// NOTICE boilerplate: set-aside identity wins over set-aside-adjacent regulatory text ("size standard", "small
+// business concern under", "annual receipts", "N employees") that the legacy blanket NON_SELF_CLEARABLE_BAR_RE
+// mis-read as a "structural" bar → false INELIGIBLE (P-3). But it must NEVER fire on a finding that ALSO carries a
+// GENUINE universal/structural bar — else that real show-stopper is softened/cleared for a cert-holding firm
+// (adversarial review, two independent finders). So the detector EXCLUDES, on requirement+excerpt+attribute:
+//   (1) GENUINE_STRUCTURAL_BAR_RE — sole-source / brand-name / named-firm / no-substitute / single-source /
+//       QPL/QML / TDP / proprietary / non-competitive / directed-award / clearance (test-#6 invariant).
+//   (2) DELIVERY_IMPOSSIBILITY_RE — the SAME exclusion clause (a) carries: discontinued / out-of-production /
+//       no-other-source-can / export-control / first-article / capacity / sole-source (a production impossibility
+//       that merely co-quotes a set-aside token is NOT a who-can-win set-aside).
+//   (3) SIZE_DISQUALIFICATION_RE — a genuine size BAR framed as a disqualification ("a concern OTHER THAN small is
+//       ineligible", "EXCEEDS the size standard", "affiliation rule"). The benign §K NOTICE tokens that merely
+//       describe the pool ("size standard", "small business concern under", "N employees", "annual receipts") are
+//       DELIBERATELY absent here so a pure §K notice still reads as a positive set-aside (P-3).
+// IDENTITY altitude: an unambiguous socioeconomic PROGRAM (8a/HUBZone/SDVOSB/WOSB/EDWOSB/VOSB/econ-disadvantaged)
+// is an identity on its own; the GENERIC small-business / ownership tokens ("small business concern", "total
+// small business", "women-owned", "veteran-owned") — which also appear in subcontracting plans, participation
+// goals, size reps and SAM boilerplate — count ONLY inside explicit set-aside FRAMING (adversarial-review
+// over-match fix). Belt-and-suspenders reads requiredAttribute too.
+const SETASIDE_PROGRAM_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|\bVOSB\b|economically disadvantaged/i;
+const SETASIDE_GENERIC_RE = /small business concern|total small business|small business set.?aside|wom[ae]n.?owned|veteran.?owned/i;
+const SETASIDE_FRAMING_RE = /set.?aside|reserved (?:for|exclusively)|restricted to|competition[^.]{0,30}restricted|100\s*(?:%|percent)/i;
+const GENUINE_STRUCTURAL_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized|firm|awardee)|non.?competit|directed award|(?:other than|without)\s+full and open|full and open competition|justification and approval|\bJ&A\b|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)/i;
+const SIZE_DISQUALIFICATION_RE = /other than small|(?:exceed\w*|\babove\b|\bover\b|in excess of)[^.]{0,25}\bsize\b|affiliation rule/i;
+// A SUBCONTRACTING goal / plan / participation target is about the AWARDEE's subcontracts, NOT who can win the
+// PRIME — even a socioeconomic PROGRAM token ("5% SDVOSB subcontracting participation goal") is not a prime
+// set-aside there (adversarial review). Targets goal/plan/"shall subcontract" language ONLY — NOT the set-aside
+// performance rule "limitation on subcontracting" (FAR 52.219-14), so a genuine set-aside naming that rule still fires.
+const SUBCONTRACTING_GOAL_RE = /subcontract\w*\s+(?:goal|plan|participation)|(?:participation|subcontracting)\s+goals?|shall\s+subcontract|small business subcontracting/i;
+/** Positively classify a WHO-CAN-WIN socioeconomic / small-business set-aside (Brain card 226 Fork-3). Pure.
+ *  Fires on a set-aside IDENTITY (a socioeconomic program, or a generic small-business token inside explicit
+ *  set-aside framing) present in requirement/excerpt/attribute that is NOT bundled with a genuine structural bar,
+ *  a delivery/production impossibility, or a size DISQUALIFICATION, and is NOT a subcontracting goal/plan.
+ *  Subordinates the benign §K/size NOTICE boilerplate (P-3); never softens a real universal show-stopper that
+ *  merely co-quotes a set-aside token, and never mis-reads a subcontracting participation goal as a prime set-aside. */
+export function isPositiveSetAside(f: TypedFinding): boolean {
+  const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+  const identity = SETASIDE_PROGRAM_RE.test(hay) || (SETASIDE_GENERIC_RE.test(hay) && SETASIDE_FRAMING_RE.test(hay));
+  return identity && !GENUINE_STRUCTURAL_BAR_RE.test(hay) && !DELIVERY_IMPOSSIBILITY_RE.test(hay)
+    && !SIZE_DISQUALIFICATION_RE.test(hay) && !SUBCONTRACTING_GOAL_RE.test(hay);
+}
+
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" | "caution" }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
     const hay = `${f.requirement} ${f.excerpt ?? ""}`;
+    // FORK-3 (Brain card 226): a positively-classified set-aside is a WHO-CAN-WIN restriction, never universal —
+    // detect it ONCE (over requirement+excerpt, subordinating §K/size boilerplate) and give it PRECEDENCE over
+    // every clause below. It is routed by ELIGIBILITY (firmStatus), in EVERY profile mode, never cleared as a
+    // mere award-methodology bar (which would drop the who-can-win dimension → a false clean BID for a proven
+    // non-holder) and never left as a `no_one_can_move` universal (→ false NO_BID/INELIGIBLE).
+    const positiveSetAside = isPositiveSetAside(f);
     // (a) award basis is never a universal bar. ROBUST altitude (panel B-1 + re-verify): the
     // award-basis trigger matches the REQUIREMENT (the lens's own characterization of WHAT the
     // bar is) — NOT the verbatim excerpt, which can incidentally quote LPTA/best-value language
@@ -280,7 +332,7 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // kept on requirement+excerpt as belt-and-suspenders. So a real impossibility (proprietary /
     // sole-source / discontinued / capacity) is never downgraded by an excerpt coincidence; only
     // a finding the lens itself typed as an evaluation-methodology bar is.
-    if (f.controllability === "no_one_can_move" && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
+    if (f.controllability === "no_one_can_move" && !positiveSetAside && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
       return { ...f, controllability: "bidder_controls", awardBasisGuard: true };
     // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
     //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
@@ -305,7 +357,11 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     //     PER-FINDING: this re-types ONLY the matched set-aside finding; a coexisting genuine universal bar
     //     (sole-source/brand-name — excluded by NON_SELF_CLEARABLE_BAR_RE, never matches SOCIOECONOMIC_SETASIDE_RE)
     //     is untouched and still reaches Step 3. Opt false ⇒ this clause is byte-identical to before.
-    const setAsideSoftenable = (profile === null || !!profile.openWorld) && SOCIOECONOMIC_SETASIDE_RE.test(f.requirement) && !NON_SELF_CLEARABLE_BAR_RE.test(hay);
+    // FORK-3 altitude: classify via the POSITIVE detector (requirement+excerpt, §K-boilerplate-subordinating),
+    // not the requirement-only SOCIOECONOMIC_SETASIDE_RE + blanket-NON_SELF_CLEARABLE veto. This closes P-5 (an
+    // excerpt-only set-aside no longer escapes the softener) and P-3 (§K NOTICE boilerplate quoted in the excerpt
+    // no longer disarms the softener → no false INELIGIBLE). A GENUINE structural bar still fails isPositiveSetAside.
+    const setAsideSoftenable = (profile === null || !!profile.openWorld) && positiveSetAside;
     // already_satisfied / bidder_cannot_move socioeconomic set-aside → curable caution (unchanged, opt-independent).
     if (setAsideSoftenable && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
@@ -330,6 +386,16 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
         return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
       return { ...f, controllability: "bidder_cannot_move", curableInWindow: false, awardBasisGuard: true };
     }
+    // FORK-3 CLOSED-WORLD (Brain card 226, folds in P-4): the softener above is gated on null/open-world, so under
+    // a CLOSED-WORLD profile a mis-typed `no_one_can_move` set-aside would reach deriveVerdict as an unmarked
+    // universal claim — a firm that PROVABLY HOLDS the cert lands in unmarkedUniversalClaim → false NHR, and the
+    // universal character bypasses firmStatus entirely. Re-type it off no_one_can_move to a profile-dependent
+    // eligibility bar so firmStatus GOVERNS in every mode: satisfies → cleared (BID); provably fails → INELIGIBLE
+    // (attribute-specific, card-228 Ruling ii) — NEVER NO_BID (default-deny guarantees), never structural. Only a
+    // PURE set-aside reaches here (a genuine structural bar fails isPositiveSetAside). Fail-safe: can only REMOVE a
+    // universal show-stopper, never add one.
+    if (profile !== null && !profile.openWorld && f.controllability === "no_one_can_move" && positiveSetAside)
+      return { ...f, controllability: "bidder_cannot_move", kind: "eligibility_bar", curableInWindow: false, awardBasisGuard: true };
     return f;
   });
 }
