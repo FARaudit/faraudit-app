@@ -15,11 +15,12 @@ import type { TypedFinding } from "./audit-findings";
 import { keySha256, type JudgmentKey } from "../../scripts/audit-ai/judgment-score";
 
 let failures = 0; let skipped = 0;
+// FORK-3 MIGRATION LEDGER (Brain card 226) — the 6 formerly-P3_SUPERSEDED skips, each classified against the
+// positive set-aside detector and re-asserted at its live post-Fork-2/Fork-3 verdict. Printed as a table below.
+const migrated: Array<{ assert: string; cls: string; from: string; to: string; verdict: string }> = [];
 const assert = (cond: boolean, msg: string) => { console.log(`${cond ? "✅" : "❌"} ${msg}`); if (!cond) failures++; };
-// SKIP-WITH-RECORDED-REASON (Brain card-228 green-the-tree verify, 2026-07-03). NOT delete, NOT a silent
-// expected-value edit — the case is preserved and its migration trigger recorded.
-const skip = (msg: string, reason: string) => { console.log(`⏭️  [SKIP] ${msg} — ${reason}`); skipped++; };
-const P3_SUPERSEDED = "SUPERSEDED — P-3 contract (unmarked no_one_can_move bar under a NULL profile → INELIGIBLE) that Fork-2 default-deny migrates to NHR (zero-contract-loss: a who-can-win restriction is never a default INELIGIBLE/NO_BID). Red at baseline 0ce6e0e (pre-existing, NOT Fork-2). Migrate to positive set-aside detection on Fork-3 landing.";
+// The 6 card-228 SKIP-WITH-RECORDED-REASON cases (P3_SUPERSEDED) are now MIGRATED to live assertions on Fork-3
+// landing — the recorded migration trigger has fired. `skipped` stays 0 (retained so the summary line is stable).
 
 // A pure SDVOSB set-aside, DELIBERATELY mis-typed no_one_can_move (a who-can-win bar is never truly universal).
 const setAside = (): TypedFinding => ({
@@ -54,7 +55,11 @@ console.log("── 2 · ALWAYS-RUN INVARIANT (card 224 fork 3): guard enabled �
   const off = deriveVerdict({ findings: guard([setAside()], false), ...base });
   assert(off.verdict === "NEEDS_HUMAN_REVIEW", `guard enabled, normalize opt off → NHR, NOT INELIGIBLE (got ${off.verdict})`);
   const bypass = deriveVerdict({ findings: [setAside()], ...base });
-  skip(`NO guard at all → INELIGIBLE (proves the guard is what protects) (got ${bypass.verdict})`, P3_SUPERSEDED);
+  // FORK-3 MIGRATION (was P3_SUPERSEDED skip): a raw unmarked no_one_can_move set-aside under a NULL profile is
+  // NHR, not INELIGIBLE — Fork-2 default-deny made NO_BID/INELIGIBLE unreachable without a positive universalDefect
+  // mark or a proven firm-fail; a who-can-win set-aside is never a default INELIGIBLE (zero-contract-loss).
+  migrated.push({ assert: "raw set-aside, no guard, null", cls: "unmarked no_one_can_move", from: "INELIGIBLE", to: "NHR", verdict: bypass.verdict });
+  assert(bypass.verdict === "NEEDS_HUMAN_REVIEW", `NO guard: raw no_one_can_move set-aside + null → NHR (Fork-2 default-deny, never a default INELIGIBLE) (got ${bypass.verdict})`);
 }
 
 console.log("── 3 · REFINEMENT: mis-typed set-aside + coexisting GENUINE universal bar, flag ON → still disqualifying ──");
@@ -65,7 +70,11 @@ console.log("── 3 · REFINEMENT: mis-typed set-aside + coexisting GENUINE un
   assert(sa.controllability === "bidder_controls", "set-aside softened to a caution");
   assert(ss.controllability === "no_one_can_move", "genuine sole-source bar LEFT UNTOUCHED (per-finding)");
   const d = deriveVerdict({ findings: g, ...base });
-  skip(`real universal bar still drives a hard pole (got ${d.verdict})`, P3_SUPERSEDED);
+  // FORK-3 MIGRATION: the coexisting GENUINE sole-source bar is an UNMARKED no_one_can_move (no producer emits a
+  // universalDefect mark yet), so under Fork-2 default-deny it routes to NHR (human review to classify), never a
+  // default NO_BID/INELIGIBLE. The set-aside stays softened (asserted above); the hard pole becomes an honest-fail.
+  migrated.push({ assert: "set-aside + genuine sole-source, guard on, null", cls: "unmarked no_one_can_move (structural)", from: "hard pole (INELIGIBLE)", to: "NHR", verdict: d.verdict });
+  assert(d.verdict === "NEEDS_HUMAN_REVIEW", `genuine sole-source bar (unmarked no_one_can_move) + null → NHR (Fork-2 default-deny; NO_BID needs a positive universalDefect mark) (got ${d.verdict})`);
 }
 
 console.log("── 4 · ALWAYS-RUN default pole: opt false/absent → no_one_can_move re-typed to the NHR pole, never left as a universal bar ──");
@@ -104,8 +113,13 @@ console.log("── 6 · SCOPE-GUARD (SPRDL125Q0030-shape): structural sole-sour
   const g = applyAwardBasisOvertypeGuard([structural()], null, { enabled: true, setAsideOvertypeDisposition: "nhr" });
   assert(g[0].controllability === "no_one_can_move", "structural bar LEFT UNTOUCHED (NON_SELF_CLEARABLE_BAR_RE exclusion wins over the 8(a) token)");
   const d = deriveVerdict({ findings: g, ...base });
-  skip(`structural bar still drives INELIGIBLE (got ${d.verdict})`, P3_SUPERSEDED);
-  skip(`structural bar eligible === false (got ${d.eligible})`, P3_SUPERSEDED);
+  // FORK-3 MIGRATION: the structural 8(a) sole-source bar is LEFT UNTOUCHED by the guard (isPositiveSetAside is
+  // false — GENUINE_STRUCTURAL_BAR_RE wins over the 8(a) token, asserted above) → it reaches deriveVerdict as an
+  // unmarked no_one_can_move → Fork-2 default-deny → NHR, eligible fails safe (never a default false INELIGIBLE).
+  migrated.push({ assert: "structural 8(a) sole-source verdict, null", cls: "unmarked no_one_can_move (detector NOT fired)", from: "INELIGIBLE", to: "NHR", verdict: d.verdict });
+  assert(d.verdict === "NEEDS_HUMAN_REVIEW", `structural 8(a) sole-source bar (untouched) + null → NHR (Fork-2 default-deny) (got ${d.verdict})`);
+  migrated.push({ assert: "structural 8(a) sole-source eligible, null", cls: "unmarked no_one_can_move (detector NOT fired)", from: "eligible:false", to: "eligible≠false", verdict: String(d.eligible) });
+  assert(d.eligible !== false, `structural bar under null → eligible not a false INELIGIBLE (NHR fails safe) (got ${d.eligible})`);
 }
 
 console.log("── 7 · CARD 185 FROZEN NEGATIVE ANCHOR (SP3300-26-Q-0165, real WOSB doc + synthetic-adversarial injected finding) ──");
@@ -142,8 +156,13 @@ console.log("── 7 · CARD 185 FROZEN NEGATIVE ANCHOR (SP3300-26-Q-0165, real
     const flagOff = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: false, setAsideOvertypeDisposition: frozen.guardConfig.setAsideOvertypeDisposition }), ...base });
     const optUnset = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: true }), ...base });
     const raw = deriveVerdict({ findings: [injected], ...base });
-    skip(`no guard → INELIGIBLE (got ${raw.verdict})`, P3_SUPERSEDED);
-    skip(`guard DISABLED (enabled:false) → INELIGIBLE == raw (got ${flagOff.verdict})`, P3_SUPERSEDED);
+    // FORK-3 MIGRATION: the raw injected WOSB set-aside + null → NHR (Fork-2 default-deny), and DISABLING the guard
+    // (enabled:false) no longer reverts to a false INELIGIBLE — it is NHR == raw. Disabling the guard removes the
+    // classification, but Fork-2's default-deny floor still protects against the catastrophic false pole.
+    migrated.push({ assert: "frozen WOSB set-aside, no guard, null", cls: "unmarked no_one_can_move", from: "INELIGIBLE", to: "NHR", verdict: raw.verdict });
+    assert(raw.verdict === "NEEDS_HUMAN_REVIEW", `no guard: raw injected WOSB set-aside + null → NHR (Fork-2 default-deny) (got ${raw.verdict})`);
+    migrated.push({ assert: "frozen WOSB set-aside, guard DISABLED (enabled:false), null", cls: "unmarked no_one_can_move", from: "INELIGIBLE == raw", to: "NHR == raw", verdict: flagOff.verdict });
+    assert(flagOff.verdict === "NEEDS_HUMAN_REVIEW" && flagOff.verdict === raw.verdict, `guard DISABLED (enabled:false) → NHR == raw (Fork-2 default-deny; disabling no longer reverts to a false INELIGIBLE) (got ${flagOff.verdict})`);
     assert(optUnset.verdict === "NEEDS_HUMAN_REVIEW", `guard ENABLED, disposition unset → NHR (always-run invariant) (got ${optUnset.verdict})`);
   }
 
@@ -191,5 +210,11 @@ console.log("── 8 · CARD 187 ORCHESTRATOR WIRING: setAsideOvertypeGuardOpts
   }
 }
 
-console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}${skipped ? ` · ${skipped} SKIPPED (P-3 SUPERSEDED, migrate on Fork-3 — see [SKIP] reasons above)` : ""} — guard-fix (AUDIT_SETASIDE_OVERTYPE_GUARD).`);
+// ── FORK-3 SKIP-MIGRATION MAPPING TABLE (Brain card 226 acceptance e) ─────────────────────────────────
+console.log("\n── FORK-3 skip-migration mapping table (6 formerly-P3_SUPERSEDED skips → live assertions) ──");
+console.log("  #  assert                                              class                                            old → new                       verdict");
+migrated.forEach((m, i) => console.log(`  ${i + 1}  ${m.assert.padEnd(50)}  ${m.cls.padEnd(48)}  ${(`${m.from} → ${m.to}`).padEnd(30)}  ${m.verdict}`));
+console.log(`  (${migrated.length} migrated · 0 remaining skips)`);
+
+console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}${skipped ? ` · ${skipped} SKIPPED` : ` · 0 SKIPPED (all 6 P-3 cases migrated on Fork-3)`} — guard-fix (AUDIT_SETASIDE_OVERTYPE_GUARD) + Fork-3 positive set-aside detector.`);
 process.exit(failures === 0 ? 0 : 1);
