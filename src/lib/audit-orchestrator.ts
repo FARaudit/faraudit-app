@@ -303,11 +303,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      and firmStatus skips it. NEVER touches a non-brand-name bar (QPL/clearance). Flag off ⇒ unchanged.
   findings = applyOrEqualCarveout(findings, { enabled: process.env.AUDIT_OREQUAL_CARVEOUT === "true" });
 
-  // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108), default-OFF (Rule 61). Re-types an award-basis /
-  //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (the award basis is never a
-  //      universal bar — fixes the #1 false-NO_BID), and marks a specific socioeconomic set-aside (8(a)/HUBZone/
-  //      SDVOSB/WOSB) under a NULL profile as a caution. NEVER touches temporal_conflict or a real delivery
-  //      impossibility; a broad Total-SB pool is left untouched. Flag off ⇒ findings pass through unchanged.
+  // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108; Fork-3 card 226/238). FLAG-DRIFT CORRECTED (card 240 §5):
+  //      the guard is DEFAULT-ON — `enabled = AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false"` (`setAsideOvertypeGuardOpts`,
+  //      audit-decide.ts:410) — and is verdict-affecting by default, RATIFIED by CEO Rule-61 on the Fork-3 ship
+  //      (`beb9cd1`); the prior "default-OFF (Rule 61)" comment was stale. Re-types an award-basis /
+  //      evaluation-methodology finding mis-typed no_one_can_move → bidder_controls (award basis is never a universal
+  //      bar), and routes a positively-classified socioeconomic/small-business set-aside (Fork-3 `isPositiveSetAside`)
+  //      by eligibility in EVERY profile mode (null/open-world → NHR; closed-world holder → BID, non-holder →
+  //      INELIGIBLE). NEVER touches temporal_conflict / a real delivery impossibility / a genuine structural or
+  //      size-disqualification bar. Only AUDIT_AWARDBASIS_OVERTYPE_GUARD="false" disables it (findings pass through).
   findings = applyAwardBasisOvertypeGuard(findings, bidderProfile, setAsideOvertypeGuardOpts(process.env)); // card 164/167 guard-fix + card 187: AUDIT_SETASIDE_OVERTYPE_GUARD (default-OFF) ON ⇒ hardcoded "nhr" disposition (mis-typed no_one_can_move set-aside → NEEDS_HUMAN_REVIEW, never false INELIGIBLE); flag OFF ⇒ byte-identical to pre-card-187
 
   // P4.3a — SET-ASIDE / SIZE FIRM-STATUS GATE (Brain card 125, doctrine #1), default-OFF (=== "true"). The
