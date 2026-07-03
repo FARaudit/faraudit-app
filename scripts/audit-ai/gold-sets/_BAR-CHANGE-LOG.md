@@ -146,3 +146,17 @@ Two tests carried RED assertions encoding PRE-Fork-2 poles that the isolated For
 1. **QPL-aware closed-world `firmStatus` attribute** (Brain card 231) — a `listed / can-list-in-window` credential enabling QPL who-can-win bars to resolve **listed→clear, not-listed-can't-list→INELIGIBLE** under a closed-world profile (today: null→NHR final). Tracked, not Fork-2.
 2. **N4008526R0065 pole-replay gap** — its CAUTION is integrity/enumerator-only (no `deriveVerdict===CAUTION` assertion; graded via matrix/gold-integrity path). Pole-replay coverage for #1 CAUTION remains open (not pole-complete).
 3. **FA860126Q00260001 pole-accounting** — registry tag `pole=NO_BID` while behaviorally BID_WITH_CAUTION (Step-7 temporal); reconcile before any "pole-complete" claim.
+
+## 2026-07-03 — FORK-2 SHIPPED TO MAIN (CEO Rule-61 greenlight, cards 226–232)
+**Named evidence:** PR #138, commit `fd7b7a2`, merge SHA `92c06c1` on `origin/main`, Vercel READY. Zero migration files (Rule-65 pre-flight clean). Pre-flight suite green: tsc clean · fork2 22/22 · derive-verdict 48/48 · caution-floor ALL-PASS (0 skips) · setaside-overtype ALL-PASS + 6 SKIPPED (Fork-3) · pole-replay #2 BID / #3 INELIGIBLE zero-regression. Shipped: NO_BID default-deny (positive-allow universalDefect — none emit → default-unreachable), rulings A/B, boot-time coupling-lock (`EngineInvariantError` + producer registry) + billing-safe decision-time backstop, precedence pre-lock, attribute-specific INELIGIBLE reason, superseded-test hygiene. **Excluded from ship (fence-held):** `gold-set-registry.json` N0016426Q0192 retirement bookkeeping (Brain Ruling A, awaiting its own commit). **P-1/P-4 held on scratch branch `p1-p4-restore-scratch` (`068a30c`)** — backup predates card-229 refinements, re-integration onto shipped Fork-2 = Fork-1/Fork-4 work.
+
+## 2026-07-03 — test-precondition-overtype-floor MIGRATED under Fork-1 (Brain card-235 ruling)
+Authority: Fork-1 ship (temporal legacy emitter retired, both temporal flags retired) + Brain card-235 ruling. All 5 asserts disposed; test ALL PASS, zero skips. No fixture ambiguous (none required STOP).
+
+| assert (line) | fixture class | old → new expected | basis |
+|---|---|---|---|
+| complete / overtype-OFF (:55) | MODEL no_one_can_move FAT precondition (un-downgraded; four-prong-derived=NO) | NO_BID → **NEEDS_HUMAN_REVIEW** | un-downgraded model no_one_can_move under null → NHR (Fork-2 default-deny, zero-contract-loss) |
+| no-window / overtype-OFF (:56) | MODEL no_one_can_move precondition (un-downgraded) | NO_BID → **NEEDS_HUMAN_REVIEW** | same |
+| co-stated-conflict (:65) | MODEL no_one_can_move temporal-claim (co-states 60-vs-30; `applyTemporalConflict` four-prong-processed=**false** → not the deterministic temporal CAUTION) | NO_BID → **NEEDS_HUMAN_REVIEW** | model bar, not four-prong → NHR (NOT the temporal→CAUTION bucket) |
+| QPL structural (:69) | WHO-CAN-WIN / STRUCTURAL (QPL membership + lead time > window) | NO_BID → **NEEDS_HUMAN_REVIEW** | who-can-win under null → NHR (consistent with card-231 QPL ruling) |
+| temporal-OFF → BID (:101) | retired flag-OFF scenario | BID → **DELETED** | temporal is unconditionally always-run; always-on counterpart covered by `test-temporal-conflict.ts` #6 anchor (`decideFx(fxComplete)===BID_WITH_CAUTION`) + tempCautionB genuine-gate checks |

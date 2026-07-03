@@ -23,14 +23,14 @@ const verdict = (findings: TypedFinding[]): string => deriveVerdict({ findings, 
 // temporal `t` runs the Option-1 arm (sharedAroGate) → the FAT-gate-vs-window tension nets to a high-confidence
 // CAUTION (bidder_controls + cautionFloor), NEVER NO_BID (Brain card 141/143). Derived live on the sweep findings.
 const decide = (findings: TypedFinding[], t: boolean, o: boolean, c: boolean): string => {
-  let f = applyTemporalConflict(findings, { enabled: t, sharedAroGate: t });
+  let f = applyTemporalConflict(findings);
   f = applyPreconditionOvertypeFloor(f, { enabled: o });
   f = applyCautionFloor(f, { enabled: c });
   return verdict(f);
 };
 // REVERSED override order: caution-floor BEFORE overtype (to test order-independence of the override pair)
 const decideRev = (findings: TypedFinding[], t: boolean, o: boolean, c: boolean): string => {
-  let f = applyTemporalConflict(findings, { enabled: t, sharedAroGate: t });
+  let f = applyTemporalConflict(findings);
   f = applyCautionFloor(f, { enabled: c });
   f = applyPreconditionOvertypeFloor(f, { enabled: o });
   return verdict(f);

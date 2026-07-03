@@ -292,20 +292,21 @@ if (G6) {
 
 // ── Doctrine (Step 7, AUDIT_TEMPORAL_SHARED_ARO) — Option-1: the temporal arm nets the FAT-gate-vs-window tension
 // to a HIGH-confidence KO-clarify CAUTION (bidder_controls + cautionFloor), NEVER NO_BID (Brain card 141/143).
-// OFF inert (unconditional): no sharedAroGate ⇒ legacy Step-2 path still fires no_one_can_move (byte-identical).
+// FORK-1 (Brain card 226): temporal is UNCONDITIONALLY the four-prong CAUTION-only arm (legacy no_one_can_move
+// emitter RETIRED; both flags retired). A genuine order-referenced gate → 0 no_one_can_move, NEVER NO_BID.
 {
   const sg = (excerpt: string): TypedFinding => ({ requirement: "FAT", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "fat_precondition" });
   const dw = (excerpt: string): TypedFinding => ({ requirement: "delivery", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "delivery_window" });
   const genFat = "NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval";
   const genDel = "deliver within THIRTY (30) calendar days ARO";
-  eq("7 OFF: legacy temporal still fires on a genuine gate (byte-identical)",
-    applyTemporalConflict([sg(genFat), dw(genDel)], { enabled: true }).some((x) => x.controllability === "no_one_can_move"), true);
+  eq("temporal (Fork-1): genuine gate → ZERO no_one_can_move (legacy emitter retired)",
+    applyTemporalConflict([sg(genFat), dw(genDel)]).some((x) => x.controllability === "no_one_can_move"), false);
 }
-const G7 = process.env.AUDIT_TEMPORAL_SHARED_ARO === "true";
-if (G7) {
+// Four-prong CAUTION detail — now UNCONDITIONAL (the AUDIT_TEMPORAL_SHARED_ARO gate is retired; always-run).
+{
   const sg = (excerpt: string): TypedFinding => ({ requirement: "FAT", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "fat_precondition" });
   const dw = (excerpt: string): TypedFinding => ({ requirement: "delivery", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "delivery_window" });
-  const onB = (fat: string, del: string) => applyTemporalConflict([sg(fat), dw(del)], { enabled: true, sharedAroGate: true });
+  const onB = (fat: string, del: string) => applyTemporalConflict([sg(fat), dw(del)]);
   const genFat = "NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval";
   const genDel = "deliver within THIRTY (30) calendar days ARO";
   // (a) genuine order-referenced sequential gate → HIGH-confidence temporal CAUTION (bidder_controls+cautionFloor), NEVER NO_BID (Option 1).

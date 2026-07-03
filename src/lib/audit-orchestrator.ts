@@ -233,14 +233,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
   }
 
-  // P1.6 — CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81 Step 2). DEFAULT-ON (Brain card 98 GO-LIVE
-  //         step 1 — flip UNCOMMITTED, pending Brain review). Consumes the sweep-grounded FAT precondition +
-  //         delivery window; emits a no_one_can_move show-stopper when a non-waivable precondition's min
-  //         duration exceeds the delivery window → deriveVerdict → NO_BID. Set AUDIT_TEMPORAL_CONFLICT="false"
-  //         to disable.
-  if (process.env.AUDIT_TEMPORAL_CONFLICT !== "false") {
+  // P1.6 — CROSS-CLAUSE TEMPORAL CHECK (Brain card 226 Fork-1) — UNCONDITIONAL always-run (both flags
+  //         AUDIT_TEMPORAL_CONFLICT + AUDIT_TEMPORAL_SHARED_ARO RETIRED; a locked doctrine is not an opt-in).
+  //         Consumes the sweep-grounded FAT precondition + delivery window and nets the tension to a KO-clarify
+  //         CAUTION carrying the parsed arithmetic — the temporal arm can NEVER emit NO_BID (legacy emitter retired).
+  {
     const before = findings.length;
-    findings = applyTemporalConflict(findings, { enabled: true, sharedAroGate: process.env.AUDIT_TEMPORAL_SHARED_ARO === "true" }); // Step 7 (Brain card 140): default-OFF order-referenced sequential-gate narrowing
+    findings = applyTemporalConflict(findings);
     if (findings.length > before) { findings[findings.length - 1].id = "temporal_conflict#0"; perLens["temporal_conflict"] = 1; }
   }
 

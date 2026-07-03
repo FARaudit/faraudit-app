@@ -17,7 +17,7 @@ const frozen = (file: string) => (JSON.parse(readFileSync(`${FROZEN}/${file}`, "
 // mis-typed no_one_can_move so a feasible precondition (no co-stated window) is not a false NO_BID; the
 // derived temporal_conflict finding survives to drive a REAL universal impossibility.
 const decideFx = (findings: TypedFinding[]) => {
-  let f = applyTemporalConflict(findings, { enabled: true, sharedAroGate: true }); // Option 1: temporal nets to CAUTION, never NO_BID
+  let f = applyTemporalConflict(findings); // Option 1: temporal nets to CAUTION, never NO_BID
   f = applyPreconditionOvertypeFloor(f, { enabled: true });
   f = applyCautionFloor(f, { enabled: true });
   const inp: VerdictInputs = { findings: f, bidderProfile: null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true };
@@ -55,31 +55,33 @@ ok(decideFx(fx2) === "BID", `temporal + floor → ${decideFx(fx2)} (stays BID)`)
 console.log("\n[safety guards]");
 const mkFat = (excerpt: string): TypedFinding => ({ requirement: "FAT", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "fat_precondition" });
 const mkDel = (excerpt: string): TypedFinding => ({ requirement: "delivery", citation: "§F", excerpt, kind: "technical_spec", controllability: "bidder_controls", grounded: true, lens: "deterministic_sweep", sweepArchetype: "delivery_window" });
-const fires = (fat: string, del: string) => applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true }).some((f) => f.controllability === "no_one_can_move");
-ok(fires("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"), "non-waivable 60 > 30 → fires");
-ok(!fires("first article testing of SIXTY (60) calendar days; the CO may waive at its discretion", "deliver within THIRTY (30) days ARO"), "WAIVABLE 60 vs 30 → does NOT fire (CO can waive → not universal)");
-ok(!fires("NON-WAIVABLE first article testing of TWENTY (20) calendar days", "deliver within THIRTY (30) days ARO"), "non-waivable 20 ≤ 30 → does NOT fire (fits in window)");
+// Fork-1 (Brain card 226): the LEGACY no_one_can_move emitter is RETIRED — `fires` now probes the locked invariant
+// (temporal must NEVER emit no_one_can_move on ANY shape, including every historical legacy-firing input).
+const fires = (fat: string, del: string) => applyTemporalConflict([mkFat(fat), mkDel(del)]).some((f) => f.controllability === "no_one_can_move");
+ok(!fires("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"), "non-waivable 60 > 30 → temporal NEVER emits no_one_can_move (Fork-1: legacy NO_BID emitter RETIRED)");
+ok(!fires("first article testing of SIXTY (60) calendar days; the CO may waive at its discretion", "deliver within THIRTY (30) days ARO"), "WAIVABLE 60 vs 30 → no no_one_can_move");
+ok(!fires("NON-WAIVABLE first article testing of TWENTY (20) calendar days", "deliver within THIRTY (30) days ARO"), "non-waivable 20 ≤ 30 → no no_one_can_move");
 
 // ── Step 7 (Brain card 140, AUDIT_TEMPORAL_SHARED_ARO) — OPTION B order-referenced SEQUENTIAL-GATE narrowing ──
 // Proven via EXPLICIT opts (sharedAroGate: true) so the logic is tested deterministically regardless of env, and
 // via the REAL gold #6 sweep so the genuine impossibility is preserved through the LIVE pipeline (not pre-baked).
 console.log("\n[Step 7 — Option B sequential-gate narrowing]");
 const firesB = (fat: string, del: string) =>
-  applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true }).some((f) => f.controllability === "no_one_can_move");
+  applyTemporalConflict([mkFat(fat), mkDel(del)]).some((f) => f.controllability === "no_one_can_move");
 // PROTECTIVE (not vacuous): a poisoned / ambiguous-window / non-order-referenced input must NOT ESCALATE — i.e.
 // 0 no_one_can_move AND the high-confidence temporal_conflict CAUTION is NOT added (the FAT is merely floored). If
 // deliveryWindowDays/gateDays regress and wrongly fire the four prongs, a temporal_conflict finding appears → this
 // FAILS. (The old form — "some cautionFloor present" — was structurally always-true since the soften branch also
 // floors the FAT; it guarded nothing. card 143 adversarial round.)
 const cautionsB = (fat: string, del: string) => {
-  const out = applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true });
+  const out = applyTemporalConflict([mkFat(fat), mkDel(del)]);
   return !out.some((f) => f.controllability === "no_one_can_move") &&
     !out.some((f) => f.lens === "temporal_conflict");
 };
 // Option 1: a GENUINE order-referenced impossibility ADDS a HIGH-confidence temporal_conflict CAUTION
 // (bidder_controls + cautionFloor), never a no_one_can_move. This replaces the Option-B "firesB" (NO_BID) checks.
 const tempCautionB = (fat: string, del: string) => {
-  const out = applyTemporalConflict([mkFat(fat), mkDel(del)], { enabled: true, sharedAroGate: true });
+  const out = applyTemporalConflict([mkFat(fat), mkDel(del)]);
   return !out.some((f) => f.controllability === "no_one_can_move") &&
     out.some((f) => f.lens === "temporal_conflict" && f.controllability === "bidder_controls" && f.cautionFloor === true && f.temporalSharedAroGuard === true);
 };
@@ -87,13 +89,13 @@ const tempCautionB = (fat: string, del: string) => {
 // (ii) LOAD-BEARING — REAL gold #6 source through the live highSignalSweep → Option B STILL fires (genuine
 //      impossibility preserved; the literal "both share an ARO token" test would have WRONGLY declawed it).
 const gold6src = readFileSync("scripts/audit-ai/gold-sets/FA860126Q00260001-FULL-SOURCE.v2.complete.txt", "utf8");
-const sweep6 = applyTemporalConflict(highSignalSweep(gold6src), { enabled: true, sharedAroGate: true });
+const sweep6 = applyTemporalConflict(highSignalSweep(gold6src));
 ok(!sweep6.some((f) => f.controllability === "no_one_can_move") &&
    sweep6.some((f) => f.lens === "temporal_conflict" && f.controllability === "bidder_controls" && f.cautionFloor === true),
   "(ii) gold #6 REAL sweep (F.1 post-order gate forecloses delivery; F.2 30-day ARO window) → Option-1 HIGH-confidence temporal CAUTION (0 no_one_can_move)");
 
 // (i) CLEAN NEGATIVE CONTROL (T-38) — no FAT precondition in the set → temporal pass emits NOTHING (no SS, no caution)
-const t38 = applyTemporalConflict([mkDel("deliver within THIRTY (30) calendar days ARO")], { enabled: true, sharedAroGate: true });
+const t38 = applyTemporalConflict([mkDel("deliver within THIRTY (30) calendar days ARO")]);
 ok(t38.length === 1 && !t38.some((f) => f.controllability === "no_one_can_move") && !t38.some((f) => f.cautionFloor),
   "(i) T-38 clean negative (no FAT) → emits nothing (no NO_BID, no caution)");
 
@@ -117,14 +119,33 @@ ok(cautionsB("NON-WAIVABLE first article testing of SIXTY (60) calendar days mea
 
 // (vi) a non-FAT genuine impossibility (pre-typed by a lens, no sweepArchetype) → UNTOUCHED by Option B
 const lensImposs: TypedFinding = { requirement: "sole source to the named OEM; no other firm can produce a conforming unit", citation: "§C", excerpt: "sole source to the named OEM", kind: "technical_spec", controllability: "no_one_can_move", grounded: true, lens: "former_ko" };
-const vi = applyTemporalConflict([lensImposs, mkFat("NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval"), mkDel("deliver within THIRTY (30) calendar days ARO")], { enabled: true, sharedAroGate: true });
+const vi = applyTemporalConflict([lensImposs, mkFat("NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval"), mkDel("deliver within THIRTY (30) calendar days ARO")]);
 const viLens = vi.find((f) => f.lens === "former_ko")!;
 ok(viLens.controllability === "no_one_can_move" && !viLens.cautionFloor,
   "(vi) non-FAT lens-typed no_one_can_move → UNCHANGED (Option B touches only the FAT sweep finding)");
 
-// SAFETY — flag OFF (no sharedAroGate) still LEGACY-fires on the SAME relative-scheduling input ⇒ the flag is the only behavior change
-ok(fires("NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"),
-  "OFF (legacy) fires on the same input → narrowing is gated entirely by sharedAroGate");
+// ── FORK-1 LOCKED INVARIANT (Brain card 226, acceptance b) — the temporal arm can NEVER emit no_one_can_move /
+// reach NO_BID on ANY input; the legacy Step-2 emitter is RETIRED. Battery covers every historical legacy-firing
+// shape (non-waivable + gate>window, order-anchored genuine gate, cross-CLIN, foreclosure phrasings). ──
+console.log("\n[Fork-1 — temporal→NO_BID UNREACHABLE (locked invariant)]");
+const NEVER_NOBID: Array<[string, string]> = [
+  ["NON-WAIVABLE first article testing SIXTY (60) calendar days before delivery", "deliver within THIRTY (30) calendar days ARO"],
+  ["NON-WAIVABLE first article testing of SIXTY (60) calendar days measured from receipt of the first article unit; no production delivery may occur before approval", "deliver within THIRTY (30) calendar days ARO"],
+  ["First article testing is NON-WAIVABLE; NINETY (90) calendar days measured from receipt of the first article. No unit shall be delivered before first article approval.", "deliver within THIRTY (30) calendar days ARO"],
+  ["First article testing cannot be waived; sixty (60) days from receipt of the first article; delivery is withheld until first article approval.", "deliver all units within THIRTY (30) calendar days after the date of award"],
+];
+ok(NEVER_NOBID.every(([f, d]) => !fires(f, d)),
+  "temporal arm emits ZERO no_one_can_move across ALL historical legacy-firing shapes → NO_BID structurally unreachable from the temporal path");
+
+// ── FORK-1 EVIDENCE FIELDS (Brain card 226, acceptance c) — a fired temporal CAUTION CARRIES the parsed arithmetic
+// (gate/window/exceeds) so the human adjudicates from numbers, never silent. ──
+const evOut = applyTemporalConflict([
+  mkFat("First article testing is NON-WAIVABLE; sixty (60) calendar days for testing, measured from issuance of the task order. Government acceptance of the first article is a condition precedent to delivery."),
+  mkDel("deliver within THIRTY (30) calendar days ARO"),
+]);
+const evCaution = evOut.find((f) => f.lens === "temporal_conflict");
+ok(!!evCaution?.temporalEvidence && evCaution.temporalEvidence.gateDays === 60 && evCaution.temporalEvidence.windowDays === 30 && evCaution.temporalEvidence.gateExceedsWindow === true,
+  `evidence fields populated on the fired CAUTION (gate=${evCaution?.temporalEvidence?.gateDays}d · window=${evCaution?.temporalEvidence?.windowDays}d · exceeds=${evCaution?.temporalEvidence?.gateExceedsWindow})`);
 
 // ── Step 7 ADVERSARIAL-HARDENED regressions (Brain card 141) — the false-NO_BID + declaw classes the panel found ──
 console.log("\n[Step 7 — adversarial-hardened regressions (card 141)]");
@@ -156,7 +177,7 @@ console.log("\n[Step 7 — round-2 hardening regressions (card 141)]");
 {
   const fatSrc = "First article testing is non-waivable. The Government requires thirty (30) days to complete testing, measured from receipt of the first article. No production delivery may occur before first article approval.";
   const delSrc = "Delivery Schedule (ARO). CLIN 0001, Tactical Radio Assembly, Quantity 1200 each, required delivery 120 days. The Contractor shall provide advance inspection notice within five (5) days prior to each shipment.";
-  const sweep = applyTemporalConflict(highSignalSweep(fatSrc + "\n\n" + delSrc), { enabled: true, sharedAroGate: true });
+  const sweep = applyTemporalConflict(highSignalSweep(fatSrc + "\n\n" + delSrc));
   ok(!sweep.some((f) => f.controllability === "no_one_can_move"),
     "(A) flattened-table notice sub-deadline (5d) does NOT poison the 120d window → no false NO_BID through the real sweep");
 }
@@ -179,7 +200,7 @@ ok(cautionsB(fat30, "Deliveries shall be made within a 120-day delivery schedule
   "(R3-a) hyphenated '120-day' real window + 5d notice → window unprovable → CAUTION, not NO_BID");
 {
   const delA = "Deliveries shall be made within a 120-day delivery schedule after receipt of order (ARO). The contractor shall provide advance shipment notice no less than 5 calendar days prior to each delivery.";
-  const sw = applyTemporalConflict(highSignalSweep(fat30 + "\n\n" + delA), { enabled: true, sharedAroGate: true });
+  const sw = applyTemporalConflict(highSignalSweep(fat30 + "\n\n" + delA));
   ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R3-a) end-to-end via real sweep → no false NO_BID");
 }
 ok(cautionsB(fat30, "Deliver within 16 weeks ARO. Advance inspection notice within five (5) calendar days prior to each shipment."),
@@ -229,7 +250,7 @@ ok(cautionsB(fatCP, "Deliver within two years after receipt of order (ARO). Noti
 console.log("\n[Step 7 — round-6 hardening regressions (card 141)]");
 {
   const delDate = "Delivery of all production units shall be completed no later than 30 September 2027. Contractor shall provide advance shipment notice within 5 days after receipt of order (ARO).";
-  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delDate), { enabled: true, sharedAroGate: true });
+  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delDate));
   ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R6-a) calendar-date window + 5d notice (real sweep) → no false NO_BID");
 }
 ok(cautionsB(fatCP, "Delivery quantity 1200 each: 120 ARO. The contractor shall provide advance shipment notice within 5 days after receipt of order (ARO)."),
@@ -246,7 +267,7 @@ ok(cautionsB(fatCP, "Delivery in accordance with the delivery schedule in Attach
 console.log("\n[Step 7 — round-7 hardening regressions (card 141)]");
 {
   const delFA = "The Contractor shall deliver the first article test unit within 30 days after receipt of order (ARO). Production units shall be delivered by contract completion.";
-  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delFA), { enabled: true, sharedAroGate: true });
+  const sw = applyTemporalConflict(highSignalSweep(fatCP + "\n\n" + delFA));
   ok(!sw.some((f) => f.controllability === "no_one_can_move"), "(R7-a) first-article-unit 30d submission deadline + 'by contract completion' window (real sweep) → no false NO_BID");
 }
 ok(cautionsB(fatCP, "Deliver the first lot within 5 days ARO. The full production quantity shall be delivered within the performance period."),
@@ -263,4 +284,4 @@ ok(decideFx(fxComplete) === goldVerdict("FA860126Q00260001"), `#6 decideFx(compl
 
 console.log("");
 if (fail) { console.error(`✗ ${fail} check(s) FAILED`); process.exit(1); }
-console.log("✓ STEP 7 OPTION-1 GREEN — the temporal arm nets the FAT-gate-vs-window tension to a HIGH-confidence KO-clarify CAUTION (bidder_controls+cautionFloor), NEVER NO_BID; #6 = BID_WITH_CAUTION anchor; #4 stays CAUTION, #2 stays BID; OFF (legacy) byte-identical still fires; all 7 adversarial classes → 0 no_one_can_move. $0.");
+console.log("✓ FORK-1 GREEN (Brain card 226) — the temporal arm nets the FAT-gate-vs-window tension to a HIGH-confidence KO-clarify CAUTION (bidder_controls+cautionFloor) CARRYING the parsed evidence, NEVER NO_BID; the legacy no_one_can_move emitter is RETIRED (locked: 0 no_one_can_move across all historical legacy-firing shapes); #6 = BID_WITH_CAUTION anchor; #4 stays CAUTION, #2 stays BID; all 7 adversarial classes → 0 no_one_can_move. $0.");
