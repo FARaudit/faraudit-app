@@ -19,6 +19,7 @@
 
 import { disposeFinding } from "./audit-decide";
 import type { Decision } from "./audit-decide";
+import { shouldGateExport } from "./audit-display";
 
 /** Compact, persistable finding — the unit the report renders. `disposition` is
  *  the derived bucket (show-stopper / gate / met) so the renderer needs no
@@ -78,6 +79,11 @@ export interface V3ReportMeta {
   setAside?: string | null;
   responseDeadline?: string | null;
   auditId?: string | null;
+  // Doctrine #5 export gate (Brain card 224). true ⇒ this report honest-failed or read an incomplete
+  // document set → the Print/Export affordance is REMOVED and printing is CSS-blocked, so a report the
+  // engine refused to fully stand behind can never leave as a clean PDF. Mirrors the server-side 409
+  // (shouldGateExport) so the on-screen surface and the export endpoint can never diverge.
+  exportGated?: boolean;
 }
 
 // Standard HTML escaping. `$` is NOT special in HTML text — it only mangled the
@@ -430,14 +436,34 @@ export function renderV3Report(payload: V3ReportPayload, meta: V3ReportMeta): st
     `Facts (NAICS · set-aside · deadline) are authoritative from SAM.gov; the verdict is a gate, not advice.` +
     `</p></div>`;
 
+  // Doctrine #5 export gate (Brain card 224). When gated, the on-screen report carries NO print/export
+  // affordance and printing is CSS-blocked (Cmd-P yields an "cannot be exported" page, not the memo) so a
+  // honest-fail / incomplete report can never be turned into a clean PDF. When NOT gated, the Export button
+  // points at the server PDF endpoint (which honours the same 409 gate) — never window.print() — so the
+  // on-screen export and the server can never diverge.
+  const gated = meta.exportGated === true;
+  const actions = gated
+    ? `<a href="/audit">← Back to audits</a><span class="tb-gated" title="This report is incomplete or under human review and cannot be exported.">⚠ Export unavailable — incomplete / human review</span>`
+    : `<a href="/audit">← Back to audits</a>${meta.auditId ? `<a class="tb-export" href="/api/audit/${escapeHtml(meta.auditId)}/pdf">Export PDF</a>` : ""}`;
+
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FARaudit · ${escapeHtml(meta.solicitationNumber ?? "Bid Decision Memo")}</title>
-<style>${REPORT_CSS}${gf ? GATE_FRAMING_CSS : ""}</style></head><body>
-<div class="topbar"><span class="tb-brand">FAR<span class="au">audit</span> · Agentic Verification Engine</span><span class="tb-actions"><a href="/audit">← Back to audits</a><button onclick="window.print()">Print / PDF</button></span></div>
+<style>${REPORT_CSS}${gf ? GATE_FRAMING_CSS : ""}${gated ? GATED_EXPORT_CSS : ""}</style></head><body>
+<div class="topbar"><span class="tb-brand">FAR<span class="au">audit</span> · Agentic Verification Engine</span><span class="tb-actions">${actions}</span></div>
 <div class="deck"><div class="sheet">${head}${verdict}${discBand}${metaSec}${covSec}${findSec}${foot}</div></div>
 </body></html>`;
 }
+
+// Doctrine #5 (Brain card 224) — when the report is export-gated, block printing at the surface: hide the
+// whole document on print and stamp a refusal notice, so Cmd-P / the browser print dialog cannot produce a
+// clean PDF of a report the engine refused to stand behind. This is the on-screen twin of the server 409.
+const GATED_EXPORT_CSS = `
+.tb-gated{color:var(--cau-deep);font-weight:600;font-size:12px}
+@media print{
+  .deck,.topbar{display:none!important}
+  html::before{content:"This report is incomplete or under human review and cannot be exported.";display:block;padding:40mm 20mm;font-family:var(--sans);font-size:14px;color:#15202e}
+}`;
 
 /** Render directly from a persisted audit row (report + PDF routes branch here
  *  when compliance_json.engine === "agentic_v3"). */
@@ -447,6 +473,10 @@ export function renderAgenticReportFromRow(audit: Record<string, unknown>): stri
     verdict: "INCOMPLETE", eligible: false, reason: "Agentic report payload missing.",
     showStoppers: [], findings: [], coverage: { required: [], covered: [], missing: [] },
   };
+  // Doctrine #5 export gate — mirror the server 409 (shouldGateExport). Force-gate the schema-drift
+  // fallback (no cj.v3 → the default INCOMPLETE payload above) even if compliance_json didn't persist the
+  // honest_fail flag, so a missing-payload report can never render a live Print affordance (medium-trust defect).
+  const gated = !cj.v3 || shouldGateExport(audit);
   return renderV3Report(payload, {
     solicitationNumber: (audit.solicitation_number as string) ?? null,
     title: (audit.title as string) ?? null,
@@ -455,6 +485,7 @@ export function renderAgenticReportFromRow(audit: Record<string, unknown>): stri
     setAside: (audit.set_aside as string) ?? null,
     responseDeadline: (audit.response_deadline as string) ?? null,
     auditId: (audit.id as string) ?? null,
+    exportGated: gated,
   });
 }
 
