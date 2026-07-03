@@ -104,3 +104,45 @@ Reconciliation (card 57) revealed #4/#5 were authored against INCOMPLETE source.
 **WHY:** (1) #5 FA667024R0001 is a TRUE construction procurement (NAICS 236220 + SF-1442) → reclassified to **oos_detection** (engine honest-fails OUT_OF_SCOPE before any paid call; the "bond-inversion MUST pass" verdict expectation was authored on the pre-spec partial source and is void). (2) #4 AOCSSB26R0023 is NOT construction — its source classifies it NAICS **541990 professional services** ("does NOT establish a set-aside") → restored as an **in-scope full_verdict CAUTION** key (v2), refilling the CAUTION verdict pole #5 vacated. Its caution basis was source-corrected (card 67): Davis-Bacon AND SCA are both explicitly NOT applicable → wage-determination is a must-NOT-raise decoy, not a caution. (3) CEO **killed the carve-out**: no in-scope key may be carved out to reach the bar.
 
 **AFTER-STATE:** in-scope full_verdict mustPass = {N4008526R0065, 1240LP26Q0067, SPRDL125Q0030, AOCSSB26R0023}, ZERO-miss · oos_detection mustFire = {FA667024R0001}, ZERO-miss · **no carve-out**.
+
+## 2026-06-29 — NO_BID pole anchor RETIRED (Brain ruling A) · first PAID graduation FAIL recorded
+
+**PAID GRADUATION GRADE — FAIL (named evidence, Rule 20).** Target: `N0016426Q0192` (NSWC Crane, REAL), the freshly-frozen+registered NO_BID full_verdict key (keySha `7bbbcadbcf71…`, sourceSha `29688bfc…`). Run: `v3-proof.ts N0016426Q0192` · live agentic engine (`auditPackage`) at defaults · single audit, no retries · **cost $1.4280** (38 calls: 37 sonnet + 1 opus, 117s). STEP-0 pre-flight all PASS. Result artifact: `ceo/proofs/v3-N0016426Q0192-result.json`.
+
+**Outcome:** verdict-flip **NO_BID → NEEDS_HUMAN_REVIEW**. grade_pass_iff conjuncts 2–5 PASS (show-stopper grounded in §B brand-name basis-for-award · eligible:true · decoy clean · no fabrication); **only conjunct 1 (verdict) FAILED.** Root cause verified in `src/lib/audit-decide.ts`: the 5 lenses typed the brand-name bar `bidder_cannot_move` + `kind:eligibility_bar` (NOT `no_one_can_move`); Step-3 NO_BID gate (L801-809) needs `no_one_can_move` OR a non-null profile that `provenFails`; null profile → `firmStatus`=unknown → falls to Step-5b (L833-836) → NHR. NO_BID structurally unreachable for this finding shape; even if promoted to `no_one_can_move`, L806 forces INELIGIBLE (not NO_BID/eligible:true).
+
+**4-lens adversarial panel** (ex-KO · attorney · two skeptics) leaned **3:1 engine-correct / gold-key mis-classified**.
+
+**BRAIN RULING A (2026-06-29):** engine NEEDS_HUMAN_REVIEW is CORRECT. `N0016426Q0192` is the WRONG CLASS for the NO_BID/eligible:true pole — a brand-name/OEM-authorized-distributor bar is a `bidder_cannot_move` eligibility bar (populous winner set), not a `no_one_can_move` universal defect. Engine UNTOUCHED. Key **retired in registry** (moved `keys`→`retired`; frozen file NOT mutated, retired_sha256 `224b031f…`). **NO_BID pole returns to ZERO real/in-scope anchors** (only the synthetic FA860126 remains; open, non-blocking gap).
+
+**DOCTRINE LOCK (encode):** NO_BID/eligible:true requires `no_one_can_move` AND `kind != eligibility_bar` — a **universal NON-eligibility defect** (contradictory mandatory terms / unmeetable requirement that closes the buy for EVERY offeror). A *who-can-win* restriction (brand-name/OEM, set-aside, clearance) is **eligibility class** → INELIGIBLE (failing profile) or NEEDS_HUMAN_REVIEW (null profile) — **NEVER NO_BID**. Never source a NO_BID base from a who-can-win restriction.
+
+**OPEN:** source a real universal-defect solicitation for the NO_BID pole. Until then NO_BID = model-judgment-only for regression; gold set is NOT pole-complete.
+
+## 2026-06-29 — ACTIVATION POSTURE + ZERO-CONTRACT-LOSS DOCTRINE (CEO) + NO_BID HARD GATE
+
+**Posture:** ladder to Steps 9 & 10. NO_BID ships **model-judgment-only**.
+
+**ZERO-CONTRACT-LOSS DOCTRINE (CEO, 2026-06-29):** the customer accepts NO risk of losing a winnable contract. The catastrophic error is a **false NO_BID** (telling a bidder to walk from a contract they could win). The engine MUST NEVER emit a confident NO_BID/walk under uncertainty: with a null profile or any unproven who-can-win fact it **fails SAFE to NEEDS_HUMAN_REVIEW**. N0016426Q0192's NHR was the doctrine WORKING, not a defect. The NO_BID terminal may fire ONLY on a proven universal defect (`no_one_can_move` AND `kind != eligibility_bar`) or a proven profile-fail — never on inference. (Composes with the 2026-06-29 NO_BID class-error doctrine lock above.)
+
+**HARD GATE (not a soft milestone):** NO customer-facing NO_BID verdict ships until BOTH — (a) a real universal-defect base grades PASS against the live engine, AND (b) false-NO_BID-under-null-profile is proven structurally impossible in `src/lib/audit-decide.ts`. Until both clear, NO_BID stays model-judgment-only and the engine's safe-fail to NHR is the guarantee.
+
+**KNOWN OPEN (documented, NOT executed this turn):** synthetic FA860126Q00260001 is still tagged `pole=NO_BID` in `gold-set-registry.json` while behaviorally migrated to BID_WITH_CAUTION (gold #6, Step-7 temporal flag). Pole-accounting reconciliation is its own flag-adjacent step (Rule 61) — MUST be resolved before any "pole-complete" claim. Deliberately NOT bundled into a state-write; opens the next NO_BID-track relay.
+
+## 2026-07-03 — FORK-2 SUPERSEDED-TEST HYGIENE (Brain card-228 green-the-tree verify · $0 · HOLD-COMMIT)
+
+Two tests carried RED assertions encoding PRE-Fork-2 poles that the isolated Fork-2 tree (NO_BID default-deny + Ruling A/B, card 226) intentionally supersedes. Marked **SKIP-WITH-RECORDED-REASON** (not deleted, not silent expected-value edits); each skip prints its migration trigger. No frozen artifact mutated. No engine/flag change.
+
+| test / case | superseded contract (pre-Fork-2) | Fork-2 behavior (now) | superseding fork | migration trigger |
+|---|---|---|---|---|
+| `scripts/audit-ai/test-caution-floor.ts` — QPL who-can-win case (was `universal`) | unmarked `no_one_can_move` QPL/"lead time exceeds window for every bidder" bar, null profile → **NO_BID** ("never downgraded") | → **NEEDS_HUMAN_REVIEW** (who-can-win QPL eligibility bar under null; CORRECT FINAL terminal). Expected migrated **NO_BID→NHR; case UN-SKIPPED** (PASSES). | **RESOLVED (Brain, card 231)** — no fork migration | **RESOLVED (Brain, card 231):** QPL-lead = who-can-win + temporal, OFF universal allowlist. Null→NHR FINAL (not Fork-1). Closed-world: listed→clear, not-listed-can't-list→INELIGIBLE, pending future QPL-aware firmStatus detector (tracked, not Fork-2 scope). Expected migrated NO_BID→NHR; case un-skipped. |
+| `src/lib/audit-decide-setaside-overtype.test.ts` — 6 asserts (§2 no-guard, §3 real-universal-bar, §6 structural×2, §7b no-guard + guard-disabled) | unmarked `no_one_can_move` bar (set-aside OR structural sole-source) under NULL profile, guard bypassed/disabled → **INELIGIBLE(eligible:false)** ("the guard is what protects") | → **NEEDS_HUMAN_REVIEW(eligible≠false)** (default-deny: a who-can-win restriction under null is NEVER a default INELIGIBLE/NO_BID — zero-contract-loss). **Red at baseline `0ce6e0e` too → pre-existing, NOT introduced by Fork-2.** | **Fork-3** (positive set-aside detection; P-3 contract) | Fork-3 landing → migrate these to positive set-aside detection. The NHR-normalization asserts (§1/§4/§5/§7a/§8) still PASS unchanged. |
+
+**Named evidence:** live verdicts captured on the isolated tree — caution-floor `universal` → `NEEDS_HUMAN_REVIEW`; setaside-overtype 6 asserts each got `NEEDS_HUMAN_REVIEW`/`eligible:true`. Both files exit 0 with skip counts printed. Baseline-red for setaside-overtype proven by `git stash` → run at `0ce6e0e` (red) → `stash pop`.
+
+**UPDATE 2026-07-03 (Brain card 231 ruling — QPL class RESOLVED):** the caution-floor QPL case is RESOLVED who-can-win, null→NHR FINAL — **un-skipped, expected migrated NO_BID→NHR, PASSES**. Only the 6 setaside-overtype asserts remain skipped (Fork-3).
+
+**POST-FORK-2 TRACKED-DEBT (do not build in Fork-2 scope):**
+1. **QPL-aware closed-world `firmStatus` attribute** (Brain card 231) — a `listed / can-list-in-window` credential enabling QPL who-can-win bars to resolve **listed→clear, not-listed-can't-list→INELIGIBLE** under a closed-world profile (today: null→NHR final). Tracked, not Fork-2.
+2. **N4008526R0065 pole-replay gap** — its CAUTION is integrity/enumerator-only (no `deriveVerdict===CAUTION` assertion; graded via matrix/gold-integrity path). Pole-replay coverage for #1 CAUTION remains open (not pole-complete).
+3. **FA860126Q00260001 pole-accounting** — registry tag `pole=NO_BID` while behaviorally BID_WITH_CAUTION (Step-7 temporal); reconcile before any "pole-complete" claim.

@@ -51,6 +51,11 @@ export interface TypedFinding {
   //   undefined on a bidder_cannot_move / eligibility bar → UNTYPED → the decision FAILS CLOSED to human
   //   review (never a silent caution). REQUIRED for every disqualifying bar.
   curableInWindow?: boolean;
+  // BRAIN CARD 226 FORK 2 — POSITIVE universal-defect classification. A committal NO_BID is reachable ONLY when
+  // a finding is positively marked here: the solicitation is internally CONTRADICTORY, or literally UNMEETABLE
+  // by ANY offeror. Absent/undefined ⇒ the finding is WHO-CAN-WIN (or curable) and can NEVER drive NO_BID
+  // (default-deny). No producer emits this yet — it is the hook a future universal-defect detector sets.
+  universalDefect?: "contradictory_mandatory_terms" | "unmeetable_by_any_offeror";
   severity?: "P0" | "P1" | "P2"; // for a residual RISK (not a hard requirement) — its materiality
   // CAUTION-FLOOR (Brain card 75-R2 / 78-R1) — set by the deterministic caution-floor pass (default-off
   // flag) when a finding matches a caution archetype (named role + quantified experience-years, specialized

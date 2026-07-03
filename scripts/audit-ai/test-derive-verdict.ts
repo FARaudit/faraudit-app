@@ -8,7 +8,7 @@ import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-fin
 
 const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding => ({
   requirement: o.requirement ?? "requirement", citation: "FAR 52.x", excerpt: "verbatim", grounded: true, lens: "x",
-  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow,
+  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow, universalDefect: o.universalDefect,
 });
 const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null; coverage?: boolean; sound?: boolean; conflict?: boolean; manifest?: boolean } = {}): VerdictInputs =>
   ({ findings, bidderProfile: o.profile ?? null, coverageComplete: o.coverage ?? true, verifierSound: o.sound ?? true, conflict: o.conflict ?? false, manifestComplete: o.manifest ?? true });
@@ -55,14 +55,35 @@ eq("curable bar, null profile → BID_WITH_CAUTION", deriveVerdict(inp(curable))
 // Brain card-45 refinement: the non-curable human-review state must CARRY the conditional-NO_BID payload.
 eq("non-curable reason carries CONDITIONAL NO-BID payload", /CONDITIONAL NO-BID/.test(deriveVerdict(inp(nonCurable)).reason), true);
 
-// Brain card-45 typing guard: a UNIVERSAL impossibility (no_one_can_move) is a PROVEN show-stopper even under
-// a null profile — must hit NO_BID, NOT soften to human-review (the mistype Brain warned about).
-const universal = [...two, f({ requirement: "5-day delivery against a 90-day irreducible lead time", kind: "technical_spec", controllability: "no_one_can_move" })];
-eq("universal impossibility, null profile → NO_BID (not human-review)", deriveVerdict(inp(universal)).verdict, "NO_BID");
-eq("universal impossibility is a named show-stopper", deriveVerdict(inp(universal)).showStoppers.length, 1);
-// a universal ELIGIBILITY impossibility → INELIGIBLE
-const universalElig = [f({ requirement: "set-aside category no firm can meet", kind: "eligibility_bar", controllability: "no_one_can_move" })];
-eq("universal eligibility impossibility → INELIGIBLE", deriveVerdict(inp(universalElig)).verdict, "INELIGIBLE");
+// ── BRAIN CARD 226 FORK 2 — DEFAULT-DENY NO_BID (positive-allow). A no_one_can_move is NO LONGER a NO_BID
+//    driver by itself; NO_BID needs a POSITIVE universalDefect allowlist match. Without it → NHR (default-deny). ──
+const universalNoMark = [...two, f({ requirement: "5-day delivery against a 90-day irreducible lead time", kind: "technical_spec", controllability: "no_one_can_move" })];
+eq("fork-2: no_one_can_move WITHOUT universalDefect, null → NHR (default-deny, never NO_BID)", deriveVerdict(inp(universalNoMark)).verdict, "NEEDS_HUMAN_REVIEW");
+// coupling-lock (Ruling B) + positive-allow: a universalDefect finding under AUDIT_ELIGIBLE_TRISTATE=off → HARD
+// ERROR; under tristate=on → NO_BID with a POSITIVELY-determined eligible (never a default true).
+const marked = [...two, f({ requirement: "no offeror can comply — contradictory mandatory terms", kind: "technical_spec", controllability: "no_one_can_move", universalDefect: "contradictory_mandatory_terms" })];
+{
+  const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; delete process.env.AUDIT_ELIGIBLE_TRISTATE;
+  let threw = false; try { deriveVerdict(inp(marked)); } catch { threw = true; }
+  eq("fork-2 Ruling B: universalDefect under tristate=off → coupling-lock HARD ERROR", threw, true);
+  process.env.AUDIT_ELIGIBLE_TRISTATE = "true";
+  const vM = deriveVerdict(inp(marked));
+  eq("fork-2: universalDefect under tristate=on → NO_BID (positive-allow is the ONLY path)", vM.verdict, "NO_BID");
+  eq("fork-2 Ruling B: NO_BID eligible is NOT a default true (positively determined)", vM.eligible === true, false);
+  if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev;
+}
+// a who-can-win set-aside typed no_one_can_move (no marker) under null → NHR (never INELIGIBLE/NO_BID)
+eq("fork-2: who-can-win set-aside (no marker) under null → NHR", deriveVerdict(inp([f({ requirement: "set-aside category", kind: "eligibility_bar", controllability: "no_one_can_move" })])).verdict, "NEEDS_HUMAN_REVIEW");
+// RULING A — a firmStatus-PROVEN who-can-win fail mis-typed clause_flowdown/technical_spec → INELIGIBLE WITH a
+// normalized eligibility_bar show-stopper (kind normalized at determination), NEVER routed to NHR.
+const provenMistyped = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
+const vRA = deriveVerdict(inp(provenMistyped, { profile: { satisfiedAttributes: [] } }));
+eq("fork-2 Ruling A: proven-fail who-can-win (mis-typed kind) → INELIGIBLE (not NHR)", vRA.verdict, "INELIGIBLE");
+eq("fork-2 Ruling A: INELIGIBLE carries a NORMALIZED eligibility_bar show-stopper", vRA.showStoppers.some((s) => s.kind === "eligibility_bar"), true);
+eq("fork-2 Ruling A: INELIGIBLE is eligible:false", vRA.eligible, false);
+// DiD (adversarial review) — an unmarked no_one_can_move that the firm SATISFIES / that is curable must NOT clear to BID → NHR
+eq("fork-2 DiD: no_one_can_move + firm SATISFIES attribute → NHR (never a silent BID)", deriveVerdict(inp([f({ requirement: "claims universal yet holds attribute", kind: "technical_spec", controllability: "no_one_can_move", requiredAttribute: "se:8a" })], { profile: { satisfiedAttributes: ["se:8a"] } })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("fork-2 DiD: no_one_can_move + curableInWindow:true under null → NHR (never BID_WITH_CAUTION)", deriveVerdict(inp([f({ requirement: "claims universal yet curable", kind: "technical_spec", controllability: "no_one_can_move", curableInWindow: true })])).verdict, "NEEDS_HUMAN_REVIEW");
 
 // ── Brain card-49 typing doctrine, locked at the decision layer (correct typing → correct verdict). ──
 // plain Total SB set-aside = already_satisfied (the pool) → NOT a gate → BID
@@ -87,9 +108,9 @@ eq("firm PROVABLY holds the OEM attribute → BID (cleared)", dillon({ satisfied
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
 eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
 eq("same bar, firm qualifies → BID", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: ["naics:333120-small"] } })).verdict, "BID");
-// non-eligibility uncontrollable bar the firm provably fails → NO_BID
+// fork-2: an OEM-exclusivity bar is WHO-CAN-WIN (Ruling A), never universal → firm provably fails → INELIGIBLE (never NO_BID)
 const noBid = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
-eq("uncontrollable non-elig bar firm fails → NO_BID", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+eq("fork-2: who-can-win OEM-exclusivity, firm provably fails → INELIGIBLE (never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
 
 // ── Manifest-incomplete cap. Card-58 capped no-bar verdicts (BID/CAUTION) to INCOMPLETE. Brain card 224 fork 4
 //    EXTENDS the cap to show-stoppers: a findings-derived hard NO_BID/INELIGIBLE on an INCOMPLETE read → NHR
@@ -101,7 +122,7 @@ eq("NO_BID + manifest incomplete → NHR (card 224 fork 4: bar could be waived b
 eq("NHR-capped show-stopper still NAMES the conditional bar", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).showStoppers.length, 1);
 // complete read → the hard pole still stands (cap does NOT fire on a confirmed-complete read)
 eq("INELIGIBLE + manifest COMPLETE → still INELIGIBLE (un-capped on a full read)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
-eq("NO_BID + manifest COMPLETE → still NO_BID (un-capped on a full read)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+eq("fork-2: who-can-win bar + manifest COMPLETE → INELIGIBLE (un-capped; never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
 
 // ── Doctrine #6 (Step 1, AUDIT_ELIGIBLE_TRISTATE) — honest-fail eligible is tri-state, flag-gated DEFAULT-OFF.
 //    OFF: byte-identical to HEAD (false). ON: INCOMPLETE & verifier-unsound NHR → null; INELIGIBLE → false (invariant). ──

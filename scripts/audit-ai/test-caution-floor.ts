@@ -57,9 +57,13 @@ ok(decide(f2, null, false) === "BID", `flag OFF → ${decide(f2, null, false)} (
 
 // ── FLOOR-ONLY SAFETY ──
 console.log("\n[FLOOR-only safety]");
-// never downgrades a NO_BID (universal show-stopper untouched even if it also matched an archetype)
-const universal: TypedFinding = { requirement: "QPL listing required; lead time exceeds window for every bidder", citation: "§E", excerpt: "Qualified Products List (QPL) membership required", kind: "technical_spec", controllability: "no_one_can_move", grounded: true, lens: "former_ko", curableInWindow: false };
-ok(decide([universal], null, true) === "NO_BID", `NO_BID (no_one_can_move) + floor ON → ${decide([universal], null, true)} (never downgraded)`);
+// never downgrades a HARD show-stopper (who-can-win QPL eligibility bar untouched even if it also matched an
+// archetype). Brain card 231 RULING: a QPL/QML-lead bar is WHO-CAN-WIN (listed firms win; "for every bidder" is
+// a FALSE universal) — OFF the universal allowlist, NEVER NO_BID, NEVER temporal-delivery CAUTION. Under a null
+// profile it terminates at NEEDS_HUMAN_REVIEW (the CORRECT FINAL terminal; a future closed-world QPL-aware
+// firmStatus detector will resolve listed→clear / not-listed→INELIGIBLE — tracked, not Fork-2 scope).
+const qplWhoCanWin: TypedFinding = { requirement: "QPL listing required; lead time exceeds window for every bidder", citation: "§E", excerpt: "Qualified Products List (QPL) membership required", kind: "technical_spec", controllability: "no_one_can_move", grounded: true, lens: "former_ko", curableInWindow: false };
+ok(decide([qplWhoCanWin], null, true) === "NEEDS_HUMAN_REVIEW", `who-can-win QPL eligibility bar (null profile) + floor ON → ${decide([qplWhoCanWin], null, true)} (NHR final — floor must NOT downgrade the hard pole)`);
 // never upgrades to INELIGIBLE under a NON-NULL profile (floor marks, does not create a profile-checked bar)
 const profile: BidderProfile = { satisfiedAttributes: [] };
 ok(decide([synthQuals], profile, true) === "BID_WITH_CAUTION", `archetype + NON-NULL profile + floor ON → ${decide([synthQuals], profile, true)} (CAUTION, never INELIGIBLE)`);
@@ -79,4 +83,4 @@ ok(decide(f4, null, true) === goldVerdict("AOCSSB26R0023"), `#4 decide(with-qual
 
 console.log("");
 if (fail) { console.error(`✗ ${fail} check(s) FAILED`); process.exit(1); }
-console.log("✓ ALL CHECKS PASS — over FROZEN fixtures (card 90): with-qual fires the floor → CAUTION; no-qual fires 0 → BID; FLOOR-only safe (no downgrade, no INELIGIBLE); flag-off unchanged; anchor matches the gold-key verdict.");
+console.log("✓ ALL CHECKS PASS — over FROZEN fixtures (card 90): with-qual fires the floor → CAUTION; no-qual fires 0 → BID; FLOOR-only safe (no downgrade, no INELIGIBLE); who-can-win QPL bar null→NHR (card 231); flag-off unchanged; anchor matches the gold-key verdict.");
