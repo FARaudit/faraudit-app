@@ -160,11 +160,41 @@ export interface IngestionFileMeta {
   bytes: number | null;
   ingested: boolean;
   reason?: string;
+  // Silent-partial guard (Brain card 224 fork 2). `ingested` means the BYTES arrived; `has_text` means the
+  // TEXT-ONLY agentic engine actually received machine-readable content (meaningfulCharCount ≥ the text-block
+  // floor). A scanned/image binding doc is ingested:true yet has_text:false — bytes rode as a vision block the
+  // text-only auditPackage never consumes → a named-but-blank contribution. Completeness must gate on has_text
+  // for BINDING docs, not on `ingested` alone (which reads green while a §M/SOW/wage-det contributed nothing).
+  has_text?: boolean;
   // FA-182 — detected solicitation section role(s) ∈ C|H|L|M, from the file
   // NAME (deterministic, conservative). Empty [] = unknown → stays a plain
   // ATTACHMENT in the ingestion banner. Drives the .isec section tags + true
   // §C/§L/§M coverage chip (upgrades the banner from form-grain).
   section_roles?: string[];
+}
+
+// Brain card 224 fork 2 — the completeness-binding contract. A doc is BINDING (its text MUST reach the engine
+// for a read to be "complete") = solicitation body · amendments · SOW/PWS/SOO/SoN · specs/drawings/markings ·
+// wage determinations · anything incorporated-by-reference carrying requirements. OFFEROR-FILL forms (blank
+// templates the offeror completes — reps & certs, price/bid worksheets, questionnaires) are NON-binding →
+// flag-only, never a completeness failure for lacking body text. UNKNOWN role ⇒ BINDING (fail-safe, zero-loss).
+// The offeror-fill allowlist is deliberately NARROW: wage determinations and pricing SCHEDULES that carry
+// binding CLIN/requirement structure stay BINDING. Widening the carve-out is a Brain checkpoint (Rule 61).
+const OFFEROR_FILL_RE = /\b(reps?\s*(?:and|&)?\s*certs?|representations?\s*(?:and|&)?\s*certifications?|fillable|fill[- ]?in(?:able)?|questionnaire|ppq|past performance questionnaire|offeror'?s?\s*(?:worksheet|template|checklist)|bid\s*worksheet|price\s*(?:worksheet|template))\b/i;
+export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; name: string }): boolean {
+  if (f.role === "form" || f.role === "amendment") return true;      // primary solicitation + amendments are always binding
+  return !OFFEROR_FILL_RE.test(f.name.replace(/[_.\-+]+/g, " "));      // attachment: binding UNLESS a recognized offeror-fill template
+}
+
+// has_text for the COMPLETENESS contract asks "did the engine actually receive this doc's text?" — so it uses
+// the ENGINE's text-inclusion floor (buildAgenticDocs keeps any doc with ≥ MIN_ENGINE_TEXT_CHARS of extracted
+// text in the assembled fullSource), NOT the 200-char TEXT-BLOCK-vs-VISION threshold (isTextDeliverable). A
+// short binding doc (e.g. a 150-char SF-30 amendment) IS assembled into fullSource and reasoned over, so it
+// must count as has_text — else a genuinely-read doc false-flags content-loss → a false INCOMPLETE. A truly
+// scanned/failed doc still yields ~0 meaningful chars and is correctly has_text=false. Failed extractions excluded.
+const MIN_ENGINE_TEXT_CHARS = 50;
+export function hasEngineText(text: string | null | undefined): boolean {
+  return !!text && !text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(text) >= MIN_ENGINE_TEXT_CHARS;
 }
 
 // FA-182 — classify a file's solicitation section role(s) from its NAME only.
@@ -882,7 +912,7 @@ export async function assembleSamDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1026,7 +1056,7 @@ export async function assembleUploadedDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {

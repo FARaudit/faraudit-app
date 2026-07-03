@@ -81,6 +81,18 @@ async function main() {
   ok("re-typed finding carries corrected controllability", rr.survived[0]?.controllability, "bidder_cannot_move");
   ok("re-typed finding carries corrected curability", rr.survived[0]?.curableInWindow, false);
 
+  // (8) VERIFIED-FLOOR (Brain card 224 fork 1) — the false-BID hole. A skeptic that overturns EVERY finding
+  //     leaves survived=[]; soundness must be FALSE (not "ruled on all → sound"), so deriveVerdict routes to
+  //     NEEDS_HUMAN_REVIEW instead of falling through to a default BID over an empty set.
+  const overturnAll: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: false, reason: "adversary kills everything" }));
+  const rFloor = await makeAgenticVerifier(overturnAll)(ctx, [grounded, misclassified]);
+  ok("total-overturn ⇒ survived is empty", rFloor.survived.length, 0);
+  ok("total-overturn ⇒ NOT sound (verified-floor, no false BID)", rFloor.sound, false);
+  // (9) zero grounded findings (nothing to verify) ⇒ NOT sound — a run that grounded nothing cannot decide.
+  const rEmpty = await makeAgenticVerifier(upholdAll)(ctx, [ungrounded]); // ungrounded dropped by re-grounding → grounded=[]
+  ok("zero grounded ⇒ NOT sound (nothing verified)", rEmpty.sound, false);
+  ok("zero grounded ⇒ survived empty", rEmpty.survived.length, 0);
+
   console.log(`verifier gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }
   console.log("✅ ALL PASS — re-grounding + adversarial overturn + honest-fail on incomplete/failed challenge.");

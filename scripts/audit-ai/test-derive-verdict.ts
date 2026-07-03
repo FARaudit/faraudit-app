@@ -33,6 +33,10 @@ eq("#2 set-aside met", deriveVerdict(inp(two)).dispositions.find((d) => d.requir
 eq("incomplete coverage → INCOMPLETE", deriveVerdict(inp(two, { coverage: false })).verdict, "INCOMPLETE");
 eq("verifier unsound → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { sound: false })).verdict, "NEEDS_HUMAN_REVIEW");
 eq("conflict → NEEDS_HUMAN_REVIEW", deriveVerdict(inp(two, { conflict: true })).verdict, "NEEDS_HUMAN_REVIEW");
+// VERIFIED-FLOOR (Brain card 224 fork 1) — coverage complete + verifier sound + ZERO surviving findings must
+// NOT fall through to a default BID (the false-BID hole). Empty verified set ⇒ NEEDS_HUMAN_REVIEW, no charge.
+eq("verified-floor: empty findings + complete coverage → NEEDS_HUMAN_REVIEW (never default BID)", deriveVerdict(inp([])).verdict, "NEEDS_HUMAN_REVIEW");
+eq("verified-floor: empty findings does NOT emit BID", deriveVerdict(inp([])).verdict !== "BID", true);
 
 // ── Brain card-44 §2: curability splits the old blanket "unknown → CAUTION" branch. ──
 // 5a. UNTYPED bar (bidder_cannot_move, no requiredAttribute / no curableInWindow) → FAIL CLOSED to human review.
@@ -87,11 +91,17 @@ eq("same bar, firm qualifies → BID", deriveVerdict(inp(eligBar, { profile: { s
 const noBid = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
 eq("uncontrollable non-elig bar firm fails → NO_BID", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
 
-// ── Brain card-58 ASYMMETRY CAP: an unfetched manifest attachment caps no-bar verdicts, NOT bar-found. ──
+// ── Manifest-incomplete cap. Card-58 capped no-bar verdicts (BID/CAUTION) to INCOMPLETE. Brain card 224 fork 4
+//    EXTENDS the cap to show-stoppers: a findings-derived hard NO_BID/INELIGIBLE on an INCOMPLETE read → NHR
+//    (an unfetched amendment could waive/moot the bar — zero-contract-loss), carrying the conditional bar. ──
 eq("BID + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(two, { manifest: false })).verdict, "INCOMPLETE");
 eq("CAUTION + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(curable, { manifest: false })).verdict, "INCOMPLETE");
-eq("INELIGIBLE + manifest incomplete → STILL INELIGIBLE (asymmetry)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "INELIGIBLE");
-eq("NO_BID + manifest incomplete → STILL NO_BID (asymmetry)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NO_BID");
+eq("INELIGIBLE + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NO_BID + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NHR-capped show-stopper still NAMES the conditional bar", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).showStoppers.length, 1);
+// complete read → the hard pole still stands (cap does NOT fire on a confirmed-complete read)
+eq("INELIGIBLE + manifest COMPLETE → still INELIGIBLE (un-capped on a full read)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+eq("NO_BID + manifest COMPLETE → still NO_BID (un-capped on a full read)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
 
 // ── Doctrine #6 (Step 1, AUDIT_ELIGIBLE_TRISTATE) — honest-fail eligible is tri-state, flag-gated DEFAULT-OFF.
 //    OFF: byte-identical to HEAD (false). ON: INCOMPLETE & verifier-unsound NHR → null; INELIGIBLE → false (invariant). ──

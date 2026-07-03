@@ -23,7 +23,7 @@ import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
-import type { IngestionMeta } from "./sam-attachments";
+import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -63,8 +63,20 @@ export function agenticManifestComplete(
   isSamSol: boolean,
 ): boolean {
   if (truncated) return false;
-  if (ingestion) return ingestion.files_total > 0 && ingestion.files_ingested >= ingestion.files_total && !ingestion.overflow;
+  if (ingestion) return ingestion.files_total > 0 && ingestion.files_ingested >= ingestion.files_total && !ingestion.overflow && !hasBindingContentLoss(ingestion);
   return !isSamSol;
+}
+
+/** Silent-partial guard (Brain card 224 fork 2). A BINDING doc whose bytes arrived (`ingested`) but whose
+ *  machine-readable text did NOT (`has_text===false` — scanned/image, rode as a vision block the text-only
+ *  engine never consumes) is a CONTENT LOSS: the read is not complete even though every file "arrived".
+ *  Offeror-fill templates (isBindingDoc=false) are exempt (blank-by-design). has_text===undefined (legacy
+ *  records written before this field) is treated as present, so replay of old records is byte-identical. */
+export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileMeta[] {
+  return ingestion.files.filter((f) => f.ingested && f.has_text === false && isBindingDoc(f));
+}
+function hasBindingContentLoss(ingestion: IngestionMeta): boolean {
+  return bindingContentLossDocs(ingestion).length > 0;
 }
 
 async function markStage(supabase: SupabaseClient, auditId: string, stage: string): Promise<void> {
@@ -170,6 +182,18 @@ export async function executeAgenticPrimary(
   if (assembled.truncated && payload.documents) {
     payload.documents.complete = false;
     for (const name of assembled.droppedDocs) payload.documents.missing.push({ name, reason: "dropped: source over size budget" });
+  }
+  // SILENT-PARTIAL guard (Brain card 224 fork 2) — a BINDING doc that arrived as bytes but contributed ZERO
+  // machine-readable text (scanned/image → rode as a vision block the text-only engine never consumed) is a
+  // content loss, even though files_ingested counted it. Surface it as missing + documents_complete=false so
+  // the report banner, watcher, and the manifestComplete verdict-cap (below) all read honest-incomplete instead
+  // of green. Offeror-fill templates are exempt (isBindingDoc=false). Mirrors agenticManifestComplete.
+  if (ing && payload.documents) {
+    const contentLoss = bindingContentLossDocs(ing);
+    if (contentLoss.length) {
+      payload.documents.complete = false;
+      for (const f of contentLoss) payload.documents.missing.push({ name: f.name, reason: "ingested but no machine-readable text (scanned/image) — content not analyzed" });
+    }
   }
   const docsIncomplete = assembled.truncated || (!!payload.documents && (!payload.documents.reconciled || !payload.documents.complete));
   const recommendation = verdictToRecommendation(res.decision.verdict);

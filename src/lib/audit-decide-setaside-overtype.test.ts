@@ -1,10 +1,14 @@
-// $0 REGRESSION for the guard-fix (card 164/167, AUDIT_SETASIDE_OVERTYPE_GUARD) — the false-INELIGIBLE-under-null
-// seam. Run: npx tsx src/lib/audit-decide-setaside-overtype.test.ts
+// $0 REGRESSION for the award-basis set-aside overtype guard — the false-INELIGIBLE-under-null seam.
+// Run: npx tsx src/lib/audit-decide-setaside-overtype.test.ts
 //
-// Doctrine (Brain): a PURE socioeconomic set-aside MIS-TYPED `no_one_can_move` under a NULL/open-world profile
-// must normalize to a CURABLE CAUTION (BID_WITH_CAUTION), never INELIGIBLE — zero-contract-loss. The fix is the
-// new opt `normalizeNoOneCanMoveSetAside` on applyAwardBasisOvertypeGuard (flag AUDIT_SETASIDE_OVERTYPE_GUARD,
-// default-OFF). Pure functions, no engine calls, flag INJECTED via the opt (no env mutation).
+// Doctrine (Brain card 224 fork 3, RATIFIED — supersedes the card 164/167 flag-gated model): a PURE socioeconomic
+// set-aside MIS-TYPED `no_one_can_move` under a NULL/open-world profile must NEVER reach step-3 as a universal bar
+// (→ false INELIGIBLE/NO_BID — THE catastrophic zero-contract-loss error). The no_one_can_move→NHR normalization is
+// now an ALWAYS-RUN INVARIANT inside the award-basis guard (which is enabled by default, AUDIT_AWARDBASIS_OVERTYPE_
+// GUARD): default pole = NHR (non-curable bidder_cannot_move → step-5b NEEDS_HUMAN_REVIEW), the "caution" disposition
+// is the softer alternative. It is NO LONGER gated by the default-OFF AUDIT_SETASIDE_OVERTYPE_GUARD flag — only
+// fully DISABLING the award-basis guard (enabled:false) reverts to the raw INELIGIBLE pole. Pure functions, no
+// engine calls, flags INJECTED via the opt (no env mutation).
 import { readFileSync } from "node:fs";
 import { applyAwardBasisOvertypeGuard, deriveVerdict, setAsideOvertypeGuardOpts } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
@@ -41,12 +45,12 @@ console.log("── 1 · flag ON: mis-typed no_one_can_move SDVOSB + null → BI
   assert(d.eligible !== false, `eligible !== false (got ${d.eligible})`);
 }
 
-console.log("── 2 · flag OFF / bypass: same input → INELIGIBLE (proves the flag is load-bearing) ──");
+console.log("── 2 · ALWAYS-RUN INVARIANT (card 224 fork 3): guard enabled → NHR regardless of the opt; only NO guard at all leaves INELIGIBLE ──");
 {
   const off = deriveVerdict({ findings: guard([setAside()], false), ...base });
-  assert(off.verdict === "INELIGIBLE", `flag OFF → INELIGIBLE (got ${off.verdict})`);
+  assert(off.verdict === "NEEDS_HUMAN_REVIEW", `guard enabled, normalize opt off → NHR, NOT INELIGIBLE (got ${off.verdict})`);
   const bypass = deriveVerdict({ findings: [setAside()], ...base });
-  assert(bypass.verdict === "INELIGIBLE", `guard bypass → INELIGIBLE (got ${bypass.verdict})`);
+  assert(bypass.verdict === "INELIGIBLE", `NO guard at all → INELIGIBLE (proves the guard is what protects) (got ${bypass.verdict})`);
 }
 
 console.log("── 3 · REFINEMENT: mis-typed set-aside + coexisting GENUINE universal bar, flag ON → still disqualifying ──");
@@ -60,12 +64,14 @@ console.log("── 3 · REFINEMENT: mis-typed set-aside + coexisting GENUINE un
   assert(d.verdict === "NO_BID" || d.verdict === "INELIGIBLE", `real universal bar still drives ${d.verdict} (softening did NOT rescue a foreclosed solicitation)`);
 }
 
-console.log("── 4 · flag-OFF byte-identical: guard output identical with opt false vs the pre-fix predicate ──");
+console.log("── 4 · ALWAYS-RUN default pole: opt false/absent → no_one_can_move re-typed to the NHR pole, never left as a universal bar ──");
 {
-  // With the opt false/absent, a no_one_can_move set-aside is NOT softened (the pre-fix behavior).
+  // Card 224 fork 3: even with the normalize/nhr opt unset, an enabled guard re-types a mis-typed
+  // no_one_can_move set-aside OFF the universal pole to the NHR pole (non-curable bidder_cannot_move).
   const optFalse = guard([setAside()], false);
   const optAbsent = applyAwardBasisOvertypeGuard([setAside()], null, { enabled: true });
-  assert(optFalse[0].controllability === "no_one_can_move" && optAbsent[0].controllability === "no_one_can_move", "opt false/absent → set-aside NOT softened (byte-identical to pre-fix)");
+  assert(optFalse[0].controllability === "bidder_cannot_move" && optFalse[0].curableInWindow === false, "opt false → NHR pole (re-typed off no_one_can_move)");
+  assert(optAbsent[0].controllability === "bidder_cannot_move" && optAbsent[0].curableInWindow === false, "opt absent → NHR pole (re-typed off no_one_can_move)");
   // And the existing bidder_cannot_move set-aside path is unchanged regardless of the opt.
   const bcm = { ...setAside(), controllability: "bidder_cannot_move" as const };
   const a = guard([bcm], true)[0], b = guard([bcm], false)[0];
@@ -126,13 +132,15 @@ console.log("── 7 · CARD 185 FROZEN NEGATIVE ANCHOR (SP3300-26-Q-0165, real
     assert(d.eligible !== false, `eligible !== false (got ${d.eligible})`);
   }
 
-  // 7b · flag OFF, and opt/disposition UNSET → byte-identical current behavior (finding falls through unchanged → INELIGIBLE).
+  // 7b · GUARD DISABLED (enabled:false) → INELIGIBLE (== raw, no protection); GUARD ENABLED, disposition unset →
+  //      NHR (the always-run invariant, card 224 fork 3). Only fully disabling the award-basis guard reverts.
   {
     const flagOff = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: false, setAsideOvertypeDisposition: frozen.guardConfig.setAsideOvertypeDisposition }), ...base });
     const optUnset = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, { enabled: true }), ...base });
     const raw = deriveVerdict({ findings: [injected], ...base });
-    assert(flagOff.verdict === raw.verdict && optUnset.verdict === raw.verdict, `flag OFF & opt unset both byte-identical to raw (${raw.verdict})`);
-    assert(raw.verdict === "INELIGIBLE", `current behavior = INELIGIBLE (got ${raw.verdict}) — proves disposition is load-bearing`);
+    assert(raw.verdict === "INELIGIBLE", `no guard → INELIGIBLE (got ${raw.verdict})`);
+    assert(flagOff.verdict === "INELIGIBLE", `guard DISABLED (enabled:false) → INELIGIBLE == raw (got ${flagOff.verdict})`);
+    assert(optUnset.verdict === "NEEDS_HUMAN_REVIEW", `guard ENABLED, disposition unset → NHR (always-run invariant) (got ${optUnset.verdict})`);
   }
 
   // 7c · structural regression: SPRDL125Q0030-shape sole-source bar stays INELIGIBLE even in nhr mode — covered green by test #6 above.
@@ -159,15 +167,17 @@ console.log("── 8 · CARD 187 ORCHESTRATOR WIRING: setAsideOvertypeGuardOpts
     assert(d.verdict === "NEEDS_HUMAN_REVIEW" && d.eligible !== false, `flag ON end-to-end → NEEDS_HUMAN_REVIEW, eligible not false (got ${d.verdict}/${d.eligible})`);
   }
 
-  // 8b · flag unset AND flag="false" → opts byte-identical to pre-card-187 ({ enabled, normalizeNoOneCanMoveSetAside:false },
-  //      NO disposition key); end-to-end → INELIGIBLE (inert / current behavior).
+  // 8b · flag unset AND flag="false" → opts SHAPE byte-identical to pre-card-187 ({ enabled:true,
+  //      normalizeNoOneCanMoveSetAside:false }, NO disposition key). The env→opts mapping is unchanged; but
+  //      because opts.enabled===true (AWARDBASIS default-ON), the end-to-end verdict is now NHR — the
+  //      no_one_can_move→NHR normalization is an always-run invariant (card 224 fork 3), no longer flag-gated.
   for (const env of [{}, { AUDIT_SETASIDE_OVERTYPE_GUARD: "false" }] as Record<string, string | undefined>[]) {
     const opts = setAsideOvertypeGuardOpts(env);
     const label = "AUDIT_SETASIDE_OVERTYPE_GUARD" in env ? `="${(env as Record<string,string>).AUDIT_SETASIDE_OVERTYPE_GUARD}"` : "unset";
     assert(opts.setAsideOvertypeDisposition === undefined && opts.normalizeNoOneCanMoveSetAside === false && opts.enabled === true,
-      `flag ${label} → opts identical to pre-change { enabled:true, normalizeNoOneCanMoveSetAside:false }, no disposition`);
+      `flag ${label} → opts SHAPE identical to pre-change { enabled:true, normalizeNoOneCanMoveSetAside:false }, no disposition`);
     const d = deriveVerdict({ findings: applyAwardBasisOvertypeGuard([injected], null, opts), ...base });
-    assert(d.verdict === "INELIGIBLE", `flag ${label} end-to-end → INELIGIBLE (inert) (got ${d.verdict})`);
+    assert(d.verdict === "NEEDS_HUMAN_REVIEW", `flag ${label} end-to-end → NHR (always-run invariant, guard enabled by default) (got ${d.verdict})`);
   }
 
   // 8c · enabled honors AUDIT_AWARDBASIS_OVERTYPE_GUARD="false" (whole guard disabled → findings pass through).
