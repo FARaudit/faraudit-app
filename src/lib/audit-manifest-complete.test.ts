@@ -2,7 +2,7 @@
 // the panel BLOCKER fix: a SAM sol whose manifest assembly FAILED (null ingestion) must
 // read INCOMPLETE for the verdict, not green BID. Run: npx tsx src/lib/audit-manifest-complete.test.ts
 import { agenticManifestComplete, bindingContentLossDocs } from "./audit-executor-v3";
-import { isBindingDoc } from "./sam-attachments";
+import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import type { IngestionMeta, IngestionFileMeta } from "./sam-attachments";
 
 const ing = (o: Partial<IngestionMeta>): IngestionMeta => ({ files_total: 0, files_ingested: 0, files: [], form_identified: true, form_name: "primary", ...(o as object) } as unknown as IngestionMeta);
@@ -54,6 +54,17 @@ eq("T15 · isBindingDoc: SOW attachment is binding", isBindingDoc(scannedSOW), t
 eq("T16 · isBindingDoc: reps-and-certs fillable is NOT binding", isBindingDoc(blankRepsCerts), false);
 eq("T17 · isBindingDoc: amendment is binding", isBindingDoc(file({ name: "amd 0001.pdf", role: "amendment" })), true);
 eq("T18 · isBindingDoc: primary form is binding", isBindingDoc(file({ name: "SF1449.pdf", role: "form" })), true);
+
+// ── has_text = ENGINE text-inclusion floor (~50), NOT the 200-char vision threshold (code-review fix) ──
+// A short binding doc the engine actually assembles into fullSource must count as has_text (no false INCOMPLETE).
+const short = "The response deadline is hereby extended to 1 August 2026; all other terms and conditions of the solicitation remain unchanged and in full force."; // ~140 chars, >50
+eq("H1 · ~140-char amendment (engine reads it) → hasEngineText true (no false content-loss)", hasEngineText(short), true);
+eq("H2 · 30-char blip → hasEngineText false", hasEngineText("closing date extended."), false);
+eq("H3 · empty → false", hasEngineText(""), false);
+eq("H4 · null → false", hasEngineText(null), false);
+eq("H5 · failed-extraction sentinel (even if long) → false", hasEngineText("[PDF_EXTRACTION_FAILED] " + "x".repeat(300)), false);
+eq("H6 · a short binding amendment is NOT flagged as content-loss",
+  bindingContentLossDocs(ing({ files: [file({ name: "SF30 Amendment 0001.pdf", role: "amendment", has_text: true })] })).length, 0);
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
 process.exit(fail === 0 ? 0 : 1);

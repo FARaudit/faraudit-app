@@ -186,6 +186,17 @@ export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; nam
   return !OFFEROR_FILL_RE.test(f.name.replace(/[_.\-+]+/g, " "));      // attachment: binding UNLESS a recognized offeror-fill template
 }
 
+// has_text for the COMPLETENESS contract asks "did the engine actually receive this doc's text?" — so it uses
+// the ENGINE's text-inclusion floor (buildAgenticDocs keeps any doc with ≥ MIN_ENGINE_TEXT_CHARS of extracted
+// text in the assembled fullSource), NOT the 200-char TEXT-BLOCK-vs-VISION threshold (isTextDeliverable). A
+// short binding doc (e.g. a 150-char SF-30 amendment) IS assembled into fullSource and reasoned over, so it
+// must count as has_text — else a genuinely-read doc false-flags content-loss → a false INCOMPLETE. A truly
+// scanned/failed doc still yields ~0 meaningful chars and is correctly has_text=false. Failed extractions excluded.
+const MIN_ENGINE_TEXT_CHARS = 50;
+export function hasEngineText(text: string | null | undefined): boolean {
+  return !!text && !text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(text) >= MIN_ENGINE_TEXT_CHARS;
+}
+
 // FA-182 — classify a file's solicitation section role(s) from its NAME only.
 // Conservative by design: a wrong §-tag is a fabrication, so we tag only what
 // the name clearly signals (a leading section letter, an explicit "Section X",
@@ -901,7 +912,7 @@ export async function assembleSamDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: isTextDeliverable(f), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1045,7 +1056,7 @@ export async function assembleUploadedDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: isTextDeliverable(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {

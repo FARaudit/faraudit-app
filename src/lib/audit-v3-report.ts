@@ -473,10 +473,11 @@ export function renderAgenticReportFromRow(audit: Record<string, unknown>): stri
     verdict: "INCOMPLETE", eligible: false, reason: "Agentic report payload missing.",
     showStoppers: [], findings: [], coverage: { required: [], covered: [], missing: [] },
   };
-  // Doctrine #5 export gate — mirror the server 409 (shouldGateExport). Force-gate the schema-drift
-  // fallback (no cj.v3 → the default INCOMPLETE payload above) even if compliance_json didn't persist the
-  // honest_fail flag, so a missing-payload report can never render a live Print affordance (medium-trust defect).
-  const gated = !cj.v3 || shouldGateExport(audit);
+  // Doctrine #5 export gate — SINGLE source of truth: shouldGateExport (which also gates the schema-drift
+  // fallback, comp.v3 == null → the default INCOMPLETE payload above). The web route, the PDF-route 409, and
+  // this renderer therefore all gate on the identical predicate and can never diverge (a mismatch previously
+  // let the PDF route serve a print-blanked 200 for a missing-payload row).
+  const gated = shouldGateExport(audit);
   return renderV3Report(payload, {
     solicitationNumber: (audit.solicitation_number as string) ?? null,
     title: (audit.title as string) ?? null,

@@ -142,6 +142,7 @@ export function shouldGateExport(audit: Record<string, unknown>): boolean {
   // refused to fully stand behind must never leave the building as a clean PDF.
   // (CEO 2026-06-28: gate on BOTH honest_fail AND incomplete documents.)
   if (comp.engine === "agentic_v3") {
+    if (comp.v3 == null) return true; // schema-drift / partial write → no report payload → gate (mirror the renderer's fallback so the PDF-route 409 can't serve a blank doc with 200)
     if (comp.honest_fail === true) return true; // INCOMPLETE / NEEDS_HUMAN_REVIEW → gate
     if (comp.documents_complete === false) return true; // didn't read the full posted set → gate
     return false; // grounded verdict over a confirmed-complete document set → export ON
