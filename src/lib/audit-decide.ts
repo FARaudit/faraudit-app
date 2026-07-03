@@ -795,6 +795,55 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   return "fails";
 }
 
+// BRAIN CARD 226 FORK 2 — the UNIVERSAL_DEFECT allowlist. A committal NO_BID is reachable ONLY on a POSITIVE
+// match to one of these classes (the solicitation contradicts itself, or is literally unmeetable by ANY
+// offeror). Exhaustive today — no producer emits `universalDefect` yet, so NO_BID is DEFAULT-DENY until a
+// finding is positively classified a universal defect. A who-can-win restriction is NEVER on this list (Ruling A:
+// named-brand / sole-source / set-aside / size / QPL / clearance are who-can-win, not universal).
+const UNIVERSAL_DEFECT_CLASSES: ReadonlySet<string> = new Set(["contradictory_mandatory_terms", "unmeetable_by_any_offeror"]);
+function isUniversalDefect(f: TypedFinding): boolean {
+  return f.universalDefect != null && UNIVERSAL_DEFECT_CLASSES.has(f.universalDefect);
+}
+
+// ── BRAIN CARD 228 RULING (i) — COUPLING-LOCK MOVED TO BOOT / REGISTRATION-TIME ────────────────────────────
+// A universalDefect producer may run ONLY when a POSITIVE eligibility determination is reachable (tristate ON).
+// The lock is now enforced at REGISTRATION/INIT (the process refuses to start) — never mid-audit as the default.
+// A config error is NOT an uncertain document input, so it must NEVER surface as an NHR verdict (NHR PROHIBITED).
+// The decision-time check below is retained ONLY as a backstop (a producer registered dynamically after boot);
+// when it fires, the audit BOUNDARY converts it to a BILLING-SAFE FAILED STATE (no charge, logged config error)
+// — never a raw 500, never an NHR verdict.
+
+/** Engine config/ordering invariant breach. Thrown at registration/boot (Ruling i) and as a decision-time
+ *  backstop / precedence pre-lock (Ruling ii). The audit boundary catches it → billing-safe terminal failure
+ *  (thrown BEFORE persist ⇒ decrementAuditQuota never runs ⇒ no charge), NOT an NHR verdict, NOT a raw 500. */
+export class EngineInvariantError extends Error {
+  constructor(message: string) { super(message); this.name = "EngineInvariantError"; }
+}
+
+// Registry of producers that can positively mark a finding `universalDefect`. EMPTY today (no producer emits) →
+// the check is a no-op in prod. A real producer self-registers at its module load; registering one while
+// AUDIT_ELIGIBLE_TRISTATE is not "on" throws AT REGISTRATION (INIT), so the process refuses to start.
+const UNIVERSAL_DEFECT_PRODUCERS = new Set<string>();
+/** Register a universalDefect producer. Validates the coupling-lock AT REGISTRATION (Ruling i, INIT-time). */
+export function registerUniversalDefectProducer(name: string): void {
+  UNIVERSAL_DEFECT_PRODUCERS.add(name);
+  validateUniversalDefectProducerConfig();  // fail at INIT (boot) — never mid-audit
+}
+/** Tests only — restore the registry to its empty prod state. */
+export function _clearUniversalDefectProducers(): void { UNIVERSAL_DEFECT_PRODUCERS.clear(); }
+
+/** BOOT/REGISTRATION-TIME coupling-lock (Ruling i). A registered universalDefect producer while tristate is OFF
+ *  ⇒ throw at INIT (process refuses to start). No-op in prod (empty registry) and byte-identical when tristate ON. */
+export function validateUniversalDefectProducerConfig(env: NodeJS.ProcessEnv = process.env): void {
+  const tristate = env.AUDIT_ELIGIBLE_TRISTATE === "true";
+  if (UNIVERSAL_DEFECT_PRODUCERS.size > 0 && !tristate)
+    throw new EngineInvariantError(
+      `FORK-2 coupling-lock (card 228 Ruling i, INIT): universalDefect producer(s) [${[...UNIVERSAL_DEFECT_PRODUCERS].join(", ")}] registered while AUDIT_ELIGIBLE_TRISTATE is not "on" — a committal NO_BID must carry a POSITIVE eligibility determination, never a default true. Enable the tristate or unregister the producer. Process refuses to start.`);
+}
+// Boot-time enforcement (belt-and-suspenders): runs at module load. No-op today (no producer self-registers),
+// LOCKS the invariant the moment a universal-defect detector is wired without the tristate.
+validateUniversalDefectProducerConfig();
+
 const mk = (verdict: Verdict, eligible: boolean | null, reason: string, dispositions: DecidedFinding[], showStoppers: DecidedFinding[]): Decision =>
   ({ verdict, eligible, reason, dispositions, showStoppers });
 
@@ -866,29 +915,68 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (dispositions.length === 0)
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No findings survived adversarial verification over complete coverage — a clean BID cannot rest on an empty verified set. Human review required.", dispositions, []);
 
-  // 3. Show-stoppers → the only NO_BID / INELIGIBLE drivers. Two kinds (Brain card-45 typing guard):
-  //    (a) UNIVERSAL impossibilities (no_one_can_move) — disqualify EVERY bidder regardless of profile, so
-  //        they are PROVEN show-stoppers even under a null profile (do NOT soften to human-review); and
-  //    (b) PROFILE-DEPENDENT bars the firm PROVABLY fails. A bar the firm provably SATISFIES is cleared; an
-  //        UNKNOWN profile-dependent bar is handled by curability in step 5.
+  // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
+  //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
+  //    internally contradictory, or literally unmeetable by ANY offeror). No allowlist match → NO_BID is
+  //    UNREACHABLE regardless of kind. Everything ELSE disqualifying is WHO-CAN-WIN (Ruling A: named-brand /
+  //    sole-source / set-aside / size / QPL / clearance are who-can-win, NOT universal) → it can NEVER reach
+  //    NO_BID: INELIGIBLE iff the profile PROVES non-qualification (firmStatus "fails"), else it flows to step 5
+  //    and lands at NEEDS_HUMAN_REVIEW (null / open-world / unknown status) — never a default eligible:true.
   const disqualifying = dispositions.filter((f) => f.disposition === "disqualifying");
-  const universal = disqualifying.filter((f) => f.controllability === "no_one_can_move");
-  const provenFails = disqualifying.filter((f) => f.controllability !== "no_one_can_move" && firmStatus(f, inp.bidderProfile) === "fails");
-  const showStoppers = [...universal, ...provenFails];
+  const universalDefect = disqualifying.filter(isUniversalDefect);
+  // COUPLING-LOCK DECISION-TIME BACKSTOP (card 228 Ruling i) — the PRIMARY lock is boot-time
+  // (validateUniversalDefectProducerConfig, above); this fires ONLY if a producer marked a finding without the
+  // tristate (a dynamic registration after boot). It throws EngineInvariantError — NOT an NHR verdict — and the
+  // audit BOUNDARY converts the throw to a billing-safe failed state (no charge, logged config error). NEVER
+  // default a NO_BID's eligibility to true.
+  if (universalDefect.length && !tristate)
+    throw new EngineInvariantError("FORK-2 coupling-lock (card 228 Ruling i, decision-time backstop): a universalDefect finding requires AUDIT_ELIGIBLE_TRISTATE=on — a committal NO_BID must carry a POSITIVE eligibility determination, never a default true.");
+  // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
+  // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
+  // eligibility_bar). An earned (proven-fail) INELIGIBLE is NEVER routed to NHR on a mis-typed kind string.
+  const provenFails = disqualifying
+    .filter((f) => !isUniversalDefect(f) && firmStatus(f, inp.bidderProfile) === "fails")
+    .map((f): DecidedFinding => (f.kind === "eligibility_bar" ? f : { ...f, kind: "eligibility_bar" }));
+  // PRECEDENCE PRE-LOCK (card 228 Ruling ii) — universal-defect attribution is evaluated BEFORE firmStatus, so a
+  // universalDefect-marked finding is attributed universal/requirement-side and is NEVER re-labeled by firmStatus
+  // into a firm disqualification (provenFails). provenFails already excludes isUniversalDefect above; this assert
+  // LOCKS that ordering the moment a producer emits (simulated in tests; no producer emits today).
+  if (provenFails.some(isUniversalDefect))
+    throw new EngineInvariantError("precedence_violation (card 228 Ruling ii): a universalDefect-marked finding was re-labeled by firmStatus as a firm disqualification — universal attribution must precede firmStatus.");
+  const showStoppers = [...universalDefect, ...provenFails];
   if (showStoppers.length) {
-    // ASYMMETRY-CAP EXTENSION (Brain card 224 fork 4) — a findings-derived hard NO_BID/INELIGIBLE may NOT stand
-    // on an INCOMPLETE manifest read: an unfetched amendment could WAIVE or moot the bar, so committing to the
-    // catastrophic pole over content we KNOW we did not fully read is the zero-contract-loss error. Downgrade the
-    // top-line to NEEDS_HUMAN_REVIEW carrying the CONDITIONAL bar (named, so the customer still gets the call —
-    // hold-it-or-walk pending the missing docs). Un-capped NO_BID/INELIGIBLE is reserved for confirmed-complete
-    // reads. (Supersedes card-58, which left show-stoppers un-capped; card 224 extends the cap to them.)
+    // ASYMMETRY-CAP EXTENSION (Brain card 224 fork 4) — LEFT EXACTLY AS-IS (correctly ordered FIRST): a
+    // findings-derived hard pole may NOT stand on an INCOMPLETE manifest read — an unfetched amendment could
+    // WAIVE or moot the bar → zero-contract-loss. Downgrade to NHR carrying the CONDITIONAL bar.
     if (inp.manifestComplete === false)
       return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
         `CONDITIONAL bar(s) on an INCOMPLETE read — a manifest-named document went unfetched and could waive or moot the following; confirm against the full package before treating as disqualifying: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers);
-    const elig = !showStoppers.some((s) => s.kind === "eligibility_bar");
-    return enforceVerdictWordInvariant(mk(elig ? "NO_BID" : "INELIGIBLE", elig,
-      `Bar(s) that cannot be cleared: ${showStoppers.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers));
+    // POSITIVE eligibility determination (Ruling B) — proven-pass→true, proven-fail→false, else null; NEVER default true.
+    const positiveEligible = (): boolean | null => {
+      const gates = disqualifying.filter((f) => !!f.requiredAttribute);
+      if (gates.some((f) => firmStatus(f, inp.bidderProfile) === "fails")) return false;
+      if (gates.length && gates.every((f) => firmStatus(f, inp.bidderProfile) === "satisfies")) return true;
+      return null;
+    };
+    if (universalDefect.length)
+      // an allowlisted UNIVERSAL defect → NO_BID (no offeror can win; the firm is not the blocker).
+      return enforceVerdictWordInvariant(mk("NO_BID", positiveEligible(),
+        `Universal solicitation defect — no offeror can comply: ${universalDefect.map((s) => s.requirement).join("; ")}`, dispositions, showStoppers));
+    // a PROVEN attribute failure → INELIGIBLE, eligible:false (positive non-qualification; kind normalized above).
+    // Ruling (ii): NAME THE SPECIFIC FAILED ATTRIBUTE; do NOT assert a bar-type category ("who-can-win
+    // restriction") the engine has not positively classified. The profile provably does not satisfy the
+    // requiredAttribute firmStatus checked — that attribute is exactly what we state, nothing broader.
+    return enforceVerdictWordInvariant(mk("INELIGIBLE", false,
+      `Ineligible — the firm's profile does not satisfy the required attribute(s): ${provenFails.map((s) => s.requiredAttribute ?? s.requirement).join("; ")}`, dispositions, showStoppers));
   }
+  // FORK-2 DEFENSE-IN-DEPTH (adversarial review) — an UNMARKED no_one_can_move finding CLAIMS universal
+  // impossibility but is NOT a positively-classified universal defect. It must NEVER silently clear to BID via
+  // firmStatus="satisfies" or curableInWindow:true (the retired `universal` bucket was immune to that mis-type).
+  // If it isn't a proven who-can-win fail (handled above), it cannot be confidently cleared → NEEDS_HUMAN_REVIEW.
+  const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile) !== "fails");
+  if (unmarkedUniversalClaim.length)
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
+      `Finding(s) claim a universal impossibility (no_one_can_move) but are not a positively-classified universal defect, and the firm does not provably fail them — human review to classify or clear: ${unmarkedUniversalClaim.map((s) => s.requirement).join("; ")}`, dispositions, unmarkedUniversalClaim);
 
   // 4. Unresolved material conflict between experts the loop could not reconcile.
   if (inp.conflict)

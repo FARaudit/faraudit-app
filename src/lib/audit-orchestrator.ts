@@ -16,7 +16,7 @@ import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-exper
 import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
@@ -381,7 +381,20 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      already FORMAT-AWARE (UCF only; commercial/simplified state these inline → empty), so this never
   //      caps a legitimately-inline commercial buy. Bar-found verdicts (NO_BID/INELIGIBLE) are NOT capped.
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) && (opts.manifestComplete ?? true) && coreMissing.length === 0 };
-  const decision = deriveVerdict(inputs);
+  // Ruling (i) AUDIT BOUNDARY — the coupling-lock decision-time BACKSTOP (EngineInvariantError) converts HERE to
+  // a billing-safe failed state: log the config error and re-throw the typed terminal failure. The caller routes
+  // it to a 'failed' status; because the throw precedes any persist/decrementAuditQuota, the customer is NOT
+  // charged. This is a logged, typed terminal failure — never a raw 500, never an NHR verdict.
+  let decision: Decision;
+  try {
+    decision = deriveVerdict(inputs);
+  } catch (e) {
+    if (e instanceof EngineInvariantError) {
+      console.error(`[ENGINE-CONFIG] billing-safe failed-state (no charge) — ${e.message}`);
+      throw e;  // typed terminal failure → worker 'failed' before persist/charge; NOT a raw 500, NOT an NHR verdict
+    }
+    throw e;
+  }
 
   return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace };
 }
