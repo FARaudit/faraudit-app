@@ -3,7 +3,10 @@
   "schemaVersion": "1.0",
   "authoredBy": "Code (per Brain cards 64/66/68, 2026-06-26)",
   "authoredAt": "2026-06-26",
-  "keyTypeEnum": ["full_verdict", "oos_detection"],
+  "keyTypeEnum": [
+    "full_verdict",
+    "oos_detection"
+  ],
   "keys": {
     "N4008526R0065": {
       "active_version": "v1",
@@ -104,6 +107,19 @@
       "scope": "deriveVerdict-unit",
       "pipeline_live_scope_note": "Live-pipeline reproduction requires coverageComplete=true, which is UNREACHABLE on this Part-12 commercial combined RFQ under current coverage rules (card 192 run evidence 2026-07-01: live verdict INCOMPLETE — honest-fail no-charge proven live, quota NOT decremented; the set-aside→NHR disposition is pre-empted at the coverage gate before deriveVerdict step-5b). expected_verdict remains VALID at deriveVerdict-unit scope (src/lib/audit-decide-setaside-overtype.test.ts). Frozen artifacts untouched.",
       "card": "192 (paid run 2026-07-01) + 193 (scope annotation)"
+    }
+  },
+  "retired": {
+    "N0016426Q0192": {
+      "was_pole": "NO_BID",
+      "key_type": "full_verdict",
+      "file": "N0016426Q0192.judgment.frozen.json",
+      "status": "retired",
+      "retired_at": "2026-06-29",
+      "retired_sha256": "224b031fb5e9a1870354e17742341bb3e39acc4ca04c666c7de0653bc8be473d",
+      "keySha256": "7bbbcadbcf7133fc8fad9e1c04f8266ff1a7a0f185b767c15e34817007321ccd",
+      "ruling": "Brain ruling A (2026-06-29)",
+      "reason": "class-error: bidder_cannot_move eligibility_bar mis-authored as no_one_can_move/defect; engine NEEDS_HUMAN_REVIEW ruled correct (Brain, ruling A). Graduation grade FAILED (verdict-flip NO_BID->NHR, $1.4280, result ceo/proofs/v3-N0016426Q0192-result.json). Frozen key file NOT mutated; removed from active resolution only. NO_BID pole returns to ZERO real/in-scope anchors."
     }
   }
 }
