@@ -18,7 +18,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
-import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
+import { buildAgenticDocs, assembleFullSourceBudgeted, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
@@ -112,7 +112,7 @@ export async function executeAgenticPrimary(
   // as a first-class prepended doc so combined-synopsis §L/§M/clauses are actually read into
   // fullSource — closing the notice-body-blind false-COMPLETE root.
   const desc = typeof solicitation?.description === "string" ? solicitation.description : "";
-  const noticeBody = isSamSol && desc.trim() && !isNoticedescUrl(desc) ? { text: desc, name: "SAM Notice Body" } : null;
+  const noticeBody = isSamSol && desc.trim() && !isNoticedescUrl(desc) ? { text: desc, name: NOTICE_BODY_DOC_NAME } : null;
 
   // GAP A — assemble the engine's single fullSource string from the intake docs
   // (notice body + primary + every attachment). Reuses the same extraction the shadow path uses.
@@ -205,7 +205,9 @@ export async function executeAgenticPrimary(
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
     : isSamSol
-      ? { reconciled: false, posted: docs.length, read: docs.length, complete: false, missing: [] }
+      // Count POSTED FILES only — the L1 notice body is the description field, not a posted document,
+      // so it must not inflate the posted/read count shown in the "could-not-confirm" banner.
+      ? (() => { const n = docs.filter((d) => d.name !== NOTICE_BODY_DOC_NAME).length; return { reconciled: false, posted: n, read: n, complete: false, missing: [] as Array<{ name: string; reason?: string }> }; })()
       : null;
   // An over-budget source (whole docs dropped) is ALSO an incomplete read — fold it
   // in so documents_complete=false and the dropped docs surface in the report banner.

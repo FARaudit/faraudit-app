@@ -8,7 +8,7 @@
 // never a mock, so a change to doc placement or the section-boundary primary-region logic fails this test.
 import { buildAgenticDocs, assembleFullSourceBudgeted } from "@/lib/agentic-executor";
 import { coreMissingFor } from "@/lib/audit-orchestrator";
-import { readSection, requiresProposalSections, findInSource, type AuditToolContext } from "@/lib/audit-tools";
+import { readSection, requiresProposalSections, findInSource, detectFormat, type AuditToolContext } from "@/lib/audit-tools";
 
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -80,6 +80,35 @@ async function main() {
     ok("body is the fullSource", findInSource(ctx, "technical approach").hits.length > 0);
     ok("coreMissing NON-EMPTY (no false-COMPLETE on a bare narrative body)",
       coreMissingFor(ctx, { requiresLM: requiresProposalSections("Combined Synopsis/Solicitation") }).length > 0);
+  }
+
+  console.log("── ADVERSARIAL (code-review): body must NOT flip whole-source format → new false-COMPLETE ──");
+  {
+    // A recognized primary FORM with §C but NO §L/§M, form_identified=true, + a body carrying the ubiquitous
+    // synopsis phrase 'Request for Quotation'. If format detection reads the WHOLE source it flips UCF→SF-18→
+    // part12-commercial and coreMissingFor collapses to [] = the exact false-COMPLETE L1 exists to kill.
+    const FORM_NO_LM = "SECTION C - DESCRIPTION/SPECIFICATIONS\nThe contractor shall provide the system.\nSECTION G - CONTRACT ADMINISTRATION\nInvoicing follows.";
+    const BODY_RFQ = "This is a Request for Quotation for commercial items. Offerors shall submit a technical approach and price. The Government evaluates on best value.";
+    const { ctx } = await build(FORM_NO_LM, BODY_RFQ);
+    eq("format stays UCF (detection scoped to the primary region, not the ingested body)", detectFormat(ctx), "UCF");
+    eq("coreMissing → [L,M] (NOT [] — the body's 'RFQ' text cannot flip the format to commercial)",
+      coreMissingFor(ctx, { requiresLM: requiresProposalSections("Combined Synopsis/Solicitation"), formIdentified: true }), ["L", "M"]);
+  }
+
+  console.log("── ADVERSARIAL (code-review): body already subsumed by the primary PDF must NOT double-count ──");
+  {
+    // A combined synopsis posted ALSO as a PDF: the primary's extracted text CONTAINS the notice body verbatim.
+    // Re-adding the body would duplicate every clause in fullSource (doubled grounding hits → verifier inflation).
+    const bodyPhrase = "Offerors shall submit a technical approach and a separately priced schedule. Evaluation is lowest-price technically-acceptable.";
+    const primaryContainingBody = `SECTION C - DESCRIPTION/SPECIFICATIONS\nThe contractor shall provide services.\n${bodyPhrase}\nSECTION L - INSTRUCTIONS\nSubmit volumes.`;
+    const { docs, ctx } = await build(primaryContainingBody, bodyPhrase);
+    eq("primary subsumes body → body NOT re-added (single doc)", docs.length, 1);
+    ok("the phrase appears but is not duplicated in fullSource", findInSource(ctx, "lowest-price technically-acceptable", 5).hits.length === 1);
+  }
+  {
+    // A genuinely DISTINCT body (not subsumed) is still ingested — dedup must be exact-containment, never fuzzy.
+    const { docs } = await build("SECTION C - SPECS\nThe contractor shall provide widgets per the drawings.", NOTICE_BODY);
+    eq("distinct body → still ingested (dedup is containment-only, not fuzzy)", docs.length, 2);
   }
 
   console.log("── NEGATIVE CONTROLS: never fabricate a body doc ──");

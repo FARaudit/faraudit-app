@@ -149,24 +149,32 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   const docMarkers: number[] = [];
   for (let i = 0; i < allLines.length; i++) { if (DOC_DELIM_RE.test(allLines[i].text.trim())) docMarkers.push(i); }
   const primaryEnd = docMarkers.length >= 2 ? docMarkers[1] : allLines.length;
+  // The FORMAT of a solicitation is a property of its PRIMARY document, never of an attachment or the
+  // Layer-1 notice body. Scope format detection to the primary region (same [marker0, marker1) discipline
+  // section detection uses — C-11), else a stray "REQUEST FOR QUOTATION" / "SF 1449" / combined-synopsis
+  // phrase in a downstream doc flips a genuine UCF solicitation to a commercial format and — when §L/§M are
+  // absent from a recognized primary form — collapses coreMissingFor to [] = a FALSE-COMPLETE (the exact
+  // notice-body-blind class L1 closes). A single-doc package has no delimiter ⇒ primaryEnd = EOF ⇒ this is
+  // the whole source ⇒ byte-identical to the pre-scoping behavior (every single-blob gold source unaffected).
+  const primaryText = docMarkers.length >= 2 ? allLines.slice(0, primaryEnd).map((l) => l.text).join("\n") : fullText;
 
-  // ─── Format detection ─────────────────────────────────────────────────────
+  // ─── Format detection (primary region only — see primaryText note above) ───
   let formatDetected: FormatType = "unknown";
   let formatConfidence: SectionConfidence = "low";
 
-  if (SF1449_HEADER_RE.test(fullText)) {
+  if (SF1449_HEADER_RE.test(primaryText)) {
     formatDetected = "SF-1449-RFQ";
     formatConfidence = "high";
-  } else if (SF18_HEADER_RE.test(fullText)) {
+  } else if (SF18_HEADER_RE.test(primaryText)) {
     formatDetected = "SF-18";
     formatConfidence = "high";
-  } else if (process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" && COMBINED_SYNOPSIS_RE.test(fullText)) {
+  } else if (process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" && COMBINED_SYNOPSIS_RE.test(primaryText)) {
     // Bare Part-12 combined synopsis/solicitation (no SF-1449 form header). Flag-gated default-OFF ⇒ when the
     // flag is unset this branch is skipped and the doc falls through to UCF/unknown exactly as before (prod
     // byte-identical). procurementPart() maps "combined-synopsis" → part12-commercial.
     formatDetected = "combined-synopsis";
     formatConfidence = "high";
-  } else if (UCF_HEADER_PATTERNS.some((p) => p.test(fullText))) {
+  } else if (UCF_HEADER_PATTERNS.some((p) => p.test(primaryText))) {
     formatDetected = "UCF";
     formatConfidence = "medium";
   } else {
