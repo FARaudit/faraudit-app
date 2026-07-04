@@ -8,11 +8,10 @@
 import { writeFileSync, readFileSync } from "node:fs";
 import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 
+// Real run-record W50S9H26QA018 (Rule 64). Fixture lives in a stable committed path — NOT the relay hub,
+// which gets archived (the original Send to Code/v4-report-B-2026-07-04/ port package was archived post-Gate-2).
 const w50 = JSON.parse(
-  readFileSync(
-    "ceo/redesign-final/Communication/Send to Code/v4-report-B-2026-07-04/w50-compliance-v3-REAL.json",
-    "utf8",
-  ),
+  readFileSync("scripts/audit-ai/fixtures/w50-compliance-v3-REAL.json", "utf8"),
 );
 
 // ── W50 · BID — real run-record (Rule 64: no synthetic gate fixture) ──
