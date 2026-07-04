@@ -41,7 +41,7 @@ console.log("");
 
 const rows: Array<[string, string, string]> = [
   ["#2 1240LP26Q0067", "BID", decideFx(frozen("1240lp-bid.json"))],
-  ["#3 SPRDL125Q0030 ", "INELIGIBLE", decideFx([dillon], { satisfiedAttributes: [] })],
+  ["#3 SPRDL125Q0030 ", "INELIGIBLE", decideFx([dillon], { satisfiedAttributes: [], closedWorld: true })],
   ["#4 AOCSSB26R0023 ", "BID_WITH_CAUTION", decideFx(frozen("aocssb-with-qual.json"))],
   ["#6 FA860126Q0026 ", "BID_WITH_CAUTION", decideFx(frozen("fa8601-complete.json"))],
 ];

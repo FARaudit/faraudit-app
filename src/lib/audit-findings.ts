@@ -125,12 +125,14 @@ export interface TypedFinding {
  *  never INELIGIBLE (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine). */
 export interface BidderProfile {
   satisfiedAttributes: string[]; // qualifications the firm HOLDS (NAICS-small codes, certs, clearances) — matched against requiredAttribute
-  // OPEN-WORLD profile (limit N5). A self-asserted, possibly-incomplete profile (e.g. a
-  // capability statement): a HELD attribute may CLEAR a bar, but a not-listed attribute is
-  // NOT proof the firm fails — it may simply be unstated → "unknown" (caution / human
-  // review), NEVER a false INELIGIBLE. Default/absent = false = CLOSED-WORLD trusted
-  // profile (the gold path), where a not-held attribute IS proof of failure.
-  openWorld?: boolean;
+  // WORLD-ASSUMPTION (Brain card-254 B ruling, 2026-07-04 — FAIL-SAFE DEFAULT FLIP). The DEFAULT (both flags
+  // absent) is now OPEN-WORLD: a self-asserted, possibly-incomplete profile where a HELD attribute may CLEAR a
+  // bar, but a not-listed attribute is NOT proof the firm fails — it is merely unstated → "unknown" (NHR / human
+  // review), NEVER a false INELIGIBLE. CLOSED-WORLD (a trusted/complete profile where a not-held attribute IS
+  // proof of failure → INELIGIBLE) is now an EXPLICIT opt-in via `closedWorld:true`, so no profile source can
+  // silently arm mass false-INELIGIBLE by omitting a flag. The live builder is open-world (unchanged).
+  closedWorld?: boolean;         // explicit opt-in: trusted/complete profile → a not-held attribute is proven-fail
+  openWorld?: boolean;           // DEPRECATED (superseded by the open-world default + closedWorld); retained for construction-compat, no longer read
 }
 
 /** Everything the deterministic decision layer reads. Each field is a FACT (LLM-asserted, grounded) or a

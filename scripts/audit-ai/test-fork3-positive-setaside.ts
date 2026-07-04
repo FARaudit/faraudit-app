@@ -77,8 +77,8 @@ console.log("[(c) P-5 — excerpt-only SDVOSB set-aside, requirement silent, nul
 // ── (d) CLOSED-WORLD both directions — proven-pass → clears (BID); proven-fail → INELIGIBLE, attribute-specific ──
 console.log("[(d) closed-world — FA301626Q0068 WOSB set-aside, both directions]");
 {
-  const holder: BidderProfile = { satisfiedAttributes: ["se:wosb"] };                 // closed-world (no openWorld) — provably HOLDS WOSB
-  const nonHolder: BidderProfile = { satisfiedAttributes: [] };                        // closed-world — provably does NOT hold WOSB
+  const holder: BidderProfile = { satisfiedAttributes: ["se:wosb"], closedWorld: true };  // closed-world (Brain card-254 B: explicit) — provably HOLDS WOSB
+  const nonHolder: BidderProfile = { satisfiedAttributes: [], closedWorld: true };         // closed-world (explicit) — provably does NOT hold WOSB
   const gPass = guard([wosbSetAside()], holder);
   ok("d-pass: closed-world guard re-typed OFF no_one_can_move so firmStatus governs (not a universal that bypasses it)", gPass[0].controllability !== "no_one_can_move");
   const vPass = deriveVerdict(inp(gPass, holder));
