@@ -24,7 +24,14 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
   const gated = shouldGateExport(audit); // single source of truth — mirrors the PDF-route 409, cannot diverge
 
   // Print gate: honest-fail / incomplete reports are CSS-blocked from printing (no clean PDF leaves).
-  const printGateCss = gated ? "@media print{html,body{display:none!important}}" : "";
+  const printGateCss = gated ? "@media print{html,body{display:none!important}} /* report cannot be exported — gated */" : "";
+
+  // Export affordance — parity with v3 (no-regression): a clean report links to the 409-honoring PDF endpoint;
+  // a gated report shows a disabled "Export unavailable" and exposes NO export path. Never window.print().
+  // NOTE (Design Gate-2): placement added for no-regression parity, not in the B mock — Design to style/place.
+  const exportAffordance = gated
+    ? `<span class="tb-ko tb-export disabled" aria-disabled="true" title="Export unavailable — the engine did not fully stand behind this report">Export unavailable</span>`
+    : `<a class="tb-ko tb-export" href="/api/audit/${auditId}/pdf" title="Export this report as PDF">⭳ Export PDF</a>`;
 
   return `<!doctype html>
 <html lang="en" data-dir="B"${gated ? ' data-export-gated="1"' : ""}>
@@ -44,6 +51,7 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
   </div>
   <div class="tb-r">
     <span class="tb-live">Live</span>
+    ${exportAffordance}
     <button class="tb-ko" id="koBtn" type="button" data-audit="${auditId}" title="Generate a clarification email to the Contracting Officer">✎ KO clarification</button>
     <span class="tb-ico" title="Search">⌕</span>
     <span class="tb-ico" title="Notifications">◔</span>
