@@ -19,7 +19,6 @@
 
 import { disposeFinding } from "./audit-decide";
 import type { Decision } from "./audit-decide";
-import { shouldGateExport } from "./audit-display";
 
 /** Compact, persistable finding — the unit the report renders. `disposition` is
  *  the derived bucket (show-stopper / gate / met) so the renderer needs no

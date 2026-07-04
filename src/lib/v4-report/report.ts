@@ -21,10 +21,15 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
   const { html: reportHtml, sections } = renderRichWeb(data);
   const rail = railItems(sections);
   const auditId = esc(data.shell?.auditId || "");
+  const auditIdRaw = String(data.shell?.auditId || ""); // unescaped — for esc()'d contexts (avoid double-escape)
   const gated = shouldGateExport(audit); // single source of truth — mirrors the PDF-route 409, cannot diverge
 
-  // Print gate: honest-fail / incomplete reports are CSS-blocked from printing (no clean PDF leaves).
-  const printGateCss = gated ? "@media print{html,body{display:none!important}} /* report cannot be exported — gated */" : "";
+  // Print CSS. Gated (honest-fail/incomplete) → block printing entirely (no clean PDF leaves). Non-gated →
+  // NEUTRALIZE the entrance animation for print: sections + masthead start at opacity:0 under html.anim, and
+  // headless-Chromium PDF export would otherwise capture a mid-animation frame showing only the verdict band.
+  const printGateCss = gated
+    ? "@media print{html,body{display:none!important}} /* report cannot be exported — gated */"
+    : "@media print{html.anim .sec,html.anim .mast{opacity:1!important;animation:none!important}html.anim .cov-fill{animation:none!important;width:var(--pct,100%)!important}}";
 
   // Export affordance — parity with v3 (no-regression): a clean report links to the 409-honoring PDF endpoint;
   // a gated report shows a disabled "Export unavailable" and exposes NO export path. Never window.print().
@@ -38,7 +43,7 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FARaudit · ${esc(data.masthead.solicitation || auditId)}</title>
+<title>FARaudit · ${esc(data.masthead.solicitation || auditIdRaw)}</title>
 <style>${FONT_CSS}</style>
 <style>${REPORT_CSS}</style>
 <style>${printGateCss}</style>
