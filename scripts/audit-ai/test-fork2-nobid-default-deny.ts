@@ -113,7 +113,7 @@ console.log("[Ruling ii — precedence pre-lock (universal BEFORE firmStatus)]")
   const realAttr2 = realBar.requiredAttribute!;
   // real bar + REAL requiredAttribute the closed-world profile provably fails, ALSO marked a universal defect:
   const markedAndFails: TypedFinding = verified({ ...realBar, controllability: "no_one_can_move", kind: "technical_spec", universalDefect: "unmeetable_by_any_offeror", grounded: true }); // Fork-5: verified mark → NO_BID path
-  const vPrec = deriveVerdict(inp([markedAndFails], { satisfiedAttributes: [] }));  // closed-world, does NOT hold realAttr2 → firmStatus "fails"
+  const vPrec = deriveVerdict(inp([markedAndFails], { satisfiedAttributes: [], closedWorld: true }));  // closed-world, does NOT hold realAttr2 → firmStatus "fails"
   ok("ii-precedence: marked universalDefect + coincident closed-world attribute-fail → NO_BID (attributed universal, requirement-side)", vPrec.verdict === "NO_BID");
   ok("ii-precedence: reason is the UNIVERSAL defect, firmStatus did NOT re-label to a firm disqualification",
     /Universal solicitation defect/i.test(vPrec.reason) && !/does not satisfy the required attribute/i.test(vPrec.reason));
@@ -128,7 +128,7 @@ console.log("[Ruling ii — attribute-specific INELIGIBLE reason]");
 {
   const realAttr3 = realBar.requiredAttribute!;
   const provenFailBar: TypedFinding = { ...realBar, controllability: "no_one_can_move", kind: "technical_spec", grounded: true };
-  const vIn = deriveVerdict(inp([provenFailBar], { satisfiedAttributes: [] }));  // closed-world non-hold → firmStatus "fails"
+  const vIn = deriveVerdict(inp([provenFailBar], { satisfiedAttributes: [], closedWorld: true }));  // closed-world non-hold → firmStatus "fails"
   ok(`ii-reason: closed-world proven-fail (real N0016426Q0192) → INELIGIBLE (was ${vIn.verdict})`, vIn.verdict === "INELIGIBLE");
   ok("ii-reason: names the SPECIFIC failed attribute", vIn.reason.includes(realAttr3));
   ok("ii-reason: does NOT assert a bar-type category ('who-can-win restriction') the engine never classified",

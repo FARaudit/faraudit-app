@@ -81,7 +81,7 @@ eq("fork-2: who-can-win set-aside (no marker) under null → NHR", deriveVerdict
 // RULING A — a firmStatus-PROVEN who-can-win fail mis-typed clause_flowdown/technical_spec → INELIGIBLE WITH a
 // normalized eligibility_bar show-stopper (kind normalized at determination), NEVER routed to NHR.
 const provenMistyped = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
-const vRA = deriveVerdict(inp(provenMistyped, { profile: { satisfiedAttributes: [] } }));
+const vRA = deriveVerdict(inp(provenMistyped, { profile: { satisfiedAttributes: [], closedWorld: true } }));
 eq("fork-2 Ruling A: proven-fail who-can-win (mis-typed kind) → INELIGIBLE (not NHR)", vRA.verdict, "INELIGIBLE");
 eq("fork-2 Ruling A: INELIGIBLE carries a NORMALIZED eligibility_bar show-stopper", vRA.showStoppers.some((s) => s.kind === "eligibility_bar"), true);
 eq("fork-2 Ruling A: INELIGIBLE is eligible:false", vRA.eligible, false);
@@ -102,38 +102,38 @@ eq("self-cert rep (bidder_controls) → BID", deriveVerdict(inp([f({ requirement
 // (non-null empty profile = "this generic SB is known not to be the named OEM"), NOT from a null/unknown
 // profile (that's the open-world branch → NEEDS_HUMAN_REVIEW, never eligible:false). Right label, right reason.
 const dillon = (profile: BidderProfile | null) => deriveVerdict(inp([f({ requirement: "sole-source to named OEM (Dillon Aero DGMT1002)", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "oem:dillon-approved-source", curableInWindow: false })], { profile }));
-eq("closed-world (known-empty profile) → INELIGIBLE via firmStatus=fails", dillon({ satisfiedAttributes: [] }).verdict, "INELIGIBLE");
-eq("closed-world INELIGIBLE is eligible:false", dillon({ satisfiedAttributes: [] }).eligible, false);
+eq("closed-world (known-empty profile) → INELIGIBLE via firmStatus=fails", dillon({ satisfiedAttributes: [], closedWorld: true }).verdict, "INELIGIBLE");
+eq("closed-world INELIGIBLE is eligible:false", dillon({ satisfiedAttributes: [], closedWorld: true }).eligible, false);
 eq("open-world (null profile) → NEEDS_HUMAN_REVIEW, NOT eligible:false (no Norfolk over-fire)", dillon(null).verdict, "NEEDS_HUMAN_REVIEW");
 eq("open-world (null profile) stays eligible:true", dillon(null).eligible, true);
 eq("firm PROVABLY holds the OEM attribute → BID (cleared)", dillon({ satisfiedAttributes: ["oem:dillon-approved-source"] }).verdict, "BID");
 
 // eligibility bar the firm provably FAILS (profile lacks the required NAICS) → INELIGIBLE
 const eligBar = [f({ requirement: "must be small under NAICS 333120", kind: "eligibility_bar", controllability: "bidder_cannot_move", requiredAttribute: "naics:333120-small" })];
-eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+eq("eligibility bar firm fails → INELIGIBLE", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "INELIGIBLE");
 eq("same bar, firm qualifies → BID", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: ["naics:333120-small"] } })).verdict, "BID");
 // fork-2: an OEM-exclusivity bar is WHO-CAN-WIN (Ruling A), never universal → firm provably fails → INELIGIBLE (never NO_BID)
 const noBid = [f({ requirement: "must hold exclusive OEM license", kind: "clause_flowdown", controllability: "bidder_cannot_move", requiredAttribute: "oem:exclusive" })];
-eq("fork-2: who-can-win OEM-exclusivity, firm provably fails → INELIGIBLE (never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+eq("fork-2: who-can-win OEM-exclusivity, firm provably fails → INELIGIBLE (never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "INELIGIBLE");
 
 // ── Manifest-incomplete cap. Card-58 capped no-bar verdicts (BID/CAUTION) to INCOMPLETE. Brain card 224 fork 4
 //    EXTENDS the cap to show-stoppers: a findings-derived hard NO_BID/INELIGIBLE on an INCOMPLETE read → NHR
 //    (an unfetched amendment could waive/moot the bar — zero-contract-loss), carrying the conditional bar. ──
 eq("BID + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(two, { manifest: false })).verdict, "INCOMPLETE");
 eq("CAUTION + manifest incomplete → INCOMPLETE (cap)", deriveVerdict(inp(curable, { manifest: false })).verdict, "INCOMPLETE");
-eq("INELIGIBLE + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
-eq("NO_BID + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
-eq("NHR-capped show-stopper still NAMES the conditional bar", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] }, manifest: false })).showStoppers.length, 1);
+eq("INELIGIBLE + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [], closedWorld: true }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NO_BID + manifest incomplete → NHR (card 224 fork 4: bar could be waived by an unfetched doc)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [], closedWorld: true }, manifest: false })).verdict, "NEEDS_HUMAN_REVIEW");
+eq("NHR-capped show-stopper still NAMES the conditional bar", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [], closedWorld: true }, manifest: false })).showStoppers.length, 1);
 // complete read → the hard pole still stands (cap does NOT fire on a confirmed-complete read)
-eq("INELIGIBLE + manifest COMPLETE → still INELIGIBLE (un-capped on a full read)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
-eq("fork-2: who-can-win bar + manifest COMPLETE → INELIGIBLE (un-capped; never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+eq("INELIGIBLE + manifest COMPLETE → still INELIGIBLE (un-capped on a full read)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "INELIGIBLE");
+eq("fork-2: who-can-win bar + manifest COMPLETE → INELIGIBLE (un-capped; never NO_BID)", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "INELIGIBLE");
 
 // ── Doctrine #6 (Step 1, AUDIT_ELIGIBLE_TRISTATE) — honest-fail eligible is tri-state, flag-gated DEFAULT-OFF.
 //    OFF: byte-identical to HEAD (false). ON: INCOMPLETE & verifier-unsound NHR → null; INELIGIBLE → false (invariant). ──
 const TRI = process.env.AUDIT_ELIGIBLE_TRISTATE === "true";
 eq(`INCOMPLETE → eligible ${TRI ? "null" : "false"} (flag ${TRI ? "ON" : "OFF"})`, deriveVerdict(inp(two, { coverage: false })).eligible, TRI ? null : false);
 eq(`NHR(verifier-unsound) → eligible ${TRI ? "null" : "false"}`, deriveVerdict(inp(two, { sound: false })).eligible, TRI ? null : false);
-eq("INELIGIBLE → eligible false (flag-INVARIANT — true firm-credential bar)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } })).eligible, false);
+eq("INELIGIBLE → eligible false (flag-INVARIANT — true firm-credential bar)", deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [], closedWorld: true } })).eligible, false);
 
 // ── Doctrine #2 (Step 2, AUDIT_VERDICT_WORD_INVARIANT) — INELIGIBLE requires a real eligibility_bar.
 //    Default-OFF (byte-identical). ON: real INELIGIBLE silent · crafted violation throws(dev)/routes-NHR(prod) ·
@@ -141,7 +141,7 @@ eq("INELIGIBLE → eligible false (flag-INVARIANT — true firm-credential bar)"
 const INV = process.env.AUDIT_VERDICT_WORD_INVARIANT === "true";
 if (INV) {
   // (i) real INELIGIBLE (firm provably fails an eligibility_bar) → unchanged, invariant silent
-  const realInelig = deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [] } }));
+  const realInelig = deriveVerdict(inp(eligBar, { profile: { satisfiedAttributes: [], closedWorld: true } }));
   eq("inv(i): real INELIGIBLE stays INELIGIBLE", realInelig.verdict, "INELIGIBLE");
   eq("inv(i): real INELIGIBLE eligible:false", realInelig.eligible, false);
   // (ii) crafted state — eligible:false with ZERO eligibility_bar (a requirement-side bar mislabeled)
@@ -159,7 +159,7 @@ if (INV) {
   eq("inv(ii)-prod: eligible null", routed.eligible, null);
   eq("inv(ii)-prod: reason tagged", routed.reason, "invariant_violation:ineligible_without_eligibility_bar");
   // (iii) requirement-side impossibility (kind != eligibility_bar) → NO_BID, never INELIGIBLE
-  eq("inv(iii): req-side impossibility → NO_BID not INELIGIBLE", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [] } })).verdict, "NO_BID");
+  eq("inv(iii): req-side impossibility → NO_BID not INELIGIBLE", deriveVerdict(inp(noBid, { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "NO_BID");
 }
 
 // ── Doctrine #1 (Step 3, AUDIT_SETASIDE_FIRMSTATUS_GATE) — a set-aside vouched already_satisfied is MET only
@@ -177,9 +177,9 @@ if (GATE3) {
   // satisfies-profile (closed-world holds the size attr) → keep met
   eq("step3: satisfies-profile → stays already_satisfied (met)", gate({ satisfiedAttributes: ["naics:333120-small"] }).controllability, "already_satisfied");
   // fails-profile (closed-world lacks it) → eligibility_bar → INELIGIBLE
-  const failsF = gate({ satisfiedAttributes: [] });
+  const failsF = gate({ satisfiedAttributes: [], closedWorld: true });
   eq("step3: fails-profile → bidder_cannot_move (bar)", failsF.controllability, "bidder_cannot_move");
-  const fv = deriveVerdict(inp([failsF], { profile: { satisfiedAttributes: [] } }));
+  const fv = deriveVerdict(inp([failsF], { profile: { satisfiedAttributes: [], closedWorld: true } }));
   eq("step3: fails-profile → INELIGIBLE", fv.verdict, "INELIGIBLE");
   eq("step3: fails INELIGIBLE carries eligibility_bar (invariant-safe)", fv.showStoppers.some((s) => s.kind === "eligibility_bar"), true);
   // ── INTERACTION — the three ordering constraints ──
@@ -187,9 +187,9 @@ if (GATE3) {
   const ab = applyAwardBasisOvertypeGuard([f({ requirement: "8(a) set-aside — firm qualifies", kind: "eligibility_bar", controllability: "already_satisfied" })], null, { enabled: true })[0];
   eq("compose(1): 8(a) Step-3 no-op after award-basis (handled once)", JSON.stringify(applySetAsideFirmStatusGate([ab], null, { enabled: true })[0]), JSON.stringify(ab));
   // (2) fails-bar survives the whitelist (no-op on a loaded profile) → INELIGIBLE un-downgraded
-  const afterWL = applyStructuralBarWhitelist([failsF], { satisfiedAttributes: [] }, { enabled: true })[0];
+  const afterWL = applyStructuralBarWhitelist([failsF], { satisfiedAttributes: [], closedWorld: true }, { enabled: true })[0];
   eq("compose(2): fails-bar survives whitelist (loaded-profile no-op)", afterWL.controllability, "bidder_cannot_move");
-  eq("compose(2): → INELIGIBLE un-downgraded", deriveVerdict(inp([afterWL], { profile: { satisfiedAttributes: [] } })).verdict, "INELIGIBLE");
+  eq("compose(2): → INELIGIBLE un-downgraded", deriveVerdict(inp([afterWL], { profile: { satisfiedAttributes: [], closedWorld: true } })).verdict, "INELIGIBLE");
   // (3) fails-bar is NOT caution-floored (caution-floor skips bar-class)
   const afterCF = applyCautionFloor([failsF], { enabled: true })[0];
   eq("compose(3): fails-bar NOT caution-floored", afterCF.cautionFloor ?? false, false);

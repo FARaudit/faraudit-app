@@ -11,7 +11,7 @@ const F = (o: Partial<TypedFinding> & { requirement: string; controllability: Ty
   ({ citation: "x", excerpt: o.requirement, grounded: true, lens: o.lens ?? "x", kind: o.kind ?? "eligibility_bar", ...o } as TypedFinding);
 
 // ── SELECTIVITY (load-bearing): the clean poles #2/#3 must produce ZERO knife-edge ──
-for (const [sol, prof] of [["1240LP26Q0067", null], ["SPRDL125Q0030", { satisfiedAttributes: [] } as BidderProfile]] as const) {
+for (const [sol, prof] of [["1240LP26Q0067", null], ["SPRDL125Q0030", { satisfiedAttributes: [], closedWorld: true } as BidderProfile]] as const) {
   const p = `ceo/proofs/v3-${sol}-result.json`;
   if (existsSync(p)) ok(`selectivity: ${sol} clean pole → 0 escalations`, knifeEdgeIndices(JSON.parse(readFileSync(p, "utf8")).findings, prof), []);
 }
@@ -37,7 +37,7 @@ ok("bar→caution: over-typed non-curable bar (null profile) is knife-edge", kni
 
 // evidence-locked bar (proven fail, closed-world) is NOT knife-edge (not contestable)
 const locked = [F({ lens: "x", requirement: "proven bar", controllability: "bidder_cannot_move", requiredAttribute: "oem:acme", curableInWindow: false })];
-ok("evidence-locked proven-fail bar → NOT knife-edge", knifeEdgeIndices(locked, { satisfiedAttributes: [] }), []);
+ok("evidence-locked proven-fail bar → NOT knife-edge", knifeEdgeIndices(locked, { satisfiedAttributes: [], closedWorld: true }), []);
 
 // a pure comply-to-win set → nothing decisive → 0 (no cost explosion on gate-heavy packages)
 const cleanGates = [F({ lens: "a", requirement: "submit form", controllability: "bidder_controls", kind: "submission" }), F({ lens: "b", requirement: "price clins", controllability: "bidder_controls", kind: "pricing" })];

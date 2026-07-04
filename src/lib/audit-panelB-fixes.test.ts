@@ -51,7 +51,7 @@ eq("B1b · sole-source bar w/ set-aside-in-excerpt → NOT softened",
 
 // ── B-3 — open-world profile gets the over-type guards (not bypassed) ──
 const openWorld: BidderProfile = { satisfiedAttributes: ["se:wosb"], openWorld: true };
-const closedWorld: BidderProfile = { satisfiedAttributes: ["se:wosb"] };
+const closedWorld: BidderProfile = { satisfiedAttributes: ["se:wosb"], closedWorld: true };
 // structural-whitelist: a bidder-resolvable compliance bar (size-standard), non-curable, over-typed.
 const compRepBar = tf({ requirement: "offeror must resolve a size-standard discrepancy / NAICS size representation", excerpt: "size standard representation under FAR 52.204-8", controllability: "bidder_cannot_move", curableInWindow: false, kind: "eligibility_bar" });
 eq("B3 · structural-whitelist FIRES under OPEN-WORLD profile (compliance → caution)",
