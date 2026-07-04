@@ -46,6 +46,13 @@ export async function buildAgenticDocs(opts: {
   primaryBytes: Buffer | null;
   primaryText: string | null;
   attachments: Array<{ name: string; base64: string }> | null;
+  // L1 (Brain card 264 Ruling 1) — the SAM-published notice body. For a combined-synopsis
+  // buy the §L/§M/clauses/set-aside live ONLY here; it was resolved by FA-148 into
+  // solicitation.description but never read into fullSource (the notice-body-blind
+  // false-COMPLETE root). Ingested as a FIRST-CLASS doc (own hash / NOTICE_BODY origin),
+  // placed after the primary form but ahead of attachments — see the placement note below.
+  // Absent on uploads / fetch-failed (never fabricated).
+  noticeBody?: { text: string; name?: string } | null;
 }): Promise<AgenticDoc[]> {
   // Prefer text we ALREADY have (the live executor extracted the primary) — only
   // extract when it's missing/too-short. Avoids a second full parse+OCR pass of a
@@ -65,6 +72,21 @@ export async function buildAgenticDocs(opts: {
   const docs: AgenticDoc[] = [];
   if (opts.primaryBytes) {
     docs.push({ name: opts.primaryName, bytes: opts.primaryBytes, text: await textOf(opts.primaryBytes, opts.primaryText) });
+  }
+  // L1 — insert the notice body AFTER the primary form but BEFORE the posted attachments.
+  // Placement is load-bearing: the section-boundary detector treats [marker[0], marker[1])
+  // (the text before the FIRST attachment delimiter) as the PRIMARY UCF region. Keeping a
+  // posted form as docs[0] leaves that region the FORM — so a file-carried §L/§M is still
+  // detected (the fully-read class does NOT regress to false-INCOMPLETE). When NO form was
+  // posted the body IS docs[0] = the primary the engine reads (zero-attachment combined
+  // synopsis). Either way the body now rides in fullSource (was orphaned in the description
+  // field), so the lenses / Layer-3 finder can read the §L/§M that live there. Own UTF-8
+  // bytes → own content hash (dedup + NOTICE_BODY origin provenance). Skip a trivially-short
+  // body (< 50 non-ws chars) — coverage treats a near-empty read as a read-failure, never
+  // fabricated text.
+  const bodyText = opts.noticeBody?.text?.trim() ?? "";
+  if (bodyText.replace(/\s/g, "").length >= 50) {
+    docs.push({ name: opts.noticeBody?.name ?? "SAM Notice Body", bytes: Buffer.from(bodyText, "utf8"), text: bodyText });
   }
   // Extract attachments with bounded concurrency (was a sequential await-per-doc
   // loop — minutes of serial OCR on a 33-doc package).
