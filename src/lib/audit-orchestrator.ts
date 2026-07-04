@@ -18,6 +18,7 @@ import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-proced
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
+import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
@@ -53,6 +54,11 @@ export interface OrchestratorInput {
   // Card 208-B — optional cheap-tier extractor for the Part-12 procedural-coverage pass. Absent ⇒ the pass uses
   // its deterministic default (the shipped path). Only consulted when AUDIT_PROCEDURAL_COVERAGE_LENS is on.
   proceduralExtract?: ProceduralExtractor;
+  // J-1/J-2 JUDGMENT LAYER (Brain card 246) — injected model callers. BOTH the AUDIT_JUDGMENT_LAYER flag AND the
+  // caller must be present for a stage to run; absent/flag-off ⇒ inert (byte-identical), no paid calls. Production
+  // wires real Opus/Sonnet callers; tests stub them. J-1 (producer) runs pre-P2; J-2 (verifier) at the P2 seam.
+  judgmentReason?: ReasonCaller;
+  judgmentEntail?: EntailmentCaller;
 }
 
 export interface AuditResult {
@@ -64,6 +70,7 @@ export interface AuditResult {
   conflict: boolean;
   sectionsRead: string[];                                                                 // union across all agents (pure-observer)
   trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
+  judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
 }
 
 /** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source. */
@@ -243,6 +250,17 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     if (findings.length > before) { findings[findings.length - 1].id = "temporal_conflict#0"; perLens["temporal_conflict"] = 1; }
   }
 
+  // J-1 — GROUNDED PRODUCER (Brain card 246), runs PRE-P2 so its findings flow through verify. Gated on BOTH the
+  //       flag AND an injected caller ⇒ inert/byte-identical otherwise (no paid calls). Gap-A candidates = the
+  //       ungrounded binding obligations completenessOf already surfaces (computed early here, re-run at P4).
+  let judgmentCost: JudgmentCost = zeroCost();
+  if (judgmentLayerEnabled() && opts.judgmentReason) {
+    const early = completenessOf(ctx, required, findings, sectionsRead);
+    const ungrounded = early.attestations.flatMap((a) => a.ungrounded);
+    const j1 = await runJudgmentProducer(findings, ctx.fullSource, ungrounded, { reason: opts.judgmentReason, log: (m) => console.log(`[j1] ${m}`) });
+    findings = j1.findings; judgmentCost = j1.cost;
+  }
+
   // P3 — reconcile: dedup + detect unresolved material conflict.
   findings = dedup(findings);
   const conflict = hasConflict(findings);
@@ -251,6 +269,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
   const ver = await verify(ctx, findings, { bidderProfile });
   findings = ver.survived;
+
+  // J-2 — REGISTERED INDEPENDENT VERIFIER (Brain card 246), at the P2 seam. For each universalDefect-marked
+  //       finding: 3-state entailment vs the cited excerpt + source (never J-1's reasoning) → VERIFIED writes
+  //       verifiedBy; REFUTED strips the mark; UNVERIFIABLE leaves it unverified (NHR wall holds). Gated: flag + caller.
+  if (judgmentLayerEnabled() && opts.judgmentEntail) {
+    const j2 = await runJudgmentVerifier(findings, ctx.fullSource, { entail: opts.judgmentEntail, log: (m) => console.log(`[j2] ${m}`) });
+    findings = j2.findings;
+    judgmentCost = { ...judgmentCost, j2Calls: j2.cost.j2Calls, j2InTokens: j2.cost.j2InTokens, j2OutTokens: j2.cost.j2OutTokens, degraded: { j1: judgmentCost.degraded.j1, j2: j2.cost.degraded.j2 } };
+    console.log(`[judgment-cost] j1Calls=${judgmentCost.j1Calls} j1In=${judgmentCost.j1InTokens} j1Out=${judgmentCost.j1OutTokens} j2Calls=${judgmentCost.j2Calls} j2In=${judgmentCost.j2InTokens} j2Out=${judgmentCost.j2OutTokens} degraded=j1:${judgmentCost.degraded.j1}/j2:${judgmentCost.degraded.j2}`);
+  }
 
   // P2.5 — PART-12 PROCEDURAL-COVERAGE PASS (Brain card 208-B), flag-gated AUDIT_PROCEDURAL_COVERAGE_LENS,
   //         default-OFF (⇒ findings byte-identical). Added AFTER verify (deterministic verbatim grounding needs no
@@ -404,5 +432,5 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace };
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
 }

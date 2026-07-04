@@ -18,6 +18,7 @@ import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
+import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
 import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
@@ -36,7 +37,72 @@ export interface AuditPackageInput {
   manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
   naics?: string | null;                    // Step 4a (plumb-only) — SAM-resolved NAICS fact, forwarded to the gate pipeline; null when absent
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
+  judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
+  judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
   onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
+}
+
+// ── J-1/J-2 JUDGMENT-LAYER CALLER SEAMS (Brain card 246/247 prod-wire) ──────────────────────────────────
+// Structured-output schemas for the two injected model seams. J-1 returns grounded produced findings (a
+// universalDefect mark, if any, is later verbatim-gated + semantic-gated + J-2-verified in the layer, so a
+// hallucinated mark can never reach a committal pole). J-2 returns the 3-state entailment verdict.
+const J1_SCHEMA = { type: "object", additionalProperties: false, required: ["findings"], properties: {
+  findings: { type: "array", items: { type: "object", additionalProperties: false, required: ["requirement", "citation", "excerpt"], properties: {
+    requirement: { type: "string" }, citation: { type: "string" }, excerpt: { type: "string" },
+    universalDefect: { type: "string", enum: ["contradictory_mandatory_terms", "unmeetable_by_any_offeror"] },
+    derivedFrom: { type: "array", items: { type: "string" } } } } } } } as const;
+const J2_SCHEMA = { type: "object", additionalProperties: false, required: ["state", "evidence"], properties: {
+  state: { type: "string", enum: ["VERIFIED", "UNVERIFIABLE", "REFUTED"] }, evidence: { type: "string" } } } as const;
+
+/** Build the REAL J-1/J-2 model callers (same wiring pattern as makeTieredSkeptic/makeAgenticVerifier: bind a
+ *  role model, close over the audit-level signal + onUsage tally, adapt callStructuredClaude's raw JSON to the
+ *  typed contract). Both meter real tokens into the returned inTokens/outTokens (the layer's JudgmentCost ledger)
+ *  AND forward usage to the executor's per-run tally so the paid run prices the layer. Fail-safe on malformed
+ *  output: J-1 → no candidates; J-2 → UNVERIFIABLE (the NHR wall holds — a parse failure never fabricates a
+ *  VERIFIED, never a false NO_BID). Constructed ONLY when the flag is on ⇒ never runs on the OFF path. */
+function makeJudgmentCallers(
+  apiKey: string, reasonModel: string, entailModel: string,
+  signal?: AbortSignal, onUsage?: (u: UsageCall) => void,
+): { judgmentReason: ReasonCaller; judgmentEntail: EntailmentCaller } {
+  const judgmentReason: ReasonCaller = async ({ system, user }) => {
+    let inTokens = 0, outTokens = 0, degraded = false, findings: ProducedFinding[] = [];
+    try {
+      const res = await callStructuredClaude({
+        apiKey, model: reasonModel, system, userPrompt: user, schema: J1_SCHEMA, maxTokens: 4096, signal, label: "judgment-j1",
+        onUsage: (u) => { inTokens += u.input_tokens; outTokens += u.output_tokens; onUsage?.(u); },
+      });
+      const p = JSON.parse(res.text) as { findings?: ProducedFinding[] }; if (Array.isArray(p.findings)) findings = p.findings;
+    } catch (e) {
+      if (signal?.aborted) throw e; // an intentional budget/wall-clock cancellation must propagate (honest-fail, not a degrade)
+      // A transient call/parse failure on this ADDITIVE layer degrades to "no candidates" — same fail-safe as a
+      // malformed parse (card 247). The base lens audit stays complete; a real defect is simply not surfaced here
+      // (fail toward NOT-NO_BID). LOGGED + degraded flag persisted (card 248 decision-2), never silent.
+      degraded = true;
+      console.log(`[j1-degrade] J-1 producer call failed (${(e as Error)?.message ?? String(e)}) — producing no candidates (fail-safe: never a false NO_BID)`);
+    }
+    return { findings, inTokens, outTokens, degraded };
+  };
+  const judgmentEntail: EntailmentCaller = async ({ system, user }) => {
+    let inTokens = 0, outTokens = 0, degraded = false, state: EntailmentState = "UNVERIFIABLE", evidence = "";
+    try {
+      const res = await callStructuredClaude({
+        apiKey, model: entailModel, system, userPrompt: user, schema: J2_SCHEMA, maxTokens: 1024, signal, label: "judgment-j2",
+        onUsage: (u) => { inTokens += u.input_tokens; outTokens += u.output_tokens; onUsage?.(u); },
+      });
+      const p = JSON.parse(res.text) as { state?: EntailmentState; evidence?: string };
+      if (p.state === "VERIFIED" || p.state === "REFUTED" || p.state === "UNVERIFIABLE") state = p.state;
+      if (typeof p.evidence === "string") evidence = p.evidence;
+    } catch (e) {
+      if (signal?.aborted) throw e; // intentional cancellation propagates (honest-fail)
+      // A transient call/parse failure degrades to UNVERIFIABLE — the NHR wall holds, a universalDefect mark can
+      // NEVER reach a committal NO_BID on a failed verify. Same fail-safe as a malformed parse. LOGGED + degraded
+      // flag persisted (card 248 decision-2), never silent.
+      degraded = true;
+      console.log(`[j2-degrade] J-2 entailment call failed (${(e as Error)?.message ?? String(e)}) — UNVERIFIABLE (fail-safe: NHR wall holds, never a false VERIFIED)`);
+    }
+    return { state, evidence, inTokens, outTokens, degraded };
+  };
+  return { judgmentReason, judgmentEntail };
 }
 
 /** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
@@ -63,6 +129,19 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   );
   const verify = makeAgenticVerifier(skeptic);
 
+  // J-1/J-2 JUDGMENT LAYER (Brain card 246/247) — construct the REAL callers ONLY when the flag is on. Flag OFF
+  // ⇒ undefined ⇒ the orchestrator's `judgmentLayerEnabled() && caller` guard is inert ⇒ byte-identical. Flag ON
+  // ⇒ both callers present ⇒ the layer runs LIVE end-to-end (no silent no-op — the "flag gates nothing" trap).
+  // The boot coupling-lock (audit-judgment-layer.ts) has already thrown if the tristate isn't also on.
+  const judgment = judgmentLayerEnabled()
+    ? makeJudgmentCallers(
+        apiKey,
+        input.judgmentReasonModel ?? modelFor("judge"),
+        input.judgmentEntailModel ?? modelFor("judge"),
+        input.signal, input.onUsage,
+      )
+    : undefined;
+
   return runAgenticAudit({
     ctx,
     experts: input.experts ?? auditLenses({ personaDiversity: process.env.AUDIT_PERSONA_DIVERSITY === "true" }),
@@ -74,5 +153,6 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     manifestComplete: input.manifestComplete,
     naics: input.naics ?? null,             // Step 4a — forward the fact; no consumer yet (verdict unchanged)
     setAside: input.setAside ?? null,
+    ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });
 }
