@@ -21,6 +21,7 @@ import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor
 import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
+import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
@@ -70,10 +71,14 @@ export function agenticManifestComplete(
 /** Silent-partial guard (Brain card 224 fork 2). A BINDING doc whose bytes arrived (`ingested`) but whose
  *  machine-readable text did NOT (`has_text===false` — scanned/image, rode as a vision block the text-only
  *  engine never consumes) is a CONTENT LOSS: the read is not complete even though every file "arrived".
- *  Offeror-fill templates (isBindingDoc=false) are exempt (blank-by-design). has_text===undefined (legacy
- *  records written before this field) is treated as present, so replay of old records is byte-identical. */
+ *  Offeror-fill templates (isBindingDoc=false) are exempt (blank-by-design). C-18 (Brain C.b): has_text===undefined
+ *  is UNKNOWN, never "present" — an ingested binding doc whose text status we cannot confirm is a content loss
+ *  (`!== true`), not silently complete. This can flip a legacy record (written before the field) to INCOMPLETE on
+ *  replay — the ruled, SAFE direction (unknown ⇒ cannot certify complete), never a false COMPLETE. */
 export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileMeta[] {
-  return ingestion.files.filter((f) => f.ingested && f.has_text === false && isBindingDoc(f));
+  // A binding doc is a CONTENT LOSS when its text is absent/unknown (has_text !== true) OR when it was
+  // mid-document truncated to fit the per-doc token budget (C-4 — the unread tail may carry a bar).
+  return ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && (f.has_text !== true || f.truncated === true));
 }
 function hasBindingContentLoss(ingestion: IngestionMeta): boolean {
   return bindingContentLossDocs(ingestion).length > 0;
@@ -195,7 +200,12 @@ export async function executeAgenticPrimary(
       for (const f of contentLoss) payload.documents.missing.push({ name: f.name, reason: "ingested but no machine-readable text (scanned/image) — content not analyzed" });
     }
   }
-  const docsIncomplete = assembled.truncated || (!!payload.documents && (!payload.documents.reconciled || !payload.documents.complete));
+  // C-1 (Brain C.e) — ONE completeness computation. `manifestComplete` (agenticManifestComplete: truncation +
+  // reconciliation + binding-content-loss, line 145) is the SINGLE truth: it was threaded into deriveVerdict
+  // (VerdictInputs.documentsComplete → the committal INCOMPLETE cap) AND is persisted here as documents_complete
+  // (export gate + banner read it). The prior independent `docsIncomplete` recompute is RETIRED — the verdict, the
+  // export gate, and the persisted flag can no longer drift (the payload.documents banner above stays as the
+  // human-readable missing-files breakdown of this same signal).
   const recommendation = verdictToRecommendation(res.decision.verdict);
   // SINGLE source of truth for honest-fail (Step 9). ORs all four signals → one persisted field read by
   // billing, the report banner, and the watcher email. In the LIVE engine path only `verdict` is produced
@@ -229,12 +239,23 @@ export async function executeAgenticPrimary(
       // document could not be ingested (the report flags it loudly). CEO 2026-06-28:
       // a partial package ALSO gates export (shouldGateExport reads this) — a report
       // we couldn't fully ground never leaves as a clean PDF.
-      documents_complete: !docsIncomplete,
+      documents_complete: manifestComplete,
       generated_at: generatedAt,
       source_chars: fullSource.length,
       doc_count: docs.length,
       source_truncated: assembled.truncated,
       ...(assembled.droppedDocs.length ? { dropped_docs: assembled.droppedDocs } : {}),
+      // C-19 interim guard (Brain C.f) — DETECT + DISCLOSE only, NEVER a verdict cap (supersession resolution is
+      // its own tranche). Surface that amendments are present (so a reviewer knows superseded terms are unresolved)
+      // + per-finding document provenance (which doc grounded each finding).
+      // SECURITY: finding_provenance[].doc is an attacker-influenceable document NAME (upload filename / SAM
+      // attachment name). It is inert today (no renderer reads it). ANY future UI that surfaces it MUST route the
+      // name through escapeHtml (the current audit-v3-report renderer already escapes the doc-name it shows) —
+      // a raw binding would be stored XSS.
+      ...(detectAmendments(fullSource)
+        ? { amendments_present: true, amendment_disclosure: "This package contains one or more amendments (SF-30 / amendment of solicitation). Superseded terms are NOT yet automatically resolved — verify the latest amendment governs before relying on any cited term." }
+        : {}),
+      finding_provenance: findingProvenance(fullSource, res.findings),
       v3: payload,
     },
   };
@@ -272,7 +293,7 @@ export async function executeAgenticPrimary(
   const { perModel, totals } = aggregate(usageCalls);
   await recordAuditCost(supabase, auditId, { perModel, totals, source: "customer" });
 
-  console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${!docsIncomplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
+  console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: verdict=${res.decision.verdict} → recommendation=${recommendation} honest_fail=${honestFail} docs_complete=${manifestComplete} (${payload.documents?`${payload.documents.read}/${payload.documents.posted}`:"n/a"}) findings=${res.findings.length} src=${(fullSource.length / 1024).toFixed(0)}KB`);
 
   return { recommendation, compliance_score: null, bid_recommendation: completeUpdate.bid_recommendation };
 }

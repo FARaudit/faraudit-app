@@ -146,4 +146,11 @@ export interface VerdictInputs {
   // label → cap BID/CAUTION to INCOMPLETE. INELIGIBLE/NO_BID are NOT capped (a real bar can't be un-found by
   // adding documents). Default true (complete) when not supplied.
   manifestComplete?: boolean;
+  // C-1 (Brain C.e) — the SINGLE document-completeness truth, computed ONCE in the executor
+  // (agenticManifestComplete: truncation + manifest reconciliation + binding-content-loss) and threaded here so
+  // the VERDICT caps on the same signal the export gate + persisted payload read (no dual-axis drift). false ⇒
+  // the engine could not confirm it read every posted binding document ⇒ INCOMPLETE, even over a committal pole
+  // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
+  // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
+  documentsComplete?: boolean;
 }

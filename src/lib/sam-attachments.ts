@@ -27,6 +27,7 @@
 
 import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extractor";
 import { extractText, MIN_TEXT_CHARS_FOR_TEXT_BLOCK, meaningfulCharCount } from "./pdf-text-extractor";
+import { looksGarbled } from "./pdf-ocr";
 import { samFetchWithKey } from "./sam-url-guard";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
@@ -166,6 +167,10 @@ export interface IngestionFileMeta {
   // text-only auditPackage never consumes → a named-but-blank contribution. Completeness must gate on has_text
   // for BINDING docs, not on `ingested` alone (which reads green while a §M/SOW/wage-det contributed nothing).
   has_text?: boolean;
+  // C-4 (Brain C.c) — this doc was MID-DOCUMENT truncated to fit MAX_DOC_TOKENS: bytes arrived and text was
+  // extracted, but the TAIL past the per-doc token budget never reached the engine. A truncated BINDING doc is a
+  // content loss (the unread tail may carry a bar) ⇒ documents_complete=false, exactly like a scanned binding doc.
+  truncated?: boolean;
   // FA-182 — detected solicitation section role(s) ∈ C|H|L|M, from the file
   // NAME (deterministic, conservative). Empty [] = unknown → stays a plain
   // ATTACHMENT in the ingestion banner. Drives the .isec section tags + true
@@ -180,7 +185,12 @@ export interface IngestionFileMeta {
 // flag-only, never a completeness failure for lacking body text. UNKNOWN role ⇒ BINDING (fail-safe, zero-loss).
 // The offeror-fill allowlist is deliberately NARROW: wage determinations and pricing SCHEDULES that carry
 // binding CLIN/requirement structure stay BINDING. Widening the carve-out is a Brain checkpoint (Rule 61).
-const OFFEROR_FILL_RE = /\b(reps?\s*(?:and|&)?\s*certs?|representations?\s*(?:and|&)?\s*certifications?|fillable|fill[- ]?in(?:able)?|questionnaire|ppq|past performance questionnaire|offeror'?s?\s*(?:worksheet|template|checklist)|bid\s*worksheet|price\s*(?:worksheet|template))\b/i;
+// C-15 (Brain C.b, R2): DEMOTED to the UNAMBIGUOUS blank-offeror-administrative forms only — reps & certs
+// (52.204-8 / 52.212-3) and explicitly "fillable"/"fill-in" templates. A worksheet / price template / (PPQ)
+// questionnaire / checklist is AMBIGUOUS (it can carry binding CLIN/pricing/technical structure), so under
+// "unknown/ambiguous role = BINDING" it is NO LONGER auto-exempted — it must reach the engine as text (worst
+// case a genuinely-blank one over-flags INCOMPLETE, the SAFE honest-fail direction; a false COMPLETE is not).
+const OFFEROR_FILL_RE = /\b(reps?\s*(?:and|&)?\s*certs?|representations?\s*(?:and|&)?\s*certifications?|fillable|fill[- ]?in(?:able)?)\b/i;
 export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; name: string }): boolean {
   if (f.role === "form" || f.role === "amendment") return true;      // primary solicitation + amendments are always binding
   return !OFFEROR_FILL_RE.test(f.name.replace(/[_.\-+]+/g, " "));      // attachment: binding UNLESS a recognized offeror-fill template
@@ -193,8 +203,17 @@ export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; nam
 // must count as has_text — else a genuinely-read doc false-flags content-loss → a false INCOMPLETE. A truly
 // scanned/failed doc still yields ~0 meaningful chars and is correctly has_text=false. Failed extractions excluded.
 const MIN_ENGINE_TEXT_CHARS = 50;
+// C-16 (Brain C.b, R2): a "real content check", not a bare char floor. A scanned worksheet whose IMAGE body
+// carries the substance but whose text layer is only a title/header ("ATTACHMENT 0003 — CONTRACTOR PRICE
+// SCHEDULE") clears 50 meaningful chars on the header alone and false-reads has_text=true. Require a minimum of
+// real alphabetic WORDS so a header-only text layer over an image body reads has_text=false. Tuned so a short but
+// genuine binding doc (e.g. a one-paragraph SF-30 amendment) still passes; a bare heading does not.
+const MIN_ENGINE_TEXT_WORDS = 8; // catches a header/title-only text layer while still passing a terse-but-genuine binding doc (a one-LINE SF-30 amendment ≈ 10 qualifying words); a bare heading (≤5 words) still fails
 export function hasEngineText(text: string | null | undefined): boolean {
-  return !!text && !text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(text) >= MIN_ENGINE_TEXT_CHARS;
+  if (!text || text.startsWith("[PDF_EXTRACTION_FAILED")) return false;
+  if (looksGarbled(text)) return false;                                  // C-17 — a mojibake text layer is NOT engine-readable content
+  if (meaningfulCharCount(text) < MIN_ENGINE_TEXT_CHARS) return false;
+  return (text.match(/[A-Za-z]{3,}/g) ?? []).length >= MIN_ENGINE_TEXT_WORDS; // C-16 — real words, not just a header
 }
 
 // FA-182 — classify a file's solicitation section role(s) from its NAME only.
@@ -912,7 +931,7 @@ export async function assembleSamDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1056,7 +1075,7 @@ export async function assembleUploadedDocumentSet(
       if (isVisionDoc) visionBase64Bytes += base64.length;
       const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` } : {}) });
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {

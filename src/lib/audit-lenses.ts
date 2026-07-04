@@ -51,11 +51,11 @@ const lens = (key: string, role: string, lane: string): ExpertSpec => ({
  *  of the UCF but is free to read any section to ground a finding. */
 export const AUDIT_LENSES: ExpertSpec[] = [
   lens("capture_strategist", "Capture strategist",
-    "Lane: §C/SOW/PWS technical scope and §M evaluation. Surface the technical specs the offered solution must meet and how award is decided (LPTA vs tradeoff vs best-value). A demanding spec the bidder can source/build/configure is bidder_controls."),
+    "Lane: §C/SOW/PWS technical scope, §E inspection & acceptance criteria, §F deliveries / period of performance, and §M evaluation. Surface the technical specs the offered solution must meet, the inspection/acceptance and delivery/PoP terms, and how award is decided (LPTA vs tradeoff vs best-value). A demanding spec the bidder can source/build/configure is bidder_controls."),
   lens("contracts_attorney", "Contracts attorney",
     "Lane: §I clauses, §H special contract requirements, §K representations, eligibility and flow-downs. Surface incorporated FAR/DFARS obligations and any HARD eligibility bar (set-aside category, size standard, required certification/clearance, SAM registration). Decide carefully whether each is something the bidder cannot move vs already satisfied."),
   lens("pricing_analyst", "Pricing analyst",
-    "Lane: §B supplies/prices and CLIN structure. Surface pricing obligations, every CLIN/SLIN that must be priced, units, options, and any cost/accounting requirement. Pricing is almost always bidder_controls (do the work)."),
+    "Lane: §B supplies/prices and CLIN structure, and §D packaging & marking requirements. Surface pricing obligations, every CLIN/SLIN that must be priced, units, options, any cost/accounting requirement, and any packaging/marking/preservation obligation. Pricing is almost always bidder_controls (do the work)."),
   lens("former_ko", "Former contracting officer",
     "Lane: the whole package for show-stoppers and traps an evaluator would enforce — mandatory forms, gating certifications, brand-name-or-equal limits, mandatory-source set-asides, deadlines already passed. You know what gets an offer thrown out. Reserve bidder_cannot_move for genuine, evaluator-enforceable disqualifiers."),
   lens("proposal_manager", "Proposal manager",
