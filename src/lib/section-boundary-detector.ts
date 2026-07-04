@@ -133,6 +133,23 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   }
   const fullText = doc.rawText;
 
+  // ── ATTACHMENT BOUNDARY (C-6 / C-11) ──────────────────────────────────────
+  // The assembled package separates the primary solicitation from each attachment with a
+  // "==== DOCUMENT: <name> ====" delimiter (agentic-executor assembleFullSource). UCF sections A–M belong to the
+  // PRIMARY solicitation; an attachment is a separate binding document (per-binding-doc attestation handles it),
+  // NEVER a UCF section. So: (1) detect UCF boundaries ONLY within the primary region — an attachment-internal
+  // "SECTION X" can never mint a UCF boundary (C-11); (2) the last section's text ends at the first delimiter,
+  // never EOF — attachment text can never bleed into §M (C-6). Single-document packages carry NO delimiter ⇒
+  // primaryEnd = allLines.length ⇒ byte-identical (the per-doc extraction path + every single-blob gold source
+  // are unaffected — the Option-A guard).
+  // assembleFullSource prefixes EVERY document with its own delimiter when >1 doc, so marker[0] labels the
+  // PRIMARY solicitation and marker[1] starts the FIRST attachment. The primary region is [marker[0], marker[1]).
+  // Fewer than 2 markers ⇒ single-doc package ⇒ primaryEnd = EOF (byte-identical).
+  const DOC_DELIM_RE = /^={4}\s+DOCUMENT:\s+.+\s+={4}$/i; // the EXACT assembleFullSource delimiter (4 equals both sides) — strict so a stray in-body "=== DOCUMENT" line can't false-split
+  const docMarkers: number[] = [];
+  for (let i = 0; i < allLines.length; i++) { if (DOC_DELIM_RE.test(allLines[i].text.trim())) docMarkers.push(i); }
+  const primaryEnd = docMarkers.length >= 2 ? docMarkers[1] : allLines.length;
+
   // ─── Format detection ─────────────────────────────────────────────────────
   let formatDetected: FormatType = "unknown";
   let formatConfidence: SectionConfidence = "low";
@@ -160,8 +177,8 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   interface Boundary { key: string; lineIdx: number; confidence: SectionConfidence; matchedPattern: string; }
   const boundaries: Boundary[] = [];
 
-  // Pass 1: explicit "SECTION X" headers — high confidence
-  for (let i = 0; i < allLines.length; i++) {
+  // Pass 1: explicit "SECTION X" headers — high confidence (primary region only — C-11)
+  for (let i = 0; i < primaryEnd; i++) {
     const line = allLines[i].text.trim();
     for (const pat of UCF_HEADER_PATTERNS) {
       const m = pat.exec(line);
@@ -185,12 +202,30 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   const foundKeys = new Set(boundaries.map((b) => b.key));
   for (const [key, pattern] of Object.entries(UCF_TITLE_PATTERNS)) {
     if (foundKeys.has(key)) continue;
-    for (let i = 0; i < allLines.length; i++) {
+    for (let i = 0; i < primaryEnd; i++) {
       if (pattern.test(allLines[i].text.trim())) {
         boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: pattern.source });
         foundKeys.add(key);
         break;
       }
+    }
+  }
+
+  // Pass 2b: PROSE HEADINGS (C-9) — a bare UCF letter + separator + a title that matches that section, e.g.
+  // "M - BASIS FOR AWARD" / "L – Instructions to Offerors", which the "SECTION X" + title-only passes miss.
+  // GUARDED: the leading letter must equal the key AND the post-separator title must match that section's title
+  // pattern (so "A - SOMETHING" cannot false-fire — A has no title pattern). Primary region only; medium; skips
+  // keys already found. Anti-false-positive: a genuine "C - 1.0 SCOPE" only credits §C if §C's title keywords follow.
+  const LETTER_DASH_RE = /^([A-M])\s*[-–—:]\s*(.+)$/;
+  for (let i = 0; i < primaryEnd; i++) {
+    const m = LETTER_DASH_RE.exec(allLines[i].text.trim());
+    if (!m) continue;
+    const key = m[1].toUpperCase();
+    if (foundKeys.has(key)) continue;
+    const titlePat = UCF_TITLE_PATTERNS[key];
+    if (titlePat && titlePat.test(m[2].trim())) {
+      boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: `LETTER_DASH_TITLE(${key})` });
+      foundKeys.add(key);
     }
   }
 
@@ -201,7 +236,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   if (!foundKeys.has("C")) {
     const NSN_RE = /\b\d{4}-\d{2}-\d{3}-\d{4}\b/;
     const ITEM_DESC_RE = /\b(ITEM\s+DESCRIPTION|MFG\s+name|Schedule\s+of\s+Supplies)/i;
-    for (let i = 0; i < allLines.length; i++) {
+    for (let i = 0; i < primaryEnd; i++) {
       const t = allLines[i].text.trim();
       if (NSN_RE.test(t) || ITEM_DESC_RE.test(t)) {
         boundaries.push({ key: "C", lineIdx: i, confidence: "low", matchedPattern: "DLA_SF18_NSN_INLINE" });
@@ -226,7 +261,9 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   for (let i = 0; i < finalBoundaries.length; i++) {
     const b = finalBoundaries[i];
     const next = finalBoundaries[i + 1];
-    const endLineIdx = next ? next.lineIdx - 1 : allLines.length - 1;
+    // C-6: the last section ends at the first attachment delimiter (primaryEnd - 1), NEVER EOF — attachment text
+    // never bleeds into §M. next.lineIdx is already within the primary region (boundaries are primary-only).
+    const endLineIdx = next ? next.lineIdx - 1 : primaryEnd - 1;
     const lines = allLines.slice(b.lineIdx, endLineIdx + 1);
     const sectionText = lines.map((l) => l.text).join("\n");
     const startPage = allLines[b.lineIdx]?.pageNum ?? 0;

@@ -66,15 +66,21 @@ async function main() {
   ok("conflict → NEEDS_HUMAN_REVIEW", resConf.decision.verdict, "NEEDS_HUMAN_REVIEW");
 
   // ── B-corrected obligation-coverage (the §C scenario), tested directly on completenessOf. ──
-  // §C carries an obligation ("shall furnish ... fully enclosed cab"); no DIRECT §C finding, but another
-  // lane's finding shares a ≥4-word verbatim n-gram with it → covered_attested, citing that finding ID.
-  // excerpt shares the 4-gram "contractor shall furnish one" with §C's obligation but is NOT a substring of
-  // §C (it ends differently) → so it grounds the obligation by n-gram (attested), not by location (direct).
-  const attestFinding: TypedFinding = { id: "proposal#0", requirement: "machine brochure", citation: "§L", excerpt: "the contractor shall furnish one mini-excavator per the attached brochure submission instructions", grounded: true, lens: "proposal", kind: "submission", controllability: "bidder_controls" };
-  const compAtt = completenessOf(ctx, ["C"], [attestFinding], new Set(["C"]));
-  ok("§C read + obligation grounded elsewhere → covered_attested", compAtt.attestations[0].status, "covered_attested");
-  ok("§C attestation CITES the grounding finding id", compAtt.attestations[0].citedFindingIds, ["proposal#0"]);
+  // R8 (C-12, Brain C.d) — MIGRATED (card-236): an obligation is covered_attested ONLY by a finding CITED TO THE
+  // SAME SECTION that shares its ≥4-word n-gram. A finding cited to a DIFFERENT section sharing a coincidental
+  // n-gram no longer attests (the cross-section false-COMPLETE that R8 closes). n-gram threshold stays ≥4.
+  // (a) SAME-SECTION attestation: a §C-cited finding (different LENS, not a direct §C substring) grounds the §C
+  //     obligation by n-gram → covered_attested. (excerpt ends "…and rops" so it is NOT a §C substring → attested, not direct.)
+  const sameSecFinding: TypedFinding = { id: "ko#0", requirement: "furnish excavator", citation: "§C", excerpt: "the contractor shall furnish one mini-excavator with a fully enclosed cab and rops", grounded: true, lens: "ko", kind: "technical_spec", controllability: "bidder_controls" };
+  const compAtt = completenessOf(ctx, ["C"], [sameSecFinding], new Set(["C"]));
+  ok("§C obligation grounded by a SAME-SECTION finding → covered_attested", compAtt.attestations[0].status, "covered_attested");
+  ok("§C attestation CITES the grounding finding id", compAtt.attestations[0].citedFindingIds, ["ko#0"]);
   ok("§C attested → not missing", compAtt.missing, []);
+  // (b) CROSS-SECTION REJECTION (R8): the SAME excerpt cited to §L does NOT attest the §C obligation.
+  const crossSecFinding: TypedFinding = { ...sameSecFinding, id: "proposal#0", citation: "§L", lens: "proposal" };
+  const compCross = completenessOf(ctx, ["C"], [crossSecFinding], new Set(["C"]));
+  ok("§C grounded ONLY by a §L-cited finding → obligations_ungrounded (R8 cross-section rejected)", compCross.attestations[0].status, "obligations_ungrounded");
+  ok("§C cross-section-only → missing", compCross.missing, ["C"]);
 
   // read + obligation + NOTHING grounds it → obligations_ungrounded → missing (silence ≠ coverage).
   const compUng = completenessOf(ctx, ["C"], [], new Set(["C"]));

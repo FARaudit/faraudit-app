@@ -12,6 +12,7 @@
 import { extractText } from "./pdf-text-extractor";
 import { type ScalarFacts, type AgenticDoc } from "./agentic-orchestrator";
 import { auditPackage } from "./audit-package";
+import { isBindingDoc } from "./sam-attachments";
 
 /** Structural view of the SAM solicitation fields we need — kept minimal so any
  *  solicitation object satisfies it without coupling to the full type. */
@@ -138,10 +139,22 @@ export interface AssembledSource {
  *  `truncated` therefore means strictly "≥1 whole doc was dropped", never "the source is big"
  *  (else a fully-read 1.4MB single solicitation would be a false honest-fail). */
 export function assembleFullSourceBudgeted(docs: AgenticDoc[], maxChars: number = MAX_FULLSOURCE_CHARS): AssembledSource {
+  const pieceLen = (d: AgenticDoc) => (docs.length > 1 ? `\n\n==== DOCUMENT: ${d.name} ====\n\n`.length + d.text.length : d.text.length);
+  // R9 (Brain C.c) — BINDING-PRIORITY drop order. When the char budget forces WHOLE-doc drops, a NON-binding doc
+  // (reps & certs / offeror-fill template) must be dropped BEFORE a binding one. Order is preserved (byte-identical)
+  // when everything fits OR when there is nothing to reprioritize; the reorder engages ONLY on an over-budget
+  // multi-doc package. docs[0] (the primary solicitation) is always highest priority. Any actual drop still sets
+  // `truncated` ⇒ documents_complete=false (a binding drop can never read COMPLETE).
+  let order = docs;
+  const total = docs.reduce((n, d) => n + pieceLen(d), 0);
+  if (docs.length > 1 && total > maxChars) {
+    const rank = (d: AgenticDoc, i: number) => (i === 0 ? 0 : isBindingDoc({ role: "attachment", name: d.name }) ? 1 : 2);
+    order = docs.map((d, i) => ({ d, i, r: rank(d, i) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.d);
+  }
   const kept: AgenticDoc[] = [];
   const droppedDocs: string[] = [];
   let used = 0;
-  for (const d of docs) {
+  for (const d of order) {
     const piece = docs.length > 1 ? `\n\n==== DOCUMENT: ${d.name} ====\n\n${d.text}` : d.text;
     if (kept.length > 0 && used + piece.length > maxChars) { droppedDocs.push(d.name); continue; }
     kept.push(d);

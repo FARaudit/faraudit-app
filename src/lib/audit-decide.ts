@@ -1010,6 +1010,13 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (!inp.coverageComplete)
     return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
 
+  // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
+  //     engine could not confirm it read in full (unfetched / scanned-no-text / mid-doc truncated / over-budget
+  //     drop) caps EVERY pole to INCOMPLETE, committal included: an unread binding doc could carry OR waive a bar,
+  //     so no verdict can be certified over a partial read. Explicit `=== false` ⇒ callers that omit it are unchanged.
+  if (inp.documentsComplete === false)
+    return mk("INCOMPLETE", honestFailEligible(), "Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated).", dispositions, []);
+
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
     return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Adversarial verification did not succeed — findings not trustworthy enough to decide.", dispositions, []);

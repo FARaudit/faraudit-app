@@ -60,10 +60,23 @@ export function procurementPart(ctx: AuditToolContext): ProcurementPart {
   }
 }
 
-/** Tool — read a UCF section's text. The expert reads only what it needs (just-in-time), never a stuffed dump. */
-export function readSection(ctx: AuditToolContext, key: string): { key: string; present: boolean; text: string } {
+// C-3 (Brain C.c) — the LENS read-cap. A read_section tool result is bounded to keep each expert turn within its
+// token budget; `truncated` tells the expert (and the completeness proof) that it is seeing a SLICE, so a bar past
+// the cap is not silently invisible. The COMPLETENESS proof does NOT read this capped view — it reads the FULL
+// section (sectionFullText) so an obligation past the cap surfaces as ungrounded ⇒ INCOMPLETE, never a false COMPLETE.
+export const SECTION_READ_CAP = 12000;
+
+/** Tool — read a UCF section's text. The expert reads only what it needs (just-in-time), never a stuffed dump.
+ *  `truncated` = the full section exceeds the lens read-cap (the expert saw only the first SECTION_READ_CAP chars). */
+export function readSection(ctx: AuditToolContext, key: string): { key: string; present: boolean; text: string; truncated: boolean } {
   const s = sectionsOf(ctx)[(key || "").toUpperCase()] ?? "";
-  return { key: (key || "").toUpperCase(), present: !!s, text: s.slice(0, 12000) };
+  return { key: (key || "").toUpperCase(), present: !!s, text: s.slice(0, SECTION_READ_CAP), truncated: s.length > SECTION_READ_CAP };
+}
+
+/** The FULL text of a section (uncapped) — used by the completeness proof so no obligation is invisible to it,
+ *  even one past the lens read-cap. Not a lens tool (the lens stays budgeted via readSection). */
+export function sectionFullText(ctx: AuditToolContext, key: string): string {
+  return sectionsOf(ctx)[(key || "").toUpperCase()] ?? "";
 }
 
 /** Tool — is a FAR/DFARS clause literally in the source? Returns presence + a grounding excerpt around it.

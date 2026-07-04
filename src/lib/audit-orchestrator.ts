@@ -13,7 +13,8 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, type AuditToolContext } from "./audit-tools";
+import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
@@ -22,8 +23,15 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
-/** UCF sections that carry binding obligations — the ones completeness is measured against. */
-export const BINDING_SECTIONS = ["B", "C", "H", "I", "L", "M"] as const;
+/** UCF sections that carry binding obligations — the ones completeness is measured against.
+ *  C-8 (Brain C.f): expanded {B,C,H,I,L,M} → {B,C,D,E,F,H,I,K,L,M}. §D (packaging/marking), §E (inspection &
+ *  acceptance), §F (deliveries / period of performance — gold-source attribution puts delivery windows here),
+ *  and §K (reps/certs affecting eligibility) carry binding terms a complete read must ground. Anti-Option-A guard:
+ *  a section is only REQUIRED when PRESENT (buildManifest filters on presence), and a legitimately THIN present
+ *  section (no obligation sentences) attests read_no_obligation → covered (the relief valve), so a package that
+ *  simply has a short §D does NOT go chronically INCOMPLETE. §G (contract admin) and §J (list of attachments) are
+ *  read-and-attest only — J feeds the C-2 per-binding-document reconciliation — so they are NOT completeness-required. */
+export const BINDING_SECTIONS = ["B", "C", "D", "E", "F", "H", "I", "K", "L", "M"] as const;
 
 const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -104,6 +112,15 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
     // Label the disclosure by the COMMERCIAL clause numbers (not §L/§M) so the gap reads honestly. Cap fires
     // ONLY when BOTH are absent — a single one missing is plausibly inline/by-reference (no false scare).
     return (!readSection(ctx, "L").present && !readSection(ctx, "M").present) ? ["52.212-1", "52.212-2"] : [];
+  if (part === "unknown") {
+    // C-5 (Brain C.f) — an UNRECOGNIZED format where NONE of the core sections can even be located cannot certify
+    // its core set ⇒ INCOMPLETE. A parseable package (a commercial synopsis carries 52.212-1/-2 ⇒ §L/§M present,
+    // or an inline SOW ⇒ §C present via the title patterns) is NOT flagged — the C-10 combined-synopsis flag path
+    // is untouched. Only a genuinely structureless blob (no §C/§L/§M detectable at all) trips.
+    const coreFound = ["C", "L", "M"].some((k) => readSection(ctx, k).present);
+    const commercialRef = /\b5?2\.212-[12]\b/.test(ctx.fullSource ?? ""); // a bare Part-12 synopsis references 52.212-1/-2 — leave it to the C-10 flag path (untouched), never a C-5 false-flag
+    return coreFound || commercialRef ? [] : ["C", "L", "M"];
+  }
   return [];
 }
 
@@ -128,21 +145,104 @@ function hasConflict(findings: TypedFinding[]): boolean {
 
 export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; }
 
+// C-7 (Brain C.c) — the obligation-extraction cap. Raised 25 → 200 so a normal binding section is fully proven
+// (25 silently dropped obligations #26+ was a false-COMPLETE hole). If a section still exceeds 200 obligation
+// sentences (pathological), `truncated` fires so the caller cannot certify it covered ⇒ INCOMPLETE — never a
+// silent drop.
+const MAX_OBLIGATIONS = 200;
 /** Extract obligation sentences from a section — the clauses that impose a duty (shall/must/provide/...). */
-function obligationsOf(text: string): string[] {
-  return text.split(/(?<=[.;\n])/).map((s) => s.trim())
-    .filter((s) => s.length > 12 && /\b(shall|must|provide|submit|furnish|required|quote|deliver)\b/i.test(s)).slice(0, 25);
+function obligationsOf(text: string): { obligations: string[]; truncated: boolean } {
+  const all = text.split(/(?<=[.;\n])/).map((s) => s.trim())
+    .filter((s) => s.length > 12 && /\b(shall|must|provide|submit|furnish|required|quote|deliver)\b/i.test(s));
+  return { obligations: all.slice(0, MAX_OBLIGATIONS), truncated: all.length > MAX_OBLIGATIONS };
 }
 
-/** A ≥4-word verbatim n-gram shared between an obligation sentence and a grounded finding's excerpt — a
- *  Rule-64 "same span" proof that the obligation IS grounded by that finding (not a model wave-off). */
-function groundedBy(obligation: string, findings: TypedFinding[]): string[] {
+/** The UCF section a finding is CITED to (from its citation, e.g. "§C" / "Section C" / "C - ..."). null when the
+ *  citation names a clause number or is unparseable — such a finding cannot ground a section-scoped obligation. */
+function findingSection(f: TypedFinding): string | null {
+  const c = (f.citation || "").trim();
+  // A commercial clause number IS its UCF section — 52.212-1 ≡ §L (instructions), 52.212-2 ≡ §M (evaluation),
+  // 52.212-4/-5 ≡ §I (clauses), 52.204-8 / 52.212-3 ≡ §K (reps/certs). Map them so a finding that cites the clause
+  // number instead of the §-letter still grounds its own section (else §M/§I/§K attested-coverage would false-drop
+  // to ungrounded → chronic false INCOMPLETE on commercial buys).
+  if (/\b5?2\.212-1\b/.test(c)) return "L";
+  if (/\b5?2\.212-2\b/.test(c)) return "M";
+  if (/\b5?2\.212-[45]\b/.test(c)) return "I";
+  if (/\b5?2\.(?:204-8|212-3)\b/.test(c)) return "K";
+  const m = /§?\s*(?:section\s+)?([A-M])\b/i.exec(c);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** C-12 (Brain C.d, R8) — a ≥4-word verbatim n-gram shared between an obligation sentence and a grounded finding's
+ *  excerpt, AND the finding must be CITED to the SAME section as the obligation. This closes the cross-section
+ *  false-attestation (a §C finding sharing a 4-gram with a §M obligation no longer attests §M covered). The n-gram
+ *  threshold stays FROZEN at ≥4 (R8 — no drift). Same-span + same-section is the Rule-64 "this obligation IS
+ *  grounded by that finding" proof. */
+function groundedBy(obligation: string, findings: TypedFinding[], sec: string): string[] {
   const words = norm(obligation).split(" ").filter(Boolean);
   const grams: string[] = [];
   for (let i = 0; i + 4 <= words.length; i++) grams.push(words.slice(i, i + 4).join(" "));
   const ids: string[] = [];
-  for (const f of findings) { const ex = norm(f.excerpt || ""); if (grams.some((g) => ex.includes(g)) && f.id) ids.push(f.id); }
+  for (const f of findings) {
+    const ex = norm(f.excerpt || "");
+    if (findingSection(f) === sec && grams.some((g) => ex.includes(g)) && f.id) ids.push(f.id);
+  }
   return [...new Set(ids)];
+}
+
+/** C-2 (Brain C.f) — PER-BINDING-DOCUMENT attestation. The assembled fullSource carries a "==== DOCUMENT: name ===="
+ *  delimiter per doc. Section-level completeness proves the PRIMARY solicitation; an ATTACHMENT is a separate binding
+ *  document that must ALSO be analyzed. For each binding attachment region: it is covered iff it carries NO obligation
+ *  sentence (read_no_obligation — a thin binding doc, the relief valve) OR ≥1 finding is grounded verbatim IN it.
+ *  A binding attachment with obligations but NO grounding finding is ingested-with-text-but-UNANALYZED → uncovered ⇒
+ *  the read cannot read COMPLETE. Single-doc packages (no delimiter) → covered (section completeness governs). */
+/** Parse the assembled fullSource into (name, text) document regions by the "==== DOCUMENT: name ====" delimiter
+ *  (assembleFullSource writes one per doc when >1). `isPrimary` marks the FIRST region (the primary solicitation).
+ *  Single-doc packages carry no delimiter → one primary region. */
+export function docRegions(fullSource: string): Array<{ name: string; text: string; isPrimary: boolean }> {
+  const parts = (fullSource ?? "").split(/={4}\s+DOCUMENT:\s+(.+?)\s+={4}/); // EXACT assembleFullSource delimiter (4 equals) — strict, matches section-boundary-detector
+  if (parts.length <= 1) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
+  const out: Array<{ name: string; text: string; isPrimary: boolean }> = [];
+  for (let i = 1; i + 1 < parts.length; i += 2) out.push({ name: parts[i], text: parts[i + 1] ?? "", isPrimary: out.length === 0 });
+  return out;
+}
+
+export function documentsCovered(fullSource: string, findings: TypedFinding[]): { complete: boolean; uncovered: string[] } {
+  const regions = docRegions(fullSource);
+  if (regions.length <= 1) return { complete: true, uncovered: [] }; // single-doc package — section completeness governs
+  const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
+  const uncovered: string[] = [];
+  for (const r of regions) {
+    if (r.isPrimary) continue;                                           // primary solicitation — handled by section completeness
+    if (!isBindingDoc({ role: "attachment", name: r.name })) continue;   // non-binding attachment (offeror-fill) — exempt
+    if (!obligationsOf(r.text).obligations.length) continue;             // read_no_obligation — a thin binding attachment is covered
+    const nRegion = norm(r.text);
+    // A finding proves this attachment was ANALYZED only if its excerpt is grounded IN the attachment AND is not a
+    // coincidental duplicate of a phrase already present in the PRIMARY (a flow-down sentence appearing in both) —
+    // else a primary finding could falsely certify an unanalyzed attachment (a false COMPLETE, the dangerous direction).
+    if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
+  }
+  return { complete: uncovered.length === 0, uncovered };
+}
+
+// C-19 INTERIM GUARD (Brain C.f — resolution is its OWN tranche; here: detect + disclose, NEVER a verdict cap).
+const AMENDMENT_RE = /\b(?:SF[-\s]?30\b|amendment\s+of\s+solicitation|amendment\s+(?:no\.?|number|#)?\s*0*\d)/i;
+/** Deterministic amendment presence — either an ingestion doc tagged role "amendment" (passed via docNames roles)
+ *  or an SF-30 / "Amendment of Solicitation" marker in the source. Detection only — supersession is NOT resolved. */
+export function detectAmendments(fullSource: string): boolean {
+  return docRegions(fullSource).some((r) => AMENDMENT_RE.test(r.name) || AMENDMENT_RE.test(r.text.slice(0, 4000)));
+}
+/** Per-finding document PROVENANCE (which assembled doc a finding's excerpt is grounded in) — persisted so a
+ *  reviewer can see which document (primary vs a specific attachment/amendment) each finding came from. */
+export function findingProvenance(fullSource: string, findings: TypedFinding[]): Array<{ id: string; doc: string }> {
+  const regions = docRegions(fullSource).map((r) => ({ name: r.name, n: norm(r.text) }));
+  const out: Array<{ id: string; doc: string }> = [];
+  for (const f of findings) {
+    if (!f.id || !f.excerpt) continue;
+    const ex = norm(f.excerpt);
+    out.push({ id: f.id, doc: regions.find((r) => r.n.includes(ex))?.name ?? "(ungrounded)" });
+  }
+  return out;
 }
 
 /** P4 (B-corrected · Brain card-48) — completeness = OBLIGATION-coverage, not per-section ≥1 finding:
@@ -175,7 +275,12 @@ const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).len
 export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
   for (const sec of required) {
-    const text = readSection(ctx, sec).text; const nText = norm(text);
+    // C-3 (Brain C.c): the completeness PROOF reads the FULL section (uncapped), NOT the lens's capped view — an
+    // obligation past the lens read-cap must surface as ungrounded, never be invisible. `lensTruncated` records
+    // that the LENS saw only a slice (so a section with no direct finding + a truncated lens view cannot be
+    // certified thin/covered — it is a truncation event ⇒ INCOMPLETE below).
+    const text = sectionFullText(ctx, sec); const nText = norm(text);
+    const lensTruncated = readSection(ctx, sec).truncated;
     if (!sectionsRead.has(sec)) { attestations.push({ section: sec, status: "unread", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
     const direct = findings.filter((f) => f.excerpt && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
@@ -191,10 +296,17 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
         attestations.push({ section: sec, status: "obligations_ungrounded", obligations: ["evaluation criteria not found / not evaluated"], citedFindingIds: [], ungrounded: ["evaluation criteria not found / not evaluated"] }); continue;
       }
     }
-    const obligations = obligationsOf(text);
-    if (!obligations.length) { attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
+    const { obligations, truncated: obTruncated } = obligationsOf(text);
+    // C-3/C-7: a section the LENS could only partially read (lensTruncated) or whose obligation set overflowed the
+    // proof cap (obTruncated) cannot be certified "thin"/covered — the unread tail may carry a bar. A truncation
+    // event with no direct grounded finding ⇒ obligations_ungrounded ⇒ INCOMPLETE (never a silent COMPLETE).
+    if (!obligations.length) {
+      if (lensTruncated) { attestations.push({ section: sec, status: "obligations_ungrounded", obligations: [], citedFindingIds: [], ungrounded: [`[truncated] §${sec} exceeds the lens read-cap — tail not read, cannot certify complete`] }); continue; }
+      attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: [], ungrounded: [] }); continue;
+    }
     const cited = new Set<string>(); const ungrounded: string[] = [];
-    for (const ob of obligations) { const ids = groundedBy(ob, findings); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
+    for (const ob of obligations) { const ids = groundedBy(ob, findings, sec); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
+    if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
     attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations, citedFindingIds: [...cited], ungrounded });
   }
   const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "read_no_obligation").map((a) => a.section);
@@ -314,7 +426,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
   const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true" });
-  const coverageComplete = allConverged && missing.length === 0 && required.length > 0;
+  // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
+  // carries obligations) is an incomplete read, just like an unread section.
+  const docCoverage = documentsCovered(ctx.fullSource, findings);
+  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete;
 
   // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
   // PRESENT, so a genuinely-absent core section never appears in `missing` and an unanalyzed one could render a
@@ -416,7 +531,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      engine cannot confidently BID over evaluation factors / §C / §L it never found. `coreMissing` is
   //      already FORMAT-AWARE (UCF only; commercial/simplified state these inline → empty), so this never
   //      caps a legitimately-inline commercial buy. Bar-found verdicts (NO_BID/INELIGIBLE) are NOT capped.
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, manifestComplete: manifestComplete(ctx) && (opts.manifestComplete ?? true) && coreMissing.length === 0 };
+  // C-1/C-13 (Brain C.e): `documentsComplete` carries the executor's SINGLE reconciliation truth (opts.manifestComplete
+  // = agenticManifestComplete: truncation + manifest reconciliation + binding-content-loss) → the committal INCOMPLETE
+  // cap. `manifestComplete` now carries ONLY the card-58 no-bar signals — the weak page-count heuristic manifestComplete(ctx)
+  // (C-13, SUBORDINATED: it can only add caution, never certify) + a missing CORE UCF section. The reconciliation signal
+  // no longer hides inside the ctx-heuristic AND; the two are separate inputs the verdict caps on independently.
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0 };
   // Ruling (i) AUDIT BOUNDARY — the coupling-lock decision-time BACKSTOP (EngineInvariantError) converts HERE to
   // a billing-safe failed state: log the config error and re-throw the typed terminal failure. The caller routes
   // it to a 'failed' status; because the throw precedes any persist/decrementAuditQuota, the customer is NOT
