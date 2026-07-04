@@ -37,6 +37,8 @@ export interface AuditPackageInput {
   manifestComplete?: boolean;               // N8 — external "every posted doc ingested" signal; false caps a no-bar verdict to INCOMPLETE
   naics?: string | null;                    // Step 4a (plumb-only) — SAM-resolved NAICS fact, forwarded to the gate pipeline; null when absent
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
+  noticeType?: string | null;               // Layer-2 (card 262) — SAM notice type; scopes the §L/§M INCOMPLETE requirement to solicitation-type buys
+  formIdentified?: boolean;                  // Layer-2 (card 262) — whether a substantive primary form was recognized; corroborates body-absent
   judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
   judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
   onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
@@ -153,6 +155,8 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     manifestComplete: input.manifestComplete,
     naics: input.naics ?? null,             // Step 4a — forward the fact; no consumer yet (verdict unchanged)
     setAside: input.setAside ?? null,
+    noticeType: input.noticeType ?? null,   // Layer-2 (card 262) — scopes the §L/§M requirement to solicitation-type buys
+    formIdentified: input.formIdentified,   // Layer-2 (card 262) — corroborates whether the §L/§M-bearing primary was ingested
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });
 }

@@ -82,9 +82,11 @@ eq("iii-and commercial 52.212-2 present, 52.212-1 absent → [] (no cap)", coreM
 // FLAG-OFF BYTE-IDENTICAL: commercial path is a no-op when the flag is off (today's free pass).
 eq("OFF commercial missing both → [] (byte-identical, free pass)", coreMissingFor(COMM_NO_CORE), []);
 eq("OFF commercial full → [] ", coreMissingFor(COMM_FULL), []);
-// unknown format → [] under BOTH flag states (byte-identical; the change never touches non-UCF/non-commercial).
-eq("unknown format → [] (flag OFF)", coreMissingFor(JUNK), []);
-eq("unknown format → [] (flag ON)", coreMissingFor(JUNK, ON), []);
+// STALE-ASSERTION CORRECTION (was red on origin, pre-Layer-2): JUNK = "not a solicitation at all" is a structureless
+// blob with NO locatable §C/§L/§M → the C-5 fail-safe (Brain C.f) correctly returns [C,L,M] (cannot certify an
+// unreadable package), NOT the old free-pass []. Flag-INDEPENDENT (the structureless path precedes the flag).
+eq("unknown structureless blob → [C,L,M] (C-5 fail-safe, flag OFF)", coreMissingFor(JUNK), ["C", "L", "M"]);
+eq("unknown structureless blob → [C,L,M] (C-5 fail-safe, flag ON)", coreMissingFor(JUNK, ON), ["C", "L", "M"]);
 // UCF path is flag-INDEPENDENT (the flag only gates the commercial branch).
 eq("UCF coreMissing identical with/without flag (full)", JSON.stringify(coreMissingFor(UCF_FULL)), JSON.stringify(coreMissingFor(UCF_FULL, ON)));
 eq("UCF coreMissing identical with/without flag (no-M)", JSON.stringify(coreMissingFor(UCF_NO_M)), JSON.stringify(coreMissingFor(UCF_NO_M, ON)));

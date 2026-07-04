@@ -60,6 +60,17 @@ export function procurementPart(ctx: AuditToolContext): ProcurementPart {
   }
 }
 
+// Layer-2 (Brain card 262) — does this SAM notice type require the proposal sections §L (instructions) and
+// §M (evaluation)? A SOLICITATION-type buy does; market-research / notice-only types (Sources Sought, RFI,
+// Presolicitation, Special Notice, Award) do NOT. FAIL-SAFE default: null/unknown/upload → TRUE (require them,
+// so a SOW-only source whose §L/§M-bearing notice body was never ingested caps to INCOMPLETE, never false-COMPLETE).
+const NON_SOLICITATION_TYPE_RE = /sources\s*sought|\brfi\b|request for information|presolicitation|pre-solicitation|special notice|award notice|\baward\b|justification|intent to|sole source notice/i;
+export function requiresProposalSections(noticeType: string | null | undefined): boolean {
+  const t = (noticeType ?? "").trim();
+  if (!t) return true;                       // unknown / upload → fail-safe: require §L/§M
+  return !NON_SOLICITATION_TYPE_RE.test(t);  // solicitation / combined synopsis / RFQ / RFP → require
+}
+
 // C-3 (Brain C.c) — the LENS read-cap. A read_section tool result is bounded to keep each expert turn within its
 // token budget; `truncated` tells the expert (and the completeness proof) that it is seeing a SLICE, so a bar past
 // the cap is not silently invisible. The COMPLETENESS proof does NOT read this capped view — it reads the FULL

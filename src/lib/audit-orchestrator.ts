@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, type AuditToolContext } from "./audit-tools";
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
@@ -59,6 +59,13 @@ export interface OrchestratorInput {
   // NOTHING reads these yet — adding them changes no verdict (a data plumb that moves a verdict is a bug).
   naics?: string | null;
   setAside?: string | null;
+  // Layer-2 (Brain card 262 — content-aware completeness). noticeType → whether this is a solicitation-type buy
+  // that REQUIRES §L/§M (vs Sources Sought / RFI / notice-only). formIdentified → whether a substantive primary
+  // solicitation FORM was recognized in the package. Both feed the core-section INCOMPLETE cap so a package whose
+  // §L/§M-bearing content (notice body) was never ingested caps to INCOMPLETE, never a confident false-COMPLETE.
+  // Absent → noticeType null (fail-safe: require §L/§M), formIdentified undefined (no independent cap contribution).
+  noticeType?: string | null;
+  formIdentified?: boolean;
   // Card 208-B — optional cheap-tier extractor for the Part-12 procedural-coverage pass. Absent ⇒ the pass uses
   // its deterministic default (the shipped path). Only consulted when AUDIT_PROCEDURAL_COVERAGE_LENS is on.
   proceduralExtract?: ProceduralExtractor;
@@ -105,21 +112,41 @@ export function manifestComplete(ctx: AuditToolContext): boolean {
  *  procurementPart(ctx) is the SINGLE deterministic format source — this EXTENDS fail-safe #10, never a parallel
  *  surface. Pure → $0 gate-testable with a fullSource string. Commercial "changes WHAT counts as core, not
  *  WHETHER a core set is required" — honest-fail preserved both ways. */
-export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestFail?: boolean }): string[] {
+export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestFail?: boolean; requiresLM?: boolean; formIdentified?: boolean }): string[] {
   const part = procurementPart(ctx);
-  if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !readSection(ctx, k).present);
-  if (opts?.commercialHonestFail && part === "part12-commercial")
-    // Label the disclosure by the COMMERCIAL clause numbers (not §L/§M) so the gap reads honestly. Cap fires
-    // ONLY when BOTH are absent — a single one missing is plausibly inline/by-reference (no false scare).
-    return (!readSection(ctx, "L").present && !readSection(ctx, "M").present) ? ["52.212-1", "52.212-2"] : [];
+  const present = (k: string) => readSection(ctx, k).present;
+  // requiresLM is NOTICE-TYPE-driven: a solicitation-type buy (default true / fail-safe when unscoped) requires the
+  // instructions (§L) and evaluation (§M); a non-solicitation (Sources Sought / RFI, requiresLM=false) is exempt.
+  const requiresLM = opts?.requiresLM !== false;
+  if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !present(k));
+  if (part === "part12-commercial") {
+    // Commercial core EQUIVALENTS: 52.212-1 ≡ §L, 52.212-2 ≡ §M. Cap ONLY when BOTH absent (a single one missing is
+    // plausibly inline/by-reference — no false scare).
+    const bothAbsent = !present("L") && !present("M");
+    if (opts?.commercialHonestFail) return bothAbsent ? ["52.212-1", "52.212-2"] : []; // Brain card 135 Step 8 — unchanged; OFF ⇒ byte-identical for GENUINE commercial
+    // Layer-2 (Brain card 262 · adversarial-review finding D) — FLAG-INDEPENDENT close of the misclassified-commercial
+    // bypass: a SOW-only source classifies part12-commercial off a STRAY "SF 1449"/"RFQ" string yet has NO recognized
+    // primary FORM (form_identified===false) and located neither 52.212-1 nor 52.212-2 → it is the 80NSSC SOW-only
+    // class hiding in the commercial branch → cap regardless of the flag. A REAL commercial RFQ has form_identified=true
+    // (its SF-1449 IS the form) → unaffected, so flag-OFF stays byte-identical for genuine commercial buys.
+    if (requiresLM && opts?.formIdentified === false && bothAbsent) return ["52.212-1", "52.212-2"];
+    return [];
+  }
   if (part === "unknown") {
-    // C-5 (Brain C.f) — an UNRECOGNIZED format where NONE of the core sections can even be located cannot certify
-    // its core set ⇒ INCOMPLETE. A parseable package (a commercial synopsis carries 52.212-1/-2 ⇒ §L/§M present,
-    // or an inline SOW ⇒ §C present via the title patterns) is NOT flagged — the C-10 combined-synopsis flag path
-    // is untouched. Only a genuinely structureless blob (no §C/§L/§M detectable at all) trips.
-    const coreFound = ["C", "L", "M"].some((k) => readSection(ctx, k).present);
-    const commercialRef = /\b5?2\.212-[12]\b/.test(ctx.fullSource ?? ""); // a bare Part-12 synopsis references 52.212-1/-2 — leave it to the C-10 flag path (untouched), never a C-5 false-flag
-    return coreFound || commercialRef ? [] : ["C", "L", "M"];
+    // C-5 (Brain C.f) — an UNRECOGNIZED format where NONE of the core sections can be located cannot certify its core
+    // set ⇒ INCOMPLETE (structureless blob). Unchanged.
+    const anyCore = ["C", "L", "M"].some(present);
+    const commercialRef = /\b5?2\.212-[12]\b/.test(ctx.fullSource ?? ""); // a bare Part-12 synopsis references 52.212-1/-2 — leave it to the C-10 flag path, never a C-5 false-flag
+    if (commercialRef) return [];
+    if (!anyCore) return ["C", "L", "M"];
+    // Layer-2 (Brain card 262) — KILL THE §C-ONLY FREE PASS. Previously `anyCore → []`, so a SOW-only source (§C
+    // detected via title patterns) certified complete while §L/§M lived in an un-ingested notice body → the
+    // catastrophic false-COMPLETE (80NSSC26936974Q). A solicitation-type buy discloses the not-located proposal
+    // sections → INCOMPLETE cap. Non-solicitations (requiresLM=false) keep the free pass. NOTE (review finding A,
+    // Layer-1 dependency): readSection presence is header-regex, so once Layer-1 ingests a NARRATIVE notice body
+    // (no "SECTION L/M" headers) §L/§M still read absent — the Layer-3 agentic section-finder is required to clear it.
+    if (!requiresLM) return [];
+    return ["L", "M"].filter((k) => !present(k));
   }
   return [];
 }
@@ -437,7 +464,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // deterministic source — Step 8): Part-15 UCF → §C/§L/§M (unchanged); Part-12 commercial → honest-fail ONLY if
   // BOTH the 52.212-1≡§L instructions AND the 52.212-2≡§M evaluation are absent (flag-gated; off ⇒ commercial
   // unchanged = today's free pass). Disclosure only; verdict unchanged except the manifest cap below.
-  const coreMissing = coreMissingFor(ctx, { commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true" });
+  // Layer-2 (Brain card 262): scope the §L/§M requirement to solicitation-type buys (requiresLM), and use
+  // form_identified to close the misclassified-commercial bypass (review finding D) — a SOW-only source that
+  // classifies commercial off a stray "SF 1449"/"RFQ" string but has NO recognized primary form → capped
+  // flag-independently, while a genuine SF-1449 RFQ (form_identified=true) stays byte-identical.
+  const coreMissing = coreMissingFor(ctx, {
+    commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",
+    requiresLM: requiresProposalSections(opts.noticeType),
+    formIdentified: opts.formIdentified,
+  });
 
   // P4.2b — OR-EQUAL CARVE-OUT (Brain card 139, Step 6), default-OFF (=== "true"). Runs FIRST among the re-typing
   //      gates: a "brand name OR EQUAL" / salient-characteristics bar (mis-typed structural via bare "brand name")
