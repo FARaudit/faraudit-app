@@ -11,7 +11,7 @@
 // is DATA-DECIDED in Stage 4 (gold-set A/B) — the default below is the starting
 // hypothesis ("max capability, not max model": extraction is factual work → cheap).
 
-export type ModelRole = "extractor" | "lens" | "crossdoc" | "judge";
+export type ModelRole = "extractor" | "lens" | "crossdoc" | "judge" | "finder";
 
 // Curated defaults. NOT permanent — Stage 4 decides extractor empirically; any
 // model swap re-runs the gold set before adoption. No model ID lives in engine
@@ -21,6 +21,10 @@ const DEFAULTS: Record<ModelRole, string> = {
   lens: "claude-sonnet-4-6",     // Stage 2 — overview/compliance/risk lenses over the compact matrix
   crossdoc: "claude-opus-4-8",   // Stage 2.5 — cross-doc reasoning over the binding-doc subset
   judge: "claude-opus-4-8",      // final judgment over compact facts (the already-correct call 4)
+  // L3 (Brain card 265/267) — grounded agentic section-finder. LOCATE-only (returns a verbatim anchor,
+  // never a summary) + deterministic offset-string-match gate ⇒ a wrong locate is REJECTED, fails SAFE to
+  // INCOMPLETE. Sonnet by "max capability, not max model": the gate — not the model — guarantees correctness.
+  finder: "claude-sonnet-4-6",
 };
 
 // Per-role env override knobs. AUDIT_MAP_MODEL / AUDIT_MODEL are the pre-registry
@@ -31,6 +35,7 @@ const ENV_OVERRIDE: Record<ModelRole, string> = {
   lens: "AUDIT_LENS_MODEL",
   crossdoc: "AUDIT_CROSSDOC_MODEL",
   judge: "AUDIT_MODEL",
+  finder: "AUDIT_FINDER_MODEL",
 };
 
 /** Resolve the model for a role: env override (trimmed, tolerant of stray spaces)

@@ -29,6 +29,13 @@ const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {
   return out;
 };
 
+/** Materialize the deterministic section map (the same map readSection/coreMissingFor read). L3 uses this to
+ *  merge agentic-located sections over the deterministic base and pin the result onto ctx.sections so every
+ *  downstream reader (experts · coverage · coreMissingFor) transparently sees the located §L/§M. */
+export function materializeSections(ctx: AuditToolContext): Record<string, string> {
+  return { ...sectionsOf(ctx) };
+}
+
 const CLAUSE_RE = /\b2?52\.\d{3}-\d{1,4}\b/;
 const norm = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase();
 
