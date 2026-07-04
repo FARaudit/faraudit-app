@@ -17,9 +17,13 @@ const buf = Buffer.from("x");
 ok("C-8: §D/§E/§F/§K are now binding-completeness sections", ["D", "E", "F", "K"].every((s) => (BINDING_SECTIONS as readonly string[]).includes(s)));
 ok("C-8: §G and §J are NOT in the completeness set (read-and-attest only)", !(BINDING_SECTIONS as readonly string[]).includes("G") && !(BINDING_SECTIONS as readonly string[]).includes("J"));
 
-// ── C-5: unrecognized format with NO locatable core → cannot certify → coreMissing; a parseable one → [] ──
+// ── C-5: unrecognized format with NO locatable core → cannot certify → coreMissing[C,L,M] ──
 ok("C-5: an unrecognized structureless blob (no §C/§L/§M) → coreMissing = [C,L,M]", coreMissingFor({ fullSource: "random unstructured text with no solicitation headers whatsoever." }).length === 3);
-ok("C-5: an unknown-format package that still has an inline SOW (§C present) is NOT flagged", coreMissingFor({ fullSource: "Statement of Work\nThe contractor shall perform the work as specified." }).length === 0);
+// SUPERSEDED by Layer-2 (Brain card 262): the §C-only "free pass" is KILLED. A SOW-only source (§C present, §L/§M
+// absent — the 80NSSC26936974Q class where §L/§M lived in an un-ingested notice body) is a solicitation-type buy
+// by fail-safe default → it now DISCLOSES the missing proposal sections [L,M] → INCOMPLETE, never a false-COMPLETE.
+// Non-solicitations stay exempt via requiresLM=false (see test-layer2-notice-body-completeness.ts).
+ok("C-5/Layer-2: SOW-only (§C present, §L/§M absent) solicitation → coreMissing [L,M] (was [] false-COMPLETE)", JSON.stringify(coreMissingFor({ fullSource: "Statement of Work\nThe contractor shall perform the work as specified." })) === JSON.stringify(["L", "M"]));
 
 // ── C-2: a binding SON attachment with obligations but NO grounding finding → NOT covered ──
 const T38_SON = "Statement of Need (SoN)\nThe contractor shall deliver three T-38 pitot probes within 45 days after receipt of order and shall provide a certificate of conformance.";

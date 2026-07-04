@@ -149,7 +149,15 @@ export async function executeAgenticPrimary(
   // upstream (audit-executor.ts SAM cross-ref). Uploads have no SAM NAICS → null → NMR stays silent.
   // Per-run token tally (concurrency-safe — this array is local to THIS audit, unlike the global usage sinks).
   const usageCalls: UsageCall[] = [];
-  const res = await auditPackage({ fullSource, bidderProfile, signal, manifestComplete, naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null, onUsage: (u) => usageCalls.push(u) });
+  const res = await auditPackage({
+    fullSource, bidderProfile, signal, manifestComplete,
+    naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
+    // Layer-2 (Brain card 262 — content-aware completeness): the SAM notice type scopes the §L/§M requirement to
+    // solicitation-type buys, and form_identified corroborates whether the §L/§M-bearing primary was ingested.
+    noticeType: solicitation?.type ?? null,
+    formIdentified: input.ingestion?.form_identified,
+    onUsage: (u) => usageCalls.push(u),
+  });
   // If the overall budget aborted mid-run, never write a "complete" row — that late
   // write would overwrite the terminal-failed status the wrapper already set and strand
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
