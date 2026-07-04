@@ -21,14 +21,12 @@ const orch = (findings: TypedFinding[], profile: BidderProfile | null): TypedFin
 const decide = (findings: TypedFinding[], profile: BidderProfile | null, coverageComplete: boolean) =>
   deriveVerdict({ findings: orch(findings, profile), bidderProfile: profile, coverageComplete, verifierSound: true, conflict: false, manifestComplete: true });
 
-let pass = 0; const fails: string[] = []; let xfailed = 0;
+let pass = 0; const fails: string[] = [];
 const eq = (label: string, got: unknown, exp: unknown) => { if (JSON.stringify(got) === JSON.stringify(exp)) pass++; else fails.push(`${label}: got ${JSON.stringify(got)} exp ${JSON.stringify(exp)}`); };
 const ok = (label: string, cond: boolean) => { if (cond) pass++; else fails.push(label); };
-// EXPECTED-FAIL (annotated, does NOT fail the suite): a case whose assertion encodes a PRE-FORK-1/FORK-2 verdict
-// pole that later doctrine superseded — preserved (not deleted) with its migration owner recorded. CEO Rule-61
-// greenlight of Fork-3 (card 238): bundle these annotations so the suite stays green-except-annotated.
-const xfail = (label: string, reason: string) => { xfailed++; console.log(`  ⏭️  [XFAIL] ${label} — ${reason}`); };
-const XFAIL_NOBID_MIGRATION = "PRE-FORK-1/FORK-2 NO_BID pole superseded — an unmarked no_one_can_move (temporal / who-can-win) bar under a null profile now → NEEDS_HUMAN_REVIEW (Fork-2 default-deny made a committal NO_BID unreachable without a positive universalDefect mark; Fork-1 made temporal CAUTION-only), and eligible→null under the tristate. Stale NO_BID expectation, NOT a regression (red on clean cf6bfae). Migrate under P-8/fork-7 (NMR verdict-migration sweep).";
+// FORK-7 MIGRATION LEDGER (Brain card 240 item 5): the U5 XFAILs (a pre-Fork-1/Fork-2 NO_BID pole) migrated to
+// live assertions at their empirically-confirmed current verdict. Zero XFAIL remaining. Printed as a table below.
+const mig: Array<{ assert: string; from: string; to: string; elig: string }> = [];
 const withFlag = <T>(on: boolean, fn: () => T): T => {
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE;
   if (on) process.env.AUDIT_ELIGIBLE_TRISTATE = "true"; else delete process.env.AUDIT_ELIGIBLE_TRISTATE;
@@ -60,10 +58,16 @@ withFlag(true, () => { const d = deriveVerdict(conflictIn()); eq("U3 ON NHR verd
 // U4 — VERIFIED profile satisfies WOSB → eligible=true path intact under BOTH flags (verified vouch untouched).
 withFlag(true, () => { const d = decide([wosb()], verifiedWOSB, true); eq("U4 ON verified verdict=BID", d.verdict, "BID"); eq("U4 ON verified eligible=true", d.eligible, true); });
 withFlag(false, () => eq("U4 OFF verified eligible=true", decide([wosb()], verifiedWOSB, true).eligible, true));
-// U5 — a REAL universal bar (no_one_can_move) → NO_BID, eligible=true (not eligibility_bar) — unchanged both flags.
+// U5 — FORK-7 MIGRATION (card 240 item 5, was XFAIL): an unmarked no_one_can_move temporal bar under a null
+// profile is NEEDS_HUMAN_REVIEW (Fork-1 temporal = CAUTION-only; Fork-2 default-deny made NO_BID unreachable
+// without a positive universalDefect mark). Empirically confirmed live before writing (card-236 discipline).
 const barFinding = (): TypedFinding => ({ id: "bar", requirement: "Delivery in 5 days vs 90-day lead time", citation: "§F", excerpt: "deliver within 5 days", kind: "technical_spec", controllability: "no_one_can_move", grounded: true, lens: "capture" });
-withFlag(false, () => { const d = decide([barFinding()], null, true); xfail("U5 OFF NO_BID → NHR", XFAIL_NOBID_MIGRATION); eq("U5 OFF eligible=true (NHR, flag-off)", d.eligible, true); });
-withFlag(true, () => { const d = decide([barFinding()], null, true); xfail("U5 ON NO_BID unchanged → NHR", XFAIL_NOBID_MIGRATION); xfail("U5 ON eligible=true → null (tristate NHR)", XFAIL_NOBID_MIGRATION); });
+withFlag(false, () => { const d = decide([barFinding()], null, true);
+  mig.push({ assert: "U5 OFF: temporal no_one_can_move + null", from: "NO_BID", to: d.verdict, elig: String(d.eligible) });
+  eq("U5 OFF: temporal bar + null → NHR (was NO_BID)", d.verdict, "NEEDS_HUMAN_REVIEW"); eq("U5 OFF eligible=true (NHR, flag-off)", d.eligible, true); });
+withFlag(true, () => { const d = decide([barFinding()], null, true);
+  mig.push({ assert: "U5 ON (tristate): temporal no_one_can_move + null", from: "NO_BID/eligible:true", to: `${d.verdict}/eligible:${d.eligible}`, elig: String(d.eligible) });
+  eq("U5 ON: temporal bar + null → NHR (was NO_BID)", d.verdict, "NEEDS_HUMAN_REVIEW"); eq("U5 ON eligible=null (tristate NHR; item-h residue resolved by tristate)", d.eligible, null); });
 // U5b — attribute-less eligibility_bar must NOT force eligible=null under a verified/any profile (code-review #3/#4).
 const samNote = (): TypedFinding => ({ id: "sam", requirement: "Offeror must be registered in SAM", citation: "§K", excerpt: "registered in SAM", kind: "eligibility_bar", controllability: "bidder_controls", grounded: true, lens: "capture" });
 withFlag(true, () => { const d = decide([samNote()], null, true); eq("U5b ON attribute-less eligibility item → eligible=true (no over-fire)", d.eligible, true); });
@@ -108,7 +112,10 @@ else {
   withFlag(false, () => { const fs = [...recFindings(), ...proc]; const d = decide(fs, null, covComplete(fs)); eq("B3 OFF verdict=BID_WITH_CAUTION", d.verdict, "BID_WITH_CAUTION"); eq("B3 OFF eligible=true", d.eligible, true); });
 }
 
-console.log(`eligible-tristate gate: ${pass}/${pass + fails.length} pass${xfailed ? ` · ${xfailed} XFAIL (P-8/fork-7 NO_BID→NHR migration)` : ""}`);
+console.log("\n── FORK-7 XFAIL→live migration (U5, empirically confirmed) ──");
+mig.forEach((m, i) => console.log(`  ${i + 1}  ${m.assert.padEnd(48)}  ${(`${m.from} → ${m.to}`).padEnd(34)}  eligible=${m.elig}`));
+console.log(`  (${mig.length} migrated · 0 XFAIL remaining)`);
+console.log(`\neligible-tristate gate: ${pass}/${pass + fails.length} pass`);
 if (fails.length) { console.log("FAILURES:"); fails.forEach((x) => console.log("  ❌ " + x)); process.exit(1); }
-console.log(`✅ ALL PASS${xfailed ? ` (· ${xfailed} annotated XFAIL)` : ""} — null-profile eligibility guarantee: tristate + mandatory firm-status typing + verify-caution; verified path intact; flag-OFF byte-identical.`);
+console.log(`✅ ALL PASS (· ${mig.length} XFAIL→live migrated, 0 remaining) — null-profile eligibility guarantee: tristate + mandatory firm-status typing + verify-caution; verified path intact; flag-OFF byte-identical.`);
 process.exit(0);

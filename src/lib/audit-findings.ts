@@ -106,6 +106,7 @@ export interface TypedFinding {
   // + cautionFloor (furnish an approved equal). NEVER fires when a restrictive qualifier (only / no substitution /
   // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
   orEqualCarveout?: boolean;
+  nmrGuard?: boolean; // FORK-7 (Brain card 240) — set when the NMR firm-status gate re-typed this finding onto the who-can-win path (marker only; deriveVerdict reads controllability/kind).
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
   // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal

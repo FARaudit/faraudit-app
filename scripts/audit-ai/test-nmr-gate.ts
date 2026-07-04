@@ -1,126 +1,67 @@
-// $0 gate for Step 4 — the deterministic NONMANUFACTURER RULE gate (Brain card 132, FAR 52.219-1).
+// $0 gate for the WIRED Fork-7 NMR mechanism (Brain card 240 + card 242 ruling).
 //   npx tsx scripts/audit-ai/test-nmr-gate.ts
 //
-// Doctrine proven here:
-//  • LOAD-BEARING NEGATIVES — fires ONLY on (SB set-aside) AND (supply/manufacturing NAICS sector). Flag-off,
-//    services/construction NAICS, full-&-open, and ABSENT NAICS (the upload path) all stay byte-identical.
-//  • POSITIVE / REPLAY — a Total-SB set-aside under NAICS 336413 (the #2-fixture shape) emits exactly one
-//    bidder_controls + cautionFloor caution citing FAR 52.219-1; it floors a clean BID → BID_WITH_CAUTION and
-//    NEVER downgrades a NO_BID (floor-only).
-//  • NON-DUPLICATION — a pre-existing NMR finding (52.219-1) blocks the emit; a 52.219-14 (LoS) finding does NOT
-//    (distinct obligation) and both survive.
-//  • WIRED + VERIFY-SAFE — runAgenticAudit emits the floor only under the flag, post-verify (skeptic can't cull).
+// Brain card 242 RETIRED the card-132 `applyNonmanufacturerRuleGate` (the SAM-facts cautionFloor emitter). This
+// gate now proves the SINGLE replacement mechanism, WIRED THROUGH THE ORCHESTRATOR (runAgenticAudit), not just unit:
+//   • the deterministic keyfact detector is the SOLE NMR-attribute emitter;
+//   • applyNmrSingleEmitter + applyNmrFirmStatusGate type it onto the Fork-3 who-can-win path;
+//   • compliant → BID/eligible=true (P-8 KILLED, POST-WIRING) · canonical-noncompliant → INELIGIBLE (attribute-specific)
+//     · unknown/null → NHR with curability text · synonym token → NHR (Finding-1 wall, never false INELIGIBLE);
+//   • flag OFF ⇒ byte-identical (the keyfact NMR keeps its card-206-A unverified-gate path).
+//   • I0/I1 MIGRATION (card 236 discipline): the old card-132 integration cases (no-NMR→BID; NMR-floors→CAUTION)
+//     migrate to their empirically-confirmed new verdicts (BID unchanged; NMR under a null profile → NHR).
 
-import { deriveVerdict, applyNonmanufacturerRuleGate, naicsSector } from "@/lib/audit-decide";
+import { deriveVerdict, applyNmrSingleEmitter, applyNmrFirmStatusGate, NMR_ATTRIBUTE } from "@/lib/audit-decide";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "@/lib/audit-findings";
 import { runAgenticAudit } from "@/lib/audit-orchestrator";
 import { type CallModel, type RawFinding } from "@/lib/audit-expert";
 import type { AuditToolContext } from "@/lib/audit-tools";
 
-const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding => ({
-  requirement: o.requirement ?? "requirement", citation: o.citation ?? "FAR 52.x", excerpt: o.excerpt ?? "verbatim", grounded: true, lens: o.lens ?? "x",
-  kind: o.kind, controllability: o.controllability, cautionFloor: o.cautionFloor, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow,
-});
-const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null } = {}): VerdictInputs =>
-  ({ findings, bidderProfile: o.profile ?? null, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true });
-const ON = { enabled: true };
-
-let pass = 0; const fails: string[] = []; let xfailed = 0;
+let pass = 0; const fails: string[] = [];
 const eq = (label: string, got: unknown, exp: unknown) => { if (JSON.stringify(got) === JSON.stringify(exp)) pass++; else fails.push(`${label}: got ${JSON.stringify(got)} exp ${JSON.stringify(exp)}`); };
-// EXPECTED-FAIL (annotated, does NOT fail the suite) — a PRE-FORK-1/FORK-2 verdict pole superseded by later doctrine,
-// preserved with its migration owner recorded (CEO Rule-61 greenlight of Fork-3, card 238).
-const xfail = (label: string, reason: string) => { xfailed++; console.log(`  ⏭️  [XFAIL] ${label} — ${reason}`); };
-const XFAIL_NOBID_MIGRATION = "PRE-FORK-1/FORK-2 NO_BID pole superseded — an unmarked no_one_can_move (temporal) show-stopper under a null profile now → NEEDS_HUMAN_REVIEW (Fork-2 default-deny: no committal NO_BID without a positive universalDefect mark; Fork-1 temporal = CAUTION-only). Stale NO_BID expectation, NOT a regression (red on clean cf6bfae). Migrate under P-8/fork-7 (NMR verdict-migration sweep).";
+const ok = (label: string, cond: boolean) => { if (cond) pass++; else fails.push(label); };
+// I0/I1 MIGRATION LEDGER (card 236 discipline): empirical live verdict computed BEFORE the assertion, table printed.
+const mig: Array<{ assert: string; from: string; to: string }> = [];
 
-// A non-NMR baseline finding set (a clean BID's worth of gate-to-clear facts).
+// ── UNIT: single-emitter + firm-status gate, keyed on the NMR attribute (order-independent) ──
+const nmr = (over: Partial<TypedFinding> = {}): TypedFinding => ({
+  requirement: "Non-Manufacturer Rule (FAR 52.219-33): a nonmanufacturer must supply a small U.S. manufacturer's end item.",
+  citation: "FAR 52.219-33 · 13 CFR 121.406(b)", excerpt: "the non-manufacturer rule applies to this small-business set-aside supply acquisition",
+  kind: "eligibility_bar", controllability: "bidder_controls", requiredAttribute: NMR_ATTRIBUTE, curableInWindow: true, grounded: true, lens: "keyfact_detector", ...over,
+});
+const gate = (fs: TypedFinding[], p: BidderProfile | null) => applyNmrFirmStatusGate(applyNmrSingleEmitter(fs), p, { enabled: true });
+const inp = (fs: TypedFinding[], p: BidderProfile | null): VerdictInputs => ({ findings: gate(fs, p), bidderProfile: p, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true });
+const withTristate = <T>(fn: () => T): T => { const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; process.env.AUDIT_ELIGIBLE_TRISTATE = "true"; try { return fn(); } finally { if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev; } };
+
+withTristate(() => {
+  eq("U-single: a model-lens NMR attribute is stripped to advisory when keyfact also emits (one canonical carrier)",
+    applyNmrSingleEmitter([{ ...nmr(), lens: "small_business_counsel" }, nmr()]).filter((f) => f.requiredAttribute === NMR_ATTRIBUTE).length, 1);
+  eq("U-compliant: firmStatus satisfies → BID / eligible=true (P-8 killed)", (() => { const d = deriveVerdict(inp([nmr()], { satisfiedAttributes: [NMR_ATTRIBUTE] })); return [d.verdict, d.eligible]; })(), ["BID", true]);
+  eq("U-noncompliant: POSITIVE canonical non-compliance token → INELIGIBLE / eligible=false", (() => { const d = deriveVerdict(inp([nmr()], { satisfiedAttributes: ["nonmanufacturer:noncompliant"], openWorld: false })); return [d.verdict, d.eligible]; })(), ["INELIGIBLE", false]);
+  eq("U-absence: closed-world with NO NMR token → NHR (absence ≠ ineligible, review-hardened)", deriveVerdict(inp([nmr()], { satisfiedAttributes: ["some clearance"], openWorld: false })).verdict, "NEEDS_HUMAN_REVIEW");
+  eq("U-unknown: null profile → NEEDS_HUMAN_REVIEW", deriveVerdict(inp([nmr()], null)).verdict, "NEEDS_HUMAN_REVIEW");
+});
+
+// ── deriveVerdict INTEGRATION (the card-132 I-series, now on the NEW mechanism) ──
+// A non-NMR clean base (gate-to-clear facts) — a clean BID's worth.
 const base: TypedFinding[] = [
-  f({ requirement: "submit pricing for all CLINs", kind: "pricing", controllability: "bidder_controls" }),
-  f({ requirement: "Certificate of Conformance", kind: "submission", controllability: "bidder_controls" }),
+  { requirement: "submit pricing for all CLINs", citation: "§B", excerpt: "pricing", kind: "pricing", controllability: "bidder_controls", grounded: true, lens: "capture" },
+  { requirement: "Certificate of Conformance", citation: "§L", excerpt: "CoC", kind: "submission", controllability: "bidder_controls", grounded: true, lens: "ko" },
 ];
-const nmrCount = (xs: TypedFinding[]) => xs.filter((x) => x.lens === "nonmanufacturer_rule").length;
+withTristate(() => {
+  const i0 = deriveVerdict(inp(base, null)).verdict;               // no NMR
+  mig.push({ assert: "I0 clean base, no NMR, null profile", from: "BID", to: i0 });
+  eq("I0 clean base (no NMR) → BID (unchanged)", i0, "BID");
+  const i1 = deriveVerdict(inp([...base, nmr()], null)).verdict;   // NMR present, null profile
+  mig.push({ assert: "I1 base + NMR, null profile (was card-132 CAUTION floor)", from: "BID_WITH_CAUTION", to: i1 });
+  eq("I1 NMR under null profile → NEEDS_HUMAN_REVIEW (migrated from the card-132 CAUTION floor)", i1, "NEEDS_HUMAN_REVIEW");
+});
 
-// ── sector arithmetic (deterministic, no lookup) ──
-eq("naicsSector 336413 → 33", naicsSector("336413"), "33");
-eq("naicsSector 423610 → 42", naicsSector("423610"), "42");
-eq("naicsSector 541330 → 54", naicsSector("541330"), "54");
-eq("naicsSector null → null", naicsSector(null), null);
-eq("naicsSector garbage → null", naicsSector("NAICS code"), null);
-
-// ── LOAD-BEARING NEGATIVES ──
-eq("N1 flag OFF → byte-identical (no emit) even with trigger facts",
-   applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: "Total Small Business Set-Aside" }), base);
-eq("N2 services NAICS (54) + SB set-aside → silent",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: "541330", setAside: "Total Small Business Set-Aside" }, ON)), 0);
-eq("N3 construction NAICS (23) + SB set-aside → silent",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: "236220", setAside: "8(a) Set-Aside" }, ON)), 0);
-eq("N4 supply NAICS + FULL & OPEN → silent",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: "Full & Open" }, ON)), 0);
-eq("N5 supply NAICS + NULL naics (upload path) → silent (honest)",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: null, setAside: "Total Small Business Set-Aside" }, ON)), 0);
-eq("N6 supply NAICS + empty set-aside → silent",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: "" }, ON)), 0);
-eq("N7 supply NAICS + non-SB unrestricted label → silent",
-   nmrCount(applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: "Unrestricted" }, ON)), 0);
-
-// ── POSITIVE / REPLAY (the #2-fixture shape: NAICS 336413 + Total SB set-aside) ──
-const fired = applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: "Total Small Business Set-Aside" }, ON);
-eq("P1 emits exactly one NMR finding", nmrCount(fired), 1);
-const n = fired.find((x) => x.lens === "nonmanufacturer_rule")!;
-eq("P1 citation = FAR 52.219-1", n.citation, "FAR 52.219-1");
-eq("P1 controllability = bidder_controls (never a bar)", n.controllability, "bidder_controls");
-eq("P1 cautionFloor = true", n.cautionFloor, true);
-eq("P1 grounded in the deterministic fact", n.grounded, true);
-eq("P2 wholesale NAICS (42) + WOSB → fires", nmrCount(applyNonmanufacturerRuleGate(base, { naics: "423610", setAside: "WOSB Set-Aside" }, ON)), 1);
-eq("P3 retail NAICS (44) + 8(a) → fires", nmrCount(applyNonmanufacturerRuleGate(base, { naics: "445110", setAside: "8(a)" }, ON)), 1);
-
-// ── REAL SAM CODES (the value that actually reaches the gate — audit row stores "8A"/"SBA", not the name) ──
-for (const code of ["SBA", "SBP", "8A", "8AN", "HZC", "HZS", "SDVOSBC", "SDVOSBS", "WOSB", "WOSBSS", "EDWOSB", "EDWOSBSS"]) {
-  eq(`P-code ${code} (supply NAICS) → fires`, nmrCount(applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: code }, ON)), 1);
-}
-// Codes that must NOT fire (not SBA-program set-asides) even under a supply NAICS.
-for (const code of ["NONE", "", "LAS", "IEE", "ISBEE", "BI"]) {
-  eq(`N-code ${JSON.stringify(code)} (supply NAICS) → silent`, nmrCount(applyNonmanufacturerRuleGate(base, { naics: "336413", setAside: code }, ON)), 0);
-}
-
-// ── NON-DUPLICATION ──
-const seededNMR = [...base, f({ requirement: "NMR per lens", citation: "FAR 52.219-1", kind: "submission", controllability: "bidder_controls", lens: "eligibility_counsel" })];
-eq("D1 pre-existing 52.219-1 finding → NO double-emit (lens NMR wins the slot)",
-   nmrCount(applyNonmanufacturerRuleGate(seededNMR, { naics: "336413", setAside: "Total Small Business Set-Aside" }, ON)), 0);
-eq("D1 length unchanged (still one NMR-citing finding total)",
-   applyNonmanufacturerRuleGate(seededNMR, { naics: "336413", setAside: "Total Small Business Set-Aside" }, ON).filter((x) => /52\.219-1(?!\d)/.test(x.citation)).length, 1);
-const seededLoS = [...base, f({ requirement: "Limitations on Subcontracting 50% self-performance", citation: "FAR 52.219-14", kind: "clause_flowdown", controllability: "bidder_controls", lens: "eligibility_counsel" })];
-const withBoth = applyNonmanufacturerRuleGate(seededLoS, { naics: "336413", setAside: "Total Small Business Set-Aside" }, ON);
-eq("D2 a 52.219-14 (LoS) finding does NOT block NMR — distinct obligation", nmrCount(withBoth), 1);
-eq("D2 both survive (52.219-1 AND 52.219-14)",
-   [withBoth.some((x) => x.citation === "FAR 52.219-1"), withBoth.some((x) => x.citation === "FAR 52.219-14")], [true, true]);
-// D3 — a lens NMR finding under a DIFFERENT NMR authority (13 CFR 121.406) still blocks the double-emit.
-const seeded406 = [...base, f({ requirement: "size/manufacturing analysis", citation: "13 CFR 121.406", kind: "submission", controllability: "bidder_controls", lens: "eligibility_counsel" })];
-eq("D3 lens NMR cited as 13 CFR 121.406 → NO double-emit", nmrCount(applyNonmanufacturerRuleGate(seeded406, { naics: "336413", setAside: "SBA" }, ON)), 0);
-// D4 — a lens finding that NAMES the rule (requirement text) but cites the waiver section → blocks double-emit.
-const seededTopic = [...base, f({ requirement: "the nonmanufacturer rule applies; consider a waiver", citation: "FAR 19.505", kind: "submission", controllability: "bidder_controls", lens: "eligibility_counsel" })];
-eq("D4 lens finding naming the nonmanufacturer rule → NO double-emit", nmrCount(applyNonmanufacturerRuleGate(seededTopic, { naics: "336413", setAside: "SBA" }, ON)), 0);
-// D5 — THE FALSE-NEGATIVE GUARD: 52.219-6 (set-aside NOTICE, on nearly every SB audit) must NEVER suppress NMR.
-const seeded6 = [...base, f({ requirement: "Notice of Total Small Business Set-Aside", citation: "FAR 52.219-6", kind: "eligibility_bar", controllability: "already_satisfied", lens: "eligibility_counsel" })];
-eq("D5 a 52.219-6 set-aside-notice finding does NOT suppress the floor (catch-every-time intact)",
-   nmrCount(applyNonmanufacturerRuleGate(seeded6, { naics: "336413", setAside: "SBA" }, ON)), 1);
-
-// ── deriveVerdict INTEGRATION: floor a clean BID, never downgrade a bar ──
-eq("I0 clean BID baseline (no NMR) → BID", deriveVerdict(inp(base)).verdict, "BID");
-eq("I1 NMR floors clean BID → BID_WITH_CAUTION", deriveVerdict(inp(fired)).verdict, "BID_WITH_CAUTION");
-eq("I1 floored verdict stays eligible", deriveVerdict(inp(fired)).eligible, true);
-const withBar = applyNonmanufacturerRuleGate(
-  [...base, f({ requirement: "5-day delivery vs 90-day irreducible lead time", kind: "technical_spec", controllability: "no_one_can_move" })],
-  { naics: "336413", setAside: "Total Small Business Set-Aside" }, ON);
-// XFAIL: the NMR floor still never DOWNGRADES a show-stopper, but the "real show-stopper" here is an unmarked
-// no_one_can_move temporal bar that Fork-1/Fork-2 themselves migrated NO_BID→NHR — so the concrete expectation is
-// stale. Verdict observed but not asserted (migrate under P-8/fork-7). void keeps `withBar` referenced.
-xfail(`I2 real no_one_can_move show-stopper → NO_BID (now ${deriveVerdict(inp(withBar)).verdict})`, XFAIL_NOBID_MIGRATION);
-
-// ── WIRED + VERIFY-SAFE: runAgenticAudit emits the floor only under the flag, post-verify ──
+// ── WIRED + VERIFY-SAFE: runAgenticAudit is the SOLE NMR mechanism; the flag types it end-to-end ──
 const SRC = [
   "SECTION B - SUPPLIES AND PRICES", "Offerors shall submit pricing for all CLINs 0001 through 0005.",
   "SECTION C - STATEMENT OF WORK", "The contractor shall furnish one mini-excavator with a fully enclosed cab.",
-  "SECTION I - CONTRACT CLAUSES", "52.219-6 Notice of Total Small Business Set-Aside is incorporated.",
+  "SECTION I - CONTRACT CLAUSES", "52.219-33 Non-Manufacturer Rule applies to this Total Small Business Set-Aside supply acquisition.",
   "SECTION L - INSTRUCTIONS TO OFFERORS", "Submit a Certificate of Conformance with the offer.",
   "SECTION M - EVALUATION FACTORS", "Award will be made on a Lowest-Priced Technically Acceptable basis.",
 ].join("\n");
@@ -128,7 +69,6 @@ const ctx: AuditToolContext = { fullSource: SRC };
 const RF: Record<string, RawFinding> = {
   price: { requirement: "submit pricing for all CLINs", citation: "§B", excerpt: "pricing for all CLINs", kind: "pricing", controllability: "bidder_controls" },
   cab:   { requirement: "enclosed cab", citation: "§C", excerpt: "fully enclosed cab", kind: "technical_spec", controllability: "bidder_controls" },
-  setA:  { requirement: "small-business set-aside (firm qualifies)", citation: "§I", excerpt: "52.219-6", kind: "eligibility_bar", controllability: "already_satisfied" },
   coc:   { requirement: "Certificate of Conformance", citation: "§L", excerpt: "Certificate of Conformance", kind: "submission", controllability: "bidder_controls" },
   eval:  { requirement: "LPTA evaluation", citation: "§M", excerpt: "Lowest-Priced Technically Acceptable", kind: "other", controllability: "bidder_controls" },
 };
@@ -136,31 +76,65 @@ const ALL = ["B", "C", "I", "L", "M"];
 const stub: CallModel = async ({ system, priorToolResults }) =>
   priorToolResults.length === 0
     ? { toolCalls: ALL.map((k) => ({ id: `r${k}`, name: "read_section", input: { key: k } })), findings: null }
-    : { toolCalls: [], findings: ({ LENS_A: [RF.price, RF.cab, RF.setA], LENS_B: [RF.cab, RF.coc, RF.eval] } as Record<string, RawFinding[]>)[system] ?? [] };
+    : { toolCalls: [], findings: ({ LENS_A: [RF.price, RF.cab], LENS_B: [RF.coc, RF.eval] } as Record<string, RawFinding[]>)[system] ?? [] };
 const experts = [{ key: "capture", system: "LENS_A" }, { key: "ko", system: "LENS_B" }];
+const nmrCount = (fs: TypedFinding[]) => fs.filter((f) => f.requiredAttribute === NMR_ATTRIBUTE).length;
+
+const withEnv = async (env: Record<string, string | undefined>, fn: () => Promise<void>) => {
+  const prev: Record<string, string | undefined> = {};
+  for (const k of Object.keys(env)) { prev[k] = process.env[k]; if (env[k] === undefined) delete process.env[k]; else process.env[k] = env[k]!; }
+  try { await fn(); } finally { for (const k of Object.keys(prev)) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]!; } }
+};
+const WIRED = { AUDIT_KEYFACT_DETECTOR: "true", AUDIT_NMR_FIRMSTATUS_GATE: "true", AUDIT_ELIGIBLE_TRISTATE: "true" };
 
 (async () => {
-  delete process.env.AUDIT_NONMANUFACTURER_RULE_GATE;
-  const off = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside" });
-  eq("W1 flag OFF → BID (unchanged baseline, facts present but inert)", off.decision.verdict, "BID");
-  eq("W1 flag OFF → no NMR finding", nmrCount(off.findings), 0);
-  eq("W1 flag OFF → no perLens NMR key (byte-identical surface)", off.perLens.nonmanufacturer_rule, undefined);
+  // W-emitter: the keyfact detector emits exactly ONE NMR attribute from the source (sole emitter).
+  await withEnv(WIRED, async () => {
+    const compliant = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: { satisfiedAttributes: [NMR_ATTRIBUTE] } });
+    eq("W-emitter: exactly one NMR attribute emitted (keyfact = sole emitter)", nmrCount(compliant.findings), 1);
+    // W-compliant (THE P-8 NEGATIVE, POST-WIRING, orchestrator path): compliant firm → BID / eligible=true.
+    eq("W-compliant: wired orchestrator path → BID", compliant.decision.verdict, "BID");
+    eq("W-compliant: P-8 KILLED end-to-end → eligible=true (was null forever)", compliant.decision.eligible, true);
 
-  process.env.AUDIT_NONMANUFACTURER_RULE_GATE = "true";
-  // Use the REAL SAM code "SBA" (Total Small Business) — proves the production code path end-to-end.
-  const on = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "SBA" });
-  eq("W2 flag ON + supply facts (code SBA) → BID_WITH_CAUTION (floor wired, survived verify)", on.decision.verdict, "BID_WITH_CAUTION");
-  eq("W2 flag ON → exactly one NMR finding present post-verify", nmrCount(on.findings), 1);
+    // W-noncompliant: a POSITIVE canonical non-compliance token → INELIGIBLE with an attribute-specific reason.
+    const nonc = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: { satisfiedAttributes: ["nonmanufacturer:noncompliant"], openWorld: false } });
+    eq("W-noncompliant: POSITIVE canonical non-compliance token → INELIGIBLE", nonc.decision.verdict, "INELIGIBLE");
+    ok("W-noncompliant: reason names the NMR attribute (attribute-specific, no category claim)", /nonmanufacturer:compliant/i.test(nonc.decision.reason) && !/who-can-win/i.test(nonc.decision.reason));
+    // W-absence: closed-world with an unrelated attribute (NO NMR token) → NHR, never a false INELIGIBLE (review-hardened).
+    const absent = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: { satisfiedAttributes: ["Top Secret facility clearance"], openWorld: false } });
+    eq("W-absence: closed-world, NO NMR token → NHR (absence ≠ ineligible)", absent.decision.verdict, "NEEDS_HUMAN_REVIEW");
 
-  const onServices = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "541330", setAside: "Total Small Business Set-Aside" });
-  eq("W3 flag ON + SERVICES NAICS → BID (silent, no floor)", onServices.decision.verdict, "BID");
+    // W-unknown: null profile → NHR with the curability path (not the lead-time framing), never NO_BID.
+    const unk = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: null });
+    eq("W-unknown: null profile → NEEDS_HUMAN_REVIEW", unk.decision.verdict, "NEEDS_HUMAN_REVIEW");
+    ok("W-unknown: NHR reason carries NMR curability (supply a small U.S. manufacturer's product)", /supplying a small u\.s\. manufacturer/i.test(unk.decision.reason) && !/lead time exceeds/i.test(unk.decision.reason));
+    ok("W-unknown: never NO_BID", unk.decision.verdict !== "NO_BID");
 
-  const onNull = await runAgenticAudit({ ctx, experts, callModel: stub, naics: null, setAside: "Total Small Business Set-Aside" });
-  eq("W4 flag ON + NULL naics (upload) → BID (honest silence)", onNull.decision.verdict, "BID");
-  delete process.env.AUDIT_NONMANUFACTURER_RULE_GATE;
+    // W-synonym (Finding-1 WALL): a closed-world firm asserting NMR status in an UNRECOGNIZED form → NHR, never INELIGIBLE.
+    const syn = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: { satisfiedAttributes: ["nonmanufacturer-ok"], openWorld: false } });
+    eq("W-synonym: closed-world synonym token → NHR (never false INELIGIBLE)", syn.decision.verdict, "NEEDS_HUMAN_REVIEW");
+    ok("W-synonym: NOT INELIGIBLE (walk-away-error wall holds through the orchestrator)", syn.decision.verdict !== "INELIGIBLE");
+  });
 
-  console.log(`nonmanufacturer-rule gate: ${pass}/${pass + fails.length} pass`);
+  // W-off: flag OFF ⇒ byte-identical — the keyfact NMR keeps its card-206-A unverified-gate path (eligible=null caution),
+  //        the who-can-win typing NEVER runs, verdict is NOT a hard pole.
+  await withEnv({ AUDIT_KEYFACT_DETECTOR: "true", AUDIT_NMR_FIRMSTATUS_GATE: undefined, AUDIT_ELIGIBLE_TRISTATE: "true" }, async () => {
+    const off = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: null });
+    ok("W-off: gate OFF → NMR is NOT a hard pole (no INELIGIBLE/NO_BID) — byte-identical card-206-A path", off.decision.verdict !== "INELIGIBLE" && off.decision.verdict !== "NO_BID");
+    eq("W-off: gate OFF → NMR attribute still emitted by keyfact (sole emitter), just not who-can-win typed", nmrCount(off.findings), 1);
+    // BYTE-IDENTITY (adversarial review Finding 2): gate OFF + a NON-NULL profile self-asserting NMR in synonym form.
+    // The firmStatus NMR branch is gated on nmrGuard (only set by the Fork-7 gate), so with the gate OFF it is INERT
+    // — the NMR stays on its card-206-A unverified-gate path → eligible=null (NOT the over-green eligible=true the
+    // un-gated branch would have produced). This is the flag-off-is-byte-identical guarantee, non-null-profile path.
+    const offNonNull = await runAgenticAudit({ ctx, experts, callModel: stub, naics: "336413", setAside: "Total Small Business Set-Aside", bidderProfile: { satisfiedAttributes: ["NMR compliant"], openWorld: true } });
+    eq("W-off byte-identity: gate OFF + non-null synonym profile → eligible NOT force-true (NMR branch inert)", offNonNull.decision.eligible !== true, true);
+  });
+
+  console.log(`nmr-gate: ${pass}/${pass + fails.length} pass`);
   if (fails.length) { console.log("✗ FAILURES:\n" + fails.map((x) => "  - " + x).join("\n")); process.exit(1); }
-  console.log(`✅ ALL PASS${xfailed ? ` (· ${xfailed} annotated XFAIL — P-8/fork-7 NO_BID→NHR migration)` : ""} — deterministic NMR floor: load-bearing negatives + #2 replay + non-dup + wired/verify-safe.`);
+  console.log("\n── I0/I1 CARD-132→FORK-7 MIGRATION (card 236 discipline, empirical verdict before assertion) ──");
+  mig.forEach((m, i) => console.log(`  ${i + 1}  ${m.assert.padEnd(52)}  ${m.from} → ${m.to}`));
+  console.log(`  (${mig.length} migrated · 0 xfail/skips)`);
+  console.log("✅ ALL PASS — WIRED Fork-7 NMR mechanism (card 242): keyfact sole emitter; compliant→BID/eligible=true (P-8 killed, orchestrator path); noncompliant→INELIGIBLE; unknown/synonym→NHR; flag-off byte-identical. card-132 RETIRED.");
   process.exit(0);
 })();
