@@ -199,6 +199,9 @@ function findings(fd: V4Findings, complete: boolean): string {
     ? `<div class="fgroup fg-ok"><div class="fg-h"><span class="fg-mk"></span>Satisfied · grounded facts<span class="fg-cnt mono">${fd.satisfied.length}</span></div>
          ${fd.satisfied.map((f) => `<div class="sat-row"><span class="sat-dot"></span><span class="sat-req">${esc(f.req)}</span><span class="sat-cite mono">${esc(f.cite)}</span></div>`).join("")}</div>`
     : "";
+  // INCOMPLETE + nothing grounded → omit the whole section (absence rule, Design Gate-2 visual QA):
+  // never render a naked header, never claim "none" on a partial read.
+  if (!complete && !groups && !sat) return "";
   return `
     <section class="sec" id="findings" data-sec>
       <div class="sec-head"><span class="sec-n mono">02</span><h2>Findings</h2>
@@ -275,7 +278,6 @@ function provenance(p: V4Provenance, cov: { state: string; solicitation?: string
           <div class="pv-mrow"><span class="pv-k">Solicitation</span><span class="pv-v mono">${esc(cov.solicitation || "")}</span></div>
           <div class="pv-mrow"><span class="pv-k">Audited</span><span class="pv-v mono">${esc(p.auditDate)}</span></div>
           <div class="pv-mrow"><span class="pv-k">Coverage</span><span class="pv-v">${esc(cov.state)}</span></div>
-          <div class="pv-mrow"><span class="pv-k">Engine</span><span class="pv-v">${esc(p.engine)}</span></div>
         </div>
         <ul class="pv-manifest">${man}</ul>
       </div></section>`;
@@ -290,7 +292,10 @@ export function renderRichWeb(d: V4Data): { html: string; sections: V4Section[] 
   add(masthead(d.masthead));
   add(verdict(d.verdict, { auditId: (d.shell && d.shell.auditId) || d.masthead.solicitation, auditDate: d.provenance && d.provenance.auditDate, coverage: d.coverage }), "verdict", "Verdict", d.verdict.tone);
   add(coverage(d.coverage), "coverage", "Coverage");
-  add(findings(d.findings, complete), "findings", "Findings");
+  // findings omits entirely on an INCOMPLETE zero-findings read → keep it out of the body AND the rail
+  // (no dead rail entry pointing at a missing section). (Design Gate-2 visual QA.)
+  const findingsHtml = findings(d.findings, complete);
+  if (findingsHtml) { parts.push(findingsHtml); sections.push({ id: "findings", label: "Findings" }); }
 
   const L = optional(d.submissionL, d.coverage.state, "sec-l", "03", "Section L · Submission",
     "No Section L submission structure applies — this instrument does not impose separate proposal volumes.", () => submissionL(d.submissionL as V4SubmissionL));

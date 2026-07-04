@@ -224,9 +224,13 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   const findings: V4Findings = buildFindings(all);
   const coverage = buildCoverage(p, documentsComplete);
 
+  // "Audited/Evaluated" date — bind the first persisted date available (Design Gate-2 flag: some run-records,
+  // incl. the real W50 fixture, carry a null v3.generatedAt → the readout showed "Evaluated —"). Fall back
+  // through the sibling top-level stamp then the row's own completion/creation columns; genuine absence → "".
+  const auditDate = s(p.generatedAt) || s(cj.generated_at) || s(audit.completed_at) || s(audit.created_at);
   const provenance: V4Provenance = {
-    auditDate: s(p.generatedAt),
-    engine: "", // engine version must NEVER be customer-facing (CEO rule) — kept out of the render surface
+    auditDate,
+    engine: "", // engine version must NEVER be customer-facing (CEO rule) — no longer rendered (Engine row removed)
     // read-file NAMES are not persisted (only counts + the missing list), so the manifest can only surface the
     // files the engine could NOT read, marked unread. A COMPLETE audit → empty manifest (nothing to flag).
     manifest: (p.documents?.missing || []).map((m) => ({ name: m.name, read: "unread" as const })),

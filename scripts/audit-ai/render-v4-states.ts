@@ -24,6 +24,8 @@ const w50Row = {
   set_aside: "Total Small Business Set-Aside",
   response_deadline: "2026-07-18",
   notice_type: "Combined Synopsis/Solicitation",
+  // real run-record carries a null v3.generatedAt → provenance/readout date falls back to the row column
+  completed_at: "2026-07-03",
   compliance_json: w50,
 };
 
@@ -134,8 +136,20 @@ if (!/No verdict — coverage incomplete/.test(inc)) fail.push("INCOMPLETE eyebr
 if (!/No verdict — outside audit scope/.test(renderV4ReportFromRow(oosRow)))
   fail.push("OUT_OF_SCOPE eyebrow must read 'outside audit scope'");
 
+// ── Design Gate-2 visual-QA guards ──
+// (1) No customer-facing "Engine" label anywhere, on any state.
+for (const [name, html] of [["W50", renderV4ReportFromRow(w50Row)], ["INCOMPLETE", inc], ["OOS", renderV4ReportFromRow(oosRow)]] as const) {
+  if (/>Engine<\/span>/.test(html) || /pv-k">Engine/.test(html)) fail.push(`${name}: customer-facing "Engine" label must be removed`);
+}
+// (2) INCOMPLETE + zero findings → the Findings section is omitted entirely (no naked header, no rail entry).
+if (/id="findings"/.test(inc)) fail.push("INCOMPLETE zero-findings render must OMIT the Findings section");
+if (/data-target="findings"/.test(inc)) fail.push("INCOMPLETE must not leave a dead 'findings' rail entry");
+// (3) readout Evaluated date binds (W50 real record has null generatedAt → must fall back, not render "—").
+if (/vdr-k">Evaluated<\/span><span class="vdr-v">—/.test(renderV4ReportFromRow(w50Row)))
+  fail.push("W50 readout 'Evaluated' must bind a fallback date, not '—'");
+
 if (fail.length) {
   console.error("\n❌ REGRESSION:\n - " + fail.join("\n - "));
   process.exit(1);
 }
-console.log("\n✅ Δ1 eyebrows pole-specific · Δ3 coverage buckets not crossed");
+console.log("\n✅ Δ1 eyebrows pole-specific · Δ3 coverage buckets not crossed · no Engine label · INCOMPLETE omits findings · readout date bound");
