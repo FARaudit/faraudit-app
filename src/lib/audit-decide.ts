@@ -11,6 +11,7 @@
 // NO LLM, NO network, NO randomness. Pure → gate-testable. The controllability rule (Brain card 41) is a
 // `switch` here, not prose in a prompt — that is the entire point.
 
+import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
@@ -855,6 +856,49 @@ function isUniversalDefect(f: TypedFinding): boolean {
   return f.universalDefect != null && UNIVERSAL_DEFECT_CLASSES.has(f.universalDefect);
 }
 
+// ── FORK-5 (Brain card 240) — VERIFICATION EVIDENCE for a committal NO_BID ───────────────────────────
+/** sha256 of a grounded excerpt — the Rule-64 binding for a verified universal-defect mark. Deterministic, pure. */
+export function excerptHash(excerpt: string): string { return createHash("sha256").update(excerpt ?? "", "utf8").digest("hex"); }
+
+// ── FORK-5 HARDENING (Brain card 242, adversarial-review Finding 3) — VERIFIER ALLOWLIST ───────────────
+// The wall-BEFORE-producer twin of the tristate coupling-lock (UNIVERSAL_DEFECT_PRODUCERS): a `verifiedBy` record
+// only counts if its verifierId belongs to a REGISTERED, independent verifier. EMPTY today (no verifier registers)
+// → every universalDefect mark is unverified → NHR in prod until J-1/J-2 registers a real verifier. This closes
+// the self-signed-verifier hole surfaced in review: a self-asserted / unregistered verifierId can NEVER reach NO_BID.
+// SECURITY (adversarial review): registration MUST be boot-only from STATIC trusted config — never from request-
+// or model-controlled data. `verifierId` is a model-shaped finding field; if an attacker could both register an id
+// and supply a matching `verifiedBy.verifierId`, that is privilege-escalation to a committal NO_BID. Today: empty,
+// zero callers, so NO_BID is unreachable (default-deny). `_clearVerifiers` is a TEST seam (twin of
+// `_clearUniversalDefectProducers`) — never call it in a request path (it would wipe NO_BID capability process-wide).
+const VERIFIER_ALLOWLIST = new Set<string>();
+/** Register an independent verifier permitted to affirm a committal universal defect (Fork-5, card 242). BOOT-ONLY. */
+export function registerVerifier(id: string): void { if (id) VERIFIER_ALLOWLIST.add(id); }
+/** Tests only — restore the allowlist to its empty prod state. */
+export function _clearVerifiers(): void { VERIFIER_ALLOWLIST.clear(); }
+/** A `universalDefect` mark is VERIFIED (may drive NO_BID) ONLY when it is GROUNDED, carries a well-formed
+ *  `verifiedBy` from a REGISTERED verifier, and its `excerptHash` matches sha256 of the finding's excerpt.
+ *  INTEGRITY NOTE (adversarial review): the source-truth control is `grounded===true` (a deterministic substring
+ *  check against real source, audit-expert.ts) — that is what stops a fabricated/hallucinated excerpt. The
+ *  `excerptHash` is a verify-time↔decide-time CONSISTENCY binding (the excerpt the verifier affirmed is byte-for-
+ *  byte the one being decided on, even after later excerpt repair), NOT itself a proof of source authenticity. The
+ *  allowlist ensures only an independent registered verifier's affirmation counts. Pure. */
+export function isVerifiedUniversalDefect(f: TypedFinding): boolean {
+  if (!isUniversalDefect(f)) return false;
+  // The excerpt must be GROUNDED (deterministically present in source) and NON-EMPTY — this is the real integrity
+  // control: the hash of a hallucinated span, or the known-constant sha256("") of an empty excerpt, must NEVER pass.
+  if (f.grounded !== true || (f.excerpt ?? "").length === 0) return false;
+  const v = f.verifiedBy;
+  return !!v
+    && typeof v.verifierId === "string" && v.verifierId.length > 0
+    && VERIFIER_ALLOWLIST.has(v.verifierId)  // Fork-5 hardening (card 242 Finding 3): the verifier must be REGISTERED — a self-signed/unregistered id can never reach NO_BID
+    && typeof v.affirmation === "string" && v.affirmation.length > 0
+    && typeof v.excerptHash === "string" && v.excerptHash === excerptHash(f.excerpt);
+}
+/** FORK-5 fail-safe log — a marked-but-unverified committal is an invariant breach (a producer emitted a NO_BID
+ *  mark without the required evidence). Logged (not thrown — that's the tristate coupling-lock's job) so the
+ *  audit fails SAFE to NHR while surfacing the breach. Guarded so a logger failure never affects the verdict. */
+function logInvariantBreach(msg: string): void { try { console.warn(`[engine-invariant-breach] ${msg}`); } catch { /* logging must never affect the verdict */ } }
+
 // ── BRAIN CARD 228 RULING (i) — COUPLING-LOCK MOVED TO BOOT / REGISTRATION-TIME ────────────────────────────
 // A universalDefect producer may run ONLY when a POSITIVE eligibility determination is reachable (tristate ON).
 // The lock is now enforced at REGISTRATION/INIT (the process refuses to start) — never mid-audit as the default.
@@ -973,14 +1017,29 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    NO_BID: INELIGIBLE iff the profile PROVES non-qualification (firmStatus "fails"), else it flows to step 5
   //    and lands at NEEDS_HUMAN_REVIEW (null / open-world / unknown status) — never a default eligible:true.
   const disqualifying = dispositions.filter((f) => f.disposition === "disqualifying");
-  const universalDefect = disqualifying.filter(isUniversalDefect);
+  const markedUniversalDefect = disqualifying.filter(isUniversalDefect);
   // COUPLING-LOCK DECISION-TIME BACKSTOP (card 228 Ruling i) — the PRIMARY lock is boot-time
   // (validateUniversalDefectProducerConfig, above); this fires ONLY if a producer marked a finding without the
   // tristate (a dynamic registration after boot). It throws EngineInvariantError — NOT an NHR verdict — and the
   // audit BOUNDARY converts the throw to a billing-safe failed state (no charge, logged config error). NEVER
-  // default a NO_BID's eligibility to true.
-  if (universalDefect.length && !tristate)
+  // default a NO_BID's eligibility to true. (Applies to ANY mark — verified or not — a config-level guard.)
+  if (markedUniversalDefect.length && !tristate)
     throw new EngineInvariantError("FORK-2 coupling-lock (card 228 Ruling i, decision-time backstop): a universalDefect finding requires AUDIT_ELIGIBLE_TRISTATE=on — a committal NO_BID must carry a POSITIVE eligibility determination, never a default true.");
+  // FORK-5 (Brain card 240) — EVIDENTIARY BAR: a `universalDefect` mark may drive NO_BID ONLY when it carries
+  // VERIFICATION EVIDENCE (a `verifiedBy` record whose excerptHash binds the affirmation to the cited grounded
+  // excerpt — Rule 64, never a model prior). Split the marks: only VERIFIED marks flow to the show-stopper /
+  // NO_BID path; an UNVERIFIED mark is an invariant breach.
+  const universalDefect = markedUniversalDefect.filter(isVerifiedUniversalDefect);
+  const unverifiedUniversalDefect = markedUniversalDefect.filter((f) => !isVerifiedUniversalDefect(f));
+  // A marked-but-UNVERIFIED committal may neither drive NO_BID nor silently clear to BID (it is excluded from the
+  // verified show-stopper set AND from unmarkedUniversalClaim which filters !isUniversalDefect). Fail SAFE to NHR
+  // + LOG the breach — same fail-safe family as the tristate coupling-lock — BEFORE any committal emission, so an
+  // unverified mark can never reach a committal pole. (When J-1/J-2 wires a real verifier this path goes quiet.)
+  if (unverifiedUniversalDefect.length) {
+    const breach = `FORK-5 invariant breach (card 240): ${unverifiedUniversalDefect.length} finding(s) marked universalDefect WITHOUT verification evidence — a committal NO_BID may not rest on an unverified mark (no verifiedBy binding the defect to the cited excerpt, Rule 64). Fail-safe → NEEDS_HUMAN_REVIEW: ${unverifiedUniversalDefect.map((s) => s.requirement).join("; ")}`;
+    logInvariantBreach(breach);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect);
+  }
   // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
   // eligibility_bar). An earned (proven-fail) INELIGIBLE is NEVER routed to NHR on a mis-typed kind string.

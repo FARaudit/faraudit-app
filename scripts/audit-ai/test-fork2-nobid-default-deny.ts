@@ -6,8 +6,17 @@
  *  to INELIGIBLE (profile proves non-qual) / NHR (null); the allowlist marker is the ONLY NO_BID gate.
  *    npx tsx scripts/audit-ai/test-fork2-nobid-default-deny.ts */
 import { readFileSync } from "node:fs";
-import { deriveVerdict, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, EngineInvariantError, registerUniversalDefectProducer, validateUniversalDefectProducerConfig, _clearUniversalDefectProducers } from "@/lib/audit-decide";
+import { deriveVerdict, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, EngineInvariantError, registerUniversalDefectProducer, validateUniversalDefectProducerConfig, _clearUniversalDefectProducers, excerptHash, registerVerifier } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
+
+// FORK-5 MIGRATION (Brain card 240): a universalDefect mark now drives NO_BID ONLY when it carries verification
+// evidence (a verifiedBy record whose excerptHash binds the affirmation to the cited excerpt — Rule 64). The
+// Fork-2 GUARANTEE is untouched (who-can-win never NO_BID; positive-allow only); the two cases here that exercise
+// the NO_BID PATH now supply the evidence Fork-5 requires. `verified()` attaches a well-formed record.
+// FORK-5 HARDENING (card 242 Finding 3): the verifier must ALSO be registration-allowlisted — register the
+// simulated verifier so the NO_BID-path marks can reach NO_BID (unregistered ids can't; proven in test-fork5).
+registerVerifier("test:sim-verifier");
+const verified = (f: TypedFinding): TypedFinding => ({ ...f, verifiedBy: { verifierId: "test:sim-verifier", excerptHash: excerptHash(f.excerpt), affirmation: "the marked defect follows from the cited excerpt" } });
 
 let pass = 0; const fails: string[] = [];
 const ok = (label: string, cond: boolean) => { if (cond) { pass++; console.log(`  [PASS] ${label}`); } else { fails.push(label); console.log(`  [FAIL] ${label}`); } };
@@ -58,7 +67,7 @@ ok("INV: no universalDefect present anywhere → NO finding can drive NO_BID (de
 // coupling-lock (Ruling B): the SAME real bar POSITIVELY marked a universal defect → HARD ERROR under
 // AUDIT_ELIGIBLE_TRISTATE=off (no universal-defect producer may run without positive-eligibility), and → NO_BID
 // under tristate=on (the allowlist is the ONLY NO_BID gate).
-const markedUniversal: TypedFinding = { ...misTyped, universalDefect: "unmeetable_by_any_offeror" };
+const markedUniversal: TypedFinding = verified({ ...misTyped, universalDefect: "unmeetable_by_any_offeror" }); // Fork-5: verified so it drives NO_BID (tristate-on) / still throws the coupling-lock (tristate-off)
 {
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; delete process.env.AUDIT_ELIGIBLE_TRISTATE;
   let threw = false; let caught: unknown; try { deriveVerdict(inp([markedUniversal], null)); } catch (e) { threw = true; caught = e; }
@@ -103,7 +112,7 @@ console.log("[Ruling ii — precedence pre-lock (universal BEFORE firmStatus)]")
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; process.env.AUDIT_ELIGIBLE_TRISTATE = "true";  // so the coupling-lock permits the marked finding
   const realAttr2 = realBar.requiredAttribute!;
   // real bar + REAL requiredAttribute the closed-world profile provably fails, ALSO marked a universal defect:
-  const markedAndFails: TypedFinding = { ...realBar, controllability: "no_one_can_move", kind: "technical_spec", universalDefect: "unmeetable_by_any_offeror", grounded: true };
+  const markedAndFails: TypedFinding = verified({ ...realBar, controllability: "no_one_can_move", kind: "technical_spec", universalDefect: "unmeetable_by_any_offeror", grounded: true }); // Fork-5: verified mark → NO_BID path
   const vPrec = deriveVerdict(inp([markedAndFails], { satisfiedAttributes: [] }));  // closed-world, does NOT hold realAttr2 → firmStatus "fails"
   ok("ii-precedence: marked universalDefect + coincident closed-world attribute-fail → NO_BID (attributed universal, requirement-side)", vPrec.verdict === "NO_BID");
   ok("ii-precedence: reason is the UNIVERSAL defect, firmStatus did NOT re-label to a firm disqualification",

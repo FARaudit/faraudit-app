@@ -56,6 +56,17 @@ export interface TypedFinding {
   // by ANY offeror. Absent/undefined ⇒ the finding is WHO-CAN-WIN (or curable) and can NEVER drive NO_BID
   // (default-deny). No producer emits this yet — it is the hook a future universal-defect detector sets.
   universalDefect?: "contradictory_mandatory_terms" | "unmeetable_by_any_offeror";
+  // BRAIN CARD 240 FORK 5 — VERIFICATION EVIDENCE for a committal NO_BID. A `universalDefect` mark drives NO_BID
+  // ONLY when it also carries this record: a verifier affirmed the defect FOLLOWS from the cited excerpt against
+  // document truth (Rule 64 — never a model prior). `excerptHash` = sha256(excerpt) binds the affirmation to the
+  // grounded source span, so a mark cannot rest on fabricated text. Absent (or a hash that doesn't match the
+  // excerpt) ⇒ the mark is UNVERIFIED and can NEVER reach NO_BID → NHR + logged invariant breach. No producer
+  // emits this yet — it is the shape J-1/J-2 (the judgment/verifier layer) builds INTO.
+  verifiedBy?: {
+    verifierId: string;    // the verifier that affirmed the defect (e.g. "adversarial-verifier@v3")
+    excerptHash: string;   // sha256(excerpt) — binds the affirmation to the grounded source span
+    affirmation: string;   // the affirmation that the defect follows from the cited excerpt
+  };
   severity?: "P0" | "P1" | "P2"; // for a residual RISK (not a hard requirement) — its materiality
   // CAUTION-FLOOR (Brain card 75-R2 / 78-R1) — set by the deterministic caution-floor pass (default-off
   // flag) when a finding matches a caution archetype (named role + quantified experience-years, specialized
