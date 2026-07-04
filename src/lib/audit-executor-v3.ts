@@ -18,13 +18,14 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
-import { buildAgenticDocs, assembleFullSourceBudgeted } from "./agentic-executor";
+import { buildAgenticDocs, assembleFullSourceBudgeted, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
+import { isNoticedescUrl } from "./sam-description";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -100,15 +101,32 @@ export async function executeAgenticPrimary(
 ): Promise<AuditExecutionResult> {
   await markStage(supabase, auditId, "extraction");
 
+  // A SAM solicitation (32-hex notice id) vs a genuine upload. Decisive both for the
+  // completeness cap below AND for L1 notice-body ingest: only a SAM notice HAS a
+  // government-published body; an upload's description field is not one.
+  const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
+
+  // L1 (Brain card 264 Ruling 1) — the SAM notice body. audit-executor.ts (FA-148) resolves
+  // the noticedesc URL into solicitation.description; a value that is STILL a noticedesc URL
+  // means the fetch failed (skip — honest, never fabricate). Threaded into buildAgenticDocs
+  // as a first-class prepended doc so combined-synopsis §L/§M/clauses are actually read into
+  // fullSource — closing the notice-body-blind false-COMPLETE root.
+  const desc = typeof solicitation?.description === "string" ? solicitation.description : "";
+  const noticeBody = isSamSol && desc.trim() && !isNoticedescUrl(desc) ? { text: desc, name: NOTICE_BODY_DOC_NAME } : null;
+
   // GAP A — assemble the engine's single fullSource string from the intake docs
-  // (primary + every attachment). Reuses the same extraction the shadow path uses.
+  // (notice body + primary + every attachment). Reuses the same extraction the shadow path uses.
   const primaryBytes = input.pdfBuffer ?? (input.pdfBase64 ? Buffer.from(input.pdfBase64, "base64") : null);
   const docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
     primaryBytes,
     primaryText: input.extractedText ?? null,
     attachments: input.attachmentPdfs?.map((a) => ({ name: a.name, base64: a.base64 })) ?? null,
+    noticeBody,
   });
+  if (noticeBody) {
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: L1 notice body ingested as first-class doc (${noticeBody.text.length} chars)`);
+  }
   // Budgeted assembly (limit N3/N4) — bounds a pathological multi-MB package by
   // dropping WHOLE overflow docs (named, never a silent mid-doc cut). `truncated`
   // feeds documents_complete=false below so an over-budget read is honest-incomplete.
@@ -130,10 +148,9 @@ export async function executeAgenticPrimary(
   // statement, else null = unknown firm. Open-world means a listed cert can CLEAR a
   // matching set-aside bar, but silence never proves "fails" → never a false INELIGIBLE.
   const bidderProfile = input.bidderProfile ?? null;
-  // A SAM solicitation (32-hex notice id) vs a genuine upload. Decisive for the cap below:
-  // a null ingestion means OPPOSITE things for the two — upload = user supplied the docs
-  // (complete); SAM = manifest assembly FAILED → single-doc fallback (INCOMPLETE).
-  const isSamSol = !!solicitation?.noticeId && /^[a-f0-9]{32}$/i.test(solicitation.noticeId);
+  // (isSamSol computed above — reused here for the completeness cap: a null ingestion means
+  // OPPOSITE things for the two — upload = user supplied the docs (complete); SAM = manifest
+  // assembly FAILED → single-doc fallback (INCOMPLETE).)
   // N8 — feed the DETERMINISTIC manifest-reconciliation truth into the VERDICT (not just
   // the post-hoc export gate). false → caps a no-bar BID/CAUTION to INCOMPLETE — the
   // engine's own honest output, never a confident verdict on a read it knows was partial.
@@ -188,7 +205,9 @@ export async function executeAgenticPrimary(
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
     : isSamSol
-      ? { reconciled: false, posted: docs.length, read: docs.length, complete: false, missing: [] }
+      // Count POSTED FILES only — the L1 notice body is the description field, not a posted document,
+      // so it must not inflate the posted/read count shown in the "could-not-confirm" banner.
+      ? (() => { const n = docs.filter((d) => d.name !== NOTICE_BODY_DOC_NAME).length; return { reconciled: false, posted: n, read: n, complete: false, missing: [] as Array<{ name: string; reason?: string }> }; })()
       : null;
   // An over-budget source (whole docs dropped) is ALSO an incomplete read — fold it
   // in so documents_complete=false and the dropped docs surface in the report banner.

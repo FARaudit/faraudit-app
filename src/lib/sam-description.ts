@@ -20,8 +20,17 @@
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 15000;
-// 4000-char cap matches mapOpportunity's description convention in sam.ts.
-const MAX_DESCRIPTION_CHARS = 4000;
+// L1 (Brain card 264 Ruling 1) — the OLD 4000-char cap silently truncated the notice
+// body, which for combined-synopsis buys carries the §L/§M/clauses/set-aside the engine
+// must read (the notice-body-blind false-COMPLETE root). Raised to a generous ceiling that
+// preserves ALL real notice content while still bounding a pathological megabyte body from
+// bloating the classifier / facts digest that also consume this field. The engine's own
+// fullSource is separately budgeted (MAX_FULLSOURCE_CHARS in agentic-executor.ts).
+const DEFAULT_MAX_DESCRIPTION_CHARS = 100_000;
+// Guard the override: only a finite POSITIVE number is honored — a 0 / NaN / negative env value
+// falls back to the default (never slice(0, -n), which would truncate from the END of the body).
+const envMaxChars = Number(process.env.SAM_DESCRIPTION_MAX_CHARS);
+const MAX_DESCRIPTION_CHARS = Number.isFinite(envMaxChars) && envMaxChars > 0 ? envMaxChars : DEFAULT_MAX_DESCRIPTION_CHARS;
 
 const NOTICEDESC_URL_RE = /^https?:\/\/(?:api\.)?sam\.gov\/(?:prod\/)?opportunities\/v\d+\/noticedesc\?noticeid=([a-f0-9]{32})/i;
 

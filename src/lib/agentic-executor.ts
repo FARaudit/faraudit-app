@@ -14,6 +14,15 @@ import { type ScalarFacts, type AgenticDoc } from "./agentic-orchestrator";
 import { auditPackage } from "./audit-package";
 import { isBindingDoc } from "./sam-attachments";
 
+/** The engine's "this is a real doc, not an empty read" floor: ≥ this many non-whitespace chars.
+ *  Below it, coverage treats the read as a failure (never fabricated text). */
+const MIN_DOC_TEXT_CHARS = 50;
+const meaningfulLen = (s: string): number => s.replace(/\s/g, "").length;
+
+/** L1 origin label for the ingested SAM notice-body doc — single source of truth so the executor's
+ *  provenance tag, the buildAgenticDocs default, and the posted-file count exclusion never diverge. */
+export const NOTICE_BODY_DOC_NAME = "SAM Notice Body";
+
 /** Structural view of the SAM solicitation fields we need — kept minimal so any
  *  solicitation object satisfies it without coupling to the full type. */
 interface SolScalarSource {
@@ -46,16 +55,23 @@ export async function buildAgenticDocs(opts: {
   primaryBytes: Buffer | null;
   primaryText: string | null;
   attachments: Array<{ name: string; base64: string }> | null;
+  // L1 (Brain card 264 Ruling 1) — the SAM-published notice body. For a combined-synopsis
+  // buy the §L/§M/clauses/set-aside live ONLY here; it was resolved by FA-148 into
+  // solicitation.description but never read into fullSource (the notice-body-blind
+  // false-COMPLETE root). Ingested as a FIRST-CLASS doc (own hash / NOTICE_BODY origin),
+  // placed after the primary form but ahead of attachments — see the placement note below.
+  // Absent on uploads / fetch-failed (never fabricated).
+  noticeBody?: { text: string; name?: string } | null;
 }): Promise<AgenticDoc[]> {
   // Prefer text we ALREADY have (the live executor extracted the primary) — only
   // extract when it's missing/too-short. Avoids a second full parse+OCR pass of a
   // doc whose text the caller already holds. On failure, fall back to the existing
   // text, else empty (coverage flags empty as a read-failure — never fabricated).
   const textOf = async (bytes: Buffer, existing: string | null): Promise<string> => {
-    if (existing && existing.replace(/\s/g, "").length >= 50) return existing;
+    if (existing && meaningfulLen(existing) >= MIN_DOC_TEXT_CHARS) return existing;
     try {
       const { rawText } = await extractText(bytes);
-      if (rawText && rawText.replace(/\s/g, "").length >= 50) return rawText;
+      if (rawText && meaningfulLen(rawText) >= MIN_DOC_TEXT_CHARS) return rawText;
     } catch {
       /* fall through to existing/empty */
     }
@@ -65,6 +81,31 @@ export async function buildAgenticDocs(opts: {
   const docs: AgenticDoc[] = [];
   if (opts.primaryBytes) {
     docs.push({ name: opts.primaryName, bytes: opts.primaryBytes, text: await textOf(opts.primaryBytes, opts.primaryText) });
+  }
+  // L1 — insert the notice body AFTER the primary form but BEFORE the posted attachments.
+  // Placement is load-bearing: the section-boundary detector treats [marker[0], marker[1])
+  // (the text before the FIRST attachment delimiter) as the PRIMARY UCF region. Keeping a
+  // posted form as docs[0] leaves that region the FORM — so a file-carried §L/§M is still
+  // detected (the fully-read class does NOT regress to false-INCOMPLETE). When NO form was
+  // posted the body IS docs[0] = the primary the engine reads (zero-attachment combined
+  // synopsis). Either way the body now rides in fullSource (was orphaned in the description
+  // field), so the lenses / Layer-3 finder can read the §L/§M that live there. Its own UTF-8
+  // bytes give it its own content hash for the per-doc MAP extract cache + NOTICE_BODY origin
+  // provenance. Skip a trivially-short body — coverage treats a near-empty read as a
+  // read-failure, never fabricated text.
+  const bodyText = opts.noticeBody?.text?.trim() ?? "";
+  // DEDUP — when a combined synopsis is ALSO posted as a PDF, the primary's extracted text can
+  // already CONTAIN the notice text; adding it again would double every §L/§M clause in fullSource
+  // (doubled findInSource/lookupClause hits → verifier claim inflation). assembleFullSource does NOT
+  // hash-dedup, so guard here: skip the body when the primary already subsumes it (normalized
+  // containment, formatting-insensitive). Cheap and exact — never a fuzzy near-match that could drop
+  // a genuinely distinct body.
+  const norm = (s: string) => s.replace(/\s+/g, " ").toLowerCase().trim();
+  const primaryNorm = docs.length ? norm(docs[0].text) : "";
+  const bodyNorm = norm(bodyText);
+  const subsumed = bodyNorm.length > 0 && primaryNorm.includes(bodyNorm);
+  if (meaningfulLen(bodyText) >= MIN_DOC_TEXT_CHARS && !subsumed) {
+    docs.push({ name: opts.noticeBody?.name ?? NOTICE_BODY_DOC_NAME, bytes: Buffer.from(bodyText, "utf8"), text: bodyText });
   }
   // Extract attachments with bounded concurrency (was a sequential await-per-doc
   // loop — minutes of serial OCR on a 33-doc package).
