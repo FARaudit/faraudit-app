@@ -92,8 +92,17 @@ function bandElig(v: V4Verdict): string {
 }
 
 function verdict(v: V4Verdict, meta: { auditId?: string; auditDate?: string; coverage?: V4Coverage }): string {
+  // Honest-fail eyebrow is POLE-SPECIFIC (Design Gate-2 Δ1). All three noVerdict poles share the SAME visual
+  // treatment (hatched slate band + NO VERDICT stamp + NO CHARGE chip) — the CATEGORY rides the word + eyebrow
+  // + rationale, never color. "human adjudication" is the remedy for NHR only; asserting it on INCOMPLETE /
+  // OUT_OF_SCOPE was factually wrong (INCOMPLETE → obtain missing docs + re-run; OOS → not an audited type).
+  const NOVERDICT_EYEBROW: Record<string, string> = {
+    NEEDS_HUMAN_REVIEW: "No verdict — human adjudication",
+    INCOMPLETE: "No verdict — coverage incomplete",
+    OUT_OF_SCOPE: "No verdict — outside audit scope",
+  };
   const eyebrow = v.noVerdict
-    ? `<span class="vd-eyebrow-t">No verdict — human adjudication</span>`
+    ? `<span class="vd-eyebrow-t">${esc(NOVERDICT_EYEBROW[v.pole] || "No verdict reached")}</span>`
     : `<span class="vd-eyebrow-t">Gate assessment</span>`;
   const charge = v.noCharge ? `<span class="vd-nocharge">No charge</span>` : "";
   const m = meta || {};

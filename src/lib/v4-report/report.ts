@@ -31,12 +31,14 @@ export function renderV4ReportFromRow(audit: Record<string, unknown>): string {
     ? "@media print{html,body{display:none!important}} /* report cannot be exported — gated */"
     : "@media print{html.anim .sec,html.anim .mast{opacity:1!important;animation:none!important}html.anim .cov-fill{animation:none!important;width:var(--pct,100%)!important}}";
 
-  // Export affordance — parity with v3 (no-regression): a clean report links to the 409-honoring PDF endpoint;
-  // a gated report shows a disabled "Export unavailable" and exposes NO export path. Never window.print().
-  // NOTE (Design Gate-2): placement added for no-regression parity, not in the B mock — Design to style/place.
+  // Export affordance (Design Gate-2 Δ2) — the PRIMARY terminal action: a solid accent pill (.tb-export), peer
+  // to and placed LEFT of the KO outline pill. Bound to the REAL 409/PDF-endpoint gate (shouldGateExport) — NOT
+  // verdict.noVerdict, which is only the mock's stand-in. Gated → the SAME pill disabled + honest label, NEVER
+  // hidden (a disabled honest pill teaches the gate; hiding it leaves the user unsure export exists — no black
+  // box). Clean → the pill is an <a> to the 409-honoring PDF endpoint (never window.print()).
   const exportAffordance = gated
-    ? `<span class="tb-ko tb-export disabled" aria-disabled="true" title="Export unavailable — the engine did not fully stand behind this report">Export unavailable</span>`
-    : `<a class="tb-ko tb-export" href="/api/audit/${auditId}/pdf" title="Export this report as PDF">⭳ Export PDF</a>`;
+    ? `<button class="tb-export" type="button" disabled aria-disabled="true" title="Available once the audit reaches a verdict and clears its gates">⭳ Export unavailable</button>`
+    : `<a class="tb-export" href="/api/audit/${auditId}/pdf" title="Export a clean PDF of this report">⭳ Export PDF</a>`;
 
   return `<!doctype html>
 <html lang="en" data-dir="B"${gated ? ' data-export-gated="1"' : ""}>
