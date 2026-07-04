@@ -12,7 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
-import { renderAgenticReportFromRow } from "@/lib/audit-v3-report";
+import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
 import { injectRail } from "@/lib/nav/rail";
@@ -411,7 +411,7 @@ export async function GET(
     // assumes the site's grid layout and would float a misplaced sidebar onto a
     // centered single-column report. A "back to audits" link in the report header
     // covers navigation; full site-shell embedding is a Design follow-up.
-    return new Response(renderAgenticReportFromRow(audit), {
+    return new Response(renderV4ReportFromRow(audit), {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     });

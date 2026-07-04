@@ -3,7 +3,7 @@
 // affordance and CSS-blocks printing (can never leave as a clean PDF); a clean report exports via the
 // server PDF endpoint (which honours the 409), and NOTHING uses window.print() anymore.
 //   npx tsx scripts/audit-ai/test-export-gating.ts
-import { renderAgenticReportFromRow } from "@/lib/audit-v3-report";
+import { renderV4ReportFromRow as renderAgenticReportFromRow } from "@/lib/v4-report/report";
 
 const cleanPayload = {
   verdict: "BID", eligible: true, reason: "Open, eligible.",

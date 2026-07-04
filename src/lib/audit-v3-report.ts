@@ -19,7 +19,6 @@
 
 import { disposeFinding } from "./audit-decide";
 import type { Decision } from "./audit-decide";
-import { shouldGateExport } from "./audit-display";
 
 /** Compact, persistable finding — the unit the report renders. `disposition` is
  *  the derived bucket (show-stopper / gate / met) so the renderer needs no
@@ -470,30 +469,10 @@ const GATED_EXPORT_CSS = `
   html::before{content:"This report is incomplete or under human review and cannot be exported.";display:block;padding:40mm 20mm;font-family:var(--sans);font-size:14px;color:#15202e}
 }`;
 
-/** Render directly from a persisted audit row (report + PDF routes branch here
- *  when compliance_json.engine === "agentic_v3"). */
-export function renderAgenticReportFromRow(audit: Record<string, unknown>): string {
-  const cj = (audit.compliance_json as Record<string, unknown> | null) ?? {};
-  const payload = (cj.v3 as V3ReportPayload | undefined) ?? {
-    verdict: "INCOMPLETE", eligible: false, reason: "Agentic report payload missing.",
-    showStoppers: [], findings: [], coverage: { required: [], covered: [], missing: [] },
-  };
-  // Doctrine #5 export gate — SINGLE source of truth: shouldGateExport (which also gates the schema-drift
-  // fallback, comp.v3 == null → the default INCOMPLETE payload above). The web route, the PDF-route 409, and
-  // this renderer therefore all gate on the identical predicate and can never diverge (a mismatch previously
-  // let the PDF route serve a print-blanked 200 for a missing-payload row).
-  const gated = shouldGateExport(audit);
-  return renderV3Report(payload, {
-    solicitationNumber: (audit.solicitation_number as string) ?? null,
-    title: (audit.title as string) ?? null,
-    agency: (audit.agency as string) ?? null,
-    naicsCode: (audit.naics_code as string) ?? null,
-    setAside: (audit.set_aside as string) ?? null,
-    responseDeadline: (audit.response_deadline as string) ?? null,
-    auditId: (audit.id as string) ?? null,
-    exportGated: gated,
-  });
-}
+// renderAgenticReportFromRow (the row→html wrapper) is RETIRED — the v4 report renderer
+// (@/lib/v4-report/report → renderV4ReportFromRow) is the sole live report path (no fallback).
+// buildV3Payload + the V3ReportPayload/FindingLite types remain (persistence); renderV3Report
+// remains for $0 sample scripts. The prod web + PDF routes render v4 directly from the row.
 
 // ── Design CSS — ported 1:1 from CEO-AGENTIC-REPORT-V3.html (switcher + mockup
 //    fixtures dropped; screen-only topbar added). Verdict color system = the moat. ──

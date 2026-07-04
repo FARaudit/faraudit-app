@@ -1,0 +1,392 @@
+{
+  "engine": "agentic_v3",
+  "analysis_phase": "done",
+  "honest_fail": false,
+  "documents_complete": true,
+  "generated_at": null,
+  "source_chars": null,
+  "doc_count": null,
+  "source_truncated": false,
+  "_NOTE": "REAL persisted-shape reconstruction from run-record W50S9H26QA018-card219-run3 (2026-07-02). v3=buildV3Payload output verbatim; masthead facts (agency/NAICS/set-aside/deadline) are SEPARATE audit-row columns, NOT in here.",
+  "v3": {
+    "verdict": "BID",
+    "eligible": null,
+    "reason": "⚠ ELIGIBILITY NOT VERIFIED — confirm nonmanufacturer:compliant before relying on award eligibility (bidder profile not provided). Open; eligibility not determined — verify the eligibility gate(s) above; all other unmet items are bidder-controllable gates to clear.",
+    "showStoppers": [],
+    "findings": [
+      {
+        "requirement": "Best-value tradeoff award: Price and Technical factors considered equally important. Award to responsible offeror whose conforming offer is most advantageous to Government.",
+        "citation": "§M, FAR 52.212-2 (Deviation 2026-O0038)",
+        "excerpt": "The following factors will be used to evaluate offers: i. Price ii. Technical When combined, Price and Technical are considered equally important.",
+        "disposition": "gate_to_clear",
+        "kind": "other",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "NAICS 337920 (Blind and Shade Manufacturing) applies to all CLINs; bidder must qualify as small under this NAICS.",
+        "citation": "§C, all CLINs 0001–0007",
+        "excerpt": "North American Industry Classification System (NAICS): 337920",
+        "disposition": "met",
+        "kind": "eligibility_bar",
+        "controllability": "already_satisfied",
+        "severity": "P1"
+      },
+      {
+        "requirement": "All work must be completed on a Firm Fixed Price basis; contractor bears cost risk for all CLINs.",
+        "citation": "§C, CLINs 0001–0007",
+        "excerpt": "Pricing Arrangement: Firm Fixed Price",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Offeror must complete DFARS 252.204-7017 representation regarding covered defense telecommunications equipment or services; if providing such equipment/services, must disclose details in the offer.",
+        "citation": "§L, DFARS 252.204-7017 (full text)",
+        "excerpt": "The Offeror represents that it [ ] will [ ] will not provide covered defense telecommunications equipment or services as a part of its offered products or services to DoD in the performance of any award resulting from this solicitation.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "Product Service Code 7230 (Blinds, Shades, and Screens) governs this acquisition; offered products must fall within this PSC.",
+        "citation": "§C, CLINs 0001–0007",
+        "excerpt": "Product Service Code: 7230",
+        "disposition": "gate_to_clear",
+        "kind": "technical_spec",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "DFARS 252.204-7012 — Safeguarding Covered Defense Information and Cyber Incident Reporting (Deviation 2024-O0013 Rev 1). Contractor must implement adequate security on all covered contractor information systems, rapidly report cyber incidents (within 72 hours), and preserve relevant images/data. Requires a DoD Assessment/SPRS score and potentially a System Security Plan.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.204-7012  Safeguarding Covered Defense  2024-05  Deviation  2024-05  Information and Cyber Incident  2024-  Reporting. (DEVIATION 2024-  O0013  O0013 REVISION 1)",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "DFARS 252.204-7018 — Prohibition on the Acquisition of Covered Defense Telecommunications Equipment or Services. Contractor is prohibited from providing or using covered telecommunications equipment/services (e.g., Huawei, ZTE) as a substantial or critical component. Requires a representation and compliance.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.204-7018  Prohibition on the Acquisition of  2023-01  Covered Defense  Telecommunications Equipment  or Services.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "FAR 52.204-23 (via 52.212-5) — Prohibition on Contracting for Hardware, Software, and Services Developed or Provided by Kaspersky Lab Covered Entities. Contractor must not provide Kaspersky-origin products/services.",
+        "citation": "§I, 52.212-5(a)(2)",
+        "excerpt": "(2) 52.204-23, Prohibition on Contracting for Hardware, Software, and Services Developed or Provided by Kaspersky Lab Covered Entities (Dec 2023) (Section 1634 of Pub. L. 115-91).",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "FAR 52.204-25 (via 52.212-5) — Prohibition on Contracting for Certain Telecommunications and Video Surveillance Services or Equipment (Section 889(a)(1)(A)). Contractor must not provide or use covered telecommunications/video surveillance equipment or services from specified Chinese entities.",
+        "citation": "§I, 52.212-5(a)(3)",
+        "excerpt": "(3) 52.204-25, Prohibition on Contracting for Certain Telecommunications and Video Surveillance Services or Equipment. (Nov 2021) (Section 889(a)(1)(A) of Pub. L. 115-232).",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "FAR 52.209-10 (via 52.212-5) — Prohibition on Contracting with Inverted Domestic Corporations. Contractor must not be an inverted domestic corporation; self-certification required.",
+        "citation": "§I, 52.212-5(a)(4)",
+        "excerpt": "(4) 52.209-10, Prohibition on Contracting with Inverted Domestic Corporations (Nov 2015).",
+        "disposition": "dropped",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.204-10 (via 52.212-5, checked [X]) — Reporting Executive Compensation and First-Tier Subcontract Awards. Applicable to contractors receiving awards ≥ $30,000; reporting to FSRS required.",
+        "citation": "§I, 52.212-5(b)(5)",
+        "excerpt": "[X] (5) 52.204-10, Reporting Executive Compensation and First-Tier Subcontract Awards (Jun 2020) (Pub. L. 109-282) ( 31 U.S.C. 6101 note).",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.209-6 (via 52.212-5, checked [X]) — Protecting the Government's Interest When Subcontracting With Contractors Debarred, Suspended, Proposed for Debarment, or Voluntarily Excluded. Contractor must check SAM exclusions before awarding subcontracts.",
+        "citation": "§I, 52.212-5(b)(12)",
+        "excerpt": "[X] (12) 52.209-6, Protecting the Government's Interest When Subcontracting With Contractors Debarred, Suspended, Proposed for",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.222-90 (Deviation 2026-O0040 Rev 1) — Addressing DEI Discrimination by Federal Contractors. Incorporated by reference; contractor must comply with EO-driven prohibition on DEI-based employment discrimination.",
+        "citation": "§I, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.222-90  Addressing DEI Discrimination  2026-04  by Federal Contractors. (Deviation 2026-O0040, Revision 1)",
+        "disposition": "dropped",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.222-36 — Equal Opportunity for Workers with Disabilities. Contractor must comply with affirmative action obligations for workers with disabilities.",
+        "citation": "§I, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.222-36  Equal Opportunity for Workers  2026-02  with Disabilities. (Deviation 2026- O0038)",
+        "disposition": "dropped",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "DFARS 252.223-7008 — Prohibition of Hexavalent Chromium. Contractor shall not provide products containing hexavalent chromium. Relevant if the deliverable involves coatings, metals, or materials that might use hexavalent chromium.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.223-7008  Prohibition of Hexavalent  2023-01  Chromium.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "DFARS 252.225-7060 — Prohibition on Certain Procurements from the Xinjiang Uyghur Autonomous Region. Contractor must not procure from the Xinjiang region; representations and supply-chain due diligence required.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.225-7060  Prohibition on Certain  2023-06  Procurements from the Xinjiang  Uyghur Autonomous Region.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "DFARS 252.225-7056 — Prohibition Regarding Business Operations with the Maduro Regime. Contractor must certify it does not conduct business with the Maduro Regime.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.225-7056  Prohibition Regarding Business  2023-01  Operations with the Maduro  Regime.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.232-33 — Payment by Electronic Funds Transfer–SAM. Contractor must maintain a valid EFT/bank account designation in SAM for payment.",
+        "citation": "§I, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.232-33  Payment by Electronic Funds  2018-10  Transfer-System for Award  Management.",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "FAR 52.222-50 — Combating Trafficking in Persons. Contractor must comply with anti-trafficking requirements and may be required to submit a compliance plan for contracts over $500,000 performed outside the U.S.",
+        "citation": "§I, FAR Clauses Incorporated by Reference",
+        "excerpt": "52.222-50  Combating Trafficking in  2026-02  Persons. (Deviation 2026-O0038)",
+        "disposition": "dropped",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "DFARS 252.203-7000 — Requirements Relating to Compensation of Former DoD Officials. Contractor must not pay former DoD officials in violation of the post-employment restrictions; certification and record-keeping obligations apply.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.203-7000  Requirements Relating to  2011-09  Compensation of Former DoD  Officials.",
+        "disposition": "dropped",
+        "kind": "boilerplate",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "DFARS 252.247-7023 — Transportation of Supplies by Sea. If the contractor ships supplies by sea, it must use U.S.-flag vessels; certain reporting obligations apply.",
+        "citation": "§I, DFARS Clauses Incorporated by Reference",
+        "excerpt": "252.247-7023  Transportation of Supplies by  2024-10  Sea.",
+        "disposition": "gate_to_clear",
+        "kind": "clause_flowdown",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "All CLINs (0001–0007) must be priced on a Firm Fixed Price basis. No cost-reimbursement or other arrangement is permitted.",
+        "citation": "§C / CLIN structure",
+        "excerpt": "Pricing Arrangement: Firm Fixed Price",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "CLIN 0001 (Base Line Item) — PROJECT AREA 1: BLDG. 449 (estimated 100 windows), unit = Each, quantity = 100. Offeror must price this line at a per-unit rate (FFP).",
+        "citation": "§C, Delivery Schedule CLIN 0001",
+        "excerpt": "0001     Delivery Schedule\nDelivery On Or Before\nDelivery Date 30 Sep 2026\nQuantity 100 Each",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "All CLINs (0001–0007) have a common delivery deadline of 30 September 2026. Pricing must be consistent with the ability to complete all ordered work by that date.",
+        "citation": "§C, Delivery Schedules CLINs 0001–0007",
+        "excerpt": "Delivery On Or Before\nDelivery Date 30 Sep 2026",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Transportation costs are borne by the Contractor (FOB Destination). Offerors must include all shipping/delivery costs in their per-unit FFP prices.",
+        "citation": "§C, FoB Details, CLINs 0001–0007",
+        "excerpt": "FoB Details\nParty to Pay Transportation Cost: Contractor\nPoint Type: Destination",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Product Service Code is 7230 (Blinds, Shades, Screens, and Awnings) and NAICS 337920 applies across all CLINs — offerors must price within this commercial product/service framework.",
+        "citation": "§C, all CLINs",
+        "excerpt": "Product Service Code: 7230\nNorth American Industry Classification\nSystem (NAICS): 337920",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P2"
+      },
+      {
+        "requirement": "Work scope is blind replacement at Volk Field billeting buildings — pricing must cover supply AND installation of blinds per the attached Statement of Work.",
+        "citation": "§C, CLIN descriptions",
+        "excerpt": "VOLK FIELD BILLETING BLIND REPLACEMENT - MULTIPLE BUILDINGS",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Offer must be submitted by the solicitation closing date. Solicitation number W50S9H26QA018 dated 27 May 2026. Response deadline is evident from solicitation date; no past-due deadline is shown on the face of the document.",
+        "citation": "SF 1449 header, solicitation W50S9H26QA018",
+        "excerpt": "W50S9H26QA018 27 MAY 2026",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "Firm Fixed Price (FFP) pricing arrangement applies to all CLINs (base CLIN 0001 and option CLINs 0002-0007).",
+        "citation": "Section C, each CLIN description",
+        "excerpt": "Pricing Arrangement: Firm Fixed Price",
+        "disposition": "gate_to_clear",
+        "kind": "pricing",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Contractor must submit payment requests and receiving reports electronically via Wide Area WorkFlow (WAWF), require SAM registration with electronic business POC, and WAWF account registration.",
+        "citation": "Section I, DFARS 252.232-7006 (full text) and 252.232-7003 (by reference)",
+        "excerpt": "To access WAWF, the Contractor shall— (1) Have a designated electronic business point of contact in the System for Award Management at https://www.sam.gov; and (2) Be registered to use WAWF at https://wawf.eb.mil/",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Evaluation is price and technical, weighted equally. Award to lowest-priced technically acceptable or best value (equal weight) offer conforming to solicitation.",
+        "citation": "Section M, 52.212-2",
+        "excerpt": "The following factors will be used to evaluate offers: i. Price ii. Technical When combined, Price and Technical are considered equally important.",
+        "disposition": "gate_to_clear",
+        "kind": "other",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Offer must be prepared and submitted in accordance with FAR 52.212-1, Instructions to Offerors—Commercial Products and Commercial Services (Deviation 2026-O0038), which governs proposal preparation for commercial acquisitions.",
+        "citation": "Section L, solicitation W50S9H26QA018",
+        "excerpt": "52.212-1 Instructions to Offerors- 2026-02 Commercial Products and Commercial Services. (Deviation 2026-O0038)",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "If the offeror represents 'will provide' covered defense telecommunications equipment or services under 252.204-7017(d), it must include as part of the offer: (1) description of all covered equipment/services (brand, model/OEM/part number, item description); (2) explanation of proposed use and permissibility; (3) for services, entity name, UEI, CAGE; (4) for equipment, entity that produced it with name, UEI, CAGE, and OEM/distributor status.",
+        "citation": "Section L, DFARS 252.204-7017(e), solicitation W50S9H26QA018",
+        "excerpt": "(e) Disclosures. If the Offeror has represented in paragraph (d) of this provision that it \"will provide covered defense telecommunications equipment or services,\" the Offeror shall provide the following information as part of the offer: (1) A description of all covered defense telecommunications equipment and services offered (include brand or manufacturer; product, such as model number, original equipment manufacturer (OEM) number, manufacturer part number, or wholesaler number; and item description, as applicable). (2) An explanation of the proposed use of covered defense telecommunications equipment and services and any factors relevant to determining if such use would be permissible under the prohibition referenced in paragraph (b) of this provision. (3) For services, the entity providing the covered defense telecommunications services (include entity name, unique entity identifier, and Commercial and Government Entity (CAGE) code, if known). (4) For equipment, the entity that produced or provided the covered defense telecommunications equipment (include entity name, unique entity identifier, CAGE code, and whether the entity was the OEM or a distributor, if known).",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P1"
+      },
+      {
+        "requirement": "Evaluation is on Price and Technical factors, equally weighted. Offeror's submission must address both a price element and a technical element sufficient to permit evaluation under these two factors.",
+        "citation": "Section M, FAR 52.212-2 (Deviation 2026-O0038), solicitation W50S9H26QA018",
+        "excerpt": "The following factors will be used to evaluate offers: i. Price ii. Technical When combined, Price and Technical are considered equally important.",
+        "disposition": "gate_to_clear",
+        "kind": "submission",
+        "controllability": "bidder_controls",
+        "severity": "P0"
+      },
+      {
+        "requirement": "Procedural obligation (§L): PROHIBITION ON THE ACQUISITION OF COVERED DEFENSE TELECOMMUNICATIONS EQUIPMENT OR SERVICES-REPRESENTATION (MAY 2021) The Offeror is not required to…",
+        "citation": "§L (procedural coverage)",
+        "excerpt": "PROHIBITION ON THE ACQUISITION OF COVERED DEFENSE TELECOMMUNICATIONS EQUIPMENT OR SERVICES-REPRESENTATION (MAY 2021) The Offeror is not required to complete the representation in this provision if the Offeror has represented in the provision at 252.204-7016, Covered Defense Telecommunications Equipment or Services-Representation, that it \"does not provide covered defense telecommunications equipment or services as a part of its offered products or services to the Government in the performance of any contract, subcontract, or other contractual instrument.\"",
+        "disposition": "gate_to_clear",
+        "kind": "procedural_obligation",
+        "controllability": "bidder_controls"
+      },
+      {
+        "requirement": "Procedural obligation (§L): (c) Procedures. The Offeror shall review the list of excluded parties in the System for Award Management (SAM) at https://www.sam.gov for entities…",
+        "citation": "§L (procedural coverage)",
+        "excerpt": "(c) Procedures. The Offeror shall review the list of excluded parties in the System for Award Management (SAM) at https://www.sam.gov for entities that are excluded when providing any equipment, system, or service to carry out covered missions that uses covered defense W50S9H26QA018 Page 44 of 75 telecommunications equipment or services as a substantial or essential component of any system, or as critical technology as part of any system, unless a waiver is granted.",
+        "disposition": "gate_to_clear",
+        "kind": "procedural_obligation",
+        "controllability": "bidder_controls"
+      },
+      {
+        "requirement": "Procedural obligation (§L): (d) Representation. If in its annual representations and certifications in SAM the Offeror has represented in paragraph (c) of the provision at…",
+        "citation": "§L (procedural coverage)",
+        "excerpt": "(d) Representation. If in its annual representations and certifications in SAM the Offeror has represented in paragraph (c) of the provision at 252.204-7016, Covered Defense Telecommunications Equipment or Services-Representation, that it \"does\" provide covered defense telecommunications equipment or services as a part of its offered products or services to the Government in the performance of any contract, subcontract, or other contractual instrument, then the Offeror shall complete the following additional representation: The Offeror represents that it [ ] will [ ] will not provide covered defense telecommunications equipment or services as a part of its offered products or services to DoD in the performance of any award resulting from this solicitation.",
+        "disposition": "gate_to_clear",
+        "kind": "procedural_obligation",
+        "controllability": "bidder_controls"
+      },
+      {
+        "requirement": "Procedural obligation (§L): (e) Disclosures. If the Offeror has represented in paragraph (d) of this provision that it \"will provide covered defense telecommunications equipment…",
+        "citation": "§L (procedural coverage)",
+        "excerpt": "(e) Disclosures. If the Offeror has represented in paragraph (d) of this provision that it \"will provide covered defense telecommunications equipment or services,\" the Offeror shall provide the following information as part of the offer:",
+        "disposition": "gate_to_clear",
+        "kind": "procedural_obligation",
+        "controllability": "bidder_controls"
+      },
+      {
+        "requirement": "Procedural obligation (§M): (b) Notice of award. A written notice of award or acceptance of an offer furnished to the successful Offeror within the time for acceptance specified…",
+        "citation": "§M (procedural coverage)",
+        "excerpt": "(b) Notice of award. A written notice of award or acceptance of an offer furnished to the successful Offeror within the time for acceptance specified in the offer, shall result in a binding contract without further action by either party. Before the offer's specified expiration time, the Government may accept an offer (or part of an offer), whether or not there are negotiations after its receipt, unless a written notice of withdrawal is received before award. (End of provision) W50S9H26QA018 Page 47 of 75 Offeror Representations and Certifications - Commercial Products and Commercial Services FAR Provisions Incorporated by Full Text Number Title Effective Alternate Variation Date Deviation Effective Date 52.212-3 Offeror Representations and 2025-03 Deviation 2025-03 Certifications-Commercial 2025- Products and Commercial O0004 Services. (DEVIATION 2025- O0003 and 2025-O0004) Offeror Representations and Certifications-Commercial Products and Commercial Services (MAR 2025) (DEVIATION 2025-O0003 and 2025-O0004)",
+        "disposition": "gate_to_clear",
+        "kind": "procedural_obligation",
+        "controllability": "bidder_controls"
+      },
+      {
+        "requirement": "Non-Manufacturer Rule (FAR 52.219-33): if supplying another manufacturer's product (nonmanufacturer), the offeror must not exceed 500 employees (SBA nonmanufacturer size standard, 13 CFR 121.406(b)) and must supply the end item of a small U.S. manufacturer, unless SBA grants a class or individual waiver.",
+        "citation": "FAR 52.219-33 (source clause list) · 13 CFR 121.406(b)",
+        "excerpt": "[ ] (30) 52.219-33, Nonmanufacturer Rule (Sep 2021) (15 U.S.C. 637(a)(17)).",
+        "disposition": "gate_to_clear",
+        "kind": "eligibility_bar",
+        "controllability": "bidder_controls",
+        "requiredAttribute": "nonmanufacturer:compliant",
+        "curableInWindow": true
+      }
+    ],
+    "coverage": {
+      "required": [
+        "C",
+        "I",
+        "L",
+        "M"
+      ],
+      "covered": [
+        "C",
+        "I",
+        "L",
+        "M"
+      ],
+      "missing": [],
+      "coreMissing": []
+    },
+    "generatedAt": null
+  }
+}

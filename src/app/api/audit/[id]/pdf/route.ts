@@ -22,7 +22,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
 import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
-import { renderAgenticReportFromRow } from "@/lib/audit-v3-report";
+import { renderV4ReportFromRow } from "@/lib/v4-report/report";
 import { displaySolicitationId, shouldGateExport } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
@@ -113,7 +113,7 @@ export async function GET(
   // (same branch as the web route), so the exported PDF matches what's on screen.
   let html: string;
   if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
-    html = renderAgenticReportFromRow(audit as Record<string, unknown>);
+    html = renderV4ReportFromRow(audit as Record<string, unknown>);
   } else {
     const vm = buildViewModel(audit, { hasCapabilityStatement });
     const templatePath = path.join(
