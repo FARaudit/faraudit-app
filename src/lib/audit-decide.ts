@@ -362,7 +362,7 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // not the requirement-only SOCIOECONOMIC_SETASIDE_RE + blanket-NON_SELF_CLEARABLE veto. This closes P-5 (an
     // excerpt-only set-aside no longer escapes the softener) and P-3 (§K NOTICE boilerplate quoted in the excerpt
     // no longer disarms the softener → no false INELIGIBLE). A GENUINE structural bar still fails isPositiveSetAside.
-    const setAsideSoftenable = (profile === null || !!profile.openWorld) && positiveSetAside;
+    const setAsideSoftenable = (profile === null || !profile.closedWorld) && positiveSetAside;
     // already_satisfied / bidder_cannot_move socioeconomic set-aside → curable caution (unchanged, opt-independent).
     if (setAsideSoftenable && (f.controllability === "already_satisfied" || f.controllability === "bidder_cannot_move"))
       return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, awardBasisGuard: true };
@@ -395,7 +395,7 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // (attribute-specific, card-228 Ruling ii) — NEVER NO_BID (default-deny guarantees), never structural. Only a
     // PURE set-aside reaches here (a genuine structural bar fails isPositiveSetAside). Fail-safe: can only REMOVE a
     // universal show-stopper, never add one.
-    if (profile !== null && !profile.openWorld && f.controllability === "no_one_can_move" && positiveSetAside)
+    if (profile !== null && profile.closedWorld && f.controllability === "no_one_can_move" && positiveSetAside)
       return { ...f, controllability: "bidder_cannot_move", kind: "eligibility_bar", curableInWindow: false, awardBasisGuard: true };
     return f;
   });
@@ -602,7 +602,7 @@ export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: B
   // mostly-unknown, so the over-type whitelist must still fire (panel B-3: a firm with a
   // capability statement must not bypass this protection). Skip ONLY for a CLOSED-WORLD
   // (trusted/complete) profile, where firmStatus genuinely governs.
-  if (!opts?.enabled || (profile !== null && !profile.openWorld)) return findings;
+  if (!opts?.enabled || (profile !== null && profile.closedWorld)) return findings;
   return findings.map((f) => {
     if (f.controllability !== "bidder_cannot_move" || f.curableInWindow !== false) return f; // only non-curable bars
     const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
@@ -852,7 +852,8 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
   // carries structural/sole-source/size language (Finding 2) — a self-asserted set-aside cert
   // may clear a PURE set-aside eligibility bar, never a bundled structural/size show-stopper.
-  if (profile.openWorld) {
+  // OPEN-WORLD is now the DEFAULT (Brain card-254 B): run this block unless the profile is EXPLICITLY closed-world.
+  if (!profile.closedWorld) {
     const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
     if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
       const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;

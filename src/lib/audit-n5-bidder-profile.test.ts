@@ -101,11 +101,11 @@ eq("pure SDVOSB set-aside whose excerpt mentions incumbent/employees → STILL c
 
 // ── code-review #3 fix — closed-world NON-exact socioeconomic string does NOT canonical-flip ──
 const wosbBarExact = f({ requirement: "WOSB set-aside", requiredAttribute: "WOSB", curableInWindow: true });
-eq("closed-world non-exact cert string → still 'fails' (no canonical flip; gold intact)", firmStatus(wosbBarExact, { satisfiedAttributes: ["women-owned small business"] }), "fails");
+eq("closed-world non-exact cert string → still 'fails' (no canonical flip; gold intact)", firmStatus(wosbBarExact, { satisfiedAttributes: ["women-owned small business"], closedWorld: true }), "fails");
 
 // ── CLOSED-WORLD (gold) regression: unchanged ──
 const dillonBar = f({ requirement: "sole-source named OEM", requiredAttribute: "oem:dillon-approved-source", curableInWindow: false });
-eq("closed-world empty profile → fails (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: [] }), "fails");
+eq("closed-world empty profile → fails (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: [], closedWorld: true }), "fails");
 eq("closed-world exact hold → satisfies (gold behavior intact)", firmStatus(dillonBar, { satisfiedAttributes: ["oem:dillon-approved-source"] }), "satisfies");
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
