@@ -13,7 +13,8 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, requiresProposalSections, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
+import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
@@ -74,6 +75,11 @@ export interface OrchestratorInput {
   // wires real Opus/Sonnet callers; tests stub them. J-1 (producer) runs pre-P2; J-2 (verifier) at the P2 seam.
   judgmentReason?: ReasonCaller;
   judgmentEntail?: EntailmentCaller;
+  // L3 (Brain card 265/267) — grounded agentic section-finder. Present ONLY when AUDIT_SECTION_FINDER is on
+  // (auditPackage wires the real PAID caller; tests stub it). Absent/flag-off ⇒ L3 never runs (byte-identical).
+  // Fires ONLY on required sections the deterministic pass did not locate; a verified locate augments ctx.sections
+  // BEFORE the experts run so both the analysis AND the completeness proof see the located §L/§M.
+  sectionFinder?: SectionFinderCall;
 }
 
 export interface AuditResult {
@@ -349,6 +355,31 @@ const groundingOnlyVerify: VerifyFn = async (_ctx, findings, _opts) => ({ sound:
 export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditResult> {
   const { ctx, experts, callModel, bidderProfile = null, maxTurns, signal } = opts;
   const verify = opts.verify ?? groundingOnlyVerify;
+
+  // L3 (Brain card 265/267) — GROUNDED AGENTIC SECTION-FINDER, runs BEFORE everything else so a verified locate
+  // augments ctx.sections for the experts, coverage, AND the completeness proof alike. Deterministic-primary:
+  // fire ONLY on required sections coreMissingFor flags as not-located, and only the single-letter UCF keys
+  // (A–M). A verified locate (anchor string-matches verbatim in source) is merged over the deterministic base;
+  // a rejected/absent locate changes nothing → the section stays missing → INCOMPLETE (fail-safe, never a false
+  // clear). Inert unless a finder was injected (AUDIT_SECTION_FINDER on) ⇒ flag-off is byte-identical.
+  if (opts.sectionFinder) {
+    const deterministicMissing = coreMissingFor(ctx, {
+      requiresLM: requiresProposalSections(opts.noticeType),
+      formIdentified: opts.formIdentified,
+    });
+    const targetKeys = deterministicMissing.filter((k) => /^[A-M]$/.test(k));
+    if (targetKeys.length > 0) {
+      const { located, attempts } = await runSectionFinder({ fullSource: ctx.fullSource, targetKeys, finder: opts.sectionFinder, signal });
+      for (const a of attempts) {
+        console.log(`[L3-finder] §${a.key}: ${a.reason}${a.rejected ? " [REJECTED — fail-safe INCOMPLETE]" : ""}`);
+      }
+      if (Object.keys(located).length > 0) {
+        // Pin base ∪ located onto ctx.sections — once set, readSection reads it directly (no re-derivation),
+        // so every downstream reader sees the located §L/§M. Located text is verbatim source, never model prose.
+        ctx.sections = { ...materializeSections(ctx), ...located };
+      }
+    }
+  }
 
   // P0 — manifest of binding sections present in this package.
   const required = buildManifest(ctx);

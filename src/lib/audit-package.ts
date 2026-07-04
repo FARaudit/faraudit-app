@@ -19,6 +19,7 @@ import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
+import { makeSectionFinderCaller } from "./audit-section-finder";
 import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
@@ -41,6 +42,7 @@ export interface AuditPackageInput {
   formIdentified?: boolean;                  // Layer-2 (card 262) — whether a substantive primary form was recognized; corroborates body-absent
   judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
   judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
+  sectionFinderModel?: string;              // L3 (card 265/267) — grounded section-finder; default modelFor("finder") (Sonnet — the offset-match gate makes it fail-safe)
   onUsage?: (u: UsageCall) => void;         // per-run token tally (concurrency-safe); the prod executor records cost from it
 }
 
@@ -144,11 +146,23 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
       )
     : undefined;
 
+  // L3 (Brain card 265/267) — grounded agentic section-finder. Constructed ONLY when AUDIT_SECTION_FINDER is on,
+  // so flag-OFF ⇒ sectionFinder undefined ⇒ L3 never runs (byte-identical, no paid calls). The caller is a
+  // LOCATE-only structured call; the offset-string-match gate in runSectionFinder makes a wrong locate fail-safe.
+  const sectionFinder = process.env.AUDIT_SECTION_FINDER === "true"
+    ? makeSectionFinderCaller(
+        async (a) => (await callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, onUsage: input.onUsage })).text,
+        input.sectionFinderModel ?? modelFor("finder"),
+        input.signal,
+      )
+    : undefined;
+
   return runAgenticAudit({
     ctx,
     experts: input.experts ?? auditLenses({ personaDiversity: process.env.AUDIT_PERSONA_DIVERSITY === "true" }),
     callModel,
     verify,
+    sectionFinder,
     bidderProfile: input.bidderProfile ?? null,
     maxTurns: input.maxTurns,
     signal: input.signal,
