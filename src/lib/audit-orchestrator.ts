@@ -16,7 +16,7 @@ import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-exper
 import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNonmanufacturerRuleGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { highSignalSweep } from "./audit-grounding-sweep";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
@@ -325,18 +325,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // both persisted/rendered AND handed to deriveVerdict (no grid-vs-verdict divergence). Idempotent if both on.
   findings = applySetAsideFirmStatusGate(findings, bidderProfile, { enabled: process.env.AUDIT_SETASIDE_FIRMSTATUS_GATE === "true" || process.env.AUDIT_ELIGIBLE_TRISTATE === "true" });
 
-  // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132, Step 4), default-OFF (=== "true"). The never-missed
-  //      deterministic FLOOR: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING NAICS (sector 31-33/42/44/45),
-  //      EMIT a bidder_controls + cautionFloor caution that a nonmanufacturer must supply a small-business
-  //      manufacturer's U.S.-made product (FAR 52.219-1) — the prong most small firms miss. Fires off the
-  //      DETERMINISTIC SAM facts (opts.naics + opts.setAside), never a source regex; NAICS absent → silent (honest).
-  //      Runs POST-VERIFY so the adversarial skeptic can never cull the floor; non-duplicating vs a lens NMR
-  //      finding (52.219-1 ≠ 52.219-14). Flag off ⇒ findings pass through unchanged.
-  {
-    const before = findings.length;
-    findings = applyNonmanufacturerRuleGate(findings, { naics: opts.naics, setAside: opts.setAside }, { enabled: process.env.AUDIT_NONMANUFACTURER_RULE_GATE === "true" });
-    if (findings.length > before) { findings[findings.length - 1].id = "nonmanufacturer_rule#0"; perLens["nonmanufacturer_rule"] = 1; }
-  }
+  // P4.3a-bis — NONMANUFACTURER RULE GATE (Brain card 132) — RETIRED (Brain card 242). The SAM-facts cautionFloor
+  //      emitter is deleted; the keyfact detector (below) is now the SOLE NMR-attribute emitter and the Fork-7
+  //      who-can-win gate (P4.6, before deriveVerdict) types it. See audit-decide.ts + `_BAR-CHANGE-LOG.md`.
 
   // P4.3a-quater — KEY-FACT DETECTOR (Brain card 215 Fork B), default-OFF (=== "true"). Surfaces the three
   //      high-value facts the substantive lenses under-cover (quote DEADLINE · DELIVERY schedule · NON-
@@ -376,6 +367,20 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
   //      so deriveVerdict floors to BID_WITH_CAUTION minimum. Flag off ⇒ findings pass through unchanged.
   findings = applyCautionFloor(findings, { enabled: process.env.AUDIT_CAUTION_FLOOR !== "false" });
+
+  // P4.6 — FORK-7 NMR MECHANISM (Brain card 240 + card 242 ruling), default-OFF (=== "true"). The SINGLE NMR
+  //      mechanism now that card-132's applyNonmanufacturerRuleGate is RETIRED. Runs LAST (after every re-typing
+  //      guard, right before deriveVerdict) so nothing re-types the NMR after it. (1) applyNmrSingleEmitter — the
+  //      keyfact detector is the SOLE NMR-attribute emitter; a co-occurring model-lens NMR attribute is stripped to
+  //      advisory (a lone model-lens NMR is fail-closed PROMOTED, never dropped). (2) applyNmrFirmStatusGate — types
+  //      the single NMR attribute onto the Fork-3 who-can-win path via canonical firm-status (card 242 Finding-1):
+  //      compliant→already_satisfied (MET, eligible=true — kills P-8); closed-world canonical-noncompliant→INELIGIBLE
+  //      (attribute-specific); unknown / unrecognized synonym→NHR with curability text. Never universal, never NO_BID;
+  //      order-independent. Flag off ⇒ findings pass through byte-identical (keyfact NMR keeps its card-206-A path).
+  if (process.env.AUDIT_NMR_FIRMSTATUS_GATE === "true") {
+    findings = applyNmrSingleEmitter(findings);
+    findings = applyNmrFirmStatusGate(findings, bidderProfile, { enabled: true });
+  }
 
   // P5 — DECIDE deterministically from the typed grounded facts. manifestComplete enforces the card-58
   //      asymmetry cap: a no-bar verdict (BID/CAUTION) on a package with an unfetched manifest attachment,

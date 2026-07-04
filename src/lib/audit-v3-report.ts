@@ -39,6 +39,9 @@ export interface FindingLite {
   severity?: "P0" | "P1" | "P2";
   requiredAttribute?: string;
   curableInWindow?: boolean;
+  // Card 243 (Brain) — the parsed temporal arithmetic behind a KO-clarify CAUTION, carried through so v4 can render
+  // the FAT-gate-vs-window tension from numbers, not prose. Persist-only; OMITTED when absent (no backfill).
+  temporalEvidence?: { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean };
 }
 
 /** The agentic report payload persisted to compliance_json.v3 and consumed by
@@ -121,6 +124,7 @@ type RawLiteInput = {
   requirement: string; citation: string; excerpt?: string;
   kind?: string; controllability?: string;
   severity?: "P0" | "P1" | "P2"; requiredAttribute?: string; curableInWindow?: boolean;
+  temporalEvidence?: { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean };
 };
 const lite = (f: RawLiteInput): FindingLite => ({
   requirement: f.requirement,
@@ -134,6 +138,7 @@ const lite = (f: RawLiteInput): FindingLite => ({
   ...(f.severity != null ? { severity: f.severity } : {}),
   ...(f.requiredAttribute != null ? { requiredAttribute: f.requiredAttribute } : {}),
   ...(f.curableInWindow != null ? { curableInWindow: f.curableInWindow } : {}),
+  ...(f.temporalEvidence != null ? { temporalEvidence: f.temporalEvidence } : {}), // card 243: carry the parsed temporal arithmetic when present; omit otherwise (no backfill)
 });
 
 // ── verdict → presentation contract (the moat lives here; ported from Design) ──

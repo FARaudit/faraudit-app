@@ -2,13 +2,13 @@
 // from typed grounded findings — including Brain card-42 §4's new criterion: identical input → identical
 // verdict across N runs (the old single-shot architecture could NEVER satisfy this).
 //   npx tsx scripts/audit-ai/test-derive-verdict.ts
-import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard, applyOrEqualCarveout, applyTemporalConflict } from "@/lib/audit-decide";
+import { deriveVerdict, enforceVerdictWordInvariant, applySetAsideFirmStatusGate, applyAwardBasisOvertypeGuard, applyStructuralBarWhitelist, applyCautionFloor, applyClauseSemanticsGuard, applyOrEqualCarveout, applyTemporalConflict, excerptHash, registerVerifier } from "@/lib/audit-decide";
 import type { Decision, DecidedFinding } from "@/lib/audit-decide";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "@/lib/audit-findings";
 
 const f = (o: Partial<TypedFinding> & { kind: TypedFinding["kind"]; controllability: TypedFinding["controllability"] }): TypedFinding => ({
   requirement: o.requirement ?? "requirement", citation: "FAR 52.x", excerpt: "verbatim", grounded: true, lens: "x",
-  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow, universalDefect: o.universalDefect,
+  kind: o.kind, controllability: o.controllability, requiredAttribute: o.requiredAttribute, curableInWindow: o.curableInWindow, universalDefect: o.universalDefect, verifiedBy: o.verifiedBy,
 });
 const inp = (findings: TypedFinding[], o: { profile?: BidderProfile | null; coverage?: boolean; sound?: boolean; conflict?: boolean; manifest?: boolean } = {}): VerdictInputs =>
   ({ findings, bidderProfile: o.profile ?? null, coverageComplete: o.coverage ?? true, verifierSound: o.sound ?? true, conflict: o.conflict ?? false, manifestComplete: o.manifest ?? true });
@@ -61,7 +61,11 @@ const universalNoMark = [...two, f({ requirement: "5-day delivery against a 90-d
 eq("fork-2: no_one_can_move WITHOUT universalDefect, null → NHR (default-deny, never NO_BID)", deriveVerdict(inp(universalNoMark)).verdict, "NEEDS_HUMAN_REVIEW");
 // coupling-lock (Ruling B) + positive-allow: a universalDefect finding under AUDIT_ELIGIBLE_TRISTATE=off → HARD
 // ERROR; under tristate=on → NO_BID with a POSITIVELY-determined eligible (never a default true).
-const marked = [...two, f({ requirement: "no offeror can comply — contradictory mandatory terms", kind: "technical_spec", controllability: "no_one_can_move", universalDefect: "contradictory_mandatory_terms" })];
+// FORK-5 (card 240): a universalDefect mark drives NO_BID only WITH verification evidence bound to the cited excerpt.
+// FORK-5 HARDENING (card 242 Finding 3): the verifier must ALSO be on the registration-time allowlist — register the
+// simulated verifier so the mark can reach NO_BID (an unregistered/self-signed id can never, proven in test-fork5).
+registerVerifier("test:sim-verifier");
+const marked = [...two, f({ requirement: "no offeror can comply — contradictory mandatory terms", kind: "technical_spec", controllability: "no_one_can_move", universalDefect: "contradictory_mandatory_terms", verifiedBy: { verifierId: "test:sim-verifier", excerptHash: excerptHash("verbatim"), affirmation: "the contradiction follows from the cited excerpt" } })];
 {
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; delete process.env.AUDIT_ELIGIBLE_TRISTATE;
   let threw = false; try { deriveVerdict(inp(marked)); } catch { threw = true; }

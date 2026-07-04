@@ -56,6 +56,17 @@ export interface TypedFinding {
   // by ANY offeror. Absent/undefined ⇒ the finding is WHO-CAN-WIN (or curable) and can NEVER drive NO_BID
   // (default-deny). No producer emits this yet — it is the hook a future universal-defect detector sets.
   universalDefect?: "contradictory_mandatory_terms" | "unmeetable_by_any_offeror";
+  // BRAIN CARD 240 FORK 5 — VERIFICATION EVIDENCE for a committal NO_BID. A `universalDefect` mark drives NO_BID
+  // ONLY when it also carries this record: a verifier affirmed the defect FOLLOWS from the cited excerpt against
+  // document truth (Rule 64 — never a model prior). `excerptHash` = sha256(excerpt) binds the affirmation to the
+  // grounded source span, so a mark cannot rest on fabricated text. Absent (or a hash that doesn't match the
+  // excerpt) ⇒ the mark is UNVERIFIED and can NEVER reach NO_BID → NHR + logged invariant breach. No producer
+  // emits this yet — it is the shape J-1/J-2 (the judgment/verifier layer) builds INTO.
+  verifiedBy?: {
+    verifierId: string;    // the verifier that affirmed the defect (e.g. "adversarial-verifier@v3")
+    excerptHash: string;   // sha256(excerpt) — binds the affirmation to the grounded source span
+    affirmation: string;   // the affirmation that the defect follows from the cited excerpt
+  };
   severity?: "P0" | "P1" | "P2"; // for a residual RISK (not a hard requirement) — its materiality
   // CAUTION-FLOOR (Brain card 75-R2 / 78-R1) — set by the deterministic caution-floor pass (default-off
   // flag) when a finding matches a caution archetype (named role + quantified experience-years, specialized
@@ -95,6 +106,7 @@ export interface TypedFinding {
   // + cautionFloor (furnish an approved equal). NEVER fires when a restrictive qualifier (only / no substitution /
   // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
   orEqualCarveout?: boolean;
+  nmrGuard?: boolean; // FORK-7 (Brain card 240) — set when the NMR firm-status gate re-typed this finding onto the who-can-win path (marker only; deriveVerdict reads controllability/kind).
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
   // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal

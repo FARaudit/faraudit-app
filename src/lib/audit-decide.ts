@@ -11,6 +11,7 @@
 // NO LLM, NO network, NO randomness. Pure → gate-testable. The controllability rule (Brain card 41) is a
 // `switch` here, not prose in a prompt — that is the entire point.
 
+import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
@@ -438,83 +439,91 @@ export function applySetAsideFirmStatusGate(findings: TypedFinding[], profile: B
   });
 }
 
-// ── NONMANUFACTURER RULE GATE (Brain card 132 — Step 4; the never-missed deterministic floor) ─────────────
-// The frequently-missed obligation: on a SMALL-BUSINESS set-aside for a SUPPLY/MANUFACTURING acquisition, an
-// offeror that does not itself manufacture the end item must (FAR 52.219-1 / 13 CFR 121.406) be small AND have
-// ≤500 employees AND supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505
-// / SBA class waiver applies. Most small firms fail the "supply a small-business manufacturer's product" prong
-// and lose the award. The product promise: we catch it EVERY TIME on a supply set-aside.
-//
-// PURE FACT-RULE (Rule 64) — fires off DETERMINISTIC scalar facts (SAM-resolved set-aside + NAICS sector), never
-// a model claim or a source regex (that would be the Part-15 trap). Sector is deterministic arithmetic off the
-// code's first two digits (31/32/33 manufacturing · 42 wholesale · 44/45 retail = the supply sectors; services /
-// construction → silent). NAICS absent → HONEST SILENCE (uploads carry null), never a guess.
-//
-// EMIT gate (like temporal_conflict): ADDS one finding, never removes/re-types. Disposition is card-132:
-// bidder_controls + cautionFloor → disposeFinding = gate_to_clear (NEVER a show-stopper, profile-INDEPENDENT),
-// floors a clean BID to BID_WITH_CAUTION in deriveVerdict; reached only after every disqualifying/human-review
-// branch, so it never downgrades a NO_BID/INELIGIBLE. NON-DUPLICATION: if an NMR finding (cites FAR 52.219-1, or
-// lens === "nonmanufacturer_rule") is already present, do NOT double-emit — the small-business-counsel lens's own
-// NMR analysis wins the slot. NMR (52.219-1) ≠ Limitations-on-Subcontracting (52.219-14), so a LoS finding never
-// blocks this and the two never false-merge. Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
-// The audit row stores the SAM.gov set-aside CODE (e.g. "8A", "SBA", "HZC" — _view-model.ts:3078), NOT the
-// description, so the trigger must match CODES first. These are the SBA socioeconomic programs FAR 52.219-1
-// governs — total/partial SB · 8(a) · HUBZone · SDVOSB · WOSB/EDWOSB, incl. their sole-source variants.
-// DELIBERATELY EXCLUDED (open Brain-ruling — see card): NONE/full-&-open, Local-Area (LAS), and the Buy-Indian
-// programs (IEE/ISBEE), whose NMR applicability rides different authority. Conservative scope by construction.
-const NMR_SB_SETASIDE_CODES = new Set([
-  "SBA", "SBP",          // Total / Partial Small Business Set-Aside
-  "8A", "8AN",           // 8(a) Set-Aside / Sole Source
-  "HZC", "HZS",          // HUBZone Set-Aside / Sole Source
-  "SDVOSBC", "SDVOSBS",  // SDVOSB Set-Aside / Sole Source
-  "WOSB", "WOSBSS",      // WOSB Set-Aside / Sole Source
-  "EDWOSB", "EDWOSBSS",  // EDWOSB Set-Aside / Sole Source
-]);
-// Friendly-name fallback — for doc-text-extracted uploads or descriptive values (not the SAM code path).
-const NMR_SB_SETASIDE_RE = /total small business|partial small business|small business set.?aside|8\(a\)|hubzone|\bsdvosb\b|service.?disabled veteran|\bwosb\b|\bedwosb\b|women.?owned small/i;
-const NMR_SUPPLY_SECTORS = new Set(["31", "32", "33", "42", "44", "45"]);
-// A finding that ALREADY addresses the Nonmanufacturer Rule — by the gate's own lens, by an NMR-SPECIFIC
-// authority (52.219-1 · 13 CFR 121.406 · FAR 19.505 waiver), or by naming the rule in its requirement text.
-// Used for non-duplication so a small-business-counsel lens's own NMR analysis wins the slot. HARD CONSTRAINT:
-// never key on 52.219-6 (the set-aside NOTICE clause present on nearly every SB set-aside) — that would suppress
-// the floor on almost every audit, the false-negative that defeats "catch every time". 52.219-14 (Limitations on
-// Subcontracting) is a DISTINCT obligation and is intentionally NOT matched (52\.219-1 lookahead excludes -14).
-const NMR_ADDRESSED_RE = /52\.219-1(?!\d)|121\.406|\b19\.505\b/i;
-function addressesNmr(f: TypedFinding): boolean {
-  return f.lens === "nonmanufacturer_rule" || NMR_ADDRESSED_RE.test(f.citation) || /non-?manufacturer/i.test(f.requirement);
+
+// ── NONMANUFACTURER RULE GATE (Brain card 132) — RETIRED (Brain card 242 ruling) ─────────────────────
+// `applyNonmanufacturerRuleGate` (the SAM-facts cautionFloor emitter) + its helpers (NMR_SB_SETASIDE_CODES /
+// NMR_SB_SETASIDE_RE / NMR_SUPPLY_SECTORS / NMR_ADDRESSED_RE / addressesNmr / naicsSector) are DELETED. Per Brain
+// card 242 the NMR mechanism is now SINGLE: the deterministic keyfact detector is the SOLE NMR-attribute emitter
+// and the who-can-win firm-status gate (applyNmrFirmStatusGate, below) types it. The old soft-caution floor
+// disagreed with the who-can-win path on the unknown verdict (caution vs NHR); the two are reconciled by retiring
+// the floor. History: git + `_BAR-CHANGE-LOG.md`.
+
+// ── FORK-7 (Brain card 240) — NMR SINGLE ATTRIBUTE EMITTER ───────────────────────────────────────────
+export const NMR_ATTRIBUTE = "nonmanufacturer:compliant";
+// FORK-7 CANONICAL NMR TOKEN (Brain card 242 Finding-1; hardened per adversarial review) — mirrors
+// canonicalizeEligibilityAttr. NMR compliance is a per-bid SUPPLY ARRANGEMENT, not a standing cert, so a
+// closed-world profile's mere ABSENCE of the token is NOT proof of ineligibility. Therefore INELIGIBLE fires
+// ONLY on a POSITIVE canonical NON-compliance token (a firm affirmatively declaring it will not comply); a
+// compliant token → satisfies; EVERYTHING ELSE (empty / unrelated / a genuine manufacturer's "OEM/fabricate"
+// phrasing / an unparseable synonym) → null → unknown → NHR — never a false INELIGIBLE (the walk-away class the
+// zero-contract-loss doctrine forbids). This is the literal reading of card-242 "INELIGIBLE ONLY on canonical-
+// token match". Negation-aware: a "not … compliant" token is treated as NON-compliance, never compliance.
+export function canonicalizeNmrAttr(raw: string | null | undefined): "nmr:compliant" | "nmr:noncompliant" | null {
+  const s = (raw ?? "").toLowerCase().trim();
+  if (!s) return null;
+  if (s === NMR_ATTRIBUTE) return "nmr:compliant";
+  // (1) must reference the Non-Manufacturer Rule SPECIFICALLY — never a bare "rule" (which caught unrelated rules,
+  //     e.g. "affiliation rule noncompliant" → false INELIGIBLE, adversarial-review Defect A).
+  if (!/non-?manufacturer|\bnmr\b/.test(s)) return null;
+  // (2) must make a compliance assertion at all.
+  if (!/complian(?:t|ce)/.test(s)) return null;
+  // (3) NON-compliance iff an explicit non-/not- negates the compliance assertion. The "not" may be gapped from the
+  //     assertion by adverbs ("not currently nmr compliant"), bounded to 40 chars so a distant unrelated "not"
+  //     ("nmr compliant, will not subcontract") does NOT flip it (adversarial-review Defect B). Bounded = ReDoS-safe.
+  if (/\bnon-?complian/.test(s) || /\bnot\b[\s\S]{0,40}?complian/.test(s)) return "nmr:noncompliant";
+  return "nmr:compliant";
 }
-/** The two-digit NAICS sector iff the code is a real ≥2-digit numeric (a genuine SAM / SF-1449 Block-10 code).
- *  null otherwise (absent / malformed) → the caller stays silent. Pure deterministic arithmetic, no lookup. */
-export function naicsSector(naics: string | null | undefined): string | null {
-  const m = (naics ?? "").trim().match(/^(\d{2})\d{0,4}$/);
-  return m ? m[1] : null;
+/** FORK-7 NMR canonical firm-status (card 242 Finding-1, review-hardened). satisfies ⇔ a canonical compliant
+ *  token; fails (→ INELIGIBLE) ⇔ a POSITIVE canonical NON-compliance token; everything else → unknown → NHR
+ *  (absence is never proof of NMR ineligibility). Shared by the gate and firmStatus so both resolve identically. */
+function nmrFirmStatus(profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
+  if (!profile) return "unknown";
+  const attrs = profile.satisfiedAttributes ?? [];
+  if (attrs.some((a) => canonicalizeNmrAttr(a) === "nmr:compliant")) return "satisfies";
+  if (attrs.some((a) => canonicalizeNmrAttr(a) === "nmr:noncompliant")) return "fails";
+  return "unknown";
 }
-/** Emit the NMR caution when (set-aside is a SB program) AND (NAICS is a supply/manufacturing sector). Pure →
- *  gate-tested. Additive + floor-only; profile-independent (card 132). Flag-gated; OFF (default) ⇒ unchanged. */
-export function applyNonmanufacturerRuleGate(
-  findings: TypedFinding[],
-  facts: { naics?: string | null; setAside?: string | null },
-  opts?: { enabled?: boolean },
-): TypedFinding[] {
-  if (!opts?.enabled) return findings;                                          // Rule 61 default-off ⇒ byte-identical
-  const naics = (facts.naics ?? "").trim();
-  const sector = naicsSector(naics);
-  if (!sector || !NMR_SUPPLY_SECTORS.has(sector)) return findings;             // services/construction/absent NAICS → silent (honest)
-  const sa = (facts.setAside ?? "").trim();
-  const code = sa.toUpperCase().replace(/[^A-Z0-9]/g, "");                     // "8(a) Set-Aside" → "8ASETASIDE"; "8A" → "8A"
-  if (!sa || !(NMR_SB_SETASIDE_CODES.has(code) || NMR_SB_SETASIDE_RE.test(sa))) return findings; // not an SBA-program set-aside → NMR N/A (full-&-open / NONE / Indian / local-area → silent)
-  if (findings.some(addressesNmr)) return findings; // non-duplication — a lens NMR analysis (under ANY NMR authority) wins the slot; 52.219-6/-14 never suppress it
-  const nmr: TypedFinding = {
-    requirement: `Nonmanufacturer Rule (FAR 52.219-1): this ${sa} is a supply acquisition under NAICS ${naics} (sector ${sector}). If your firm does NOT manufacture the end item, to be eligible you must (1) be small under the size standard, (2) have no more than 500 employees, and (3) supply the product of a small-business manufacturer made in the U.S. — unless an FAR 19.505 / SBA class waiver applies. Confirm your manufacturing status and, if a nonmanufacturer, all three prongs before relying on award eligibility.`,
-    citation: "FAR 52.219-1",
-    excerpt: `NAICS ${naics} · set-aside "${sa}" (deterministic SAM-resolved facts — supply sector ${sector})`,
-    kind: "submission",
-    controllability: "bidder_controls",
-    cautionFloor: true,
-    grounded: true,
-    lens: "nonmanufacturer_rule",
-  };
-  return [...findings, nmr];
+/** SINGLE EMITTER: the deterministic keyfact detector is the SOLE emitter of the NMR eligibility attribute. Any
+ *  OTHER finding (a model lens) that carries `nonmanufacturer:compliant` is RETIRED from attribute-emission →
+ *  advisory context only (the attribute is stripped; the narrative stays, but is NEVER typed into eligibility).
+ *  Pure + ORDER-INDEPENDENT — keyed on `lens`, not position — so the same finding set yields the same result
+ *  regardless of orchestrator emitter order (kills P-9). */
+export function applyNmrSingleEmitter(findings: TypedFinding[]): TypedFinding[] {
+  const carriers = findings.filter((f) => f.requiredAttribute === NMR_ATTRIBUTE);
+  if (carriers.length <= 1) return findings; // 0 or 1 emitter → nothing to reconcile (FAIL-CLOSED: a SOLE model-lens
+  // NMR is PROMOTED, not dropped — the eligibility signal is never silently lost when the deterministic detector
+  // happened to miss an unusually-phrased NMR obligation, per adversarial review). Order-independent.
+  // Multiple emitters → keep the attribute on ONE canonical (prefer the deterministic keyfact detector); strip it
+  // from the rest → advisory. The single surviving carrier is what the firm-status gate then types.
+  const canonical = carriers.find((f) => f.lens === "keyfact_detector") ?? carriers[0];
+  return findings.map((f) => (f.requiredAttribute === NMR_ATTRIBUTE && f !== canonical)
+    ? { ...f, requiredAttribute: undefined }
+    : f);
+}
+/** TRISTATE MAPPING (Brain card 240 Fork-7, kills P-8): the NMR attribute rides the Fork-3 who-can-win path as a
+ *  REQUIRED ATTRIBUTE — never universal, never NO_BID — governed by `firmStatus` in EVERY profile mode:
+ *    • proven-compliant (firmStatus "satisfies")   → already_satisfied (MET) — contributes true, NEVER pins the
+ *        committal eligibility to null (the P-8 "null forever" bug: a bidder_controls NMR gate was stuck in
+ *        unverifiedGates because it could never resolve to satisfies);
+ *    • closed-world noncompliant (firmStatus "fails") → a disqualifying eligibility_bar → INELIGIBLE with an
+ *        attribute-specific reason (deriveVerdict provenFails path, card-228 Rulings A/ii);
+ *    • unknown / null (firmStatus "unknown")        → a non-curable eligibility_bar → NHR when verdict-decisive
+ *        (deriveVerdict step-5b nonCurable) — the same fail-safe a Fork-3 set-aside takes under a null profile.
+ *  Runs AFTER applyNmrSingleEmitter, so it acts on the SINGLE keyfact-sourced NMR attribute. Pure; order-independent
+ *  (per-finding, keyed on the attribute). Default-OFF via the caller. */
+export function applyNmrFirmStatusGate(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-identical
+  return findings.map((f): TypedFinding => {
+    if (f.requiredAttribute !== NMR_ATTRIBUTE) return f;
+    const st = nmrFirmStatus(profile); // NMR-canonical status (Finding-1) — NOT the generic firmStatus
+    // cautionFloor is CLEARED on re-type: a MET (compliant) NMR must not be floored to a caution by a prior
+    // caution-floor pass (that would turn compliant→BID into CAUTION); a bar carries its own disposition.
+    if (st === "satisfies") return { ...f, controllability: "already_satisfied", cautionFloor: undefined, nmrGuard: true }; // proven-compliant → MET (never pins null)
+    // fails (closed-world canonical-noncompliant) OR unknown (null/open-world/unrecognized synonym) → who-can-win
+    // eligibility bar: firmStatus (NMR-canonical, Finding-1) decides — fails → provenFails → INELIGIBLE
+    // (attribute-specific); unknown → the FORK-7 NMR-unknown NHR branch (curability text), never a lead-time bar.
+    return { ...f, controllability: "bidder_cannot_move", kind: "eligibility_bar", curableInWindow: false, cautionFloor: undefined, nmrGuard: true };
+  });
 }
 
 // ── KNOWN-CLAUSE SEMANTICS GUARD (Brain card 135 — Step 5a; verified clause→disposition map) ──────────────
@@ -823,6 +832,12 @@ const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufac
 
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
+  // FORK-7 Finding-1 (Brain card 242, review-hardened) — an NMR finding the Fork-7 gate has processed (nmrGuard)
+  // resolves via the NMR-canonical status: compliant token → satisfies; POSITIVE non-compliance token → fails
+  // (→ INELIGIBLE); everything else (absence included) → unknown → NHR (absence is never proof of NMR
+  // ineligibility — the walk-away class). GATED ON nmrGuard so, with the Fork-7 flag OFF, this is inert and
+  // firmStatus is byte-identical to pre-diff (the keyfact NMR keeps its card-206-A unverified-gate path).
+  if (f.nmrGuard === true && f.requiredAttribute === NMR_ATTRIBUTE) return nmrFirmStatus(profile);
   // Exact attribute match (trusted/gold closed-world profile) — unchanged.
   if (profile.satisfiedAttributes.includes(f.requiredAttribute)) return "satisfies";
   // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
@@ -854,6 +869,49 @@ const UNIVERSAL_DEFECT_CLASSES: ReadonlySet<string> = new Set(["contradictory_ma
 function isUniversalDefect(f: TypedFinding): boolean {
   return f.universalDefect != null && UNIVERSAL_DEFECT_CLASSES.has(f.universalDefect);
 }
+
+// ── FORK-5 (Brain card 240) — VERIFICATION EVIDENCE for a committal NO_BID ───────────────────────────
+/** sha256 of a grounded excerpt — the Rule-64 binding for a verified universal-defect mark. Deterministic, pure. */
+export function excerptHash(excerpt: string): string { return createHash("sha256").update(excerpt ?? "", "utf8").digest("hex"); }
+
+// ── FORK-5 HARDENING (Brain card 242, adversarial-review Finding 3) — VERIFIER ALLOWLIST ───────────────
+// The wall-BEFORE-producer twin of the tristate coupling-lock (UNIVERSAL_DEFECT_PRODUCERS): a `verifiedBy` record
+// only counts if its verifierId belongs to a REGISTERED, independent verifier. EMPTY today (no verifier registers)
+// → every universalDefect mark is unverified → NHR in prod until J-1/J-2 registers a real verifier. This closes
+// the self-signed-verifier hole surfaced in review: a self-asserted / unregistered verifierId can NEVER reach NO_BID.
+// SECURITY (adversarial review): registration MUST be boot-only from STATIC trusted config — never from request-
+// or model-controlled data. `verifierId` is a model-shaped finding field; if an attacker could both register an id
+// and supply a matching `verifiedBy.verifierId`, that is privilege-escalation to a committal NO_BID. Today: empty,
+// zero callers, so NO_BID is unreachable (default-deny). `_clearVerifiers` is a TEST seam (twin of
+// `_clearUniversalDefectProducers`) — never call it in a request path (it would wipe NO_BID capability process-wide).
+const VERIFIER_ALLOWLIST = new Set<string>();
+/** Register an independent verifier permitted to affirm a committal universal defect (Fork-5, card 242). BOOT-ONLY. */
+export function registerVerifier(id: string): void { if (id) VERIFIER_ALLOWLIST.add(id); }
+/** Tests only — restore the allowlist to its empty prod state. */
+export function _clearVerifiers(): void { VERIFIER_ALLOWLIST.clear(); }
+/** A `universalDefect` mark is VERIFIED (may drive NO_BID) ONLY when it is GROUNDED, carries a well-formed
+ *  `verifiedBy` from a REGISTERED verifier, and its `excerptHash` matches sha256 of the finding's excerpt.
+ *  INTEGRITY NOTE (adversarial review): the source-truth control is `grounded===true` (a deterministic substring
+ *  check against real source, audit-expert.ts) — that is what stops a fabricated/hallucinated excerpt. The
+ *  `excerptHash` is a verify-time↔decide-time CONSISTENCY binding (the excerpt the verifier affirmed is byte-for-
+ *  byte the one being decided on, even after later excerpt repair), NOT itself a proof of source authenticity. The
+ *  allowlist ensures only an independent registered verifier's affirmation counts. Pure. */
+export function isVerifiedUniversalDefect(f: TypedFinding): boolean {
+  if (!isUniversalDefect(f)) return false;
+  // The excerpt must be GROUNDED (deterministically present in source) and NON-EMPTY — this is the real integrity
+  // control: the hash of a hallucinated span, or the known-constant sha256("") of an empty excerpt, must NEVER pass.
+  if (f.grounded !== true || (f.excerpt ?? "").length === 0) return false;
+  const v = f.verifiedBy;
+  return !!v
+    && typeof v.verifierId === "string" && v.verifierId.length > 0
+    && VERIFIER_ALLOWLIST.has(v.verifierId)  // Fork-5 hardening (card 242 Finding 3): the verifier must be REGISTERED — a self-signed/unregistered id can never reach NO_BID
+    && typeof v.affirmation === "string" && v.affirmation.length > 0
+    && typeof v.excerptHash === "string" && v.excerptHash === excerptHash(f.excerpt);
+}
+/** FORK-5 fail-safe log — a marked-but-unverified committal is an invariant breach (a producer emitted a NO_BID
+ *  mark without the required evidence). Logged (not thrown — that's the tristate coupling-lock's job) so the
+ *  audit fails SAFE to NHR while surfacing the breach. Guarded so a logger failure never affects the verdict. */
+function logInvariantBreach(msg: string): void { try { console.warn(`[engine-invariant-breach] ${msg}`); } catch { /* logging must never affect the verdict */ } }
 
 // ── BRAIN CARD 228 RULING (i) — COUPLING-LOCK MOVED TO BOOT / REGISTRATION-TIME ────────────────────────────
 // A universalDefect producer may run ONLY when a POSITIVE eligibility determination is reachable (tristate ON).
@@ -973,14 +1031,29 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    NO_BID: INELIGIBLE iff the profile PROVES non-qualification (firmStatus "fails"), else it flows to step 5
   //    and lands at NEEDS_HUMAN_REVIEW (null / open-world / unknown status) — never a default eligible:true.
   const disqualifying = dispositions.filter((f) => f.disposition === "disqualifying");
-  const universalDefect = disqualifying.filter(isUniversalDefect);
+  const markedUniversalDefect = disqualifying.filter(isUniversalDefect);
   // COUPLING-LOCK DECISION-TIME BACKSTOP (card 228 Ruling i) — the PRIMARY lock is boot-time
   // (validateUniversalDefectProducerConfig, above); this fires ONLY if a producer marked a finding without the
   // tristate (a dynamic registration after boot). It throws EngineInvariantError — NOT an NHR verdict — and the
   // audit BOUNDARY converts the throw to a billing-safe failed state (no charge, logged config error). NEVER
-  // default a NO_BID's eligibility to true.
-  if (universalDefect.length && !tristate)
+  // default a NO_BID's eligibility to true. (Applies to ANY mark — verified or not — a config-level guard.)
+  if (markedUniversalDefect.length && !tristate)
     throw new EngineInvariantError("FORK-2 coupling-lock (card 228 Ruling i, decision-time backstop): a universalDefect finding requires AUDIT_ELIGIBLE_TRISTATE=on — a committal NO_BID must carry a POSITIVE eligibility determination, never a default true.");
+  // FORK-5 (Brain card 240) — EVIDENTIARY BAR: a `universalDefect` mark may drive NO_BID ONLY when it carries
+  // VERIFICATION EVIDENCE (a `verifiedBy` record whose excerptHash binds the affirmation to the cited grounded
+  // excerpt — Rule 64, never a model prior). Split the marks: only VERIFIED marks flow to the show-stopper /
+  // NO_BID path; an UNVERIFIED mark is an invariant breach.
+  const universalDefect = markedUniversalDefect.filter(isVerifiedUniversalDefect);
+  const unverifiedUniversalDefect = markedUniversalDefect.filter((f) => !isVerifiedUniversalDefect(f));
+  // A marked-but-UNVERIFIED committal may neither drive NO_BID nor silently clear to BID (it is excluded from the
+  // verified show-stopper set AND from unmarkedUniversalClaim which filters !isUniversalDefect). Fail SAFE to NHR
+  // + LOG the breach — same fail-safe family as the tristate coupling-lock — BEFORE any committal emission, so an
+  // unverified mark can never reach a committal pole. (When J-1/J-2 wires a real verifier this path goes quiet.)
+  if (unverifiedUniversalDefect.length) {
+    const breach = `FORK-5 invariant breach (card 240): ${unverifiedUniversalDefect.length} finding(s) marked universalDefect WITHOUT verification evidence — a committal NO_BID may not rest on an unverified mark (no verifiedBy binding the defect to the cited excerpt, Rule 64). Fail-safe → NEEDS_HUMAN_REVIEW: ${unverifiedUniversalDefect.map((s) => s.requirement).join("; ")}`;
+    logInvariantBreach(breach);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect);
+  }
   // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
   // eligibility_bar). An earned (proven-fail) INELIGIBLE is NEVER routed to NHR on a mis-typed kind string.
@@ -1050,10 +1123,21 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     NEEDS_HUMAN_REVIEW (the determining fact — does the firm already hold it — is absent, so the engine
   //     must not over-assert NO_BID). But the PAYLOAD carries the decisive conditional-NO_BID so the customer
   //     gets the call, not mush (Brain card-45 refinement): hold-it-or-walk.
-  const nonCurable = unknownBars.filter((f) => f.curableInWindow === false);
+  //     FORK-7 (card 242): an NMR bar is NOT a lead-time structural bar — exclude it here; it gets its own
+  //     curability-carrying NHR branch below. A GENUINE structural non-curable bar (clearance/QPL/TDP) still leads.
+  const nonCurable = unknownBars.filter((f) => f.curableInWindow === false && f.nmrGuard !== true);
   if (nonCurable.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
       `Non-curable bar(s) — lead time exceeds the response window. CONDITIONAL NO-BID: if your firm does not ALREADY hold the following and cannot obtain it before the deadline, this is a NO-BID — it cannot be cured in the window: ${names(nonCurable)}`, dispositions, nonCurable);
+
+  // 5b-NMR. FORK-7 (Brain card 242 item 4) — NMR unknown/unrecognized status. NOT a lead-time bar: a nonmanufacturer
+  //     typically CURES by supplying a small U.S. manufacturer's product. Route to NHR carrying that curability path
+  //     (honest verdict + a visible way through), never the generic "lead time exceeds window" framing, never NO_BID.
+  //     Ordered AFTER the generic structural non-curable branch so a real structural bar's hold-it-or-walk leads.
+  const nmrUnknown = unknownBars.filter((f) => f.nmrGuard === true && f.curableInWindow === false);
+  if (nmrUnknown.length)
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
+      `Manufacturer/nonmanufacturer status not determined; if nonmanufacturer, Nonmanufacturer Rule compliance is typically achievable by supplying a small U.S. manufacturer's product — confirm status in profile: ${names(nmrUnknown)}`, dispositions, nmrUnknown);
 
   // ASYMMETRY CAP (Brain card-58): a "no-bar" verdict (CAUTION/BID) is valid only if the read was COMPLETE.
   // If a manifest-named attachment went unfetched, a clean verdict is the §C content-loss failure with a clean
