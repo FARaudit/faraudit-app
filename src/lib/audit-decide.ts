@@ -236,7 +236,7 @@ const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation 
 // also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
 // real universal show-stopper). Covers delivery/precondition impossibility AND supply/
 // sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
-const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity/i;
+const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
 /** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
@@ -296,7 +296,7 @@ export function applyOrEqualCarveout(findings: TypedFinding[], opts?: { enabled?
 const SETASIDE_PROGRAM_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|\bVOSB\b|economically disadvantaged/i;
 const SETASIDE_GENERIC_RE = /small business concern|total small business|small business set.?aside|wom[ae]n.?owned|veteran.?owned/i;
 const SETASIDE_FRAMING_RE = /set.?aside|reserved (?:for|exclusively)|restricted to|competition[^.]{0,30}restricted|100\s*(?:%|percent)/i;
-const GENUINE_STRUCTURAL_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized|firm|awardee)|non.?competit|directed award|(?:other than|without)\s+full and open|full and open competition|justification and approval|\bJ&A\b|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)/i;
+const GENUINE_STRUCTURAL_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized|firm|awardee)|non.?competit|directed award|(?:other than|without)\s+full and open|full and open competition|justification and approval|\bJ&A\b|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)/i;
 const SIZE_DISQUALIFICATION_RE = /other than small|(?:exceed\w*|\babove\b|\bover\b|in excess of)[^.]{0,25}\bsize\b|affiliation rule/i;
 // A SUBCONTRACTING goal / plan / participation target is about the AWARDEE's subcontracts, NOT who can win the
 // PRIME — even a socioeconomic PROGRAM token ("5% SDVOSB subcontracting participation goal") is not a prime
@@ -470,7 +470,14 @@ export function canonicalizeNmrAttr(raw: string | null | undefined): "nmr:compli
   // (3) NON-compliance iff an explicit non-/not- negates the compliance assertion. The "not" may be gapped from the
   //     assertion by adverbs ("not currently nmr compliant"), bounded to 40 chars so a distant unrelated "not"
   //     ("nmr compliant, will not subcontract") does NOT flip it (adversarial-review Defect B). Bounded = ReDoS-safe.
-  if (/\bnon-?complian/.test(s) || /\bnot\b[\s\S]{0,40}?complian/.test(s)) return "nmr:noncompliant";
+  // (3a) A MITIGATED / WAIVED / RESOLVED non-compliance is NOT a positive non-compliance STATUS — a granted
+  //      waiver may permit award. It is ambiguous → UNKNOWN (→ NHR, human review), never a false INELIGIBLE
+  //      (adversarial-review 2026-07-04, Finding C) nor a false clean-BID. Absence-is-not-proof still holds.
+  const positiveNoncompliant = /\bnon-?complian/.test(s) || /\bnot\b[\s\S]{0,40}?complian/.test(s);
+  if (positiveNoncompliant) {
+    if (/\b(?:waiv|mitigat|resolv|correct|cured|remediat|exempt)\w*/.test(s)) return null; // waived/mitigated → NHR, not fails
+    return "nmr:noncompliant";
+  }
   return "nmr:compliant";
 }
 /** FORK-7 NMR canonical firm-status (card 242 Finding-1, review-hardened). satisfies ⇔ a canonical compliant
@@ -584,7 +591,7 @@ export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { ena
 // AS-IS (→ NEEDS_HUMAN_REVIEW) — NEVER silently downgraded to BID. Only fires under a NULL profile (a real profile →
 // firmStatus governs, so #3's proven Dillon fail stays INELIGIBLE via step 3). Never touches no_one_can_move (#6's
 // temporal impossibility). Flag-gated; default OFF (Rule 61) ⇒ unchanged byte-for-byte.
-const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|unobtainable/i;
+const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|unobtainable/i;
 const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|representation|reps? (?:and|&) cert|certif|\bSAM\b|registration|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
 
 /** Generalize the over-type guards (Brain card 114): a non-curable bidder_cannot_move bar under a NULL profile is kept
@@ -828,7 +835,7 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
 // annual") were dropped in favor of size-specific phrases, so a pure 8(a)/SDVOSB set-aside
 // still self-clears, while "8(a) AND small (business) under NAICS / size standard / N
 // employees / annual receipts" does not.
-const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|security clearance|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
+const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
 
 export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
