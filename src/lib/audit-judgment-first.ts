@@ -63,3 +63,80 @@ export async function runJudgmentFirst(input: JudgmentFirstInput, propose: Propo
   );
   return { disposed, proposed, railDerived, analysis: proposed.analysis };
 }
+
+// ── THE REAL HOLISTIC PROPOSER (PAID) ─────────────────────────────────────────────────────────────────
+// One structured model call that reads the WHOLE assembled source and reasons to a verdict the way pasting a
+// solicitation into Claude does. The structured caller is INJECTED (the anthropic-structured wrapper in prod, a
+// stub in tests). The output is a PROPOSAL — every finding must carry a verbatim excerpt (Rule 64 / I3); the rail
+// re-grounds and gates it downstream, so a hallucinated finding or an over-eager committal can never survive.
+const VERDICT_ENUM = ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE", "NEEDS_HUMAN_REVIEW", "INCOMPLETE"] as const;
+const KIND_ENUM = ["eligibility_bar", "technical_spec", "pricing", "submission", "past_performance", "clause_flowdown", "boilerplate", "other"] as const;
+const CONTROLLABILITY_ENUM = ["bidder_controls", "bidder_cannot_move", "no_one_can_move", "already_satisfied"] as const;
+
+/** The strict structured-output schema for the proposal. A verbatim `excerpt` is REQUIRED on every finding. */
+export const JUDGMENT_FIRST_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["verdict", "analysis", "reason", "findings"],
+  properties: {
+    verdict: { type: "string", enum: VERDICT_ENUM },
+    eligible: { type: ["boolean", "null"] },
+    analysis: { type: "string", description: "The boardroom-grade bid/no-bid narrative a capture director would present." },
+    reason: { type: "string", description: "One-line rationale for the proposed verdict." },
+    findings: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["requirement", "citation", "excerpt", "kind", "controllability"],
+      properties: {
+        requirement: { type: "string" }, citation: { type: "string" },
+        excerpt: { type: "string", description: "VERBATIM source span proving the requirement exists (Rule 64) — copied word-for-word from the solicitation." },
+        kind: { type: "string", enum: KIND_ENUM },
+        controllability: { type: "string", enum: CONTROLLABILITY_ENUM },
+        requiredAttribute: { type: "string" }, curableInWindow: { type: "boolean" },
+        severity: { type: "string", enum: ["P0", "P1", "P2"] },
+      } } },
+  },
+} as const;
+
+const PROPOSER_SYSTEM = [
+  "You are a senior federal-contracting capture director. You are handed the FULL solicitation (every section and",
+  "attachment). Read ALL of it and produce a boardroom-grade bid / no-bid analysis, then PROPOSE a verdict.",
+  "GROUND every finding in a VERBATIM excerpt copied word-for-word from the source (never paraphrase an excerpt);",
+  "a finding without a real verbatim excerpt will be dropped.",
+  "Type each finding by controllability: bidder_controls (do-the-work gate), bidder_cannot_move (a PROFILE bar this",
+  "firm may or may not hold — add requiredAttribute + curableInWindow), no_one_can_move (a UNIVERSAL impossibility",
+  "disqualifying EVERY offeror), already_satisfied.",
+  "VERDICT DISCIPLINE — the deterministic rail gates your proposal, so propose HONESTLY, never defensively:",
+  "  • Propose NO_BID ONLY for a UNIVERSAL impossibility (the solicitation contradicts itself, or no offeror can",
+  "    comply) — never for a who-can-win restriction (set-aside / NAICS size / clearance / QPL are not NO_BID).",
+  "  • NEVER infer INELIGIBLE from SILENCE. If the solicitation does not state the firm holds an attribute, that is",
+  "    UNKNOWN → propose NEEDS_HUMAN_REVIEW, not INELIGIBLE.",
+  "  • A non-curable credential the firm must HOLD (CMMC level, clearance, ATO, a cert whose lead time exceeds the",
+  "    response window) is a structural bar → NEEDS_HUMAN_REVIEW, not a soft caution.",
+  "  • If the package is incomplete or you cannot ground the core, propose INCOMPLETE.",
+  "  • Default to BID for a genuinely open, biddable solicitation; BID_WITH_CAUTION when a real caution attaches.",
+  "Return ONLY the structured object.",
+].join(" ");
+
+/** Adapter contract for the injected paid structured caller (the anthropic-structured wrapper in prod). */
+export type JudgmentStructuredCaller = (args: { model: string; system: string; user: string; schema: Record<string, unknown> }) => Promise<{ text: string; stopReason: string | null }>;
+
+/** Build the real holistic ProposeFn. On a truncated (max_tokens) or unparseable response it THROWS — never a
+ *  silent partial proposal (the audit boundary honest-fails, same no-swallow doctrine as the skeptic adapter). */
+export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCaller, model: string): ProposeFn {
+  return async (input: JudgmentFirstInput): Promise<ProposedJudgment> => {
+    const profileLine = input.bidderProfile == null
+      ? "Bidder profile: UNKNOWN (open-world — do NOT infer ineligibility from anything the firm does not explicitly hold)."
+      : `Bidder profile attributes: ${(input.bidderProfile.satisfiedAttributes ?? []).join(", ") || "(none listed)"}${input.bidderProfile.closedWorld ? " [closed-world: complete profile]" : " [open-world: self-asserted]"}.`;
+    const ctxLine = [input.naics ? `NAICS ${input.naics}` : "", input.setAside ? `set-aside ${input.setAside}` : "", input.noticeType ? `notice type ${input.noticeType}` : ""].filter(Boolean).join(" · ");
+    const user = `${profileLine}${ctxLine ? `\nSolicitation facts: ${ctxLine}.` : ""}\n\n=== FULL SOLICITATION SOURCE ===\n${input.fullSource}`;
+    const res = await callStructured({ model, system: PROPOSER_SYSTEM, user, schema: JUDGMENT_FIRST_SCHEMA as unknown as Record<string, unknown> });
+    if (res.stopReason === "max_tokens") throw new Error(`judgment-first proposal truncated (max_tokens, model=${model}) — refusing a partial proposal`);
+    let parsed: Partial<ProposedJudgment> & { findings?: TypedFinding[] };
+    try { parsed = JSON.parse(res.text); } catch (e) { throw new Error(`judgment-first proposal unparseable (model=${model}): ${(e as Error)?.message ?? String(e)}`); }
+    if (!parsed.verdict || !VERDICT_ENUM.includes(parsed.verdict as typeof VERDICT_ENUM[number])) throw new Error(`judgment-first proposal missing/invalid verdict (model=${model})`);
+    return {
+      verdict: parsed.verdict as Verdict,
+      eligible: parsed.eligible ?? null,
+      analysis: typeof parsed.analysis === "string" ? parsed.analysis : "",
+      reason: typeof parsed.reason === "string" ? parsed.reason : "",
+      findings: (Array.isArray(parsed.findings) ? parsed.findings : []).map((f) => ({ ...f, grounded: true, lens: "judgment" })),
+    };
+  };
+}
