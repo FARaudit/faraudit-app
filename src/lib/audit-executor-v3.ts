@@ -145,7 +145,7 @@ export async function executeAgenticPrimary(
   const usageCalls: UsageCall[] = [];
   const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
   let assembled: { source: string; truncated: boolean; keptDocs: number; droppedDocs: string[]; contentLossDocs: string[] };
-  let readModes: Array<{ name: string; mode: DocReadMode; chunks: number; spansKept: number; spansRejected: number }> | null = null;
+  let readModes: Array<{ name: string; mode: DocReadMode; chunks: number; spansKept: number; spansRejected: number; failedWindows: number }> | null = null;
   if (chunkedOn && wouldOverflow(docs, MAX_FULLSOURCE_CHARS)) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("agentic engine: ANTHROPIC_API_KEY not set — cannot run chunked map-reduce ingest");
@@ -161,7 +161,7 @@ export async function executeAgenticPrimary(
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: chunked map-reduce ingest — ${compressed}/${ch.perDoc.length} docs compressed to grounded digests, 0 dropped (primary kept whole; amendments always mapped)${ch.contentLossDocs.length ? ` — CONTENT-LOSS on [${ch.contentLossDocs.join(", ")}] → documents_complete=false (honest INCOMPLETE)` : ""}`);
   } else {
     assembled = { ...assembleFullSourceBudgeted(docs), contentLossDocs: [] };
-    if (chunkedOn) readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0 }));
+    if (chunkedOn) readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0 }));
   }
   // Abort mid-ingest (budget/wall-clock) is an HONEST hard-fail — never spend the Opus auditPackage verdict on a
   // partial read, and never persist a partial digest as complete (Brain R1: abort = honest-fail, not a degrade).
@@ -315,7 +315,7 @@ export async function executeAgenticPrimary(
       // The report discloses this so a reviewer knows a compressed doc was read for compliance, not cover-to-cover.
       // SECURITY: read_modes[].name is an attacker-influenceable document NAME (upload / SAM attachment) — inert
       // today (no renderer reads it); ANY future UI surfacing it MUST route the name through escapeHtml (stored-XSS).
-      ...(readModes ? { read_modes: readModes.map((r) => ({ name: r.name, mode: r.mode, ...(r.mode === "map-reduce" ? { chunks: r.chunks, spans_kept: r.spansKept, spans_rejected: r.spansRejected } : {}) })) } : {}),
+      ...(readModes ? { read_modes: readModes.map((r) => ({ name: r.name, mode: r.mode, ...(r.mode === "map-reduce" ? { chunks: r.chunks, spans_kept: r.spansKept, spans_rejected: r.spansRejected, failed_windows: r.failedWindows } : {}) })) } : {}),
       // C-19 interim guard (Brain C.f) — DETECT + DISCLOSE only, NEVER a verdict cap (supersession resolution is
       // its own tranche). Surface that amendments are present (so a reviewer knows superseded terms are unresolved)
       // + per-finding document provenance (which doc grounded each finding).

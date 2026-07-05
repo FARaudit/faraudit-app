@@ -71,21 +71,27 @@ export function overlappingWindows(text: string, size: number, overlap: number):
 const DATE_RE = /\b(?:\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})(?:\s+(?:at\s+)?\d{1,2}:\d{2}\s*(?:[AaPp]\.?[Mm]\.?)?(?:\s*[A-Z]{2,4})?)?/g;
 const CLIN_RE = /\b(?:Sub-?CLIN|CLIN|ELIN)\s*[:#]?\s*\d{3,4}[A-Z]{0,2}\b/gi;
 const SETASIDE_RE = /\b(?:total\s+small\s+business|100%\s+small\s+business|8\(a\)|SDVOSBs?|service-disabled\s+veteran|HUBZone|EDWOSBs?|WOSBs?|women-owned|veteran-owned)\b[^.\n]{0,50}/gi;
+// #3 (ultracode hardening) — CONTENT-based amendment detection. Filenames are unreliable ("am_2" ≠ "amend"), so we
+// detect amendment LANGUAGE in the full text and surface it into the floor → the compressed digest carries it →
+// detectAmendments (which scans the region's first ~4000 chars) fires even when the header wasn't a surfaced span.
+const AMENDMENT_RE = /\bamendment of solicitation\b|\bamendment\s+(?:no\.?|number|#)?\s*0*\d+\b|\bSF[\s-]?30\b/gi;
 
 const capUniq = (matches: string[], cap: number): string[] => Array.from(new Set(matches.map((m) => m.trim()).filter(Boolean))).slice(0, cap);
 
 /** Build the deterministic floor for one doc's FULL text: clause numbers + material dates + CLIN ids + set-aside
- *  markers. Runs on the whole doc regardless of chunking/map recall (R2-c). Returns [] when nothing matches. Pure. */
+ *  markers + amendment markers. Runs on the whole doc regardless of chunking/map recall (R2-c). [] when nothing. Pure. */
 export function deterministicFloor(text: string): string[] {
   const clauses = extractClauseNumbers(text);
   const dates = capUniq(text.match(DATE_RE) ?? [], 20);
   const clins = capUniq(text.match(CLIN_RE) ?? [], 30);
   const setAsides = capUniq(text.match(SETASIDE_RE) ?? [], 10);
+  const amendments = capUniq(text.match(AMENDMENT_RE) ?? [], 5);
   const parts: string[] = [];
   if (clauses.length) parts.push(`clauses: ${clauses.join(", ")}`);
   if (dates.length) parts.push(`dates: ${dates.join(" | ")}`);
   if (clins.length) parts.push(`CLINs: ${clins.join(", ")}`);
   if (setAsides.length) parts.push(`set-aside markers: ${setAsides.join(" | ")}`);
+  if (amendments.length) parts.push(`amendment markers: ${amendments.join(" | ")}`);
   return parts;
 }
 
@@ -107,7 +113,8 @@ export interface ChunkedDocResult {
   chunks: number;        // MAP chunks processed (0 when kept whole)
   spansKept: number;     // grounded excerpts kept (0 when kept whole)
   spansRejected: number; // excerpts the model returned that were NOT verbatim in-source → rejected (R2-b)
-  contentLoss: boolean;  // true iff a BINDING doc compressed to an EMPTY digest (no spans + no clauses) — fail-safe
+  failedWindows: number; // windows whose map call THREW / returned unparseable JSON (0 when kept whole) — coverage gate
+  contentLoss: boolean;  // true iff a BINDING doc read to nothing OR mostly-failed windows — honest-fail, never false-COMPLETE
 }
 
 export interface ChunkedAssembly {
@@ -158,6 +165,7 @@ export async function mapReduceDoc(
   const windows = overlappingWindows(doc.text, MAP_CHUNK_CHARS, MAP_OVERLAP_CHARS);
   const grounded: string[] = [];
   let rejected = 0;
+  let failedWindows = 0;
   for (let i = 0; i < windows.length; i++) {
     if (signal?.aborted) break;                       // upstream budget fired — stop mapping, keep what we have
     const chunk = windows[i];
@@ -165,7 +173,8 @@ export async function mapReduceDoc(
     try {
       res = await mapCall({ docName: doc.name, chunk, chunkIndex: i, chunkCount: windows.length });
     } catch {
-      continue;                                        // fail-safe: a bad window contributes nothing, never drops the doc
+      failedWindows++;                                 // #2 — a window that THREW / returned unparseable JSON is UNREAD,
+      continue;                                        // never dropped; counted so a mostly-failed binding doc fails safe
     }
     for (const ex of res.excerpts ?? []) {
       // R2-b GROUNDING: verbatim substring of THIS window, or REJECTED. A hallucinated / paraphrased span cannot
@@ -180,21 +189,29 @@ export async function mapReduceDoc(
   // (a moved due date, a set-aside flip) that are prose the recall-imperfect MAP might miss (code-review card 271).
   const floor = deterministicFloor(doc.text);
   const floorLine = floor.length ? `\n\n[DETERMINISTIC FLOOR (full-text scan): ${floor.join(" · ")}]` : "";
-  // CONTENT LOSS iff a BINDING doc yielded NOTHING — no grounded span AND an empty deterministic floor. With the
-  // floor now covering clauses/dates/CLINs/set-aside, a genuine material change almost always leaves a trace; a
-  // truly empty result on a binding doc is a real extraction failure ⇒ honest INCOMPLETE, never false-COMPLETE.
+  // CONTENT LOSS (fail-safe, never false-COMPLETE) — a BINDING doc is a genuine content loss when EITHER it yielded
+  // NOTHING (no grounded span AND an empty deterministic floor), OR a MAJORITY of its windows FAILED (threw /
+  // unparseable-truncated JSON) so most of the doc went unread even though a stray span/floor item survived (#2
+  // — the sustained-failure gap the ultracode review flagged). Either way → honest documents_complete=false.
   const empty = spans.length === 0 && floor.length === 0;
-  const contentLoss = empty && isBinding(doc.name);
+  const mostlyUnread = windows.length >= 2 && failedWindows * 2 >= windows.length;
+  const contentLoss = isBinding(doc.name) && (empty || mostlyUnread);
+  // #3 — CONTENT-based amendment marker at the TOP of the digest. Fires only when the deterministicFloor actually
+  // found amendment LANGUAGE in the text (no filename over-match), and sits in the first chars so detectAmendments
+  // (which scans the region's first ~4000 chars) reliably fires even on a large compressed digest.
+  const amendHeader = floor.some((p) => p.startsWith("amendment markers:"))
+    ? "[AMENDMENT OF SOLICITATION — this document contains amendment language]\n\n" : "";
   const body = spans.length
     ? spans.join("\n\n")
     : "[no compliance-relevant spans surfaced by the map for this document — see deterministic floor below]";
   return {
     name: doc.name,
     mode: "map-reduce",
-    text: `${READMODE_NOTE}${body}${floorLine}`,
+    text: `${amendHeader}${READMODE_NOTE}${body}${floorLine}`,
     chunks: windows.length,
     spansKept: spans.length,
     spansRejected: rejected,
+    failedWindows,
     contentLoss,
   };
 }
@@ -228,7 +245,7 @@ export async function assembleFullSourceChunked(
 ): Promise<ChunkedAssembly> {
   const multi = docs.length > 1;
   const results: ChunkedDocResult[] = docs.map((d) => ({
-    name: d.name, mode: "full" as DocReadMode, text: d.text, chunks: 0, spansKept: 0, spansRejected: 0, contentLoss: false,
+    name: d.name, mode: "full" as DocReadMode, text: d.text, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0, contentLoss: false,
   }));
   // total = sum of (header + body) PLUS the "\n\n" separators the final join inserts between the N pieces (2×(N−1)).
   const sepLen = multi ? Math.max(0, results.length - 1) * 2 : 0;
@@ -278,10 +295,11 @@ export function wouldOverflow(docs: AgenticDoc[], maxChars: number): boolean {
   return total > maxChars;
 }
 
-/** Amendments are ALWAYS material (R2-c) — a convenience predicate for asserting an amendment is never dropped.
- *  An SF-30 / "amendment" doc is binding by definition. */
+/** STRICT filename-based amendment check (SF-30 / "amendment" in the name). Does NOT treat every binding doc as an
+ *  amendment — that over-match spuriously flagged spec sheets. Amendment CONTENT is detected separately by the
+ *  deterministicFloor AMENDMENT_RE (the reliable, filename-independent path); this predicate is a name-only hint. */
 export function isAmendmentDoc(name: string): boolean {
-  return /amend|sf-?30\b|sf ?30\b/i.test(name) || isBinding(name);
+  return /amend|sf-?30\b|sf ?30\b/i.test(name);
 }
 
 const MAP_SCHEMA = {
@@ -325,12 +343,16 @@ export function makeChunkMapCaller(
       `Document: ${docName} (chunk ${chunkIndex + 1} of ${chunkCount}).\n\n` +
       `Extract every compliance-relevant VERBATIM span from the chunk below.\n\n---CHUNK---\n${chunk}`;
     const text = await callStructured({ model, system, user, schema: MAP_SCHEMA, maxTokens: 4096, signal });
+    let parsed: { excerpts?: unknown };
     try {
-      const parsed = JSON.parse(text) as { excerpts?: unknown };
-      const excerpts = Array.isArray(parsed.excerpts) ? parsed.excerpts.filter((e): e is string => typeof e === "string") : [];
-      return { excerpts };
+      parsed = JSON.parse(text) as { excerpts?: unknown };
     } catch {
-      return { excerpts: [] }; // unparseable → nothing (fail-safe: deterministic floor + other chunks still cover)
+      // #2 — unparseable / truncated output is a window FAILURE, not a genuine empty. THROW so mapReduceDoc counts
+      // it toward the coverage gate (a majority of failed windows on a binding doc → honest content-loss). A VALID
+      // {"excerpts":[]} still returns cleanly below (genuine "no compliance content here"), which is not a failure.
+      throw new Error("chunk map: unparseable structured output");
     }
+    const excerpts = Array.isArray(parsed.excerpts) ? parsed.excerpts.filter((e): e is string => typeof e === "string") : [];
+    return { excerpts };
   };
 }
