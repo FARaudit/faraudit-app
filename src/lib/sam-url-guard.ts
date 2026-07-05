@@ -52,7 +52,8 @@ export function assertAllowedSamUrl(raw: string, kind: "initial" | "redirect"): 
 export async function samFetchWithKey(
   url: string,
   apiKey: string,
-  timeoutMs: number
+  timeoutMs: number,
+  extraHeaders?: Record<string, string>
 ): Promise<Response> {
   const initial = assertAllowedSamUrl(url, "initial");
   initial.searchParams.set("api_key", apiKey);
@@ -66,7 +67,8 @@ export async function samFetchWithKey(
   for (let hop = 0; hop <= MAX_SAM_REDIRECTS; hop++) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error("SAM fetch exceeded its total time budget");
-    res = await fetch(currentUrl, { redirect: "manual", signal: AbortSignal.timeout(remaining) });
+    // extraHeaders (e.g. Accept) ride only the first sam.gov hop, never a redirect target.
+    res = await fetch(currentUrl, { redirect: "manual", signal: AbortSignal.timeout(remaining), ...(hop === 0 && extraHeaders ? { headers: extraHeaders } : {}) });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) break;
