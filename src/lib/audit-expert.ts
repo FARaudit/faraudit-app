@@ -118,7 +118,35 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
       messages.push({ role: "assistant", content: batch.map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input })) });
       messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
     }
-    const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, system, tools: [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL], messages };
+    // ── PROMPT CACHING (flag-gated, behavior-NEUTRAL — caching changes billing, not output) ──
+    // The expert is a MULTI-TURN tool loop: each turn re-sends the whole stable prefix (tool
+    // schemas + per-lens system + the growing tool-result transcript) UNCACHED, so an N-turn loop
+    // re-bills turns 1..N-1 every turn — the dominant Sonnet input cost (Console CSV 2026-07-04:
+    // $2.68 input, token_type=input_no_cache, ZERO cache hits). Mark three ephemeral breakpoints so
+    // turn N READS turns 1..N-1 from cache (≈10% of input price) and pays fresh only for the delta:
+    //   (1) the LAST tool schema  → caches the identical tool block set across every call & lens
+    //   (2) the per-lens system   → caches across that lens's turns
+    //   (3) the last message block → caches the transcript prefix turn-over-turn
+    // Anthropic silently no-ops a breakpoint under the model minimum (~1024 tok), so this is safe.
+    // Flag-OFF ⇒ req is BYTE-IDENTICAL to the prior prod shape (proven by test-expert-prompt-cache).
+    // ONE unified flag AUDIT_PROMPT_CACHE governs all engine caching (this expert loop + the L3 finder).
+    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
+    const EPHEMERAL = { type: "ephemeral" as const };
+    // cache_control on the LAST tool caches the whole tool-schema prefix (all tools before it).
+    const tools = cacheOn
+      ? [...AUDIT_TOOLS, { ...SUBMIT_FINDINGS_TOOL, cache_control: EPHEMERAL }]
+      : [...AUDIT_TOOLS, SUBMIT_FINDINGS_TOOL];
+    const systemField: unknown = cacheOn ? [{ type: "text", text: system, cache_control: EPHEMERAL }] : system;
+    if (cacheOn && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1] as { role: string; content: unknown };
+      if (Array.isArray(lastMsg.content) && lastMsg.content.length > 0) {
+        const blocks = lastMsg.content as Array<Record<string, unknown>>;
+        blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: EPHEMERAL };
+      } else if (typeof lastMsg.content === "string") {
+        lastMsg.content = [{ type: "text", text: lastMsg.content, cache_control: EPHEMERAL }];
+      }
+    }
+    const req: Record<string, unknown> = { model, max_tokens: opts?.maxTokens ?? 4096, system: systemField, tools, messages };
     if (forceSubmit) req.tool_choice = { type: "tool", name: "submit_findings" }; // last turn → must produce findings
     // Pass the overall-budget signal so a breach cancels the in-flight paid call (stops
     // spend) instead of abandoning a Promise that keeps costing. Absent signal = no-op.

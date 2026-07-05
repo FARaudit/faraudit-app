@@ -151,7 +151,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   // LOCATE-only structured call; the offset-string-match gate in runSectionFinder makes a wrong locate fail-safe.
   const sectionFinder = process.env.AUDIT_SECTION_FINDER === "true"
     ? makeSectionFinderCaller(
-        async (a) => (await callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, onUsage: input.onUsage })).text,
+        async (a) => (await callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, onUsage: input.onUsage, ...(a.cachedSystemPrefix ? { cachedSystemPrefix: a.cachedSystemPrefix } : {}) })).text,
         input.sectionFinderModel ?? modelFor("finder"),
         input.signal,
       )
