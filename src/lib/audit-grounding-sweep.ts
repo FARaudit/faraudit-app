@@ -134,11 +134,18 @@ const LIMITATION_SUBK_RE = /\b52\.219-(?:14|27|3|29|30|33)\b|limitations?\s+on\s
 const PROHIBITED_SOURCE_RE = /\b52\.204-2[456]\b|covered\s+telecommunications(?:\s+equipment)?|prohibited\s+source|\bByteDance\b|\bKaspersky\b/i;
 const FACILITY_CLEARANCE_RE = /\bfacility\s+(?:security\s+)?clearance\b|\bFCL\b|\bDD[\s-]?254\b|top\s+secret\s+facility|cleared\s+facility/i;
 const OCI_RE = /\borganizational\s+conflict\s+of\s+interest\b|\bOCI\b|\b9\.5(?:0[0-9]|)\b|52\.209-7[0-9]/i;
+// CMMC / NIST SP 800-171 (DFARS 252.204-7012/-7019/-7020/-7021) — a structural cyber-eligibility bar (a required
+// CMMC level / SPRS score can gate award) already recognized elsewhere in the engine; must be in the sweep so a §I
+// incorporation isn't attested away. Buy American / TAA country-of-origin (52.225-x) — a domestic/TAA-source bar.
+const CMMC_RE = /\bCMMC\b|NIST\s+SP?\s*800-171|\b252\.204-70(?:12|19|20|21)\b|\bSPRS\b(?![a-z])|cybersecurity\s+maturity\s+model/i;
+const BUY_AMERICAN_RE = /\b52\.225-[0-9]{1,2}\b|Buy\s+American\s+Act|Trade\s+Agreements?\s+(?:Act|clause)|\bTAA\b(?![a-z])|domestic\s+end\s+product|designated\s+country/i;
 const TRAP_CLASSES: TrapHit[] = [
   { trapClass: "limitation_on_subcontracting", requirementLabel: "Limitations on Subcontracting (FAR 52.219-14/-27/-3/-29/-30/-33 — self-performance / 50% rule; an ostensible-subcontractor / affiliation size trap)", anchor: LIMITATION_SUBK_RE },
   { trapClass: "prohibited_source", requirementLabel: "Covered-telecommunications / prohibited-source restriction (FAR 52.204-24/-25/-26)", anchor: PROHIBITED_SOURCE_RE },
   { trapClass: "facility_clearance", requirementLabel: "Facility Security Clearance / DD-254 requirement (a structural eligibility bar — lead time may exceed the response window)", anchor: FACILITY_CLEARANCE_RE },
   { trapClass: "organizational_conflict_of_interest", requirementLabel: "Organizational Conflict of Interest restriction (FAR 9.5 / 52.209-7x — may bar an offeror with a disqualifying OCI)", anchor: OCI_RE },
+  { trapClass: "cmmc_nist_800171", requirementLabel: "CMMC / NIST SP 800-171 cybersecurity requirement (DFARS 252.204-7012/-7019/-7020/-7021 — a required CMMC level / SPRS score can gate award)", anchor: CMMC_RE },
+  { trapClass: "buy_american_taa", requirementLabel: "Buy American Act / Trade Agreements Act country-of-origin restriction (FAR 52.225-x — domestic / designated-country end-product bar)", anchor: BUY_AMERICAN_RE },
 ];
 /** Deterministically ground the named §I/§K trap classes from source as clause_flowdown findings (verbatim excerpt).
  *  The trap classes Brain named as living inside boilerplate §I/§K; grounding them makes the boilerplate attestation

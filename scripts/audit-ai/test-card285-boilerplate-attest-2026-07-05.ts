@@ -70,6 +70,8 @@ function main() {
   ok("trap sweep grounds facility-clearance / DD-254 (structural eligibility bar)", boilerplateTrapSweep("SECTION K\nOfferor must hold a Secret facility security clearance and DD-254.").some((x) => x.sweepArchetype === "facility_clearance"), true);
   ok("trap sweep grounds organizational conflict of interest", boilerplateTrapSweep("SECTION I\nAn organizational conflict of interest (OCI) may render an offeror ineligible.").some((x) => x.sweepArchetype === "organizational_conflict_of_interest"), true);
   ok("trap sweep grounds the LOS clause family (52.219-27 SDVOSB)", boilerplateTrapSweep("SECTION I\nClause 52.219-27 applies to this SDVOSB set-aside.").some((x) => x.sweepArchetype === "limitation_on_subcontracting"), true);
+  ok("trap sweep grounds CMMC / NIST 800-171 (DFARS 252.204-7012)", boilerplateTrapSweep("SECTION I\nDFARS 252.204-7012 applies; a CMMC Level 2 assessment is required.").some((x) => x.sweepArchetype === "cmmc_nist_800171"), true);
+  ok("trap sweep grounds Buy American / TAA (52.225-x)", boilerplateTrapSweep("SECTION I\nClause 52.225-1 Buy American Act — supplies applies; only domestic end products.").some((x) => x.sweepArchetype === "buy_american_taa"), true);
 
   console.log(`\ncard285 Fix2 boilerplate attestation — ${pass} passed, ${fails.length} failed`);
   for (const x of fails) console.log("  ✗ " + x);
