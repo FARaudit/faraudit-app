@@ -761,14 +761,14 @@ export function applyTemporalConflict(findings: TypedFinding[]): TypedFinding[] 
   const delivery = findings.find((f) => f.sweepArchetype === "delivery_window");
   if (!fat || !delivery) return findings;
 
-  const gDays = gateDays(fat.excerpt), winDays = deliveryWindowDays(delivery.excerpt);              // ANCHORED durations (no global-min poisoning)
+  const gDays = gateDays(fat.excerpt ?? ""), winDays = deliveryWindowDays(delivery.excerpt ?? "");  // ANCHORED durations (?? "" — sibling-consistent guard; .matchAll on undefined throws mid-run)
   const prong1 = DELIVERY_ORDER_ANCHOR_RE.test(delivery.excerpt);                                   // delivery is order-anchored
   const prong2 = POST_ORDER_GATE_ANCHOR_RE.test(fat.excerpt) && DELIVERY_FORECLOSE_RE.test(fat.excerpt); // post-order gate + delivery foreclosure (rejects relative scheduling)
   const prong3 = NONWAIVABLE_TIGHT_RE.test(fat.excerpt);                                            // explicit non-waiver (mandatory-only is NOT enough)
   const prong4 = gDays != null && winDays != null && gDays > winDays;                               // PROVEN arithmetic on anchored durations (never estimate)
   // same-deliverable guard: if BOTH excerpts name CLIN/line items and the sets are DISJOINT, the gate and the
   // window concern DIFFERENT deliverables ⇒ not a universal tension for either ⇒ do not fire (→ soft floor).
-  const fatClins = clinSet(fat.excerpt), delClins = clinSet(delivery.excerpt);
+  const fatClins = clinSet(fat.excerpt ?? ""), delClins = clinSet(delivery.excerpt ?? ""); // ?? "" — sibling-consistent guard (clinSet → .matchAll)
   const crossDeliverable = fatClins.size > 0 && delClins.size > 0 && ![...fatClins].some((c) => delClins.has(c));
   // EVIDENCE the human adjudicates from — the parsed arithmetic, never silent (Brain card 226).
   const evidence = { gateDays: gDays, windowDays: winDays, gateExceedsWindow: prong4 };
@@ -845,8 +845,9 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   // ineligibility — the walk-away class). GATED ON nmrGuard so, with the Fork-7 flag OFF, this is inert and
   // firmStatus is byte-identical to pre-diff (the keyfact NMR keeps its card-206-A unverified-gate path).
   if (f.nmrGuard === true && f.requiredAttribute === NMR_ATTRIBUTE) return nmrFirmStatus(profile);
+  const held = profile.satisfiedAttributes ?? []; // ?? [] — sibling-consistent guard (nmrFirmStatus already does this); a profile missing the array must not throw mid-verdict
   // Exact attribute match (trusted/gold closed-world profile) — unchanged.
-  if (profile.satisfiedAttributes.includes(f.requiredAttribute)) return "satisfies";
+  if (held.includes(f.requiredAttribute)) return "satisfies";
   // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
   // Restricted to open-world so a closed-world/gold profile is never flipped fails→satisfies
   // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
@@ -855,7 +856,7 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   // OPEN-WORLD is now the DEFAULT (Brain card-254 B): run this block unless the profile is EXPLICITLY closed-world.
   if (!profile.closedWorld) {
     const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
-    if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
+    if (reqCanon && held.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
       const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
       if (!NON_SELF_CLEARABLE_BAR_RE.test(hay)) return "satisfies";
       // bundled structural/size bar → don't self-clear; fall through to unknown (human review).
