@@ -160,7 +160,11 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
     // set ⇒ INCOMPLETE (structureless blob). Unchanged.
     const anyCore = ["C", "L", "M"].some(present);
     const commercialRef = /\b5?2\.212-[12]\b/.test(ctx.fullSource ?? ""); // a bare Part-12 synopsis references 52.212-1/-2 — leave it to the C-10 flag path, never a C-5 false-flag
-    if (commercialRef) return [];
+    // S3 (Brain card 274) — gate the commercialRef free-pass behind !requiresLM. A SOLICITATION-type buy (requiresLM)
+    // with a STRAY 52.212-1/-2 reference used to short-circuit to [] (COMPLETE) BEFORE the §L/§M cap below, reopening
+    // the notice-body-blind false-COMPLETE and zeroing the L3 finder target set. Only a NON-solicitation (RFI/Sources
+    // Sought, requiresLM=false — no §L/§M required anyway) keeps the free pass.
+    if (commercialRef && !requiresLM) return [];
     if (!anyCore) return ["C", "L", "M"];
     // Layer-2 (Brain card 262) — KILL THE §C-ONLY FREE PASS. Previously `anyCore → []`, so a SOW-only source (§C
     // detected via title patterns) certified complete while §L/§M lived in an un-ingested notice body → the
@@ -332,7 +336,10 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     const text = sectionFullText(ctx, sec); const nText = norm(text);
     const lensTruncated = readSection(ctx, sec).truncated;
     if (!sectionsRead.has(sec)) { attestations.push({ section: sec, status: "unread", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
-    const direct = findings.filter((f) => f.excerpt && nText.includes(norm(f.excerpt)));
+    // S7 (Brain card 274) — a section is covered_direct ONLY by a finding CITED TO THAT SAME SECTION whose excerpt is
+    // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
+    // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
+    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
     // 5b §M DEPTH — REFINED (Brain card 137 ruling), flag-gated, §M ONLY (never §L/§C or the coreMissing path).
     // Fire "not evaluated" ONLY when ALL THREE hold: (1) NO direct grounded finding (the covered_direct check

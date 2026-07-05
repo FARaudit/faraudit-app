@@ -669,8 +669,8 @@ export function isPdfPortfolio(buffer: Buffer): boolean {
 // extracted to text and wrapped into a PDF (P0 fix 2026-06-20) so it rides the
 // same inline-PDF + pdf-parse ingestion path. Anything else → null (honest
 // fallback; the caller flags it, never fabricates).
-async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null> {
-  if (raw.subarray(0, 4).toString("latin1") === "%PDF") return raw;
+async function normalizeToPdf(name: string, raw: Buffer): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
+  if (raw.subarray(0, 4).toString("latin1") === "%PDF") return { buf: raw, sourceTruncated: false };
   const kind = nonPdfKind(name);
   if (kind) {
     let text = await extractNonPdfText(name, raw);
@@ -679,20 +679,26 @@ async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null>
       // inventory/ELINS sheet can't hog the token budget and starve other docs.
       // Keep the structure + a representative sample; honest truncation note.
       // .docx prose is left intact (bounded later by MAX_DOC_TOKENS if needed).
+      let sourceTruncated = false;
       if (kind === "xlsx") {
         const maxChars = Math.floor(MAX_XLSX_DOC_TOKENS * CHARS_PER_TOKEN);
         if (text.length > maxChars) {
           text = text.slice(0, Math.max(0, maxChars - 130)) +
             "\n\n[… spreadsheet truncated for the analysis budget — representative rows shown; full line-item file on SAM.gov …]";
+          // S1 (Brain card 274) — the TAIL was cut at the source (before the token-budget pass), so the doc's
+          // token count is already under budget and the downstream truncated flag would otherwise read false →
+          // documents_complete=true on a partial wage/ELIN price sheet. Report it so the caller ORs it into
+          // the per-file `truncated` flag (the honest-fail gate reads f.truncated).
+          sourceTruncated = true;
         }
       }
-      return textToPdfBuffer(text, name);
+      return { buf: textToPdfBuffer(text, name), sourceTruncated };
     }
   }
   return null;
 }
 
-async function downloadPdf(url: string, name = ""): Promise<Buffer | null> {
+async function downloadPdf(url: string, name = ""): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
   try {
     if (!SAM_API_KEY) return null;
     // SSRF + key-leak guard (shared with sam-pdf.ts): host-allowlist the untrusted
@@ -857,7 +863,7 @@ export async function assembleSamDocumentSet(
   // Pass 1: download + page-count + token-estimate every byte/doc-budgeted
   // member, in tier order.
   const files: IngestionFileMeta[] = [];
-  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
+  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -865,13 +871,14 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
-    const buf = await downloadPdf(e.url, e.name);
-    if (!buf) {
+    const dl = await downloadPdf(e.url, e.name);
+    if (!dl) {
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "download failed or not a PDF" });
       continue;
     }
+    const buf = dl.buf;
     const { tokens, text } = await estimateDocTokens(buf);
-    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
+    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: dl.sourceTruncated });
   }
   // Pass 2: trim by the page ceiling — but ONLY for VISION-delivered docs.
   // FA-INGEST3 (2026-06-21): the ~600-page API ceiling that MAX_TOTAL_PAGES guards
@@ -929,9 +936,11 @@ export async function assembleSamDocumentSet(
         continue;
       }
       if (isVisionDoc) visionBase64Bytes += base64.length;
-      const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
+      const tokenTruncated = kept.truncated && buf !== f.buffer;
+      const wasTruncated = tokenTruncated || f.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
+      const displayName = wasTruncated ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1020,7 +1029,7 @@ export async function assembleUploadedDocumentSet(
   // Pass 1: page-count + token-estimate every byte/doc-budgeted member (bytes
   // already local).
   const files: IngestionFileMeta[] = [];
-  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
+  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -1031,13 +1040,14 @@ export async function assembleUploadedDocumentSet(
     const raw = bufById.get(e.resourceId);
     // P0 fix (2026-06-20): a native PDF passes the %PDF check; a .docx/.xlsx is
     // extracted to text + wrapped into a PDF so it ingests like the SAM arm.
-    const buf = raw ? await normalizeToPdf(e.name, raw) : null;
-    if (!buf) {
+    const norm = raw ? await normalizeToPdf(e.name, raw) : null;
+    if (!norm) {
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "not a valid PDF (magic-byte check)" });
       continue;
     }
+    const buf = norm.buf;
     const { tokens, text } = await estimateDocTokens(buf);
-    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
+    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: norm.sourceTruncated });
   }
   // Pass 2: trim by the page ceiling (form exempt → generics drop first).
   const { ingest: pageKept } = applyPageBudget(
@@ -1073,9 +1083,11 @@ export async function assembleUploadedDocumentSet(
         continue;
       }
       if (isVisionDoc) visionBase64Bytes += base64.length;
-      const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
+      const tokenTruncated = kept.truncated && buf !== c.buffer;
+      const wasTruncated = tokenTruncated || c.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
+      const displayName = wasTruncated ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
