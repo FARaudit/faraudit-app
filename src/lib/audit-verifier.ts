@@ -203,7 +203,7 @@ export function makeStructuredSkeptic(
   const SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"], properties: { verdicts: { type: "array", items: {
     type: "object", additionalProperties: false, required: ["index", "upheld", "reason"],
     properties: { index: { type: "integer" }, upheld: { type: "boolean" }, reason: { type: "string" },
-      corrected: { type: "object", additionalProperties: false, minProperties: 1, properties: { // card 274 RULING 1 — an empty corrected:{} is never a valid re-type
+      corrected: { type: "object", additionalProperties: false, properties: { // card 274 RULING 1 — an empty corrected:{} is rejected in CODE (makeAgenticVerifier `substantive` check); NOT via a JSON-schema `minProperties` (the Anthropic structured-output API 400s on `minProperties` → the skeptic call throws → sound=false → universal honest-fail; the code check is the real enforcement)
         controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "no_one_can_move", "already_satisfied"] },
         curableInWindow: { type: "boolean" } } } } } } } };
   return async (_ctx, findings, _opts) => {

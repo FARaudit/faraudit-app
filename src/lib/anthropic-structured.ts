@@ -65,8 +65,29 @@ export function setStructuredUsageSink(sink: ((u: StructuredUsage) => void) | nu
  *  "temperature is deprecated for this model". Throws on non-2xx or a missing text
  *  block (fail loud). `stopReason === "max_tokens"` lets the caller flag an
  *  output-capped (under-extracted) response instead of trusting it as complete. */
+// The Anthropic structured-output (json_schema) validator REJECTS a handful of standard JSON-Schema keywords with a
+// hard 400 (e.g. `minProperties`/`maxProperties` on an object → "property 'minProperties' is not supported"). A 400
+// is non-retryable, so a single such keyword ANYWHERE in a schema makes every call using it throw — and a caller
+// that swallows the throw (e.g. the adversarial verifier → sound=false) then honest-fails EVERY audit silently.
+// Card 274 shipped exactly such a keyword (`minProperties:1`) and it universally broke committals (card 285 root).
+// Defensively DEEP-STRIP the known-unsupported keywords here so no future schema can reintroduce the class of bug.
+const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["minProperties", "maxProperties"]);
+export function sanitizeSchema<T>(node: T): T {
+  if (Array.isArray(node)) return node.map((n) => sanitizeSchema(n)) as unknown as T;
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (UNSUPPORTED_SCHEMA_KEYWORDS.has(k)) continue; // drop the unsupported keyword (would 400)
+      out[k] = sanitizeSchema(v);
+    }
+    return out as unknown as T;
+  }
+  return node;
+}
+
 export async function callStructuredClaude(opts: StructuredCallOpts): Promise<StructuredCallResult> {
-  const { apiKey, model, system, userPrompt, schema, maxTokens } = opts;
+  const { apiKey, model, system, userPrompt, maxTokens } = opts;
+  const schema = sanitizeSchema(opts.schema);
   const timeoutMs = opts.timeoutMs ?? (Number(process.env.CLAUDE_TIMEOUT_MS) || 240000);
   const label = opts.label ?? "structured call";
   // When a cached prefix is supplied, send `system` as a two-block array: the shared
