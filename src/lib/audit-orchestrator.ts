@@ -36,7 +36,11 @@ export const BINDING_SECTIONS = ["B", "C", "D", "E", "F", "H", "I", "K", "L", "M
 
 const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
-export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; }
+/** Telemetry record for a finding the skeptic dropped (Brain card 274 RULING 1). `empty_corrected` = a refuted
+ *  finding whose `corrected` object was non-substantive (the false-INELIGIBLE/NO_BID resurrection hole, now closed);
+ *  `overturned` = a plain upheld=false drop. Persisted so every drop is auditable, never silent. */
+export interface CorrectedDrop { index: number; id?: string; requirement: string; citation: string; refutation: string; dropReason: "empty_corrected" | "overturned"; }
+export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; correctedDrops?: CorrectedDrop[]; }
 /** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests.
  *  bidderProfile is passed so the verifier can compute the deterministic knife-edge set (Brain card-54/55). */
 export type VerifyFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { bidderProfile?: BidderProfile | null }) => Promise<VerifyResult>;
@@ -91,6 +95,7 @@ export interface AuditResult {
   conflict: boolean;
   sectionsRead: string[];                                                                 // union across all agents (pure-observer)
   trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
+  verifierDrops?: CorrectedDrop[];                                                        // card 274 RULING 1 — skeptic drops (empty-corrected + overturned), telemetry-visible; absent when none
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
 }
 
@@ -451,6 +456,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
   const ver = await verify(ctx, findings, { bidderProfile });
   findings = ver.survived;
+  const verifierDrops = ver.correctedDrops ?? []; // card 274 RULING 1 — persisted to AuditResult (telemetry-visible)
 
   // J-2 — REGISTERED INDEPENDENT VERIFIER (Brain card 246), at the P2 seam. For each universalDefect-marked
   //       finding: 3-state entailment vs the cited excerpt + source (never J-1's reasoning) → VERIFIED writes
@@ -630,5 +636,5 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
 }

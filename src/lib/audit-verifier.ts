@@ -10,7 +10,7 @@
 // The skeptic is INJECTED → unit-testable with a stub ($0). makeStructuredSkeptic wires the real model.
 
 import { findInSource, type AuditToolContext } from "./audit-tools";
-import type { VerifyFn, VerifyResult } from "./audit-orchestrator";
+import type { VerifyFn, VerifyResult, CorrectedDrop } from "./audit-orchestrator";
 import type { TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 import { knifeEdgeIndices } from "./audit-decide";
 
@@ -47,16 +47,29 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     const byIdx = new Map(verdicts.map((v) => [v.index, v]));
     const complete = grounded.every((_, i) => byIdx.has(i)); // every finding actually got ruled
     const survived: TypedFinding[] = []; const rejected: TypedFinding[] = [...droppedUngrounded];
+    const correctedDrops: CorrectedDrop[] = [];
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
-      if (v?.corrected) survived.push({ ...f, ...(v.corrected.controllability ? { controllability: v.corrected.controllability } : {}), ...(v.corrected.curableInWindow !== undefined ? { curableInWindow: v.corrected.curableInWindow } : {}) }); // RE-TYPE
-      else if (v && !v.upheld) rejected.push(f);                                                                  // overturned → drop
-      else survived.push(f);                                                                                      // upheld as-is
+      // RE-TYPE requires a SUBSTANTIVE correction (Brain card 274 RULING 1). An empty/non-substantive
+      // `corrected:{}` used to be truthy → the finding survived UNCHANGED even when the skeptic REFUTED it
+      // (upheld=false) → false INELIGIBLE/NO_BID (the catastrophic ZERO-CONTRACT-LOSS hole). A correction only
+      // counts when it carries controllability or curableInWindow; otherwise the upheld flag governs.
+      const substantive = !!v?.corrected && (v.corrected.controllability !== undefined || v.corrected.curableInWindow !== undefined);
+      if (substantive) {
+        survived.push({ ...f, ...(v!.corrected!.controllability ? { controllability: v!.corrected!.controllability } : {}), ...(v!.corrected!.curableInWindow !== undefined ? { curableInWindow: v!.corrected!.curableInWindow } : {}) }); // RE-TYPE
+      } else if (v && !v.upheld) {
+        rejected.push(f); // overturned → drop (INCLUDES the empty-corrected:{} case that formerly resurrected)
+        correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: v.corrected ? "empty_corrected" : "overturned" });
+      } else {
+        survived.push(f); // upheld as-is (upheld=true, no substantive correction)
+      }
     });
+    if (correctedDrops.some((d) => d.dropReason === "empty_corrected"))
+      console.log(`[verifier] dropped ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").length} refuted finding(s) with empty corrected:{} (card 274 RULING 1 — no false resurrection): ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").map((d) => `#${d.index} "${d.requirement}"`).join(", ")}`);
     // SOUND iff the skeptic ruled on every finding (challenge completed) AND ≥1 survived. Total-overturn
     // (survived=[]) is NOT sound — soundness is "the skeptic confirmed at least one finding stands", never
     // "the skeptic ruled on every finding and killed them all" (the false-BID hole). Brain card 224 fork 1.
-    return { sound: complete && survived.length > 0, survived, rejected };
+    return { sound: complete && survived.length > 0, survived, rejected, correctedDrops };
   };
 }
 
@@ -77,6 +90,16 @@ export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): Skeptic
     const escVerdicts = await escalate(ctx, contested);                             // Opus re-judges/re-types ONLY the contested subset
     const escByOrig = new Map<number, SkepticVerdict>();
     escVerdicts.forEach((v) => { const orig = contestedIdx[v.index]; if (orig !== undefined) escByOrig.set(orig, { index: orig, upheld: v.upheld, reason: v.reason, corrected: v.corrected }); });
+    // RULING 2 (Brain card 274) — NEVER pass through the lenient base (Sonnet) type on an UNRESOLVED knife-edge.
+    // If the escalation returned no ruling for one or more contested findings (empty-return-on-contested-set, or a
+    // partial cover), we cannot trust the base classification → THROW so makeAgenticVerifier's catch routes the run
+    // to sound:false → NEEDS_HUMAN_REVIEW with the contested/grounded set attached. A truncation/parse-fail already
+    // throws inside structuredAdapter; this closes the valid-but-incomplete escalation return.
+    const unresolved = contestedIdx.filter((i) => !escByOrig.has(i));
+    if (unresolved.length) {
+      console.log(`[skeptic] escalation left ${unresolved.length}/${contestedIdx.length} contested finding(s) unresolved (idx ${unresolved.join(",")}) — refusing lenient pass-through → NHR (card 274 RULING 2)`);
+      throw new Error(`escalation unresolved on ${unresolved.length}/${contestedIdx.length} contested finding(s) — no lenient pass-through`);
+    }
     return baseVerdicts.map((v) => escByOrig.get(v.index) ?? v);                     // escalation wins where it ruled
   };
 }
@@ -111,7 +134,7 @@ export function makeStructuredSkeptic(
   const SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"], properties: { verdicts: { type: "array", items: {
     type: "object", additionalProperties: false, required: ["index", "upheld", "reason"],
     properties: { index: { type: "integer" }, upheld: { type: "boolean" }, reason: { type: "string" },
-      corrected: { type: "object", additionalProperties: false, properties: {
+      corrected: { type: "object", additionalProperties: false, minProperties: 1, properties: { // card 274 RULING 1 — an empty corrected:{} is never a valid re-type
         controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "no_one_can_move", "already_satisfied"] },
         curableInWindow: { type: "boolean" } } } } } } } };
   return async (_ctx, findings, _opts) => {

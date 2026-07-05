@@ -327,6 +327,13 @@ export async function executeAgenticPrimary(
         ? { amendments_present: true, amendment_disclosure: "This package contains one or more amendments (SF-30 / amendment of solicitation). Superseded terms are NOT yet automatically resolved — verify the latest amendment governs before relying on any cited term." }
         : {}),
       finding_provenance: findingProvenance(fullSource, res.findings),
+      // Card 274 RULING 1 (Brain) — persist every skeptic DROP to the durable audit trail (finding id/requirement/
+      // citation, the refutation reason, and dropReason). The `empty_corrected` rows are the closed false-resurrection
+      // hole (a refuted finding that used to survive unchanged → false INELIGIBLE/NO_BID); `overturned` rows are plain
+      // adversarial drops. Telemetry-visible per the ruling; omitted when no drops occurred (byte-stable).
+      // SECURITY: requirement/citation/refutation are model-/source-derived text — inert today (no renderer reads
+      // verifier_drops). ANY future UI that surfaces them MUST route through escapeHtml (stored-XSS), like the fields above.
+      ...(res.verifierDrops?.length ? { verifier_drops: res.verifierDrops } : {}),
       v3: payload,
     },
   };

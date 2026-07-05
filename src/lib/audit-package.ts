@@ -109,12 +109,27 @@ function makeJudgmentCallers(
   return { judgmentReason, judgmentEntail };
 }
 
+/** Parse + validate a raw skeptic response into typed verdicts. RULING 2 (Brain card 274): a truncated
+ *  (max_tokens) or unparseable or verdicts-missing response THROWS — NEVER a silent {verdicts:[]} swallow. An
+ *  empty verdict set would keep the lenient base type on a contested finding → verifier sound:true → FALSE BID.
+ *  The throw propagates to makeAgenticVerifier's catch, which routes the run to sound:false → NHR (with the
+ *  grounded/contested set attached). A max_tokens stop means the JSON is cut off — a partial verdict set is
+ *  untrustworthy even if it happens to parse. Exported so the $0 regression gate exercises the real parser. */
+export function parseSkepticResponse(res: { text: string; stopReason: string | null }, model: string): { verdicts: SkepticVerdict[] } {
+  if (res.stopReason === "max_tokens") throw new Error(`skeptic response truncated (max_tokens, model=${model}) — refusing to trust a partial verdict set`);
+  let parsed: { verdicts?: SkepticVerdict[] };
+  try { parsed = JSON.parse(res.text) as { verdicts?: SkepticVerdict[] }; }
+  catch (e) { throw new Error(`skeptic response unparseable (model=${model}) — refusing empty-swallow: ${(e as Error)?.message ?? String(e)}`); }
+  if (!Array.isArray(parsed.verdicts)) throw new Error(`skeptic response missing verdicts[] (model=${model}) — refusing empty-swallow`);
+  return { verdicts: parsed.verdicts };
+}
+
 /** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
  *  budget `signal` (if any) is closed over so an overall-budget breach also cancels the skeptic's calls. */
 function structuredAdapter(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void) {
   return async (args: { model: string; system: string; user: string; schema: Record<string, unknown> }): Promise<{ verdicts: SkepticVerdict[] }> => {
     const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal, onUsage });
-    try { return JSON.parse(res.text) as { verdicts: SkepticVerdict[] }; } catch { return { verdicts: [] }; }
+    return parseSkepticResponse(res, args.model);
   };
 }
 
