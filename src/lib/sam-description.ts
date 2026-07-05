@@ -18,6 +18,8 @@
 // exactly as it did pre-FA-148, loudly noted in the row. Never blocks a run,
 // never fabricates.
 
+import { samFetchWithKey } from "./sam-url-guard";
+
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 15000;
 // L1 (Brain card 264 Ruling 1) — the OLD 4000-char cap silently truncated the notice
@@ -86,9 +88,14 @@ export async function resolveSamDescription(
   if (!id) return unfetched("no resolvable notice id (description is not a noticedesc URL and noticeId is not a SAM UUID)");
 
   try {
-    const res = await fetch(
-      `https://sam.gov/api/prod/opps/v2/opportunities/${id}?api_key=${SAM_API_KEY}`,
-      { headers: { accept: "application/hal+json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+    // SSRF + key-leak guard (shared with the audit pipeline's document fetches): host-allowlist
+    // the URL, append the key only on the first sam.gov hop, and follow any redirect MANUALLY so
+    // the api_key is never replayed to an S3 presigned target. Accept header rides the first hop.
+    const res = await samFetchWithKey(
+      `https://sam.gov/api/prod/opps/v2/opportunities/${id}`,
+      SAM_API_KEY,
+      FETCH_TIMEOUT_MS,
+      { accept: "application/hal+json" }
     );
     if (!res.ok) return unfetched(`detail fetch HTTP ${res.status}`);
     const j = (await res.json()) as { description?: Array<{ body?: string }> };

@@ -246,13 +246,16 @@ async function detectNoticeBodySections(
   if (budget < 6000) return none; // not enough headroom to safely resolve the body — skip (honest fallback)
   const cap = Math.min(15000, budget - 1500);
   let resolved;
+  let capTimer: ReturnType<typeof setTimeout> | null = null;
   try {
     resolved = await Promise.race([
       resolveSamDescription(noticeId, description),
-      new Promise<null>((r) => setTimeout(() => r(null), cap)),
+      new Promise<null>((r) => { capTimer = setTimeout(() => r(null), cap); }),
     ]);
   } catch {
     return none;
+  } finally {
+    if (capTimer !== null) clearTimeout(capTimer); // don't leave a dangling timer when the fetch wins
   }
   if (!resolved || !resolved.fetched) return none;
   const text = resolved.text.trim();

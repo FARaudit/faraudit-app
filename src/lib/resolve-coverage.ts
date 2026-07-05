@@ -62,6 +62,14 @@ export function detectBodySections(text: string): ContentSections {
 // authority to declare a narrative section absent — only the audit's L3 finder can. So a
 // not-detected core section is "absent" ONLY when we did a content read AND there is no notice
 // body in play; otherwise it is "unverified" (the full audit confirms). Never present as missing.
+//
+// COUPLING (surfaced by adversarial review, both hold in prod):
+//   1. This defers narrative §L/§M to the audit's L3 finder, which is LIVE in prod
+//      (AUDIT_SECTION_FINDER=true). If L3 were disabled, the door ("unverified") and audit
+//      ("absent") would SOFT-disagree — both non-catastrophic; "unverified" still fails safe.
+//   2. The door↔audit disagreement is one-directional and acceptable: the door defers (never
+//      false-alarms), and the audit remains AUTHORITATIVE — it honestly reports INCOMPLETE (and
+//      no-charges on honest-fail) when a core section it deferred on is genuinely absent.
 export function sectionStateFor(
   present: boolean,
   coverageBasis: "content" | "name_only",
