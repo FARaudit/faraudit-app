@@ -242,6 +242,9 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
     console.log(`   ↳ chunked ingest: ${docs.length} docs, ${(before / 1e6).toFixed(2)}M chars → compressing to ≤${(deps.MAX / 1e6).toFixed(2)}M (concurrency ${process.env.AGENTIC_MAP_CONCURRENCY || 6}) …`);
     const asm = await deps.assembleFullSourceChunked(docs, deps.makeMapCall(caseSignal), deps.MAX, caseSignal);
     source = asm.source;
+    // Save the compressed digest so a rail-verdict diagnosis is CHEAP (~$0.20 re-audit of this file) instead of a
+    // full $3.74 recompression. The expensive part is the ~314 paid map calls; the digest is the reusable artifact.
+    try { fs.writeFileSync(path.join(HERE, `_${rc.id}-compressed-digest.txt`), source); console.log(`   ↳ saved compressed digest → _${rc.id}-compressed-digest.txt (${source.length} chars)`); } catch { /* non-fatal */ }
     console.log(`   ↳ assembled ${(source.length / 1e6).toFixed(2)}M chars · truncated=${asm.truncated} · contentLoss=[${asm.contentLossDocs.join(",")}]`);
     if (asm.truncated) return { verdict: "INCOMPLETE", eligible: null };  // honest-fail — an incomplete read can't commit
   }
