@@ -3,11 +3,11 @@
 // soundness (marked unverified, kept), an UNRESOLVED verdict-driving (bar / knife-edge) finding DOES → not sound
 // (NHR) and is ATTACHED never dropped (Brain's forbidden silent-drop fail-safe); makeBatchedSkeptic covers a
 // >batch set and remaps indices, and leaves per-batch residue when the base can't rule everything.
-import { makeAgenticVerifier, makeBatchedSkeptic, type SkepticFn } from "@/lib/audit-verifier";
+import { makeAgenticVerifier, makeBatchedSkeptic, makeTieredSkeptic, type SkepticFn } from "@/lib/audit-verifier";
 import type { AuditToolContext } from "@/lib/audit-tools";
 import type { TypedFinding } from "@/lib/audit-findings";
 
-const SRC = "SECTION C\nThe item shall have a fully enclosed cab.\nThe contractor shall submit a price schedule.\nSECTION I\n252.225-7001 Buy American applies.\nA facility security clearance at the Secret level is required.";
+const SRC = "SECTION C\nThe item shall have a fully enclosed cab.\nStandard commercial terms and conditions apply.\nSECTION I\n252.225-7001 Buy American applies.\nA facility security clearance at the Secret level is required.\nContractor shall provide a proprietary widget.";
 const ctx: AuditToolContext = { fullSource: SRC };
 const f = (o: Partial<TypedFinding>): TypedFinding => ({ requirement: o.requirement ?? "r", citation: o.citation ?? "§C", excerpt: o.excerpt ?? "", grounded: true, lens: "x", kind: o.kind ?? "other", controllability: o.controllability ?? "bidder_controls", ...o });
 
@@ -15,9 +15,13 @@ let pass = 0; const fails: string[] = [];
 const ok = (l: string, g: unknown, e: unknown) => { if (JSON.stringify(g) === JSON.stringify(e)) pass++; else fails.push(`${l}: ${JSON.stringify(g)} != ${JSON.stringify(e)}`); };
 
 // grounded excerpts (must be verbatim substrings of SRC)
-const info = f({ requirement: "submit price schedule", excerpt: "shall submit a price schedule", controllability: "bidder_controls", kind: "submission" });
+// TRULY informational: a boilerplate-KIND finding (engine-defined never-a-bar) — the ONLY safe residue class.
+const info = f({ requirement: "standard T&C", excerpt: "Standard commercial terms and conditions apply", controllability: "bidder_controls", kind: "boilerplate" });
 const cab = f({ requirement: "enclosed cab", excerpt: "fully enclosed cab", controllability: "bidder_controls" });
 const bar = f({ requirement: "secret clearance", excerpt: "facility security clearance at the Secret level is required", controllability: "bidder_cannot_move", curableInWindow: false });
+// THE CATASTROPHIC HOLE (adversarial finding R1-A): a REAL bar the lens UNDER-TYPED to bidder_controls, with a
+// non-safe KIND — must be treated as verdict-driving even though its controllability looks harmless.
+const underTypedBar = f({ requirement: "proprietary widget (real spec bar mislabeled)", excerpt: "provide a proprietary widget", controllability: "bidder_controls", kind: "technical_spec" });
 
 // skeptic that ONLY rules index 0 → index 1 is the UNRESOLVED residue.
 const rulesOnlyFirst: SkepticFn = async () => [{ index: 0, upheld: true, reason: "only first" }];
@@ -36,9 +40,9 @@ async function main() {
   r = await makeAgenticVerifier(rulesOnlyFirst)(ctx, [cab, info]);
   ok("flag ON: unresolved informational ⇒ SOUND (does not sink)", r.sound, true);
   ok("flag ON: informational residue KEPT (not dropped)", r.survived.length, 2);
-  ok("flag ON: informational residue marked unverified", r.survived.find((x) => x.requirement === "submit price schedule")?.unverified, true);
+  ok("flag ON: informational residue marked unverified", r.survived.find((x) => x.requirement === "standard T&C")?.unverified, true);
   ok("flag ON: resolved finding NOT marked unverified", r.survived.find((x) => x.requirement === "enclosed cab")?.unverified, undefined);
-  ok("flag ON: informational residue never in rejected (no silent drop)", r.rejected.some((x) => x.requirement === "submit price schedule"), false);
+  ok("flag ON: informational residue never in rejected (no silent drop)", r.rejected.some((x) => x.requirement === "standard T&C"), false);
 
   // (B) unresolved VERDICT-DRIVING (bar-class) ⇒ NOT sound (→ NHR); ATTACHED to survived, never dropped.
   r = await makeAgenticVerifier(rulesOnlyFirst)(ctx, [cab, bar]);
@@ -47,10 +51,27 @@ async function main() {
   ok("flag ON: unresolved bar NOT in rejected (forbidden silent drop)", r.rejected.some((x) => x.requirement === "secret clearance"), false);
   ok("flag ON: unresolved bar NOT marked unverified", r.survived.find((x) => x.requirement === "secret clearance")?.unverified, undefined);
 
+  // (B2) R1-A HARDENING — an UNDER-TYPED bar (bidder_controls, but a non-safe KIND) unresolved must NOT be waved
+  //      through as informational. The predicate keys on KIND, not the contestable controllability → verdict-driving
+  //      → NOT sound (NHR). This is the catastrophic false-BID hole the adversarial review caught; it must stay closed.
+  r = await makeAgenticVerifier(rulesOnlyFirst)(ctx, [cab, underTypedBar]);
+  ok("R1-A: under-typed bar (bidder_controls, technical_spec) unresolved ⇒ NOT sound (not waved through)", r.sound, false);
+  ok("R1-A: under-typed bar NOT marked unverified (treated verdict-driving)", r.survived.find((x) => x.requirement.startsWith("proprietary widget"))?.unverified, undefined);
+  ok("R1-A: under-typed bar attached, not dropped", r.rejected.some((x) => x.requirement.startsWith("proprietary widget")), false);
+
   // (C) total-overturn is never sound even flag-on.
   const overturnAll: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: false, reason: "no" }));
   r = await makeAgenticVerifier(overturnAll)(ctx, [info]);
   ok("flag ON: total-overturn ⇒ NOT sound (survived empty)", r.sound, false);
+
+  // ── R1-C: makeTieredSkeptic must PRESERVE an escalation verdict for a contested index the base left unruled. ──
+  const baseRulesFirstOnly: SkepticFn = async (_c, fs) => (fs.length ? [{ index: 0, upheld: true, reason: "base" }] : []);
+  const escRetypes: SkepticFn = async (_c, fs) => fs.map((_x, i) => ({ index: i, upheld: true, reason: "esc", corrected: { controllability: "bidder_cannot_move" as const, curableInWindow: false } }));
+  const tiered = makeTieredSkeptic(baseRulesFirstOnly, escRetypes);
+  // knife-edge points at index 1 (contested); base only ruled index 0 → escalation is the ONLY ruling for index 1.
+  const tv = await tiered(ctx, [cab, bar], { escalateIdx: [1] });
+  ok("R1-C: escalation verdict for a base-unruled contested index is PRESERVED (not dropped)", tv.some((v) => v.index === 1), true);
+  ok("R1-C: the preserved verdict carries the escalation re-type", tv.find((v) => v.index === 1)?.corrected?.controllability, "bidder_cannot_move");
 
   // ── makeBatchedSkeptic — coverage + index remap + residue. ──
   // base that rules EVERY finding it's handed → batched must cover all 5 indices, remapped.

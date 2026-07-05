@@ -60,6 +60,17 @@ function main() {
   const unread = completenessOf({ fullSource: SRC_I_CLEAN }, ["I"], [], new Set(), ATTEST);
   ok("unread §I stays unread (attestation requires READ)", unread.attestations.find((a) => a.section === "I")?.status, "unread");
 
+  // ── (G) HARDENING — INTERNAL CLAMP: a caller passing a binding-obligation section (§M) must NEVER attest it,
+  //      even though the arg lists it. The fixed {I,K} allowlist governs. Closes the exported-API footgun. ──
+  const mClamp = completenessOf({ fullSource: "SECTION M - EVALUATION FACTORS\nThe Government shall evaluate on best value and price." }, ["M"], [], new Set(["M"]), { boilerplateAttest: { sections: ["I", "K", "M"], swept: true } });
+  ok("§M never boilerplate-attested even when arg lists it (internal clamp)", mClamp.attestations.find((a) => a.section === "M")?.status !== "covered_attested_boilerplate", true);
+  ok("§M with an ungrounded obligation stays MISSING (clamp holds)", mClamp.missing.includes("M"), true);
+
+  // ── (H) HARDENING — expanded §I/§K trap coverage so "swept" is meaningful (facility clearance + OCI). ──
+  ok("trap sweep grounds facility-clearance / DD-254 (structural eligibility bar)", boilerplateTrapSweep("SECTION K\nOfferor must hold a Secret facility security clearance and DD-254.").some((x) => x.sweepArchetype === "facility_clearance"), true);
+  ok("trap sweep grounds organizational conflict of interest", boilerplateTrapSweep("SECTION I\nAn organizational conflict of interest (OCI) may render an offeror ineligible.").some((x) => x.sweepArchetype === "organizational_conflict_of_interest"), true);
+  ok("trap sweep grounds the LOS clause family (52.219-27 SDVOSB)", boilerplateTrapSweep("SECTION I\nClause 52.219-27 applies to this SDVOSB set-aside.").some((x) => x.sweepArchetype === "limitation_on_subcontracting"), true);
+
   console.log(`\ncard285 Fix2 boilerplate attestation — ${pass} passed, ${fails.length} failed`);
   for (const x of fails) console.log("  ✗ " + x);
   process.exit(fails.length ? 1 : 0);

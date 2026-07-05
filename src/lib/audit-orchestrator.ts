@@ -332,6 +332,10 @@ function sectionMCriteria(text: string): string {
   return out.join("\n").slice(0, 2000);
 }
 const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).length < 12;
+// Fixed allowlist for boilerplate attestation (card 285 Fix 2). The ONLY sections a holistic read may attest covered
+// without per-obligation grounding — incorporated FAR-clause lists (§I) and reps/certs (§K). Never a binding-
+// obligation section (§C/§F/§L/§M). An internal clamp so no caller of the exported completenessOf can widen it.
+const BOILERPLATE_ATTESTABLE = new Set(["I", "K"]);
 
 export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
@@ -354,7 +358,11 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // (condition 1: hash-bound — the attestation carries sha256 of the section text). This certifies COVERAGE only;
     // it can NEVER suppress a detector hit (condition 3) — a trap-sweep finding cited to this section already
     // returned covered_direct above and drives the verdict. Fires only for the read, present, configured sections.
-    if (opts?.boilerplateAttest?.swept && opts.boilerplateAttest.sections.includes(sec) && text.trim().length > 0) {
+    // Adversarial-review hardening (card 285): (a) INTERNAL clamp — completenessOf is exported public API, so a
+    // caller passing sections:["M"] must NEVER boilerplate-attest a binding-obligation section; the fixed allowlist
+    // {I,K} governs regardless of the arg. (b) A lens-TRUNCATED section is NOT attestable — its unread tail may carry
+    // a bar the trap sweep never saw; fall through to the truncation→INCOMPLETE path (honest, never a false-COMPLETE).
+    if (opts?.boilerplateAttest?.swept && BOILERPLATE_ATTESTABLE.has(sec) && opts.boilerplateAttest.sections.includes(sec) && !lensTruncated && text.trim().length > 0) {
       attestations.push({ section: sec, status: "covered_attested_boilerplate", obligations: [], citedFindingIds: [], ungrounded: [], sectionHash: createHash("sha256").update(text, "utf8").digest("hex") });
       continue;
     }

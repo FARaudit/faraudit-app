@@ -57,9 +57,18 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     //     the whole clean audit — the customer-readiness gap card 285 closes.
     // Flag OFF ⇒ byte-identical to the pre-card-285 rule: unresolved ⇒ `complete=false` ⇒ not sound (whole-run NHR).
     const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true";
-    const escalateSet = new Set(escalateIdx);
-    const isVerdictDriving = (f: TypedFinding, i: number): boolean =>
-      f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move" || escalateSet.has(i);
+    // CONSERVATIVE verdict-driving predicate (adversarial-review hardening, card 285). A finding is "informational"
+    // (safe to leave UNRESOLVED without sinking soundness) ONLY when its KIND is one the engine defines as
+    // structurally NEVER-a-bar: procedural_obligation (coverage-only, invisible to the verdict) or boilerplate
+    // (routine standard T&C, explicitly NOT a gate). EVERYTHING ELSE unresolved is treated as verdict-driving → NHR.
+    // Rationale (closes the catastrophic residue hole): the skeptic exists precisely to CORRECT a mis-typed
+    // controllability, so we must NOT trust the lens's `controllability` to decide a finding is harmless — an
+    // under-typed bar (real disqualifier the lens labeled bidder_controls, no lens-disagreement sibling → absent
+    // from the knife-edge set) would otherwise be waved through as "informational" → false BID. Keying on the
+    // never-a-bar KINDS (not on the contestable controllability) removes that trust. Residue is near-zero once the
+    // batched skeptic rules every finding; this is the fail-SAFE fallback for the rare truncation tail.
+    const SAFE_INFORMATIONAL_KINDS = new Set(["procedural_obligation", "boilerplate"]);
+    const isVerdictDriving = (f: TypedFinding, _i: number): boolean => !SAFE_INFORMATIONAL_KINDS.has(f.kind);
     let unresolvedVerdictDriving = 0;
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
@@ -152,7 +161,15 @@ export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): Skeptic
       console.log(`[skeptic] escalation left ${unresolved.length}/${contestedIdx.length} contested finding(s) unresolved (idx ${unresolved.join(",")}) — refusing lenient pass-through → NHR (card 274 RULING 2)`);
       throw new Error(`escalation unresolved on ${unresolved.length}/${contestedIdx.length} contested finding(s) — no lenient pass-through`);
     }
-    return baseVerdicts.map((v) => escByOrig.get(v.index) ?? v);                     // escalation wins where it ruled
+    // MERGE base ∪ escalation over the UNION of ruled indices (adversarial-review hardening, card 285). The old
+    // `baseVerdicts.map(...)` emitted ONLY base-ruled indices, so a contested finding the batched base left unruled
+    // but the escalation DID rule was silently dropped — RULING-2's `escByOrig.has(i)` guard passes, yet the valid
+    // Opus re-type vanished → the verifier saw it as residue → a spurious honest-fail. Emit every index either side
+    // ruled; escalation wins where both did.
+    const mergedByIdx = new Map<number, SkepticVerdict>();
+    for (const v of baseVerdicts) mergedByIdx.set(v.index, v);
+    for (const [i, v] of escByOrig) mergedByIdx.set(i, v);          // escalation overrides the lenient base
+    return [...mergedByIdx.values()];
   };
 }
 

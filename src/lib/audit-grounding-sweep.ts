@@ -125,11 +125,20 @@ export function highSignalSweep(source: string): TypedFinding[] {
 // elevate an eligibility concern (e.g. an ostensible-subcontractor size risk under 52.219-14); the deterministic
 // pass only SURFACES the clause so it cannot vanish behind an attestation. Pure, no model. Dedup by (class+excerpt).
 interface TrapHit { trapClass: string; requirementLabel: string; anchor: RegExp; }
-const LIMITATION_SUBK_RE = /\b52\.219-14\b|limitations?\s+on\s+subcontracting|(?:at least|not less than|no less than)\s+(?:50|fifty)\s*(?:%|percent)[^.]{0,60}\b(?:self-?perform|cost of|the work)/i;
+// The recognized §I/§K structural / eligibility trap classes (Brain card 285 · condition 2). Broadened past the
+// single named example so "swept" is a MEANINGFUL guarantee — the full Limitations-on-Subcontracting clause family,
+// prohibited-source, facility clearance, and OCI are the well-known bars that hide inside boilerplate §I/§K. A truly
+// novel bar outside every detector remains the accepted residual (same as anywhere in the engine), but the common
+// families are now covered so attestation isn't certifying an un-swept section.
+const LIMITATION_SUBK_RE = /\b52\.219-(?:14|27|3|29|30|33)\b|limitations?\s+on\s+subcontracting|(?:at least|not less than|no less than)\s+(?:50|fifty)\s*(?:%|percent)[^.]{0,60}\b(?:self-?perform|cost of|the work)/i;
 const PROHIBITED_SOURCE_RE = /\b52\.204-2[456]\b|covered\s+telecommunications(?:\s+equipment)?|prohibited\s+source|\bByteDance\b|\bKaspersky\b/i;
+const FACILITY_CLEARANCE_RE = /\bfacility\s+(?:security\s+)?clearance\b|\bFCL\b|\bDD[\s-]?254\b|top\s+secret\s+facility|cleared\s+facility/i;
+const OCI_RE = /\borganizational\s+conflict\s+of\s+interest\b|\bOCI\b|\b9\.5(?:0[0-9]|)\b|52\.209-7[0-9]/i;
 const TRAP_CLASSES: TrapHit[] = [
-  { trapClass: "limitation_on_subcontracting", requirementLabel: "Limitations on Subcontracting (FAR 52.219-14 — self-performance / 50% rule; an ostensible-subcontractor / affiliation size trap)", anchor: LIMITATION_SUBK_RE },
+  { trapClass: "limitation_on_subcontracting", requirementLabel: "Limitations on Subcontracting (FAR 52.219-14/-27/-3/-29/-30/-33 — self-performance / 50% rule; an ostensible-subcontractor / affiliation size trap)", anchor: LIMITATION_SUBK_RE },
   { trapClass: "prohibited_source", requirementLabel: "Covered-telecommunications / prohibited-source restriction (FAR 52.204-24/-25/-26)", anchor: PROHIBITED_SOURCE_RE },
+  { trapClass: "facility_clearance", requirementLabel: "Facility Security Clearance / DD-254 requirement (a structural eligibility bar — lead time may exceed the response window)", anchor: FACILITY_CLEARANCE_RE },
+  { trapClass: "organizational_conflict_of_interest", requirementLabel: "Organizational Conflict of Interest restriction (FAR 9.5 / 52.209-7x — may bar an offeror with a disqualifying OCI)", anchor: OCI_RE },
 ];
 /** Deterministically ground the named §I/§K trap classes from source as clause_flowdown findings (verbatim excerpt).
  *  The trap classes Brain named as living inside boilerplate §I/§K; grounding them makes the boilerplate attestation
