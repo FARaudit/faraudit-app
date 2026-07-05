@@ -156,7 +156,7 @@ const FINDER_SCHEMA = {
 /** Build the real (PAID) finder — a locate-only structured call. Constructed ONLY when AUDIT_SECTION_FINDER is on
  *  (auditPackage), so flag-OFF is byte-identical (finder undefined ⇒ L3 never runs). Locate, never summarize. */
 export function makeSectionFinderCaller(
-  callStructured: (args: { model: string; system: string; user: string; schema: object; maxTokens: number; signal?: AbortSignal }) => Promise<string>,
+  callStructured: (args: { model: string; system: string; user: string; schema: object; maxTokens: number; signal?: AbortSignal; cachedSystemPrefix?: string }) => Promise<string>,
   model: string,
   signal?: AbortSignal,
 ): SectionFinderCall {
@@ -168,11 +168,21 @@ export function makeSectionFinderCaller(
       "the document, so it pins the location unambiguously. Do not paraphrase, summarize, invent, or lightly edit " +
       "the text — copy it exactly. If the content is genuinely NOT present, return located=false and an empty " +
       "anchor. Never guess.";
-    const user =
-      `Required section §${sectionKey} contains ${sectionIntent}.\n\n` +
-      `Locate §${sectionKey} in the document below. Return a distinctive verbatim anchor where its content begins, ` +
-      `copied exactly. If it is not present, located=false.\n\n---DOCUMENT---\n${fullSource}`;
-    const text = await callStructured({ model, system, user, schema: FINDER_SCHEMA, maxTokens: 1024, signal });
+    // CACHING (unified flag AUDIT_PROMPT_CACHE): runSectionFinder calls this SEQUENTIALLY once per target key
+    // (§L then §M) with the SAME fullSource. Un-cached, each call re-bills the whole document. When the flag is
+    // on, carry the document as a SHARED cached system prefix (identical across §L/§M) so the FIRST locate writes
+    // it and the SECOND reads it (~10% of input price). The section-specific ask stays in the (tiny) user turn.
+    // Flag-OFF ⇒ document rides the user turn exactly as before (BYTE-IDENTICAL prompt — no behavior change).
+    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
+    const docBlock = `---DOCUMENT---\n${fullSource}`;
+    const user = cacheOn
+      ? `Required section §${sectionKey} contains ${sectionIntent}.\n\n` +
+        `Locate §${sectionKey} in the DOCUMENT provided in the system context above. Return a distinctive verbatim ` +
+        `anchor where its content begins, copied exactly. If it is not present, located=false.`
+      : `Required section §${sectionKey} contains ${sectionIntent}.\n\n` +
+        `Locate §${sectionKey} in the document below. Return a distinctive verbatim anchor where its content begins, ` +
+        `copied exactly. If it is not present, located=false.\n\n${docBlock}`;
+    const text = await callStructured({ model, system, user, schema: FINDER_SCHEMA, maxTokens: 1024, signal, ...(cacheOn ? { cachedSystemPrefix: docBlock } : {}) });
     try {
       const parsed = JSON.parse(text) as { located?: boolean; anchor?: string };
       return { located: parsed.located === true, anchor: parsed.anchor ?? null };

@@ -1,12 +1,18 @@
-// Expert-loop PROMPT-CACHE draft — $0 deterministic test (fake SDK client, no network, no LLM).
+// PROMPT-CACHE (unified flag AUDIT_PROMPT_CACHE) — $0 deterministic test (fakes, no network, no LLM).
 //   npx tsx scripts/audit-ai/test-expert-prompt-cache.ts
-// Proves the flag-gated caching change to makeAnthropicCallModel:
-//   • flag-OFF ⇒ the request is BYTE-IDENTICAL to the prior prod shape (system is a plain string,
-//     ZERO cache_control anywhere) — so merging it is a no-op until AUDIT_EXPERT_PROMPT_CACHE=true.
-//   • flag-ON  ⇒ exactly THREE ephemeral breakpoints (tools tail, per-lens system, last message
+// Covers BOTH cacheable engine paths:
+//   • EXPERT LOOP (makeAnthropicCallModel): flag-OFF ⇒ request BYTE-IDENTICAL (system a plain string, ZERO
+//     cache_control); flag-ON ⇒ exactly THREE ephemeral breakpoints (tools tail, per-lens system, last message
 //     block) so a multi-turn tool loop reads turns 1..N-1 from cache instead of re-billing them.
-// Behavior-neutral: caching changes billing, not output — the returned findings are unaffected.
+//   • L3 FINDER (makeSectionFinderCaller): §L/§M are located SEQUENTIALLY over the SAME fullSource. flag-OFF ⇒
+//     document rides the user turn (byte-identical); flag-ON ⇒ document rides a SHARED cachedSystemPrefix (so the
+//     §M locate reads what §L wrote) and is REMOVED from the user turn (no duplicate send).
+// NOT cached (verified single-shot O(1) calls — no repeated prefix to cache): the skeptic (1 base + 1 escalate)
+// and the judgment layer (Gap-A/Gap-B/entailment). Adding cache_control there would be dead code.
+// Behavior-neutral for the expert loop; the finder moves the doc user→system (functionally equivalent locate,
+// guarded by the uniqueness gate). Both changes are inert when the flag is off.
 import { makeAnthropicCallModel } from "@/lib/audit-expert";
+import { makeSectionFinderCaller } from "@/lib/audit-section-finder";
 
 let pass = 0, fail = 0;
 const ok = (name: string, cond: boolean) => { if (cond) { pass++; console.log(`  ✓ ${name}`); } else { fail++; console.log(`  ✗ ${name}`); } };
@@ -25,7 +31,7 @@ function fakeClient() {
 }
 
 async function capture(flag: boolean): Promise<Record<string, unknown>> {
-  if (flag) process.env.AUDIT_EXPERT_PROMPT_CACHE = "true"; else delete process.env.AUDIT_EXPERT_PROMPT_CACHE;
+  if (flag) process.env.AUDIT_PROMPT_CACHE = "true"; else delete process.env.AUDIT_PROMPT_CACHE;
   const f = fakeClient();
   const cm = makeAnthropicCallModel(f.client as never, "claude-sonnet-4-6");
   // one prior tool-result batch ⇒ the last message is a user tool_result batch (array content)
@@ -54,6 +60,25 @@ async function main() {
 
   console.log("── behavior-neutral: findings shape returned regardless of flag ──");
   ok("callModel still returns (loop unaffected)", off != null && on != null);
+
+  // ── L3 FINDER: the document is shared across §L/§M — cache it as a system prefix when the flag is on ──
+  const FULLSRC = "STATEMENT OF WORK. The contractor shall furnish widgets per spec. INSTRUCTIONS TO OFFERORS follow.";
+  async function captureFinder(flag: boolean): Promise<{ system: string; user: string; cachedSystemPrefix?: string }> {
+    if (flag) process.env.AUDIT_PROMPT_CACHE = "true"; else delete process.env.AUDIT_PROMPT_CACHE;
+    let cap: { model: string; system: string; user: string; schema: object; maxTokens: number; cachedSystemPrefix?: string } | null = null;
+    const finder = makeSectionFinderCaller(async (a) => { cap = a; return JSON.stringify({ located: false, anchor: "" }); }, "claude-sonnet-4-6");
+    await finder({ fullSource: FULLSRC, sectionKey: "L", sectionIntent: "instructions to offerors" });
+    return cap!;
+  }
+  console.log("── L3 finder flag-OFF: document rides the USER turn (byte-identical) ──");
+  const fOff = await captureFinder(false);
+  ok("user contains the ---DOCUMENT--- + fullSource", fOff.user.includes("---DOCUMENT---") && fOff.user.includes(FULLSRC));
+  ok("NO cachedSystemPrefix", fOff.cachedSystemPrefix === undefined);
+  console.log("── L3 finder flag-ON: document moves to a SHARED cachedSystemPrefix (§M reads §L's cache) ──");
+  const fOn = await captureFinder(true);
+  ok("cachedSystemPrefix carries the document (shared across §L/§M)", (fOn.cachedSystemPrefix ?? "").includes(FULLSRC));
+  ok("user turn NO LONGER re-sends the fullSource (no duplicate)", !fOn.user.includes(FULLSRC));
+  ok("user still names the section ask (§L / instructions)", fOn.user.includes("§L"));
 
   console.log(`\n${fail === 0 ? "✅ ALL PASS" : "❌ FAIL"} — ${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

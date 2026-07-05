@@ -129,7 +129,8 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     //   (3) the last message block → caches the transcript prefix turn-over-turn
     // Anthropic silently no-ops a breakpoint under the model minimum (~1024 tok), so this is safe.
     // Flag-OFF ⇒ req is BYTE-IDENTICAL to the prior prod shape (proven by test-expert-prompt-cache).
-    const cacheOn = process.env.AUDIT_EXPERT_PROMPT_CACHE === "true";
+    // ONE unified flag AUDIT_PROMPT_CACHE governs all engine caching (this expert loop + the L3 finder).
+    const cacheOn = process.env.AUDIT_PROMPT_CACHE === "true";
     const EPHEMERAL = { type: "ephemeral" as const };
     // cache_control on the LAST tool caches the whole tool-schema prefix (all tools before it).
     const tools = cacheOn
