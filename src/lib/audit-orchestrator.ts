@@ -106,8 +106,20 @@ export function buildManifest(ctx: AuditToolContext): string[] {
  *  attachments are all plausibly contained returns true. Tunable; intentionally errs toward NOT capping. */
 export function manifestComplete(ctx: AuditToolContext): boolean {
   let maxPages = 0;
-  for (const m of ctx.fullSource.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) maxPages = Math.max(maxPages, parseInt(m[1], 10));
-  return !(maxPages * 1000 > ctx.fullSource.length); // a single named attachment can't exceed the whole source → unfetched
+  const src = ctx.fullSource;
+  // A "N pages" span is an ATTACHMENT page-COUNT signal (a named attachment that cannot physically fit in the
+  // assembled source) ONLY when it is NOT a proposal page LIMIT. §L/§M limits — "shall not exceed 40 pages",
+  // "not to exceed 50 pages", "limited to 30 pages" — constrain the BIDDER's response; they are NOT evidence of
+  // an unfetched attachment. Counting them false-caps a fully-ingested, biddable audit to INCOMPLETE and would
+  // BURN a paid run (W9126G26RA087 USACE construction carries §L page limits). Skip any match whose immediately
+  // preceding context carries limit phrasing. Errs toward NOT capping (the stated intent of this weak heuristic).
+  const LIMIT_CTX = /(?:not\s+to\s+exceed|not\s+exceed|no\s+more\s+than|no\s+longer\s+than|limited\s+to|maximum|minimum|up\s+to|within|less\s+than|fewer\s+than|at\s+least|shall\s+not)(?:\s+of)?\s*$/i;
+  for (const m of src.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) {
+    const before = src.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0);
+    if (LIMIT_CTX.test(before)) continue; // proposal page LIMIT, not an attachment page-count → never a cap signal
+    maxPages = Math.max(maxPages, parseInt(m[1], 10));
+  }
+  return !(maxPages * 1000 > src.length); // a single named attachment can't exceed the whole source → unfetched
 }
 
 /** Format-aware CORE-section honest-fail (fail-safe #10 — Brain card 135, Step 8). Part-15 UCF: any of §C/§L/§M
