@@ -136,7 +136,14 @@ export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCall
       eligible: parsed.eligible ?? null,
       analysis: typeof parsed.analysis === "string" ? parsed.analysis : "",
       reason: typeof parsed.reason === "string" ? parsed.reason : "",
-      findings: (Array.isArray(parsed.findings) ? parsed.findings : []).map((f) => ({ ...f, grounded: true, lens: "judgment" })),
+      // grounded:false is DELIBERATE and load-bearing. `grounded===true` is the rail's source-truth control
+      // (audit-decide.ts isVerifiedUniversalDefect / the verified floor TRUST it as "the real integrity control …
+      // that stops a fabricated/hallucinated excerpt"), and it is only legitimate when SET by the deterministic
+      // substring check in audit-expert.ts against the real assembled source. The proposer must NEVER self-assert
+      // it — a model excerpt is a CLAIM, not a proof. The prod rail seam MUST run the re-grounding pass that
+      // recomputes `grounded` from source before deriveVerdict; a hallucinated excerpt then stays ungrounded and
+      // fails SAFE (dropped → NHR), never rides a forged flag into a committal verdict (Rule 64 / I3).
+      findings: (Array.isArray(parsed.findings) ? parsed.findings : []).map((f) => ({ ...f, grounded: false, lens: "judgment" })),
     };
   };
 }

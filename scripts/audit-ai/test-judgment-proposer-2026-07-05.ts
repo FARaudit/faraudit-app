@@ -1,6 +1,7 @@
 // $0 gate for the real holistic PROPOSER (makeJudgmentFirstProposer), model call STUBBED. Proves: the whole
 // source + profile context reach the model; the structured output is parsed into a ProposedJudgment; findings are
-// stamped grounded/lens; and a truncated/unparseable/invalid response THROWS (no silent partial — honest-fail).
+// stamped grounded:false/lens (the proposer NEVER self-asserts grounding — the rail's substring check owns that);
+// and a truncated/unparseable/invalid response THROWS (no silent partial — honest-fail).
 import { makeJudgmentFirstProposer, runJudgmentFirst, JUDGMENT_FIRST_SCHEMA, type JudgmentStructuredCaller, type JudgmentFirstInput } from "@/lib/audit-judgment-first";
 import type { Decision, Verdict } from "@/lib/audit-decide";
 import type { BidderProfile } from "@/lib/audit-findings";
@@ -32,7 +33,7 @@ async function main() {
   check("strict schema handed to the caller", seen.schema === JUDGMENT_FIRST_SCHEMA);
   check("verdict parsed", proposed.verdict === "BID_WITH_CAUTION");
   check("analysis parsed (the boardroom product surface)", proposed.analysis.startsWith("Boardroom analysis"));
-  check("findings parsed + stamped grounded/lens", proposed.findings.length === 1 && proposed.findings[0].grounded === true && proposed.findings[0].lens === "judgment");
+  check("findings parsed + stamped grounded:false (rail owns grounding, not the proposer) + lens", proposed.findings.length === 1 && proposed.findings[0].grounded === false && proposed.findings[0].lens === "judgment");
 
   console.log("\nproposer — fail-safe (no silent partial)");
   check("truncated (max_tokens) response → THROWS", await throws(() => makeJudgmentFirstProposer(stub(VALID, "max_tokens").caller, "m")(input)));
