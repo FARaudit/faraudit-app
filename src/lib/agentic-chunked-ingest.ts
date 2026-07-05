@@ -163,26 +163,43 @@ export async function mapReduceDoc(
   signal?: AbortSignal,
 ): Promise<ChunkedDocResult> {
   const windows = overlappingWindows(doc.text, MAP_CHUNK_CHARS, MAP_OVERLAP_CHARS);
-  const grounded: string[] = [];
+  // PARALLEL COMPRESSION (Brain card 286-B, ratified). A bounded-concurrency worker pool pulls windows by a shared
+  // cursor (AGENTIC_MAP_CONCURRENCY at a time) instead of one-at-a-time — the sequential loop made an 11MB package's
+  // ~314 map calls too slow to finish inside any sane wall-clock (the W9126 false-INCOMPLETE root). Assembly is
+  // DETERMINISTIC BY WINDOW INDEX: each window's grounded spans land in perWindowSpans[i] and are flattened in index
+  // order, NEVER completion order — so the compressed digest is byte-identical regardless of concurrency or which
+  // call returns first (the property the regression test pins). Abort/failed-window semantics are preserved exactly:
+  // on abort a worker stops pulling new windows ("keep what we have", the old `break`); an un-attempted window is
+  // simply empty and NOT counted failed; only a THROWN/unparseable window increments failedWindows (the content-loss
+  // gate). Increments are safe under this pool because JS is single-threaded — they run synchronously between awaits.
+  const CONCURRENCY = Math.max(1, Number(process.env.AGENTIC_MAP_CONCURRENCY) || 6);
+  const perWindowSpans: string[][] = Array.from({ length: windows.length }, () => []);
   let rejected = 0;
   let failedWindows = 0;
-  for (let i = 0; i < windows.length; i++) {
-    if (signal?.aborted) break;                       // upstream budget fired — stop mapping, keep what we have
-    const chunk = windows[i];
-    let res: { excerpts: string[] };
-    try {
-      res = await mapCall({ docName: doc.name, chunk, chunkIndex: i, chunkCount: windows.length });
-    } catch {
-      failedWindows++;                                 // #2 — a window that THREW / returned unparseable JSON is UNREAD,
-      continue;                                        // never dropped; counted so a mostly-failed binding doc fails safe
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (signal?.aborted) return;                     // upstream budget fired — stop pulling new windows
+      const i = cursor++;                              // unique per pull (single-threaded: no interleave mid-statement)
+      if (i >= windows.length) return;
+      const chunk = windows[i];
+      let res: { excerpts: string[] };
+      try {
+        res = await mapCall({ docName: doc.name, chunk, chunkIndex: i, chunkCount: windows.length });
+      } catch {
+        failedWindows++;                               // #2 — a window that THREW / returned unparseable JSON is UNREAD,
+        continue;                                      // never dropped; counted so a mostly-failed binding doc fails safe
+      }
+      for (const ex of res.excerpts ?? []) {
+        // R2-b GROUNDING: verbatim substring of THIS window, or REJECTED. A hallucinated / paraphrased span cannot
+        // enter the digest, so the digest is 100% verbatim source (find_in_source stays sound downstream).
+        if (typeof ex === "string" && isGroundedInSource(ex, chunk)) perWindowSpans[i].push(ex);
+        else rejected++;
+      }
     }
-    for (const ex of res.excerpts ?? []) {
-      // R2-b GROUNDING: verbatim substring of THIS window, or REJECTED. A hallucinated / paraphrased span cannot
-      // enter the digest, so the digest is 100% verbatim source (find_in_source stays sound downstream).
-      if (typeof ex === "string" && isGroundedInSource(ex, chunk)) grounded.push(ex);
-      else rejected++;
-    }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, windows.length) }, () => worker()));
+  const grounded: string[] = perWindowSpans.flat();    // DETERMINISTIC assembly — window-index order, not completion
   const spans = dedupeSpans(grounded);
   // R2-c DETERMINISTIC FLOOR — clause numbers + material DATES + CLIN ids + set-aside markers from the FULL doc
   // text, always, regardless of MAP recall. This is the backstop for the material scalars an amendment changes

@@ -231,25 +231,33 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
   }
   const { fullSource, profile } = assembleSource(rc);
   let source = fullSource;
+  // HARNESS FIX (Brain card 286-B, mandatory-first): PER-CASE timeout isolation — a fresh AbortSignal per case,
+  // NEVER shared. The prior single shared 20-min signal let cheap-9 consume most of the budget so W9126's
+  // compression aborted ~40% through → a false-INCOMPLETE (the artifact that invalidated the prior diagnosis,
+  // Rule 69). Each case now gets its own full budget; the map caller is rebuilt bound to THIS case's signal.
+  const caseSignal = AbortSignal.timeout(PER_CASE_TIMEOUT_MS);
   if (rc.needsChunk) {
     const docs = parseDocs(fullSource).map((d) => ({ name: d.name, bytes: Buffer.from(d.text, "utf8"), text: d.text }));
     const before = docs.reduce((n, d) => n + d.text.length, 0);
-    console.log(`   ↳ chunked ingest: ${docs.length} docs, ${(before / 1e6).toFixed(2)}M chars → compressing to ≤${(deps.MAX / 1e6).toFixed(2)}M …`);
-    const asm = await deps.assembleFullSourceChunked(docs, deps.mapCall, deps.MAX, deps.signal);
+    console.log(`   ↳ chunked ingest: ${docs.length} docs, ${(before / 1e6).toFixed(2)}M chars → compressing to ≤${(deps.MAX / 1e6).toFixed(2)}M (concurrency ${process.env.AGENTIC_MAP_CONCURRENCY || 6}) …`);
+    const asm = await deps.assembleFullSourceChunked(docs, deps.makeMapCall(caseSignal), deps.MAX, caseSignal);
     source = asm.source;
     console.log(`   ↳ assembled ${(source.length / 1e6).toFixed(2)}M chars · truncated=${asm.truncated} · contentLoss=[${asm.contentLossDocs.join(",")}]`);
     if (asm.truncated) return { verdict: "INCOMPLETE", eligible: null };  // honest-fail — an incomplete read can't commit
   }
   const res = await deps.runJudgmentFirstAudit({
-    fullSource: source, bidderProfile: profile, naics: rc.naics ?? null, setAside: rc.setAside ?? null, signal: deps.signal,
+    fullSource: source, bidderProfile: profile, naics: rc.naics ?? null, setAside: rc.setAside ?? null, signal: caseSignal,
   });
   return { verdict: res.disposed.verdict, eligible: res.disposed.eligible, proposed: res.proposed.verdict, railDerived: res.railDerived.verdict };
 }
 
+// Per-case wall-clock budget (Brain card 286-B). Each CERT case gets its OWN fresh timeout — never shared. Generous
+// so the biggest chunked package (W9126) has full room under parallel compression; cheap cases finish far sooner.
+const PER_CASE_TIMEOUT_MS = 15 * 60 * 1000;
 interface EngineDeps {
   runJudgmentFirstAudit: (i: { fullSource: string; bidderProfile: Profile | null; naics: string | null; setAside: string | null; signal?: AbortSignal }) => Promise<{ disposed: { verdict: Verdict; eligible: boolean | null }; proposed: { verdict: Verdict }; railDerived: { verdict: Verdict } }>;
   assembleFullSourceChunked: (docs: Array<{ name: string; bytes: Buffer; text: string }>, mapCall: unknown, maxChars: number, signal?: AbortSignal) => Promise<{ source: string; truncated: boolean; contentLossDocs: string[] }>;
-  mapCall: unknown; MAX: number; signal?: AbortSignal;
+  makeMapCall: (signal: AbortSignal) => unknown; MAX: number;
 }
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -269,7 +277,6 @@ async function main() {
   const usageCalls: unknown[] = [];
   let aggregate!: (calls: unknown[]) => { perModel: unknown[]; totals: { usd: number; calls: number; unpriced_calls?: number } };
   let appendLedgerRow!: (row: Record<string, unknown>) => void;
-  const signal = AbortSignal.timeout(20 * 60 * 1000); // generous wall-clock guard for the chunked leg
   if (!DRY) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) { console.error("⛔ ANTHROPIC_API_KEY not set — cannot run PAID."); process.exit(2); }
@@ -286,11 +293,11 @@ async function main() {
     (structured.setStructuredUsageSink as (s: (u: unknown) => void) => void)((u) => usageCalls.push(u));
     const callStructured = async (a: { model: string; system: string; user: string; schema: object; maxTokens: number; signal?: AbortSignal }) =>
       (await structured.callStructuredClaude({ apiKey, model: a.model, system: a.system, userPrompt: a.user, schema: a.schema as Record<string, unknown>, maxTokens: a.maxTokens, signal: a.signal, label: "cert10-chunk-map" })).text;
-    const mapCall = chunk.makeChunkMapCaller(callStructured, registry.modelFor("extractor"), signal);
+    const makeMapCall = (sig: AbortSignal) => chunk.makeChunkMapCaller(callStructured, registry.modelFor("extractor"), sig);
     deps = {
       runJudgmentFirstAudit: pkg.runJudgmentFirstAudit as unknown as EngineDeps["runJudgmentFirstAudit"],
       assembleFullSourceChunked: chunk.assembleFullSourceChunked as unknown as EngineDeps["assembleFullSourceChunked"],
-      mapCall, MAX: exec.MAX_FULLSOURCE_CHARS, signal,
+      makeMapCall, MAX: exec.MAX_FULLSOURCE_CHARS,
     };
   }
 
