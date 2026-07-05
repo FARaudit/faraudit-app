@@ -117,6 +117,26 @@ const PROPOSER_SYSTEM = [
 /** Adapter contract for the injected paid structured caller (the anthropic-structured wrapper in prod). */
 export type JudgmentStructuredCaller = (args: { model: string; system: string; user: string; schema: Record<string, unknown> }) => Promise<{ text: string; stopReason: string | null }>;
 
+/** Project a raw model finding onto ONLY the schema-declared fields (card 282 adversarial hardening). This is a
+ *  security boundary: it drops any out-of-schema field a prompt-injected model might emit to claim committal
+ *  authority — universalDefect, verifiedBy, id, nmrGuard, grounded, lens, cautionFloor, etc. `grounded` is forced
+ *  false (the rail owns grounding) and `lens` is stamped. The rail re-grounds + re-derives from here. */
+function projectProposedFinding(f: Record<string, unknown>): TypedFinding {
+  const out: TypedFinding = {
+    requirement: typeof f.requirement === "string" ? f.requirement : "",
+    citation: typeof f.citation === "string" ? f.citation : "",
+    excerpt: typeof f.excerpt === "string" ? f.excerpt : "",
+    kind: f.kind as TypedFinding["kind"],
+    controllability: f.controllability as TypedFinding["controllability"],
+    grounded: false,          // the rail SETS this from source — never the model
+    lens: "judgment",
+  };
+  if (typeof f.requiredAttribute === "string") out.requiredAttribute = f.requiredAttribute;
+  if (typeof f.curableInWindow === "boolean") out.curableInWindow = f.curableInWindow;
+  if (f.severity === "P0" || f.severity === "P1" || f.severity === "P2") out.severity = f.severity;
+  return out;
+}
+
 /** Build the real holistic ProposeFn. On a truncated (max_tokens) or unparseable response it THROWS — never a
  *  silent partial proposal (the audit boundary honest-fails, same no-swallow doctrine as the skeptic adapter). */
 export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCaller, model: string): ProposeFn {
@@ -128,7 +148,7 @@ export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCall
     const user = `${profileLine}${ctxLine ? `\nSolicitation facts: ${ctxLine}.` : ""}\n\n=== FULL SOLICITATION SOURCE ===\n${input.fullSource}`;
     const res = await callStructured({ model, system: PROPOSER_SYSTEM, user, schema: JUDGMENT_FIRST_SCHEMA as unknown as Record<string, unknown> });
     if (res.stopReason === "max_tokens") throw new Error(`judgment-first proposal truncated (max_tokens, model=${model}) — refusing a partial proposal`);
-    let parsed: Partial<ProposedJudgment> & { findings?: TypedFinding[] };
+    let parsed: Partial<Omit<ProposedJudgment, "findings">> & { findings?: unknown[] };
     try { parsed = JSON.parse(res.text); } catch (e) { throw new Error(`judgment-first proposal unparseable (model=${model}): ${(e as Error)?.message ?? String(e)}`); }
     if (!parsed.verdict || !VERDICT_ENUM.includes(parsed.verdict as typeof VERDICT_ENUM[number])) throw new Error(`judgment-first proposal missing/invalid verdict (model=${model})`);
     return {
@@ -143,7 +163,13 @@ export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCall
       // it — a model excerpt is a CLAIM, not a proof. The prod rail seam MUST run the re-grounding pass that
       // recomputes `grounded` from source before deriveVerdict; a hallucinated excerpt then stays ungrounded and
       // fails SAFE (dropped → NHR), never rides a forged flag into a committal verdict (Rule 64 / I3).
-      findings: (Array.isArray(parsed.findings) ? parsed.findings : []).map((f) => ({ ...f, grounded: false, lens: "judgment" })),
+      //
+      // FIELD-ALLOWLIST PROJECTION (adversarial security review, card 282): copy ONLY the schema-declared fields —
+      // NOT a raw `{...f}` spread. The model's structured output is trusted for the schema shape, but a
+      // prompt-injected model could emit OUT-OF-SCHEMA committal-authority fields (universalDefect, verifiedBy, id,
+      // nmrGuard); those are all neutralized downstream (empty VERIFIER_ALLOWLIST → NHR), but projecting removes the
+      // dependence on distant guards — the proposer boundary itself refuses to carry any committal-forcing field.
+      findings: (Array.isArray(parsed.findings) ? parsed.findings : []).map((f) => projectProposedFinding((f ?? {}) as Record<string, unknown>)),
     };
   };
 }

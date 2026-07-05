@@ -1,0 +1,23 @@
+SECTION A — SOLICITATION / CONTRACT
+Solicitation Number: 1202SC24R2100
+Issuing Office: U.S. Department of Agriculture, Forest Service, National Interagency Fire Center (NIFC), Incident Procurement
+Acquisition: National Mobile Food Service Units (MFSU), 2025–2029
+
+SECTION B — SUPPLIES OR SERVICES AND PRICES
+B.1 General Information
+(e) This acquisition is 100% set-aside for small business concerns. The North American Industry Classification System (NAICS) code is 722310, Food Service Contractors, with a corresponding small business size standard of $47 million in average annual receipts. An offeror must qualify as small under the assigned NAICS code and size standard as of the date of its initial offer including price.
+(b) This is an Indefinite-Delivery/Indefinite-Quantity (IDIQ) acquisition. At a minimum, Offerors must provide at least one complete MFSU system and meet minimum capability requirements. After award of a National MFSU "Parent" IDIQ contract, awardees will be provided fair opportunity to compete for Mobile Food Service Unit Task Orders for any or all of the 30 Designated Dispatch Points. Each awardee is guaranteed a minimum order. Term: a base year plus up to four one-year renewals (5-year maximum), plus up to 6 months under FAR 52.217-8.
+
+SECTION D — PERFORMANCE WORK STATEMENT
+D.1.1 Scope
+(a) The scope of this effort is to obtain the services of Mobile Food Service Units (MFSU) at various field locations during fire suppression related activities, all-hazard incidents and severity/preparedness assignments throughout the contiguous western states. The expectation and desired result of this Performance Work Statement (PWS) is to provide appetizing, nutritional, well balanced hot meals, Shift Provisions, hot and cold container meals, and supplemental items.
+(b) MFSU Requirements — The MFSU is to include all equipment, supervision, labor, materials, and supplies (except those items listed as Government-furnished) to accomplish the full scope of work defined herein. Equipment must be capable of operating in adversely impacted urban areas to remote primitive locations with access limitations such as tight one-lane roads or over limited load-capacity bridges or culverts.
+(c) These services shall include complete management, control, purchase, receipt, storage, issue, handling, processing, packaging, preparation, food serving, clean up, transport, repair, and maintenance. All hot meals shall be served by Contractor personnel, except for those meals served at Spike Camps.
+(e) Ordering Requirements — The Government is obligated to order services from the National MFSU Contractors any time (a) the number of people to be fed is at or above 200 persons per meal and (b) the headcount is estimated to remain at those numbers, or greater, for at least 72 hours from when the headcount first reaches 200 per meal, provided that the Contractor can reasonably meet the incident's needs and required time frames.
+
+D.1.6 Minimum Mobile Food Unit Equipment Requirements
+(o) Refrigeration and freezer units for the storage of meat and other perishables.
+(q) A minimum of 500 gallons potable water storage tank capacity and an initial supply of 480 gallons of potable water. Equipment and utilities shall comply with the National Electrical Code (NEC), the Uniform Plumbing Code (UPC), and Federal and State potable water codes.
+
+SECTION I — CONTRACT CLAUSES
+FAR 52.212-4 and 52.212-5 (commercial items), FAR 52.216-18/-19/-22 (IDIQ ordering), FAR 52.217-8/-9 (options), and FAR 52.219-14, Limitations on Subcontracting, apply. For a service contract, the concern will not pay more than 50% of the amount paid by the Government to it to firms that are not similarly situated, and the concern must perform the primary and vital requirements with its own employees.

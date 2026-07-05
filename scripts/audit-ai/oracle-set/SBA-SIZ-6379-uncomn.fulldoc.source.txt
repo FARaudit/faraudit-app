@@ -1,0 +1,16 @@
+SECTION A — SOLICITATION
+Solicitation Number: HTC71125RD002
+Issuing Office: United States Transportation Command (USTRANSCOM)
+Acquisition: Enterprise Architecture, Data, and Engineering (EADE)
+
+SECTION B — SUPPLIES OR SERVICES AND PRICES
+This is a single-award Indefinite-Delivery/Indefinite-Quantity (IDIQ) contract with firm-fixed-price and labor-hour task orders. Estimated ceiling: $210,000,000 over a five-year ordering period. This solicitation is a 100% Total Small Business set-aside under NAICS code 541512, Computer Systems Design Services, with a corresponding small business size standard of $34 million in average annual receipts. A concern, including its affiliates, must qualify as small under the assigned NAICS code as of the date it submits its initial offer, including price, containing a written self-certification that it is small.
+
+SECTION C — DESCRIPTION / STATEMENT OF WORK
+USTRANSCOM and Air Mobility Command (AMC), supported by the Air Force Life Cycle Management Center (AFLCMC) and the Military Surface Deployment and Distribution Command (SDDC), require enterprise architecture, data management, engineering, and architecture-tools sustainment support. The scope of architecture, data management, and engineering services includes the operational and system perspectives of Command and Control (C2), planning, transportation, logistics, and business-support system domains. Core service areas: enterprise architecture development from enterprise through solution level; data governance, quality management, and analytics; engineering support translating capability objectives into design solutions; and prototyping and system administration.
+
+SECTION L — INSTRUCTIONS TO OFFERORS
+This procurement is conducted in two phases. Phase I proposals and Phase II proposals (including price) are due on the dates stated in this solicitation.
+
+SECTION M — EVALUATION FACTORS FOR AWARD
+Award will be made on a best-value basis using Department of Defense source-selection procedures.

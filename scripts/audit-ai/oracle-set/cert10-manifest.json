@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "built": "2026-07-05",
+    "authority": "Brain card 282 §3 (CERT-10, CEO-mandated customer-ready bar)",
+    "status": "ASSEMBLED — freeze on CEO confirm of the campaign price",
+    "gate": "Customer-ready = 10/10 clean. Per-audit pass bar (ALL 4): zero committal-direction errors · 100% verbatim-grounded claims · honest-fail fires correctly + never bills · CEO Gate-3 acceptance. Any committal failure → fix + permanent regression test → re-run case + class. Final = 10/10 on the frozen set.",
+    "grading": "oracle cases → oracle-harness scorer (vs external adjudicated truth); W9126 + FA301626 + incomplete packages → CEO Gate-3 acceptance + the 4 per-audit criteria.",
+    "fullDocCount": "5 real full documents (3 oracle FULL-DOC + W9126 + FA301626) — satisfies Brain R5 >=2-3 FULL-DOC.",
+    "billsCriterion": "SIGNAL-LEVEL per Brain card 283: honest-fail fires on all 4 triggers · persisted compliance_json.honest_fail correct · all display surfaces consistent (S9 'No charge' chip vs billable flag)."
+  },
+  "cases": [
+    { "n": 1, "id": "SBA-SIZ-6373-underdogs", "source": "SBA-SIZ-6373-underdogs.source.txt", "grader": "oracle", "kind": "external-adjudicated (SBA size ineligible)", "sourceType": "TERM-LEVEL" },
+    { "n": 2, "id": "SBA-SIZ-6379-uncomn", "source": "SBA-SIZ-6379-uncomn.source.txt", "fullDoc": "SBA-SIZ-6379-uncomn.fulldoc.source.txt", "grader": "oracle", "kind": "external-adjudicated (SBA size eligible)", "sourceType": "TERM + FULL-DOC" },
+    { "n": 3, "id": "SBA-SIZ-6381-sgi-global", "source": "SBA-SIZ-6381-sgi-global.source.txt", "fullDoc": "SBA-SIZ-6381-sgi-global.fulldoc.source.txt", "grader": "oracle", "kind": "external-adjudicated (SBA size eligible)", "sourceType": "TERM + FULL-DOC (deep)" },
+    { "n": 4, "id": "SBA-SIZ-6380-nisou-negative", "source": "SBA-SIZ-6380-nisou-negative.source.txt", "grader": "oracle", "kind": "external-adjudicated (remand negative — no over-assert)", "sourceType": "TERM-LEVEL" },
+    { "n": 5, "id": "GAO-B-424249-fcn-negative", "source": "GAO-B-424249-fcn-negative.source.txt", "grader": "oracle", "kind": "external-adjudicated (GAO denied-on-merits — term proper)", "sourceType": "TERM-LEVEL" },
+    { "n": 6, "id": "GAO-B-423993-ecs-caution", "source": "GAO-B-423993-ecs-caution.source.txt", "fullDoc": "GAO-B-423993-ecs-caution.fulldoc.source.txt", "grader": "oracle", "kind": "external-adjudicated (GAO sustained — caution)", "sourceType": "TERM + FULL-DOC" },
+    { "n": 7, "id": "W9126G26RA087", "source": "../gold-sets/W9126G26RA087-FULL-SOURCE.txt", "grader": "ceo-gate3", "kind": "held real committal target (USACE construction MATOC, 11.3MB — chunked ingest)", "expected": "biddable committal (BID / BID_WITH_CAUTION)", "blocker": ["NO_BID", "INELIGIBLE"], "sourceType": "FULL-DOC (huge)" },
+    { "n": 8, "id": "FA301626Q0068", "source": "../../../Solicitation+-+FA301626Q0068.pdf", "grader": "ceo-gate3", "kind": "simple real RFQ", "expected": "BID / BID_WITH_CAUTION", "blocker": ["NO_BID", "INELIGIBLE"], "sourceType": "FULL-DOC (PDF)" },
+    { "n": 9, "id": "CERT10-incomplete-A", "source": "CERT10-incomplete-A-missing-eval.source.txt", "grader": "ceo-gate3", "kind": "engineered incomplete (§M + attachments referenced, absent)", "expected": "INCOMPLETE (honest-fail, no bill)", "blocker": ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"], "sourceType": "engineered" },
+    { "n": 10, "id": "CERT10-incomplete-B", "source": "CERT10-incomplete-B-truncated-core.source.txt", "grader": "ceo-gate3", "kind": "engineered incomplete (§C spec truncated mid-sentence — content loss)", "expected": "INCOMPLETE (honest-fail, no bill)", "blocker": ["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"], "sourceType": "engineered" }
+  ]
+}
