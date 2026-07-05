@@ -19,11 +19,12 @@ import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
+import { makeJudgmentFirstProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
 import { makeSectionFinderCaller } from "./audit-section-finder";
 import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
-import type { ExpertSpec } from "./audit-expert";
+import type { CallModel, ExpertSpec } from "./audit-expert";
 
 export interface AuditPackageInput {
   fullSource: string;                       // assembled package source (every routed section + attachment)
@@ -188,4 +189,72 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     formIdentified: input.formIdentified,   // Layer-2 (card 262) — corroborates whether the §L/§M-bearing primary was ingested
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });
+}
+
+// ── JUDGMENT-FIRST WIRING (Brain cards 276/279) — the thin adapter: real proposer + real rail behind the flag ──
+// PROPOSE (one holistic Opus call reads the WHOLE source and reasons to a verdict, the way pasting a solicitation
+// into Claude does) → the deterministic RAIL (runAgenticAudit over the re-grounded proposal, enforcing I1–I8) →
+// DISPOSE (a committal pole survives only on proposer↔rail agreement). This wires both PAID seams to the real
+// callers; the $0 unit tests inject stubs. It does NOT touch auditPackage/executeAudit — nothing calls it on the
+// customer path yet (flag AUDIT_JUDGMENT_FIRST gates the eventual executor branch); the $0 proof-replay harness
+// calls it directly to score judgment-first vs the ladder before any greenlit paid run.
+
+/** Adapt callStructuredClaude → the proposer's JudgmentStructuredCaller seam (maps user→userPrompt; surfaces the
+ *  raw text + stopReason so the proposer's own max_tokens/parse honest-fail runs). One holistic call, so the
+ *  token ceiling is generous (the whole boardroom analysis + grounded findings). */
+function judgmentStructuredCaller(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void): JudgmentStructuredCaller {
+  return ({ model, system, user, schema }) => callStructuredClaude({
+    apiKey, model, system, userPrompt: user, schema, maxTokens: 8192, signal, label: "judgment-first", onUsage,
+  });
+}
+
+/** The RailFn must NEVER be invoked with the expert lens loop in seed mode — runAgenticAudit skips P1 entirely
+ *  when seedFindings is present, so callModel is dead. Guard it so a future refactor that reintroduces a lens call
+ *  fails loud instead of silently making an unbudgeted paid call. */
+const seedModeCallModelGuard: CallModel = () => { throw new Error("judgment-first rail: callModel must not run in seedFindings mode (the proposer replaces the lenses)"); };
+
+/** Run the judgment-first path end-to-end with the REAL model + REAL rail. PAID (one proposer call + the rail's
+ *  P2 adversarial verify). Returns the DISPOSED result — the disposed verdict is the customer-facing one; proposed
+ *  + railDerived are carried for telemetry/proof. Same guard as auditPackage: throws if the SDK isn't configured. */
+export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<JudgmentFirstResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the judgment-first engine.");
+
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
+  const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
+  const skeptic = makeTieredSkeptic(
+    makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
+    makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
+  );
+  const verify = makeAgenticVerifier(skeptic);
+
+  const propose = makeJudgmentFirstProposer(judgmentStructuredCaller(apiKey, input.signal, input.onUsage), input.judgmentReasonModel ?? modelFor("judge"));
+
+  // The RAIL: the full deterministic orchestrator over the re-grounded proposal. runAgenticAudit re-grounds the
+  // seed (drops any ungrounded finding), runs the deterministic sweep/temporal/verify/completeness + every re-typing
+  // guard, and DERIVES the verdict — I1–I8 enforced by the real rail, not a re-implementation. Returns its Decision.
+  const rail: RailFn = async (findings) => (await runAgenticAudit({
+    ctx,
+    experts: [],
+    callModel: seedModeCallModelGuard,
+    verify,
+    seedFindings: findings,
+    bidderProfile: input.bidderProfile ?? null,
+    signal: input.signal,
+    manifestComplete: input.manifestComplete,
+    naics: input.naics ?? null,
+    setAside: input.setAside ?? null,
+    noticeType: input.noticeType ?? null,
+    formIdentified: input.formIdentified,
+  })).decision;
+
+  const jfInput: JudgmentFirstInput = {
+    fullSource: input.fullSource,
+    sections: input.sections,
+    bidderProfile: input.bidderProfile ?? null,
+    noticeType: input.noticeType ?? null,
+    naics: input.naics ?? null,
+    setAside: input.setAside ?? null,
+  };
+  return runJudgmentFirst(jfInput, propose, rail);
 }

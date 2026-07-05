@@ -12,7 +12,7 @@
 //
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
-import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
+import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc } from "./sam-attachments";
@@ -84,6 +84,12 @@ export interface OrchestratorInput {
   // Fires ONLY on required sections the deterministic pass did not locate; a verified locate augments ctx.sections
   // BEFORE the experts run so both the analysis AND the completeness proof see the located §L/§M.
   sectionFinder?: SectionFinderCall;
+  // JUDGMENT-FIRST SEAM (Brain cards 276/279) — opt-in. When the holistic proposer supplies pre-found findings,
+  // the orchestrator SKIPS the paid expert lenses (P1) and runs the FULL deterministic rail (P1.5→P5: sweep,
+  // temporal, dedup, verify, completeness, every re-typing guard, deriveVerdict) over this seed instead. The seed
+  // is RE-GROUNDED here against real source with the SAME isGrounded check the lenses use — the proposer never
+  // self-asserts grounding (audit-judgment-first.ts). Absent ⇒ the ladder path (P1 experts) is byte-identical.
+  seedFindings?: TypedFinding[];
 }
 
 export interface AuditResult {
@@ -413,15 +419,34 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const perLens: Record<string, number> = {};
   const trace: AuditResult["trace"] = {};
   const sectionsRead = new Set<string>();
-  const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
   let findings: TypedFinding[] = [];
-  experts.forEach((spec, i) => {
-    runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
-    perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
-    runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
-    trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
-  });
-  const allConverged = runs.every((r) => r.converged);
+  let allConverged: boolean;
+
+  if (opts.seedFindings) {
+    // JUDGMENT-FIRST (Brain cards 276/279) — the holistic proposer already read the whole source and reasoned to
+    // this finding set; SKIP the paid lenses and run the deterministic rail (P1.5→P5) over it. RE-GROUND the seed
+    // against real source with the SAME isGrounded substring check the lenses use: a finding whose excerpt is NOT
+    // verbatim in source has grounded set false and is DROPPED here (fail-safe — a hallucinated/paraphrased excerpt
+    // never survives, Rule 64 / I3). This is the load-bearing re-grounding the proposer's grounded:false depends on.
+    const reground = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+    reground.forEach((f, j) => { f.id = f.id ?? `judgment#${j}`; });
+    findings = reground;
+    perLens["judgment"] = reground.length;
+    // The proposer read the WHOLE assembled source → every present section counts as read for completeness (a
+    // binding section whose obligations the proposer failed to ground still fails completenessOf → honest-fail).
+    Object.keys(materializeSections(ctx)).forEach((s) => sectionsRead.add(s));
+    trace["judgment"] = { converged: true, turns: 1, sectionsRead: [...sectionsRead], tools: [] };
+    allConverged = true;
+  } else {
+    const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
+    experts.forEach((spec, i) => {
+      runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
+      perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
+      runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
+      trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
+    });
+    allConverged = runs.every((r) => r.converged);
+  }
 
   // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE
   //         step 1 — flip UNCOMMITTED, pending Brain review of the live runs). Grounds the failing archetypes

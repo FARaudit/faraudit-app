@@ -42,9 +42,11 @@ export function disposeVerdict(
   const base = { proposed: p, railDerived: r };
 
   // 1. AGREEMENT — the sole path to a committal pole. The rail already confirmed r under I1–I8, and the proposer
-  //    independently reached the same verdict → confirm it, carrying the rail's determination.
+  //    independently reached the same verdict → confirm it, carrying the rail's determination. eligible is clamped
+  //    to null on a NON-committal verdict (NHR/INCOMPLETE): doctrine #6 — an undetermined verdict may never carry
+  //    eligible=false. (Defense-in-depth beneath deriveVerdict; a rail that ever returned NHR+false can't leak it.)
   if (p === r) {
-    return { verdict: r, eligible: railDerived.eligible, reason: railDerived.reason, outcome: "confirmed", ...base };
+    return { verdict: r, eligible: isCommittal(r) ? railDerived.eligible : null, reason: railDerived.reason, outcome: "confirmed", ...base };
   }
 
   // 2. INCOMPLETE dominates. An incomplete read (ingest could not be completed) can never carry a confirmed
