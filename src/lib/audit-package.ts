@@ -16,7 +16,7 @@ import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
-import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
+import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, makeBatchedSkeptic, type SkepticFn, type SkepticVerdict } from "./audit-verifier";
 import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
 import { makeJudgmentFirstProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
@@ -143,8 +143,11 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"), { onUsage: input.onUsage });
   // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
+  // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
+  // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
-    makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
+    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);
@@ -222,8 +225,11 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
 
   const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
+  // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
+  // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
-    makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
+    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);

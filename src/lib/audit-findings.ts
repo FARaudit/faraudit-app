@@ -42,6 +42,11 @@ export interface TypedFinding {
   controllability: Controllability;
   grounded: boolean;          // excerpt verified present in the source (deterministic grounding check)
   lens: string;               // which expert produced it
+  // VERIFIER RESIDUE (Brain card 285, Fix 1) — set true when the adversarial skeptic could NOT reach this finding
+  // after batching + retries AND it is NON-verdict-driving (informational: not bar-class, not knife-edge). Such a
+  // finding is kept (never silently dropped — Brain's forbidden fail-safe) but EXCLUDED from report claims and does
+  // NOT sink run soundness. An UNRESOLVED VERDICT-DRIVING finding is never marked unverified — it forces NHR instead.
+  unverified?: boolean;
   requiredAttribute?: string; // for an eligibility bar: the qualification the firm must HOLD (NAICS-small code, cert) — matched against the bidder profile
   // CURABILITY (Brain card-44 §2) — a property of the GATE, independent of the bidder profile: can a firm
   // that lacks the requiredAttribute obtain/satisfy it WITHIN the solicitation's response window?

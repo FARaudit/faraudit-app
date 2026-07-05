@@ -21,7 +21,8 @@ import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
-import { highSignalSweep } from "./audit-grounding-sweep";
+import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
+import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against.
@@ -203,7 +204,7 @@ function hasConflict(findings: TypedFinding[]): boolean {
   return false;
 }
 
-export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; }
+export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "covered_attested_boilerplate" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; sectionHash?: string; }
 
 // C-7 (Brain C.c) — the obligation-extraction cap. Raised 25 → 200 so a normal binding section is fully proven
 // (25 silently dropped obligations #26+ was a false-COMPLETE hole). If a section still exceeds 200 obligation
@@ -332,7 +333,7 @@ function sectionMCriteria(text: string): string {
 }
 const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).length < 12;
 
-export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
+export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
   for (const sec of required) {
     // C-3 (Brain C.c): the completeness PROOF reads the FULL section (uncapped), NOT the lens's capped view — an
@@ -347,6 +348,16 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
     const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
+    // Fix 2 (Brain card 285) — BOILERPLATE ATTESTATION. A configured boilerplate section (§I/§K) with no direct
+    // finding may be ATTESTED covered — but ONLY when the deterministic §I/§K trap detectors SWEPT it (condition 2:
+    // opts.boilerplateAttest.swept, set by the orchestrator when the trap sweep ran) AND the section text is present
+    // (condition 1: hash-bound — the attestation carries sha256 of the section text). This certifies COVERAGE only;
+    // it can NEVER suppress a detector hit (condition 3) — a trap-sweep finding cited to this section already
+    // returned covered_direct above and drives the verdict. Fires only for the read, present, configured sections.
+    if (opts?.boilerplateAttest?.swept && opts.boilerplateAttest.sections.includes(sec) && text.trim().length > 0) {
+      attestations.push({ section: sec, status: "covered_attested_boilerplate", obligations: [], citedFindingIds: [], ungrounded: [], sectionHash: createHash("sha256").update(text, "utf8").digest("hex") });
+      continue;
+    }
     // 5b §M DEPTH — REFINED (Brain card 137 ruling), flag-gated, §M ONLY (never §L/§C or the coreMissing path).
     // Fire "not evaluated" ONLY when ALL THREE hold: (1) NO direct grounded finding (the covered_direct check
     // above already returned for that case), (2) NO award-basis token in the criteria region, AND (3) the criteria
@@ -372,7 +383,7 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
     attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations, citedFindingIds: [...cited], ungrounded });
   }
-  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "read_no_obligation").map((a) => a.section);
+  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation").map((a) => a.section);
   return { covered, missing: required.filter((s) => !covered.includes(s)), attestations };
 }
 
@@ -459,6 +470,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
   }
 
+  // P1.5b — §I/§K BOILERPLATE-TRAP SWEEP (Brain card 285, Fix 2 · condition 2), gated on AUDIT_BOILERPLATE_ATTEST.
+  //          Grounds the named §I/§K traps (52.219-14 limitations-on-subcontracting / 52.204-25 prohibited-source)
+  //          the archetype sweep deliberately excludes — so the boilerplate attestation in completenessOf can NEVER
+  //          swallow one (condition 3: a hit surfaces as a finding, drives the verdict). The sweep RUNNING is exactly
+  //          condition 2 (detectors swept the section). Flag OFF ⇒ neither sweep nor attestation runs (byte-identical).
+  const boilerplateAttestOn = process.env.AUDIT_BOILERPLATE_ATTEST === "true";
+  if (boilerplateAttestOn) {
+    const traps = boilerplateTrapSweep(ctx.fullSource);
+    traps.forEach((f, j) => { f.id = `boilerplate_trap#${j}`; });
+    if (traps.length) { perLens["boilerplate_trap_sweep"] = traps.length; findings.push(...traps); }
+  }
+
   // P1.6 — CROSS-CLAUSE TEMPORAL CHECK (Brain card 226 Fork-1) — UNCONDITIONAL always-run (both flags
   //         AUDIT_TEMPORAL_CONFLICT + AUDIT_TEMPORAL_SHARED_ARO RETIRED; a locked doctrine is not an opt-in).
   //         Consumes the sweep-grounded FAT precondition + delivery window and nets the tension to a KO-clarify
@@ -533,7 +556,10 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
-  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true" });
+  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, {
+    sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true",
+    ...(boilerplateAttestOn ? { boilerplateAttest: { sections: ["I", "K"], swept: true } } : {}),
+  });
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
   const docCoverage = documentsCovered(ctx.fullSource, findings);

@@ -45,9 +45,22 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     catch { return { sound: false, survived: grounded, rejected: droppedUngrounded }; } // challenge failed → not sound
 
     const byIdx = new Map(verdicts.map((v) => [v.index, v]));
-    const complete = grounded.every((_, i) => byIdx.has(i)); // every finding actually got ruled
     const survived: TypedFinding[] = []; const rejected: TypedFinding[] = [...droppedUngrounded];
     const correctedDrops: CorrectedDrop[] = [];
+    // RESIDUE DOCTRINE (Brain card 285, Fix 1), flag-gated AUDIT_VERIFIER_BATCHING. An UNRESOLVED finding (the
+    // skeptic returned no ruling for its index — truncation / claim-explosion residue) is classified:
+    //   • VERDICT-DRIVING (bar-class OR knife-edge — could support/block a committal) → the run is NOT sound
+    //     → NHR (a genuine honest fail). The finding is ATTACHED to survived (never silently dropped — Brain's
+    //     forbidden fail-safe: a vanished disqualifier is a false-BID path).
+    //   • INFORMATIONAL (everything else) → marked `unverified` (excluded from report claims) and KEPT, but it
+    //     does NOT sink soundness. A stray informational finding the skeptic never reached must not honest-fail
+    //     the whole clean audit — the customer-readiness gap card 285 closes.
+    // Flag OFF ⇒ byte-identical to the pre-card-285 rule: unresolved ⇒ `complete=false` ⇒ not sound (whole-run NHR).
+    const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true";
+    const escalateSet = new Set(escalateIdx);
+    const isVerdictDriving = (f: TypedFinding, i: number): boolean =>
+      f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move" || escalateSet.has(i);
+    let unresolvedVerdictDriving = 0;
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
       // RE-TYPE requires a SUBSTANTIVE correction (Brain card 274 RULING 1). An empty/non-substantive
@@ -60,16 +73,55 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
       } else if (v && !v.upheld) {
         rejected.push(f); // overturned → drop (INCLUDES the empty-corrected:{} case that formerly resurrected)
         correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: v.corrected ? "empty_corrected" : "overturned" });
-      } else {
+      } else if (v) {
         survived.push(f); // upheld as-is (upheld=true, no substantive correction)
+      } else if (residueDoctrine && !isVerdictDriving(f, i)) {
+        survived.push({ ...f, unverified: true }); // UNRESOLVED informational → kept, marked, does not sink soundness
+      } else {
+        survived.push(f);                          // UNRESOLVED verdict-driving (or flag-off residue) → attached…
+        if (isVerdictDriving(f, i)) unresolvedVerdictDriving++; // …and it sinks soundness → NHR
       }
     });
     if (correctedDrops.some((d) => d.dropReason === "empty_corrected"))
       console.log(`[verifier] dropped ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").length} refuted finding(s) with empty corrected:{} (card 274 RULING 1 — no false resurrection): ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").map((d) => `#${d.index} "${d.requirement}"`).join(", ")}`);
-    // SOUND iff the skeptic ruled on every finding (challenge completed) AND ≥1 survived. Total-overturn
-    // (survived=[]) is NOT sound — soundness is "the skeptic confirmed at least one finding stands", never
-    // "the skeptic ruled on every finding and killed them all" (the false-BID hole). Brain card 224 fork 1.
-    return { sound: complete && survived.length > 0, survived, rejected, correctedDrops };
+    // SOUND (Brain card 224 fork 1 + card 285): ≥1 finding survives AND no verdict-driving residue is unresolved.
+    // Flag OFF: unresolvedVerdictDriving counts ANY unresolved finding (every non-ruled index takes the final else),
+    //   reproducing the old `complete` gate exactly. Flag ON: only bar-class/knife-edge residue sinks the run; a
+    //   truncated informational tail no longer honest-fails a clean audit. Total-overturn (survived=[]) is never sound.
+    const unresolvedCount = residueDoctrine ? unresolvedVerdictDriving : grounded.filter((_, i) => !byIdx.has(i)).length;
+    if (residueDoctrine && unresolvedVerdictDriving > 0)
+      console.log(`[verifier] ${unresolvedVerdictDriving} VERDICT-DRIVING finding(s) unresolved after the skeptic pass → run NOT sound → NHR (card 285 residue doctrine; findings attached, never dropped)`);
+    return { sound: unresolvedCount === 0 && survived.length > 0, survived, rejected, correctedDrops };
+  };
+}
+
+/** BATCHED SKEPTIC (Brain card 285, Fix 1). Wraps a base skeptic so it challenges the material set in bounded
+ *  BATCHES with a per-batch completeness check + retries — instead of one call whose O(findings) output truncates
+ *  (the claim-explosion root: on 24–43 findings the single skeptic response clipped and left indices unruled →
+ *  false honest-fail). Each batch is retried until every finding in it is ruled or `retries` is exhausted; any
+ *  still-unruled finding is left ABSENT from the merged verdicts (the residue makeAgenticVerifier then classifies —
+ *  verdict-driving → NHR, informational → unverified). Indices are remapped to the FULL set so downstream logic is
+ *  unchanged. Pure orchestration over the injected base; adds no model of its own. */
+export function makeBatchedSkeptic(base: SkepticFn, opts?: { batchSize?: number; retries?: number }): SkepticFn {
+  const batchSize = Math.max(1, opts?.batchSize ?? 12);
+  const retries = Math.max(0, opts?.retries ?? 2);
+  return async (ctx, findings, _opts) => {
+    if (findings.length <= batchSize) return base(ctx, findings, _opts); // no batching needed → identical single call
+    const merged: SkepticVerdict[] = [];
+    for (let start = 0; start < findings.length; start += batchSize) {
+      const batch = findings.slice(start, start + batchSize);
+      const ruled = new Map<number, SkepticVerdict>(); // local index → verdict
+      for (let attempt = 0; attempt <= retries && ruled.size < batch.length; attempt++) {
+        // Re-challenge ONLY the still-unruled remainder so a partial batch converges without re-spending on the resolved.
+        const remainIdx = batch.map((_, i) => i).filter((i) => !ruled.has(i));
+        const remain = remainIdx.map((i) => batch[i]);
+        let vs: SkepticVerdict[];
+        try { vs = await base(ctx, remain, _opts); } catch { break; } // a failed batch call → leave remainder unruled (residue)
+        for (const v of vs) { const local = remainIdx[v.index]; if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local }); }
+      }
+      for (const [local, v] of ruled) merged.push({ ...v, index: start + local }); // remap to the full-set index
+    }
+    return merged;
   };
 }
 
