@@ -74,9 +74,11 @@ const markedUniversal: TypedFinding = verified({ ...misTyped, universalDefect: "
   ok("INV Ruling B/i: universalDefect under tristate=off → coupling-lock BACKSTOP HARD ERROR (never returns a verdict)", threw);
   ok("INV Ruling i: backstop throws EngineInvariantError → billing-safe boundary conversion, NEVER an NHR verdict", caught instanceof EngineInvariantError);
   process.env.AUDIT_ELIGIBLE_TRISTATE = "true";
+  const prevFW = process.env.AUDIT_FOURWALLS_NOBID; process.env.AUDIT_FOURWALLS_NOBID = "true"; // card 275 R4b — seal so the NO_BID mechanism is reachable
   const vMarked = deriveVerdict(inp([markedUniversal], null));
-  ok("INV: universalDefect='unmeetable_by_any_offeror' under tristate=on → NO_BID (positive-allow is the ONLY path)", vMarked.verdict === "NO_BID");
+  ok("INV: universalDefect='unmeetable_by_any_offeror' under tristate=on + four-walls seal → NO_BID (positive-allow is the ONLY path)", vMarked.verdict === "NO_BID");
   ok("INV Ruling B: NO_BID eligible is NOT a default true (positively determined)", vMarked.eligible !== true);
+  if (prevFW === undefined) delete process.env.AUDIT_FOURWALLS_NOBID; else process.env.AUDIT_FOURWALLS_NOBID = prevFW;
   if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev;
 }
 ok("INV: a who-can-win class ('contradictory'/'unmeetable' NOT set) can NEVER reach NO_BID", noneAllowlisted.every((f) => !f.universalDefect));
@@ -110,6 +112,7 @@ console.log("[Ruling i — INIT-time coupling-lock]");
 console.log("[Ruling ii — precedence pre-lock (universal BEFORE firmStatus)]");
 {
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; process.env.AUDIT_ELIGIBLE_TRISTATE = "true";  // so the coupling-lock permits the marked finding
+  const prevFW = process.env.AUDIT_FOURWALLS_NOBID; process.env.AUDIT_FOURWALLS_NOBID = "true"; // card 275 R4b — seal so the NO_BID mechanism is reachable
   const realAttr2 = realBar.requiredAttribute!;
   // real bar + REAL requiredAttribute the closed-world profile provably fails, ALSO marked a universal defect:
   const markedAndFails: TypedFinding = verified({ ...realBar, controllability: "no_one_can_move", kind: "technical_spec", universalDefect: "unmeetable_by_any_offeror", grounded: true }); // Fork-5: verified mark → NO_BID path
@@ -118,6 +121,7 @@ console.log("[Ruling ii — precedence pre-lock (universal BEFORE firmStatus)]")
   ok("ii-precedence: reason is the UNIVERSAL defect, firmStatus did NOT re-label to a firm disqualification",
     /Universal solicitation defect/i.test(vPrec.reason) && !/does not satisfy the required attribute/i.test(vPrec.reason));
   void realAttr2;
+  if (prevFW === undefined) delete process.env.AUDIT_FOURWALLS_NOBID; else process.env.AUDIT_FOURWALLS_NOBID = prevFW;
   if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev;
 }
 

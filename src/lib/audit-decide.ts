@@ -228,20 +228,17 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
 //       UNVERIFIED eligibility gate — surface it as a caution (mark `cautionFloor`), NOT an assumed
 //       `already_satisfied`. A broad Total-Small-Business pool is NOT socioeconomic → left untouched (no
 //       over-caution). With a known profile (non-null) the existing firmStatus path governs.
-// Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
-const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation methodology|basis (?:for|of) award|source selection|screened (?:by|for) price|\bbest value\b|trade.?off|non-price factor|evaluation factor|technically acceptable|proposals?(?: will| are)? (?:initially )?(?:be )?screened/i;
-// Exclusion for the award-basis (a) downgrade: a no_one_can_move finding is NOT an
-// award-basis artifact — and must NEVER be downgraded to bidder_controls — when ANY
-// genuine impossibility/structural language is present, even if an LPTA/evaluation phrase
-// also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
-// real universal show-stopper). Covers delivery/precondition impossibility AND supply/
-// sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
+// AWARD_BASIS_RE was REMOVED with clause (a) (Brain card 275 RULING 1 — no silent award-basis downgrade).
+// DELIVERY_IMPOSSIBILITY_RE remains: it is the structural/impossibility exclusion `isPositiveSetAside` uses to
+// refuse to classify a genuine delivery/precondition OR supply/sole-source impossibility as a who-can-win set-aside
+// (discontinued / no-acceptable-substitute / single-source / clearance).
 const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
-/** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
- *  bidder_controls (never the temporal_conflict finding or a real delivery/precondition impossibility);
- *  (b) a specific socioeconomic set-aside under a NULL profile → cautionFloor. Flag-gated; OFF ⇒ unchanged. */
+/** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. Clause (a) (award-basis no_one_can_move
+ *  → bidder_controls) was REMOVED per Brain card 275 RULING 1 — no silent downgrade; the finding flows to Fork-2 →
+ *  NEEDS_HUMAN_REVIEW. The set-aside clauses remain: a socioeconomic set-aside under a NULL/open-world profile →
+ *  curable cautionFloor, and a mis-typed no_one_can_move set-aside → NHR (default) — never a false INELIGIBLE. */
 // ── OR-EQUAL CARVE-OUT (Brain card 139 — Step 6) ──────────────────────────────────────────────────────────
 // A "brand name OR EQUAL" line is PERMISSIVE — the bidder furnishes an approved equal meeting the salient
 // characteristics → bidder_controls, NEVER a structural bar. But it matches the structural patterns
@@ -326,15 +323,13 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // mere award-methodology bar (which would drop the who-can-win dimension → a false clean BID for a proven
     // non-holder) and never left as a `no_one_can_move` universal (→ false NO_BID/INELIGIBLE).
     const positiveSetAside = isPositiveSetAside(f);
-    // (a) award basis is never a universal bar. ROBUST altitude (panel B-1 + re-verify): the
-    // award-basis trigger matches the REQUIREMENT (the lens's own characterization of WHAT the
-    // bar is) — NOT the verbatim excerpt, which can incidentally quote LPTA/best-value language
-    // while describing a genuine supply/structural impossibility. The impossibility exclusion is
-    // kept on requirement+excerpt as belt-and-suspenders. So a real impossibility (proprietary /
-    // sole-source / discontinued / capacity) is never downgraded by an excerpt coincidence; only
-    // a finding the lens itself typed as an evaluation-methodology bar is.
-    if (f.controllability === "no_one_can_move" && !positiveSetAside && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
-      return { ...f, controllability: "bidder_controls", awardBasisGuard: true };
+    // (a) REMOVED — Brain card 275 RULING 1 (NHR POLE). This clause pre-emptively re-typed a `no_one_can_move`
+    // award-basis finding → `bidder_controls` — a SILENT clean BID off an UNVERIFIED heuristic downgrade — and by
+    // re-typing BEFORE deriveVerdict it PRE-EMPTED the Fork-2 `unmarkedUniversalClaim → NHR` safety. Ruling: no
+    // such silent downgrade. The finding stays `no_one_can_move` and flows to Fork-2 → NEEDS_HUMAN_REVIEW. A
+    // caution-floored award-basis downgrade may return ONLY behind a tight GROUNDED award-basis allowlist
+    // (four-walls style) — NOT this run. (The set-aside re-type clauses below are a separate FORK-3 doctrine
+    // invariant — who-can-win set-asides route by eligibility, never NO_BID — and are unaffected.)
     // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
     //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
     //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b
@@ -590,9 +585,18 @@ export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { ena
 // by construction): an UNRECOGNIZED non-curable bar (neither whitelisted-structural nor clearly compliance) is LEFT
 // AS-IS (→ NEEDS_HUMAN_REVIEW) — NEVER silently downgraded to BID. Only fires under a NULL profile (a real profile →
 // firmStatus governs, so #3's proven Dillon fail stays INELIGIBLE via step 3). Never touches no_one_can_move (#6's
-// temporal impossibility). Flag-gated; default OFF (Rule 61) ⇒ unchanged byte-for-byte.
-const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|unobtainable/i;
-const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|representation|reps? (?:and|&) cert|certif|\bSAM\b|registration|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
+// temporal impossibility). Flag-gated on AUDIT_STRUCTURAL_BAR_WHITELIST — DEFAULT-ON in the orchestrator
+// (!== "false"): this whitelist runs on every real audit unless explicitly disabled (NOT "off by default").
+// Brain card 275 RULING 2 — POSSESSION-cert bars are STRUCTURAL, never a soft caution. A credential the firm must
+// HOLD at award whose lead time exceeds a typical response window is non-curable: CMMC L1/L2/L3, facility/personnel
+// clearances (already covered), an Authorization To Operate (ATO), and the generic "must hold/possess/maintain a …
+// certification/accreditation". These are KEPT (→ NEEDS_HUMAN_REVIEW), never downgraded to BID_WITH_CAUTION.
+const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|unobtainable|\bcmmc\b|cybersecurity maturity model|cmmc\s*(?:level|lvl|l)?\s*[123]\b|authorization to operate|\bATO\b|(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|obtain(?:s|ed|ing)?|current|active|valid)\b[^.\n]{0,40}?(?:certification|accreditation|accredited|certified)|(?:certification|accreditation)\b[^.\n]{0,25}?(?:at (?:time of )?award|prior to award|required at award|by award)/i;
+// Brain card 275 RULING 2 — only REPRESENTATION FILINGS (a self-cert the firm EXECUTES) may soften to caution; a
+// possession credential (matched structural above) may not. Bare "certif"/"registration" REMOVED — they conflated
+// "file a representation" with "hold this credential". Softenable set = reps&certs, self-certs, SAM registration,
+// size/NAICS reps, OCI/responsibility reps, socioeconomic self-certs (which the set-aside path also handles).
+const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|reps? (?:and|&) certs?|representations? and certifications?|annual representations|online representations|\bSAM\b(?:\.gov)? registration|register(?:ed)? in \bSAM\b|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
 
 /** Generalize the over-type guards (Brain card 114): a non-curable bidder_cannot_move bar under a NULL profile is kept
  *  only if it is a recognized structural impossibility; a clearly compliance/representation item → caution; an
@@ -1036,8 +1040,12 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     byte-indistinguishable from a genuinely clean package. Fail honest → NEEDS_HUMAN_REVIEW (no charge),
   //     never a default BID. Defense-in-depth: makeAgenticVerifier already returns sound=false on an empty
   //     survivor set (caught at step 2); this guard also covers grounding-only / non-adversarial verify paths.
-  if (dispositions.length === 0)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No findings survived adversarial verification over complete coverage — a clean BID cannot rest on an empty verified set. Human review required.", dispositions, []);
+  // Brain card 275 RULING 3 — MATERIAL emptiness, not literal length. `disposeFinding` returns "dropped" for every
+  // boilerplate finding, so an all-boilerplate / all-dropped set has length > 0 yet carries ZERO decision content —
+  // it would sail past a `length === 0` test and fall through to a clean default BID. A materially-empty verified set
+  // (no non-`dropped` survivor) → NEEDS_HUMAN_REVIEW, never a default BID. (`every` on [] is true → literal-empty covered.)
+  if (dispositions.every((f) => f.disposition === "dropped"))
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, []);
 
   // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
   //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
@@ -1069,6 +1077,19 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     const breach = `FORK-5 invariant breach (card 240): ${unverifiedUniversalDefect.length} finding(s) marked universalDefect WITHOUT verification evidence — a committal NO_BID may not rest on an unverified mark (no verifiedBy binding the defect to the cited excerpt, Rule 64). Fail-safe → NEEDS_HUMAN_REVIEW: ${unverifiedUniversalDefect.map((s) => s.requirement).join("; ")}`;
     logInvariantBreach(breach);
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect);
+  }
+  // CARD 275 RULING 4b (Brain) — SUPPRESS judgment-sourced committal NO_BID → NHR until the four-walls re-enable
+  // (RULING 4a). Today a universalDefect is proven on a SINGLE J-2 entailment over a ±1KB window — one wall, not
+  // four — and Gap-B re-arms the FAT/delivery temporal-tension class the temporal arm deliberately restricts to
+  // caution-only (the RULING 4 RATCHET RULE: no arm may re-escalate a class a sibling restricted). Until a
+  // document-wide supersession-aware refutation pass + a REGISTERED INDEPENDENT second entailment verifier seal it
+  // (AUDIT_FOURWALLS_NOBID, default OFF ⇒ suppressed), a verified-but-not-four-walls universal defect fails SAFE to
+  // NEEDS_HUMAN_REVIEW. Downgrade-only (PROPOSE/DISPOSE rail authority, card 276): the rail may never fabricate a
+  // committal verdict the model's single-verifier judgment merely PROPOSED.
+  if (universalDefect.length && process.env.AUDIT_FOURWALLS_NOBID !== "true") {
+    const msg = `card 275 R4b: ${universalDefect.length} verified universalDefect(s) SUPPRESSED to NHR pending four-walls re-enable (single-verifier entailment is not four-walls): ${universalDefect.map((s) => s.requirement).join("; ")}`;
+    try { console.log(`[card275-r4b] ${msg}`); } catch { /* logging must never affect the verdict */ } // a normal suppression, NOT an invariant breach
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), msg, dispositions, universalDefect);
   }
   // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an

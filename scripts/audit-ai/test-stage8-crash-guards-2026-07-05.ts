@@ -12,7 +12,9 @@ let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, detail = "") => { console.log(`${cond ? "  ✓" : "✗ FAIL"}  ${name}${cond || !detail ? "" : `  — ${detail}`}`); cond ? pass++ : fail++; };
 const noThrow = (fn: () => unknown): boolean => { try { fn(); return true; } catch (e) { console.log(`     threw: ${(e as Error)?.message}`); return false; } };
 
-const f = (o: Partial<TypedFinding>): TypedFinding => ({ requirement: o.requirement ?? "r", citation: o.citation ?? "§F", excerpt: o.excerpt, grounded: true, lens: "x", kind: o.kind ?? "technical_spec", controllability: o.controllability ?? "bidder_controls", ...o });
+// NOTE: excerpt is intentionally left to `...o` so a test can pass `excerpt: undefined` (the crash input under
+// test). Cast to TypedFinding — the guards under test must tolerate a missing excerpt at runtime.
+const f = (o: Partial<TypedFinding>): TypedFinding => ({ requirement: o.requirement ?? "r", citation: o.citation ?? "§F", grounded: true, lens: "x", kind: o.kind ?? "technical_spec", controllability: o.controllability ?? "bidder_controls", ...o } as TypedFinding);
 
 console.log("Stage-8 crash guard A — applyTemporalConflict tolerates a missing excerpt");
 // A malformed pair carrying the sweep archetypes but NO excerpt (a hallucinated/deserialized field) used to hit

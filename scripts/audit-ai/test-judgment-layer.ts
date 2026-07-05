@@ -62,7 +62,9 @@ const entailStub = (state: EntailmentState) => async () => ({ state, evidence: `
   }
 
   // ── FOUR-WALLS INTEGRATION (acceptance b), tristate on ──
-  await withEnv({ AUDIT_ELIGIBLE_TRISTATE: "true" }, async () => {
+  // Brain card 275 R4b — a committal NO_BID also requires the four-walls seal; set it so b(ii) still exercises the
+  // verified→NO_BID mechanism. R4b default-suppression (verified WITHOUT seal → NHR) is asserted in test-derive-verdict.
+  await withEnv({ AUDIT_ELIGIBLE_TRISTATE: "true", AUDIT_FOURWALLS_NOBID: "true" }, async () => {
     // Wall 4: register the judgment verifier (simulate boot registration).
     _clearVerifiers(); registerVerifier(JUDGMENT_VERIFIER_ID);
 
