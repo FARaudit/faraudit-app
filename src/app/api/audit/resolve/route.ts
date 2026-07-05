@@ -6,6 +6,13 @@ import { extractText } from "@/lib/pdf-text-extractor";
 import { detectSections } from "@/lib/section-boundary-detector";
 import { anthropic } from "@/lib/anthropic";
 import { samFetchWithKey } from "@/lib/sam-url-guard";
+import { resolveSamDescription } from "@/lib/sam-description";
+import {
+  detectBodySections,
+  sectionStateFor,
+  NOTICE_BODY_MIN_CHARS,
+  NOTICE_BODY_MAIN_CHARS,
+} from "@/lib/resolve-coverage";
 
 // Synchronous resolve+manifest endpoint backing the Run Audit front door
 // (fix/run-audit-frontdoor-static). It answers ONE question — "what does the
@@ -221,6 +228,38 @@ async function detectPrimarySectionsViaVision(buf: Buffer, budgetMs: number): Pr
   }
 }
 
+// ━━ L4 (front-door notice-body parity) — read the SAME SAM notice body the audit ingests (L1) ━━
+// Returns whether a substantive government-published body was retrieved, whether it is large enough
+// to stand in as the primary solicitation (no-form parity), and which §C/§L/§M/§I it POSITIVELY
+// contains (deterministic, $0 — no model call; narrative sections only L3 locates degrade to
+// "unverified" downstream). Bounded so it can never push the door past maxDuration: resolveSamDescription
+// has a fixed 15s internal timeout, so start it only with budget to absorb a full timeout, and race a
+// hard cap as a backstop. Any failure → not-present (honest → sections stay unverified, never absent).
+interface NoticeBodyResult { present: boolean; substantive: boolean; sections: { C: boolean; L: boolean; M: boolean; I: boolean }; }
+async function detectNoticeBodySections(
+  noticeId: string,
+  description: string | null | undefined,
+  requestDeadline: number
+): Promise<NoticeBodyResult> {
+  const none: NoticeBodyResult = { present: false, substantive: false, sections: { C: false, L: false, M: false, I: false } };
+  const budget = requestDeadline - Date.now();
+  if (budget < 6000) return none; // not enough headroom to safely resolve the body — skip (honest fallback)
+  const cap = Math.min(15000, budget - 1500);
+  let resolved;
+  try {
+    resolved = await Promise.race([
+      resolveSamDescription(noticeId, description),
+      new Promise<null>((r) => setTimeout(() => r(null), cap)),
+    ]);
+  } catch {
+    return none;
+  }
+  if (!resolved || !resolved.fetched) return none;
+  const text = resolved.text.trim();
+  if (text.length < NOTICE_BODY_MIN_CHARS) return none;
+  return { present: true, substantive: text.length >= NOTICE_BODY_MAIN_CHARS, sections: detectBodySections(text) };
+}
+
 export async function GET(req: NextRequest) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return NextResponse.json({ ok: false, reason: "supabase_not_configured" }, { status: 500 });
@@ -334,18 +373,34 @@ export async function GET(req: NextRequest) {
   // counts as present if found EITHER in the primary text OR as a tagged
   // attachment. On any download/parse/image-only failure this returns null and
   // coverage degrades to the prior honest name-based behavior.
+  // Read the primary attachment AND the L1 notice body in PARALLEL (independent SAM fetches),
+  // each bounded by the shared request deadline, then UNION both into coverage. Reading either is
+  // a real "content" read; a positive hit from either is REAL and never un-sets a name-based hit.
   const primaryDoc = pickContentPrimary(plan);
+  const [bodyResult, textSections] = await Promise.all([
+    detectNoticeBodySections(noticeId, solicitation.description, requestDeadline),
+    primaryDoc ? detectPrimarySectionsFromText(primaryDoc, requestDeadline) : Promise.resolve(null),
+  ]);
   let coverageBasis: "content" | "name_only" = "name_only";
-  if (primaryDoc) {
-    const textSections = await detectPrimarySectionsFromText(primaryDoc, requestDeadline);
-    if (textSections) {
-      coverageBasis = "content";
-      // UNION — text-detected presence is REAL; never un-set a name-based hit.
-      coverage.C = coverage.C || textSections.C;
-      coverage.L = coverage.L || textSections.L;
-      coverage.M = coverage.M || textSections.M;
-      coverage.I = coverage.I || textSections.I;
-    }
+  if (textSections) {
+    coverageBasis = "content";
+    coverage.C = coverage.C || textSections.C;
+    coverage.L = coverage.L || textSections.L;
+    coverage.M = coverage.M || textSections.M;
+    coverage.I = coverage.I || textSections.I;
+  }
+  // ━━ L4 — UNION the notice-body sections the full audit ingests (parity with L1) ━━
+  // A substantive body means a real solicitation was retrieved (MAIN present even with no form
+  // file — "no form → the body IS the primary") AND that the audit's L3 finder will mine narrative
+  // §L/§M we cannot confirm deterministically here — so those must not be reported "absent" below.
+  const noticeBodyInPlay = bodyResult.present;
+  if (bodyResult.present) {
+    coverageBasis = "content";
+    coverage.C = coverage.C || bodyResult.sections.C;
+    coverage.L = coverage.L || bodyResult.sections.L;
+    coverage.M = coverage.M || bodyResult.sections.M;
+    coverage.I = coverage.I || bodyResult.sections.I;
+    if (bodyResult.substantive) coverage.main = true;
   }
 
   const complete = coverage.main && coverage.C && coverage.L && coverage.M;
@@ -361,10 +416,12 @@ export async function GET(req: NextRequest) {
   // content detection ran: "content" = we READ the primary, so a not-found section is genuinely ABSENT;
   // "name_only" = we could NOT read it (image-only / timeout / oversized) → we CANNOT claim absence, it
   // is UNVERIFIED ("the full audit reads the complete package"). Never present unverified as missing.
-  const sectionState = (present: boolean): "present" | "absent" | "unverified" =>
-    present ? "present" : coverageBasis === "content" ? "absent" : "unverified";
+  // L4-aware: reading the notice body deterministically is NOT authority to declare a narrative
+  // §C/§L/§M "absent" — only the audit's L3 finder can locate those. So when a notice body is in
+  // play, a not-detected core section is "unverified" (the full audit confirms), never "absent".
+  const sectionState = (present: boolean) => sectionStateFor(present, coverageBasis, noticeBodyInPlay);
   const coverageStates: Record<string, "present" | "absent" | "unverified"> = {
-    MAIN: coverage.main ? "present" : "unverified", // a form-role signal; its absence is never "confirmed"
+    MAIN: coverage.main ? "present" : "unverified", // a form-role / notice-body signal; its absence is never "confirmed"
     C: sectionState(coverage.C),
     L: sectionState(coverage.L),
     M: sectionState(coverage.M),
