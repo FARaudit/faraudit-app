@@ -155,4 +155,8 @@ export interface VerdictInputs {
   // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
   // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
   documentsComplete?: boolean;
+  // Brain card 284 / I8 — the assembled source, threaded so `firmStatus` can GROUND a closed-world INELIGIBLE bar
+  // (an ungrounded/model-named requiredAttribute → NHR, never a false INELIGIBLE). Default undefined ⇒ the grounding
+  // gate is SKIPPED (pure-unit callers stay byte-identical); the orchestrator always supplies ctx.fullSource.
+  source?: string;
 }

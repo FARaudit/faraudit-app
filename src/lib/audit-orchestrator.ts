@@ -652,7 +652,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // cap. `manifestComplete` now carries ONLY the card-58 no-bar signals — the weak page-count heuristic manifestComplete(ctx)
   // (C-13, SUBORDINATED: it can only add caution, never certify) + a missing CORE UCF section. The reconciliation signal
   // no longer hides inside the ctx-heuristic AND; the two are separate inputs the verdict caps on independently.
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0 };
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource };
   // Ruling (i) AUDIT BOUNDARY — the coupling-lock decision-time BACKSTOP (EngineInvariantError) converts HERE to
   // a billing-safe failed state: log the config error and re-throw the typed terminal failure. The caller routes
   // it to a 'failed' status; because the throw precedes any persist/decrementAuditQuota, the customer is NOT

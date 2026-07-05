@@ -841,7 +841,24 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
 // employees / annual receipts" does not.
 const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
 
-export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
+/** Grounding gate for a closed-world INELIGIBLE bar (Brain card 284 / I8). The BAR must come from the DOCUMENT: a
+ *  closed-world profile trusts firm FACTS, it never licenses a model-NAMED requirement. The requiredAttribute (or,
+ *  for a canonical `ns:value` label, its `value` segment) must be a normalized substring of the assembled source;
+ *  otherwise it is a FABRICATED bar. Pure. */
+export function requiredAttributeGrounded(requiredAttribute: string, source: string): boolean {
+  const norm = (s: string) => s.replace(/[_:-]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  const nSrc = norm(source);
+  if (nSrc.length === 0) return false;
+  const full = norm(requiredAttribute);
+  if (full.length >= 4 && nSrc.includes(full)) return true;
+  // canonical namespace labels (e.g. "oem:dillon-approved-source", "naics:333120-small") — check the value segment.
+  // Min length 4 so a contrived namespaced attr with a common 3-char value (e.g. "x:the") can't borrow a stopword
+  // hit in source; a real bar's value language is longer. Residual over-grounding still fails safe (stays gated).
+  const value = norm(requiredAttribute.includes(":") ? requiredAttribute.slice(requiredAttribute.indexOf(":") + 1) : requiredAttribute);
+  return value.length >= 4 && nSrc.includes(value);
+}
+
+export function firmStatus(f: TypedFinding, profile: BidderProfile | null, source?: string): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
   // FORK-7 Finding-1 (Brain card 242, review-hardened) — an NMR finding the Fork-7 gate has processed (nmrGuard)
   // resolves via the NMR-canonical status: compliant token → satisfies; POSITIVE non-compliance token → fails
@@ -869,7 +886,12 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
     // unstated → "unknown" (caution / human review), never a false INELIGIBLE.
     return "unknown";
   }
-  // CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails.
+  // CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails — BUT the BAR must come from the
+  // DOCUMENT (Brain card 284 / I8). A closed-world profile trusts firm FACTS; it never licenses a model-NAMED
+  // requirement. An UNGROUNDED requiredAttribute (not a normalized substring of the assembled source) is a
+  // FABRICATED bar → fail SAFE to "unknown" (→ NHR), never a false INELIGIBLE. Grounded → unchanged. Gated on
+  // `source` presence so pure-unit callers (no source) are byte-identical; the orchestrator threads ctx.fullSource.
+  if (source !== undefined && !requiredAttributeGrounded(f.requiredAttribute, source)) return "unknown";
   return "fails";
 }
 
@@ -1012,7 +1034,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     committal verdict these force eligible=null ("not determined", never a false green) + a mandatory
   //     verify-caution. requiredAttribute is REQUIRED so an attribute-less/bidder-controllable eligibility item
   //     (e.g. generic SAM registration) never false-fires a "not determined" on a verified firm (code-review #3/#4).
-  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile) !== "satisfies");
+  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile, inp.source) !== "satisfies");
   const committalEligible = (): boolean | null => (tristate && unverifiedGates.length ? null : true);
   const committalCaution = (): string => (tristate && unverifiedGates.length
     ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ")} before relying on award eligibility (bidder profile not provided). `
@@ -1095,7 +1117,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
   // eligibility_bar). An earned (proven-fail) INELIGIBLE is NEVER routed to NHR on a mis-typed kind string.
   const provenFails = disqualifying
-    .filter((f) => !isUniversalDefect(f) && firmStatus(f, inp.bidderProfile) === "fails")
+    .filter((f) => !isUniversalDefect(f) && firmStatus(f, inp.bidderProfile, inp.source) === "fails")
     .map((f): DecidedFinding => (f.kind === "eligibility_bar" ? f : { ...f, kind: "eligibility_bar" }));
   // PRECEDENCE PRE-LOCK (card 228 Ruling ii) — universal-defect attribution is evaluated BEFORE firmStatus, so a
   // universalDefect-marked finding is attributed universal/requirement-side and is NEVER re-labeled by firmStatus
@@ -1114,8 +1136,8 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // POSITIVE eligibility determination (Ruling B) — proven-pass→true, proven-fail→false, else null; NEVER default true.
     const positiveEligible = (): boolean | null => {
       const gates = disqualifying.filter((f) => !!f.requiredAttribute);
-      if (gates.some((f) => firmStatus(f, inp.bidderProfile) === "fails")) return false;
-      if (gates.length && gates.every((f) => firmStatus(f, inp.bidderProfile) === "satisfies")) return true;
+      if (gates.some((f) => firmStatus(f, inp.bidderProfile, inp.source) === "fails")) return false;
+      if (gates.length && gates.every((f) => firmStatus(f, inp.bidderProfile, inp.source) === "satisfies")) return true;
       return null;
     };
     if (universalDefect.length)
@@ -1133,7 +1155,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // impossibility but is NOT a positively-classified universal defect. It must NEVER silently clear to BID via
   // firmStatus="satisfies" or curableInWindow:true (the retired `universal` bucket was immune to that mis-type).
   // If it isn't a proven who-can-win fail (handled above), it cannot be confidently cleared → NEEDS_HUMAN_REVIEW.
-  const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile) !== "fails");
+  const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile, inp.source) !== "fails");
   if (unmarkedUniversalClaim.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
       `Finding(s) claim a universal impossibility (no_one_can_move) but are not a positively-classified universal defect, and the firm does not provably fail them — human review to classify or clear: ${unmarkedUniversalClaim.map((s) => s.requirement).join("; ")}`, dispositions, unmarkedUniversalClaim);
@@ -1147,7 +1169,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    bar under a null profile is the SPRS error re-armed (soft caution where the bidder cannot win and
   //    cannot cure). CURABILITY is a property of the GATE, independent of profile, so it is checked HERE —
   //    and an untyped bar FAILS CLOSED, never silently to caution.
-  const unknownBars = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile) === "unknown");
+  const unknownBars = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile, inp.source) === "unknown");
   const names = (xs: DecidedFinding[]) => xs.map((x) => x.requirement).join("; ");
 
   // 5a. UNTYPED disqualifying bar (missing requiredAttribute or curableInWindow) → fail CLOSED to human review.
