@@ -59,7 +59,14 @@ export function disposeVerdict(
   //    whether a caution attaches. Keep the CAUTION (a downgrade from clean BID; the rail may never upgrade
   //    CAUTION→BID). This is the only "created" verdict, and it is strictly safer than plain BID.
   if (POSITIVE_COMMITTAL.has(p) && POSITIVE_COMMITTAL.has(r)) {
-    return { verdict: "BID_WITH_CAUTION", eligible: true, reason: `DISPOSE: proposer(${p}) and rail(${r}) agree biddable but differ on caution → BID_WITH_CAUTION (keep the caution; never upgrade to clean BID).`, outcome: "downgraded", ...base };
+    // eligible carries through from the RAIL (Guard 1) — the rail is the eligibility AUTHORITY here, exactly as the
+    // agreement branch above (line 49) trusts railDerived.eligible and ignores the proposer's. `r` is positive-committal
+    // so railDerived.eligible is `true | null` (never false). This propagates the rail's null-profile set-aside clamp
+    // (eligible=null) WITHOUT re-asserting a clean eligible=true, and — unlike keying on proposed.eligible — never
+    // spuriously downgrades a rail-VERIFIED eligible=true just because the proposer omitted its (optional) eligible
+    // field. Previously hardcoded `true`, which defeated the clamp. (Adversarial-review card: proposer eligible is
+    // routinely null via `parsed.eligible ?? null`, so keying on it broke flag-OFF byte-identity + verified firms.)
+    return { verdict: "BID_WITH_CAUTION", eligible: railDerived.eligible, reason: `DISPOSE: proposer(${p}) and rail(${r}) agree biddable but differ on caution → BID_WITH_CAUTION (keep the caution; never upgrade to clean BID).`, outcome: "downgraded", ...base };
   }
 
   // 4. ANY OTHER DISAGREEMENT → NEEDS_HUMAN_REVIEW. Covers: safe-vs-committal (rail did not confirm the model's

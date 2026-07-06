@@ -216,6 +216,63 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
   });
 }
 
+// ── ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2) ─────────────────────────────────────────────────────────
+// Override-slot guard (same layer as the precondition floor / award-basis guard, BEFORE deriveVerdict;
+// deriveVerdict UNTOUCHED). The construction proposer, run once per binding document, AMPLIFIES a typing
+// variance the card-291 prompt could not make reliable: it occasionally types two classes of ROUTINE federal
+// clause as a bar, and the DISPOSE rail then honest-fails the whole package (NHR) on a non-bar. Two narrow,
+// deterministic re-types close it, keyed on construction-SPECIFIC clause tokens (NOT generic vocabulary):
+//   (a) AVAILABILITY OF FUNDS (52.232-18 / 52.232-19 / "subject to the availability of appropriations") mis-typed
+//       no_one_can_move → bidder_controls. This is a routine appropriations contingency present in almost every
+//       federal solicitation; it is NEVER a universal impossibility (no_one_can_move is only a self-contradictory
+//       or unmeetable-by-any-offeror solicitation). A false no_one_can_move here is a false NO_BID / false NHR.
+//   (b) BONDING (52.228-1/-15/-16 / bid guarantee / performance & payment bond) mis-typed bidder_cannot_move →
+//       bidder_controls. Furnishing a bond is a do-the-work gate the bidder CLEARS by obtaining the bond — it is
+//       never a non-curable PROFILE credential the firm must independently hold.
+// SAFETY (adversarial): (a) only fires on no_one_can_move (never softens a bidder_cannot_move profile bar into a
+// clean BID), and NEVER on a finding carrying a VERIFIED universal-defect mark (universalDefect / verifiedBy) — a
+// genuine, evidence-backed universal impossibility is left untouched. The regexes are FAR-clause-specific, so a
+// finding merely mentioning "funds" or "bond" in passing does not match. Flag-gated; OFF (default) ⇒ unchanged.
+const AVAILABILITY_OF_FUNDS_RE = /\b52\.232-(?:18|19)\b|availability of funds|subject to the availability of (?:funds|appropriations)|availability of appropriations/i;
+const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and payment bonds?|performance bond|payment bond/i;
+
+/** Re-type a ROUTINE federal clause the proposer over-typed as a bar → bidder_controls (Guard 2). Pure →
+ *  gate-tested. Two arms: Availability-of-Funds no_one_can_move → bidder_controls; bonding bidder_cannot_move →
+ *  bidder_controls. NEVER touches a verified universal defect. Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyRoutineClauseOvertypeGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // default-off ⇒ byte-for-byte unchanged
+  return findings.map((f) => {
+    // A VERIFIED universal defect (evidence-backed contradictory/unmeetable terms) is NEVER downgraded — the guard
+    // corrects proposer MIS-typing, not a proven impossibility. (Note: on the judgment-first proposer path
+    // projectProposedFinding strips these marks, so this check alone is NOT load-bearing — the requirement-scoped
+    // trigger + the structural keep-the-bar exclusion below are the real protection. Adversarial-review card.)
+    if (f.universalDefect || f.verifiedBy) return f;
+    // TRIGGER on citation + requirement ONLY — NEVER the verbatim excerpt. Altitude discipline borrowed from the
+    // sibling applyPreconditionOvertypeFloor (which keys its downgrade basis on `requirement`, not `excerpt`, for
+    // exactly this reason): a genuine bar (facility clearance / QPL / sole-source) whose grounded excerpt happens to
+    // quote a NEIGHBORING bonds or appropriations clause must not be downgraded → that was a false-BID / suppressed-
+    // INELIGIBLE hole (adversarial-review catastrophic finding). The proposer's actual over-type carries the routine
+    // clause in its OWN requirement/citation, so the guard still fires on the real target.
+    const trigger = `${f.citation ?? ""} ${f.requirement ?? ""}`;
+    // KEEP-THE-BAR exclusion on the FULL hay (incl. excerpt): if a genuine structural-impossibility token is co-stated
+    // ANYWHERE, never downgrade — keeping a bar is the conservative zero-contract-loss direction (mirrors the sibling).
+    // Uses the COMPREHENSIVE STRUCTURAL_BAR_RE_114 (not the narrow STRUCTURAL_BAR_RE): a genuine non-curable bar whose
+    // OWN requirement co-states a routine bond/appropriations clause (e.g. a DoD construction+cyber bundle: "maintain
+    // CMMC Level 2 at award and furnish performance & payment bonds") must keep the CMMC/ATO/TDP/clearance/cert-at-
+    // award bar — the narrow regex missed those whole classes → residual false-BID (second adversarial pass). Erring
+    // toward keep-the-bar can only leave a routine clause un-downgraded (→ honest-fail NHR), never a false BID.
+    const hay = `${trigger} ${f.excerpt ?? ""}`;
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;
+    // (a) Availability of Funds mis-typed as a universal impossibility → routine contingency, biddable.
+    if (f.controllability === "no_one_can_move" && AVAILABILITY_OF_FUNDS_RE.test(trigger))
+      return { ...f, controllability: "bidder_controls", curableInWindow: true, routineClauseGuard: true };
+    // (b) Bonding mis-typed as a non-curable profile bar → the bidder obtains the bond (do-the-work gate).
+    if (f.controllability === "bidder_cannot_move" && BONDING_CLAUSE_RE.test(trigger))
+      return { ...f, controllability: "bidder_controls", curableInWindow: true, routineClauseGuard: true };
+    return f;
+  });
+}
+
 // ── AWARD-BASIS OVER-TYPE GUARD (Brain card 108) ─────────────────────────────────────────────────────
 // Override-slot guard (same layer as caution-floor, BEFORE deriveVerdict; deriveVerdict UNTOUCHED). Two
 // deterministic re-types that fix the #1 false-NO_BID class:
@@ -1035,9 +1092,15 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     verify-caution. requiredAttribute is REQUIRED so an attribute-less/bidder-controllable eligibility item
   //     (e.g. generic SAM registration) never false-fires a "not determined" on a verified firm (code-review #3/#4).
   const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile, inp.source) !== "satisfies");
-  const committalEligible = (): boolean | null => (tristate && unverifiedGates.length ? null : true);
-  const committalCaution = (): string => (tristate && unverifiedGates.length
-    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ")} before relying on award eligibility (bidder profile not provided). `
+  // GUARD 1 — the DETERMINISTIC manifest-sourced signal joins the finding-derived unverifiedGates. It fires the SAME
+  //   "eligibility not verified" clamp WITHOUT depending on the proposer having emitted a correctly-typed
+  //   eligibility_bar finding: the sealed construction manifest detected a set-aside in source under a null profile,
+  //   so a committal verdict must not assert eligible=true. Only bites under the tristate; undefined ⇒ byte-identical.
+  const manifestUnverifiableGate = inp.detectedUnverifiableEligibilityGate === true;
+  const eligibilityUnverified = tristate && (unverifiedGates.length > 0 || manifestUnverifiableGate);
+  const committalEligible = (): boolean | null => (eligibilityUnverified ? null : true);
+  const committalCaution = (): string => (eligibilityUnverified
+    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.length ? unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ") : "the set-aside / socioeconomic eligibility gate"} before relying on award eligibility (bidder profile not provided). `
     : "");
   const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
 

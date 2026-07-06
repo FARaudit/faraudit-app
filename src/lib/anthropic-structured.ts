@@ -119,10 +119,15 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
     const t0 = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    // External cancellation also aborts this request (upstream budget timeout).
+    // External cancellation also aborts this request (upstream budget timeout). The listener is NAMED and removed in
+    // `finally` (adversarial-review): `opts.signal` is a LONG-LIVED, run-wide budget signal shared by dozens of calls,
+    // and a per-iteration anonymous `{once:true}` listener that never fires accumulates dead listeners across retries
+    // + across the whole run (MaxListenersExceededWarning + retained dead controllers). Bind once per attempt, remove
+    // on every exit path.
+    const onExternalAbort = () => controller.abort();
     if (opts.signal) {
       if (opts.signal.aborted) controller.abort();
-      else opts.signal.addEventListener("abort", () => controller.abort(), { once: true });
+      else opts.signal.addEventListener("abort", onExternalAbort, { once: true });
     }
     let res: Response;
     try {
@@ -137,8 +142,30 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+    } catch (err) {
+      // NETWORK-LEVEL THROW retry (Guard 3). `fetch` REJECTS — never returns an HTTP status — on a transient network
+      // failure ("fetch failed" / ECONNRESET / socket hang up / DNS). The prior loop had a `finally` but NO `catch`,
+      // so every such throw escaped the retry loop unretried — even though the IDENTICAL Anthropic-overload condition,
+      // when it arrives as a 529, IS retried below. Under a capacity brown-out that asymmetry killed long multi-call
+      // runs (the per-doc construction proposer makes ~6 calls; one network drop aborted the whole run). Retry
+      // genuine network throws with the SAME backoff as a retryable status.
+      // DO NOT retry an ABORT (adversarial-review cost fix): an AbortError is EITHER an external budget cancellation
+      // (must stop promptly) OR an INTERNAL `timeoutMs` timeout. A timeout means the request was accepted and the
+      // model may have been GENERATING BILLABLE OUTPUT for up to timeoutMs before being killed — re-firing it would
+      // silently re-bill up to MAX_RETRIES× (aborts return no body, so those tokens are UNCOUNTED). Both abort flavors
+      // therefore honest-fail here rather than re-spend. Only a non-abort network throw is transient-and-cheap to retry.
+      const isAbort = (err as Error)?.name === "AbortError";
+      lastErr = `${label} fetch threw: ${(err as Error)?.message ?? String(err)}`;
+      if (!isAbort && attempt < MAX_RETRIES) {
+        const backoffMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
+        console.warn(`[anthropic-structured] ${label} network throw — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+      throw new Error(lastErr);
     } finally {
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onExternalAbort);
     }
     if (res.ok) {
       const data = await res.json();

@@ -90,6 +90,13 @@ export interface TypedFinding {
   // no_one_can_move with NO co-stated window conflict → bidder_controls (so a feasible precondition is
   // not a false universal bar). Marker only; deriveVerdict reads controllability, not this field.
   preconditionOvertypeFloored?: boolean;
+  // ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2) — set when the deterministic guard re-typed a ROUTINE federal clause
+  // the proposer mis-typed as a bar: an Availability-of-Funds contingency (52.232-18/-19) mis-typed no_one_can_move
+  // → bidder_controls (a routine appropriations contingency present in almost every solicitation is NOT a universal
+  // impossibility), or a bonding requirement (52.228-1/-15/-16 / bid guarantee / perf & payment bond) mis-typed
+  // bidder_cannot_move → bidder_controls (the bidder OBTAINS the bond — a do-the-work gate, never a profile bar).
+  // Marker only; deriveVerdict reads controllability, not this field.
+  routineClauseGuard?: boolean;
   // AWARD-BASIS OVER-TYPE GUARD (Brain card 108) — set when the deterministic guard either (a) re-typed an
   // award-basis / evaluation-methodology / source-selection finding mis-typed no_one_can_move → bidder_controls
   // (the award basis is never a universal bar — a false NO_BID), or (b) marked a SPECIFIC socioeconomic
@@ -164,4 +171,11 @@ export interface VerdictInputs {
   // (an ungrounded/model-named requiredAttribute → NHR, never a false INELIGIBLE). Default undefined ⇒ the grounding
   // gate is SKIPPED (pure-unit callers stay byte-identical); the orchestrator always supplies ctx.fullSource.
   source?: string;
+  // GUARD 1 (card 206-A generalized) — a DETERMINISTIC "eligibility cannot be verified" signal sourced from the
+  // SEALED construction manifest (a set-aside/socioeconomic element detected in source) under a NULL bidder profile,
+  // computed in the orchestrator INDEPENDENT of how the proposer typed its findings. When true (and the tristate is
+  // ON), a committal verdict forces eligible=null + a mandatory verify-caution — the engine never asserts a firm is
+  // eligible for a set-aside it detected but could not verify, even if the proposer failed to emit a properly-typed
+  // eligibility_bar finding. Default undefined ⇒ byte-identical (no clamp); flag-gated at the orchestrator.
+  detectedUnverifiableEligibilityGate?: boolean;
 }

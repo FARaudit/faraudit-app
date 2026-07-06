@@ -19,7 +19,7 @@ import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -766,6 +766,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      BEFORE caution-floor; deriveVerdict untouched. Flag off ⇒ findings pass through unchanged.
   findings = applyPreconditionOvertypeFloor(findings, { enabled: process.env.AUDIT_PRECONDITION_OVERTYPE_FLOOR === "true" });
 
+  // P4.4-bis — ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2), default-OFF (=== "true"). Corrects the per-doc construction
+  //      proposer's residual typing variance: an Availability-of-Funds contingency (52.232-18/-19) mis-typed
+  //      no_one_can_move → bidder_controls, and a bonding requirement (52.228-1/-15/-16) mis-typed bidder_cannot_move
+  //      → bidder_controls (the bidder obtains the bond). Narrow FAR-clause-specific regexes; NEVER touches a verified
+  //      universal defect. Reduces false honest-fail NHR on routine construction clauses. Flag off ⇒ unchanged.
+  findings = applyRoutineClauseOvertypeGuard(findings, { enabled: process.env.AUDIT_ROUTINE_CLAUSE_GUARD === "true" });
+
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
   //      so deriveVerdict floors to BID_WITH_CAUTION minimum. Flag off ⇒ findings pass through unchanged.
@@ -796,7 +803,16 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // cap. `manifestComplete` now carries ONLY the card-58 no-bar signals — the weak page-count heuristic manifestComplete(ctx)
   // (C-13, SUBORDINATED: it can only add caution, never certify) + a missing CORE UCF section. The reconciliation signal
   // no longer hides inside the ctx-heuristic AND; the two are separate inputs the verdict caps on independently.
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource };
+  // GUARD 1 — DETERMINISTIC null-profile set-aside eligibility clamp (card 206-A generalized), default-OFF
+  //   (=== "true"). When the SEALED construction manifest detected a set-aside/socioeconomic element in source AND
+  //   no bidder profile was provided, the engine cannot verify award eligibility — so a committal verdict must carry
+  //   eligible=null + a verify-caution, INDEPENDENT of whether the proposer emitted a correctly-typed eligibility_bar
+  //   finding (the residual the card-291 prompt could not make reliable). Sourced from the manifest (source-grounded),
+  //   NOT the unreliable SAM typeOfSetAside metadata. Only bites under AUDIT_ELIGIBLE_TRISTATE; flag off ⇒ unchanged.
+  const detectedUnverifiableEligibilityGate = process.env.AUDIT_SETASIDE_ELIG_CLAMP === "true"
+    && bidderProfile == null
+    && !!ctx.constructionManifest?.elements.some((e) => e.key === "set_aside" && e.present);
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
