@@ -67,6 +67,14 @@ const ELEMENT_DEFS: Array<{ key: ConstructionElementKey; re: RegExp }> = [
   { key: "set_aside", re: /set[\s-]?aside|\b8\(a\)\b|SDVOSB|HUBZone|WOSB|small\s+business\s+(?:set|concern|program)/i },
 ];
 
+// Key → detector regex, for the coverage SURVIVAL / ANALYZED checks (below). Survival keys on whether the element's
+// binding SIGNAL (ANY detector alternate) reached the read source — NOT one brittle exact anchor phrase. Rationale
+// (Rule-69 W9126 diagnosis): the map-reduce compressor keeps the stable clause TOKEN ("52.222-6") but may drop the
+// prose title ("Construction Wage Rate"); a single-phrase anchor false-INCOMPLETEs a package whose binding content
+// the compressor semantically KEPT. Re-testing the detector on the read source is robust to digest phrasing AND still
+// gate-strong (the clause token's presence IS the binding signal; coverage still requires a grounded finding too).
+const ELEMENT_RE: Record<ConstructionElementKey, RegExp> = Object.fromEntries(ELEMENT_DEFS.map((d) => [d.key, d.re])) as Record<ConstructionElementKey, RegExp>;
+
 // SF-1442 header — the construction counterpart to SF-1449 (commercial). Classification signal, PRIMARY-region only.
 const SF1442_HEADER_RE = /\bSF[-\s]?1442\b|STANDARD\s+FORM\s+1442|SOLICITATION[\/,\s]+OFFER[\/,\s]+(?:AND\s+)?AWARD\s*\(?\s*CONSTRUCTION/i;
 
@@ -148,14 +156,18 @@ export function constructionCoverage(
   const droppedByCompressor: string[] = [];
 
   for (const e of m.elements) {
-    if (!e.present || !e.anchor) continue; // only PRESENT elements are `required`; absent ones are handled by coreMissing
-    const nAnchor = norm(e.anchor);
-    const inSource = nAnchor.length > 0 && nSource.includes(nAnchor);
+    if (!e.present) continue; // only PRESENT elements are `required`; absent ones are handled by coreMissing
+    const re = ELEMENT_RE[e.key]; // stateless (/i, no /g) — safe to reuse across calls
+    const nAnchor = e.anchor ? norm(e.anchor) : "";
+    // SURVIVED iff the element's binding SIGNAL (any detector alternate — e.g. the stable clause token) reached the
+    // read source. Robust to compression phrasing: the prose title may be dropped but the clause number survives.
+    const inSource = (nAnchor.length > 0 && nSource.includes(nAnchor)) || re.test(fullSource);
     if (!inSource) { droppedByCompressor.push(e.key); missing.push(e.key); continue; }
     survived.push(e.key);
-    // analyzed iff a grounded finding's excerpt carries this element's anchor — a real join on the binding token, not a
-    // loose 2-way substring on a 220-char window (which coincidental overlap could false-satisfy — card-274 regression).
-    const analyzed = nExcerpts.some((ex) => ex.includes(nAnchor));
+    // ANALYZED iff a grounded finding's excerpt carries this element's binding signal (matches the detector regex, or
+    // carries the exact anchor) — a real join on the binding token, not a loose 2-way substring on a 220-char window
+    // (which coincidental overlap could false-satisfy — card-274 regression).
+    const analyzed = nExcerpts.some((ex) => (nAnchor.length > 0 && ex.includes(nAnchor)) || re.test(ex));
     if (analyzed) covered.push(e.key);
     else missing.push(e.key);
   }

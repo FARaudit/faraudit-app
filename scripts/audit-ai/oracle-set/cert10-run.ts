@@ -126,6 +126,11 @@ function buildCases(): RunCase[] {
         mustDecide: cc.mustDecide === true,
         blocker: (cc.blocker as Verdict[]) ?? [],
         needsChunk: id === "W9126G26RA087",
+        // NAICS is an authoritative SAM FACT the prod executor passes from the SAM cross-ref (solicitation.naicsCode).
+        // W9126G26RA087 is a USACE construction buy — NAICS 236220. The harness must pass it so the construction
+        // classifier (isConstruction) sees the same authoritative signal prod does; the primary here is the SAM
+        // synopsis (no SF-1442 header — the form is in Attachment 2), so NAICS is the load-bearing construction signal.
+        naics: id === "W9126G26RA087" ? "236220" : null,
         fullDocRanEligible: id === "W9126G26RA087" || id === "FA301626Q0068",
       });
     }
