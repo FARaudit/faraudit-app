@@ -42,6 +42,11 @@ export interface TypedFinding {
   controllability: Controllability;
   grounded: boolean;          // excerpt verified present in the source (deterministic grounding check)
   lens: string;               // which expert produced it
+  // VERIFIER RESIDUE (Brain card 285, Fix 1) — set true when the adversarial skeptic could NOT reach this finding
+  // after batching + retries AND it is NON-verdict-driving (informational: not bar-class, not knife-edge). Such a
+  // finding is kept (never silently dropped — Brain's forbidden fail-safe) but EXCLUDED from report claims and does
+  // NOT sink run soundness. An UNRESOLVED VERDICT-DRIVING finding is never marked unverified — it forces NHR instead.
+  unverified?: boolean;
   requiredAttribute?: string; // for an eligibility bar: the qualification the firm must HOLD (NAICS-small code, cert) — matched against the bidder profile
   // CURABILITY (Brain card-44 §2) — a property of the GATE, independent of the bidder profile: can a firm
   // that lacks the requiredAttribute obtain/satisfy it WITHIN the solicitation's response window?
@@ -85,6 +90,13 @@ export interface TypedFinding {
   // no_one_can_move with NO co-stated window conflict → bidder_controls (so a feasible precondition is
   // not a false universal bar). Marker only; deriveVerdict reads controllability, not this field.
   preconditionOvertypeFloored?: boolean;
+  // ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2) — set when the deterministic guard re-typed a ROUTINE federal clause
+  // the proposer mis-typed as a bar: an Availability-of-Funds contingency (52.232-18/-19) mis-typed no_one_can_move
+  // → bidder_controls (a routine appropriations contingency present in almost every solicitation is NOT a universal
+  // impossibility), or a bonding requirement (52.228-1/-15/-16 / bid guarantee / perf & payment bond) mis-typed
+  // bidder_cannot_move → bidder_controls (the bidder OBTAINS the bond — a do-the-work gate, never a profile bar).
+  // Marker only; deriveVerdict reads controllability, not this field.
+  routineClauseGuard?: boolean;
   // AWARD-BASIS OVER-TYPE GUARD (Brain card 108) — set when the deterministic guard either (a) re-typed an
   // award-basis / evaluation-methodology / source-selection finding mis-typed no_one_can_move → bidder_controls
   // (the award basis is never a universal bar — a false NO_BID), or (b) marked a SPECIFIC socioeconomic
@@ -155,4 +167,15 @@ export interface VerdictInputs {
   // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
   // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
   documentsComplete?: boolean;
+  // Brain card 284 / I8 — the assembled source, threaded so `firmStatus` can GROUND a closed-world INELIGIBLE bar
+  // (an ungrounded/model-named requiredAttribute → NHR, never a false INELIGIBLE). Default undefined ⇒ the grounding
+  // gate is SKIPPED (pure-unit callers stay byte-identical); the orchestrator always supplies ctx.fullSource.
+  source?: string;
+  // GUARD 1 (card 206-A generalized) — a DETERMINISTIC "eligibility cannot be verified" signal sourced from the
+  // SEALED construction manifest (a set-aside/socioeconomic element detected in source) under a NULL bidder profile,
+  // computed in the orchestrator INDEPENDENT of how the proposer typed its findings. When true (and the tristate is
+  // ON), a committal verdict forces eligible=null + a mandatory verify-caution — the engine never asserts a firm is
+  // eligible for a set-aside it detected but could not verify, even if the proposer failed to emit a properly-typed
+  // eligibility_bar finding. Default undefined ⇒ byte-identical (no clamp); flag-gated at the orchestrator.
+  detectedUnverifiableEligibilityGate?: boolean;
 }

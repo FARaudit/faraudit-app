@@ -1,0 +1,12 @@
+SECTION A — SOLICITATION
+Solicitation Number: [ENGINEERED-INCOMPLETE-A]
+Issuing Office: Department of Defense (test package — deliberately incomplete)
+
+SECTION B — SUPPLIES OR SERVICES AND PRICES
+This is a solicitation-type buy (RFP). Offerors shall submit pricing for all CLINs 0001 through 0004.
+
+SECTION C — STATEMENT OF WORK
+The Contractor shall provide facility maintenance services at the identified installation, including HVAC, plumbing, and electrical preventive maintenance and repair.
+
+SECTION L — INSTRUCTIONS TO OFFERORS
+Proposals shall be submitted in two volumes: Volume I Technical, Volume II Price. Volume I shall not exceed 30 pages. Proposals will be evaluated in accordance with the factors set forth in Section M below. Offerors shall complete and submit Attachment J-1 (Past Performance Questionnaire) and Attachment J-2 (Technical Approach Template).

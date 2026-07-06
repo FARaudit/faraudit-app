@@ -111,3 +111,68 @@ export function highSignalSweep(source: string): TypedFinding[] {
   pushPara(start, source.length);
   return out;
 }
+
+// ── §I/§K BOILERPLATE-TRAP SWEEP (Brain card 285, Fix 2 · condition 2) ───────────────────────────────────────
+// The §I/§K attestation (completenessOf) may certify a boilerplate section covered WITHOUT itemizing every clause —
+// but ONLY if the deterministic structural/trap detectors actually SWEPT that section text first. highSignalSweep
+// deliberately EXCLUDES set-aside/small-business text, so the named §I/§K traps (52.219-14 limitations-on-
+// subcontracting; 52.204-25 covered-telecom / prohibited-source) would be invisible — attesting "swept, no bar"
+// over them would be a false-BID path. This pass GUARANTEES those trap classes are grounded as findings so
+// attestation never silently swallows them (Fix 2 condition 3: attestation can never suppress a detector hit).
+//
+// GROUND-DON'T-TYPE (same doctrine as highSignalSweep): findings land as `clause_flowdown` + `bidder_controls`
+// (an incorporated comply-to-win clause obligation) — NEVER a bar. The model lenses / small-business panel lens
+// elevate an eligibility concern (e.g. an ostensible-subcontractor size risk under 52.219-14); the deterministic
+// pass only SURFACES the clause so it cannot vanish behind an attestation. Pure, no model. Dedup by (class+excerpt).
+interface TrapHit { trapClass: string; requirementLabel: string; anchor: RegExp; }
+// The recognized §I/§K structural / eligibility trap classes (Brain card 285 · condition 2). Broadened past the
+// single named example so "swept" is a MEANINGFUL guarantee — the full Limitations-on-Subcontracting clause family,
+// prohibited-source, facility clearance, and OCI are the well-known bars that hide inside boilerplate §I/§K. A truly
+// novel bar outside every detector remains the accepted residual (same as anywhere in the engine), but the common
+// families are now covered so attestation isn't certifying an un-swept section.
+const LIMITATION_SUBK_RE = /\b52\.219-(?:14|27|3|29|30|33)\b|limitations?\s+on\s+subcontracting|(?:at least|not less than|no less than)\s+(?:50|fifty)\s*(?:%|percent)[^.]{0,60}\b(?:self-?perform|cost of|the work)/i;
+const PROHIBITED_SOURCE_RE = /\b52\.204-2[456]\b|covered\s+telecommunications(?:\s+equipment)?|prohibited\s+source|\bByteDance\b|\bKaspersky\b/i;
+const FACILITY_CLEARANCE_RE = /\bfacility\s+(?:security\s+)?clearance\b|\bFCL\b|\bDD[\s-]?254\b|top\s+secret\s+facility|cleared\s+facility/i;
+const OCI_RE = /\borganizational\s+conflict\s+of\s+interest\b|\bOCI\b|\b9\.5(?:0[0-9]|)\b|52\.209-7[0-9]/i;
+// CMMC / NIST SP 800-171 (DFARS 252.204-7012/-7019/-7020/-7021) — a structural cyber-eligibility bar (a required
+// CMMC level / SPRS score can gate award) already recognized elsewhere in the engine; must be in the sweep so a §I
+// incorporation isn't attested away. Buy American / TAA country-of-origin (52.225-x) — a domestic/TAA-source bar.
+const CMMC_RE = /\bCMMC\b|NIST\s+SP?\s*800-171|\b252\.204-70(?:12|19|20|21)\b|\bSPRS\b(?![a-z])|cybersecurity\s+maturity\s+model/i;
+const BUY_AMERICAN_RE = /\b52\.225-[0-9]{1,2}\b|Buy\s+American\s+Act|Trade\s+Agreements?\s+(?:Act|clause)|\bTAA\b(?![a-z])|domestic\s+end\s+product|designated\s+country/i;
+const TRAP_CLASSES: TrapHit[] = [
+  { trapClass: "limitation_on_subcontracting", requirementLabel: "Limitations on Subcontracting (FAR 52.219-14/-27/-3/-29/-30/-33 — self-performance / 50% rule; an ostensible-subcontractor / affiliation size trap)", anchor: LIMITATION_SUBK_RE },
+  { trapClass: "prohibited_source", requirementLabel: "Covered-telecommunications / prohibited-source restriction (FAR 52.204-24/-25/-26)", anchor: PROHIBITED_SOURCE_RE },
+  { trapClass: "facility_clearance", requirementLabel: "Facility Security Clearance / DD-254 requirement (a structural eligibility bar — lead time may exceed the response window)", anchor: FACILITY_CLEARANCE_RE },
+  { trapClass: "organizational_conflict_of_interest", requirementLabel: "Organizational Conflict of Interest restriction (FAR 9.5 / 52.209-7x — may bar an offeror with a disqualifying OCI)", anchor: OCI_RE },
+  { trapClass: "cmmc_nist_800171", requirementLabel: "CMMC / NIST SP 800-171 cybersecurity requirement (DFARS 252.204-7012/-7019/-7020/-7021 — a required CMMC level / SPRS score can gate award)", anchor: CMMC_RE },
+  { trapClass: "buy_american_taa", requirementLabel: "Buy American Act / Trade Agreements Act country-of-origin restriction (FAR 52.225-x — domestic / designated-country end-product bar)", anchor: BUY_AMERICAN_RE },
+];
+/** Deterministically ground the named §I/§K trap classes from source as clause_flowdown findings (verbatim excerpt).
+ *  The trap classes Brain named as living inside boilerplate §I/§K; grounding them makes the boilerplate attestation
+ *  safe (a hit surfaces as a finding, never suppressed). Pure. */
+export function boilerplateTrapSweep(source: string): TypedFinding[] {
+  const out: TypedFinding[] = [];
+  const seen = new Set<string>();
+  const paraRe = /\n\s*\n/g;
+  let start = 0, m: RegExpExecArray | null;
+  const pushPara = (rawStart: number, rawEnd: number) => {
+    const para = source.slice(rawStart, rawEnd).trim();
+    if (para.length < 12 || PROVENANCE_SKIP_RE.test(para)) return;
+    for (const t of TRAP_CLASSES) {
+      if (!t.anchor.test(para)) continue;
+      const excerpt = windowAround(para, t.anchor);
+      const key = t.trapClass + "|" + excerpt.slice(0, 80).toLowerCase();
+      if (seen.has(key)) continue; seen.add(key);
+      const letter = nearestSection(source, rawStart);
+      out.push({
+        requirement: `${t.requirementLabel} (grounded by deterministic §I/§K trap sweep).`,
+        citation: letter ? `§${letter} (trap sweep)` : "§I (trap sweep)",
+        excerpt, kind: "clause_flowdown", controllability: "bidder_controls", grounded: true,
+        lens: "boilerplate_trap_sweep", sweepArchetype: t.trapClass,
+      });
+    }
+  };
+  while ((m = paraRe.exec(source))) { pushPara(start, m.index); start = m.index + m[0].length; }
+  pushPara(start, source.length);
+  return out;
+}

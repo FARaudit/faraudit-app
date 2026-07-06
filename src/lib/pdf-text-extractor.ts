@@ -20,6 +20,32 @@ export interface ExtractedDocument {
   pageCount: number;
   extractionMethod: "pdf-parse" | "pdfjs" | "ocr" | "fallback";
   warnings: string[];
+  // FA-INGEST (2026-07-06) — a multi-page doc whose extractable text sits on
+  // only a MINORITY of pages is a mixed cover(text)+body(scanned) document: the
+  // readable cover clears the whole-doc text floor and MASKS a scanned body the
+  // text-only engine never receives. True here → the completeness contract must
+  // read the doc as content-loss (honest INCOMPLETE), NOT green off the cover
+  // text alone (see hasEngineText consumers in sam-attachments). Only ever set
+  // from reliable per-page structure (pdf-parse v2 pages[]); OCR-recovered and
+  // single-block reads leave it undefined (falsy).
+  partialPageText?: boolean;
+}
+
+// Reliable per-page floor for the mixed cover+scanned detection above. A page
+// under this many meaningful chars is treated as image-only (no readable text).
+const MIN_PAGE_MEANINGFUL_CHARS = 10;
+
+// Detect the mixed cover(text)+body(scanned) case from RELIABLE per-page text.
+// Conservative by design — a false INCOMPLETE degrades UX, a false COMPLETE is
+// catastrophic, so we require ≥3 pages AND a STRICT scanned majority: a normal
+// doc with one blank signature/divider page (majority still text) never flags,
+// but a 1-text-cover + N-scanned-body doc does. Callers MUST only pass pages
+// from real per-page extraction (pdf-parse v2) — buildPageStructure drops empty
+// pages, so a form-feed/single-block split cannot be trusted here.
+export function isPartialPageText(pages: PageText[]): boolean {
+  if (pages.length < 3) return false;
+  const withText = pages.filter((p) => meaningfulCharCount(p.text) >= MIN_PAGE_MEANINGFUL_CHARS).length;
+  return withText >= 1 && withText * 2 < pages.length;
 }
 
 // SINGLE SOURCE OF TRUTH for the text-vs-vision delivery decision (2026-06-21).
@@ -107,13 +133,22 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
           })
         : buildPageStructure(rawText, pageCount);
 
+      // Mixed cover(text)+body(scanned) detection — ONLY from pdf-parse's real
+      // per-page text (pagesArr). buildPageStructure drops empty pages, so its
+      // pages[] can't expose the scanned gaps and must not be trusted here.
+      const partialFromPages = pagesArr ? isPartialPageText(pages) : false;
+
       // Stage-2 parse-tier OCR fallback (2026-06-22). The native layer is either
       // MISSING (true scan → low meaningful chars) or GARBLED (present but
       // unreadable font/encoding junk — N4008526R0065's CBA). In both cases OCR
       // recovers clean text for ~$0, removing the Opus-vision dependency. OCR is
       // attempted ONLY when needed, used ONLY when it's genuinely better, and is a
       // graceful no-op where the OCR binary is absent (e.g. serverless).
-      const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText);
+      // partialFromPages ALSO triggers OCR: a mixed cover+scanned doc clears the
+      // whole-doc floor (cover text) so the first two conditions miss it, but its
+      // scanned body still needs OCR to recover. Where OCR is a no-op (serverless,
+      // binary absent) the flag rides through on the return below → honest INCOMPLETE.
+      const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText) || partialFromPages;
       if (needsOcr) {
         const ocrText = await ocrPdfToText(pdfBuffer);
         if (ocrText && meaningfulCharCount(ocrText) > meaningfulLength && !looksGarbled(ocrText)) {
@@ -130,8 +165,18 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
         }
       }
 
+      // Reached here means OCR did NOT recover (fits-under-floor whole read, or
+      // OCR was a no-op / not better). If per-page text was partial, the scanned
+      // body is genuinely lost — surface it so the completeness contract reads
+      // content-loss instead of green off the cover.
+      if (partialFromPages) {
+        const withText = pages.filter((p) => meaningfulCharCount(p.text) >= MIN_PAGE_MEANINGFUL_CHARS).length;
+        warnings.push(`PARTIAL_PAGE_TEXT: extractable text on only ${withText}/${pages.length} pages — likely a mixed cover+scanned PDF; the image-only body was not recovered (OCR unavailable) and is treated as content loss.`);
+      }
+      // [PDF-DIAG] (#157) — the live worker success probe; keep it after the partial-page
+      // warning so the log line carries that warning too.
       console.error(`[PDF-DIAG] extractText OK: method=pdf-parse pages=${pageCount} rawLen=${rawText.length} meaningful=${meaningfulLength}${warnings.length ? ` warnings=[${warnings.join(" | ")}]` : ""}`);
-      return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings };
+      return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings, partialPageText: partialFromPages };
     }
     throw new Error("pdf-parse module did not export a usable parser");
   } catch (err) {

@@ -216,6 +216,63 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
   });
 }
 
+// ── ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2) ─────────────────────────────────────────────────────────
+// Override-slot guard (same layer as the precondition floor / award-basis guard, BEFORE deriveVerdict;
+// deriveVerdict UNTOUCHED). The construction proposer, run once per binding document, AMPLIFIES a typing
+// variance the card-291 prompt could not make reliable: it occasionally types two classes of ROUTINE federal
+// clause as a bar, and the DISPOSE rail then honest-fails the whole package (NHR) on a non-bar. Two narrow,
+// deterministic re-types close it, keyed on construction-SPECIFIC clause tokens (NOT generic vocabulary):
+//   (a) AVAILABILITY OF FUNDS (52.232-18 / 52.232-19 / "subject to the availability of appropriations") mis-typed
+//       no_one_can_move → bidder_controls. This is a routine appropriations contingency present in almost every
+//       federal solicitation; it is NEVER a universal impossibility (no_one_can_move is only a self-contradictory
+//       or unmeetable-by-any-offeror solicitation). A false no_one_can_move here is a false NO_BID / false NHR.
+//   (b) BONDING (52.228-1/-15/-16 / bid guarantee / performance & payment bond) mis-typed bidder_cannot_move →
+//       bidder_controls. Furnishing a bond is a do-the-work gate the bidder CLEARS by obtaining the bond — it is
+//       never a non-curable PROFILE credential the firm must independently hold.
+// SAFETY (adversarial): (a) only fires on no_one_can_move (never softens a bidder_cannot_move profile bar into a
+// clean BID), and NEVER on a finding carrying a VERIFIED universal-defect mark (universalDefect / verifiedBy) — a
+// genuine, evidence-backed universal impossibility is left untouched. The regexes are FAR-clause-specific, so a
+// finding merely mentioning "funds" or "bond" in passing does not match. Flag-gated; OFF (default) ⇒ unchanged.
+const AVAILABILITY_OF_FUNDS_RE = /\b52\.232-(?:18|19)\b|availability of funds|subject to the availability of (?:funds|appropriations)|availability of appropriations/i;
+const BONDING_CLAUSE_RE = /\b52\.228-(?:1|15|16)\b|bid guarantee|performance and payment bonds?|performance bond|payment bond/i;
+
+/** Re-type a ROUTINE federal clause the proposer over-typed as a bar → bidder_controls (Guard 2). Pure →
+ *  gate-tested. Two arms: Availability-of-Funds no_one_can_move → bidder_controls; bonding bidder_cannot_move →
+ *  bidder_controls. NEVER touches a verified universal defect. Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyRoutineClauseOvertypeGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // default-off ⇒ byte-for-byte unchanged
+  return findings.map((f) => {
+    // A VERIFIED universal defect (evidence-backed contradictory/unmeetable terms) is NEVER downgraded — the guard
+    // corrects proposer MIS-typing, not a proven impossibility. (Note: on the judgment-first proposer path
+    // projectProposedFinding strips these marks, so this check alone is NOT load-bearing — the requirement-scoped
+    // trigger + the structural keep-the-bar exclusion below are the real protection. Adversarial-review card.)
+    if (f.universalDefect || f.verifiedBy) return f;
+    // TRIGGER on citation + requirement ONLY — NEVER the verbatim excerpt. Altitude discipline borrowed from the
+    // sibling applyPreconditionOvertypeFloor (which keys its downgrade basis on `requirement`, not `excerpt`, for
+    // exactly this reason): a genuine bar (facility clearance / QPL / sole-source) whose grounded excerpt happens to
+    // quote a NEIGHBORING bonds or appropriations clause must not be downgraded → that was a false-BID / suppressed-
+    // INELIGIBLE hole (adversarial-review catastrophic finding). The proposer's actual over-type carries the routine
+    // clause in its OWN requirement/citation, so the guard still fires on the real target.
+    const trigger = `${f.citation ?? ""} ${f.requirement ?? ""}`;
+    // KEEP-THE-BAR exclusion on the FULL hay (incl. excerpt): if a genuine structural-impossibility token is co-stated
+    // ANYWHERE, never downgrade — keeping a bar is the conservative zero-contract-loss direction (mirrors the sibling).
+    // Uses the COMPREHENSIVE STRUCTURAL_BAR_RE_114 (not the narrow STRUCTURAL_BAR_RE): a genuine non-curable bar whose
+    // OWN requirement co-states a routine bond/appropriations clause (e.g. a DoD construction+cyber bundle: "maintain
+    // CMMC Level 2 at award and furnish performance & payment bonds") must keep the CMMC/ATO/TDP/clearance/cert-at-
+    // award bar — the narrow regex missed those whole classes → residual false-BID (second adversarial pass). Erring
+    // toward keep-the-bar can only leave a routine clause un-downgraded (→ honest-fail NHR), never a false BID.
+    const hay = `${trigger} ${f.excerpt ?? ""}`;
+    if (STRUCTURAL_BAR_RE_114.test(hay)) return f;
+    // (a) Availability of Funds mis-typed as a universal impossibility → routine contingency, biddable.
+    if (f.controllability === "no_one_can_move" && AVAILABILITY_OF_FUNDS_RE.test(trigger))
+      return { ...f, controllability: "bidder_controls", curableInWindow: true, routineClauseGuard: true };
+    // (b) Bonding mis-typed as a non-curable profile bar → the bidder obtains the bond (do-the-work gate).
+    if (f.controllability === "bidder_cannot_move" && BONDING_CLAUSE_RE.test(trigger))
+      return { ...f, controllability: "bidder_controls", curableInWindow: true, routineClauseGuard: true };
+    return f;
+  });
+}
+
 // ── AWARD-BASIS OVER-TYPE GUARD (Brain card 108) ─────────────────────────────────────────────────────
 // Override-slot guard (same layer as caution-floor, BEFORE deriveVerdict; deriveVerdict UNTOUCHED). Two
 // deterministic re-types that fix the #1 false-NO_BID class:
@@ -228,20 +285,17 @@ export function applyPreconditionOvertypeFloor(findings: TypedFinding[], opts?: 
 //       UNVERIFIED eligibility gate — surface it as a caution (mark `cautionFloor`), NOT an assumed
 //       `already_satisfied`. A broad Total-Small-Business pool is NOT socioeconomic → left untouched (no
 //       over-caution). With a known profile (non-null) the existing firmStatus path governs.
-// Flag-gated; default OFF (Rule 61) ⇒ findings unchanged byte-for-byte.
-const AWARD_BASIS_RE = /lowest price technically acceptable|\bLPTA\b|evaluation methodology|basis (?:for|of) award|source selection|screened (?:by|for) price|\bbest value\b|trade.?off|non-price factor|evaluation factor|technically acceptable|proposals?(?: will| are)? (?:initially )?(?:be )?screened/i;
-// Exclusion for the award-basis (a) downgrade: a no_one_can_move finding is NOT an
-// award-basis artifact — and must NEVER be downgraded to bidder_controls — when ANY
-// genuine impossibility/structural language is present, even if an LPTA/evaluation phrase
-// also appears in the verbatim excerpt (panel B-1: an excerpt coincidence must not erase a
-// real universal show-stopper). Covers delivery/precondition impossibility AND supply/
-// sole-source impossibility (discontinued / no-acceptable-substitute / single-source).
+// AWARD_BASIS_RE was REMOVED with clause (a) (Brain card 275 RULING 1 — no silent award-basis downgrade).
+// DELIVERY_IMPOSSIBILITY_RE remains: it is the structural/impossibility exclusion `isPositiveSetAside` uses to
+// refuse to classify a genuine delivery/precondition OR supply/sole-source impossibility as a who-can-win set-aside
+// (discontinued / no-acceptable-substitute / single-source / clearance).
 const DELIVERY_IMPOSSIBILITY_RE = /first.?article|\bFAT\b|delivery window|\bARO\b|precondition|non-?waivable|cannot complete|deliver within|production delivery|universal delivery|sole.?source|brand.?name|named (?:oem|manufacturer|source)|single (?:source|approved|authorized)|no (?:acceptable )?substitut|no longer (?:manufactured|available|produced|in production)|out of production|discontinu|unobtainable|only (?:one |a single )?(?:source|manufacturer)|\bQPL\b|\bQML\b|proprietary|technical data package|\bTDP\b|data rights|approved source|export.?control|no other (?:source|firm|manufacturer|offeror|vendor) can|exceeds?\b[^.]{0,30}\b(?:production|capacity)|insufficient (?:production )?capacity|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b/i;
 const SOCIOECONOMIC_SETASIDE_RE = /8\(a\)|\bHUBZone\b|\bSDVOSB\b|service.?disabled.?veteran|\bWOSB\b|\bEDWOSB\b|women.?owned|economically disadvantaged/i;
 
-/** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. (a) award-basis no_one_can_move →
- *  bidder_controls (never the temporal_conflict finding or a real delivery/precondition impossibility);
- *  (b) a specific socioeconomic set-aside under a NULL profile → cautionFloor. Flag-gated; OFF ⇒ unchanged. */
+/** Re-type the #1 false-NO_BID class (Brain card 108). Pure → gate-tested. Clause (a) (award-basis no_one_can_move
+ *  → bidder_controls) was REMOVED per Brain card 275 RULING 1 — no silent downgrade; the finding flows to Fork-2 →
+ *  NEEDS_HUMAN_REVIEW. The set-aside clauses remain: a socioeconomic set-aside under a NULL/open-world profile →
+ *  curable cautionFloor, and a mis-typed no_one_can_move set-aside → NHR (default) — never a false INELIGIBLE. */
 // ── OR-EQUAL CARVE-OUT (Brain card 139 — Step 6) ──────────────────────────────────────────────────────────
 // A "brand name OR EQUAL" line is PERMISSIVE — the bidder furnishes an approved equal meeting the salient
 // characteristics → bidder_controls, NEVER a structural bar. But it matches the structural patterns
@@ -326,15 +380,13 @@ export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: 
     // mere award-methodology bar (which would drop the who-can-win dimension → a false clean BID for a proven
     // non-holder) and never left as a `no_one_can_move` universal (→ false NO_BID/INELIGIBLE).
     const positiveSetAside = isPositiveSetAside(f);
-    // (a) award basis is never a universal bar. ROBUST altitude (panel B-1 + re-verify): the
-    // award-basis trigger matches the REQUIREMENT (the lens's own characterization of WHAT the
-    // bar is) — NOT the verbatim excerpt, which can incidentally quote LPTA/best-value language
-    // while describing a genuine supply/structural impossibility. The impossibility exclusion is
-    // kept on requirement+excerpt as belt-and-suspenders. So a real impossibility (proprietary /
-    // sole-source / discontinued / capacity) is never downgraded by an excerpt coincidence; only
-    // a finding the lens itself typed as an evaluation-methodology bar is.
-    if (f.controllability === "no_one_can_move" && !positiveSetAside && f.lens !== "temporal_conflict" && AWARD_BASIS_RE.test(f.requirement) && !DELIVERY_IMPOSSIBILITY_RE.test(hay))
-      return { ...f, controllability: "bidder_controls", awardBasisGuard: true };
+    // (a) REMOVED — Brain card 275 RULING 1 (NHR POLE). This clause pre-emptively re-typed a `no_one_can_move`
+    // award-basis finding → `bidder_controls` — a SILENT clean BID off an UNVERIFIED heuristic downgrade — and by
+    // re-typing BEFORE deriveVerdict it PRE-EMPTED the Fork-2 `unmarkedUniversalClaim → NHR` safety. Ruling: no
+    // such silent downgrade. The finding stays `no_one_can_move` and flows to Fork-2 → NEEDS_HUMAN_REVIEW. A
+    // caution-floored award-basis downgrade may return ONLY behind a tight GROUNDED award-basis allowlist
+    // (four-walls style) — NOT this run. (The set-aside re-type clauses below are a separate FORK-3 doctrine
+    // invariant — who-can-win set-asides route by eligibility, never NO_BID — and are unaffected.)
     // (b) An UNVERIFIED specific socioeconomic eligibility (8a/HUBZone/SDVOSB/WOSB) under a NULL profile is a CAUTION
     //     REGARDLESS of how a lens typed it — the lenses disagree (already_satisfied vs bidder_cannot_move/non-curable
     //     on the same setaside object, card 110). Normalize ANY such typing to a curable caution gate so step-5b
@@ -590,9 +642,18 @@ export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { ena
 // by construction): an UNRECOGNIZED non-curable bar (neither whitelisted-structural nor clearly compliance) is LEFT
 // AS-IS (→ NEEDS_HUMAN_REVIEW) — NEVER silently downgraded to BID. Only fires under a NULL profile (a real profile →
 // firmStatus governs, so #3's proven Dillon fail stays INELIGIBLE via step 3). Never touches no_one_can_move (#6's
-// temporal impossibility). Flag-gated; default OFF (Rule 61) ⇒ unchanged byte-for-byte.
-const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|unobtainable/i;
-const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|representation|reps? (?:and|&) cert|certif|\bSAM\b|registration|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
+// temporal impossibility). Flag-gated on AUDIT_STRUCTURAL_BAR_WHITELIST — DEFAULT-ON in the orchestrator
+// (!== "false"): this whitelist runs on every real audit unless explicitly disabled (NOT "off by default").
+// Brain card 275 RULING 2 — POSSESSION-cert bars are STRUCTURAL, never a soft caution. A credential the firm must
+// HOLD at award whose lead time exceeds a typical response window is non-curable: CMMC L1/L2/L3, facility/personnel
+// clearances (already covered), an Authorization To Operate (ATO), and the generic "must hold/possess/maintain a …
+// certification/accreditation". These are KEPT (→ NEEDS_HUMAN_REVIEW), never downgraded to BID_WITH_CAUTION.
+const STRUCTURAL_BAR_RE_114 = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer)|single (?:source|approved|authorized)|\bQPL\b|\bQML\b|qualified products? list|qualified manufacturers? list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|unobtainable|\bcmmc\b|cybersecurity maturity model|cmmc\s*(?:level|lvl|l)?\s*[123]\b|authorization to operate|\bATO\b|(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|obtain(?:s|ed|ing)?|current|active|valid)\b[^.\n]{0,40}?(?:certification|accreditation|accredited|certified)|(?:certification|accreditation)\b[^.\n]{0,25}?(?:at (?:time of )?award|prior to award|required at award|by award)/i;
+// Brain card 275 RULING 2 — only REPRESENTATION FILINGS (a self-cert the firm EXECUTES) may soften to caution; a
+// possession credential (matched structural above) may not. Bare "certif"/"registration" REMOVED — they conflated
+// "file a representation" with "hold this credential". Softenable set = reps&certs, self-certs, SAM registration,
+// size/NAICS reps, OCI/responsibility reps, socioeconomic self-certs (which the set-aside path also handles).
+const COMPLIANCE_REP_RE = /size standard|small business size|\bNAICS\b|52\.204-8|organizational conflict|conflict of interest|\bOCI\b|reps? (?:and|&) certs?|representations? and certifications?|annual representations|online representations|\bSAM\b(?:\.gov)? registration|register(?:ed)? in \bSAM\b|set.?aside|8\(a\)|hubzone|sdvosb|wosb|self.?cert|inverted domestic|telecom|covered telecommunications|52\.209|responsib/i;
 
 /** Generalize the over-type guards (Brain card 114): a non-curable bidder_cannot_move bar under a NULL profile is kept
  *  only if it is a recognized structural impossibility; a clearly compliance/representation item → caution; an
@@ -761,14 +822,14 @@ export function applyTemporalConflict(findings: TypedFinding[]): TypedFinding[] 
   const delivery = findings.find((f) => f.sweepArchetype === "delivery_window");
   if (!fat || !delivery) return findings;
 
-  const gDays = gateDays(fat.excerpt), winDays = deliveryWindowDays(delivery.excerpt);              // ANCHORED durations (no global-min poisoning)
+  const gDays = gateDays(fat.excerpt ?? ""), winDays = deliveryWindowDays(delivery.excerpt ?? "");  // ANCHORED durations (?? "" — sibling-consistent guard; .matchAll on undefined throws mid-run)
   const prong1 = DELIVERY_ORDER_ANCHOR_RE.test(delivery.excerpt);                                   // delivery is order-anchored
   const prong2 = POST_ORDER_GATE_ANCHOR_RE.test(fat.excerpt) && DELIVERY_FORECLOSE_RE.test(fat.excerpt); // post-order gate + delivery foreclosure (rejects relative scheduling)
   const prong3 = NONWAIVABLE_TIGHT_RE.test(fat.excerpt);                                            // explicit non-waiver (mandatory-only is NOT enough)
   const prong4 = gDays != null && winDays != null && gDays > winDays;                               // PROVEN arithmetic on anchored durations (never estimate)
   // same-deliverable guard: if BOTH excerpts name CLIN/line items and the sets are DISJOINT, the gate and the
   // window concern DIFFERENT deliverables ⇒ not a universal tension for either ⇒ do not fire (→ soft floor).
-  const fatClins = clinSet(fat.excerpt), delClins = clinSet(delivery.excerpt);
+  const fatClins = clinSet(fat.excerpt ?? ""), delClins = clinSet(delivery.excerpt ?? ""); // ?? "" — sibling-consistent guard (clinSet → .matchAll)
   const crossDeliverable = fatClins.size > 0 && delClins.size > 0 && ![...fatClins].some((c) => delClins.has(c));
   // EVIDENCE the human adjudicates from — the parsed arithmetic, never silent (Brain card 226).
   const evidence = { gateDays: gDays, windowDays: winDays, gateExceedsWindow: prong4 };
@@ -837,7 +898,24 @@ export function canonicalizeEligibilityAttr(raw: string): string | null {
 // employees / annual receipts" does not.
 const NON_SELF_CLEARABLE_BAR_RE = /sole.?source|brand.?name|named (?:oem|manufacturer|source|dealer|firm|awardee)|single (?:source|approved|authorized)|non.?competit|directed award|\bQPL\b|\bQML\b|qualified (?:products?|manufacturers?) list|approved (?:source|manufactur)|technical data package|\bTDP\b|no substitut|proprietary|(?:security|secret|top[-\s]?secret|personnel|interim|active|dod)\b[^.\n]{0,25}?clearance|\bTS\/SCI\b|\bpolygraph\b|facility (?:clearance|certification|security)|size standard|other than small|exceed(?:s|ed)? the size|small (?:business )?(?:concern )?under\b|under the size|\d+\s+employees|number of employees|annual receipts|affiliation rule/i;
 
-export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "satisfies" | "fails" | "unknown" {
+/** Grounding gate for a closed-world INELIGIBLE bar (Brain card 284 / I8). The BAR must come from the DOCUMENT: a
+ *  closed-world profile trusts firm FACTS, it never licenses a model-NAMED requirement. The requiredAttribute (or,
+ *  for a canonical `ns:value` label, its `value` segment) must be a normalized substring of the assembled source;
+ *  otherwise it is a FABRICATED bar. Pure. */
+export function requiredAttributeGrounded(requiredAttribute: string, source: string): boolean {
+  const norm = (s: string) => s.replace(/[_:-]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  const nSrc = norm(source);
+  if (nSrc.length === 0) return false;
+  const full = norm(requiredAttribute);
+  if (full.length >= 4 && nSrc.includes(full)) return true;
+  // canonical namespace labels (e.g. "oem:dillon-approved-source", "naics:333120-small") — check the value segment.
+  // Min length 4 so a contrived namespaced attr with a common 3-char value (e.g. "x:the") can't borrow a stopword
+  // hit in source; a real bar's value language is longer. Residual over-grounding still fails safe (stays gated).
+  const value = norm(requiredAttribute.includes(":") ? requiredAttribute.slice(requiredAttribute.indexOf(":") + 1) : requiredAttribute);
+  return value.length >= 4 && nSrc.includes(value);
+}
+
+export function firmStatus(f: TypedFinding, profile: BidderProfile | null, source?: string): "satisfies" | "fails" | "unknown" {
   if (!profile || !f.requiredAttribute) return "unknown";
   // FORK-7 Finding-1 (Brain card 242, review-hardened) — an NMR finding the Fork-7 gate has processed (nmrGuard)
   // resolves via the NMR-canonical status: compliant token → satisfies; POSITIVE non-compliance token → fails
@@ -845,8 +923,9 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   // ineligibility — the walk-away class). GATED ON nmrGuard so, with the Fork-7 flag OFF, this is inert and
   // firmStatus is byte-identical to pre-diff (the keyfact NMR keeps its card-206-A unverified-gate path).
   if (f.nmrGuard === true && f.requiredAttribute === NMR_ATTRIBUTE) return nmrFirmStatus(profile);
+  const held = profile.satisfiedAttributes ?? []; // ?? [] — sibling-consistent guard (nmrFirmStatus already does this); a profile missing the array must not throw mid-verdict
   // Exact attribute match (trusted/gold closed-world profile) — unchanged.
-  if (profile.satisfiedAttributes.includes(f.requiredAttribute)) return "satisfies";
+  if (held.includes(f.requiredAttribute)) return "satisfies";
   // Canonical SOCIOECONOMIC match — OPEN-WORLD ONLY (a self-asserted capability statement).
   // Restricted to open-world so a closed-world/gold profile is never flipped fails→satisfies
   // by a non-exact socioeconomic string (code-review #3). And it is BLOCKED when the bar
@@ -855,7 +934,7 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
   // OPEN-WORLD is now the DEFAULT (Brain card-254 B): run this block unless the profile is EXPLICITLY closed-world.
   if (!profile.closedWorld) {
     const reqCanon = canonicalizeEligibilityAttr(f.requiredAttribute);
-    if (reqCanon && profile.satisfiedAttributes.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
+    if (reqCanon && held.some((a) => canonicalizeEligibilityAttr(a) === reqCanon)) {
       const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
       if (!NON_SELF_CLEARABLE_BAR_RE.test(hay)) return "satisfies";
       // bundled structural/size bar → don't self-clear; fall through to unknown (human review).
@@ -864,7 +943,12 @@ export function firmStatus(f: TypedFinding, profile: BidderProfile | null): "sat
     // unstated → "unknown" (caution / human review), never a false INELIGIBLE.
     return "unknown";
   }
-  // CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails.
+  // CLOSED-WORLD (trusted complete profile, e.g. gold): not-held = provably fails — BUT the BAR must come from the
+  // DOCUMENT (Brain card 284 / I8). A closed-world profile trusts firm FACTS; it never licenses a model-NAMED
+  // requirement. An UNGROUNDED requiredAttribute (not a normalized substring of the assembled source) is a
+  // FABRICATED bar → fail SAFE to "unknown" (→ NHR), never a false INELIGIBLE. Grounded → unchanged. Gated on
+  // `source` presence so pure-unit callers (no source) are byte-identical; the orchestrator threads ctx.fullSource.
+  if (source !== undefined && !requiredAttributeGrounded(f.requiredAttribute, source)) return "unknown";
   return "fails";
 }
 
@@ -1007,10 +1091,16 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     committal verdict these force eligible=null ("not determined", never a false green) + a mandatory
   //     verify-caution. requiredAttribute is REQUIRED so an attribute-less/bidder-controllable eligibility item
   //     (e.g. generic SAM registration) never false-fires a "not determined" on a verified firm (code-review #3/#4).
-  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile) !== "satisfies");
-  const committalEligible = (): boolean | null => (tristate && unverifiedGates.length ? null : true);
-  const committalCaution = (): string => (tristate && unverifiedGates.length
-    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ")} before relying on award eligibility (bidder profile not provided). `
+  const unverifiedGates = dispositions.filter((f) => f.kind === "eligibility_bar" && !!f.requiredAttribute && firmStatus(f, inp.bidderProfile, inp.source) !== "satisfies");
+  // GUARD 1 — the DETERMINISTIC manifest-sourced signal joins the finding-derived unverifiedGates. It fires the SAME
+  //   "eligibility not verified" clamp WITHOUT depending on the proposer having emitted a correctly-typed
+  //   eligibility_bar finding: the sealed construction manifest detected a set-aside in source under a null profile,
+  //   so a committal verdict must not assert eligible=true. Only bites under the tristate; undefined ⇒ byte-identical.
+  const manifestUnverifiableGate = inp.detectedUnverifiableEligibilityGate === true;
+  const eligibilityUnverified = tristate && (unverifiedGates.length > 0 || manifestUnverifiableGate);
+  const committalEligible = (): boolean | null => (eligibilityUnverified ? null : true);
+  const committalCaution = (): string => (eligibilityUnverified
+    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.length ? unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ") : "the set-aside / socioeconomic eligibility gate"} before relying on award eligibility (bidder profile not provided). `
     : "");
   const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
 
@@ -1035,8 +1125,12 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     byte-indistinguishable from a genuinely clean package. Fail honest → NEEDS_HUMAN_REVIEW (no charge),
   //     never a default BID. Defense-in-depth: makeAgenticVerifier already returns sound=false on an empty
   //     survivor set (caught at step 2); this guard also covers grounding-only / non-adversarial verify paths.
-  if (dispositions.length === 0)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No findings survived adversarial verification over complete coverage — a clean BID cannot rest on an empty verified set. Human review required.", dispositions, []);
+  // Brain card 275 RULING 3 — MATERIAL emptiness, not literal length. `disposeFinding` returns "dropped" for every
+  // boilerplate finding, so an all-boilerplate / all-dropped set has length > 0 yet carries ZERO decision content —
+  // it would sail past a `length === 0` test and fall through to a clean default BID. A materially-empty verified set
+  // (no non-`dropped` survivor) → NEEDS_HUMAN_REVIEW, never a default BID. (`every` on [] is true → literal-empty covered.)
+  if (dispositions.every((f) => f.disposition === "dropped"))
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "No decision-bearing findings survived over complete coverage (empty or all-boilerplate verified set) — a clean BID cannot rest on a materially-empty set. Human review required.", dispositions, []);
 
   // 3. Show-stoppers — BRAIN CARD 226 FORK 2: DEFAULT-DENY NO_BID (positive-allow, not negative-deny). A committal
   //    NO_BID is reachable ONLY on a POSITIVE match to the UNIVERSAL_DEFECT allowlist (the solicitation is
@@ -1069,11 +1163,24 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     logInvariantBreach(breach);
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), breach, dispositions, unverifiedUniversalDefect);
   }
+  // CARD 275 RULING 4b (Brain) — SUPPRESS judgment-sourced committal NO_BID → NHR until the four-walls re-enable
+  // (RULING 4a). Today a universalDefect is proven on a SINGLE J-2 entailment over a ±1KB window — one wall, not
+  // four — and Gap-B re-arms the FAT/delivery temporal-tension class the temporal arm deliberately restricts to
+  // caution-only (the RULING 4 RATCHET RULE: no arm may re-escalate a class a sibling restricted). Until a
+  // document-wide supersession-aware refutation pass + a REGISTERED INDEPENDENT second entailment verifier seal it
+  // (AUDIT_FOURWALLS_NOBID, default OFF ⇒ suppressed), a verified-but-not-four-walls universal defect fails SAFE to
+  // NEEDS_HUMAN_REVIEW. Downgrade-only (PROPOSE/DISPOSE rail authority, card 276): the rail may never fabricate a
+  // committal verdict the model's single-verifier judgment merely PROPOSED.
+  if (universalDefect.length && process.env.AUDIT_FOURWALLS_NOBID !== "true") {
+    const msg = `card 275 R4b: ${universalDefect.length} verified universalDefect(s) SUPPRESSED to NHR pending four-walls re-enable (single-verifier entailment is not four-walls): ${universalDefect.map((s) => s.requirement).join("; ")}`;
+    try { console.log(`[card275-r4b] ${msg}`); } catch { /* logging must never affect the verdict */ } // a normal suppression, NOT an invariant breach
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), msg, dispositions, universalDefect);
+  }
   // RULING A — a firmStatus-PROVEN who-can-win failure is INELIGIBLE by construction: normalize its kind to
   // eligibility_bar at the determination point so the show-stopper is coherent (eligible:false WITH an
   // eligibility_bar). An earned (proven-fail) INELIGIBLE is NEVER routed to NHR on a mis-typed kind string.
   const provenFails = disqualifying
-    .filter((f) => !isUniversalDefect(f) && firmStatus(f, inp.bidderProfile) === "fails")
+    .filter((f) => !isUniversalDefect(f) && firmStatus(f, inp.bidderProfile, inp.source) === "fails")
     .map((f): DecidedFinding => (f.kind === "eligibility_bar" ? f : { ...f, kind: "eligibility_bar" }));
   // PRECEDENCE PRE-LOCK (card 228 Ruling ii) — universal-defect attribution is evaluated BEFORE firmStatus, so a
   // universalDefect-marked finding is attributed universal/requirement-side and is NEVER re-labeled by firmStatus
@@ -1092,8 +1199,8 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     // POSITIVE eligibility determination (Ruling B) — proven-pass→true, proven-fail→false, else null; NEVER default true.
     const positiveEligible = (): boolean | null => {
       const gates = disqualifying.filter((f) => !!f.requiredAttribute);
-      if (gates.some((f) => firmStatus(f, inp.bidderProfile) === "fails")) return false;
-      if (gates.length && gates.every((f) => firmStatus(f, inp.bidderProfile) === "satisfies")) return true;
+      if (gates.some((f) => firmStatus(f, inp.bidderProfile, inp.source) === "fails")) return false;
+      if (gates.length && gates.every((f) => firmStatus(f, inp.bidderProfile, inp.source) === "satisfies")) return true;
       return null;
     };
     if (universalDefect.length)
@@ -1111,7 +1218,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   // impossibility but is NOT a positively-classified universal defect. It must NEVER silently clear to BID via
   // firmStatus="satisfies" or curableInWindow:true (the retired `universal` bucket was immune to that mis-type).
   // If it isn't a proven who-can-win fail (handled above), it cannot be confidently cleared → NEEDS_HUMAN_REVIEW.
-  const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile) !== "fails");
+  const unmarkedUniversalClaim = disqualifying.filter((f) => !isUniversalDefect(f) && f.controllability === "no_one_can_move" && firmStatus(f, inp.bidderProfile, inp.source) !== "fails");
   if (unmarkedUniversalClaim.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(),
       `Finding(s) claim a universal impossibility (no_one_can_move) but are not a positively-classified universal defect, and the firm does not provably fail them — human review to classify or clear: ${unmarkedUniversalClaim.map((s) => s.requirement).join("; ")}`, dispositions, unmarkedUniversalClaim);
@@ -1125,7 +1232,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //    bar under a null profile is the SPRS error re-armed (soft caution where the bidder cannot win and
   //    cannot cure). CURABILITY is a property of the GATE, independent of profile, so it is checked HERE —
   //    and an untyped bar FAILS CLOSED, never silently to caution.
-  const unknownBars = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile) === "unknown");
+  const unknownBars = disqualifying.filter((f) => firmStatus(f, inp.bidderProfile, inp.source) === "unknown");
   const names = (xs: DecidedFinding[]) => xs.map((x) => x.requirement).join("; ");
 
   // 5a. UNTYPED disqualifying bar (missing requiredAttribute or curableInWindow) → fail CLOSED to human review.

@@ -12,16 +12,18 @@
 //
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
-import { runAgenticExpert, type CallModel, type ExpertSpec } from "./audit-expert";
+import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
+import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
-import { highSignalSweep } from "./audit-grounding-sweep";
+import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
+import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against.
@@ -36,7 +38,11 @@ export const BINDING_SECTIONS = ["B", "C", "D", "E", "F", "H", "I", "K", "L", "M
 
 const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
-export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; }
+/** Telemetry record for a finding the skeptic dropped (Brain card 274 RULING 1). `empty_corrected` = a refuted
+ *  finding whose `corrected` object was non-substantive (the false-INELIGIBLE/NO_BID resurrection hole, now closed);
+ *  `overturned` = a plain upheld=false drop. Persisted so every drop is auditable, never silent. */
+export interface CorrectedDrop { index: number; id?: string; requirement: string; citation: string; refutation: string; dropReason: "empty_corrected" | "overturned"; }
+export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; correctedDrops?: CorrectedDrop[]; }
 /** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests.
  *  bidderProfile is passed so the verifier can compute the deterministic knife-edge set (Brain card-54/55). */
 export type VerifyFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { bidderProfile?: BidderProfile | null }) => Promise<VerifyResult>;
@@ -80,6 +86,12 @@ export interface OrchestratorInput {
   // Fires ONLY on required sections the deterministic pass did not locate; a verified locate augments ctx.sections
   // BEFORE the experts run so both the analysis AND the completeness proof see the located §L/§M.
   sectionFinder?: SectionFinderCall;
+  // JUDGMENT-FIRST SEAM (Brain cards 276/279) — opt-in. When the holistic proposer supplies pre-found findings,
+  // the orchestrator SKIPS the paid expert lenses (P1) and runs the FULL deterministic rail (P1.5→P5: sweep,
+  // temporal, dedup, verify, completeness, every re-typing guard, deriveVerdict) over this seed instead. The seed
+  // is RE-GROUNDED here against real source with the SAME isGrounded check the lenses use — the proposer never
+  // self-asserts grounding (audit-judgment-first.ts). Absent ⇒ the ladder path (P1 experts) is byte-identical.
+  seedFindings?: TypedFinding[];
 }
 
 export interface AuditResult {
@@ -91,11 +103,18 @@ export interface AuditResult {
   conflict: boolean;
   sectionsRead: string[];                                                                 // union across all agents (pure-observer)
   trace: Record<string, { converged: boolean; turns: number; sectionsRead: string[]; tools: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }>; // per-lens
+  verifierDrops?: CorrectedDrop[];                                                        // card 274 RULING 1 — skeptic drops (empty-corrected + overturned), telemetry-visible; absent when none
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
 }
 
-/** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source. */
+/** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
+ *  Brain card 288 — FORMAT-AWARE carrier: a construction (SF-1442 / part36) package has no §A–M headers, so the UCF
+ *  filter returns [] and the engine honest-fails the whole construction CLASS on FORMAT (:574 required.length>0). For
+ *  part36 the carrier is the SEALED construction binding-content manifest (present elements = the §A–M analog),
+ *  computed at ingest over FULL doc text. The :574 completeness FORMULA is untouched — only WHICH set populates
+ *  `required` changes. Flag-off / no manifest ⇒ procurementPart never returns part36 ⇒ byte-identical UCF path. */
 export function buildManifest(ctx: AuditToolContext): string[] {
+  if (procurementPart(ctx) === "part36-construction" && ctx.constructionManifest) return constructionRequired(ctx.constructionManifest);
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
 }
 
@@ -106,8 +125,20 @@ export function buildManifest(ctx: AuditToolContext): string[] {
  *  attachments are all plausibly contained returns true. Tunable; intentionally errs toward NOT capping. */
 export function manifestComplete(ctx: AuditToolContext): boolean {
   let maxPages = 0;
-  for (const m of ctx.fullSource.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) maxPages = Math.max(maxPages, parseInt(m[1], 10));
-  return !(maxPages * 1000 > ctx.fullSource.length); // a single named attachment can't exceed the whole source → unfetched
+  const src = ctx.fullSource;
+  // A "N pages" span is an ATTACHMENT page-COUNT signal (a named attachment that cannot physically fit in the
+  // assembled source) ONLY when it is NOT a proposal page LIMIT. §L/§M limits — "shall not exceed 40 pages",
+  // "not to exceed 50 pages", "limited to 30 pages" — constrain the BIDDER's response; they are NOT evidence of
+  // an unfetched attachment. Counting them false-caps a fully-ingested, biddable audit to INCOMPLETE and would
+  // BURN a paid run (W9126G26RA087 USACE construction carries §L page limits). Skip any match whose immediately
+  // preceding context carries limit phrasing. Errs toward NOT capping (the stated intent of this weak heuristic).
+  const LIMIT_CTX = /(?:not\s+to\s+exceed|not\s+exceed|no\s+more\s+than|no\s+longer\s+than|limited\s+to|maximum|minimum|up\s+to|within|less\s+than|fewer\s+than|at\s+least|shall\s+not)(?:\s+of)?\s*$/i;
+  for (const m of src.matchAll(/(\d{2,4})\s*(?:pgs?\b|pages\b)/gi)) {
+    const before = src.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0);
+    if (LIMIT_CTX.test(before)) continue; // proposal page LIMIT, not an attachment page-count → never a cap signal
+    maxPages = Math.max(maxPages, parseInt(m[1], 10));
+  }
+  return !(maxPages * 1000 > src.length); // a single named attachment can't exceed the whole source → unfetched
 }
 
 /** Format-aware CORE-section honest-fail (fail-safe #10 — Brain card 135, Step 8). Part-15 UCF: any of §C/§L/§M
@@ -124,6 +155,14 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
   // requiresLM is NOTICE-TYPE-driven: a solicitation-type buy (default true / fail-safe when unscoped) requires the
   // instructions (§L) and evaluation (§M); a non-solicitation (Sources Sought / RFI, requiresLM=false) is exempt.
   const requiresLM = opts?.requiresLM !== false;
+  if (part === "part36-construction") {
+    // Brain card 288 — construction CORE = bonding / wage determination / submission (the §C/§L/§M analog). A
+    // solicitation-type construction buy that cannot ground ALL core elements cannot certify a biddable package ⇒
+    // INCOMPLETE. Non-solicitation types (requiresLM=false) keep the free pass, symmetric with UCF/commercial. Reads
+    // the SEALED full-text manifest, never the digest. No manifest (defensive) ⇒ [] (buildManifest already gates part36).
+    if (!requiresLM) return [];
+    return ctx.constructionManifest ? constructionCoreMissing(ctx.constructionManifest) : [];
+  }
   if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !present(k));
   if (part === "part12-commercial") {
     // Commercial core EQUIVALENTS: 52.212-1 ≡ §L, 52.212-2 ≡ §M. Cap ONLY when BOTH absent (a single one missing is
@@ -143,7 +182,11 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
     // set ⇒ INCOMPLETE (structureless blob). Unchanged.
     const anyCore = ["C", "L", "M"].some(present);
     const commercialRef = /\b5?2\.212-[12]\b/.test(ctx.fullSource ?? ""); // a bare Part-12 synopsis references 52.212-1/-2 — leave it to the C-10 flag path, never a C-5 false-flag
-    if (commercialRef) return [];
+    // S3 (Brain card 274) — gate the commercialRef free-pass behind !requiresLM. A SOLICITATION-type buy (requiresLM)
+    // with a STRAY 52.212-1/-2 reference used to short-circuit to [] (COMPLETE) BEFORE the §L/§M cap below, reopening
+    // the notice-body-blind false-COMPLETE and zeroing the L3 finder target set. Only a NON-solicitation (RFI/Sources
+    // Sought, requiresLM=false — no §L/§M required anyway) keeps the free pass.
+    if (commercialRef && !requiresLM) return [];
     if (!anyCore) return ["C", "L", "M"];
     // Layer-2 (Brain card 262) — KILL THE §C-ONLY FREE PASS. Previously `anyCore → []`, so a SOW-only source (§C
     // detected via title patterns) certified complete while §L/§M lived in an un-ingested notice body → the
@@ -176,7 +219,7 @@ function hasConflict(findings: TypedFinding[]): boolean {
   return false;
 }
 
-export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; }
+export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "covered_attested_boilerplate" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; sectionHash?: string; }
 
 // C-7 (Brain C.c) — the obligation-extraction cap. Raised 25 → 200 so a normal binding section is fully proven
 // (25 silently dropped obligations #26+ was a false-COMPLETE hole). If a section still exceeds 200 obligation
@@ -258,12 +301,64 @@ export function documentsCovered(fullSource: string, findings: TypedFinding[]): 
   return { complete: uncovered.length === 0, uncovered };
 }
 
+/** Brain card 289 — PART36 per-doc coverage with SEALED full-text ATTESTATION (card-285 Fix-2 generalized to
+ *  attachments; gate UNCHANGED, only the per-doc CONDITION is stated via attestation). For each binding attachment:
+ *   • HARD LINE — no sealed attestation OR no machine-readable text (hasText=false) ⇒ UNREAD ⇒ never attestable ⇒
+ *     uncovered ⇒ INCOMPLETE (read-and-empty ≠ unread);
+ *   • obligation-FREE over FULL text (groundableObligations===0) ⇒ ATTESTED "read in full · hash-bound · swept ·
+ *     zero groundable obligations" ⇒ covered WITHOUT a finding-in-doc (the drawings-PDF relief valve);
+ *   • has obligations ⇒ still needs a grounded finding IN the doc's region (never suppresses a real obligation —
+ *     Fix-2 condition 3). Attestation reads the SEALED FULL-TEXT sweep, never the digest self-certifying. */
+export function constructionDocumentsCovered(ctx: AuditToolContext, findings: TypedFinding[]): { complete: boolean; uncovered: string[] } {
+  const regions = docRegions(ctx.fullSource);
+  if (regions.length <= 1) return { complete: true, uncovered: [] };
+  const attByName = new Map((ctx.constructionManifest?.docAttestations ?? []).map((a) => [a.name, a]));
+  const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
+  const uncovered: string[] = [];
+  for (const r of regions) {
+    if (r.isPrimary) continue;
+    if (!isBindingDoc({ role: "attachment", name: r.name })) continue; // offeror-fill exempt
+    const att = attByName.get(r.name);
+    if (!att || !att.hasText) { uncovered.push(r.name); continue; }    // HARD LINE — unread/no-text can NEVER be attested
+    // (B) Brain card 291 — SWEEP-based attestation (complement): a construction ELEMENT sealed IN this doc (verbatim
+    // span + full-text hash at ingest) attests the doc was read + its binding content captured, without a proposer
+    // finding — reduces per-doc passes. Insufficient alone for a doc carrying NO element (e.g. a drawings/spec set).
+    if (ctx.constructionManifest?.elements.some((e) => e.present && e.sourceDoc === r.name)) continue;
+    if (att.groundableObligations === 0) continue;                     // ATTESTED read-and-empty (obligation-free full text)
+    const nRegion = norm(r.text);                                      // has obligations ⇒ require a grounded finding-in-doc
+    if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
+  }
+  return { complete: uncovered.length === 0, uncovered };
+}
+
 // C-19 INTERIM GUARD (Brain C.f — resolution is its OWN tranche; here: detect + disclose, NEVER a verdict cap).
 const AMENDMENT_RE = /\b(?:SF[-\s]?30\b|amendment\s+of\s+solicitation|amendment\s+(?:no\.?|number|#)?\s*0*\d)/i;
 /** Deterministic amendment presence — either an ingestion doc tagged role "amendment" (passed via docNames roles)
  *  or an SF-30 / "Amendment of Solicitation" marker in the source. Detection only — supersession is NOT resolved. */
 export function detectAmendments(fullSource: string): boolean {
   return docRegions(fullSource).some((r) => AMENDMENT_RE.test(r.name) || AMENDMENT_RE.test(r.text.slice(0, 4000)));
+}
+
+// Brain card 288 RULING 2 (interim, until the amendment-resolution tranche) — unresolved SF-30 supersession with no
+// deterministic resolution → INCOMPLETE honest-fail (never decide over possibly-superseded terms). The deterministic
+// resolver does not exist yet, so "unresolved" = a supersession-AMBIGUITY signal: ≥2 distinct amendment/modification
+// numbers (the supersession ORDER cannot be resolved without the resolver) OR any term-REVISION / supersession
+// language. FAIL-SAFE toward INCOMPLETE — a bare due-date-extension single amendment with no revision language
+// proceeds; anything that revises/replaces terms, or a second amendment, honest-fails. (Hardened per adversarial
+// review: "Modification No." is now counted, and generic "revise/change … to read / delete / replace" trips it.)
+const AMEND_NUM_RE = /\b(?:amendment|modification|mod)\s+(?:no\.?|number|#)?\s*0*(\d{1,3})\b/gi;
+const SUPERSEDE_RE = /\b(?:supersed|in\s+lieu\s+of|deleted\s+in\s+its\s+entirety|replaced?\s+in\s+its\s+entirety|hereby\s+(?:deleted|replaced|amended)|(?:is|are|hereby)\s+(?:revised|changed|deleted|replaced)|(?:revised|changed|amended|deleted|replaced)\s+to\s+read|change[sd]?\s+(?:section|clause|paragraph))/i;
+export function amendmentSupersessionUnresolved(fullSource: string): boolean {
+  // NEW-HOLE fix (Rule-69 re-review): the shared detectAmendments/AMENDMENT_RE recognizes SF-30 / "amendment of
+  // solicitation" / "amendment No." but NOT "Modification No." — so a modification-only revising doc would slip the
+  // short-circuit and never reach the broadened counters below (catastrophic false-COMPLETE direction). Recognize
+  // modifications HERE (scoped to this fail-safe, leaving the shared disclosure detector byte-identical).
+  const hasAmendmentOrMod = detectAmendments(fullSource) || /\b(?:modification|mod)\s+(?:no\.?|number|#)?\s*0*\d/i.test(fullSource ?? "");
+  if (!hasAmendmentOrMod) return false;
+  const nums = new Set<string>();
+  for (const m of (fullSource ?? "").matchAll(AMEND_NUM_RE)) nums.add(m[1]);
+  if (nums.size >= 2) return true;                 // ≥2 distinct amendments/mods — ordering ambiguous without the resolver
+  return SUPERSEDE_RE.test(fullSource ?? "");      // explicit term-revision / supersession language on an amended buy
 }
 /** Per-finding document PROVENANCE (which assembled doc a finding's excerpt is grounded in) — persisted so a
  *  reviewer can see which document (primary vs a specific attachment/amendment) each finding came from. */
@@ -304,9 +399,43 @@ function sectionMCriteria(text: string): string {
   return out.join("\n").slice(0, 2000);
 }
 const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).length < 12;
+// Fixed allowlist for boilerplate attestation (card 285 Fix 2). The ONLY sections a holistic read may attest covered
+// without per-obligation grounding — incorporated FAR-clause lists (§I) and reps/certs (§K). Never a binding-
+// obligation section (§C/§F/§L/§M). An internal clamp so no caller of the exported completenessOf can widen it.
+const BOILERPLATE_ATTESTABLE = new Set(["I", "K"]);
 
-export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
+export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
+  // Brain card 288 — PART36 construction path (ANCHOR-based, compression-boundary-safe). `required` here is the sealed
+  // construction element set. An element is covered iff (1) its compression-STABLE ANCHOR SURVIVED into the read source
+  // (the compressor did NOT drop this binding content) AND (2) a grounded finding carries that anchor. A present
+  // element the compressor dropped → uncovered ⇒ INCOMPLETE (the false-COMPLETE-via-digest interceptor). Certifies
+  // against the SEALED anchor set from FULL text, never the digest self-certifying (Brain #1). :574 formula untouched.
+  if (ctx.constructionManifest && procurementPart(ctx) === "part36-construction") {
+    const nrm = (s: string) => (s || "").replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase().trim();
+    // Which documents carry a GROUNDED finding — an element is analyzed if a finding lands in the doc that carries it
+    // (findingProvenance maps each finding's excerpt to its assembled-doc region; "(ungrounded)" excluded).
+    const analyzedDocs = new Set(findingProvenance(ctx.fullSource, findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
+    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""), analyzedDocs);
+    for (const e of ctx.constructionManifest.elements) {
+      if (!e.present) continue;
+      const covered = cov.covered.includes(e.key);
+      const dropped = cov.droppedByCompressor.includes(e.key);
+      // Provenance backstop (adversarial review): a covered element cites the findings whose excerpt carries its anchor.
+      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(f.excerpt || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
+      attestations.push({
+        section: e.key,
+        status: covered ? "covered_direct" : "obligations_ungrounded",
+        obligations: covered ? [] : [dropped
+          ? `[compressor-dropped] construction element '${e.key}' sealed at ingest but its anchor is absent from the read source — cannot certify complete`
+          : `construction element '${e.key}' present in source but no grounded finding analyzed it`],
+        citedFindingIds: cited,
+        ungrounded: covered ? [] : [e.key],
+        ...(e.regionHash ? { sectionHash: e.regionHash } : {}),
+      });
+    }
+    return { covered: cov.covered, missing: cov.missing, attestations };
+  }
   for (const sec of required) {
     // C-3 (Brain C.c): the completeness PROOF reads the FULL section (uncapped), NOT the lens's capped view — an
     // obligation past the lens read-cap must surface as ungrounded, never be invisible. `lensTruncated` records
@@ -315,8 +444,25 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     const text = sectionFullText(ctx, sec); const nText = norm(text);
     const lensTruncated = readSection(ctx, sec).truncated;
     if (!sectionsRead.has(sec)) { attestations.push({ section: sec, status: "unread", obligations: [], citedFindingIds: [], ungrounded: [] }); continue; }
-    const direct = findings.filter((f) => f.excerpt && nText.includes(norm(f.excerpt)));
+    // S7 (Brain card 274) — a section is covered_direct ONLY by a finding CITED TO THAT SAME SECTION whose excerpt is
+    // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
+    // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
+    const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
     if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
+    // Fix 2 (Brain card 285) — BOILERPLATE ATTESTATION. A configured boilerplate section (§I/§K) with no direct
+    // finding may be ATTESTED covered — but ONLY when the deterministic §I/§K trap detectors SWEPT it (condition 2:
+    // opts.boilerplateAttest.swept, set by the orchestrator when the trap sweep ran) AND the section text is present
+    // (condition 1: hash-bound — the attestation carries sha256 of the section text). This certifies COVERAGE only;
+    // it can NEVER suppress a detector hit (condition 3) — a trap-sweep finding cited to this section already
+    // returned covered_direct above and drives the verdict. Fires only for the read, present, configured sections.
+    // Adversarial-review hardening (card 285): (a) INTERNAL clamp — completenessOf is exported public API, so a
+    // caller passing sections:["M"] must NEVER boilerplate-attest a binding-obligation section; the fixed allowlist
+    // {I,K} governs regardless of the arg. (b) A lens-TRUNCATED section is NOT attestable — its unread tail may carry
+    // a bar the trap sweep never saw; fall through to the truncation→INCOMPLETE path (honest, never a false-COMPLETE).
+    if (opts?.boilerplateAttest?.swept && BOILERPLATE_ATTESTABLE.has(sec) && opts.boilerplateAttest.sections.includes(sec) && !lensTruncated && text.trim().length > 0) {
+      attestations.push({ section: sec, status: "covered_attested_boilerplate", obligations: [], citedFindingIds: [], ungrounded: [], sectionHash: createHash("sha256").update(text, "utf8").digest("hex") });
+      continue;
+    }
     // 5b §M DEPTH — REFINED (Brain card 137 ruling), flag-gated, §M ONLY (never §L/§C or the coreMissing path).
     // Fire "not evaluated" ONLY when ALL THREE hold: (1) NO direct grounded finding (the covered_direct check
     // above already returned for that case), (2) NO award-basis token in the criteria region, AND (3) the criteria
@@ -342,7 +488,7 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
     attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations, citedFindingIds: [...cited], ungrounded });
   }
-  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "read_no_obligation").map((a) => a.section);
+  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation").map((a) => a.section);
   return { covered, missing: required.filter((s) => !covered.includes(s)), attestations };
 }
 
@@ -389,15 +535,34 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const perLens: Record<string, number> = {};
   const trace: AuditResult["trace"] = {};
   const sectionsRead = new Set<string>();
-  const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
   let findings: TypedFinding[] = [];
-  experts.forEach((spec, i) => {
-    runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
-    perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
-    runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
-    trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
-  });
-  const allConverged = runs.every((r) => r.converged);
+  let allConverged: boolean;
+
+  if (opts.seedFindings) {
+    // JUDGMENT-FIRST (Brain cards 276/279) — the holistic proposer already read the whole source and reasoned to
+    // this finding set; SKIP the paid lenses and run the deterministic rail (P1.5→P5) over it. RE-GROUND the seed
+    // against real source with the SAME isGrounded substring check the lenses use: a finding whose excerpt is NOT
+    // verbatim in source has grounded set false and is DROPPED here (fail-safe — a hallucinated/paraphrased excerpt
+    // never survives, Rule 64 / I3). This is the load-bearing re-grounding the proposer's grounded:false depends on.
+    const reground = opts.seedFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+    reground.forEach((f, j) => { f.id = f.id ?? `judgment#${j}`; });
+    findings = reground;
+    perLens["judgment"] = reground.length;
+    // The proposer read the WHOLE assembled source → every present section counts as read for completeness (a
+    // binding section whose obligations the proposer failed to ground still fails completenessOf → honest-fail).
+    Object.keys(materializeSections(ctx)).forEach((s) => sectionsRead.add(s));
+    trace["judgment"] = { converged: true, turns: 1, sectionsRead: [...sectionsRead], tools: [] };
+    allConverged = true;
+  } else {
+    const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
+    experts.forEach((spec, i) => {
+      runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
+      perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
+      runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
+      trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
+    });
+    allConverged = runs.every((r) => r.converged);
+  }
 
   // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE
   //         step 1 — flip UNCOMMITTED, pending Brain review of the live runs). Grounds the failing archetypes
@@ -408,6 +573,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     const swept = highSignalSweep(ctx.fullSource);
     swept.forEach((f, j) => { f.id = `deterministic_sweep#${j}`; });
     if (swept.length) { perLens["deterministic_sweep"] = swept.length; findings.push(...swept); }
+  }
+
+  // P1.5b — §I/§K BOILERPLATE-TRAP SWEEP (Brain card 285, Fix 2 · condition 2), gated on AUDIT_BOILERPLATE_ATTEST.
+  //          Grounds the named §I/§K traps (52.219-14 limitations-on-subcontracting / 52.204-25 prohibited-source)
+  //          the archetype sweep deliberately excludes — so the boilerplate attestation in completenessOf can NEVER
+  //          swallow one (condition 3: a hit surfaces as a finding, drives the verdict). The sweep RUNNING is exactly
+  //          condition 2 (detectors swept the section). Flag OFF ⇒ neither sweep nor attestation runs (byte-identical).
+  const boilerplateAttestOn = process.env.AUDIT_BOILERPLATE_ATTEST === "true";
+  if (boilerplateAttestOn) {
+    const traps = boilerplateTrapSweep(ctx.fullSource);
+    traps.forEach((f, j) => { f.id = `boilerplate_trap#${j}`; });
+    if (traps.length) { perLens["boilerplate_trap_sweep"] = traps.length; findings.push(...traps); }
   }
 
   // P1.6 — CROSS-CLAUSE TEMPORAL CHECK (Brain card 226 Fork-1) — UNCONDITIONAL always-run (both flags
@@ -439,6 +616,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
   const ver = await verify(ctx, findings, { bidderProfile });
   findings = ver.survived;
+  const verifierDrops = ver.correctedDrops ?? []; // card 274 RULING 1 — persisted to AuditResult (telemetry-visible)
 
   // J-2 — REGISTERED INDEPENDENT VERIFIER (Brain card 246), at the P2 seam. For each universalDefect-marked
   //       finding: 3-state entailment vs the cited excerpt + source (never J-1's reasoning) → VERIFIED writes
@@ -483,11 +661,27 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // P4 — completeness (B-corrected): every binding section READ + obligation-coverage (direct or attested
   //      with cited finding IDs); experts must have converged. Attestations carried for trace adjudication.
-  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, { sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true" });
+  const { covered, missing, attestations } = completenessOf(ctx, required, findings, sectionsRead, {
+    sectionMDepth: process.env.AUDIT_SECTION_M_DEPTH === "true",
+    ...(boilerplateAttestOn ? { boilerplateAttest: { sections: ["I", "K"], swept: true } } : {}),
+  });
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
-  const docCoverage = documentsCovered(ctx.fullSource, findings);
-  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete;
+  const docCoverage = (ctx.constructionManifest && procurementPart(ctx) === "part36-construction")
+    ? constructionDocumentsCovered(ctx, findings)   // Brain card 289 — sealed full-text attestation for attachments
+    : documentsCovered(ctx.fullSource, findings);
+  // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
+  // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
+  // later tranche; this is detection + fail-safe only.
+  const amendmentUnresolved = process.env.AUDIT_AMENDMENT_RESOLUTION === "true" && amendmentSupersessionUnresolved(ctx.fullSource);
+  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
+  if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
+  if (process.env.CONSTRUCTION_DEBUG === "true") {
+    const provCount: Record<string, number> = {};
+    for (const p of findingProvenance(ctx.fullSource, findings)) provCount[p.doc] = (provCount[p.doc] ?? 0) + 1;
+    console.log(`[CONSTRUCTION_DEBUG] part=${procurementPart(ctx)} coverageComplete=${coverageComplete} | allConverged=${allConverged} required=${JSON.stringify(required)} missing=${JSON.stringify(missing)} docCoverage.complete=${docCoverage.complete} docUncovered=${JSON.stringify(docCoverage.uncovered)} amendmentUnresolved=${amendmentUnresolved} coreMissing=${JSON.stringify(coreMissingFor(ctx, { requiresLM: requiresProposalSections(opts.noticeType), formIdentified: opts.formIdentified }))}`);
+    console.log(`[CONSTRUCTION_DEBUG] findings=${findings.length} provenance=${JSON.stringify(provCount)}`);
+  }
 
   // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
   // PRESENT, so a genuinely-absent core section never appears in `missing` and an unanalyzed one could render a
@@ -572,6 +766,13 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      BEFORE caution-floor; deriveVerdict untouched. Flag off ⇒ findings pass through unchanged.
   findings = applyPreconditionOvertypeFloor(findings, { enabled: process.env.AUDIT_PRECONDITION_OVERTYPE_FLOOR === "true" });
 
+  // P4.4-bis — ROUTINE-CLAUSE OVER-TYPE GUARD (Guard 2), default-OFF (=== "true"). Corrects the per-doc construction
+  //      proposer's residual typing variance: an Availability-of-Funds contingency (52.232-18/-19) mis-typed
+  //      no_one_can_move → bidder_controls, and a bonding requirement (52.228-1/-15/-16) mis-typed bidder_cannot_move
+  //      → bidder_controls (the bidder obtains the bond). Narrow FAR-clause-specific regexes; NEVER touches a verified
+  //      universal defect. Reduces false honest-fail NHR on routine construction clauses. Flag off ⇒ unchanged.
+  findings = applyRoutineClauseOvertypeGuard(findings, { enabled: process.env.AUDIT_ROUTINE_CLAUSE_GUARD === "true" });
+
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
   //      so deriveVerdict floors to BID_WITH_CAUTION minimum. Flag off ⇒ findings pass through unchanged.
@@ -602,7 +803,25 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // cap. `manifestComplete` now carries ONLY the card-58 no-bar signals — the weak page-count heuristic manifestComplete(ctx)
   // (C-13, SUBORDINATED: it can only add caution, never certify) + a missing CORE UCF section. The reconciliation signal
   // no longer hides inside the ctx-heuristic AND; the two are separate inputs the verdict caps on independently.
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0 };
+  // GUARD 1 — DETERMINISTIC null-profile set-aside eligibility clamp (card 206-A generalized), default-OFF
+  //   (=== "true"). When the SEALED construction manifest detected a set-aside/socioeconomic element in source AND
+  //   no bidder profile was provided, the engine cannot verify award eligibility — so a committal verdict must carry
+  //   eligible=null + a verify-caution, INDEPENDENT of whether the proposer emitted a correctly-typed eligibility_bar
+  //   finding (the residual the card-291 prompt could not make reliable). Sourced from the manifest (source-grounded),
+  //   NOT the unreliable SAM typeOfSetAside metadata. Only bites under AUDIT_ELIGIBLE_TRISTATE; flag off ⇒ unchanged.
+  const detectedUnverifiableEligibilityGate = process.env.AUDIT_SETASIDE_ELIG_CLAMP === "true"
+    && bidderProfile == null
+    && !!ctx.constructionManifest?.elements.some((e) => e.key === "set_aside" && e.present);
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate };
+  if (process.env.CONSTRUCTION_DEBUG === "true") {
+    const kc: Record<string, number> = {}, dc: Record<string, number> = {};
+    for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
+    console.log(`[CONSTRUCTION_DEBUG] DECIDE-INPUTS verifierSound=${ver.sound} conflict=${conflict} findings=${findings.length} verifierDrops=${ver.rejected?.length ?? 0} manifestComplete=${manifestComplete(ctx) && coreMissing.length === 0} documentsComplete=${opts.manifestComplete}`);
+    console.log(`[CONSTRUCTION_DEBUG] kinds=${JSON.stringify(kc)} dispositions=${JSON.stringify(dc)}`);
+    for (const f of findings.filter((f) => f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move")) {
+      console.log(`[CONSTRUCTION_DEBUG] BAR kind=${f.kind} ctrl=${f.controllability} req="${(f.requirement || "").slice(0, 90)}" cite="${(f.citation || "").slice(0, 40)}" excerpt="${(f.excerpt || "").slice(0, 90)}"`);
+    }
+  }
   // Ruling (i) AUDIT BOUNDARY — the coupling-lock decision-time BACKSTOP (EngineInvariantError) converts HERE to
   // a billing-safe failed state: log the config error and re-throw the typed terminal failure. The caller routes
   // it to a 'failed' status; because the throw precedes any persist/decrementAuditQuota, the customer is NOT
@@ -618,5 +837,5 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     throw e;
   }
 
-  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
+  return { decision, inputs, findings, coverage: { required, covered, missing, attestations, coreMissing }, perLens, conflict, sectionsRead: [...sectionsRead], trace, ...(verifierDrops.length ? { verifierDrops } : {}), ...(judgmentLayerEnabled() && (opts.judgmentReason || opts.judgmentEntail) ? { judgmentCost } : {}) };
 }

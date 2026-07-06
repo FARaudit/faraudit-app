@@ -68,12 +68,19 @@ registerVerifier("test:sim-verifier");
 const marked = [...two, f({ requirement: "no offeror can comply — contradictory mandatory terms", kind: "technical_spec", controllability: "no_one_can_move", universalDefect: "contradictory_mandatory_terms", verifiedBy: { verifierId: "test:sim-verifier", excerptHash: excerptHash("verbatim"), affirmation: "the contradiction follows from the cited excerpt" } })];
 {
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; delete process.env.AUDIT_ELIGIBLE_TRISTATE;
+  const prevFW = process.env.AUDIT_FOURWALLS_NOBID;
   let threw = false; try { deriveVerdict(inp(marked)); } catch { threw = true; }
   eq("fork-2 Ruling B: universalDefect under tristate=off → coupling-lock HARD ERROR", threw, true);
   process.env.AUDIT_ELIGIBLE_TRISTATE = "true";
+  // Brain card 275 RULING 4b — DEFAULT (no four-walls seal): a verified universalDefect SUPPRESSES to NHR, not NO_BID.
+  delete process.env.AUDIT_FOURWALLS_NOBID;
+  eq("card 275 R4b: verified universalDefect WITHOUT four-walls seal → suppressed to NHR (never a committal NO_BID)", deriveVerdict(inp(marked)).verdict, "NEEDS_HUMAN_REVIEW");
+  // With the four-walls seal present, the committal NO_BID EMISSION MECHANISM is reachable (positive-allow path).
+  process.env.AUDIT_FOURWALLS_NOBID = "true";
   const vM = deriveVerdict(inp(marked));
-  eq("fork-2: universalDefect under tristate=on → NO_BID (positive-allow is the ONLY path)", vM.verdict, "NO_BID");
+  eq("fork-2: universalDefect under tristate=on + four-walls seal → NO_BID (positive-allow is the ONLY path)", vM.verdict, "NO_BID");
   eq("fork-2 Ruling B: NO_BID eligible is NOT a default true (positively determined)", vM.eligible === true, false);
+  if (prevFW === undefined) delete process.env.AUDIT_FOURWALLS_NOBID; else process.env.AUDIT_FOURWALLS_NOBID = prevFW;
   if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev;
 }
 // a who-can-win set-aside typed no_one_can_move (no marker) under null → NHR (never INELIGIBLE/NO_BID)

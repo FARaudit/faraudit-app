@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { fetchSolicitationByNoticeId, resolveAgency, resolveOfficeLeaf, type Solicitation } from "@/lib/sam";
 import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
-import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
+import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, hasEngineText, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
+import { extractText } from "@/lib/pdf-text-extractor";
 import { type PdfSource } from "@/lib/audit-engine";
 import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
@@ -366,6 +367,31 @@ export async function POST(req: NextRequest) {
   } else if (pdfBuffer) {
     // Storage arm (single large PDF > Vercel body limit) — unchanged inline /
     // Files-API split. No multi-file assembly (one file by construction).
+    //
+    // FA-INGEST #2 fix (2026-07-06): build a single-file ingestion meta so the
+    // binding-content-loss guard actually fires on a scanned/mixed large PDF.
+    // Without it the storage arm left ingestion=null, and for an upload
+    // agenticManifestComplete(null, …, isSamSol=false) returns !isSamSol=TRUE —
+    // so a fully-scanned uploaded solicitation false-read COMPLETE. extractText
+    // runs pdf-parse locally on the bytes we already hold (Node runtime), so
+    // has_text is honest whether the PDF then rides inline or via the Files API.
+    // A normal text PDF → has_text=true → COMPLETE (unchanged); a scanned/mixed
+    // one → has_text=false → content-loss → honest INCOMPLETE.
+    const storageName = safeName ?? "upload.pdf";
+    let storageHasText = false;
+    try {
+      const extracted = await extractText(pdfBuffer);
+      storageHasText = hasEngineText(extracted.rawText) && !extracted.partialPageText;
+    } catch {
+      /* extraction failure → has_text stays false → honest INCOMPLETE, never a false green */
+    }
+    ingestion = {
+      files_total: 1,
+      files_ingested: 1,
+      form_identified: true,
+      form_name: storageName,
+      files: [{ name: storageName, role: "form", bytes: pdfBuffer.length, ingested: true, has_text: storageHasText }],
+    };
     if (pdfBuffer.length > PDF_FILES_API_THRESHOLD_BYTES) {
       const uploaded = await uploadPdfToFilesApi(pdfBuffer, safeName);
       pdfFileId = uploaded.fileId;

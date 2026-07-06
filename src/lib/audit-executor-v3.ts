@@ -19,12 +19,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
 import { buildAgenticDocs, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
+import { assembleFullSourceLossless } from "./agentic-lossless-ingest";
 import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocReadMode } from "./agentic-chunked-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
+import { sweepConstructionManifest } from "./audit-construction-manifest";
+import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
@@ -143,10 +146,28 @@ export async function executeAgenticPrimary(
   // Per-run token tally (concurrency-safe — local to THIS audit). Declared here so the MAP calls that run
   // during assembly are priced into the SAME ledger as the auditPackage calls below.
   const usageCalls: UsageCall[] = [];
+  // AUDIT_LOSSLESS_INGEST (2026-07-06, CEO leap) — DETERMINISTIC $0 replacement for the lossy map-reduce
+  // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
+  // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
+  // Flag-OFF ⇒ this branch never runs ⇒ byte-identical to today. (W9126: 2.83M→~331K tok, §M/wage/bonding survive.)
+  const losslessOn = process.env.AUDIT_LOSSLESS_INGEST === "true";
   const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
+  // The lossless READ budget is sized to the model's 1M-token window (~4M chars), NOT the compression-era 1.4M-char
+  // budget (that ceiling forced the summarizer). Default ~3M chars (~750K tok — a safe margin under 1M for the
+  // system prompt + schema). A package whose BINDING content (post-filter) still exceeds this reads honest-INCOMPLETE.
+  const losslessMaxChars = Number(process.env.AGENTIC_LOSSLESS_MAX_CHARS) || 3_000_000;
   let assembled: { source: string; truncated: boolean; keptDocs: number; droppedDocs: string[]; contentLossDocs: string[] };
-  let readModes: Array<{ name: string; mode: DocReadMode; chunks: number; spansKept: number; spansRejected: number }> | null = null;
-  if (chunkedOn && wouldOverflow(docs, MAX_FULLSOURCE_CHARS)) {
+  let readModes: Array<{ name: string; mode: DocReadMode; chunks: number; spansKept: number; spansRejected: number; failedWindows: number }> | null = null;
+  // When lossless is ON it handles ALL packages (fits-whole → untouched whole read; over-budget → binding-filter;
+  // filtered-still-over → honest INCOMPLETE) — so it fully supersedes the compressor, and reads MORE whole (up to the
+  // 1M window) than the old 1.4M budgeted/chunked paths did.
+  if (losslessOn) {
+    const la = assembleFullSourceLossless(docs, losslessMaxChars);
+    assembled = { source: la.source, truncated: la.truncated, keptDocs: la.keptDocs, droppedDocs: la.droppedDocs, contentLossDocs: la.contentLossDocs };
+    // Every doc is READ (full binding content) — no chunking, no map-reduce, zero paid MAP calls.
+    readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0 }));
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: LOSSLESS ingest — ${la.filteredDocs.length}/${docs.length} docs binding-filtered (noise dropped, binding kept VERBATIM, 0 summarized), source ${(assembled.source.length / 1e6).toFixed(2)}M chars${la.contentLossDocs.length ? ` — CONTENT-LOSS on [${la.contentLossDocs.join(", ")}] (binding content alone exceeds the read window) → documents_complete=false (honest INCOMPLETE)` : ""}`);
+  } else if (chunkedOn && wouldOverflow(docs, MAX_FULLSOURCE_CHARS)) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("agentic engine: ANTHROPIC_API_KEY not set — cannot run chunked map-reduce ingest");
     const mapCall = makeChunkMapCaller(
@@ -161,7 +182,7 @@ export async function executeAgenticPrimary(
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: chunked map-reduce ingest — ${compressed}/${ch.perDoc.length} docs compressed to grounded digests, 0 dropped (primary kept whole; amendments always mapped)${ch.contentLossDocs.length ? ` — CONTENT-LOSS on [${ch.contentLossDocs.join(", ")}] → documents_complete=false (honest INCOMPLETE)` : ""}`);
   } else {
     assembled = { ...assembleFullSourceBudgeted(docs), contentLossDocs: [] };
-    if (chunkedOn) readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0 }));
+    if (chunkedOn) readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0 }));
   }
   // Abort mid-ingest (budget/wall-clock) is an HONEST hard-fail — never spend the Opus auditPackage verdict on a
   // partial read, and never persist a partial digest as complete (Brain R1: abort = honest-fail, not a degrade).
@@ -200,8 +221,24 @@ export async function executeAgenticPrimary(
   // read them downstream (Step 4: Nonmanufacturer Rule). naicsCode/typeOfSetAside are already resolved
   // upstream (audit-executor.ts SAM cross-ref). Uploads have no SAM NAICS → null → NMR stays silent.
   // (usageCalls declared above at assembly so MAP tokens are priced into the same ledger.)
+  // Brain card 288 — SEALED construction (SF-1442/part36) binding-content manifest over each doc's FULL text (docs =
+  // pre-compression). NEVER the compressed digest. Gated: AUDIT_CONSTRUCTION_SWEEP OFF ⇒ undefined ⇒ part36 carrier
+  // absent (byte-identical). Step 5 — narrowed OUT_OF_SCOPE (design-heavy CSI/drawing-dominant, NO resolvable offer
+  // structure) honest-fail cap, gated by the master flag. W9126 (offer structure present) → null → decided path
+  // proceeds. Reuses the INCOMPLETE cap via manifestComplete (no new verdict enum): OOS → honest-fail, no charge.
+  const constructionManifest = process.env.AUDIT_CONSTRUCTION_SWEEP === "true"
+    ? sweepConstructionManifest(docs.map((d) => ({ name: d.name, text: d.text })), solicitation?.naicsCode ?? null)
+    : undefined;
+  // OOS reads the PRE-compression full text (docs joined), NOT the lossy digest — else the offer-structure veto could
+  // be lost to compression and false-fire OUT_OF_SCOPE on a biddable construction buy (adversarial-review finding).
+  const constructionOOS = process.env.AUDIT_CONSTRUCTION_DECIDED === "true"
+    && !!detectConstructionOutOfScope({ naicsCode: solicitation?.naicsCode ?? null, fullText: docs.map((d) => d.text).join("\n") });
+  if (constructionOOS) console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: construction OUT_OF_SCOPE (design-build, no resolvable offer/submission structure) → honest-fail, no charge`);
+  // Brain card 291 — grounding corpus = the pre-compression full text (all docs), so per-doc-decomposition findings
+  // ground against source, not the digest. Only consumed when AUDIT_PERDOC_DECOMP is on; otherwise inert.
+  const groundingSource = docs.map((d) => d.text).join("\n\n");
   const res = await auditPackage({
-    fullSource, bidderProfile, signal, manifestComplete,
+    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
     // Layer-2 (Brain card 262 — content-aware completeness): the SAM notice type scopes the §L/§M requirement to
     // solicitation-type buys, and form_identified corroborates whether the §L/§M-bearing primary was ingested.
@@ -236,6 +273,11 @@ export async function executeAgenticPrimary(
         read: ing.files_ingested,
         complete: ing.files_total > 0 && ing.files_ingested >= ing.files_total && !ing.overflow,
         missing: (ing.files ?? []).filter((f) => !f.ingested).map((f) => ({ name: f.name, ...(f.reason ? { reason: f.reason } : {}) })),
+        // Provenance for honest disclosure copy: an UPLOAD set (isSamSol=false) must NOT
+        // claim "retrieved every document the agency posted to SAM.gov" — there is no SAM
+        // manifest. Both upload arms (multipart + storage) set ingestion, so this guards
+        // the fabricated-SAM-provenance card the report would otherwise render for uploads.
+        fromSam: isSamSol,
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
     : isSamSol
@@ -315,7 +357,7 @@ export async function executeAgenticPrimary(
       // The report discloses this so a reviewer knows a compressed doc was read for compliance, not cover-to-cover.
       // SECURITY: read_modes[].name is an attacker-influenceable document NAME (upload / SAM attachment) — inert
       // today (no renderer reads it); ANY future UI surfacing it MUST route the name through escapeHtml (stored-XSS).
-      ...(readModes ? { read_modes: readModes.map((r) => ({ name: r.name, mode: r.mode, ...(r.mode === "map-reduce" ? { chunks: r.chunks, spans_kept: r.spansKept, spans_rejected: r.spansRejected } : {}) })) } : {}),
+      ...(readModes ? { read_modes: readModes.map((r) => ({ name: r.name, mode: r.mode, ...(r.mode === "map-reduce" ? { chunks: r.chunks, spans_kept: r.spansKept, spans_rejected: r.spansRejected, failed_windows: r.failedWindows } : {}) })) } : {}),
       // C-19 interim guard (Brain C.f) — DETECT + DISCLOSE only, NEVER a verdict cap (supersession resolution is
       // its own tranche). Surface that amendments are present (so a reviewer knows superseded terms are unresolved)
       // + per-finding document provenance (which doc grounded each finding).
@@ -327,6 +369,13 @@ export async function executeAgenticPrimary(
         ? { amendments_present: true, amendment_disclosure: "This package contains one or more amendments (SF-30 / amendment of solicitation). Superseded terms are NOT yet automatically resolved — verify the latest amendment governs before relying on any cited term." }
         : {}),
       finding_provenance: findingProvenance(fullSource, res.findings),
+      // Card 274 RULING 1 (Brain) — persist every skeptic DROP to the durable audit trail (finding id/requirement/
+      // citation, the refutation reason, and dropReason). The `empty_corrected` rows are the closed false-resurrection
+      // hole (a refuted finding that used to survive unchanged → false INELIGIBLE/NO_BID); `overturned` rows are plain
+      // adversarial drops. Telemetry-visible per the ruling; omitted when no drops occurred (byte-stable).
+      // SECURITY: requirement/citation/refutation are model-/source-derived text — inert today (no renderer reads
+      // verifier_drops). ANY future UI that surfaces them MUST route through escapeHtml (stored-XSS), like the fields above.
+      ...(res.verifierDrops?.length ? { verifier_drops: res.verifierDrops } : {}),
       v3: payload,
     },
   };

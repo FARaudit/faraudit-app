@@ -10,7 +10,7 @@
 // The skeptic is INJECTED → unit-testable with a stub ($0). makeStructuredSkeptic wires the real model.
 
 import { findInSource, type AuditToolContext } from "./audit-tools";
-import type { VerifyFn, VerifyResult } from "./audit-orchestrator";
+import type { VerifyFn, VerifyResult, CorrectedDrop } from "./audit-orchestrator";
 import type { TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 import { knifeEdgeIndices } from "./audit-decide";
 
@@ -45,18 +45,92 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     catch { return { sound: false, survived: grounded, rejected: droppedUngrounded }; } // challenge failed → not sound
 
     const byIdx = new Map(verdicts.map((v) => [v.index, v]));
-    const complete = grounded.every((_, i) => byIdx.has(i)); // every finding actually got ruled
     const survived: TypedFinding[] = []; const rejected: TypedFinding[] = [...droppedUngrounded];
+    const correctedDrops: CorrectedDrop[] = [];
+    // RESIDUE DOCTRINE (Brain card 285, Fix 1), flag-gated AUDIT_VERIFIER_BATCHING. An UNRESOLVED finding (the
+    // skeptic returned no ruling for its index — truncation / claim-explosion residue) is classified:
+    //   • VERDICT-DRIVING (bar-class OR knife-edge — could support/block a committal) → the run is NOT sound
+    //     → NHR (a genuine honest fail). The finding is ATTACHED to survived (never silently dropped — Brain's
+    //     forbidden fail-safe: a vanished disqualifier is a false-BID path).
+    //   • INFORMATIONAL (everything else) → marked `unverified` (excluded from report claims) and KEPT, but it
+    //     does NOT sink soundness. A stray informational finding the skeptic never reached must not honest-fail
+    //     the whole clean audit — the customer-readiness gap card 285 closes.
+    // Flag OFF ⇒ byte-identical to the pre-card-285 rule: unresolved ⇒ `complete=false` ⇒ not sound (whole-run NHR).
+    const residueDoctrine = process.env.AUDIT_VERIFIER_BATCHING === "true";
+    // CONSERVATIVE verdict-driving predicate (adversarial-review hardening, card 285). A finding is "informational"
+    // (safe to leave UNRESOLVED without sinking soundness) ONLY when its KIND is one the engine defines as
+    // structurally NEVER-a-bar: procedural_obligation (coverage-only, invisible to the verdict) or boilerplate
+    // (routine standard T&C, explicitly NOT a gate). EVERYTHING ELSE unresolved is treated as verdict-driving → NHR.
+    // Rationale (closes the catastrophic residue hole): the skeptic exists precisely to CORRECT a mis-typed
+    // controllability, so we must NOT trust the lens's `controllability` to decide a finding is harmless — an
+    // under-typed bar (real disqualifier the lens labeled bidder_controls, no lens-disagreement sibling → absent
+    // from the knife-edge set) would otherwise be waved through as "informational" → false BID. Keying on the
+    // never-a-bar KINDS (not on the contestable controllability) removes that trust. Residue is near-zero once the
+    // batched skeptic rules every finding; this is the fail-SAFE fallback for the rare truncation tail.
+    const SAFE_INFORMATIONAL_KINDS = new Set(["procedural_obligation", "boilerplate"]);
+    const isVerdictDriving = (f: TypedFinding, _i: number): boolean => !SAFE_INFORMATIONAL_KINDS.has(f.kind);
+    let unresolvedVerdictDriving = 0;
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
-      if (v?.corrected) survived.push({ ...f, ...(v.corrected.controllability ? { controllability: v.corrected.controllability } : {}), ...(v.corrected.curableInWindow !== undefined ? { curableInWindow: v.corrected.curableInWindow } : {}) }); // RE-TYPE
-      else if (v && !v.upheld) rejected.push(f);                                                                  // overturned → drop
-      else survived.push(f);                                                                                      // upheld as-is
+      // RE-TYPE requires a SUBSTANTIVE correction (Brain card 274 RULING 1). An empty/non-substantive
+      // `corrected:{}` used to be truthy → the finding survived UNCHANGED even when the skeptic REFUTED it
+      // (upheld=false) → false INELIGIBLE/NO_BID (the catastrophic ZERO-CONTRACT-LOSS hole). A correction only
+      // counts when it carries controllability or curableInWindow; otherwise the upheld flag governs.
+      const substantive = !!v?.corrected && (v.corrected.controllability !== undefined || v.corrected.curableInWindow !== undefined);
+      if (substantive) {
+        survived.push({ ...f, ...(v!.corrected!.controllability ? { controllability: v!.corrected!.controllability } : {}), ...(v!.corrected!.curableInWindow !== undefined ? { curableInWindow: v!.corrected!.curableInWindow } : {}) }); // RE-TYPE
+      } else if (v && !v.upheld) {
+        rejected.push(f); // overturned → drop (INCLUDES the empty-corrected:{} case that formerly resurrected)
+        correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: v.corrected ? "empty_corrected" : "overturned" });
+      } else if (v) {
+        survived.push(f); // upheld as-is (upheld=true, no substantive correction)
+      } else if (residueDoctrine && !isVerdictDriving(f, i)) {
+        survived.push({ ...f, unverified: true }); // UNRESOLVED informational → kept, marked, does not sink soundness
+      } else {
+        survived.push(f);                          // UNRESOLVED verdict-driving (or flag-off residue) → attached…
+        if (isVerdictDriving(f, i)) unresolvedVerdictDriving++; // …and it sinks soundness → NHR
+      }
     });
-    // SOUND iff the skeptic ruled on every finding (challenge completed) AND ≥1 survived. Total-overturn
-    // (survived=[]) is NOT sound — soundness is "the skeptic confirmed at least one finding stands", never
-    // "the skeptic ruled on every finding and killed them all" (the false-BID hole). Brain card 224 fork 1.
-    return { sound: complete && survived.length > 0, survived, rejected };
+    if (correctedDrops.some((d) => d.dropReason === "empty_corrected"))
+      console.log(`[verifier] dropped ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").length} refuted finding(s) with empty corrected:{} (card 274 RULING 1 — no false resurrection): ${correctedDrops.filter((d) => d.dropReason === "empty_corrected").map((d) => `#${d.index} "${d.requirement}"`).join(", ")}`);
+    // SOUND (Brain card 224 fork 1 + card 285): ≥1 finding survives AND no verdict-driving residue is unresolved.
+    // Flag OFF: unresolvedVerdictDriving counts ANY unresolved finding (every non-ruled index takes the final else),
+    //   reproducing the old `complete` gate exactly. Flag ON: only bar-class/knife-edge residue sinks the run; a
+    //   truncated informational tail no longer honest-fails a clean audit. Total-overturn (survived=[]) is never sound.
+    const unresolvedCount = residueDoctrine ? unresolvedVerdictDriving : grounded.filter((_, i) => !byIdx.has(i)).length;
+    if (residueDoctrine && unresolvedVerdictDriving > 0)
+      console.log(`[verifier] ${unresolvedVerdictDriving} VERDICT-DRIVING finding(s) unresolved after the skeptic pass → run NOT sound → NHR (card 285 residue doctrine; findings attached, never dropped)`);
+    return { sound: unresolvedCount === 0 && survived.length > 0, survived, rejected, correctedDrops };
+  };
+}
+
+/** BATCHED SKEPTIC (Brain card 285, Fix 1). Wraps a base skeptic so it challenges the material set in bounded
+ *  BATCHES with a per-batch completeness check + retries — instead of one call whose O(findings) output truncates
+ *  (the claim-explosion root: on 24–43 findings the single skeptic response clipped and left indices unruled →
+ *  false honest-fail). Each batch is retried until every finding in it is ruled or `retries` is exhausted; any
+ *  still-unruled finding is left ABSENT from the merged verdicts (the residue makeAgenticVerifier then classifies —
+ *  verdict-driving → NHR, informational → unverified). Indices are remapped to the FULL set so downstream logic is
+ *  unchanged. Pure orchestration over the injected base; adds no model of its own. */
+export function makeBatchedSkeptic(base: SkepticFn, opts?: { batchSize?: number; retries?: number }): SkepticFn {
+  const batchSize = Math.max(1, opts?.batchSize ?? 12);
+  const retries = Math.max(0, opts?.retries ?? 2);
+  return async (ctx, findings, _opts) => {
+    if (findings.length <= batchSize) return base(ctx, findings, _opts); // no batching needed → identical single call
+    const merged: SkepticVerdict[] = [];
+    for (let start = 0; start < findings.length; start += batchSize) {
+      const batch = findings.slice(start, start + batchSize);
+      const ruled = new Map<number, SkepticVerdict>(); // local index → verdict
+      for (let attempt = 0; attempt <= retries && ruled.size < batch.length; attempt++) {
+        // Re-challenge ONLY the still-unruled remainder so a partial batch converges without re-spending on the resolved.
+        const remainIdx = batch.map((_, i) => i).filter((i) => !ruled.has(i));
+        const remain = remainIdx.map((i) => batch[i]);
+        let vs: SkepticVerdict[];
+        try { vs = await base(ctx, remain, _opts); } catch { break; } // a failed batch call → leave remainder unruled (residue)
+        for (const v of vs) { const local = remainIdx[v.index]; if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local }); }
+      }
+      for (const [local, v] of ruled) merged.push({ ...v, index: start + local }); // remap to the full-set index
+    }
+    return merged;
   };
 }
 
@@ -77,7 +151,25 @@ export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): Skeptic
     const escVerdicts = await escalate(ctx, contested);                             // Opus re-judges/re-types ONLY the contested subset
     const escByOrig = new Map<number, SkepticVerdict>();
     escVerdicts.forEach((v) => { const orig = contestedIdx[v.index]; if (orig !== undefined) escByOrig.set(orig, { index: orig, upheld: v.upheld, reason: v.reason, corrected: v.corrected }); });
-    return baseVerdicts.map((v) => escByOrig.get(v.index) ?? v);                     // escalation wins where it ruled
+    // RULING 2 (Brain card 274) — NEVER pass through the lenient base (Sonnet) type on an UNRESOLVED knife-edge.
+    // If the escalation returned no ruling for one or more contested findings (empty-return-on-contested-set, or a
+    // partial cover), we cannot trust the base classification → THROW so makeAgenticVerifier's catch routes the run
+    // to sound:false → NEEDS_HUMAN_REVIEW with the contested/grounded set attached. A truncation/parse-fail already
+    // throws inside structuredAdapter; this closes the valid-but-incomplete escalation return.
+    const unresolved = contestedIdx.filter((i) => !escByOrig.has(i));
+    if (unresolved.length) {
+      console.log(`[skeptic] escalation left ${unresolved.length}/${contestedIdx.length} contested finding(s) unresolved (idx ${unresolved.join(",")}) — refusing lenient pass-through → NHR (card 274 RULING 2)`);
+      throw new Error(`escalation unresolved on ${unresolved.length}/${contestedIdx.length} contested finding(s) — no lenient pass-through`);
+    }
+    // MERGE base ∪ escalation over the UNION of ruled indices (adversarial-review hardening, card 285). The old
+    // `baseVerdicts.map(...)` emitted ONLY base-ruled indices, so a contested finding the batched base left unruled
+    // but the escalation DID rule was silently dropped — RULING-2's `escByOrig.has(i)` guard passes, yet the valid
+    // Opus re-type vanished → the verifier saw it as residue → a spurious honest-fail. Emit every index either side
+    // ruled; escalation wins where both did.
+    const mergedByIdx = new Map<number, SkepticVerdict>();
+    for (const v of baseVerdicts) mergedByIdx.set(v.index, v);
+    for (const [i, v] of escByOrig) mergedByIdx.set(i, v);          // escalation overrides the lenient base
+    return [...mergedByIdx.values()];
   };
 }
 
@@ -111,7 +203,7 @@ export function makeStructuredSkeptic(
   const SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"], properties: { verdicts: { type: "array", items: {
     type: "object", additionalProperties: false, required: ["index", "upheld", "reason"],
     properties: { index: { type: "integer" }, upheld: { type: "boolean" }, reason: { type: "string" },
-      corrected: { type: "object", additionalProperties: false, properties: {
+      corrected: { type: "object", additionalProperties: false, properties: { // card 274 RULING 1 — an empty corrected:{} is rejected in CODE (makeAgenticVerifier `substantive` check); NOT via a JSON-schema `minProperties` (the Anthropic structured-output API 400s on `minProperties` → the skeptic call throws → sound=false → universal honest-fail; the code check is the real enforcement)
         controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "no_one_can_move", "already_satisfied"] },
         curableInWindow: { type: "boolean" } } } } } } } };
   return async (_ctx, findings, _opts) => {

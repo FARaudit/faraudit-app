@@ -12,9 +12,16 @@ let pass = 0; const fails: string[] = [];
 const ok = (label: string, cond: boolean) => { if (cond) { pass++; console.log(`  [PASS] ${label}`); } else { fails.push(label); console.log(`  [FAIL] ${label}`); } };
 const inp = (findings: TypedFinding[], profile: BidderProfile | null): VerdictInputs =>
   ({ findings, bidderProfile: profile, coverageComplete: true, verifierSound: true, conflict: false, manifestComplete: true });
-const withTristate = <T>(fn: () => T): T => { // the coupling-lock requires tristate ON for ANY mark
+const withTristate = <T>(fn: () => T): T => { // coupling-lock requires tristate ON for ANY mark; card 275 R4b
   const prev = process.env.AUDIT_ELIGIBLE_TRISTATE; process.env.AUDIT_ELIGIBLE_TRISTATE = "true";
-  try { return fn(); } finally { if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev; }
+  // Brain card 275 R4b — a committal NO_BID now ALSO requires the four-walls seal; set it so this suite continues to
+  // exercise the EVIDENTIARY bar (verified→NO_BID vs unverified→NHR). R4b's default-suppression is asserted
+  // canonically in test-derive-verdict. (Unverified/unregistered marks stay NHR regardless of this seal.)
+  const prevFW = process.env.AUDIT_FOURWALLS_NOBID; process.env.AUDIT_FOURWALLS_NOBID = "true";
+  try { return fn(); } finally {
+    if (prev === undefined) delete process.env.AUDIT_ELIGIBLE_TRISTATE; else process.env.AUDIT_ELIGIBLE_TRISTATE = prev;
+    if (prevFW === undefined) delete process.env.AUDIT_FOURWALLS_NOBID; else process.env.AUDIT_FOURWALLS_NOBID = prevFW;
+  }
 };
 
 // A genuine universal defect (contradictory mandatory terms), grounded excerpt. The MARK is the same across cases;

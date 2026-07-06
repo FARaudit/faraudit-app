@@ -576,21 +576,50 @@ function dedupeKey(name: string): string {
     .trim();
 }
 
+// Amendment/modification number (leading zeros stripped so "0001" ≡ "1"); null
+// when the name carries no amendment number. Used so two DIFFERENT amendments of
+// the same series can never collapse into one another (Guard C below).
+function amendmentNumber(name: string): string | null {
+  const m = name.match(/\b(?:amendment|amend|amd|modification|mod)\b[\s_.\-]*0*(\d+)/i);
+  return m ? m[1] : null;
+}
+
 // Drop near-identical files BEFORE the budget. Among entries sharing a dedupeKey
 // keep ONE — prefer the larger (an amendment supersedes its base and is usually
 // bigger); size-unknown sorts last; name as the final deterministic tie-break.
 // Dropped duplicates are returned so the caller can record the loud overflow.
 // Pure + exported for the gate suite.
-export function dedupeNearDuplicates(plan: DocumentPlanEntry[]): {
+//
+// FA-INGEST (2026-07-06, 36C25626Q0947): the base solicitation and its SF-30
+// amendments are commonly named as JUST the sol number + a role token
+// ("<sol> - Final.pdf", "<sol> - Amendment 0001.pdf", "<sol> - Amendment 0002.pdf").
+// dedupeKey strips the role token AND its trailing number, so all of them collapse
+// to the bare sol number and the amendments get DROPPED as "near-duplicate of
+// Final" — silently losing a real, bid-critical change (here Final still read
+// "offers due 07-07" while amendment 0001 moved the deadline to 07-09). Base +
+// each amendment are DISTINCT binding documents, never duplicates. Two guards,
+// both zero-loss and provably clear of the DTS "RFQ CLIN Structure" merge (its key
+// is a real content title, never the sol number, and it carries no amendment #):
+//  (A) a key that is empty or exactly the solicitation number carries no content
+//      identity beyond the base/amendment family → never group it;
+//  (C) entries with DIFFERENT amendment numbers are distinct documents → never
+//      share a group (fold the amendment # into the group key).
+export function dedupeNearDuplicates(plan: DocumentPlanEntry[], solicitationNumber?: string | null): {
   kept: DocumentPlanEntry[];
   dropped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
+  const solKey = solicitationNumber ? norm(solicitationNumber) : "";
   const groups = new Map<string, DocumentPlanEntry[]>();
   for (const e of plan) {
     const k = dedupeKey(e.name);
-    // Empty key (name had no alphanumerics after normalization) → never group.
-    if (!k) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
-    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+    // Guard A — empty key (no alphanumerics after normalization) OR a key that is
+    // only the solicitation number (the base/amendment family) → never group; each
+    // is a distinct binding doc.
+    if (!k || (solKey && k.replace(/\s+/g, "") === solKey)) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
+    // Guard C — a different amendment number can never share a group.
+    const amd = amendmentNumber(e.name);
+    const groupKey = amd ? `${k}::amd${amd}` : k;
+    (groups.get(groupKey) ?? groups.set(groupKey, []).get(groupKey)!).push(e);
   }
   const kept: DocumentPlanEntry[] = [];
   const dropped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
@@ -622,7 +651,7 @@ const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
 // budget on an unsized file beyond the form). Near-duplicate files are deduped
 // first so duplicate copies never consume slots that distinct docs need.
-export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
+export function applyBudget(plan: DocumentPlanEntry[], solicitationNumber?: string | null, maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
   ingest: DocumentPlanEntry[];
   skipped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
@@ -630,8 +659,9 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
   const skipped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
   let total = 0;
   // DTS W51H7226 fix — collapse near-duplicates before filling; dropped copies
-  // are carried into `skipped` so the overflow record stays loud.
-  const { kept: dedupedPlan, dropped } = dedupeNearDuplicates(plan);
+  // are carried into `skipped` so the overflow record stays loud. The sol number
+  // is passed so the base/amendment family (keys = bare sol #) is never collapsed.
+  const { kept: dedupedPlan, dropped } = dedupeNearDuplicates(plan, solicitationNumber);
   skipped.push(...dropped);
   // Fill order (FA-119): documentTier primary — form → amendment → strong work
   // statement → weak spec → generic attachment — with size-ASCENDING as the
@@ -669,8 +699,8 @@ export function isPdfPortfolio(buffer: Buffer): boolean {
 // extracted to text and wrapped into a PDF (P0 fix 2026-06-20) so it rides the
 // same inline-PDF + pdf-parse ingestion path. Anything else → null (honest
 // fallback; the caller flags it, never fabricates).
-async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null> {
-  if (raw.subarray(0, 4).toString("latin1") === "%PDF") return raw;
+async function normalizeToPdf(name: string, raw: Buffer): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
+  if (raw.subarray(0, 4).toString("latin1") === "%PDF") return { buf: raw, sourceTruncated: false };
   const kind = nonPdfKind(name);
   if (kind) {
     let text = await extractNonPdfText(name, raw);
@@ -679,20 +709,26 @@ async function normalizeToPdf(name: string, raw: Buffer): Promise<Buffer | null>
       // inventory/ELINS sheet can't hog the token budget and starve other docs.
       // Keep the structure + a representative sample; honest truncation note.
       // .docx prose is left intact (bounded later by MAX_DOC_TOKENS if needed).
+      let sourceTruncated = false;
       if (kind === "xlsx") {
         const maxChars = Math.floor(MAX_XLSX_DOC_TOKENS * CHARS_PER_TOKEN);
         if (text.length > maxChars) {
           text = text.slice(0, Math.max(0, maxChars - 130)) +
             "\n\n[… spreadsheet truncated for the analysis budget — representative rows shown; full line-item file on SAM.gov …]";
+          // S1 (Brain card 274) — the TAIL was cut at the source (before the token-budget pass), so the doc's
+          // token count is already under budget and the downstream truncated flag would otherwise read false →
+          // documents_complete=true on a partial wage/ELIN price sheet. Report it so the caller ORs it into
+          // the per-file `truncated` flag (the honest-fail gate reads f.truncated).
+          sourceTruncated = true;
         }
       }
-      return textToPdfBuffer(text, name);
+      return { buf: textToPdfBuffer(text, name), sourceTruncated };
     }
   }
   return null;
 }
 
-async function downloadPdf(url: string, name = ""): Promise<Buffer | null> {
+async function downloadPdf(url: string, name = ""): Promise<{ buf: Buffer; sourceTruncated: boolean } | null> {
   try {
     if (!SAM_API_KEY) return null;
     // SSRF + key-leak guard (shared with sam-pdf.ts): host-allowlist the untrusted
@@ -739,11 +775,13 @@ const VISION_TOKENS_PER_PAGE = 1600;
 
 // Token estimate for a (PDF) buffer: extract the text and estimate via
 // CHARS_PER_TOKEN — the text content is what the model reads and is billed for.
-async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string }> {
+async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string; partialPageText: boolean }> {
   try {
     const extracted = await extractText(buf);
     const text = extracted.rawText ?? "";
-    if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text };
+    // partialPageText (mixed cover+scanned) travels with the text so the has_text
+    // completeness signal below can gate on it — cover text alone must not read green.
+    if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text, partialPageText: extracted.partialPageText === true };
   } catch {
     /* fall through to the page-based vision estimate */
   }
@@ -760,7 +798,7 @@ async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: s
   const tokens = pages > 0
     ? pages * VISION_TOKENS_PER_PAGE
     : Math.min(estimateTokensFromChars(buf.length), MAX_DOC_TOKENS);
-  return { tokens, text: "" };
+  return { tokens, text: "", partialPageText: false };
 }
 
 // Truncate a doc to a token budget. We have the extracted `text`; keep the
@@ -851,13 +889,13 @@ export async function assembleSamDocumentSet(
 
   const plan = planDocumentOrder(manifest, solicitationNumber);
   const formEntry = plan.find((e) => e.role === "form") ?? null;
-  const { ingest, skipped } = applyBudget(plan);
+  const { ingest, skipped } = applyBudget(plan, solicitationNumber);
 
   // FA-119 Phase 2B — page budget runs AFTER download (page count needs bytes).
   // Pass 1: download + page-count + token-estimate every byte/doc-budgeted
   // member, in tier order.
   const files: IngestionFileMeta[] = [];
-  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
+  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean; partialPageText: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -865,13 +903,14 @@ export async function assembleSamDocumentSet(
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
-    const buf = await downloadPdf(e.url, e.name);
-    if (!buf) {
+    const dl = await downloadPdf(e.url, e.name);
+    if (!dl) {
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "download failed or not a PDF" });
       continue;
     }
-    const { tokens, text } = await estimateDocTokens(buf);
-    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
+    const buf = dl.buf;
+    const { tokens, text, partialPageText } = await estimateDocTokens(buf);
+    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: dl.sourceTruncated, partialPageText });
   }
   // Pass 2: trim by the page ceiling — but ONLY for VISION-delivered docs.
   // FA-INGEST3 (2026-06-21): the ~600-page API ceiling that MAX_TOTAL_PAGES guards
@@ -929,9 +968,13 @@ export async function assembleSamDocumentSet(
         continue;
       }
       if (isVisionDoc) visionBase64Bytes += base64.length;
-      const displayName = kept.truncated && buf !== f.buffer ? `${f.entry.name} (truncated)` : f.entry.name;
+      const tokenTruncated = kept.truncated && buf !== f.buffer;
+      const wasTruncated = tokenTruncated || f.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
+      const displayName = wasTruncated ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(kept.truncated && buf !== f.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
+      // partialPageText (mixed cover+scanned) forces has_text=false even when the
+      // cover text alone would clear hasEngineText — the scanned body is content loss.
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text) && !f.partialPageText, ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1015,12 +1058,12 @@ export async function assembleUploadedDocumentSet(
 
   const plan = planDocumentOrder(manifest, solicitationNumber);
   const formEntry = plan.find((e) => e.role === "form") ?? null;
-  const { ingest, skipped } = applyBudget(plan);
+  const { ingest, skipped } = applyBudget(plan, solicitationNumber);
 
   // Pass 1: page-count + token-estimate every byte/doc-budgeted member (bytes
   // already local).
   const files: IngestionFileMeta[] = [];
-  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string }> = [];
+  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean; partialPageText: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -1031,13 +1074,14 @@ export async function assembleUploadedDocumentSet(
     const raw = bufById.get(e.resourceId);
     // P0 fix (2026-06-20): a native PDF passes the %PDF check; a .docx/.xlsx is
     // extracted to text + wrapped into a PDF so it ingests like the SAM arm.
-    const buf = raw ? await normalizeToPdf(e.name, raw) : null;
-    if (!buf) {
+    const norm = raw ? await normalizeToPdf(e.name, raw) : null;
+    if (!norm) {
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "not a valid PDF (magic-byte check)" });
       continue;
     }
-    const { tokens, text } = await estimateDocTokens(buf);
-    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text });
+    const buf = norm.buf;
+    const { tokens, text, partialPageText } = await estimateDocTokens(buf);
+    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: norm.sourceTruncated, partialPageText });
   }
   // Pass 2: trim by the page ceiling (form exempt → generics drop first).
   const { ingest: pageKept } = applyPageBudget(
@@ -1073,9 +1117,12 @@ export async function assembleUploadedDocumentSet(
         continue;
       }
       if (isVisionDoc) visionBase64Bytes += base64.length;
-      const displayName = kept.truncated && buf !== c.buffer ? `${c.entry.name} (truncated)` : c.entry.name;
+      const tokenTruncated = kept.truncated && buf !== c.buffer;
+      const wasTruncated = tokenTruncated || c.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
+      const displayName = wasTruncated ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(kept.truncated && buf !== c.buffer ? { reason: `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget`, truncated: true } : {}) });
+      // partialPageText (mixed cover+scanned) forces has_text=false — see SAM arm.
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text) && !c.partialPageText, ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {

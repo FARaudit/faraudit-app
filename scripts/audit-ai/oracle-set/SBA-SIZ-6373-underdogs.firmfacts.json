@@ -1,0 +1,7 @@
+{
+  "_note": "OHA-established firm facts fed as the bidder profile per Brain R2(i). NEUTRAL facts only — no litigation/decision framing. The engine must reach INELIGIBLE via a grounded bar given these facts, or at minimum never declare the firm eligible.",
+  "satisfiesSizeStandard": false,
+  "closedWorld": true,
+  "basis": "The concern's combined average annual receipts with its affiliate exceed the $22 million NAICS 238290 size standard. The concern lacks qualified employees to self-perform the primary and vital requirement (elevator repair) and is unusually reliant on a subcontractor to perform that work.",
+  "expectedGivenFacts": "INELIGIBLE"
+}

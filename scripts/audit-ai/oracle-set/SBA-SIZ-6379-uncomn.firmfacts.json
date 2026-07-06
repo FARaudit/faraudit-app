@@ -1,0 +1,7 @@
+{
+  "_note": "OHA-established firm facts fed as the bidder profile per Brain R2(i). NEUTRAL facts only. The engine must NOT declare INELIGIBLE.",
+  "satisfiesSizeStandard": true,
+  "closedWorld": true,
+  "basis": "The concern qualified as small under NAICS 541512 ($34M) as of the date of its initial offer including price. Size is fixed at that date; a later change in size status does not affect eligibility for this procurement.",
+  "expectedGivenFacts": "eligible — engine must not declare INELIGIBLE"
+}

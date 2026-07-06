@@ -31,6 +31,11 @@ export interface ExpertSpec { key: string; system: string; }
 /** Deterministic grounding backstop: a finding is grounded iff its excerpt is literally in the source. */
 export function isGrounded(ctx: AuditToolContext, f: RawFinding): boolean {
   if (!f.excerpt || f.excerpt.trim().length < 4) return false;
+  // Brain card 291 — ground against the STORED FULL TEXT when present ("source grounds"), never the compressed digest;
+  // else fall back to fullSource (byte-identical when groundingSource absent). Same normalized substring semantics.
+  if (ctx.groundingSource && ctx.groundingSource !== ctx.fullSource) {
+    return findInSource({ fullSource: ctx.groundingSource }, f.excerpt).hits.length > 0;
+  }
   return findInSource(ctx, f.excerpt).hits.length > 0;
 }
 
@@ -75,7 +80,13 @@ export async function runAgenticExpert(
     // observe (pure logging) then execute the tools the expert called, deterministically, feeding results back.
     trace.push({ turn, tools: out.toolCalls.map((tc) => ({ name: tc.name, input: tc.input })) });
     for (const tc of out.toolCalls) if (tc.name === "read_section" && tc.input?.key) sectionsRead.add(String(tc.input.key).toUpperCase());
-    priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
+    // Only record a transcript batch when the turn ACTUALLY called tools. A text-only model turn
+    // (no findings AND no tool_use — e.g. the model narrates instead of acting) must NOT push an empty
+    // batch: the transcript rebuild (makeAnthropicCallModel) would emit an assistant message with
+    // content:[] → Anthropic 400 → the shared Promise.all rejects the WHOLE paid audit. Skipping it lets
+    // the loop advance a turn harmlessly (bounded by maxTurns + forceSubmit on the last turn).
+    if (out.toolCalls.length > 0)
+      priorToolResults.push(out.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, input: tc.input, result: runAuditTool(ctx, tc.name, tc.input) })));
   }
   return { findings: [], turns: maxTurns, dropped: 0, converged: false, sectionsRead: [...sectionsRead], trace };
 }
@@ -115,6 +126,7 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
   return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
+      if (batch.length === 0) continue; // defensive: never emit an assistant/user turn with content:[] → Anthropic 400
       messages.push({ role: "assistant", content: batch.map((b) => ({ type: "tool_use", id: b.id, name: b.name, input: b.input })) });
       messages.push({ role: "user", content: batch.map((b) => ({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(b.result) })) });
     }

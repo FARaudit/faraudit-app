@@ -11,7 +11,7 @@
 //     flagged → truncated=true → honest INCOMPLETE. A NON-binding blank template is NOT a loss.
 //   • Verdict-gate flip: nothing dropped ⇒ agenticManifestComplete=true ⇒ no INCOMPLETE cap (committal flows).
 
-import { assembleFullSourceChunked, mapReduceDoc, wouldOverflow, isAmendmentDoc, deterministicFloor, overlappingWindows, MAP_CHUNK_CHARS, type ChunkMapCall } from "./agentic-chunked-ingest";
+import { assembleFullSourceChunked, mapReduceDoc, makeChunkMapCaller, wouldOverflow, isAmendmentDoc, deterministicFloor, overlappingWindows, MAP_CHUNK_CHARS, type ChunkMapCall } from "./agentic-chunked-ingest";
 import { assembleFullSourceBudgeted } from "./agentic-executor";
 import { agenticManifestComplete } from "./audit-executor-v3";
 import type { AgenticDoc } from "./agentic-orchestrator";
@@ -132,7 +132,7 @@ async function main() {
   const r = await mapReduceDoc(mk("x-att.pdf", "body with clause 52.212-4 present and prose"), throwing, undefined);
   check("T23 · a failing MAP is fail-safe (no throw, doc still produced)", r.mode === "map-reduce" && typeof r.text === "string", "threw or empty");
   check("T24 · clause floor survives a total MAP failure (52.212-4)", r.text.includes("52.212-4"), "floor lost on map failure");
-  check("T25 · isAmendmentDoc recognizes SF-30 / amendment names", isAmendmentDoc("am_2.pdf") && isAmendmentDoc("SF30-amend-0002.pdf"), "amendment not recognized");
+  check("T25 · isAmendmentDoc is STRICT (amendment/SF-30 names only, NOT every binding doc)", isAmendmentDoc("amendment_0002.pdf") && isAmendmentDoc("SF30-amend-0002.pdf") && !isAmendmentDoc("spec-sheet.pdf") && !isAmendmentDoc("g26ra087.pdf"), "strict amendment name check failed");
   check("T26 · MAP_CHUNK_CHARS is a sane positive size", MAP_CHUNK_CHARS >= 1000, `chunk=${MAP_CHUNK_CHARS}`);
 }
 
@@ -155,6 +155,39 @@ async function main() {
   const w = overlappingWindows("AAAA" + "x".repeat(96) + "BOUNDARY-SPAN-MARKER" + "y".repeat(80), 100, 40);
   check("T31 · overlapping windows keep a boundary span intact in some window", w.some((win) => win.includes("BOUNDARY-SPAN-MARKER")), `windows=${w.length}`);
   check("T32 · overlappingWindows: single short text → one window (no overlap needed)", overlappingWindows("short", 100, 40).length === 1, "unexpected split");
+}
+
+// ── 9 · HARDENING FIXES (ultracode watchpoints) — chunk-failure gate (#2) + amendment marker (#3) ──────
+{
+  // #2 — a BINDING doc where a MAJORITY of windows FAIL (throw) is "mostly unread" → contentLoss=true, even though
+  // its deterministic floor is non-empty. Isolates the coverage gate from the empty-digest path.
+  const throwAll: ChunkMapCall = async () => { throw new Error("window failed"); };
+  const bigBinding = mk("amendment_0007.pdf", "clause 52.212-4 applies. " + "z".repeat(90000)); // ~3 windows, floor non-empty
+  const r = await mapReduceDoc(bigBinding, throwAll);
+  check("T33 · majority-failed windows on a binding doc ⇒ contentLoss=true (#2 coverage gate)", r.contentLoss === true && r.failedWindows >= 2, `contentLoss=${r.contentLoss} failed=${r.failedWindows}/${r.chunks}`);
+
+  // A binding doc where windows SUCCEED but return genuine empty [] (valid JSON, not a failure) with a non-empty
+  // floor is NOT content-loss — genuine "no spans here" must not be conflated with failure.
+  const emptyOk: ChunkMapCall = async () => ({ excerpts: [] });
+  const r2 = await mapReduceDoc(mk("amendment_0008.pdf", "clause 52.212-4 applies. " + "z".repeat(90000)), emptyOk);
+  check("T34 · genuine-empty windows (valid []) + floor ⇒ contentLoss=false (not conflated with failure)", r2.contentLoss === false && r2.failedWindows === 0, `contentLoss=${r2.contentLoss} failed=${r2.failedWindows}`);
+
+  // makeChunkMapCaller must THROW on unparseable output (so it counts as a window failure), and return cleanly on valid JSON.
+  const badCaller = makeChunkMapCaller(async () => "THIS IS NOT JSON", "m");
+  let threw = false;
+  try { await badCaller({ docName: "d.pdf", chunk: "c", chunkIndex: 0, chunkCount: 1 }); } catch { threw = true; }
+  check("T35 · makeChunkMapCaller THROWS on unparseable output (counts as window failure)", threw === true, "did not throw");
+  const goodCaller = makeChunkMapCaller(async () => JSON.stringify({ excerpts: ["hello"] }), "m");
+  const good = await goodCaller({ docName: "d.pdf", chunk: "c", chunkIndex: 0, chunkCount: 1 });
+  check("T36 · makeChunkMapCaller returns cleanly on valid JSON", good.excerpts.length === 1 && good.excerpts[0] === "hello", "bad parse");
+
+  // #3 — CONTENT-based: a compressed doc whose TEXT contains amendment language gets a top-of-digest marker (in the
+  // first chars, so detectAmendments' 4000-char scan fires) — filename-independent, no over-match on non-amendments.
+  const stub: ChunkMapCall = async ({ chunk }) => ({ excerpts: [chunk.slice(0, 40)] });
+  const amd = await mapReduceDoc(mk("0002.pdf", "AMENDMENT OF SOLICITATION No. 0002 revises the due date. ".repeat(2000)), stub);
+  check("T37 · amendment CONTENT (not filename) ⇒ marker at digest head (#3)", /AMENDMENT OF SOLICITATION/i.test(amd.text.slice(0, 120)), "amendment marker missing from digest head");
+  const nonAmd = await mapReduceDoc(mk("spec-sheet.pdf", "technical specification section ".repeat(3000)), stub);
+  check("T38 · non-amendment content ⇒ NO amendment marker (no over-match)", !/AMENDMENT OF SOLICITATION/i.test(nonAmd.text), "spurious marker");
 }
 
 console.log(`\n──────────────  ${pass} pass · ${fail} fail`);

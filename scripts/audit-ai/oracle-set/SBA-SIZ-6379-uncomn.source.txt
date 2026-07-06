@@ -1,0 +1,9 @@
+SECTION A — SOLICITATION
+Solicitation Number: HTC71125RD002
+Issuing Office: United States Transportation Command (USTRANSCOM)
+
+SET-ASIDE AND SIZE STANDARD
+This solicitation is a one hundred percent (100%) small business set-aside under NAICS code 541512, Computer Systems Design Services, with a corresponding small business size standard of $34 million in average annual receipts. A concern, including its affiliates, must qualify as small under the assigned NAICS code as of the date it submits its initial offer, including price, containing a written self-certification that it is small.
+
+SCOPE
+The Contractor shall provide enterprise architecture, data management, and information technology engineering services. This procurement is conducted in two phases: phase I proposals and phase II proposals (including price) are due on the dates stated elsewhere in this solicitation.

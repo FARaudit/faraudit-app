@@ -237,6 +237,34 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     }
   }
 
+  // Pass 2c: COMMERCIAL clause headings (§L ≡ 52.212-1, §M ≡ 52.212-2). VA/agency combined RFQs
+  // number the commercial instructions/evaluation clauses under their OWN sub-section id — e.g.
+  // "E.1 52.212-1 INSTRUCTIONS TO OFFERORS—COMMERCIAL PRODUCTS", "E.5 52.212-2 EVALUATION—COMMERCIAL
+  // PRODUCTS". The §L/§M title patterns lead the line-anchored group with the bare clause number, so a
+  // "E.5 " agency prefix defeats them and §M reads ABSENT even though its content is present
+  // (36C25626Q0947: §M was false-missing while the 52.212-2 evaluation heading sat under an E.5 prefix).
+  // ADDITIVE + guarded: only for §L/§M NOT already found; the leading letter/number prefix is optional,
+  // and a TABLE-OF-CONTENTS entry (this line — or its wrapped continuation — ending in a dot-leader page
+  // number) is skipped so the boundary lands on the REAL heading, never the TOC. Medium confidence. Cannot
+  // change any already-detected section, so gold sources with §L/§M present are byte-identical.
+  const COMMERCIAL_CLAUSE_HEAD: Record<string, RegExp> = {
+    L: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-1\b/i,
+    M: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-2\b/i,
+  };
+  const TOC_LEADER_RE = /\.{5,}\s*\d{1,4}\s*$/; // "…………53" dot-leader + page number (TOC entry)
+  for (const [key, pat] of Object.entries(COMMERCIAL_CLAUSE_HEAD)) {
+    if (foundKeys.has(key)) continue;
+    for (let i = 0; i < primaryEnd; i++) {
+      const t = allLines[i].text.trim();
+      if (!pat.test(t)) continue;
+      // Skip a TOC entry: the candidate line, or its wrapped continuation, ends in a dot-leader page ref.
+      if (TOC_LEADER_RE.test(t) || (i + 1 < primaryEnd && TOC_LEADER_RE.test(allLines[i + 1].text.trim()))) continue;
+      boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: `COMMERCIAL_CLAUSE(${key})` });
+      foundKeys.add(key);
+      break;
+    }
+  }
+
   // Pass 2.5: §C fallback for DLA SF-18 combined format — scope lives inline as
   // NSN-anchored item description block, not under a labeled §C header.
   // Anchor on NSN pattern (4-2-3-4 digits) OR "Item Description" / "MFG name"
@@ -363,6 +391,16 @@ const CSI_SECTION_RE = /\bSECTION\s+\d{2}\s+\d{2}\s+\d{2}\b/gi;
  * is construction, or null when it is in-scope (or undetermined → let the normal pipeline run).
  * Pure → gate-testable; runs at the pre-paid classify stage and short-circuits before any model call.
  */
+// Resolvable OFFER/SUBMISSION structure — a document-bounded construction solicitation the engine CAN reason over
+// (SF-1442 offer form + bid schedule / offer-due / receipt-of-offers mechanics). Its presence VETOES out-of-scope
+// (Brain card 288 RULING 1: OOS is a CAPABILITY boundary, not a form/NAICS one). Keyed on SUBMISSION MECHANICS, NOT
+// bonding — bonding is statutory on essentially every construction buy, so vetoing on it would disable the boundary
+// for the whole population (adversarial-review finding); a design-build drawing set with a stray bond mention but no
+// way to submit an offer must still fall to OOS. Keyed on SUBMISSION MECHANICS only — the SF-1442 form token is the
+// CLASSIFIER, not proof of biddability (Rule-69 re-review): an SF-1442 design-build with NO bid schedule must still
+// fall to OOS, not escape on the bare form name. W9126 (bid schedule + offers-due) has real offer structure.
+const OFFER_STRUCTURE_RE = /bid\s+schedule|offers?\s+(?:are\s+)?due|offer\s+due\s+date|receipt\s+of\s+offers|bid\s+opening/i;
+
 export function detectConstructionOutOfScope(opts: {
   naicsCode?: string | null;
   fullText: string;
@@ -370,22 +408,22 @@ export function detectConstructionOutOfScope(opts: {
   const naics = (opts.naicsCode ?? "").trim();
   const text = opts.fullText ?? "";
 
-  // ── HARD tier (any one fires) ──
-  const hard: string[] = [];
-  if (/^23\d{4}$/.test(naics)) hard.push(`NAICS ${naics} (Construction, sector 23)`);
-  if (SF1442_HEADER_RE.test(text)) hard.push("SF-1442 (Solicitation/Offer/Award for Construction)");
-  if (hard.length >= 1) {
-    return { outOfScope: true, outcome: "OUT_OF_SCOPE", reason: "out_of_scope:construction", tier: "hard", matchedSignals: hard };
-  }
+  // Brain card 288 RULING 1 (NARROWED, supersedes the 2026-06-26 form/NAICS ruling): OUT_OF_SCOPE ONLY for packages
+  // with NO resolvable offer/submission structure — design-heavy CSI/drawing-dominant design-build the engine cannot
+  // reason over. A resolvable offer structure (bid schedule + bonds + submission) → decided path via the construction
+  // carrier, regardless of NAICS-23 or SF-1442. This is the WIRED narrowed trigger; the detector no longer HARD-fires
+  // on form/NAICS alone (the landmine Brain flagged).
+  if (OFFER_STRUCTURE_RE.test(text)) return null; // biddable — decided path, never out of scope
 
-  // ── BOUNDARY tier (>=2 together) ──
-  const boundary: string[] = [];
-  if (DAVIS_BACON_RE.test(text)) boundary.push("Davis-Bacon construction wage rate (FAR 52.222-6 / construction WD)");
+  // No offer structure → the genuinely-unreasonable class fires ONLY when the package is CSI-spec/drawing-DOMINANT
+  // (a multi-division spec book with no way to bid it). NAICS-23 alone no longer fires (capability, not code).
   const csiSections = new Set((text.match(CSI_SECTION_RE) ?? []).map((s) => s.toUpperCase()));
-  if (csiSections.size >= 2) boundary.push(`CSI MasterFormat multi-division spec (${csiSections.size} section codes)`);
-  if (boundary.length >= 2) {
-    return { outOfScope: true, outcome: "OUT_OF_SCOPE", reason: "out_of_scope:construction", tier: "boundary", matchedSignals: boundary };
+  if (csiSections.size >= 3) {
+    const signals = [`CSI MasterFormat multi-division spec (${csiSections.size} section codes) with NO resolvable offer/submission structure`];
+    if (/^23\d{4}$/.test(naics)) signals.push(`NAICS ${naics} (Construction, sector 23)`);
+    if (DAVIS_BACON_RE.test(text)) signals.push("Davis-Bacon construction wage rate (FAR 52.222-6 / construction WD)");
+    return { outOfScope: true, outcome: "OUT_OF_SCOPE", reason: "out_of_scope:construction", tier: "hard", matchedSignals: signals };
   }
 
-  return null;
+  return null; // undetermined — let the normal pipeline run
 }

@@ -16,14 +16,16 @@ import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
-import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, type SkepticVerdict } from "./audit-verifier";
-import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
+import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, makeBatchedSkeptic, type SkepticFn, type SkepticVerdict } from "./audit-verifier";
+import { runAgenticAudit, docRegions, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
+import { makeJudgmentFirstProposer, makePerDocProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
 import { makeSectionFinderCaller } from "./audit-section-finder";
 import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
-import type { ExpertSpec } from "./audit-expert";
+import type { CallModel, ExpertSpec } from "./audit-expert";
+import type { ConstructionManifest } from "./audit-construction-manifest";
 
 export interface AuditPackageInput {
   fullSource: string;                       // assembled package source (every routed section + attachment)
@@ -40,6 +42,8 @@ export interface AuditPackageInput {
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
   noticeType?: string | null;               // Layer-2 (card 262) — SAM notice type; scopes the §L/§M INCOMPLETE requirement to solicitation-type buys
   formIdentified?: boolean;                  // Layer-2 (card 262) — whether a substantive primary form was recognized; corroborates body-absent
+  constructionManifest?: ConstructionManifest; // Brain card 288 — sealed SF-1442/part36 binding-content manifest (full-text, pre-compression); the part36 completeness carrier reads it
+  groundingSource?: string;                  // Brain card 291 — STORED FULL TEXT (pre-compression) for Rule-64 grounding; model reads the digest (fullSource), source grounds
   judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
   judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
   sectionFinderModel?: string;              // L3 (card 265/267) — grounded section-finder; default modelFor("finder") (Sonnet — the offset-match gate makes it fail-safe)
@@ -109,12 +113,27 @@ function makeJudgmentCallers(
   return { judgmentReason, judgmentEntail };
 }
 
+/** Parse + validate a raw skeptic response into typed verdicts. RULING 2 (Brain card 274): a truncated
+ *  (max_tokens) or unparseable or verdicts-missing response THROWS — NEVER a silent {verdicts:[]} swallow. An
+ *  empty verdict set would keep the lenient base type on a contested finding → verifier sound:true → FALSE BID.
+ *  The throw propagates to makeAgenticVerifier's catch, which routes the run to sound:false → NHR (with the
+ *  grounded/contested set attached). A max_tokens stop means the JSON is cut off — a partial verdict set is
+ *  untrustworthy even if it happens to parse. Exported so the $0 regression gate exercises the real parser. */
+export function parseSkepticResponse(res: { text: string; stopReason: string | null }, model: string): { verdicts: SkepticVerdict[] } {
+  if (res.stopReason === "max_tokens") throw new Error(`skeptic response truncated (max_tokens, model=${model}) — refusing to trust a partial verdict set`);
+  let parsed: { verdicts?: SkepticVerdict[] };
+  try { parsed = JSON.parse(res.text) as { verdicts?: SkepticVerdict[] }; }
+  catch (e) { throw new Error(`skeptic response unparseable (model=${model}) — refusing empty-swallow: ${(e as Error)?.message ?? String(e)}`); }
+  if (!Array.isArray(parsed.verdicts)) throw new Error(`skeptic response missing verdicts[] (model=${model}) — refusing empty-swallow`);
+  return { verdicts: parsed.verdicts };
+}
+
 /** Adapt callStructuredClaude (returns raw JSON text) to the skeptic's typed contract. The audit-level
  *  budget `signal` (if any) is closed over so an overall-budget breach also cancels the skeptic's calls. */
 function structuredAdapter(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void) {
   return async (args: { model: string; system: string; user: string; schema: Record<string, unknown> }): Promise<{ verdicts: SkepticVerdict[] }> => {
     const res = await callStructuredClaude({ apiKey, model: args.model, system: args.system, userPrompt: args.user, schema: args.schema, maxTokens: 4096, signal, onUsage });
-    try { return JSON.parse(res.text) as { verdicts: SkepticVerdict[] }; } catch { return { verdicts: [] }; }
+    return parseSkepticResponse(res, args.model);
   };
 }
 
@@ -123,12 +142,15 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the agentic engine.");
 
-  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest };
   const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"), { onUsage: input.onUsage });
   // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
+  // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
+  // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
   const skeptic = makeTieredSkeptic(
-    makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens")),
+    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
     makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
   );
   const verify = makeAgenticVerifier(skeptic);
@@ -173,4 +195,80 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
     formIdentified: input.formIdentified,   // Layer-2 (card 262) — corroborates whether the §L/§M-bearing primary was ingested
     ...(judgment ? { judgmentReason: judgment.judgmentReason, judgmentEntail: judgment.judgmentEntail } : {}),
   });
+}
+
+// ── JUDGMENT-FIRST WIRING (Brain cards 276/279) — the thin adapter: real proposer + real rail behind the flag ──
+// PROPOSE (one holistic Opus call reads the WHOLE source and reasons to a verdict, the way pasting a solicitation
+// into Claude does) → the deterministic RAIL (runAgenticAudit over the re-grounded proposal, enforcing I1–I8) →
+// DISPOSE (a committal pole survives only on proposer↔rail agreement). This wires both PAID seams to the real
+// callers; the $0 unit tests inject stubs. It does NOT touch auditPackage/executeAudit — nothing calls it on the
+// customer path yet (flag AUDIT_JUDGMENT_FIRST gates the eventual executor branch); the $0 proof-replay harness
+// calls it directly to score judgment-first vs the ladder before any greenlit paid run.
+
+/** Adapt callStructuredClaude → the proposer's JudgmentStructuredCaller seam (maps user→userPrompt; surfaces the
+ *  raw text + stopReason so the proposer's own max_tokens/parse honest-fail runs). One holistic call, so the
+ *  token ceiling is generous (the whole boardroom analysis + grounded findings). */
+function judgmentStructuredCaller(apiKey: string, signal?: AbortSignal, onUsage?: (u: UsageCall) => void): JudgmentStructuredCaller {
+  return ({ model, system, user, schema }) => callStructuredClaude({
+    apiKey, model, system, userPrompt: user, schema, maxTokens: 8192, signal, label: "judgment-first", onUsage,
+  });
+}
+
+/** The RailFn must NEVER be invoked with the expert lens loop in seed mode — runAgenticAudit skips P1 entirely
+ *  when seedFindings is present, so callModel is dead. Guard it so a future refactor that reintroduces a lens call
+ *  fails loud instead of silently making an unbudgeted paid call. */
+const seedModeCallModelGuard: CallModel = () => { throw new Error("judgment-first rail: callModel must not run in seedFindings mode (the proposer replaces the lenses)"); };
+
+/** Run the judgment-first path end-to-end with the REAL model + REAL rail. PAID (one proposer call + the rail's
+ *  P2 adversarial verify). Returns the DISPOSED result — the disposed verdict is the customer-facing one; proposed
+ *  + railDerived are carried for telemetry/proof. Same guard as auditPackage: throws if the SDK isn't configured. */
+export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<JudgmentFirstResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the judgment-first engine.");
+
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest, groundingSource: input.groundingSource };
+  const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
+  // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
+  // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
+  const baseSkeptic: SkepticFn = makeStructuredSkeptic(adapt, input.skepticBaseModel ?? modelFor("lens"));
+  const skeptic = makeTieredSkeptic(
+    process.env.AUDIT_VERIFIER_BATCHING === "true" ? makeBatchedSkeptic(baseSkeptic) : baseSkeptic,
+    makeStructuredSkeptic(adapt, input.skepticEscalateModel ?? modelFor("judge")),
+  );
+  const verify = makeAgenticVerifier(skeptic);
+
+  const basePropose = makeJudgmentFirstProposer(judgmentStructuredCaller(apiKey, input.signal, input.onUsage), input.judgmentReasonModel ?? modelFor("judge"));
+  // Brain card 291 — PER-DOC DECOMPOSITION (flag-gated). When on, wrap the holistic proposer so each binding document
+  // also gets its own proposer pass (findings unioned) → per-doc attestation is satisfiable by construction; the rail
+  // still DISPOSEs over the union. OFF ⇒ the single holistic proposer (byte-identical). Multi-doc packages only.
+  const propose = process.env.AUDIT_PERDOC_DECOMP === "true" ? makePerDocProposer(basePropose, docRegions) : basePropose;
+
+  // The RAIL: the full deterministic orchestrator over the re-grounded proposal. runAgenticAudit re-grounds the
+  // seed (drops any ungrounded finding), runs the deterministic sweep/temporal/verify/completeness + every re-typing
+  // guard, and DERIVES the verdict — I1–I8 enforced by the real rail, not a re-implementation. Returns its Decision.
+  const rail: RailFn = async (findings) => (await runAgenticAudit({
+    ctx,
+    experts: [],
+    callModel: seedModeCallModelGuard,
+    verify,
+    seedFindings: findings,
+    bidderProfile: input.bidderProfile ?? null,
+    signal: input.signal,
+    manifestComplete: input.manifestComplete,
+    naics: input.naics ?? null,
+    setAside: input.setAside ?? null,
+    noticeType: input.noticeType ?? null,
+    formIdentified: input.formIdentified,
+  })).decision;
+
+  const jfInput: JudgmentFirstInput = {
+    fullSource: input.fullSource,
+    sections: input.sections,
+    bidderProfile: input.bidderProfile ?? null,
+    noticeType: input.noticeType ?? null,
+    naics: input.naics ?? null,
+    setAside: input.setAside ?? null,
+    isConstruction: input.constructionManifest?.isConstruction, // Brain card 289 — construction-aware proposer
+  };
+  return runJudgmentFirst(jfInput, propose, rail);
 }

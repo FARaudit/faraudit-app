@@ -1,0 +1,13 @@
+SECTION A — REQUEST FOR QUOTATION
+Solicitation Number: 2032H5-26-Q-0011
+Issuing Office: Department of the Treasury, Internal Revenue Service (issued under the NASA SEWP Government-Wide Acquisition Contract)
+
+SCOPE / SALIENT REQUIREMENTS
+The Government requires an enterprise virtualization platform to migrate approximately 10,000 virtual machines from an existing VMware environment to a scalable enterprise virtualization solution. Quoted solutions shall meet the following requirements:
+(a) Provide a single, shared storage pool that aggregates direct-attached storage across nodes.
+(b) Support live, in-place conversion between hypervisors without data movement.
+(c) Provide integrated disaster recovery with no add-on or separately licensed software.
+(d) Complete software installation within 7 days of delivery.
+
+BRAND NAME OR EQUAL
+The bill of materials is stated on a "brand name or equal" basis. Reference products include Nutanix NTX-HCI-BNDL and NTX-8170-G9. Quotes offering "equal" products that meet the salient characteristics stated above will be considered for award.

@@ -1,0 +1,7 @@
+{
+  "_note": "OHA-established firm facts fed as the bidder profile per Brain R2(i). NEUTRAL facts only. The engine must NOT declare INELIGIBLE.",
+  "satisfiesSizeStandard": true,
+  "closedWorld": true,
+  "basis": "The concern's five-year average annual receipts, combined with its affiliates, are below the $47 million NAICS 722310 size standard. The concern performs 56.54% of the cost of the vital services with its own employees (exceeding the 50% limitation on subcontracting). Its large-business teammate is a subcontractor, not a joint-venture partner.",
+  "expectedGivenFacts": "eligible — engine must not declare INELIGIBLE"
+}
