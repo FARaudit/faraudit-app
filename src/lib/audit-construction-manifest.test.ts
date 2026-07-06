@@ -207,6 +207,10 @@ ok("289 · a doc WITH obligations is NOT attested obligation-free", sweepConstru
 ok("289 · IMPERATIVE-mood spec (no shall/must) still counts obligations (CSI regression)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "spec.pdf", text: "Furnish and install cast-in-place concrete. Provide formwork and shoring. Submit shop drawings for approval." }], "236220").docAttestations.find((a) => a.name === "spec.pdf")!.groundableObligations > 0);
 // Rule-69 card-289 hole #2 (HIGH) — a failed-extraction marker must read hasText=false (never attestable), via hasEngineText.
 ok("289 · [PDF_EXTRACTION_FAILED marker → hasText=false (never attestable)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "x.pdf", text: "[PDF_EXTRACTION_FAILED: pdftotext returned nothing readable]" }], "236220").docAttestations.find((a) => a.name === "x.pdf")!.hasText === false);
+// W9126 root fix — an ANNOTATION-HEAVY drawings doc (trips hasEngineText's garbled heuristic) but carrying real
+// obligation verbs is READ, not unread: hasText=true (obl proves readable content), still needs its obligations grounded.
+const drawGarble = "12 34 56 A-101 B/C 3'-6\" GRID Ø25 EL.+14.5 shall furnish and install per detail. 90° R2 TYP.";
+ok("W9126 · annotation-heavy drawings WITH obligations → hasText=true (read, not unread)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "dwg.pdf", text: drawGarble }], "236220").docAttestations.find((a) => a.name === "dwg.pdf")!.hasText === true);
 // UNREAD / no-text attachment → hasText=false → HARD LINE (never attestable).
 ok("289 · no-text (scanned) attachment → hasText=false (HARD LINE: never attestable)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "scan.pdf", text: "[img]" }], "236220").docAttestations.find((a) => a.name === "scan.pdf")!.hasText === false);
 

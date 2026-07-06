@@ -129,12 +129,22 @@ export function sweepConstructionManifest(
   // read/no-text check `hasEngineText` (word floor + mojibake + [PDF_EXTRACTION_FAILED guards) — NOT an ad-hoc char
   // floor (Rule-69 card-289 review): a header-only text layer or a failed-extraction marker must read hasText=false
   // ⇒ uncovered ⇒ INCOMPLETE, especially on the upload path where there is no upstream content-loss cap.
-  const docAttestations: DocAttestation[] = docs.map((d) => ({
-    name: d.name,
-    fullTextHash: sha256(d.text),
-    hasText: hasEngineText(d.text),
-    groundableObligations: countGroundableObligations(d.text ?? ""),
-  }));
+  const docAttestations: DocAttestation[] = docs.map((d) => {
+    const groundableObligations = countGroundableObligations(d.text ?? "");
+    // hasText = the doc extracted REAL machine-readable content (was READ), vs a scanned / failed-extraction stub.
+    // hasEngineText catches clean prose; but an ANNOTATION-HEAVY doc (construction drawings: dimensions, grid labels,
+    // symbols + some spec prose) trips hasEngineText's garbled/word-floor heuristic yet is genuinely READ. Its
+    // detected obligation VERBS (shall / furnish / provide …) are real English words that CANNOT occur in a scanned
+    // stub or mojibake — so groundableObligations>0 PROVES the doc was read (Brain HARD LINE: read-and-empty ≠ unread;
+    // a doc with obligations is READ, and still needs its obligations grounded — never attested read-and-empty). A
+    // scanned/[PDF_EXTRACTION_FAILED] stub has obl=0 → hasText stays false → correctly never attestable.
+    return {
+      name: d.name,
+      fullTextHash: sha256(d.text),
+      hasText: hasEngineText(d.text) || groundableObligations > 0,
+      groundableObligations,
+    };
+  });
 
   const elements: ConstructionElement[] = ELEMENT_DEFS.map((def) => {
     for (const d of docs) {

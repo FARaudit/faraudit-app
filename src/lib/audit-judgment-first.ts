@@ -200,11 +200,14 @@ export function makePerDocProposer(
     if (regions.length <= 1) return holistic; // single-doc — no per-doc decomposition
     const primary = regions.find((r) => r.isPrimary)?.text ?? "";
     const perDoc: TypedFinding[] = [];
+    // A SHORT primary context header (first ~1200 chars) so the per-doc pass knows the solicitation framing, but the
+    // BULK is THIS attachment — the model can only quote this document, so its findings ground IN it (not the primary).
+    const ctxHead = primary.slice(0, 1200);
     for (const r of regions) {
       if (r.isPrimary) continue;
-      // Propose over {primary context + this ONE attachment} so the model's attention is on this document — its
-      // findings quote THIS attachment. Grounding (the rail) verifies each excerpt against the STORED FULL TEXT.
-      const sub = await base({ ...input, fullSource: `${primary}\n\n==== DOCUMENT: ${r.name} ====\n\n${r.text}` });
+      // Propose over THIS ONE attachment (+ a short primary context header) so the model's findings quote THIS
+      // document. Grounding (the rail) verifies each excerpt against the STORED FULL TEXT.
+      const sub = await base({ ...input, fullSource: `[SOLICITATION CONTEXT]\n${ctxHead}\n\n=== ANALYZE THIS ATTACHMENT — quote findings from it ===\n==== DOCUMENT: ${r.name} ====\n\n${r.text}` });
       perDoc.push(...sub.findings);
     }
     const seen = new Set<string>(); const union: TypedFinding[] = [];
