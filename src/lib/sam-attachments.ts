@@ -576,21 +576,50 @@ function dedupeKey(name: string): string {
     .trim();
 }
 
+// Amendment/modification number (leading zeros stripped so "0001" ≡ "1"); null
+// when the name carries no amendment number. Used so two DIFFERENT amendments of
+// the same series can never collapse into one another (Guard C below).
+function amendmentNumber(name: string): string | null {
+  const m = name.match(/\b(?:amendment|amend|amd|modification|mod)\b[\s_.\-]*0*(\d+)/i);
+  return m ? m[1] : null;
+}
+
 // Drop near-identical files BEFORE the budget. Among entries sharing a dedupeKey
 // keep ONE — prefer the larger (an amendment supersedes its base and is usually
 // bigger); size-unknown sorts last; name as the final deterministic tie-break.
 // Dropped duplicates are returned so the caller can record the loud overflow.
 // Pure + exported for the gate suite.
-export function dedupeNearDuplicates(plan: DocumentPlanEntry[]): {
+//
+// FA-INGEST (2026-07-06, 36C25626Q0947): the base solicitation and its SF-30
+// amendments are commonly named as JUST the sol number + a role token
+// ("<sol> - Final.pdf", "<sol> - Amendment 0001.pdf", "<sol> - Amendment 0002.pdf").
+// dedupeKey strips the role token AND its trailing number, so all of them collapse
+// to the bare sol number and the amendments get DROPPED as "near-duplicate of
+// Final" — silently losing a real, bid-critical change (here Final still read
+// "offers due 07-07" while amendment 0001 moved the deadline to 07-09). Base +
+// each amendment are DISTINCT binding documents, never duplicates. Two guards,
+// both zero-loss and provably clear of the DTS "RFQ CLIN Structure" merge (its key
+// is a real content title, never the sol number, and it carries no amendment #):
+//  (A) a key that is empty or exactly the solicitation number carries no content
+//      identity beyond the base/amendment family → never group it;
+//  (C) entries with DIFFERENT amendment numbers are distinct documents → never
+//      share a group (fold the amendment # into the group key).
+export function dedupeNearDuplicates(plan: DocumentPlanEntry[], solicitationNumber?: string | null): {
   kept: DocumentPlanEntry[];
   dropped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
+  const solKey = solicitationNumber ? norm(solicitationNumber) : "";
   const groups = new Map<string, DocumentPlanEntry[]>();
   for (const e of plan) {
     const k = dedupeKey(e.name);
-    // Empty key (name had no alphanumerics after normalization) → never group.
-    if (!k) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
-    (groups.get(k) ?? groups.set(k, []).get(k)!).push(e);
+    // Guard A — empty key (no alphanumerics after normalization) OR a key that is
+    // only the solicitation number (the base/amendment family) → never group; each
+    // is a distinct binding doc.
+    if (!k || (solKey && k.replace(/\s+/g, "") === solKey)) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
+    // Guard C — a different amendment number can never share a group.
+    const amd = amendmentNumber(e.name);
+    const groupKey = amd ? `${k}::amd${amd}` : k;
+    (groups.get(groupKey) ?? groups.set(groupKey, []).get(groupKey)!).push(e);
   }
   const kept: DocumentPlanEntry[] = [];
   const dropped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
@@ -622,7 +651,7 @@ const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
 // ingestible in the multi-set; unknown sizes are skipped (never gamble the
 // budget on an unsized file beyond the form). Near-duplicate files are deduped
 // first so duplicate copies never consume slots that distinct docs need.
-export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
+export function applyBudget(plan: DocumentPlanEntry[], solicitationNumber?: string | null, maxDocs = MAX_DOCS, maxTotal = MAX_DOWNLOAD_BYTES): {
   ingest: DocumentPlanEntry[];
   skipped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
@@ -630,8 +659,9 @@ export function applyBudget(plan: DocumentPlanEntry[], maxDocs = MAX_DOCS, maxTo
   const skipped: Array<{ entry: DocumentPlanEntry; reason: string }> = [];
   let total = 0;
   // DTS W51H7226 fix — collapse near-duplicates before filling; dropped copies
-  // are carried into `skipped` so the overflow record stays loud.
-  const { kept: dedupedPlan, dropped } = dedupeNearDuplicates(plan);
+  // are carried into `skipped` so the overflow record stays loud. The sol number
+  // is passed so the base/amendment family (keys = bare sol #) is never collapsed.
+  const { kept: dedupedPlan, dropped } = dedupeNearDuplicates(plan, solicitationNumber);
   skipped.push(...dropped);
   // Fill order (FA-119): documentTier primary — form → amendment → strong work
   // statement → weak spec → generic attachment — with size-ASCENDING as the
@@ -859,7 +889,7 @@ export async function assembleSamDocumentSet(
 
   const plan = planDocumentOrder(manifest, solicitationNumber);
   const formEntry = plan.find((e) => e.role === "form") ?? null;
-  const { ingest, skipped } = applyBudget(plan);
+  const { ingest, skipped } = applyBudget(plan, solicitationNumber);
 
   // FA-119 Phase 2B — page budget runs AFTER download (page count needs bytes).
   // Pass 1: download + page-count + token-estimate every byte/doc-budgeted
@@ -1028,7 +1058,7 @@ export async function assembleUploadedDocumentSet(
 
   const plan = planDocumentOrder(manifest, solicitationNumber);
   const formEntry = plan.find((e) => e.role === "form") ?? null;
-  const { ingest, skipped } = applyBudget(plan);
+  const { ingest, skipped } = applyBudget(plan, solicitationNumber);
 
   // Pass 1: page-count + token-estimate every byte/doc-budgeted member (bytes
   // already local).

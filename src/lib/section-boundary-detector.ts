@@ -237,6 +237,34 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     }
   }
 
+  // Pass 2c: COMMERCIAL clause headings (§L ≡ 52.212-1, §M ≡ 52.212-2). VA/agency combined RFQs
+  // number the commercial instructions/evaluation clauses under their OWN sub-section id — e.g.
+  // "E.1 52.212-1 INSTRUCTIONS TO OFFERORS—COMMERCIAL PRODUCTS", "E.5 52.212-2 EVALUATION—COMMERCIAL
+  // PRODUCTS". The §L/§M title patterns lead the line-anchored group with the bare clause number, so a
+  // "E.5 " agency prefix defeats them and §M reads ABSENT even though its content is present
+  // (36C25626Q0947: §M was false-missing while the 52.212-2 evaluation heading sat under an E.5 prefix).
+  // ADDITIVE + guarded: only for §L/§M NOT already found; the leading letter/number prefix is optional,
+  // and a TABLE-OF-CONTENTS entry (this line — or its wrapped continuation — ending in a dot-leader page
+  // number) is skipped so the boundary lands on the REAL heading, never the TOC. Medium confidence. Cannot
+  // change any already-detected section, so gold sources with §L/§M present are byte-identical.
+  const COMMERCIAL_CLAUSE_HEAD: Record<string, RegExp> = {
+    L: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-1\b/i,
+    M: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-2\b/i,
+  };
+  const TOC_LEADER_RE = /\.{5,}\s*\d{1,4}\s*$/; // "…………53" dot-leader + page number (TOC entry)
+  for (const [key, pat] of Object.entries(COMMERCIAL_CLAUSE_HEAD)) {
+    if (foundKeys.has(key)) continue;
+    for (let i = 0; i < primaryEnd; i++) {
+      const t = allLines[i].text.trim();
+      if (!pat.test(t)) continue;
+      // Skip a TOC entry: the candidate line, or its wrapped continuation, ends in a dot-leader page ref.
+      if (TOC_LEADER_RE.test(t) || (i + 1 < primaryEnd && TOC_LEADER_RE.test(allLines[i + 1].text.trim()))) continue;
+      boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: `COMMERCIAL_CLAUSE(${key})` });
+      foundKeys.add(key);
+      break;
+    }
+  }
+
   // Pass 2.5: §C fallback for DLA SF-18 combined format — scope lives inline as
   // NSN-anchored item description block, not under a labeled §C header.
   // Anchor on NSN pattern (4-2-3-4 digits) OR "Item Description" / "MFG name"
