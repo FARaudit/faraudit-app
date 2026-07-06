@@ -19,6 +19,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
 import { buildAgenticDocs, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
+import { assembleFullSourceLossless } from "./agentic-lossless-ingest";
 import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocReadMode } from "./agentic-chunked-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
@@ -145,10 +146,28 @@ export async function executeAgenticPrimary(
   // Per-run token tally (concurrency-safe — local to THIS audit). Declared here so the MAP calls that run
   // during assembly are priced into the SAME ledger as the auditPackage calls below.
   const usageCalls: UsageCall[] = [];
+  // AUDIT_LOSSLESS_INGEST (2026-07-06, CEO leap) — DETERMINISTIC $0 replacement for the lossy map-reduce
+  // compressor: an over-budget package is shrunk by keeping every BINDING line verbatim (+ context) and dropping
+  // only noise, NEVER summarizing. Runs BEFORE the chunked branch and short-circuits it (no paid MAP calls).
+  // Flag-OFF ⇒ this branch never runs ⇒ byte-identical to today. (W9126: 2.83M→~331K tok, §M/wage/bonding survive.)
+  const losslessOn = process.env.AUDIT_LOSSLESS_INGEST === "true";
   const chunkedOn = process.env.AUDIT_CHUNKED_INGEST === "true";
+  // The lossless READ budget is sized to the model's 1M-token window (~4M chars), NOT the compression-era 1.4M-char
+  // budget (that ceiling forced the summarizer). Default ~3M chars (~750K tok — a safe margin under 1M for the
+  // system prompt + schema). A package whose BINDING content (post-filter) still exceeds this reads honest-INCOMPLETE.
+  const losslessMaxChars = Number(process.env.AGENTIC_LOSSLESS_MAX_CHARS) || 3_000_000;
   let assembled: { source: string; truncated: boolean; keptDocs: number; droppedDocs: string[]; contentLossDocs: string[] };
   let readModes: Array<{ name: string; mode: DocReadMode; chunks: number; spansKept: number; spansRejected: number; failedWindows: number }> | null = null;
-  if (chunkedOn && wouldOverflow(docs, MAX_FULLSOURCE_CHARS)) {
+  // When lossless is ON it handles ALL packages (fits-whole → untouched whole read; over-budget → binding-filter;
+  // filtered-still-over → honest INCOMPLETE) — so it fully supersedes the compressor, and reads MORE whole (up to the
+  // 1M window) than the old 1.4M budgeted/chunked paths did.
+  if (losslessOn) {
+    const la = assembleFullSourceLossless(docs, losslessMaxChars);
+    assembled = { source: la.source, truncated: la.truncated, keptDocs: la.keptDocs, droppedDocs: la.droppedDocs, contentLossDocs: la.contentLossDocs };
+    // Every doc is READ (full binding content) — no chunking, no map-reduce, zero paid MAP calls.
+    readModes = docs.map((d) => ({ name: d.name, mode: "full" as DocReadMode, chunks: 0, spansKept: 0, spansRejected: 0, failedWindows: 0 }));
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: LOSSLESS ingest — ${la.filteredDocs.length}/${docs.length} docs binding-filtered (noise dropped, binding kept VERBATIM, 0 summarized), source ${(assembled.source.length / 1e6).toFixed(2)}M chars${la.contentLossDocs.length ? ` — CONTENT-LOSS on [${la.contentLossDocs.join(", ")}] (binding content alone exceeds the read window) → documents_complete=false (honest INCOMPLETE)` : ""}`);
+  } else if (chunkedOn && wouldOverflow(docs, MAX_FULLSOURCE_CHARS)) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("agentic engine: ANTHROPIC_API_KEY not set — cannot run chunked map-reduce ingest");
     const mapCall = makeChunkMapCaller(
