@@ -25,6 +25,16 @@ ok("N5 spelled-out §L page limit → KEPT", dropNoise("Technical proposals are 
 ok("N6 a wage/$ table row (prose-ish) → KEPT", dropNoise("SCALE 1:100\nCARPENTER JOURNEYMAN $34.12 per hour\nGRID B-2").kept.includes("$34.12"));
 { const f = dropNoise("Line one is a full real sentence here.\n12x24\nLine two is another full real sentence.");
   ok("N7 prose kept, interstitial dimension noise dropped", f.kept.includes("Line one") && f.kept.includes("Line two") && !f.kept.includes("12x24")); }
+// ── N8 ★ FINDING-1 regression (adversarial review 2026-07-06): a pdftotext column-split BINDING numeric cell is
+//    letter-free but MUST survive — the old alt-1 `^[\s\W\d]*$` silently dropped these → false-COMPLETE wage/page/bond loss.
+{ const f = dropNoise("Technical Volume page limit:\n                          50\nBid guarantee (percent of bid):\n                          20%\nCARPENTER\n                          38.50   22.15\nBid amount:\n                          $150,000");
+  ok("N8 letter-free §L page limit '50' KEPT", f.kept.includes("50"));
+  ok("N8 letter-free bid-bond '20%' KEPT", f.kept.includes("20%"));
+  ok("N8 letter-free wage row '38.50   22.15' KEPT", f.kept.includes("38.50") && f.kept.includes("22.15"));
+  ok("N8 letter-free dollar value '$150,000' KEPT", f.kept.includes("$150,000")); }
+// N9 — the fix must NOT stop dropping genuine letter-free FURNITURE (blank / separators / pure symbols / dimension callouts).
+{ const f = dropNoise("Real binding sentence the vendor shall submit on time.\n\n=====\n| | |\n12'-6\"\n. . .");
+  ok("N9 blank/separator/symbol/dimension furniture still dropped", f.kept.trim() === "Real binding sentence the vendor shall submit on time."); }
 
 // ── assembleFullSourceLossless ───────────────────────────────────────────────────────────────────────
 {

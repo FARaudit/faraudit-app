@@ -38,10 +38,18 @@ export interface LosslessAssembled extends AssembledSource {
 const WORD = /[A-Za-z]{3,}/g;
 const PROSE_MIN_WORDS = 4;
 
-// PROVABLE NOISE — a line that is ONLY drawing/sheet furniture: blank / symbol-or-number-only, a dimension callout
+// PROVABLE NOISE — a line that is ONLY drawing/sheet furniture: blank / symbol-only, a dimension callout
 // (12'-6"), or a grid/scale/sheet/elevation/detail label with no trailing prose. Deliberately CONSERVATIVE: it
 // must match the WHOLE line (…$) so a label that is followed by real words is NOT noise and is kept.
-const NOISE_SHAPE = /^[\s\W\d]*$|^\s*\d+\s*['"]?\s*[-x×]\s*\d+\s*['"]?\s*$|^\s*(?:GRID|SCALE|SHEET|REV|DETAIL|NORTH|SOUTH|EAST|WEST|SECTION\s+[A-Z][-\s]?[A-Z]|PLAN\s+VIEW|ELEV(?:ATION)?|TYP|DWG|DRAWING\s+(?:NO|NUMBER))\b(?:\s+[A-Z]{1,2}[-.]?\d+[A-Z]?)?[\s\W\d]*$/i;
+//
+// ★ NEVER drop a line merely because it is letter-free-but-NUMERIC (adversarial-review FINDING 1, 2026-07-06): the
+// first alternation was `^[\s\W\d]*$`, which matched ANY line with no letters — silently dropping pdftotext
+// column-split binding table cells (a Davis-Bacon wage rate "38.50 22.15", a §L page limit "50", a bid-bond "20%",
+// a CLIN quantity) on the over-budget noise-drop path → a false-COMPLETE (documents_complete=true over lost content,
+// the very W9126 wage-table loss this module was built to end). FIX: alt-1 is now `^[\s\W]*$` — it drops ONLY
+// blank / pure-symbol / separator lines (no digits). Any line carrying a NUMBER is KEPT (a few cheap tokens vs a
+// silent binding-value loss). Explicit dimension callouts still drop via alt-2; drawing labels via alt-3.
+const NOISE_SHAPE = /^[\s\W]*$|^\s*\d+\s*['"]?\s*[-x×]\s*\d+\s*['"]?\s*$|^\s*(?:GRID|SCALE|SHEET|REV|DETAIL|NORTH|SOUTH|EAST|WEST|SECTION\s+[A-Z][-\s]?[A-Z]|PLAN\s+VIEW|ELEV(?:ATION)?|TYP|DWG|DRAWING\s+(?:NO|NUMBER))\b(?:\s+[A-Z]{1,2}[-.]?\d+[A-Z]?)?[\s\W\d]*$/i;
 
 /** True iff the line carries real prose (could be a binding obligation). Over-inclusive on purpose — the cost of
  *  keeping a borderline line is a few tokens; the cost of dropping a real obligation is a completeness miss. */
