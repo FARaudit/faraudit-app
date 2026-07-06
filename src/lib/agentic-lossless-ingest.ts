@@ -1,101 +1,91 @@
 // ── LOSSLESS INGEST (deterministic, $0, NO model) — the map-reduce COMPRESSOR replacement ──────────────
 //
-// WHY (2026-07-06, CEO-directed "take the leap", data-proven on W9126): the map-reduce compressor
-// (agentic-chunked-ingest.ts, ~314 cheap-model MAP calls, ~$4/15-min per giant) SUMMARIZES over-budget docs
-// into a small digest — and a summary silently DROPS content (W9126 lost its §M evaluation factors + the
-// Davis-Bacon wage table; adversarial panel confirmed). No industry pipeline summarizes; the standard is
-// clean EXTRACTION → structured read. The engine already has clean text (pdftotext-quality docs), so the fix
-// is NOT better extraction — it is to stop SUMMARIZING. This module shrinks an over-budget package by keeping
-// every binding line VERBATIM (+ its context) and dropping only genuine noise (drawing dimension callouts,
-// grid/scale/sheet furniture, blank/symbol rows). Deterministic, no model, no cost, no summarization.
+// WHY (2026-07-06, CEO-directed "take the leap"): the map-reduce compressor (agentic-chunked-ingest.ts, ~314
+// cheap-model MAP calls, ~$4/15-min per giant) SUMMARIZES over-budget docs into a small digest, and a summary
+// silently DROPS content (W9126 lost its §M evaluation factors + the Davis-Bacon wage table; panel-confirmed).
+// No industry pipeline summarizes; the standard is clean EXTRACTION → structured read. The engine already has
+// clean text (pdftotext-quality docs), so the fix is to stop SUMMARIZING.
 //
-// PROVEN on W9126: raw 11.32M chars (~2.83M tok) → filtered ~1.32M chars (~331K tok, 11% retained) that FITS
-// the existing 1.4M-char read budget → ONE long-context Opus read instead of 314 compression calls; §M / wage
-// / bonding all survive. Giant per-audit cost drops from ~$14 (whole read) to ~$2-3 (filtered read).
+// ★ DESIGN = DROP-NOISE, NOT KEEP-BINDING (adversarial-review REVISE, 2026-07-06). A first cut KEPT only lines
+// matching a "binding" keyword regex — but a keyword filter can NEVER be provably complete: an eligibility bar
+// with no obligation verb ("Firms lacking a facility clearance are not eligible"), a spelled-out §L page limit,
+// a present-tense spec ("concrete attains 4,000 psi"), and third-person verbs ("provides/submits") ALL slipped it,
+// and on the fits-budget path the drop was SILENT → false-eligible BID. Unacceptable for a completeness moat.
+// So we INVERT: keep EVERY line that carries real prose (any obligation, whatever its phrasing), and drop ONLY
+// PROVABLE NOISE — drawing dimension callouts, grid/scale/sheet furniture, symbol/number-only lines. A binding
+// obligation is always prose, so it can never be dropped. Lossless-FOR-PROSE by construction, no oracle needed.
 //
-// DOCTRINE (completeness moat, non-negotiable): the filter is LOSSLESS-FOR-BINDING by construction — it only
-// ever DROPS lines that carry no binding signal AND are not within the context window of one. It NEVER
-// summarizes, paraphrases, or reorders. Grounding still runs against the PRE-filter full text (groundingSource
-// in the executor), so a finding can never be fabricated. The residual risk is a binding obligation phrased
-// with NO signal word slipping the filter → mitigated by (a) a deliberately GENEROUS signal set, (b) ±context
-// windows, (c) whole-table retention, (d) the audit's own completeness verification downstream. Flag-gated
-// (AUDIT_LOSSLESS_INGEST); OFF ⇒ this module is never called ⇒ byte-identical to today.
+// This shrinks drawing-heavy giants (the drawings are mostly dimension noise) while keeping every text document
+// essentially whole. A PROSE package that still exceeds the read window is NOT force-summarized — it routes to
+// per-document reads (giant path) or reads honest-INCOMPLETE (named whole-doc drop, never a silent cut).
+//
+// Grounding: because only NOISE is dropped, no binding span is ever removed, so grounding against the assembled
+// (noise-dropped) source can never miss an obligation the model needed to see. Flag-gated (AUDIT_LOSSLESS_INGEST);
+// OFF ⇒ never called ⇒ byte-identical to today.
 
 import type { AgenticDoc } from "./agentic-orchestrator";
 import { assembleFullSource, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, type AssembledSource } from "./agentic-executor";
 
 export interface LosslessAssembled extends AssembledSource {
-  contentLossDocs: string[];   // WHOLE binding docs dropped (honest documents_complete=false) — [] when filtering fits
-  filteredDocs: string[];      // docs whose NOISE was dropped (binding kept verbatim) — NOT content loss
+  contentLossDocs: string[];   // WHOLE docs dropped (honest documents_complete=false) — [] when the noise-drop fits
+  filteredDocs: string[];      // docs whose NOISE was dropped (all prose kept verbatim) — NOT content loss
 }
 
-// BINDING-SIGNAL — a line carrying legal / obligation / evaluation weight. GENEROUS by design (err toward KEEP):
-// the cost of keeping a non-binding line is a few tokens; the cost of dropping a binding one is a completeness
-// miss. Covers obligation verbs, FAR/DFARS clause numbers, UCF/CSI section headers, evaluation factors, wage /
-// bond / surety / price / schedule / deadline terms, and party references.
-const BINDING_SIGNAL = /\b(?:shall|must|will\b|furnish|provide|submit|require|required|responsible|deliver|install|perform|comply|complies|complete|bond|guarantee|surety|wage|davis[\s-]?bacon|price|priced|pricing|cost|evaluat|factor|basis\s+for\s+award|award\s+will|awarded|deadline|due\b|no\s+later\s+than|offeror|contractor|liquidated|damages|SSEB|SSA\b|technically\s+acceptable|incorporat|clause|amend)\b|\b\d{2}\.\d{3}(?:-\d+)?\b|\b252\.\d{3}|\bWD\s+\d{2}[-\s]?\d{3,4}|\bsection\s+00\s+\d{2}\b|\bCLIN\b/i;
+// A line is PROSE if it carries real English — ≥ PROSE_MIN_WORDS tokens of ≥3 letters. ANY real obligation
+// qualifies regardless of phrasing (verb, tense, party noun, vocabulary) — this is why the drop-noise design is
+// provably complete where a keep-binding regex is not. Drawing callouts / grid labels / dimensions do NOT qualify.
+const WORD = /[A-Za-z]{3,}/g;
+const PROSE_MIN_WORDS = 4;
 
-// TABLE / DATA rows — wage schedules, bid/CLIN pricing tables, CSI section codes. Keep intact. MONEY + explicit
-// codes ONLY — a bare decimal (\d.\d{2}) is NOT enough: construction DRAWINGS are full of dimension callouts
-// ("12.50", "3.25") that would drag context windows around pure drawing noise and inflate the digest past the read
-// budget (observed on W9126: forced a false drop of the amendment + drawings). Wage-rate rows still survive via the
-// Davis-Bacon / "wage determination" header context (BINDING_SIGNAL) — we don't need to match every bare rate.
-const TABLE_ROW = /\$\s?\d[\d,]*(?:\.\d{2})?|\bCLIN\s*\d|\b\d{2}\s+\d{2}\s+\d{2}\b/;
+// PROVABLE NOISE — a line that is ONLY drawing/sheet furniture: blank / symbol-or-number-only, a dimension callout
+// (12'-6"), or a grid/scale/sheet/elevation/detail label with no trailing prose. Deliberately CONSERVATIVE: it
+// must match the WHOLE line (…$) so a label that is followed by real words is NOT noise and is kept.
+const NOISE_SHAPE = /^[\s\W\d]*$|^\s*\d+\s*['"]?\s*[-x×]\s*\d+\s*['"]?\s*$|^\s*(?:GRID|SCALE|SHEET|REV|DETAIL|NORTH|SOUTH|EAST|WEST|SECTION\s+[A-Z][-\s]?[A-Z]|PLAN\s+VIEW|ELEV(?:ATION)?|TYP|DWG|DRAWING\s+(?:NO|NUMBER))\b(?:\s+[A-Z]{1,2}[-.]?\d+[A-Z]?)?[\s\W\d]*$/i;
 
-// PURE NOISE — drawing dimension callouts, grid refs, scale / sheet / revision furniture, blank / symbol-only
-// lines. A line matching this AND not matching a binding signal is droppable.
-const PURE_NOISE = /^[\s\W\d]*$|^\s*\d+\s*['"]?\s*[-x×]\s*\d+|^\s*(?:GRID|SCALE|SHEET|REV\.?|DETAIL|NORTH\b|PLAN\s+VIEW|ELEV(?:ATION)?\b|TYP\.?\b)\b/i;
+/** True iff the line carries real prose (could be a binding obligation). Over-inclusive on purpose — the cost of
+ *  keeping a borderline line is a few tokens; the cost of dropping a real obligation is a completeness miss. */
+export function isProse(line: string): boolean {
+  return (line.match(WORD)?.length ?? 0) >= PROSE_MIN_WORDS;
+}
 
-// Keep this many lines on EITHER side of a binding hit so the obligation's surrounding sentence / table row /
-// heading context survives the filter (a bare matched line out of context reads worse to the model).
-const CONTEXT_LINES = 2;
-
-/** Filter ONE document's text to its binding content, VERBATIM. Keeps every binding/table line plus a ±context
- *  window; drops runs of pure noise. Never summarizes / reorders. Returns the kept text + char accounting. */
-export function filterBindingContent(text: string): { kept: string; keptChars: number; rawChars: number } {
+/** Drop ONLY provable NOISE from a document; KEEP ALL PROSE verbatim (never summarize/reorder). Lossless-for-prose:
+ *  a binding obligation is always prose, so it survives whatever its phrasing. Returns kept text + char accounting. */
+export function dropNoise(text: string): { kept: string; keptChars: number; rawChars: number } {
   const lines = text.split("\n");
-  const keep = new Array<boolean>(lines.length).fill(false);
-  for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
-    if (PURE_NOISE.test(ln) && !BINDING_SIGNAL.test(ln)) continue;   // pure noise, no binding signal → droppable
-    if (BINDING_SIGNAL.test(ln) || TABLE_ROW.test(ln)) {
-      const lo = Math.max(0, i - CONTEXT_LINES), hi = Math.min(lines.length - 1, i + CONTEXT_LINES);
-      for (let j = lo; j <= hi; j++) keep[j] = true;               // keep the hit + its context window
-    }
-  }
-  const out: string[] = [];
-  for (let i = 0; i < lines.length; i++) if (keep[i]) out.push(lines[i]);
+  // KEEP a line unless it is NON-prose AND matches the whole-line noise shape.
+  const out = lines.filter((ln) => isProse(ln) || !NOISE_SHAPE.test(ln));
   const kept = out.join("\n");
   return { kept, keptChars: kept.length, rawChars: text.length };
 }
 
-/** Assemble an over-budget package by binding-filtering each doc (verbatim, lossless-for-binding), NOT by
- *  compressing. Fits-whole → identical to the budgeted whole read (no filtering). Over-budget → filter → if it
- *  now fits, ONE read of the full binding set (contentLoss=[]); if STILL over budget the binding content itself
- *  exceeds the read window → drop WHOLE non-binding overflow docs (named, honest documents_complete=false). */
+/** Assemble a package by DROPPING NOISE (never summarizing). Fits-whole → untouched whole read. Over-budget →
+ *  noise-drop each doc (all prose kept) → if it now fits, ONE complete read (contentLoss=[]); if the PROSE alone
+ *  still exceeds the window, the package is too large for a single read → drop WHOLE non-binding-first overflow
+ *  docs (named, honest documents_complete=false). A giant should instead route to per-document reads BEFORE this
+ *  whole-doc drop (see the giant per-doc path); this function's whole-doc drop is the honest last-resort. */
 export function assembleFullSourceLossless(docs: AgenticDoc[], maxChars: number = MAX_FULLSOURCE_CHARS): LosslessAssembled {
-  // 1. Fits whole → NO filtering (byte-identical whole read — every char preserved). Gate on the ACTUAL assembled
-  //    size, NOT budgeted.truncated: a SINGLE over-budget doc never "truncates" (budgeted won't drop the only doc),
-  //    so a truncated-gate would skip filtering the very giant we were called to shrink (caught by L2 regression).
+  // 1. Fits whole → NO filtering (byte-identical whole read — every char preserved). Gate on ACTUAL assembled size,
+  //    NOT budgeted.truncated (a single over-budget doc never "truncates" → would skip the shrink; L2 regression).
   const wholeSource = assembleFullSource(docs);
   if (wholeSource.length <= maxChars) return { source: wholeSource, truncated: false, keptDocs: docs.length, droppedDocs: [], contentLossDocs: [], filteredDocs: [] };
 
-  // 2. Over budget → binding-filter each doc VERBATIM (drop noise, keep every binding line + context).
+  // 2. Over budget → drop NOISE from each doc (all prose kept verbatim).
   const filtered = docs.map((d) => {
-    const f = filterBindingContent(d.text);
+    const f = dropNoise(d.text);
     return { doc: { ...d, text: f.kept } as AgenticDoc, name: d.name, changed: f.keptChars < f.rawChars };
   });
   const filteredSet = filtered.map((f) => f.doc);
   const filteredNames = filtered.filter((f) => f.changed).map((f) => f.name);
   const assembledText = assembleFullSource(filteredSet);
 
-  // 3a. Filtered binding set fits → ONE complete read. Dropping NOISE is NOT content loss (all binding retained).
+  // 3a. Noise-drop fits → ONE complete read. Dropping NOISE is NOT content loss (all prose/binding retained).
   if (assembledText.length <= maxChars) {
     return { source: assembledText, truncated: false, keptDocs: filteredSet.length, droppedDocs: [], contentLossDocs: [], filteredDocs: filteredNames };
   }
 
-  // 3b. Still over budget after filtering → the BINDING content alone exceeds the window. Fail SAFE: drop whole
-  //     non-binding-first overflow docs on the FILTERED set (binding-priority order), named + honest INCOMPLETE.
+  // 3b. PROSE alone still exceeds the window → too large for a SINGLE read. Honest last-resort: drop whole
+  //     non-binding-first overflow docs on the noise-dropped set (named + documents_complete=false). The giant
+  //     per-doc path should intercept BEFORE here so no binding doc is dropped.
   const fb = assembleFullSourceBudgeted(filteredSet, maxChars);
   return { ...fb, contentLossDocs: fb.droppedDocs, filteredDocs: filteredNames };
 }
