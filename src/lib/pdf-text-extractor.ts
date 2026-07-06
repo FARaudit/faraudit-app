@@ -50,6 +50,11 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParseMod = require("pdf-parse");
     const PdfParseCtor = pdfParseMod?.PDFParse ?? pdfParseMod?.default ?? pdfParseMod;
+    // [PDF-DIAG] (2026-07-06, temporary) — the audit-worker container read ALL attachments
+    // has_text=false while this exact commit extracts them fine locally. Every doc (PDF + docx-
+    // via-wrapped-PDF) funnels through pdf-parse here, so this pins the container failure:
+    // module-load vs wrong-shape vs empty-yield vs throw. Remove once the cause is fixed.
+    console.error(`[PDF-DIAG] require pdf-parse: mod=${typeof pdfParseMod} ctor=${typeof PdfParseCtor} bytes=${pdfBuffer.length} magic=${pdfBuffer.subarray(0, 5).toString("latin1")}`);
     let rawText = "";
     let pageCount = 1;
 
@@ -125,10 +130,14 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
         }
       }
 
+      console.error(`[PDF-DIAG] extractText OK: method=pdf-parse pages=${pageCount} rawLen=${rawText.length} meaningful=${meaningfulLength}${warnings.length ? ` warnings=[${warnings.join(" | ")}]` : ""}`);
       return { pages, rawText, pageCount, extractionMethod: "pdf-parse", warnings };
     }
     throw new Error("pdf-parse module did not export a usable parser");
   } catch (err) {
+    // [PDF-DIAG] — surface the swallowed failure in the worker logs (the pushed warning alone did
+    // not print). "Cannot find module 'pdf-parse'" here would confirm the devDep pruned at runtime.
+    console.error(`[PDF-DIAG] extractText THREW → empty placeholder: ${(err as Error).message}\n${(err as Error).stack}`);
     warnings.push(`pdf-parse failed: ${(err as Error).message}`);
   }
 
