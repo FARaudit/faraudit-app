@@ -186,6 +186,7 @@ export function constructionCoverage(
   m: ConstructionManifest,
   fullSource: string,
   findingExcerpts: string[],
+  analyzedDocs?: Set<string>,   // doc names where a grounded finding lands (Brain card 289 — element analyzed via its source doc)
 ): { covered: string[]; missing: string[]; survived: string[]; droppedByCompressor: string[] } {
   const nSource = norm(fullSource);
   const nExcerpts = findingExcerpts.map(norm).filter((e) => e.length > 0);
@@ -203,10 +204,17 @@ export function constructionCoverage(
     const inSource = (nAnchor.length > 0 && nSource.includes(nAnchor)) || re.test(fullSource);
     if (!inSource) { droppedByCompressor.push(e.key); missing.push(e.key); continue; }
     survived.push(e.key);
-    // ANALYZED iff a grounded finding's excerpt carries this element's binding signal (matches the detector regex, or
-    // carries the exact anchor) — a real join on the binding token, not a loose 2-way substring on a 220-char window
-    // (which coincidental overlap could false-satisfy — card-274 regression).
-    const analyzed = nExcerpts.some((ex) => (nAnchor.length > 0 && ex.includes(nAnchor)) || re.test(ex));
+    // ANALYZED iff a grounded finding addresses this element. Two accepted signals (Brain card 289):
+    //   (1) a finding excerpt carries the element's binding SIGNAL (matches the detector regex, or the exact anchor) —
+    //       a direct token join; OR
+    //   (2) a grounded finding lands in the element's SOURCE DOCUMENT (analyzedDocs). Correctness fix: the element
+    //       DETECTOR matches STRUCTURAL markers (CSI codes, "statement of work") while a FINDING about the element is
+    //       CONTENT (the work / the obligation) — they share no tokens, so a regex-only check false-missed a genuinely
+    //       analyzed element. Grounding a finding in the doc that carries the element = the auditor read+reasoned that
+    //       doc. NOT a weakening: still requires a real grounded finding in the right document; combined with per-doc
+    //       attestation (each binding doc grounded/attested) + element PRESENCE (coreMissing) the bar stays strong.
+    const inSourceDoc = !!(e.sourceDoc && analyzedDocs?.has(e.sourceDoc));
+    const analyzed = inSourceDoc || nExcerpts.some((ex) => (nAnchor.length > 0 && ex.includes(nAnchor)) || re.test(ex));
     if (analyzed) covered.push(e.key);
     else missing.push(e.key);
   }

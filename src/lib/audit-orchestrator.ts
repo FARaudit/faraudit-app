@@ -409,7 +409,10 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
   // against the SEALED anchor set from FULL text, never the digest self-certifying (Brain #1). :574 formula untouched.
   if (ctx.constructionManifest && procurementPart(ctx) === "part36-construction") {
     const nrm = (s: string) => (s || "").replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase().trim();
-    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""));
+    // Which documents carry a GROUNDED finding — an element is analyzed if a finding lands in the doc that carries it
+    // (findingProvenance maps each finding's excerpt to its assembled-doc region; "(ungrounded)" excluded).
+    const analyzedDocs = new Set(findingProvenance(ctx.fullSource, findings).map((p) => p.doc).filter((d) => d && d !== "(ungrounded)"));
+    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""), analyzedDocs);
     for (const e of ctx.constructionManifest.elements) {
       if (!e.present) continue;
       const covered = cov.covered.includes(e.key);
