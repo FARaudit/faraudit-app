@@ -257,6 +257,14 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     for (let i = 0; i < primaryEnd; i++) {
       const t = allLines[i].text.trim();
       if (!pat.test(t)) continue;
+      // Reject a PROSE / cross-reference line — the catastrophic false-COMPLETE vector (expert-panel
+      // finding, 2026-07-06): a wrapped body line like "52.212-2, the Government will evaluate…" or
+      // "52.212-1 is incorporated by reference…" would else credit §M/§L off a genuinely-absent section
+      // and hide the coreMissingFor cap on a part-15 UCF buy. A REAL heading has the clause number
+      // followed by its UPPERCASE title (EVALUATION / INSTRUCTIONS) or nothing — never lowercase running
+      // text. (Case-sensitive on purpose; the pattern's /i can't distinguish case in a character class.)
+      const afterClause = t.replace(pat, "").replace(/^[\s,.:;—–-]+/, "");
+      if (/^[a-z]/.test(afterClause)) continue;
       // Skip a TOC entry: the candidate line, or its wrapped continuation, ends in a dot-leader page ref.
       if (TOC_LEADER_RE.test(t) || (i + 1 < primaryEnd && TOC_LEADER_RE.test(allLines[i + 1].text.trim()))) continue;
       boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: `COMMERCIAL_CLAUSE(${key})` });

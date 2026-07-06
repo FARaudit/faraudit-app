@@ -70,6 +70,17 @@ const namedSeries = planDocumentOrder([
 ok("Guard C: 'Amendment 0001' vs '0002' (no sol # in name) both kept (0 dropped)",
   droppedNames(namedSeries, sol), []);
 
+// ── 3b · Guard C token-symmetry (expert-panel finding): a binding attachment distinguished
+//        ONLY by a revision/version token that dedupeKey strips a number from must NOT collapse. ──
+for (const [tok, a, b] of [["Revision", "1", "2"], ["Rev", "1", "2"], ["v", "1", "2"], ["Version", "1", "2"]] as const) {
+  const rev = planDocumentOrder([
+    F(`Statement of Work ${tok} ${a}.pdf`, 90000),
+    F(`Statement of Work ${tok} ${b}.pdf`, 80000), // the revision is SMALLER (scope removed) — the dangerous case
+  ], sol);
+  ok(`Guard C: "SOW ${tok} ${a}" vs "${tok} ${b}" both kept (no silent binding-doc drop)`,
+    droppedNames(rev, sol), []);
+}
+
 // ── 4 · true duplicate of the SAME amendment number DOES still merge ──
 const sameAmd = planDocumentOrder([
   F("Wage Determination Amendment 0001.pdf", 50000),
