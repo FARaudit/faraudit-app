@@ -1,8 +1,9 @@
 // $0 REGRESSION for the LOSSLESS ingest (map-reduce compressor replacement) — DROP-NOISE design.
 // Run: npx tsx src/lib/agentic-lossless-ingest.test.ts
-import { assembleFullSourceLossless, dropNoise, isProse } from "./agentic-lossless-ingest";
+import { assembleFullSourceLossless, dropNoise, isProse, runGiantPerDoc } from "./agentic-lossless-ingest";
 import { assembleFullSource } from "./agentic-executor";
 import type { AgenticDoc } from "./agentic-orchestrator";
+import type { TypedFinding } from "./audit-findings";
 
 let pass = 0, fail = 0;
 const ok = (l: string, c: boolean) => { c ? pass++ : fail++; console.log(`${c ? "✓" : "✗"} ${l}`); };
@@ -54,5 +55,36 @@ ok("N6 a wage/$ table row (prose-ish) → KEPT", dropNoise("SCALE 1:100\nCARPENT
   ok("L3 a dropped doc is named (never silent)", la.droppedDocs.length > 0 || la.contentLossDocs.length > 0);
 }
 
-console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
-if (fail > 0) process.exit(1);
+// ── runGiantPerDoc — per-document reading for giants, HARD completeness gate ────────────────────────────
+const F = (req: string): TypedFinding => ({ requirement: req, citation: "c", excerpt: req, kind: "other", controllability: "bidder_controls", grounded: true, lens: "giant" });
+(async () => {
+  {
+    // All docs fit → all read, complete, findings UNIONED.
+    const docs = [D("primary", "Offeror shall submit a proposal."), D("attA", "Only small business firms are eligible.")];
+    const stub = async (_t: string, name: string) => [F(`finding-from-${name}`)];
+    const r = await runGiantPerDoc(docs, 1_000_000, stub);
+    eq("G1 all docs fit → documentsComplete=true", r.documentsComplete, true);
+    eq("G1 all docs read", r.readDocs.sort(), ["attA", "primary"]);
+    ok("G1 findings unioned across docs", r.findings.length === 2 && r.findings.some((f) => f.requirement.includes("attA")));
+  }
+  {
+    // A doc whose noise-dropped text ALONE exceeds the window → UNREAD → honest INCOMPLETE (never false-COMPLETE).
+    const huge = "The contractor shall perform all work described in this section. ".repeat(50);
+    const docs = [D("primary", "Offeror shall submit."), D("bigAmendment", huge)];
+    let reads = 0;
+    const stub = async (_t: string, name: string) => { reads++; return [F(`f-${name}`)]; };
+    const r = await runGiantPerDoc(docs, 300, stub);
+    eq("G2 oversized doc → documentsComplete=false (honest INCOMPLETE)", r.documentsComplete, false);
+    eq("G2 the unreadable doc is NAMED (never silent)", r.unreadDocs, ["bigAmendment"]);
+    ok("G2 the oversized doc was NOT passed to auditOne (no partial read)", reads === 1);
+  }
+  {
+    // Completeness can never be faked: a doc counts read ONLY when its full text reached auditOne.
+    const docs = [D("d1", "Real prose sentence number one here."), D("d2", "Real prose sentence number two here.")];
+    const r = await runGiantPerDoc(docs, 1_000_000, async () => []);
+    eq("G3 docs with zero findings still count as READ (complete) when they fit", r.documentsComplete, true);
+  }
+
+  console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
+  if (fail > 0) process.exit(1);
+})();

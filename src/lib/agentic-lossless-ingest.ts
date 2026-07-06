@@ -24,6 +24,7 @@
 // OFF ⇒ never called ⇒ byte-identical to today.
 
 import type { AgenticDoc } from "./agentic-orchestrator";
+import type { TypedFinding } from "./audit-findings";
 import { assembleFullSource, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, type AssembledSource } from "./agentic-executor";
 
 export interface LosslessAssembled extends AssembledSource {
@@ -85,7 +86,42 @@ export function assembleFullSourceLossless(docs: AgenticDoc[], maxChars: number 
 
   // 3b. PROSE alone still exceeds the window → too large for a SINGLE read. Honest last-resort: drop whole
   //     non-binding-first overflow docs on the noise-dropped set (named + documents_complete=false). The giant
-  //     per-doc path should intercept BEFORE here so no binding doc is dropped.
+  //     per-doc path (runGiantPerDoc) should intercept BEFORE here so no binding doc is dropped.
   const fb = assembleFullSourceBudgeted(filteredSet, maxChars);
   return { ...fb, contentLossDocs: fb.droppedDocs, filteredDocs: filteredNames };
+}
+
+export interface GiantPerDocResult {
+  findings: TypedFinding[];       // UNION of per-doc findings — the caller runs ONE deriveVerdict over this
+  documentsComplete: boolean;     // false ⇒ a doc could not be read in full ⇒ honest INCOMPLETE (never false-COMPLETE)
+  readDocs: string[];             // docs read in full (noise-dropped text fit a single read)
+  unreadDocs: string[];           // docs whose noise-dropped text ALONE exceeds the window (could not be read)
+}
+
+/** Read a GIANT (combined content exceeds the single-read window) by reading each DOCUMENT SEPARATELY and gathering
+ *  its findings; the caller then runs ONE deterministic deriveVerdict over the UNION — the single reconciliation
+ *  authority, NEVER a naive merge of N per-doc verdicts (adversarial-review requirement). COMPLETENESS is HARD-gated:
+ *  a document whose noise-dropped text ALONE still exceeds `maxChars` cannot be read → it lands in `unreadDocs` and
+ *  forces documentsComplete=false (honest INCOMPLETE). This can NEVER produce a false-COMPLETE: a doc is only counted
+ *  read when its full (noise-dropped) text was passed to `auditOne`. `auditOne` is INJECTED (the real per-doc audit
+ *  in prod, a stub in tests) so this orchestration is $0 unit-testable. Each doc grounds against its OWN full text. */
+export async function runGiantPerDoc(
+  docs: AgenticDoc[],
+  maxChars: number,
+  auditOne: (docText: string, docName: string) => Promise<TypedFinding[]>,
+): Promise<GiantPerDocResult> {
+  const findings: TypedFinding[] = [];
+  const readDocs: string[] = [];
+  const unreadDocs: string[] = [];
+  for (const d of docs) {
+    const text = dropNoise(d.text).kept;
+    // A single document whose noise-dropped text still exceeds one read window cannot be read completely (would need
+    // intra-doc chunking or a larger-context model). Fail SAFE: record it unread → honest INCOMPLETE, never a partial
+    // read passed off as complete. (e.g. W9126's 340-page amendment.)
+    if (text.length > maxChars) { unreadDocs.push(d.name); continue; }
+    const f = await auditOne(text, d.name);
+    findings.push(...f);
+    readDocs.push(d.name);
+  }
+  return { findings, documentsComplete: unreadDocs.length === 0, readDocs, unreadDocs };
 }
