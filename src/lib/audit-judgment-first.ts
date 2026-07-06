@@ -181,3 +181,34 @@ export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCall
     };
   };
 }
+
+/** Brain card 291 — PER-DOC DECOMPOSITION wrapper (the ratified 286-B/287 hierarchical fallback). Runs the base
+ *  proposer HOLISTICALLY (the package verdict + analysis + its findings), then ONCE PER binding document region
+ *  (findings only, each read against {primary context + that one document}), and UNIONs all findings. Every binding
+ *  document therefore contributes findings by construction → the rail's per-doc attestation is satisfiable, while the
+ *  package verdict stays the single holistic proposal and the rail DISPOSEs over the UNION — NEVER summarized
+ *  per-doc sub-verdicts (Brain condition 2). `docSplit` is injected (docRegions) to avoid an orchestrator import
+ *  cycle. Single-doc packages skip decomposition (byte-identical to the holistic proposer). */
+export function makePerDocProposer(
+  base: ProposeFn,
+  docSplit: (src: string) => Array<{ name: string; text: string; isPrimary: boolean }>,
+): ProposeFn {
+  const key = (f: TypedFinding) => (f.excerpt || "").replace(/\s+/g, " ").toLowerCase().trim();
+  return async (input: JudgmentFirstInput): Promise<ProposedJudgment> => {
+    const holistic = await base(input);
+    const regions = docSplit(input.fullSource);
+    if (regions.length <= 1) return holistic; // single-doc — no per-doc decomposition
+    const primary = regions.find((r) => r.isPrimary)?.text ?? "";
+    const perDoc: TypedFinding[] = [];
+    for (const r of regions) {
+      if (r.isPrimary) continue;
+      // Propose over {primary context + this ONE attachment} so the model's attention is on this document — its
+      // findings quote THIS attachment. Grounding (the rail) verifies each excerpt against the STORED FULL TEXT.
+      const sub = await base({ ...input, fullSource: `${primary}\n\n==== DOCUMENT: ${r.name} ====\n\n${r.text}` });
+      perDoc.push(...sub.findings);
+    }
+    const seen = new Set<string>(); const union: TypedFinding[] = [];
+    for (const f of [...holistic.findings, ...perDoc]) { const k = key(f); if (!k || seen.has(k)) continue; seen.add(k); union.push(f); }
+    return { ...holistic, findings: union };
+  };
+}

@@ -320,6 +320,10 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
     if (!isBindingDoc({ role: "attachment", name: r.name })) continue; // offeror-fill exempt
     const att = attByName.get(r.name);
     if (!att || !att.hasText) { uncovered.push(r.name); continue; }    // HARD LINE — unread/no-text can NEVER be attested
+    // (B) Brain card 291 — SWEEP-based attestation (complement): a construction ELEMENT sealed IN this doc (verbatim
+    // span + full-text hash at ingest) attests the doc was read + its binding content captured, without a proposer
+    // finding — reduces per-doc passes. Insufficient alone for a doc carrying NO element (e.g. a drawings/spec set).
+    if (ctx.constructionManifest?.elements.some((e) => e.present && e.sourceDoc === r.name)) continue;
     if (att.groundableObligations === 0) continue;                     // ATTESTED read-and-empty (obligation-free full text)
     const nRegion = norm(r.text);                                      // has obligations ⇒ require a grounded finding-in-doc
     if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);

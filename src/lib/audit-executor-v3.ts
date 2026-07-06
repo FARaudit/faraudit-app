@@ -215,8 +215,11 @@ export async function executeAgenticPrimary(
   const constructionOOS = process.env.AUDIT_CONSTRUCTION_DECIDED === "true"
     && !!detectConstructionOutOfScope({ naicsCode: solicitation?.naicsCode ?? null, fullText: docs.map((d) => d.text).join("\n") });
   if (constructionOOS) console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: construction OUT_OF_SCOPE (design-build, no resolvable offer/submission structure) → honest-fail, no charge`);
+  // Brain card 291 — grounding corpus = the pre-compression full text (all docs), so per-doc-decomposition findings
+  // ground against source, not the digest. Only consumed when AUDIT_PERDOC_DECOMP is on; otherwise inert.
+  const groundingSource = docs.map((d) => d.text).join("\n\n");
   const res = await auditPackage({
-    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest,
+    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
     // Layer-2 (Brain card 262 — content-aware completeness): the SAM notice type scopes the §L/§M requirement to
     // solicitation-type buys, and form_identified corroborates whether the §L/§M-bearing primary was ingested.

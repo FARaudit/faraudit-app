@@ -262,6 +262,7 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
   }
   const res = await deps.runJudgmentFirstAudit({
     fullSource: source, bidderProfile: profile, naics: rc.naics ?? null, setAside: rc.setAside ?? null, signal: caseSignal, constructionManifest,
+    groundingSource: fullSource,  // Brain card 291 — model reads the compressed `source`; grounding is against the ORIGINAL full text
   });
   return { verdict: res.disposed.verdict, eligible: res.disposed.eligible, proposed: res.proposed.verdict, railDerived: res.railDerived.verdict };
 }
@@ -270,7 +271,7 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
 // so the biggest chunked package (W9126) has full room under parallel compression; cheap cases finish far sooner.
 const PER_CASE_TIMEOUT_MS = 15 * 60 * 1000;
 interface EngineDeps {
-  runJudgmentFirstAudit: (i: { fullSource: string; bidderProfile: Profile | null; naics: string | null; setAside: string | null; signal?: AbortSignal; constructionManifest?: ConstructionManifest }) => Promise<{ disposed: { verdict: Verdict; eligible: boolean | null }; proposed: { verdict: Verdict }; railDerived: { verdict: Verdict } }>;
+  runJudgmentFirstAudit: (i: { fullSource: string; bidderProfile: Profile | null; naics: string | null; setAside: string | null; signal?: AbortSignal; constructionManifest?: ConstructionManifest; groundingSource?: string }) => Promise<{ disposed: { verdict: Verdict; eligible: boolean | null }; proposed: { verdict: Verdict }; railDerived: { verdict: Verdict } }>;
   assembleFullSourceChunked: (docs: Array<{ name: string; bytes: Buffer; text: string }>, mapCall: unknown, maxChars: number, signal?: AbortSignal) => Promise<{ source: string; truncated: boolean; contentLossDocs: string[] }>;
   makeMapCall: (signal: AbortSignal) => unknown; MAX: number;
 }

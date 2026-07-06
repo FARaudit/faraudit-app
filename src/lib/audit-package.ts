@@ -17,9 +17,9 @@ import { modelFor } from "./model-registry";
 import { makeAnthropicCallModel } from "./audit-expert";
 import { auditLenses } from "./audit-lenses";
 import { makeAgenticVerifier, makeStructuredSkeptic, makeTieredSkeptic, makeBatchedSkeptic, type SkepticFn, type SkepticVerdict } from "./audit-verifier";
-import { runAgenticAudit, type AuditResult } from "./audit-orchestrator";
+import { runAgenticAudit, docRegions, type AuditResult } from "./audit-orchestrator";
 import { judgmentLayerEnabled, type ReasonCaller, type EntailmentCaller, type ProducedFinding, type EntailmentState } from "./audit-judgment-layer";
-import { makeJudgmentFirstProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
+import { makeJudgmentFirstProposer, makePerDocProposer, runJudgmentFirst, type JudgmentStructuredCaller, type JudgmentFirstInput, type JudgmentFirstResult, type RailFn } from "./audit-judgment-first";
 import { makeSectionFinderCaller } from "./audit-section-finder";
 import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
@@ -43,6 +43,7 @@ export interface AuditPackageInput {
   noticeType?: string | null;               // Layer-2 (card 262) — SAM notice type; scopes the §L/§M INCOMPLETE requirement to solicitation-type buys
   formIdentified?: boolean;                  // Layer-2 (card 262) — whether a substantive primary form was recognized; corroborates body-absent
   constructionManifest?: ConstructionManifest; // Brain card 288 — sealed SF-1442/part36 binding-content manifest (full-text, pre-compression); the part36 completeness carrier reads it
+  groundingSource?: string;                  // Brain card 291 — STORED FULL TEXT (pre-compression) for Rule-64 grounding; model reads the digest (fullSource), source grounds
   judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
   judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
   sectionFinderModel?: string;              // L3 (card 265/267) — grounded section-finder; default modelFor("finder") (Sonnet — the offset-match gate makes it fail-safe)
@@ -225,7 +226,7 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the judgment-first engine.");
 
-  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest };
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest, groundingSource: input.groundingSource };
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
   // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
   // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.
@@ -236,7 +237,11 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   );
   const verify = makeAgenticVerifier(skeptic);
 
-  const propose = makeJudgmentFirstProposer(judgmentStructuredCaller(apiKey, input.signal, input.onUsage), input.judgmentReasonModel ?? modelFor("judge"));
+  const basePropose = makeJudgmentFirstProposer(judgmentStructuredCaller(apiKey, input.signal, input.onUsage), input.judgmentReasonModel ?? modelFor("judge"));
+  // Brain card 291 — PER-DOC DECOMPOSITION (flag-gated). When on, wrap the holistic proposer so each binding document
+  // also gets its own proposer pass (findings unioned) → per-doc attestation is satisfiable by construction; the rail
+  // still DISPOSEs over the union. OFF ⇒ the single holistic proposer (byte-identical). Multi-doc packages only.
+  const propose = process.env.AUDIT_PERDOC_DECOMP === "true" ? makePerDocProposer(basePropose, docRegions) : basePropose;
 
   // The RAIL: the full deterministic orchestrator over the re-grounded proposal. runAgenticAudit re-grounds the
   // seed (drops any ungrounded finding), runs the deterministic sweep/temporal/verify/completeness + every re-typing

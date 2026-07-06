@@ -31,6 +31,11 @@ export interface ExpertSpec { key: string; system: string; }
 /** Deterministic grounding backstop: a finding is grounded iff its excerpt is literally in the source. */
 export function isGrounded(ctx: AuditToolContext, f: RawFinding): boolean {
   if (!f.excerpt || f.excerpt.trim().length < 4) return false;
+  // Brain card 291 — ground against the STORED FULL TEXT when present ("source grounds"), never the compressed digest;
+  // else fall back to fullSource (byte-identical when groundingSource absent). Same normalized substring semantics.
+  if (ctx.groundingSource && ctx.groundingSource !== ctx.fullSource) {
+    return findInSource({ fullSource: ctx.groundingSource }, f.excerpt).hits.length > 0;
+  }
   return findInSource(ctx, f.excerpt).hits.length > 0;
 }
 

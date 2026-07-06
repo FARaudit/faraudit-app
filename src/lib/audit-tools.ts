@@ -25,6 +25,11 @@ export interface AuditToolContext {
   // doc's FULL text PRE-compression (audit-construction-manifest.sweepConstructionManifest). Present ONLY when
   // AUDIT_CONSTRUCTION_SWEEP is on. The part36 completeness carrier reads THIS (sealed full-text), never the digest.
   constructionManifest?: ConstructionManifest;
+  // Brain card 291 — GROUNDING GUARDRAIL. The STORED FULL TEXT (pre-compression, all docs concatenated) used to
+  // GROUND findings (Rule-64 offset match), while the model-facing `fullSource` may be the compressed digest —
+  // "digest routes, source grounds". Present only on the per-doc-decomposition path (AUDIT_PERDOC_DECOMP); when
+  // absent, grounding falls back to fullSource (byte-identical). Deterministic substring only — an 11MB corpus is fine.
+  groundingSource?: string;
 }
 
 const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {
