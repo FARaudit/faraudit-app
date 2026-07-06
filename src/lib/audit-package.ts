@@ -25,6 +25,7 @@ import type { UsageCall } from "./audit-cost";
 import type { AuditToolContext } from "./audit-tools";
 import type { BidderProfile } from "./audit-findings";
 import type { CallModel, ExpertSpec } from "./audit-expert";
+import type { ConstructionManifest } from "./audit-construction-manifest";
 
 export interface AuditPackageInput {
   fullSource: string;                       // assembled package source (every routed section + attachment)
@@ -41,6 +42,7 @@ export interface AuditPackageInput {
   setAside?: string | null;                 // Step 4a (plumb-only) — SAM-resolved set-aside fact, forwarded to the gate pipeline; null when absent
   noticeType?: string | null;               // Layer-2 (card 262) — SAM notice type; scopes the §L/§M INCOMPLETE requirement to solicitation-type buys
   formIdentified?: boolean;                  // Layer-2 (card 262) — whether a substantive primary form was recognized; corroborates body-absent
+  constructionManifest?: ConstructionManifest; // Brain card 288 — sealed SF-1442/part36 binding-content manifest (full-text, pre-compression); the part36 completeness carrier reads it
   judgmentReasonModel?: string;             // J-1 producer tier — default modelFor("judge") (Opus, the reasoning core); overridable to lens (Sonnet) as the card-246 cost lever
   judgmentEntailModel?: string;             // J-2 the registered independent Opus entailment verifier (card 246) — default modelFor("judge")
   sectionFinderModel?: string;              // L3 (card 265/267) — grounded section-finder; default modelFor("finder") (Sonnet — the offset-match gate makes it fail-safe)
@@ -139,7 +141,7 @@ export async function auditPackage(input: AuditPackageInput): Promise<AuditResul
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the agentic engine.");
 
-  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest };
   const callModel = makeAnthropicCallModel(anthropic as never, input.expertModel ?? modelFor("lens"), { onUsage: input.onUsage });
   // Capability-tiered P2 (Brain card-44 §4): Sonnet base over all findings, Opus only on the contested subset.
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
@@ -223,7 +225,7 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropic || !apiKey) throw new Error("ANTHROPIC_API_KEY not configured — cannot run the judgment-first engine.");
 
-  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections };
+  const ctx: AuditToolContext = { fullSource: input.fullSource, sections: input.sections, constructionManifest: input.constructionManifest };
   const adapt = structuredAdapter(apiKey, input.signal, input.onUsage);
   // Card 285 Fix 1: batch the BASE skeptic behind AUDIT_VERIFIER_BATCHING so its O(findings) output can't truncate
   // on a realistic finding count (the claim-explosion root). Flag OFF ⇒ the single-call base, byte-identical.

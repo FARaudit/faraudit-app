@@ -25,6 +25,8 @@ import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
+import { sweepConstructionManifest } from "./audit-construction-manifest";
+import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
@@ -200,8 +202,21 @@ export async function executeAgenticPrimary(
   // read them downstream (Step 4: Nonmanufacturer Rule). naicsCode/typeOfSetAside are already resolved
   // upstream (audit-executor.ts SAM cross-ref). Uploads have no SAM NAICS → null → NMR stays silent.
   // (usageCalls declared above at assembly so MAP tokens are priced into the same ledger.)
+  // Brain card 288 — SEALED construction (SF-1442/part36) binding-content manifest over each doc's FULL text (docs =
+  // pre-compression). NEVER the compressed digest. Gated: AUDIT_CONSTRUCTION_SWEEP OFF ⇒ undefined ⇒ part36 carrier
+  // absent (byte-identical). Step 5 — narrowed OUT_OF_SCOPE (design-heavy CSI/drawing-dominant, NO resolvable offer
+  // structure) honest-fail cap, gated by the master flag. W9126 (offer structure present) → null → decided path
+  // proceeds. Reuses the INCOMPLETE cap via manifestComplete (no new verdict enum): OOS → honest-fail, no charge.
+  const constructionManifest = process.env.AUDIT_CONSTRUCTION_SWEEP === "true"
+    ? sweepConstructionManifest(docs.map((d) => ({ name: d.name, text: d.text })), solicitation?.naicsCode ?? null)
+    : undefined;
+  // OOS reads the PRE-compression full text (docs joined), NOT the lossy digest — else the offer-structure veto could
+  // be lost to compression and false-fire OUT_OF_SCOPE on a biddable construction buy (adversarial-review finding).
+  const constructionOOS = process.env.AUDIT_CONSTRUCTION_DECIDED === "true"
+    && !!detectConstructionOutOfScope({ naicsCode: solicitation?.naicsCode ?? null, fullText: docs.map((d) => d.text).join("\n") });
+  if (constructionOOS) console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: construction OUT_OF_SCOPE (design-build, no resolvable offer/submission structure) → honest-fail, no charge`);
   const res = await auditPackage({
-    fullSource, bidderProfile, signal, manifestComplete,
+    fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest,
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
     // Layer-2 (Brain card 262 — content-aware completeness): the SAM notice type scopes the §L/§M requirement to
     // solicitation-type buys, and form_identified corroborates whether the §L/§M-bearing primary was ingested.

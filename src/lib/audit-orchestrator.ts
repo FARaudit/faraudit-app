@@ -14,6 +14,7 @@
 
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
+import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
@@ -106,8 +107,14 @@ export interface AuditResult {
   judgmentCost?: JudgmentCost;                                                            // J-1/J-2 per-audit token/call ledger (card 246 acceptance h); absent when the layer is off
 }
 
-/** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source. */
+/** P0 — the manifest: binding UCF sections that are actually PRESENT (non-empty) in this package's source.
+ *  Brain card 288 — FORMAT-AWARE carrier: a construction (SF-1442 / part36) package has no §A–M headers, so the UCF
+ *  filter returns [] and the engine honest-fails the whole construction CLASS on FORMAT (:574 required.length>0). For
+ *  part36 the carrier is the SEALED construction binding-content manifest (present elements = the §A–M analog),
+ *  computed at ingest over FULL doc text. The :574 completeness FORMULA is untouched — only WHICH set populates
+ *  `required` changes. Flag-off / no manifest ⇒ procurementPart never returns part36 ⇒ byte-identical UCF path. */
 export function buildManifest(ctx: AuditToolContext): string[] {
+  if (procurementPart(ctx) === "part36-construction" && ctx.constructionManifest) return constructionRequired(ctx.constructionManifest);
   return BINDING_SECTIONS.filter((k) => readSection(ctx, k).present);
 }
 
@@ -148,6 +155,14 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
   // requiresLM is NOTICE-TYPE-driven: a solicitation-type buy (default true / fail-safe when unscoped) requires the
   // instructions (§L) and evaluation (§M); a non-solicitation (Sources Sought / RFI, requiresLM=false) is exempt.
   const requiresLM = opts?.requiresLM !== false;
+  if (part === "part36-construction") {
+    // Brain card 288 — construction CORE = bonding / wage determination / submission (the §C/§L/§M analog). A
+    // solicitation-type construction buy that cannot ground ALL core elements cannot certify a biddable package ⇒
+    // INCOMPLETE. Non-solicitation types (requiresLM=false) keep the free pass, symmetric with UCF/commercial. Reads
+    // the SEALED full-text manifest, never the digest. No manifest (defensive) ⇒ [] (buildManifest already gates part36).
+    if (!requiresLM) return [];
+    return ctx.constructionManifest ? constructionCoreMissing(ctx.constructionManifest) : [];
+  }
   if (part === "part15-ucf") return ["C", "L", "M"].filter((k) => !present(k));
   if (part === "part12-commercial") {
     // Commercial core EQUIVALENTS: 52.212-1 ≡ §L, 52.212-2 ≡ §M. Cap ONLY when BOTH absent (a single one missing is
@@ -293,6 +308,28 @@ const AMENDMENT_RE = /\b(?:SF[-\s]?30\b|amendment\s+of\s+solicitation|amendment\
 export function detectAmendments(fullSource: string): boolean {
   return docRegions(fullSource).some((r) => AMENDMENT_RE.test(r.name) || AMENDMENT_RE.test(r.text.slice(0, 4000)));
 }
+
+// Brain card 288 RULING 2 (interim, until the amendment-resolution tranche) — unresolved SF-30 supersession with no
+// deterministic resolution → INCOMPLETE honest-fail (never decide over possibly-superseded terms). The deterministic
+// resolver does not exist yet, so "unresolved" = a supersession-AMBIGUITY signal: ≥2 distinct amendment/modification
+// numbers (the supersession ORDER cannot be resolved without the resolver) OR any term-REVISION / supersession
+// language. FAIL-SAFE toward INCOMPLETE — a bare due-date-extension single amendment with no revision language
+// proceeds; anything that revises/replaces terms, or a second amendment, honest-fails. (Hardened per adversarial
+// review: "Modification No." is now counted, and generic "revise/change … to read / delete / replace" trips it.)
+const AMEND_NUM_RE = /\b(?:amendment|modification|mod)\s+(?:no\.?|number|#)?\s*0*(\d{1,3})\b/gi;
+const SUPERSEDE_RE = /\b(?:supersed|in\s+lieu\s+of|deleted\s+in\s+its\s+entirety|replaced?\s+in\s+its\s+entirety|hereby\s+(?:deleted|replaced|amended)|(?:is|are|hereby)\s+(?:revised|changed|deleted|replaced)|(?:revised|changed|amended|deleted|replaced)\s+to\s+read|change[sd]?\s+(?:section|clause|paragraph))/i;
+export function amendmentSupersessionUnresolved(fullSource: string): boolean {
+  // NEW-HOLE fix (Rule-69 re-review): the shared detectAmendments/AMENDMENT_RE recognizes SF-30 / "amendment of
+  // solicitation" / "amendment No." but NOT "Modification No." — so a modification-only revising doc would slip the
+  // short-circuit and never reach the broadened counters below (catastrophic false-COMPLETE direction). Recognize
+  // modifications HERE (scoped to this fail-safe, leaving the shared disclosure detector byte-identical).
+  const hasAmendmentOrMod = detectAmendments(fullSource) || /\b(?:modification|mod)\s+(?:no\.?|number|#)?\s*0*\d/i.test(fullSource ?? "");
+  if (!hasAmendmentOrMod) return false;
+  const nums = new Set<string>();
+  for (const m of (fullSource ?? "").matchAll(AMEND_NUM_RE)) nums.add(m[1]);
+  if (nums.size >= 2) return true;                 // ≥2 distinct amendments/mods — ordering ambiguous without the resolver
+  return SUPERSEDE_RE.test(fullSource ?? "");      // explicit term-revision / supersession language on an amended buy
+}
 /** Per-finding document PROVENANCE (which assembled doc a finding's excerpt is grounded in) — persisted so a
  *  reviewer can see which document (primary vs a specific attachment/amendment) each finding came from. */
 export function findingProvenance(fullSource: string, findings: TypedFinding[]): Array<{ id: string; doc: string }> {
@@ -339,6 +376,33 @@ const BOILERPLATE_ATTESTABLE = new Set(["I", "K"]);
 
 export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
+  // Brain card 288 — PART36 construction path (ANCHOR-based, compression-boundary-safe). `required` here is the sealed
+  // construction element set. An element is covered iff (1) its compression-STABLE ANCHOR SURVIVED into the read source
+  // (the compressor did NOT drop this binding content) AND (2) a grounded finding carries that anchor. A present
+  // element the compressor dropped → uncovered ⇒ INCOMPLETE (the false-COMPLETE-via-digest interceptor). Certifies
+  // against the SEALED anchor set from FULL text, never the digest self-certifying (Brain #1). :574 formula untouched.
+  if (ctx.constructionManifest && procurementPart(ctx) === "part36-construction") {
+    const nrm = (s: string) => (s || "").replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase().trim();
+    const cov = constructionCoverage(ctx.constructionManifest, ctx.fullSource, findings.map((f) => f.excerpt || ""));
+    for (const e of ctx.constructionManifest.elements) {
+      if (!e.present) continue;
+      const covered = cov.covered.includes(e.key);
+      const dropped = cov.droppedByCompressor.includes(e.key);
+      // Provenance backstop (adversarial review): a covered element cites the findings whose excerpt carries its anchor.
+      const cited = covered && e.anchor ? findings.filter((f) => f.id && nrm(f.excerpt || "").includes(nrm(e.anchor!))).map((f) => f.id!) : [];
+      attestations.push({
+        section: e.key,
+        status: covered ? "covered_direct" : "obligations_ungrounded",
+        obligations: covered ? [] : [dropped
+          ? `[compressor-dropped] construction element '${e.key}' sealed at ingest but its anchor is absent from the read source — cannot certify complete`
+          : `construction element '${e.key}' present in source but no grounded finding analyzed it`],
+        citedFindingIds: cited,
+        ungrounded: covered ? [] : [e.key],
+        ...(e.regionHash ? { sectionHash: e.regionHash } : {}),
+      });
+    }
+    return { covered: cov.covered, missing: cov.missing, attestations };
+  }
   for (const sec of required) {
     // C-3 (Brain C.c): the completeness PROOF reads the FULL section (uncapped), NOT the lens's capped view — an
     // obligation past the lens read-cap must surface as ungrounded, never be invisible. `lensTruncated` records
@@ -571,7 +635,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
   const docCoverage = documentsCovered(ctx.fullSource, findings);
-  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete;
+  // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
+  // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
+  // later tranche; this is detection + fail-safe only.
+  const amendmentUnresolved = process.env.AUDIT_AMENDMENT_RESOLUTION === "true" && amendmentSupersessionUnresolved(ctx.fullSource);
+  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
+  if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
 
   // CORE-PRESENCE (panel blocker / fail-safe #10): buildManifest/`required` only contains sections DETECTED
   // PRESENT, so a genuinely-absent core section never appears in `missing` and an unanalyzed one could render a

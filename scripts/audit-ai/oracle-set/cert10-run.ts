@@ -24,6 +24,7 @@ import {
   scoreOracleCase, summarizeOracle, type OracleCase, type OracleManifest, type ScoredCase,
 } from "./oracle-harness";
 import type { Verdict } from "../../../src/lib/audit-decide";
+import { sweepConstructionManifest, type ConstructionManifest } from "../../../src/lib/audit-construction-manifest";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GOLD = path.join(HERE, "..", "gold-sets");
@@ -231,6 +232,12 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
   }
   const { fullSource, profile } = assembleSource(rc);
   let source = fullSource;
+  // Brain card 288 — SEALED construction manifest over the FULL (pre-compression) per-doc text. Computed from the
+  // ORIGINAL fullSource docs, NEVER the compressed digest (else the gate would certify from the compressor). Gated by
+  // AUDIT_CONSTRUCTION_SWEEP; undefined when off ⇒ the part36 carrier is absent (byte-identical non-construction path).
+  const constructionManifest: ConstructionManifest | undefined = process.env.AUDIT_CONSTRUCTION_SWEEP === "true"
+    ? sweepConstructionManifest(parseDocs(fullSource).map((d) => ({ name: d.name, text: d.text })), rc.naics ?? null)
+    : undefined;
   // HARNESS FIX (Brain card 286-B, mandatory-first): PER-CASE timeout isolation — a fresh AbortSignal per case,
   // NEVER shared. The prior single shared 20-min signal let cheap-9 consume most of the budget so W9126's
   // compression aborted ~40% through → a false-INCOMPLETE (the artifact that invalidated the prior diagnosis,
@@ -249,7 +256,7 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
     if (asm.truncated) return { verdict: "INCOMPLETE", eligible: null };  // honest-fail — an incomplete read can't commit
   }
   const res = await deps.runJudgmentFirstAudit({
-    fullSource: source, bidderProfile: profile, naics: rc.naics ?? null, setAside: rc.setAside ?? null, signal: caseSignal,
+    fullSource: source, bidderProfile: profile, naics: rc.naics ?? null, setAside: rc.setAside ?? null, signal: caseSignal, constructionManifest,
   });
   return { verdict: res.disposed.verdict, eligible: res.disposed.eligible, proposed: res.proposed.verdict, railDerived: res.railDerived.verdict };
 }
@@ -258,7 +265,7 @@ async function runEngine(rc: RunCase, deps: EngineDeps): Promise<EngineOut> {
 // so the biggest chunked package (W9126) has full room under parallel compression; cheap cases finish far sooner.
 const PER_CASE_TIMEOUT_MS = 15 * 60 * 1000;
 interface EngineDeps {
-  runJudgmentFirstAudit: (i: { fullSource: string; bidderProfile: Profile | null; naics: string | null; setAside: string | null; signal?: AbortSignal }) => Promise<{ disposed: { verdict: Verdict; eligible: boolean | null }; proposed: { verdict: Verdict }; railDerived: { verdict: Verdict } }>;
+  runJudgmentFirstAudit: (i: { fullSource: string; bidderProfile: Profile | null; naics: string | null; setAside: string | null; signal?: AbortSignal; constructionManifest?: ConstructionManifest }) => Promise<{ disposed: { verdict: Verdict; eligible: boolean | null }; proposed: { verdict: Verdict }; railDerived: { verdict: Verdict } }>;
   assembleFullSourceChunked: (docs: Array<{ name: string; bytes: Buffer; text: string }>, mapCall: unknown, maxChars: number, signal?: AbortSignal) => Promise<{ source: string; truncated: boolean; contentLossDocs: string[] }>;
   makeMapCall: (signal: AbortSignal) => unknown; MAX: number;
 }

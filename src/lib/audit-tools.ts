@@ -8,6 +8,7 @@
 
 import { detectSections, type FormatType } from "./section-boundary-detector";
 import { makeClauseSourceChecker } from "./agentic-sections";
+import type { ConstructionManifest } from "./audit-construction-manifest";
 
 const asDoc = (text: string) => ({
   pages: [{ pageNum: 1, text, lines: text.split("\n").map((l) => l.trim()).filter(Boolean) }],
@@ -20,6 +21,10 @@ export interface AuditToolContext {
   fetchedDocs?: string[];             // titles/filenames of the documents actually fetched+assembled (production
                                       // assembly populates this) — reconciled against the manifest so a small
                                       // material attachment going unfetched caps a no-bar verdict (Brain card-59)
+  // Brain card 288 — SEALED construction (SF-1442 / Part-36) binding-content manifest, computed at ingest over each
+  // doc's FULL text PRE-compression (audit-construction-manifest.sweepConstructionManifest). Present ONLY when
+  // AUDIT_CONSTRUCTION_SWEEP is on. The part36 completeness carrier reads THIS (sealed full-text), never the digest.
+  constructionManifest?: ConstructionManifest;
 }
 
 const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {
@@ -52,8 +57,14 @@ export function detectFormat(ctx: AuditToolContext): FormatType {
  *  source; no parallel surface). Part-12 (commercial: SF-1449 / SF-18 / combined-synopsis) states instructions +
  *  evaluation via 52.212-1/-2 INLINE or by reference; Part-15 (UCF) mandates §C/§L/§M as SEPARATE sections.
  *  Brain card 135 Step 8 — coreMissing keys off THIS, extending fail-safe #10 (never a parallel format surface). */
-export type ProcurementPart = "part12-commercial" | "part15-ucf" | "unknown";
+export type ProcurementPart = "part12-commercial" | "part15-ucf" | "part36-construction" | "unknown";
 export function procurementPart(ctx: AuditToolContext): ProcurementPart {
+  // Brain card 288 — SINGLE-SOURCE construction classification off the sealed manifest (set at ingest from the
+  // SF-1442 header + NAICS sector-23). Flag-gated: AUDIT_FORMAT_PART36 OFF or no manifest ⇒ falls through to the
+  // UCF/commercial/unknown detection below (prod byte-identical). No parallel format surface — the manifest is the
+  // one construction signal, computed over FULL doc text, so a stray "SF 1442" string in an attachment can't flip a
+  // services buy (isConstruction requires the header OR NAICS-23 at sweep time).
+  if (process.env.AUDIT_FORMAT_PART36 === "true" && ctx.constructionManifest?.isConstruction) return "part36-construction";
   switch (detectFormat(ctx)) {
     case "UCF": return "part15-ucf";
     case "SF-1449-RFQ":
