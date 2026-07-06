@@ -27,7 +27,7 @@ const hostileCaller: JudgmentStructuredCaller = async () => ({
 async function main() {
   const propose = makeJudgmentFirstProposer(hostileCaller, "claude-opus-4-8");
   const out = await propose({ fullSource: "SECTION C\nsome text here." });
-  const f = out.findings[0] as Record<string, unknown>;
+  const f = out.findings[0] as unknown as Record<string, unknown>;
 
   ok("kept schema field: requirement", f.requirement === "req");
   ok("kept schema field: requiredAttribute", f.requiredAttribute === "secret_clearance");
