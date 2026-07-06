@@ -273,6 +273,11 @@ export async function executeAgenticPrimary(
         read: ing.files_ingested,
         complete: ing.files_total > 0 && ing.files_ingested >= ing.files_total && !ing.overflow,
         missing: (ing.files ?? []).filter((f) => !f.ingested).map((f) => ({ name: f.name, ...(f.reason ? { reason: f.reason } : {}) })),
+        // Provenance for honest disclosure copy: an UPLOAD set (isSamSol=false) must NOT
+        // claim "retrieved every document the agency posted to SAM.gov" — there is no SAM
+        // manifest. Both upload arms (multipart + storage) set ingestion, so this guards
+        // the fabricated-SAM-provenance card the report would otherwise render for uploads.
+        fromSam: isSamSol,
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
     : isSamSol

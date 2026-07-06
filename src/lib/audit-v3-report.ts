@@ -69,6 +69,11 @@ export interface V3ReportPayload {
     complete: boolean;
     missing: Array<{ name: string; reason?: string }>;
     note?: string;
+    // Provenance for the disclosure wording. true/absent = SAM notice (retrieved from
+    // SAM.gov, wording references the agency's posted manifest). false = a user UPLOAD
+    // (no SAM manifest exists) — the card must say "documents you provided", never claim
+    // SAM retrieval/reconciliation. Absent on legacy rows → treated as SAM (unchanged copy).
+    fromSam?: boolean;
   } | null;
   generatedAt?: string;
 }
@@ -265,16 +270,24 @@ function deriveDisclosures(payload: V3ReportPayload, coreMissing: string[]): Dis
     } else if (d.complete && missing.length === 0 && read >= posted) {
       // Green "complete" ONLY when internally consistent — an object claiming complete:true yet
       // listing missing files (or read<posted) must fall through to partial, never vouch.
+      // Provenance-aware copy: an UPLOAD set (fromSam===false) has no SAM manifest, so it must
+      // NOT claim "retrieved every document the agency posted to SAM.gov" (a fabrication). Legacy
+      // rows (fromSam undefined) keep the SAM wording — they predate uploads carrying ingestion.
       out.push({
         tone: "confirm", icon: "go",
         head: "Document set — complete",
-        text: `Retrieved and read <b>every document the agency posted</b> to SAM.gov (${posted} file${posted === 1 ? "" : "s"}), including amendments as of the generation time.`,
+        text: d.fromSam === false
+          ? `Read <b>every document you provided</b> (${posted} file${posted === 1 ? "" : "s"}) and grounded every finding in them. An uploaded set has no SAM.gov manifest to reconcile against — re-run from the solicitation number for a manifest-confirmed audit.`
+          : `Retrieved and read <b>every document the agency posted</b> to SAM.gov (${posted} file${posted === 1 ? "" : "s"}), including amendments as of the generation time.`,
       });
     } else {
       out.push({
         tone: "caution", icon: "alert",
         head: "Document set — partial",
-        text: `Read <b>${read} of ${posted}</b> document${posted === 1 ? "" : "s"} the agency posted to SAM.gov.${d.note ? ` ${escapeHtml(d.note)}` : ""} This verdict reflects only the documents we could read — add the missing files for a complete audit.`,
+        text: (d.fromSam === false
+          ? `Read <b>${read} of ${posted}</b> document${posted === 1 ? "" : "s"} you provided.`
+          : `Read <b>${read} of ${posted}</b> document${posted === 1 ? "" : "s"} the agency posted to SAM.gov.`) +
+          `${d.note ? ` ${escapeHtml(d.note)}` : ""} This verdict reflects only the documents we could read — add the missing files for a complete audit.`,
         files: missing.map((m) => (m.reason ? `${m.name} — ${m.reason}` : `${m.name} — retrieval failed; re-run to recover`)),
       });
     }

@@ -745,11 +745,13 @@ const VISION_TOKENS_PER_PAGE = 1600;
 
 // Token estimate for a (PDF) buffer: extract the text and estimate via
 // CHARS_PER_TOKEN — the text content is what the model reads and is billed for.
-async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string }> {
+async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: string; partialPageText: boolean }> {
   try {
     const extracted = await extractText(buf);
     const text = extracted.rawText ?? "";
-    if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text };
+    // partialPageText (mixed cover+scanned) travels with the text so the has_text
+    // completeness signal below can gate on it — cover text alone must not read green.
+    if (text.length > 0) return { tokens: estimateTokensFromChars(text.length), text, partialPageText: extracted.partialPageText === true };
   } catch {
     /* fall through to the page-based vision estimate */
   }
@@ -766,7 +768,7 @@ async function estimateDocTokens(buf: Buffer): Promise<{ tokens: number; text: s
   const tokens = pages > 0
     ? pages * VISION_TOKENS_PER_PAGE
     : Math.min(estimateTokensFromChars(buf.length), MAX_DOC_TOKENS);
-  return { tokens, text: "" };
+  return { tokens, text: "", partialPageText: false };
 }
 
 // Truncate a doc to a token budget. We have the extracted `text`; keep the
@@ -863,7 +865,7 @@ export async function assembleSamDocumentSet(
   // Pass 1: download + page-count + token-estimate every byte/doc-budgeted
   // member, in tier order.
   const files: IngestionFileMeta[] = [];
-  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean }> = [];
+  const fetched: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean; partialPageText: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -877,8 +879,8 @@ export async function assembleSamDocumentSet(
       continue;
     }
     const buf = dl.buf;
-    const { tokens, text } = await estimateDocTokens(buf);
-    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: dl.sourceTruncated });
+    const { tokens, text, partialPageText } = await estimateDocTokens(buf);
+    fetched.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: dl.sourceTruncated, partialPageText });
   }
   // Pass 2: trim by the page ceiling — but ONLY for VISION-delivered docs.
   // FA-INGEST3 (2026-06-21): the ~600-page API ceiling that MAX_TOTAL_PAGES guards
@@ -940,7 +942,9 @@ export async function assembleSamDocumentSet(
       const wasTruncated = tokenTruncated || f.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
       const displayName = wasTruncated ? `${f.entry.name} (truncated)` : f.entry.name;
       downloaded.push({ name: displayName, base64, buffer: buf, role: f.entry.role });
-      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
+      // partialPageText (mixed cover+scanned) forces has_text=false even when the
+      // cover text alone would clear hasEngineText — the scanned body is content loss.
+      files.push({ name: displayName, role: f.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(f.text) && !f.partialPageText, ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(f.entry.resourceId)) {
       files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
@@ -1029,7 +1033,7 @@ export async function assembleUploadedDocumentSet(
   // Pass 1: page-count + token-estimate every byte/doc-budgeted member (bytes
   // already local).
   const files: IngestionFileMeta[] = [];
-  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean }> = [];
+  const counted: Array<{ entry: DocumentPlanEntry; base64: string; buffer: Buffer; pages: number; tokens: number; text: string; sourceTruncated: boolean; partialPageText: boolean }> = [];
   for (const e of plan) {
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
@@ -1046,8 +1050,8 @@ export async function assembleUploadedDocumentSet(
       continue;
     }
     const buf = norm.buf;
-    const { tokens, text } = await estimateDocTokens(buf);
-    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: norm.sourceTruncated });
+    const { tokens, text, partialPageText } = await estimateDocTokens(buf);
+    counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: norm.sourceTruncated, partialPageText });
   }
   // Pass 2: trim by the page ceiling (form exempt → generics drop first).
   const { ingest: pageKept } = applyPageBudget(
@@ -1087,7 +1091,8 @@ export async function assembleUploadedDocumentSet(
       const wasTruncated = tokenTruncated || c.sourceTruncated; // S1 — OR the at-source xlsx head-truncation into the doc's truncated flag
       const displayName = wasTruncated ? `${c.entry.name} (truncated)` : c.entry.name;
       ingested.push({ name: displayName, base64, buffer: buf, role: c.entry.role });
-      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text), ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
+      // partialPageText (mixed cover+scanned) forces has_text=false — see SAM arm.
+      files.push({ name: displayName, role: c.entry.role, bytes: buf.length, ingested: true, has_text: hasEngineText(c.text) && !c.partialPageText, ...(wasTruncated ? { reason: tokenTruncated ? `truncated to ~${Math.round(MAX_DOC_TOKENS / 1000)}k tokens to fit the analysis budget` : `spreadsheet head-truncated at the source (~${Math.round(MAX_XLSX_DOC_TOKENS / 1000)}k tokens) — full line-item file on SAM.gov`, truncated: true } : {}) });
     } else if (tokenSkippedIds.has(c.entry.resourceId)) {
       files.push({ name: c.entry.name, role: c.entry.role, bytes: c.entry.sizeBytes, ingested: false, reason: `token budget (${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens) exceeded` });
     } else {
