@@ -81,9 +81,21 @@ export async function extractNonPdfText(name: string, buffer: Buffer): Promise<s
   if (!kind) return null;
   try {
     const text = kind === "docx" ? await extractDocxText(buffer) : await extractXlsxText(buffer);
-    return text && text.length > 0 ? text : null;
+    if (!text || text.length === 0) {
+      // DIAGNOSTIC (2026-07-06): the EMPTY-yield path was previously invisible — it just
+      // returned null with no log, so a .docx that carries text (confirmed in the gold
+      // source) but extracts to nothing gave the has_text=false signal ZERO explanation.
+      // Loud, greppable marker so the next prod re-run reveals whether the bytes arrived
+      // intact and mammoth simply produced nothing (bad/corrupt/HTML bytes from the SAM
+      // download arm) vs a thrown error below. Return value unchanged (null).
+      console.error(`[NONPDF-DIAG] ${kind} extraction returned EMPTY for "${name}" — ${buffer.length} bytes, magic=${buffer.subarray(0, 4).toString("hex")} (PK\\x03\\x04=504b0304 is a valid zip/docx/xlsx).`);
+      return null;
+    }
+    return text;
   } catch (err) {
-    console.warn(`[nonpdf-extractor] ${kind} extraction failed for ${name}: ${err instanceof Error ? err.message : err}`);
+    // Was console.warn(.message) — upgraded to error + full stack + a greppable marker so
+    // the REAL serverless failure (env/dep/memory/throw inside mammoth) is captured, not lost.
+    console.error(`[NONPDF-DIAG] ${kind} extraction THREW for "${name}" — ${buffer.length} bytes, magic=${buffer.subarray(0, 4).toString("hex")}: ${err instanceof Error ? `${err.message}\n${err.stack}` : String(err)}`);
     return null;
   }
 }
