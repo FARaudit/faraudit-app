@@ -20,6 +20,7 @@
 //   • Deterministic, $0, NO model. Rule 64: never PRESENT without a verbatim span in the named doc.
 
 import { createHash } from "crypto";
+import { hasEngineText } from "./sam-attachments";
 
 const sha256 = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
 const norm = (s: string): string => s.replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase().trim();
@@ -40,12 +41,39 @@ export interface ConstructionElement {
   regionHash: string | null;  // sha256 of the grounded region (full-text-bound; provenance for the trace)
 }
 
+/** Per-document sealed attestation (Brain card 289 — card-285 Fix-2 generalized to attachments). Computed at ingest
+ *  over each doc's FULL (pre-compression) text. The gate consumes THIS, never the digest: an obligation-FREE binding
+ *  attachment READ IN FULL (hasText, hash-bound, obligation detector swept the full text → zero) may be ATTESTED
+ *  covered without a finding-in-doc; an attachment WITH obligations still needs a grounded finding; an UNREAD /
+ *  no-text attachment (hasText=false) can NEVER be attested → INCOMPLETE (Brain HARD LINE: read-and-empty ≠ unread). */
+export interface DocAttestation {
+  name: string;
+  fullTextHash: string;         // sha256 of the FULL pre-compression text — the hash-bound provenance
+  hasText: boolean;             // the doc carried substantive machine-readable text (read in full) — false ⇒ never attestable
+  groundableObligations: number;// count of binding-obligation sentences over the FULL text (0 ⇒ attest read-and-empty)
+}
+
 export interface ConstructionManifest {
   /** True iff this package is a construction (SF-1442 / NAICS sector-23) buy — set from the PRIMARY-doc header + NAICS. */
   isConstruction: boolean;
   elements: ConstructionElement[];
   /** sha256 over each document's FULL (pre-compression) text — the provenance root. */
   docHashes: Array<{ name: string; hash: string }>;
+  /** Per-doc sealed attestation over FULL text (Brain card 289) — the per-doc coverage condition consumes this. */
+  docAttestations: DocAttestation[];
+}
+
+// A binding-obligation signal over FULL text. This MUST be a STRICT SUPERSET of the general-path detector
+// (audit-orchestrator.ts obligationsOf: shall|must|provide|submit|furnish|required|quote|deliver) — else a
+// construction attachment written in IMPERATIVE mood ("Furnish and install…", "Provide formwork", "Submit shop
+// drawings"), the CSI-spec standard, would read obligation-FREE and be attested covered with ZERO analysis
+// (false-COMPLETE = false-BID; caught by Rule-69 card-289 review). Superset = obligationsOf's verbs + construction
+// imperatives. Broadening only raises false-INCOMPLETE (the safe zero-contract-loss direction); the attest-empty
+// relief valve then fires ONLY on a genuinely prose-free drawing set. If obligationsOf's verb list ever changes,
+// this must stay a superset (guarded by the imperative-spec regression test).
+const OBLIGATION_RE = /\b(?:shall|must|provide|submit|furnish|required|quote|deliver|install|erect|construct|responsible\s+for|is\s+required\s+to|are\s+required\s+to|no\s+later\s+than|at\s+no\s+(?:additional|extra)\s+cost|to\s+be\s+provided\s+by)\b/gi;
+function countGroundableObligations(text: string): number {
+  return (text.match(OBLIGATION_RE) ?? []).length;
 }
 
 // ── Deterministic element detectors (verbatim, $0, NO model). Each anchored to a construction-SPECIFIC, distinctive,
@@ -96,6 +124,17 @@ export function sweepConstructionManifest(
   const isConstruction = naicsConstruction || headerConstruction;
 
   const docHashes = docs.map((d) => ({ name: d.name, hash: sha256(d.text) }));
+  // Per-doc sealed attestation over FULL text (Brain card 289). hasText gates the HARD LINE (no-text ⇒ never
+  // attestable); groundableObligations===0 enables attest-read-and-empty. hasText uses the codebase's authoritative
+  // read/no-text check `hasEngineText` (word floor + mojibake + [PDF_EXTRACTION_FAILED guards) — NOT an ad-hoc char
+  // floor (Rule-69 card-289 review): a header-only text layer or a failed-extraction marker must read hasText=false
+  // ⇒ uncovered ⇒ INCOMPLETE, especially on the upload path where there is no upstream content-loss cap.
+  const docAttestations: DocAttestation[] = docs.map((d) => ({
+    name: d.name,
+    fullTextHash: sha256(d.text),
+    hasText: hasEngineText(d.text),
+    groundableObligations: countGroundableObligations(d.text ?? ""),
+  }));
 
   const elements: ConstructionElement[] = ELEMENT_DEFS.map((def) => {
     for (const d of docs) {
@@ -117,7 +156,7 @@ export function sweepConstructionManifest(
     return { key: def.key, present: false, sourceDoc: null, anchor: null, span: null, regionHash: null };
   });
 
-  return { isConstruction, elements, docHashes };
+  return { isConstruction, elements, docHashes, docAttestations };
 }
 
 /** Carrier — the construction `required` set = the elements DETECTED PRESENT (the §A–M analog). Never empty for a real

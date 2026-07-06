@@ -42,6 +42,8 @@ export interface JudgmentFirstInput {
   noticeType?: string | null;
   naics?: string | null;
   setAside?: string | null;
+  isConstruction?: boolean;   // Brain card 289 — part36 construction: the proposer is told to surface each binding
+                              // element + attest each attachment so the rail's completeness bar is met HONESTLY.
 }
 
 export interface JudgmentFirstResult {
@@ -145,7 +147,13 @@ export function makeJudgmentFirstProposer(callStructured: JudgmentStructuredCall
       ? "Bidder profile: UNKNOWN (open-world — do NOT infer ineligibility from anything the firm does not explicitly hold)."
       : `Bidder profile attributes: ${(input.bidderProfile.satisfiedAttributes ?? []).join(", ") || "(none listed)"}${input.bidderProfile.closedWorld ? " [closed-world: complete profile]" : " [open-world: self-asserted]"}.`;
     const ctxLine = [input.naics ? `NAICS ${input.naics}` : "", input.setAside ? `set-aside ${input.setAside}` : "", input.noticeType ? `notice type ${input.noticeType}` : ""].filter(Boolean).join(" · ");
-    const user = `${profileLine}${ctxLine ? `\nSolicitation facts: ${ctxLine}.` : ""}\n\n=== FULL SOLICITATION SOURCE ===\n${input.fullSource}`;
+    // Brain card 289 — construction (SF-1442 / part-36) awareness. This is GUIDANCE to ground what is genuinely in the
+    // source (the rail re-grounds + gates every finding; a hallucinated excerpt is still dropped). It does NOT force a
+    // verdict — it makes the proposer analyze the whole construction package so the completeness bar is met honestly.
+    const constructionLine = input.isConstruction
+      ? "\n\nCONSTRUCTION PACKAGE (SF-1442 / FAR Part 36). Ground a SEPARATE finding, each with a VERBATIM excerpt, for EVERY binding element PRESENT in the source: (1) bonding — bid guarantee / performance & payment bonds (52.228-1/-15/-16); (2) wage determination — Davis-Bacon (52.222-6); (3) submission mechanics — bid schedule / offer due date / receipt of offers; (4) scope of work — the SOW / CSI specification sections; (5) set-aside / eligibility. ALSO read EVERY attachment (specifications, drawings, amendments) and ground at least one finding from EACH attachment that carries a binding obligation — an attachment left unanalyzed makes the package INCOMPLETE. Do NOT invent an element that is not in the source."
+      : "";
+    const user = `${profileLine}${ctxLine ? `\nSolicitation facts: ${ctxLine}.` : ""}${constructionLine}\n\n=== FULL SOLICITATION SOURCE ===\n${input.fullSource}`;
     const res = await callStructured({ model, system: PROPOSER_SYSTEM, user, schema: JUDGMENT_FIRST_SCHEMA as unknown as Record<string, unknown> });
     if (res.stopReason === "max_tokens") throw new Error(`judgment-first proposal truncated (max_tokens, model=${model}) — refusing a partial proposal`);
     let parsed: Partial<Omit<ProposedJudgment, "findings">> & { findings?: unknown[] };

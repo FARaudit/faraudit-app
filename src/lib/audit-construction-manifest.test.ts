@@ -98,7 +98,7 @@ eq("flag ON + non-solicitation (requiresLM=false) → free pass []", coreMissing
 
 // N5 — a misclassified NON-construction blob marked isConstruction=true but with ZERO present elements → required=[]
 //      ⇒ required.length>0 guard fails ⇒ INCOMPLETE, never a false BID (the guard is intact).
-const emptyManifest: ConstructionManifest = { isConstruction: true, elements: CONSTRUCTION_CORE.concat(["scope", "set_aside"]).map((k) => ({ key: k as any, present: false, sourceDoc: null, anchor: null, span: null, regionHash: null })), docHashes: [] };
+const emptyManifest: ConstructionManifest = { isConstruction: true, elements: CONSTRUCTION_CORE.concat(["scope", "set_aside"]).map((k) => ({ key: k as any, present: false, sourceDoc: null, anchor: null, span: null, regionHash: null })), docHashes: [], docAttestations: [] };
 const ctxEmpty: AuditToolContext = { fullSource: "random non-construction text with no binding elements", constructionManifest: emptyManifest };
 eq("N5 · isConstruction but zero present elements → buildManifest=[] ⇒ INCOMPLETE (guard intact)", buildManifest(ctxEmpty), []);
 eq("N5 · zero-present coreMissing = all core absent (honest-fail)", coreMissingFor(ctxEmpty, { requiresLM: true }).sort(), ["bonding", "submission", "wage_determination"]);
@@ -192,6 +192,25 @@ const covNoAnchor = constructionCoverage(m, W9126_SRC, ["the offeror shall submi
 ok("HARD-5 · finding lacking the anchor token → bonding NOT covered (no coincidental false-COMPLETE)", !covNoAnchor.covered.includes("bonding"));
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// CARD 289 — per-doc ATTESTATION (card-285 Fix-2 generalized). Sealed full-text sweep records hasText + obligation count.
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const attDocs = [
+  { name: "primary solicitation", text: PRIMARY },
+  { name: "Attachment — drawings.pdf", text: "General notes. Grid lines and elevations. Sheet A-101. Details and dimensions only." }, // READ, obligation-FREE
+];
+const mAtt = sweepConstructionManifest(attDocs, "236220");
+const drawAtt = mAtt.docAttestations.find((a) => a.name === "Attachment — drawings.pdf")!;
+ok("289 · sealed attestation records hasText + obligation count", drawAtt.hasText === true && drawAtt.groundableObligations === 0 && !!drawAtt.fullTextHash);
+ok("289 · a doc WITH obligations is NOT attested obligation-free", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "spec.pdf", text: "The contractor shall furnish all materials and must comply with the spec." }], "236220").docAttestations.find((a) => a.name === "spec.pdf")!.groundableObligations > 0);
+// Rule-69 card-289 hole #1 (CATASTROPHIC) — CSI specs are IMPERATIVE mood; an imperative spec with NO shall/must must
+// still count obligations (else attested obligation-free → zero analysis → false-BID). OBLIGATION_RE is a superset.
+ok("289 · IMPERATIVE-mood spec (no shall/must) still counts obligations (CSI regression)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "spec.pdf", text: "Furnish and install cast-in-place concrete. Provide formwork and shoring. Submit shop drawings for approval." }], "236220").docAttestations.find((a) => a.name === "spec.pdf")!.groundableObligations > 0);
+// Rule-69 card-289 hole #2 (HIGH) — a failed-extraction marker must read hasText=false (never attestable), via hasEngineText.
+ok("289 · [PDF_EXTRACTION_FAILED marker → hasText=false (never attestable)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "x.pdf", text: "[PDF_EXTRACTION_FAILED: pdftotext returned nothing readable]" }], "236220").docAttestations.find((a) => a.name === "x.pdf")!.hasText === false);
+// UNREAD / no-text attachment → hasText=false → HARD LINE (never attestable).
+ok("289 · no-text (scanned) attachment → hasText=false (HARD LINE: never attestable)", sweepConstructionManifest([{ name: "p", text: PRIMARY }, { name: "scan.pdf", text: "[img]" }], "236220").docAttestations.find((a) => a.name === "scan.pdf")!.hasText === false);
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // ORCHESTRATOR INTEGRATION — the seed (judgment-first rail) path reaches a DECIDED verdict on W9126-shape (criterion 5)
 // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 const noExpertModel: CallModel = async () => ({ toolCalls: [], findings: [] });
@@ -212,6 +231,23 @@ const noExpertModel: CallModel = async () => ({ toolCalls: [], findings: [] });
   const ctxNoBond: AuditToolContext = { fullSource: W9126_SRC.replace(/52\.228-1 Bid Guarantee[^\n]*/g, "").replace(/Performance bond and payment bond[^\n]*/g, ""), constructionManifest: sweepConstructionManifest([{ name: "primary solicitation", text: PRIMARY.replace(/52\.228-1 Bid Guarantee[^\n]*/g, "").replace(/Performance bond and payment bond[^\n]*/g, "") }, { name: "wage-det-attachment", text: ATTACH }], "236220") };
   const incomplete = await runAgenticAudit({ ctx: ctxNoBond, experts: [], callModel: noExpertModel, seedFindings: seed.filter((f) => !/bid guarantee|performance bond/i.test(f.excerpt)), noticeType: "Solicitation", naics: "236220" });
   ok(`integration · bonding core absent → INCOMPLETE honest-fail — got ${incomplete.decision.verdict}`, incomplete.decision.verdict === "INCOMPLETE");
+
+  // CARD 289 attestation, BOTH SIDES (Brain regression requirement):
+  const P2 = [PRIMARY, "Davis-Bacon wage determination WD 24-0012 applies.", "STATEMENT OF WORK: repair the roof of Building 100."].join("\n"); // all 5 elements inline in primary
+  const DRAW = "General notes. Grid lines A-101. Elevations and dimensions only. Sheet index."; // READ, obligation-FREE
+  const SRC2 = `==== DOCUMENT: primary ====\n\n${P2}\n\n==== DOCUMENT: drawings.pdf ====\n\n${DRAW}`;
+  const m2 = sweepConstructionManifest([{ name: "primary", text: P2 }, { name: "drawings.pdf", text: DRAW }], "236220");
+  const ctx2: AuditToolContext = { fullSource: SRC2, constructionManifest: m2 };
+  const seed2 = m2.elements.filter((e) => e.present).map((e) => mkFinding(e.span!, "other", "bidder_controls"));
+  // SIDE 1 — obligation-free drawings attachment READ (no finding needed) → ATTESTED → package DECIDES.
+  const attested = await runAgenticAudit({ ctx: ctx2, experts: [], callModel: noExpertModel, seedFindings: seed2, noticeType: "Solicitation", naics: "236220" });
+  ok(`289 · obligation-free READ attachment attested (no finding) → DECIDES — got ${attested.decision.verdict}`, attested.decision.verdict !== "INCOMPLETE" && attested.decision.verdict !== "NEEDS_HUMAN_REVIEW");
+  // SIDE 2 — UNREAD / no-text attachment (HARD LINE) → NEVER attested → INCOMPLETE, even with all elements grounded.
+  const SRC3 = `==== DOCUMENT: primary ====\n\n${P2}\n\n==== DOCUMENT: drawings.pdf ====\n\n[img]`;
+  const m3 = sweepConstructionManifest([{ name: "primary", text: P2 }, { name: "drawings.pdf", text: "[img]" }], "236220");
+  const ctx3: AuditToolContext = { fullSource: SRC3, constructionManifest: m3 };
+  const unread = await runAgenticAudit({ ctx: ctx3, experts: [], callModel: noExpertModel, seedFindings: seed2, noticeType: "Solicitation", naics: "236220" });
+  ok(`289 · UNREAD (no-text) attachment → INCOMPLETE (HARD LINE) — got ${unread.decision.verdict}`, unread.decision.verdict === "INCOMPLETE");
 
   console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);

@@ -263,6 +263,7 @@ export async function runJudgmentFirstAudit(input: AuditPackageInput): Promise<J
     noticeType: input.noticeType ?? null,
     naics: input.naics ?? null,
     setAside: input.setAside ?? null,
+    isConstruction: input.constructionManifest?.isConstruction, // Brain card 289 — construction-aware proposer
   };
   return runJudgmentFirst(jfInput, propose, rail);
 }

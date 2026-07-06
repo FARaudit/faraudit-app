@@ -301,6 +301,32 @@ export function documentsCovered(fullSource: string, findings: TypedFinding[]): 
   return { complete: uncovered.length === 0, uncovered };
 }
 
+/** Brain card 289 — PART36 per-doc coverage with SEALED full-text ATTESTATION (card-285 Fix-2 generalized to
+ *  attachments; gate UNCHANGED, only the per-doc CONDITION is stated via attestation). For each binding attachment:
+ *   • HARD LINE — no sealed attestation OR no machine-readable text (hasText=false) ⇒ UNREAD ⇒ never attestable ⇒
+ *     uncovered ⇒ INCOMPLETE (read-and-empty ≠ unread);
+ *   • obligation-FREE over FULL text (groundableObligations===0) ⇒ ATTESTED "read in full · hash-bound · swept ·
+ *     zero groundable obligations" ⇒ covered WITHOUT a finding-in-doc (the drawings-PDF relief valve);
+ *   • has obligations ⇒ still needs a grounded finding IN the doc's region (never suppresses a real obligation —
+ *     Fix-2 condition 3). Attestation reads the SEALED FULL-TEXT sweep, never the digest self-certifying. */
+export function constructionDocumentsCovered(ctx: AuditToolContext, findings: TypedFinding[]): { complete: boolean; uncovered: string[] } {
+  const regions = docRegions(ctx.fullSource);
+  if (regions.length <= 1) return { complete: true, uncovered: [] };
+  const attByName = new Map((ctx.constructionManifest?.docAttestations ?? []).map((a) => [a.name, a]));
+  const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
+  const uncovered: string[] = [];
+  for (const r of regions) {
+    if (r.isPrimary) continue;
+    if (!isBindingDoc({ role: "attachment", name: r.name })) continue; // offeror-fill exempt
+    const att = attByName.get(r.name);
+    if (!att || !att.hasText) { uncovered.push(r.name); continue; }    // HARD LINE — unread/no-text can NEVER be attested
+    if (att.groundableObligations === 0) continue;                     // ATTESTED read-and-empty (obligation-free full text)
+    const nRegion = norm(r.text);                                      // has obligations ⇒ require a grounded finding-in-doc
+    if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
+  }
+  return { complete: uncovered.length === 0, uncovered };
+}
+
 // C-19 INTERIM GUARD (Brain C.f — resolution is its OWN tranche; here: detect + disclose, NEVER a verdict cap).
 const AMENDMENT_RE = /\b(?:SF[-\s]?30\b|amendment\s+of\s+solicitation|amendment\s+(?:no\.?|number|#)?\s*0*\d)/i;
 /** Deterministic amendment presence — either an ingestion doc tagged role "amendment" (passed via docNames roles)
@@ -634,7 +660,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   });
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
-  const docCoverage = documentsCovered(ctx.fullSource, findings);
+  const docCoverage = (ctx.constructionManifest && procurementPart(ctx) === "part36-construction")
+    ? constructionDocumentsCovered(ctx, findings)   // Brain card 289 — sealed full-text attestation for attachments
+    : documentsCovered(ctx.fullSource, findings);
   // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
   // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
   // later tranche; this is detection + fail-safe only.
