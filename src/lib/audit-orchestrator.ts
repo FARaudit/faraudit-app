@@ -19,7 +19,7 @@ import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder
 import { isBindingDoc } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -797,6 +797,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // (C-13, SUBORDINATED: it can only add caution, never certify) + a missing CORE UCF section. The reconciliation signal
   // no longer hides inside the ctx-heuristic AND; the two are separate inputs the verdict caps on independently.
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource };
+  if (process.env.CONSTRUCTION_DEBUG === "true") {
+    const kc: Record<string, number> = {}, dc: Record<string, number> = {};
+    for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
+    console.log(`[CONSTRUCTION_DEBUG] DECIDE-INPUTS verifierSound=${ver.sound} conflict=${conflict} findings=${findings.length} verifierDrops=${ver.rejected?.length ?? 0} manifestComplete=${manifestComplete(ctx) && coreMissing.length === 0} documentsComplete=${opts.manifestComplete}`);
+    console.log(`[CONSTRUCTION_DEBUG] kinds=${JSON.stringify(kc)} dispositions=${JSON.stringify(dc)}`);
+    for (const f of findings.filter((f) => f.controllability === "bidder_cannot_move" || f.controllability === "no_one_can_move")) {
+      console.log(`[CONSTRUCTION_DEBUG] BAR kind=${f.kind} ctrl=${f.controllability} req="${(f.requirement || "").slice(0, 90)}" cite="${(f.citation || "").slice(0, 40)}" excerpt="${(f.excerpt || "").slice(0, 90)}"`);
+    }
+  }
   // Ruling (i) AUDIT BOUNDARY — the coupling-lock decision-time BACKSTOP (EngineInvariantError) converts HERE to
   // a billing-safe failed state: log the config error and re-throw the typed terminal failure. The caller routes
   // it to a 'failed' status; because the throw precedes any persist/decrementAuditQuota, the customer is NOT
