@@ -2,10 +2,11 @@
 //   buildV4Data(row) → renderRichWebV5(data) → v5 chrome shell + REPORT_V5_CSS + interactivity JS.
 // Chrome ported 1:1 from the Design v5 host (v5-report.html); dev pole-switcher stripped;
 // export gate + KO wired to the REAL production routes (shouldGateExport / pdf / ko-email).
-// Self-contained HTML (PDF-safe). Fonts ride REPORT_V5_CSS @import until the Phase-5 embed.
+// Self-contained HTML (PDF-safe). Fonts embedded (base64 woff2) via FONTS_CSS — Phase-5 HARD GATE.
 import { renderRichWebV5, type V5RenderResult } from "@/lib/v5-report/render";
 import { buildV4Data } from "@/lib/v4-report/build-data";
 import { REPORT_V5_CSS } from "@/lib/v5-report/styles";
+import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { shouldGateExport } from "@/lib/audit-display";
 
 const esc = (s: unknown): string =>
@@ -56,6 +57,7 @@ export function renderV5ReportFromRow(audit: Record<string, unknown>): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FARaudit · ${sol}</title>
+<style>${FONTS_CSS}</style>
 <style>${REPORT_V5_CSS}</style>
 <style>${printGateCss}</style>
 </head>

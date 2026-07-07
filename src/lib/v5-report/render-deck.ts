@@ -25,6 +25,7 @@
 import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, type EligInfo } from "@/lib/v5-report/core";
 import { reasoningSteps, REACHED_INTRO, splitMethod } from "@/lib/v5-report/render";
 import { REPORT_DECK_CSS } from "@/lib/v5-report/styles-deck";
+import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { buildV4Data } from "@/lib/v4-report/build-data";
 import type { V4Data, V4Verdict, V4SubmissionL, V4EvalM, V4Finding } from "@/lib/v4-report/render";
 
@@ -321,6 +322,7 @@ export function renderGateDeckDocV5(d: V4Data): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FARaudit · Gate Deck · ${sol}</title>
+<style>${FONTS_CSS}</style>
 <style>${REPORT_DECK_CSS}</style>
 </head>
 <body>

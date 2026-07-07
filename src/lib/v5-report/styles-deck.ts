@@ -17,11 +17,13 @@
    PDF is byte-1:1 with the mock per page. No 1993-line presenter/editor runtime
    is inlined into the artifact.
 
-   Fonts ride the @import until the Phase-5 font-embed HARD GATE self-hosts
-   Manrope + IBM Plex Mono.
+   Fonts (Manrope + IBM Plex Mono) are embedded via FONTS_CSS (Phase-5 HARD GATE) —
+   see the note at the top of REPORT_DECK_CSS below.
    ============================================================================= */
 export const REPORT_DECK_CSS: string = `
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+/* Fonts are embedded (base64 woff2) via FONTS_CSS, prepended into the render
+   document ahead of this stylesheet — the Google Fonts @import was removed at the
+   Phase-5 HARD GATE so the deck is self-hosted (offline/print-fidelity). */
 
 :root{
   /* verdict semantics ONLY — ink-friendly, print-safe */

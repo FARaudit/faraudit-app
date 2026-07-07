@@ -9,6 +9,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { renderRichWebV5, reasoningSteps, REACHED_INTRO } from "@/lib/v5-report/render";
 import { REPORT_V5_CSS } from "@/lib/v5-report/styles";
+import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import type { V4Data } from "@/lib/v4-report/render";
 
 let pass = 0; const fails: string[] = [];
@@ -69,7 +70,7 @@ mkdirSync(OUT, { recursive: true });
 // places .main in the correct column — a sample without the sidebar collapses main
 // into the 236px track (the earlier broken-narrow render was this wrapper bug, not
 // the renderer). rail present so .stage's 1fr+224px also resolves.
-const wrap = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v5 port · ${title}</title><style>${REPORT_V5_CSS}</style></head><body><div class="app"><aside class="sidebar"><div class="sb-brand"><span class="dot">◆</span> FARaudit</div></aside><div class="main"><header class="topbar"><div class="tb-crumb"><span>Past audits</span><span class="sep">/</span><span class="cur">sample</span></div><span class="tb-live">Live web view</span></header><div class="stage"><article class="report anim" id="report">${body}</article><nav class="rail" id="rail" aria-label="On this page"></nav></div></div></div></body></html>`;
+const wrap = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v5 port · ${title}</title><style>${FONTS_CSS}</style><style>${REPORT_V5_CSS}</style></head><body><div class="app"><aside class="sidebar"><div class="sb-brand"><span class="dot">◆</span> FARaudit</div></aside><div class="main"><header class="topbar"><div class="tb-crumb"><span>Past audits</span><span class="sep">/</span><span class="cur">sample</span></div><span class="tb-live">Live web view</span></header><div class="stage"><article class="report anim" id="report">${body}</article><nav class="rail" id="rail" aria-label="On this page"></nav></div></div></div></body></html>`;
 writeFileSync(`${OUT}/01-BID.html`, wrap("BID", bidHtml));
 writeFileSync(`${OUT}/06-INCOMPLETE.html`, wrap("INCOMPLETE", incHtml));
 
