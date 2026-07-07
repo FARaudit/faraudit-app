@@ -10,9 +10,6 @@
 //
 // Error contract:
 //   - Engine/SAM/content errors THROW — caller marks the audits row failed.
-//   - The complete-update persist failure throws AuditPersistError — the sync
-//     route preserves its historical behavior (500 with auditId, row left in
-//     'processing'); the worker treats it like any failure.
 //   - V2 shadow + corpus failures are swallowed (parity with route).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -23,52 +20,16 @@ import { MAX_DOCS, type IngestionMeta } from "@/lib/sam-attachments";
 import { executeAgenticPrimary } from "@/lib/audit-executor-v3";
 import type { BidderProfile } from "@/lib/audit-findings";
 
-export class AuditPersistError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AuditPersistError";
-  }
-}
-
-// FA-147 — a structurally collapsed run must never persist as complete.
-export class DegradedRunError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DegradedRunError";
-  }
-}
-
-// FA-147 — minimum-shape assertion, the net for degradation modes we haven't
-// met yet. THRESHOLD RATIONALE: this is deliberately the UNAMBIGUOUS
-// structural floor — each of the three call outputs must exist as parsed,
-// non-empty JSON. callWithRetry already retried (Sonnet → Opus escalation)
-// before falling back to {}, so an empty object here means BOTH models failed
-// to produce parseable output for that call: never a legitimate product, on
-// any arm (full-doc, image, text, and the deliberate metadata-only path all
-// populate all three). Anything stricter — minimum risk counts, clause-list
-// floors, checklist lengths — would be a PRODUCT judgment about acceptable
-// thinness and is explicitly NOT made here (Brain call, per FA-147 filing).
-export function assertMinimumAuditShape(result: {
-  overview: { json: object | null };
-  compliance: { json: object | null };
-  risks: { json: object | null };
-}, opts?: {
-  // FA-137 — when call-3 collapsed, the run completes WITH the explicit
-  // call3_collapsed marker + §05 banner instead of tripping this floor.
-  allowCollapsedRisks?: boolean;
-}): void {
-  const collapsed: string[] = [];
-  const calls = opts?.allowCollapsedRisks ? (["overview", "compliance"] as const) : (["overview", "compliance", "risks"] as const);
-  for (const call of calls) {
-    const j = result[call].json;
-    if (!j || typeof j !== "object" || Object.keys(j).length === 0) collapsed.push(call);
-  }
-  if (collapsed.length > 0) {
-    throw new DegradedRunError(
-      `degraded_run_shape: call output collapsed for [${collapsed.join(", ")}] — refusing to persist a thin report as complete`
-    );
-  }
-}
+// T2-2 (engine line-audit 2026-07-07) — REMOVED three retired-engine phantoms:
+//   • AuditPersistError — a class that was caught (route.ts) + advertised in the
+//     comment above but NEVER thrown anywhere (dead catch arm removed too).
+//   • assertMinimumAuditShape — asserted the RETIRED V1/V2 3-call shape
+//     (overview/compliance/risks json) the live V3 engine never produces (it had
+//     zero real callers — only a stale comment mentioned it).
+//   • DegradedRunError — its ONLY thrower was assertMinimumAuditShape, so deleting
+//     that orphaned it (the worker's instanceof branches went with it).
+// The live anti-false-COMPLETE net is V3's compliance_json.honest_fail +
+// documents_complete + the 9 Tier-0 verdict-integrity fixes — not these.
 
 export interface AuditExecutionInput {
   solicitation: Solicitation;
@@ -171,24 +132,8 @@ async function markStage(
 const FACTS_SAM_BUDGET_MS = 30 * 1000;
 const V1_OVERALL_BUDGET_MS = 11 * 60 * 1000;
 
-// Attachment-set degrade ceiling. The V1 engine + V2 shadow each ingest EVERY
-// member of input.attachmentPdfs; an abnormally large set is the in-executor
-// half of the long-tail cost. assembleSamDocumentSet already applies a doc /
-// byte / page budget upstream (MAX_DOCS etc.), so under normal operation the
-// set is already small and this NEVER trips. It's a defensive backstop against
-// a pathological set slipping through: keep the first N (deterministic order is
-// preserved upstream — form first, then tier order), drop the rest, and flag it
-// LOUDLY on compliance_json.ingestion (no silent truncation).
-//
-// P0 fix (2026-06-20): MUST stay AT/ABOVE the upstream attachment count so this
-// backstop never re-truncates a normal set. Upstream MAX_DOCS bounds TOTAL docs
-// (primary + attachments); the primary is split out before this runs, so a
-// normal set carries up to MAX_DOCS-1 attachments. Pinning the backstop to
-// MAX_DOCS keeps it strictly above that (was hardcoded 8 — which, after MAX_DOCS
-// rose to 12, would have silently dropped the very ELIN/SOW/SLS docs the upstream
-// ranking fix just promoted).
-const ATTACHMENT_SET_MAX = MAX_DOCS;
-
+// T2-2 — ATTACHMENT_SET_MAX (the V1/V2 attachment-set degrade ceiling `= MAX_DOCS`)
+// removed: zero callers, an advertised backstop that never ran on the V3 path.
 // Race a promise against a wall-clock budget. On breach the returned promise
 // REJECTS with `new Error(label)` — callers decide whether that degrades
 // (catch → fallback) or fails (propagate). Mirrors the inline V2 race already

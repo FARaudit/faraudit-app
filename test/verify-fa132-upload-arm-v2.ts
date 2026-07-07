@@ -34,7 +34,7 @@ function check(name: string, cond: boolean, detail = ""): void {
 
 async function main(): Promise<void> {
   const { uploadPdfToFilesApi, deletePdfFromFilesApi } = await import("../src/lib/anthropic-files");
-  const { executeAudit, assertMinimumAuditShape } = await import("../src/lib/audit-executor");
+  const { executeAudit } = await import("../src/lib/audit-executor");
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // ── R · the enqueue→worker bytes channel ───────────────────────────────────
@@ -95,13 +95,7 @@ async function main(): Promise<void> {
     const { data: sam } = await supabase.from("audits").select("compliance_json").eq("id", "8aa2bab9-485b-4abb-ad4e-70681380bdf0").single();
     check("S1 sam_fetched production row keeps its v2_shadow", !!sam?.compliance_json?.v2_shadow && sam.compliance_json.v2_shadow.path === "pdf");
     check("S2 sam_fetched row pdf_source unchanged", sam?.compliance_json?.pdf_source === "sam_fetched");
-
-    // ── G · FA-147 gate: missing shadow ≠ degraded ───────────────────────────
-    let gErr: unknown = null;
-    try {
-      assertMinimumAuditShape({ overview: { json: { summary: "x" } }, compliance: { json: { far_clauses: [] } }, risks: { json: { risk_findings: [] } } });
-    } catch (e) { gErr = e; }
-    check("G1 missing-shadow-by-design passes the shape gate", gErr === null, String(gErr));
+    // (G · FA-147 shape-gate check REMOVED 2026-07-07 per T2-2 — assertMinimumAuditShape retired.)
   } finally {
     if (auditId) {
       await supabase.from("fa_intelligence_corpus").delete().eq("audit_id", auditId);
