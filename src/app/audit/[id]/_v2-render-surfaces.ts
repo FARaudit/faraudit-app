@@ -958,6 +958,10 @@ export function readIngestion(comp: Record<string, unknown> | null | undefined):
   const rawFiles = ing && Array.isArray(ing.files) ? (ing.files as Array<Record<string, unknown>>) : null;
   if (!rawFiles || rawFiles.length === 0) return null;
   const files = rawFiles
+    // Exclude COVERED near-duplicate rows (a SAM double-post whose content is present via the kept copy). They
+    // are subtracted from files_total upstream (reconcileNearDuplicates); listing/counting them here would break
+    // the read/indexed/total identity (Gate-5 finding ①) and show a same-content dupe as a deep-read source.
+    .filter((f) => f && (f as { nearDuplicate?: unknown }).nearDuplicate !== true)
     .filter((f) => f && typeof f.name === "string" && (f.name as string).trim().length > 0)
     .map((f) => {
       const role: "form" | "amendment" | "attachment" =

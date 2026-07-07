@@ -167,6 +167,11 @@ export interface IngestionFileMeta {
   // text-only auditPackage never consumes → a named-but-blank contribution. Completeness must gate on has_text
   // for BINDING docs, not on `ingested` alone (which reads green while a §M/SOW/wage-det contributed nothing).
   has_text?: boolean;
+  // Near-duplicate reconciliation (2026-07-07 false-INCOMPLETE fix). SAM frequently posts the same file twice
+  // (re-upload / mirrored copy). dedupeNearDuplicates drops the redundant copy because an identical-or-larger
+  // copy WAS ingested — its content is fully covered, so it is NOT a distinct posted doc and NOT content loss.
+  // Marked so the completeness gate never counts a dropped dupe as "missing" and never inflates files_total.
+  nearDuplicate?: boolean;
   // C-4 (Brain C.c) — this doc was MID-DOCUMENT truncated to fit MAX_DOC_TOKENS: bytes arrived and text was
   // extracted, but the TAIL past the per-doc token budget never reached the engine. A truncated BINDING doc is a
   // content loss (the unread tail may carry a bar) ⇒ documents_complete=false, exactly like a scanned binding doc.
@@ -636,12 +641,49 @@ export function dedupeNearDuplicates(plan: DocumentPlanEntry[], solicitationNumb
     );
     kept.push(ranked[0]);
     for (const d of ranked.slice(1)) {
-      dropped.push({ entry: d, reason: `near-duplicate of "${ranked[0].name}" — kept the larger/most-recent copy` });
+      dropped.push({ entry: d, reason: `${NEAR_DUP_REASON_PREFIX}"${ranked[0].name}"${NEAR_DUP_REASON_SUFFIX}` });
     }
   }
   // Preserve the incoming plan order for the kept set (tiering happens later).
   const keptIds = new Set(kept.map((k) => k.resourceId));
   return { kept: plan.filter((e) => keptIds.has(e.resourceId)), dropped };
+}
+
+// Single source for the near-duplicate drop reason so the completeness reconciler identifies a dropped dupe
+// without string drift. (2026-07-07: fixes a systemic false-INCOMPLETE — SAM routinely double-posts a file,
+// dedupe correctly drops the copy, and the gate then counted the dropped copy as a "missing" doc, burying an
+// otherwise-complete scored verdict.)
+const NEAR_DUP_REASON_PREFIX = "near-duplicate of ";
+const NEAR_DUP_REASON_SUFFIX = " — kept the larger/most-recent copy";
+const isNearDuplicateDrop = (reason?: string): boolean => !!reason && reason.startsWith(NEAR_DUP_REASON_PREFIX);
+// Kept-copy name parsed from the single-source near-dup reason. null if unparseable.
+const nearDuplicateKeptName = (reason?: string): string | null => {
+  if (!reason || !reason.startsWith(NEAR_DUP_REASON_PREFIX) || !reason.endsWith(NEAR_DUP_REASON_SUFFIX)) return null;
+  const inner = reason.slice(NEAR_DUP_REASON_PREFIX.length, reason.length - NEAR_DUP_REASON_SUFFIX.length);
+  return inner.length >= 2 && inner.startsWith('"') && inner.endsWith('"') ? inner.slice(1, -1) : null;
+};
+// Refined near-duplicate reconciliation (2026-07-07, hardened after the Gate-5 re-review). A dropped near-duplicate
+// is "content-covered" — excluded from the completeness denominator AND the read banner — ONLY when it is a
+// HIGH-CONFIDENCE true duplicate: its LITERAL name exactly matches a KEPT copy that actually ingested WITH text.
+// A normalized-key OVER-MERGE of DISTINCT docs (different literal names, e.g. "SOW Draft.pdf" vs "SOW Final.pdf"
+// both strip to "sow"), or a dup whose kept copy failed/has no text, stays ingested:false → honest INCOMPLETE.
+// This is the fail-SAFE direction: a dedupe over-merge must never read false-COMPLETE over lost binding content.
+// Mutates files[] in place; returns the count of covered dupes to subtract from files_total.
+function reconcileNearDuplicates(files: IngestionFileMeta[]): number {
+  const stripTrunc = (n: string) => n.replace(/ \(truncated\)$/, "");
+  const ingestedWithText = new Set(files.filter((f) => f.ingested && f.has_text === true).map((f) => stripTrunc(f.name)));
+  let covered = 0;
+  for (const f of files) {
+    if (f.ingested || !isNearDuplicateDrop(f.reason)) continue;
+    const keptName = nearDuplicateKeptName(f.reason);
+    if (keptName !== null && keptName === f.name && ingestedWithText.has(stripTrunc(f.name))) {
+      f.ingested = true;
+      f.has_text = true;
+      f.nearDuplicate = true;
+      covered++;
+    }
+  }
+  return covered;
 }
 
 // P0 fix (2026-06-20): .docx/.xlsx members are now INGESTIBLE — they are
@@ -916,6 +958,8 @@ export async function assembleSamDocumentSet(
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
       const skip = skipped.find((s) => s.entry.resourceId === e.resourceId);
+      // Near-duplicate drops are recorded ingested:false here; reconcileNearDuplicates() (after ingestion,
+      // when kept-copy has_text is known) flips ONLY high-confidence true dupes to covered. Safe default.
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
@@ -999,9 +1043,14 @@ export async function assembleSamDocumentSet(
   const primary = downloaded.find((d) => d.role === "form") ?? downloaded[0] ?? null;
   const attachments = downloaded.filter((d) => d !== primary);
   const ingestedCount = downloaded.length;
+  // Refined near-dup reconciliation (post-Gate-5) — flip HIGH-CONFIDENCE true dupes to covered BEFORE counting;
+  // over-merges / kept-has-no-text stay ingested:false → honest INCOMPLETE. Runs here (after ingestion) so the
+  // kept copy's has_text is known. Covered dupes are excluded from files_total (not distinct documents).
+  const nearDupCount = reconcileNearDuplicates(files);
   const skippedCount = files.filter((f) => !f.ingested).length;
+  const distinctTotal = plan.length - nearDupCount;
   const ingestion: IngestionMeta = {
-    files_total: plan.length,
+    files_total: distinctTotal,
     files_ingested: ingestedCount,
     // RC5 Fix 1 — only honest if a SUBSTANTIVE form was identified. An
     // amendment-only / SF-30-cover primary (form claim is just the sol-number
@@ -1009,7 +1058,7 @@ export async function assembleSamDocumentSet(
     form_identified: !!formEntry && downloaded.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${distinctTotal} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
@@ -1082,6 +1131,8 @@ export async function assembleUploadedDocumentSet(
     const planned = ingest.find((i) => i.resourceId === e.resourceId);
     if (!planned) {
       const skip = skipped.find((s) => s.entry.resourceId === e.resourceId);
+      // Near-duplicate drops are recorded ingested:false here; reconcileNearDuplicates() (after ingestion,
+      // when kept-copy has_text is known) flips ONLY high-confidence true dupes to covered. Safe default.
       files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: skip?.reason ?? "not planned" });
       continue;
     }
@@ -1151,16 +1202,21 @@ export async function assembleUploadedDocumentSet(
 
   const primary = ingested.find((d) => d.role === "form") ?? ingested[0] ?? null;
   const attachments = ingested.filter((d) => d !== primary);
+  // Refined near-dup reconciliation (post-Gate-5) — flip HIGH-CONFIDENCE true dupes to covered BEFORE counting;
+  // over-merges / kept-has-no-text stay ingested:false → honest INCOMPLETE. Runs here (after ingestion) so the
+  // kept copy's has_text is known. Covered dupes are excluded from files_total (not distinct documents).
+  const nearDupCount = reconcileNearDuplicates(files);
   const skippedCount = files.filter((f) => !f.ingested).length;
+  const distinctTotal = plan.length - nearDupCount;
   const ingestion: IngestionMeta = {
-    files_total: plan.length,
+    files_total: distinctTotal,
     files_ingested: ingested.length,
     // RC5 Fix 1 — see assembleSamDocumentSet: substantive-form gate so an
     // amendment-only upload (audit #4) honestly fires the no-primary banner.
     form_identified: !!formEntry && ingested.some((d) => d.role === "form") && formIsSubstantive(formEntry.name),
     form_name: formEntry?.name ?? null,
     ...(primary && isPdfPortfolio(primary.buffer) ? { portfolio_detected: true } : {}),
-    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${plan.length} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
+    ...(skippedCount > 0 ? { overflow: `${skippedCount} of ${distinctTotal} files not ingested (budget: ${MAX_DOCS} docs / ${Math.round(MAX_TOTAL_TOKENS / 1000)}k tokens / ${MAX_TOTAL_PAGES}pp vision / ${Math.round(MAX_DOWNLOAD_BYTES / 1048576)}MB download; PDF + .docx/.xlsx read as text, scanned PDFs OCR'd, other types not)` } : {}),
     files: files.map((f) => ({ ...f, section_roles: f.role === "attachment" ? classifySectionRoles(f.name) : [] })),
   };
   return {
