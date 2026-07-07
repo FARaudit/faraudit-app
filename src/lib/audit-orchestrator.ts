@@ -233,6 +233,47 @@ function obligationsOf(text: string): { obligations: string[]; truncated: boolea
   return { obligations: all.slice(0, MAX_OBLIGATIONS), truncated: all.length > MAX_OBLIGATIONS };
 }
 
+// ── Commercial §L false-INCOMPLETE fix (ENGINE-5-ROOT #1, clears P0 S3-1 + S6-1) ──────────────
+// On a FAR Part-12 commercial (SF1449) buy, §L (Instructions to Offerors) is the INCORPORATED
+// standard provision FAR 52.212-1 plus the agency's own "Addendum". obligationsOf() enumerates the
+// standard (a)-(l) provision boilerplate as obligations, but NO auditor finding quotes that canned
+// government text verbatim (auditors flag the Addendum's real bars — OEM letter, SAM registration,
+// 90-day acceptance, warranty). So a handful of un-quotable 52.212-1 boilerplate sentences land
+// `ungrounded` → §L `missing` → false INCOMPLETE on essentially every commercial SF1449. This is the
+// verbatim FAR 52.212-1 (SEP 2023) obligation-bearing body; an obligation that shares a ≥6-word
+// verbatim n-gram with it (stricter than the ≥4-word grounding gram) is standard clause boilerplate,
+// NOT an agency-authored bar, and is excused from per-obligation grounding — but ONLY on a commercial
+// §L that already proved it was read (≥1 direct §L-cited grounded finding). See completenessOf.
+const FAR_52_212_1_BOILERPLATE = `
+Submit signed and dated offers to the office specified in this solicitation at or before the exact time specified in the solicitation.
+As a minimum, offers must show the solicitation number; the name, address, and telephone number of the offeror; a technical description of the items being offered in sufficient detail to evaluate compliance with the requirements in the solicitation.
+Terms of any express warranty; price and any discount terms; remit to address, if different than mailing address; a completed copy of the representations and certifications; acknowledgment of solicitation amendments; past performance information; and if the offer is not submitted on the SF 1449, include a statement specifying the extent of agreement with all terms, conditions, and provisions included in the solicitation.
+Offers that fail to furnish required representations or information, or reject the terms and conditions of the solicitation, may be excluded from consideration.
+The offeror shall submit any statement of the extent of agreement with all terms, conditions, and provisions included in the solicitation.
+The offeror agrees to hold the prices in its offer firm for 30 calendar days from the date specified for receipt of offers, unless another time period is specified in an addendum to the solicitation.
+When required by the solicitation, product samples shall be submitted at or prior to the time specified for receipt of offers.
+Offerors are encouraged to submit multiple offers presenting alternative terms and conditions, including alternative line items or alternative commercial products or services for satisfying the requirements of this solicitation.
+Nongovernment (voluntary) standards must be obtained from the organization responsible for their preparation, publication, or maintenance.
+Offerors are responsible for submitting offers, and any modifications, revisions, or withdrawals, so as to reach the Government office designated in the solicitation by the time specified in the solicitation.
+The offeror shall enter, in the block with its name and address on the cover page of its offer, the annotation Unique Entity Identifier followed by the unique entity identifier that identifies the offeror's name and address.
+The offeror also shall enter its Electronic Funds Transfer indicator, if applicable.
+Offers are bound by the terms of the solicitation and shall provide the required information.
+`;
+const norm6 = (s: string): string => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const FAR_52_212_1_GRAMS: Set<string> = (() => {
+  const words = norm6(FAR_52_212_1_BOILERPLATE).split(" ").filter(Boolean);
+  const grams = new Set<string>();
+  for (let i = 0; i + 6 <= words.length; i++) grams.add(words.slice(i, i + 6).join(" "));
+  return grams;
+})();
+/** True when an obligation sentence is verbatim FAR 52.212-1 standard-provision boilerplate (shares a
+ *  ≥6-word n-gram with the canonical clause body) — i.e. incorporated government text, not an agency bar. */
+function isFar52121Boilerplate(ob: string): boolean {
+  const words = norm6(ob).split(" ").filter(Boolean);
+  for (let i = 0; i + 6 <= words.length; i++) { if (FAR_52_212_1_GRAMS.has(words.slice(i, i + 6).join(" "))) return true; }
+  return false;
+}
+
 /** The UCF section a finding is CITED to (from its citation, e.g. "§C" / "Section C" / "C - ..."). null when the
  *  citation names a clause number or is unparseable — such a finding cannot ground a section-scoped obligation. */
 function findingSection(f: TypedFinding): string | null {
@@ -500,17 +541,29 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
       }
     }
     const { obligations, truncated: obTruncated } = obligationsOf(text);
+    // ENGINE-5-ROOT #1 — commercial §L false-INCOMPLETE fix. On a Part-12 commercial buy, §L is the
+    // incorporated standard FAR 52.212-1 provision + the agency Addendum; the canned 52.212-1 (a)-(l)
+    // sentences are never quoted verbatim by a finding, so grading them per-obligation vetoes an
+    // otherwise-complete §L. Drop ONLY that boilerplate from the graded set — but ONLY when §L was
+    // demonstrably READ+analyzed (≥1 direct §L-cited grounded finding, `direct` above). The agency
+    // Addendum bars still require grounding, so a genuinely-missed agency instruction still reads
+    // INCOMPLETE. FAIL-SAFE stack: an unread §L never reaches here (`unread` at line 466); a read §L
+    // with zero §L findings has direct.length===0 → filter does NOT fire → full per-obligation proof.
+    let obligationSet = obligations;
+    if (sec === "L" && direct.length > 0 && procurementPart(ctx) === "part12-commercial") {
+      obligationSet = obligations.filter((ob) => !isFar52121Boilerplate(ob));
+    }
     // C-3/C-7: a section the LENS could only partially read (lensTruncated) or whose obligation set overflowed the
     // proof cap (obTruncated) cannot be certified "thin"/covered — the unread tail may carry a bar. A truncation
     // event with no direct grounded finding ⇒ obligations_ungrounded ⇒ INCOMPLETE (never a silent COMPLETE).
-    if (!obligations.length) {
+    if (!obligationSet.length) {
       if (lensTruncated) { attestations.push({ section: sec, status: "obligations_ungrounded", obligations: [], citedFindingIds: [], ungrounded: [`[truncated] §${sec} exceeds the lens read-cap — tail not read, cannot certify complete`] }); continue; }
-      attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: [], ungrounded: [] }); continue;
+      attestations.push({ section: sec, status: "read_no_obligation", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue;
     }
     const cited = new Set<string>(); const ungrounded: string[] = [];
-    for (const ob of obligations) { const ids = groundedBy(ob, findings, sec); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
+    for (const ob of obligationSet) { const ids = groundedBy(ob, findings, sec); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
     if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
-    attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations, citedFindingIds: [...cited], ungrounded });
+    attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations: obligationSet, citedFindingIds: [...cited], ungrounded });
   }
   const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation").map((a) => a.section);
   return { covered, missing: required.filter((s) => !covered.includes(s)), attestations };

@@ -160,10 +160,41 @@ function buildDates(responseDeadline: string): V4Date[] {
   return responseDeadline ? [{ label: "Quote/Proposal due", value: responseDeadline, kind: "gate" }] : [];
 }
 
-function buildCoverage(p: V3ReportPayload, documentsComplete: boolean): V4Coverage {
+// ── ENGINE-5-ROOT #2 (S7-1 / S8-04) — deadline conflict caveat ───────────────────────────────
+// SAM metadata REMAINS authoritative for the displayed/controlling date and open-vs-closed — a doc
+// parse must NEVER override it (a prior attempt closed a live, winnable solicitation off a mis-parsed
+// cancelled date: customer-fatal). But when the DOCUMENT states a different offer-due date than SAM,
+// silently showing only SAM's can send a bidder to the wrong day (0728: SAM 13 Jul vs the SF1449's
+// 9 Jul). So keep SAM's date and, when a confidently-parsed document date differs by >24h, ADD a
+// verify caveat. Conservative by construction: fires ONLY when BOTH dates parse cleanly and clearly
+// disagree — any ambiguity ⇒ no caveat. It never changes the shown date or the open/closed status, so
+// the worst case is a harmless "double-check" note, never a false close.
+function docOfferDueMs(cj: Record<string, unknown>): number | null {
+  const dl = cj.deadlines;
+  if (!Array.isArray(dl)) return null;
+  for (const e of dl) {
+    const isObj = e && typeof e === "object";
+    const label = String(isObj ? ((e as Record<string, unknown>).label ?? "") : "").toLowerCase();
+    const raw = typeof e === "string" ? e : String(isObj ? ((e as Record<string, unknown>).date ?? "") : "");
+    if (!raw) continue;
+    // Only consider offer/quote/response-due labels; an unlabeled bare date string is allowed.
+    if (label && !/offer|quote|proposal|response|due|submission|close/i.test(label)) continue;
+    const t = Date.parse(raw);
+    if (!Number.isNaN(t)) return t;
+  }
+  return null;
+}
+function deadlineConflictNote(responseDeadline: string, cj: Record<string, unknown>): string | null {
+  const sam = Date.parse(responseDeadline);
+  const doc = docOfferDueMs(cj);
+  if (Number.isNaN(sam) || doc == null) return null;
+  if (Math.abs(sam - doc) <= 24 * 60 * 60 * 1000) return null;
+  return `⚠ Document states ${new Date(doc).toISOString().slice(0, 10)} — verify before submitting`;
+}
+
+function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict: boolean): V4Coverage {
   const cov = p.coverage || { required: [], covered: [], missing: [] };
   const docs = p.documents || null;
-  const state = documentsComplete ? "COMPLETE" : "INCOMPLETE";
   const required = Array.isArray(cov.required) ? cov.required : [];
   const covered = new Set(Array.isArray(cov.covered) ? cov.covered : []);
   const coreMissing = Array.isArray(cov.coreMissing) ? cov.coreMissing : [];
@@ -179,6 +210,11 @@ function buildCoverage(p: V3ReportPayload, documentsComplete: boolean): V4Covera
   const total = docs?.posted ?? required.length;
   const rawRead = docs?.read ?? covered.size;
   const read = Math.min(rawRead, total); // never exceed total → coverage % can't blow past 100
+  // ENGINE-5-ROOT #5 (S8-02/S8-03) — coverage.state is COMPLETE only when the document set is complete,
+  // no required section is missing, AND the engine actually reached a verdict. Keying it on documentsComplete
+  // alone stamped a green COMPLETE badge (and, via the render `complete` flag, a false "Show-stoppers — None
+  // identified") on a withheld-verdict report where a section was uncovered. A no-verdict pole never shows COMPLETE.
+  const state = (documentsComplete && missing.length === 0 && !noVerdict) ? "COMPLETE" : "INCOMPLETE";
   return { state, lead: docs?.note || "", read, indexed: 0, total, core, missing, unreadable } as V4Coverage;
 }
 
@@ -226,7 +262,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   if (agency) facts.push({ k: "Agency", v: agency });
   if (naics) facts.push({ k: "NAICS", v: naics, mono: true });
   if (setAside) facts.push({ k: "Set-aside", v: setAside });
-  if (responseDeadline) facts.push({ k: "Delivery", v: responseDeadline, sub: "response due" });
+  if (responseDeadline) facts.push({ k: "Delivery", v: responseDeadline, sub: deadlineConflictNote(responseDeadline, cj) ?? "response due" });
   const docType = deriveDocType(s(audit.notice_type), pole);
 
   // ── verdict ──
@@ -247,7 +283,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   // Findings tiers: p0 sourced EXCLUSIVELY from showStoppers[] (Brain card-293) — a
   // severity-P0 finding not in the registry routes to Gates/Advisories, never Show-stoppers.
   const findings: V4Findings = buildFindings(showStoppers, all);
-  const coverage = buildCoverage(p, documentsComplete);
+  const coverage = buildCoverage(p, documentsComplete, NO_VERDICT_POLES.has(pole));
 
   // "Audited/Evaluated" date — bind the first persisted date available (Design Gate-2 flag: some run-records,
   // incl. the real W50 fixture, carry a null v3.generatedAt → the readout showed "Evaluated —"). Fall back
