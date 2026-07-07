@@ -419,6 +419,10 @@ const isThin = (s: string): boolean => s.trim().split(/\s+/).filter(Boolean).len
 // without per-obligation grounding — incorporated FAR-clause lists (§I) and reps/certs (§K). Never a binding-
 // obligation section (§C/§F/§L/§M). An internal clamp so no caller of the exported completenessOf can widen it.
 const BOILERPLATE_ATTESTABLE = new Set(["I", "K"]);
+// T1-12 — the binding OBLIGATION sections. A single direct grounded finding must
+// NOT blanket-cover these via covered_direct (that skipped the per-obligation
+// ungrounded→INCOMPLETE proof); they are certified per-obligation instead.
+const PER_OBLIGATION_SECTIONS = new Set(["L", "M"]);
 
 export function completenessOf(ctx: AuditToolContext, required: string[], findings: TypedFinding[], sectionsRead: Set<string>, opts?: { sectionMDepth?: boolean; boilerplateAttest?: { sections: string[]; swept: boolean } }): { covered: string[]; missing: string[]; attestations: SectionAttestation[] } {
   const attestations: SectionAttestation[] = [];
@@ -464,7 +468,11 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // in the section text. Without the findingSection guard, a §B-cited finding whose sentence coincidentally appears
     // in §H/§M text falsely certified §H/§M covered → false-COMPLETE. Same guard the covered_attested path uses (groundedBy).
     const direct = findings.filter((f) => f.excerpt && findingSection(f) === sec && nText.includes(norm(f.excerpt)));
-    if (direct.length) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
+    // T1-12 — restrict the covered_direct blanket short-circuit to NON-per-obligation sections. For §L/§M a
+    // single grounded obligation cannot flip the whole section covered; fall through to the per-obligation
+    // proof below (the direct findings still count there via groundedBy, so a fully-grounded §L/§M certifies
+    // covered_attested — but a long §L with grounded head + ungrounded tail now correctly reads INCOMPLETE).
+    if (direct.length && !PER_OBLIGATION_SECTIONS.has(sec)) { attestations.push({ section: sec, status: "covered_direct", obligations: [], citedFindingIds: direct.map((f) => f.id!).filter(Boolean), ungrounded: [] }); continue; }
     // Fix 2 (Brain card 285) — BOILERPLATE ATTESTATION. A configured boilerplate section (§I/§K) with no direct
     // finding may be ATTESTED covered — but ONLY when the deterministic §I/§K trap detectors SWEPT it (condition 2:
     // opts.boilerplateAttest.swept, set by the orchestrator when the trap sweep ran) AND the section text is present

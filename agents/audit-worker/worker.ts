@@ -337,7 +337,13 @@ async function processOne(row: UserPendingRow): Promise<void> {
       .eq("id", row.audit_id);
     const input = await buildInput(row);
     const result = await executeAudit(supabase, row.audit_id, input);
-    const { error } = await supabase
+    // T1-2 — compare-and-set on status='processing'. Under a rolling deploy the
+    // FA-149 reclaim path can hand this row to a replacement worker while this
+    // one is still finishing; without the guard a late markProcessed would stomp
+    // the replacement's claim (flip it to 'processed') AND delete the shared
+    // stash out from under it. Guard + affected-row check: 0 rows back ⇒ we lost
+    // the claim, so leave the row and its bytes to the current owner and exit.
+    const { data: marked, error } = await supabase
       .from("pending_audits")
       .update({
         status: "processed",
@@ -346,8 +352,14 @@ async function processOne(row: UserPendingRow): Promise<void> {
         bid_no_bid: result.bid_recommendation,
         processed_at: new Date().toISOString()
       })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .eq("status", "processing")
+      .select("id");
     if (error) throw new Error(`markProcessed(${row.id}): ${error.message}`);
+    if (!marked || marked.length === 0) {
+      console.warn(`[audit-worker] claim lost for ${row.id} (no longer 'processing' — reclaimed under rolling deploy); skipping success write + storage cleanup`);
+      return;
+    }
     console.log(`[audit-worker] done ${label} · ${result.recommendation} · score=${result.compliance_score} · ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     // FA-132 — storage hygiene: the stashed bytes served their purpose once
     // the run completes. Best-effort delete on SUCCESS only — failed rows
@@ -502,24 +514,25 @@ async function buildInput(row: UserPendingRow): Promise<AuditExecutionInput> {
   } else if (row.anthropic_file_id) {
     pdfFileId = row.anthropic_file_id;
     pdfSource = "uploaded_pdf_via_files_api";
-    // FA-132 — closes the FA-130 residual class: the V2 shadow needs local
-    // bytes (file_id alone starves it), and the worker never saw the
-    // multipart upload. The enqueue route stashes the bytes in Supabase
-    // Storage (the Files API refuses to download uploaded files back) and
-    // records the key in pdf_path. Loud but NON-fatal on failure: V1 reads
-    // the file_id directly, and V2 is a shadow surface (FA-147 leaves shadow
-    // errors swallowed by design) — failing a paid customer run over shadow
-    // input would invert priorities. Legacy rows (pdf_path null, enqueued
-    // before FA-132) degrade the same way.
+    // T1-1 — the enqueue route stashes the uploaded bytes in Supabase Storage
+    // (the Files API refuses to download uploaded files back) and records the
+    // key in pdf_path. Under the live V3 engine those stashed bytes ARE the
+    // audit input: V3 reads pdfBuffer/pdfBase64 and IGNORES pdfFileId (only the
+    // retired V1 ever consumed a file_id directly). So a failed download is NOT
+    // a skippable "V2 shadow" — it starves the whole run. Handle it honestly:
+    //   • download blip on an existing key → TransientInputError (release+retry,
+    //     bounded by the FA-149 attempt cap; the stash is deleted only on success)
+    //   • no pdf_path at all (legacy pre-FA-132 row / stash failure) → terminal
+    //     fail with a correct reason — re-running hits the same wall and V3 has
+    //     no other source for a file_id-only upload.
     if (row.pdf_path) {
       const { data: blob, error: dlErr } = await supabase.storage.from("audit-pdfs").download(row.pdf_path);
       if (dlErr || !blob) {
-        console.error(`[audit-worker] FA-132: storage download failed for ${row.pdf_path} — V2 shadow will be skipped this run: ${dlErr?.message ?? "empty blob"}`);
-      } else {
-        pdfBuffer = Buffer.from(await blob.arrayBuffer());
+        throw new TransientInputError(`T1-1: uploaded bytes unreadable from storage (${row.pdf_path}) — V3 input starved: ${dlErr?.message ?? "empty blob"}`);
       }
+      pdfBuffer = Buffer.from(await blob.arrayBuffer());
     } else {
-      console.warn(`[audit-worker] FA-132: no pdf_path on upload-arm row ${row.id} (pre-FA-132 enqueue or stash failure) — V2 shadow skipped`);
+      throw new Error(`T1-1: file_id-only upload row ${row.id} has no stashed bytes (pdf_path null); the live V3 engine cannot read a Files API file_id, so there is no audit input`);
     }
   } else {
     // FA-136 — multi-attachment plan first: deterministic form-first

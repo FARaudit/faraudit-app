@@ -58,19 +58,27 @@ interface SweepHit { archetype: string; requirementLabel: string; kind: TypedFin
 
 /** Classify a binding paragraph against the high-signal archetypes (most-specific first). `anchor` is the
  *  discriminating token the excerpt window is centered on (so the duration / role-years is always captured,
- *  even in giant pdftotext paragraphs). Returns null if none. */
-function classify(p: string): SweepHit | null {
+ *  even in giant pdftotext paragraphs). Returns ALL distinct archetypes present, one hit per archetype.
+ *  T1-7 — the old single-return classify() lost co-located bindings: a paragraph carrying BOTH a FAT
+ *  precondition AND a delivery window (common when pdftotext blobs §F into one segment) grounded only the
+ *  FAT, so Step 2's cross-clause temporal-conflict check never saw the delivery half and the NO_BID went
+ *  undetected. Now every archetype in the segment grounds. The two personnel_qual variants share an archetype,
+ *  so first-per-archetype keeps that a single finding (behavior-preserving) while emitting genuinely distinct
+ *  archetypes together. */
+function classifyAll(p: string): SweepHit[] {
+  const hits: SweepHit[] = [];
   if (FAT_RE.test(p) && FAT_PRECOND_RE.test(p) && DURATION_RE.test(p))
-    return { archetype: "fat_precondition", requirementLabel: "First Article Testing precondition (duration before any production delivery)", kind: "technical_spec", anchor: DURATION_RE };
+    hits.push({ archetype: "fat_precondition", requirementLabel: "First Article Testing precondition (duration before any production delivery)", kind: "technical_spec", anchor: DURATION_RE });
   if (DELIVER_RE.test(p) && DELIVERY_WINDOW_RE.test(p) && DURATION_RE.test(p) && ARO_RE.test(p))
-    return { archetype: "delivery_window", requirementLabel: "Production delivery window after receipt of order/award", kind: "technical_spec", anchor: DURATION_RE };
+    hits.push({ archetype: "delivery_window", requirementLabel: "Production delivery window after receipt of order/award", kind: "technical_spec", anchor: DURATION_RE });
   if (ROLE_RE.test(p) && YEARS_RE.test(p) && EXP_CONTEXT_RE.test(p))
-    return { archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: named role with a quantified minimum experience", kind: "submission", anchor: YEARS_RE };
+    hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: named role with a quantified minimum experience", kind: "submission", anchor: YEARS_RE });
   if (CERT_RE.test(p) && PERSONNEL_RE.test(p) && !EXCLUDE_RE.test(p))
-    return { archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: specialized professional certification/license of performing personnel", kind: "submission", anchor: CERT_RE };
-  if (QPL_RE.test(p)) return { archetype: "qpl", requirementLabel: "Qualified Products/Manufacturers List (QPL/QML) membership requirement", kind: "technical_spec", anchor: QPL_RE };
-  if (OREQUAL_RE.test(p)) return { archetype: "or_equal", requirementLabel: "Brand-name-or-equal qualification burden (salient characteristics)", kind: "technical_spec", anchor: OREQUAL_RE };
-  return null;
+    hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: specialized professional certification/license of performing personnel", kind: "submission", anchor: CERT_RE });
+  if (QPL_RE.test(p)) hits.push({ archetype: "qpl", requirementLabel: "Qualified Products/Manufacturers List (QPL/QML) membership requirement", kind: "technical_spec", anchor: QPL_RE });
+  if (OREQUAL_RE.test(p)) hits.push({ archetype: "or_equal", requirementLabel: "Brand-name-or-equal qualification burden (salient characteristics)", kind: "technical_spec", anchor: OREQUAL_RE });
+  const seenArch = new Set<string>();
+  return hits.filter((h) => (seenArch.has(h.archetype) ? false : (seenArch.add(h.archetype), true)));
 }
 
 /** Verbatim excerpt window CENTERED on the discriminating token (±300 chars), so role+years / first-article+
@@ -94,18 +102,20 @@ export function highSignalSweep(source: string): TypedFinding[] {
     const raw = source.slice(rawStart, rawEnd);
     const para = raw.trim();
     if (para.length < 12 || PROVENANCE_SKIP_RE.test(para)) return;        // skip empty + labeled provenance/authoring notes
-    const hit = classify(para);
-    if (!hit) return;
-    const excerpt = windowAround(para, hit.anchor);                       // verbatim window centered on the signal
-    const key = hit.archetype + "|" + excerpt.slice(0, 80).toLowerCase();
-    if (seen.has(key)) return; seen.add(key);
+    const hits = classifyAll(para);                                       // T1-7 — every archetype in the segment
+    if (hits.length === 0) return;
     const letter = nearestSection(source, rawStart);
-    out.push({
-      requirement: `${hit.requirementLabel} (grounded by deterministic high-signal sweep).`,
-      citation: letter ? `§${letter} (grounding sweep)` : "(grounding sweep)",
-      excerpt, kind: hit.kind, controllability: "bidder_controls", grounded: true,
-      lens: "deterministic_sweep", sweepArchetype: hit.archetype,
-    });
+    for (const hit of hits) {
+      const excerpt = windowAround(para, hit.anchor);                     // verbatim window centered on the signal
+      const key = hit.archetype + "|" + excerpt.slice(0, 80).toLowerCase();
+      if (seen.has(key)) continue; seen.add(key);
+      out.push({
+        requirement: `${hit.requirementLabel} (grounded by deterministic high-signal sweep).`,
+        citation: letter ? `§${letter} (grounding sweep)` : "(grounding sweep)",
+        excerpt, kind: hit.kind, controllability: "bidder_controls", grounded: true,
+        lens: "deterministic_sweep", sweepArchetype: hit.archetype,
+      });
+    }
   };
   while ((m = paraRe.exec(source))) { pushPara(start, m.index); start = m.index + m[0].length; }
   pushPara(start, source.length);

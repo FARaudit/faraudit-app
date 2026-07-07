@@ -23,7 +23,7 @@ const SHARED = [
   "For each requirement decide controllability — the decisive field:",
   "  bidder_controls    = the bidder satisfies it by doing the work (source/price/configure/document/submit). A GATE TO CLEAR, never disqualifying.",
   "  bidder_cannot_move = the bidder cannot satisfy it regardless of effort (failed eligibility/size, a part it cannot legally supply, unattainable past performance, an exclusivity). A DISQUALIFYING bar.",
-  "  already_satisfied  = structurally true right now (a set-aside the firm qualifies under, an existing registration, a passed deadline).",
+  "  already_satisfied  = structurally true right now IN THE BIDDER'S FAVOR (a set-aside the firm qualifies under, an existing registration). A closed/passed RESPONSE DEADLINE is NEVER already_satisfied — it is a universal show-stopper (type it no_one_can_move per the rule below); calling a passed deadline already_satisfied would wrongly soften a NO-BID.",
   "Distinguish a PROFILE-dependent bar (bidder_cannot_move — THIS firm may or may not hold it: a cert/clearance/size)",
   "from a UNIVERSAL impossibility (no_one_can_move — disqualifies EVERY bidder regardless: e.g. a 5-day delivery against",
   "a 90-day irreducible lead time, or an already-passed deadline). A universal impossibility is a PROVEN show-stopper —",

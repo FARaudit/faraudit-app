@@ -49,6 +49,31 @@ export function materializeSections(ctx: AuditToolContext): Record<string, strin
 const CLAUSE_RE = /\b2?52\.\d{3}-\d{1,4}\b/;
 const norm = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, " ").toLowerCase();
 
+// T1-6 — the same normalization as `norm`, but carrying an index map so a match
+// offset in the NORMALIZED string can be mapped back to the ORIGINAL string.
+// `norm` collapses whitespace runs (\s+ → " "), which shifts every offset past
+// the first collapsed run; slicing the original source at a normalized offset
+// therefore drifts the grounding excerpt off the real match (worse on the
+// whitespace-dense text PDFs produce). `map[k]` = original index of normalized
+// char k; `map[normed.length]` = src.length (the end boundary).
+function normWithMap(s: string): { normed: string; map: number[] } {
+  let normed = "";
+  const map: number[] = [];
+  let prevSpace = false;
+  for (let j = 0; j < s.length; j++) {
+    const c = s[j];
+    if (/\s/.test(c)) {
+      if (!prevSpace) { normed += " "; map.push(j); prevSpace = true; }
+      continue;
+    }
+    prevSpace = false;
+    const rep = /[‐-―]/.test(c) ? "-" : c.toLowerCase();
+    for (const rc of rep) { normed += rc; map.push(j); }
+  }
+  map.push(s.length);
+  return { normed, map };
+}
+
 /** The procurement FORMAT of the assembled package. Negotiated full-UCF mandates
  *  §C/§L/§M as SEPARATE sections; commercial (SF-1449) / simplified (SF-18) /
  *  combined-synopsis state specs + 52.212-1/-2 INLINE or by reference, so an absent
@@ -120,8 +145,17 @@ export function lookupClause(ctx: AuditToolContext, clause: string): { clause: s
   const present = inSrc(clause);
   let excerpt = "";
   if (present) {
-    const i = norm(ctx.fullSource).indexOf(norm(clause));
-    if (i >= 0) excerpt = ctx.fullSource.slice(Math.max(0, i - 80), i + 240).replace(/\s+/g, " ").trim();
+    // T1-6 — map the normalized match offset back to the ORIGINAL source so the
+    // grounding excerpt is aligned to the real clause, not drifted by collapsed
+    // whitespace (this excerpt also backs T0-1's anti-false-present grounding).
+    const { normed, map } = normWithMap(ctx.fullSource);
+    const nClause = norm(clause);
+    const i = normed.indexOf(nClause);
+    if (i >= 0) {
+      const origStart = map[i];
+      const origEnd = map[Math.min(i + nClause.length, map.length - 1)];
+      excerpt = ctx.fullSource.slice(Math.max(0, origStart - 80), origEnd + 240).replace(/\s+/g, " ").trim();
+    }
   }
   return { clause, present, excerpt };
 }
@@ -129,14 +163,21 @@ export function lookupClause(ctx: AuditToolContext, clause: string): { clause: s
 /** Tool — find verbatim source spans containing a phrase (grounding). Returns up to `limit` excerpts; an
  *  empty list means the phrase is NOT in the document — so a claim resting on it is ungrounded. */
 export function findInSource(ctx: AuditToolContext, phrase: string, limit = 3): { phrase: string; hits: string[] } {
-  const src = ctx.fullSource, nSrc = norm(src), nPhrase = norm(phrase);
+  const src = ctx.fullSource;
+  // T1-6 — locate in the normalized string but map each hit back to ORIGINAL
+  // offsets before slicing, so the excerpt is aligned to the real match instead
+  // of drifting left by the collapsed-whitespace delta.
+  const { normed: nSrc, map } = normWithMap(src);
+  const nPhrase = norm(phrase);
   const hits: string[] = [];
   if (nPhrase.length >= 3) {
     let from = 0;
     while (hits.length < limit) {
       const i = nSrc.indexOf(nPhrase, from);
       if (i < 0) break;
-      hits.push(src.slice(Math.max(0, i - 60), i + nPhrase.length + 120).replace(/\s+/g, " ").trim());
+      const origStart = map[i];
+      const origEnd = map[Math.min(i + nPhrase.length, map.length - 1)];
+      hits.push(src.slice(Math.max(0, origStart - 60), origEnd + 120).replace(/\s+/g, " ").trim());
       from = i + nPhrase.length;
     }
   }

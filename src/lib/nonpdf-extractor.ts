@@ -106,10 +106,41 @@ export async function extractNonPdfText(name: string, buffer: Buffer): Promise<s
 // multi-page. NOT a faithful render — it carries the TEXT, which is all the
 // section/clause/fact extractors consume.
 //
+// T1-5 — the whole PDF is serialized latin1 (single-byte) below and the simple
+// Helvetica font carries WinAnsi bytes. A code point > 0xFF (em/en dash, curly
+// quotes, bullet, ellipsis, CJK, …) would be SILENTLY truncated by latin1 to its
+// low byte — usually a control char — corrupting the very text the clause/fact
+// extractors consume. A naive utf8 swap is worse: multi-byte chars would shift
+// every byte offset and invalidate the xref. So normalize to a WinAnsi-safe form
+// FIRST: transliterate common smart punctuation to ASCII, and replace anything
+// still outside 0x00–0xFF with '?'. Chars ≤ 0xFF (incl. Latin-1 accents, which
+// the /WinAnsiEncoding font renders correctly) pass through unchanged, so the
+// latin1 serialization round-trips byte-exactly and the xref offsets stay valid.
+const WINANSI_TRANSLITERATION: Record<string, string> = {
+  "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-",
+  "‘": "'", "’": "'", "‚": "'", "‛": "'",
+  "“": '"', "”": '"', "„": '"', "‟": '"',
+  "′": "'", "″": '"',
+  "•": "*", "‣": "*", "●": "*", "▪": "*",
+  "…": "...",
+  " ": " ", " ": " ", " ": " ", " ": " ", " ": " ",
+  "€": "EUR", "™": "(TM)", "®": "(R)", "©": "(C)",
+};
+function toWinAnsiSafe(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const mapped = WINANSI_TRANSLITERATION[ch];
+    if (mapped !== undefined) { out += mapped; continue; }
+    out += (ch.codePointAt(0) ?? 0) <= 0xff ? ch : "?";
+  }
+  return out;
+}
+
 // Escapes the three PDF string metacharacters and drops control chars so the
-// content stream can never corrupt the file structure.
+// content stream can never corrupt the file structure. Unicode is transliterated
+// to a WinAnsi-safe form (T1-5) before escaping so latin1 serialization is lossless.
 function escapePdfText(s: string): string {
-  return s
+  return toWinAnsiSafe(s)
     // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, " ")
     .replace(/\\/g, "\\\\")
@@ -179,7 +210,10 @@ export function textToPdfBuffer(text: string, title = ""): Buffer {
     const stream = contentStreams[p];
     objects[contentNum] = `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`;
   }
-  objects[fontObjNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`;
+  // T1-5 — WinAnsiEncoding so the single-byte content-stream bytes (0x80–0xFF,
+  // e.g. Latin-1 accents) decode to the intended glyphs when pdf-parse reads the
+  // wrapped text back; without it a default StandardEncoding mis-maps the high range.
+  objects[fontObjNum] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`;
 
   // Serialize with byte-accurate offsets for the xref.
   let pdf = "%PDF-1.4\n";
