@@ -20,6 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
 import { buildAgenticDocs, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { assembleFullSourceLossless } from "./agentic-lossless-ingest";
+import { extractDocumentDeadlines } from "./audit-deadline-extract";
 import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocReadMode } from "./agentic-chunked-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
@@ -326,6 +327,10 @@ export async function executeAgenticPrimary(
   // stays NULL (the engine emits no 0-100 score — the report page already has an
   // unscored path). The report + PDF routes branch on compliance_json.engine.
   const stopperCount = (payload.showStoppers.length ? payload.showStoppers : payload.findings.filter((f) => f.disposition === "disqualifying")).length;
+  // ENGINE-5-ROOT #2 (engine half) — persist the document-stated offer-due date so the render layer can flag a
+  // SAM/document deadline conflict (build-data.ts deadlineConflictNote). SAM stays authoritative; this only powers
+  // a "verify" caveat. Conservative extractor — labeled numeric/ISO dates only; empty when none confidently found.
+  const documentDeadlines = extractDocumentDeadlines(fullSource);
   const completeUpdate = {
     overview_summary: `Agentic verdict: ${res.decision.verdict.replace(/_/g, " ")}.`,
     overview_json: { engine: "agentic_v3" },
@@ -351,6 +356,8 @@ export async function executeAgenticPrimary(
       source_chars: fullSource.length,
       doc_count: docs.length,
       source_truncated: assembled.truncated,
+      // ENGINE-5-ROOT #2 — document-stated offer-due date(s) for the render conflict caveat (SAM stays authoritative).
+      ...(documentDeadlines.length ? { deadlines: documentDeadlines } : {}),
       ...(assembled.droppedDocs.length ? { dropped_docs: assembled.droppedDocs } : {}),
       // R3 (Brain card 271) — READ-MODE disclosure. When AUDIT_CHUNKED_INGEST is on, each doc is read either
       // "full" (verbatim whole doc) or "map-reduce" (compliance-relevant verbatim spans; NOT a full-text read).

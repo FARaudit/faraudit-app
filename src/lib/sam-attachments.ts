@@ -461,6 +461,19 @@ export function planDocumentOrder(entries: AttachmentManifestEntry[], solicitati
     ...e,
     role: isForm(e.name) ? "form" : isAmendment(e.name) ? "amendment" : "attachment"
   }));
+  // ENGINE-5-ROOT #4 (ING-1) — the attach/wage/spec/exhibit/drawing veto in isForm() denies form-hood to a
+  // single combined synopsis/solicitation named e.g. "Attachment 1 - Solicitation <sol>.pdf" or "Solicitation
+  // and Wage Determination <sol>.pdf". With no form, form_identified=false → the customer-facing "no primary
+  // solicitation" banner fires and the verdict is suppressed even though the whole solicitation WAS ingested.
+  // FAIL-SAFE fallback: only when NOTHING classified as a form, promote the strongest candidate — a doc carrying
+  // the EXACT solicitation number (the strongest possible signal), else the sole substantive doc. Never fires
+  // when a real form exists, so it cannot mis-promote an attachment in a normal multi-doc set (there, no
+  // sol-numbered doc + >1 doc ⇒ no promotion ⇒ the honest banner still shows).
+  if (!planned.some((p) => p.role === "form")) {
+    const bySol = solNorm ? planned.find((p) => norm(p.name).includes(solNorm)) : undefined;
+    const promote = bySol || (planned.length === 1 ? planned[0] : undefined);
+    if (promote) promote.role = "form";
+  }
   // FA-119: tier primary (work statement promoted above generic attachments),
   // size-ascending tie-break within tier, name last for determinism.
   // FA-E2E re-verify Fix C: within the form tier, prefer the file whose name
