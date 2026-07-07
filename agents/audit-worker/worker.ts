@@ -159,11 +159,13 @@ export async function runWorker(): Promise<never> {
   process.once("SIGINT", () => { void drainAndExit("SIGINT"); });
   await probeFa149Columns();
   console.log(`[audit-worker] up · poll=${POLL_MS}ms · stale_cutoff=${STALE_PROCESSING_MS / 60000}min · drain handler registered · reclaim=${fa149Columns ? `ACTIVE (stale>${RECLAIM_STALE_MS / 1000}s, cap ${MAX_ATTEMPTS})` : "inactive (migration pending)"}`);
-  // Deploy self-verification (2026-06-19): print the live engine model at startup
-  // so a deploy proves which model it runs from the logs alone — no audit run, no
-  // metered tokens, no guessing from the DB default placeholder. V2 judgment is
-  // threaded from this same constant (MI-1), so this one line covers both layers.
-  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} · deploy=${process.env.RAILWAY_DEPLOYMENT_ID?.slice(0, 8) ?? "?"} · sha=${process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"} (V1 extraction + V2 judgment)`);
+  // Deploy self-verification (2026-06-19 · T2-1 truth fix 2026-07-07): print the live
+  // engine at startup so a deploy proves which model+engine it runs from the logs alone
+  // — no audit run, no metered tokens, no guessing from the DB default placeholder.
+  // The live engine is AGENTIC V3 (the SOLE engine; V1/V2 were deleted — no fallback);
+  // extraction + judgment both ride this one model. The old "(V1 extraction + V2
+  // judgment)" tag lied to the operator about a runtime that no longer exists.
+  console.log(`[audit-worker] ENGINE MODEL = ${CLAUDE_MODEL} · deploy=${process.env.RAILWAY_DEPLOYMENT_ID?.slice(0, 8) ?? "?"} · sha=${process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"} (agentic V3 — sole engine, V1/V2 deleted)`);
   // Boot reclaim pass — a redeploy replaced a container that may have died
   // holding a claim; reclaim it before the first poll.
   await reclaimOrphans().catch((err) => console.error("[audit-worker] boot reclaim error:", err instanceof Error ? err.message : err));
