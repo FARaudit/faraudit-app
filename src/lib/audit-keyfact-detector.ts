@@ -139,7 +139,14 @@ export function applyKeyfactDetector(
   // 3) NON-MANUFACTURER RULE (FAR 52.219-33) — eligibility_bar + requiredAttribute, bidder_controls (gate_to_clear).
   //    Rides the card-206-A unverified-gate path: committal + null profile → eligible=null + verify-caution; can
   //    NEVER be a show-stopper (bidder_controls) and NEVER flips eligible to false.
-  if (setAsideCtx && supplyCtx && !covers(/non-?manufacturer|52\.219-33/i)) {
+  // T0-9 (engine line-audit 2026-07-06) — dedup the NMR bar against an existing NMR ELIGIBILITY finding ONLY, not
+  // against ANY finding that merely QUOTES the clause. The coarse covers(/non-manufacturer|52.219-33/) matched a
+  // clause-matrix / submission finding that incidentally cites 52.219-33 and SILENTLY SUPPRESSED the SOLE NMR
+  // eligibility emitter (a dropped eligibility bar → a false-eligible path). Only an existing eligibility_bar about
+  // NMR legitimately stands in for it.
+  const NMR_RE = /non-?manufacturer|52\.219-33/i;
+  const nmrBarAlreadyEmitted = findings.some((f) => f.kind === "eligibility_bar" && NMR_RE.test(`${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""} ${f.citation ?? ""}`));
+  if (setAsideCtx && supplyCtx && !nmrBarAlreadyEmitted) {
     const span = verbatimSpan(src, /[^\n]*(?:non-?manufacturer rule|52\.219-33)[^\n]*/i);
     if (span) add.push({
       requirement: NMR_CAUTION,

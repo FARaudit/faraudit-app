@@ -576,11 +576,17 @@ function dedupeKey(name: string): string {
     .trim();
 }
 
-// Amendment/modification number (leading zeros stripped so "0001" ≡ "1"); null
-// when the name carries no amendment number. Used so two DIFFERENT amendments of
-// the same series can never collapse into one another (Guard C below).
+// Version number (leading zeros stripped so "0001" ≡ "1"); null when the name
+// carries none. Used so two DIFFERENT versions of the same series can never
+// collapse into one another (Guard C below). CRITICAL: the token set here MUST
+// stay a superset of the version tokens dedupeKey STRIPS a trailing number from
+// (amendment/amd/mod/revision/rev/version/ver/v/final/draft/copy/conformed/updated)
+// — else dedupeKey deletes the distinguishing number but Guard C can't recover it,
+// and two distinct binding docs (e.g. "SOW Revision 1" vs "SOW Revision 2") collapse
+// and one is silently dropped (expert-panel finding, 2026-07-06). Kept in lockstep
+// with the dedupeKey alternation above.
 function amendmentNumber(name: string): string | null {
-  const m = name.match(/\b(?:amendment|amend|amd|modification|mod)\b[\s_.\-]*0*(\d+)/i);
+  const m = name.match(/\b(?:amendment|amend|amd|modification|mod|revision|rev|version|ver|v|final|draft|copy|conformed|updated?)\b[\s_.\-]*0*(\d+)/i);
   return m ? m[1] : null;
 }
 

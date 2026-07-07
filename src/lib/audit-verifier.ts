@@ -117,6 +117,7 @@ export function makeBatchedSkeptic(base: SkepticFn, opts?: { batchSize?: number;
   return async (ctx, findings, _opts) => {
     if (findings.length <= batchSize) return base(ctx, findings, _opts); // no batching needed → identical single call
     const merged: SkepticVerdict[] = [];
+    let anySucceeded = false; let lastError: unknown = null; // T0-4 — track whether the adversary EVER ran
     for (let start = 0; start < findings.length; start += batchSize) {
       const batch = findings.slice(start, start + batchSize);
       const ruled = new Map<number, SkepticVerdict>(); // local index → verdict
@@ -125,11 +126,16 @@ export function makeBatchedSkeptic(base: SkepticFn, opts?: { batchSize?: number;
         const remainIdx = batch.map((_, i) => i).filter((i) => !ruled.has(i));
         const remain = remainIdx.map((i) => batch[i]);
         let vs: SkepticVerdict[];
-        try { vs = await base(ctx, remain, _opts); } catch { break; } // a failed batch call → leave remainder unruled (residue)
+        try { vs = await base(ctx, remain, _opts); anySucceeded = true; } catch (e) { lastError = e; break; } // failed batch call → leave remainder unruled (residue)
         for (const v of vs) { const local = remainIdx[v.index]; if (local !== undefined && !ruled.has(local)) ruled.set(local, { ...v, index: local }); }
       }
       for (const [local, v] of ruled) merged.push({ ...v, index: start + local }); // remap to the full-set index
     }
+    // T0-4 (engine line-audit 2026-07-06) — a TOTAL skeptic outage (EVERY batch call threw → the adversary never
+    // ran on a single finding) must NOT read as "skeptic ruled nothing → run sound". Rethrow so makeAgenticVerifier's
+    // catch routes the run to sound:false → NHR — symmetric with the ≤batchSize path above where a base throw
+    // propagates. A PARTIAL outage (≥1 batch ruled) stays the intended residue behavior (unruled → classified).
+    if (!anySucceeded) throw (lastError instanceof Error ? lastError : new Error("batched skeptic: every batch call failed (total skeptic outage)"));
     return merged;
   };
 }

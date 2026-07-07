@@ -16,7 +16,7 @@ import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from ".
 import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
-import { isBindingDoc } from "./sam-attachments";
+import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
@@ -291,7 +291,12 @@ export function documentsCovered(fullSource: string, findings: TypedFinding[]): 
   for (const r of regions) {
     if (r.isPrimary) continue;                                           // primary solicitation — handled by section completeness
     if (!isBindingDoc({ role: "attachment", name: r.name })) continue;   // non-binding attachment (offeror-fill) — exempt
-    if (!obligationsOf(r.text).obligations.length) continue;             // read_no_obligation — a thin binding attachment is covered
+    // T0-2 (engine line-audit 2026-07-06) — UNREAD ≠ read-and-empty (mirrors constructionDocumentsCovered): a
+    // binding attachment whose region carries no machine-readable text (failed extraction / scanned / empty) was
+    // NOT analyzed — its obligations were never extractable, so "0 obligations" is not proof of coverage. Flag it
+    // uncovered ⇒ INCOMPLETE (the safe direction); never let a content-loss doc pass as read_no_obligation.
+    if (!hasEngineText(r.text)) { uncovered.push(r.name); continue; }
+    if (!obligationsOf(r.text).obligations.length) continue;             // read_no_obligation — a genuinely-read thin binding attachment is covered
     const nRegion = norm(r.text);
     // A finding proves this attachment was ANALYZED only if its excerpt is grounded IN the attachment AND is not a
     // coincidental duplicate of a phrase already present in the PRIMARY (a flow-down sentence appearing in both) —
@@ -299,6 +304,17 @@ export function documentsCovered(fullSource: string, findings: TypedFinding[]): 
     if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
   }
   return { complete: uncovered.length === 0, uncovered };
+}
+
+/** T0-5 (engine line-audit 2026-07-06) — partition the residue-doctrine's UNVERIFIED INFORMATIONAL findings out
+ *  of the claim/verdict set. Such a finding (skeptic never ruled; GUARANTEED non-bar / non-verdict-driving by the
+ *  marker's guard at audit-verifier.ts:87) must NOT read as a VERIFIED finding, but is RETAINED (returned in
+ *  `excluded`) for telemetry — the residue-doctrine contract (verifier line 55) that previously had ZERO readers.
+ *  Applied AFTER coverage (so an unverified finding still legitimately counts a section/doc as analyzed) and
+ *  BEFORE the verdict. Pure + exported for the gate suite. */
+export function excludeUnverifiedInformational(findings: TypedFinding[]): { kept: TypedFinding[]; excluded: TypedFinding[] } {
+  const excluded = findings.filter((f) => f.unverified);
+  return { kept: excluded.length ? findings.filter((f) => !f.unverified) : findings, excluded };
 }
 
 /** Brain card 289 — PART36 per-doc coverage with SEALED full-text ATTESTATION (card-285 Fix-2 generalized to
@@ -698,6 +714,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     requiresLM: requiresProposalSections(opts.noticeType),
     formIdentified: opts.formIdentified,
   });
+
+  // T0-5 (engine line-audit 2026-07-06) — ENFORCE the residue-doctrine contract (verifier line 55): an UNRESOLVED
+  //      INFORMATIONAL finding (the skeptic never ruled on it; GUARANTEED non-bar / non-verdict-driving by the
+  //      marker's own guard at verifier:87) is KEPT for telemetry but EXCLUDED from report CLAIMS + the verdict — it
+  //      must never read as a VERIFIED finding. Placed AFTER coverage (completenessOf / documentsCovered / coreMissing
+  //      above already legitimately counted it as "section/doc analyzed") and BEFORE the re-typing guards + deriveVerdict.
+  //      Previously the `unverified:true` marker had ZERO readers, so a never-verified finding flowed to the report as a
+  //      claim. Non-silent (logged, not dropped-in-the-dark); only fires under AUDIT_VERIFIER_BATCHING (the sole writer).
+  const residue = excludeUnverifiedInformational(findings);
+  if (residue.excluded.length) {
+    findings = residue.kept;
+    console.log(`[orchestrator] residue: excluded ${residue.excluded.length} UNVERIFIED informational finding(s) from report claims + verdict (kept for telemetry; never a bar): ${residue.excluded.map((f) => `"${f.requirement}"`).join(", ")}`);
+  }
 
   // P4.2b — OR-EQUAL CARVE-OUT (Brain card 139, Step 6), default-OFF (=== "true"). Runs FIRST among the re-typing
   //      gates: a "brand name OR EQUAL" / salient-characteristics bar (mis-typed structural via bare "brand name")
