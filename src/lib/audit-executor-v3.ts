@@ -11,10 +11,10 @@
 // completeness to the consumers that gate on it: compliance_json.honest_fail and
 // compliance_json.documents_complete are read by shouldGateExport (blocks PDF/web
 // export of an incomplete report). The watcher email ALSO fails safe to amber on
-// these flags (defense-in-depth) — but note the watcher AUTO-AUDIT currently runs the
-// LEGACY V1 engine (watcher-tick.ts → runAudit), NOT this agentic path, so it does not
-// yet set these flags; the amber-forcing activates only if the watcher is migrated to
-// executeAgenticPrimary. The customer-initiated sync + worker paths DO run this engine.
+// these flags (defense-in-depth). (T3 truth fix 2026-07-07: the old note here claimed
+// the watcher AUTO-AUDIT ran the "LEGACY V1 engine (watcher-tick.ts → runAudit)" — but
+// V1/runAudit are DELETED and watcher-tick.ts now calls executeAudit → this agentic V3
+// engine, so the watcher DOES set honest_fail/documents_complete like every other path.)
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
