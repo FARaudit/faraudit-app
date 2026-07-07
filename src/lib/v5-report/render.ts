@@ -374,7 +374,7 @@ function submissionLBody(s: SubmissionLGrounded): string {
       ${s.provision ? `<p class="lx-gov"><span class="lx-gov-k">Governed by</span> <span class="lx-gov-v mono">${esc(s.provision)}</span></p>` : ""}
       <div class="lx-list">${rows}</div>`;
 }
-function splitMethod(basis: string): { head: string; tail: string } {
+export function splitMethod(basis: string): { head: string; tail: string } {
   const m = String(basis || "").split(/\s+—\s+/);
   return { head: m[0] || "", tail: m.slice(1).join(" — ") };
 }

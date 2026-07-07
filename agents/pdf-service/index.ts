@@ -111,10 +111,16 @@ app.post("/pdf", async (req, res) => {
     });
   }
 
-  const { auditId, html, solicitationNumber } = (req.body ?? {}) as {
+  const { auditId, html, solicitationNumber, selfContained } = (req.body ?? {}) as {
     auditId?: string;
     html?: string;
     solicitationNumber?: string;
+    // v5 exports (Executive Brief / Gate Deck) are self-contained documents that
+    // own their own page size (CSS @page — Letter via doc-page, or landscape
+    // 1280×720 for the deck) AND their own running header/footer. When true, the
+    // service defers to the document: respect @page, no service header/footer, no
+    // margin. Absent/false → the legacy v4 Letter + service-header path (unchanged).
+    selfContained?: boolean;
   };
   if (typeof html !== "string" || html.length === 0) {
     return res.status(400).json({ error: "html (string) required in body" });
@@ -171,15 +177,26 @@ app.post("/pdf", async (req, res) => {
           <span><b style="color:#0a1628; font-weight:700;">FAR</b>audit</span>
           <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
         </div>`;
-      const out = await page.pdf({
-        format: "Letter",
-        printBackground: true,
-        preferCSSPageSize: false,
-        margin: { top: "20mm", bottom: "16mm", left: "13mm", right: "13mm" },
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate
-      });
+      // v5 self-contained (Executive Brief / Gate Deck): the document owns the
+      // page geometry (CSS @page) and its own running chrome, so defer to it —
+      // respect @page, no service header/footer, zero margin. Legacy v4 keeps the
+      // hardcoded Letter + service header/footer bands, byte-for-byte unchanged.
+      const out = selfContained
+        ? await page.pdf({
+            printBackground: true,
+            preferCSSPageSize: true,
+            margin: { top: "0", bottom: "0", left: "0", right: "0" },
+            displayHeaderFooter: false
+          })
+        : await page.pdf({
+            format: "Letter",
+            printBackground: true,
+            preferCSSPageSize: false,
+            margin: { top: "20mm", bottom: "16mm", left: "13mm", right: "13mm" },
+            displayHeaderFooter: true,
+            headerTemplate,
+            footerTemplate
+          });
       return out as Buffer;
     })();
     pdfBytes = await Promise.race<Buffer>([

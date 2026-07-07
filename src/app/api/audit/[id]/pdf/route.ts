@@ -23,6 +23,8 @@ import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "../../../../audit/[id]/_view-model";
 import { renderAuditReportComplete } from "../../../../audit/[id]/_render";
 import { renderV4ReportFromRow } from "@/lib/v4-report/report";
+import { renderExecBriefV5 } from "@/lib/v5-report/render-pdf";
+import { renderGateDeckV5 } from "@/lib/v5-report/render-deck";
 import { displaySolicitationId, shouldGateExport } from "@/lib/audit-display";
 
 export const dynamic = "force-dynamic";
@@ -39,11 +41,20 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HERO_AUDIT_ID = "7e389f1a-0fc4-4ba2-8299-c86d23adb62a";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // v5 export formats (Executive Brief / Gate Deck) — ONLY when AUDIT_REPORT_V5 is
+  // on. Any other value (or flag off) falls through to the legacy v4 PDF, byte-
+  // identical. The web report's two-item Export menu passes ?format=brief|deck.
+  const fmtParam = new URL(req.url).searchParams.get("format");
+  const v5Format =
+    process.env.AUDIT_REPORT_V5 === "true" && (fmtParam === "brief" || fmtParam === "deck")
+      ? fmtParam
+      : null;
 
   const pdfUrl = process.env.RAILWAY_PDF_URL;
   const pdfSecret = process.env.RAILWAY_PDF_SECRET;
@@ -109,10 +120,22 @@ export async function GET(
   if (!capErr) hasCapabilityStatement = !!capRow;
 
   // Build the same view model + render the same HTML the web route serves.
-  // AGENTIC V3 — agentic-engine audits render their own self-contained report
-  // (same branch as the web route), so the exported PDF matches what's on screen.
+  // v5 (flag on) — the Executive Brief / Gate Deck are self-contained documents
+  // that own their page geometry + running chrome; the service renders them in
+  // selfContained mode. Otherwise: AGENTIC V3 renders its own v4 report; legacy
+  // audits go through the v3 template. Either way the PDF matches the screen.
   let html: string;
-  if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
+  let selfContained = false;
+  let variantSuffix = "";
+  if (v5Format === "brief") {
+    html = renderExecBriefV5(audit as Record<string, unknown>);
+    selfContained = true;
+    variantSuffix = "-brief";
+  } else if (v5Format === "deck") {
+    html = renderGateDeckV5(audit as Record<string, unknown>);
+    selfContained = true;
+    variantSuffix = "-deck";
+  } else if (((audit.compliance_json as Record<string, unknown> | null)?.engine) === "agentic_v3") {
     html = renderV4ReportFromRow(audit as Record<string, unknown>);
   } else {
     const vm = buildViewModel(audit, { hasCapabilityStatement });
@@ -132,10 +155,14 @@ export async function GET(
   // min-height:100vh which survives into print — Chromium pads the document
   // to viewport height and can emit an empty final page. Patched here, not in
   // _template.html, so the template stays 1:1 with the canonical design file.
-  const pdfHtml = html.replace(
-    "</head>",
-    '<style>@media print{.frame{min-height:0!important}.rpt-main>:last-child{margin-bottom:0!important}}</style></head>'
-  );
+  // v5 self-contained docs own their own @page geometry (doc-page / deck-stage),
+  // so this v4-targeted patch is skipped for them.
+  const pdfHtml = selfContained
+    ? html
+    : html.replace(
+        "</head>",
+        '<style>@media print{.frame{min-height:0!important}.rpt-main>:last-child{margin-bottom:0!important}}</style></head>'
+      );
 
   // POST to Railway pdf-service. The service Bearer-checks RAILWAY_PDF_SECRET
   // and returns PDF bytes with Content-Type: application/pdf.
@@ -157,7 +184,10 @@ export async function GET(
         solicitationNumber:
           (audit.solicitation_number as string | null) ??
           (audit.notice_id as string | null) ??
-          ""
+          "",
+        // v5 Brief/Deck own their page geometry + running chrome — tell the
+        // service to defer (respect @page, no service header/footer, no margin).
+        selfContained
       })
     });
   } catch (err) {
@@ -183,7 +213,7 @@ export async function GET(
       title: audit.title as string | null | undefined
     }).replace(/[^A-Za-z0-9_-]+/g, "_") || "audit";
   const generatedAt = new Date().toISOString().slice(0, 10);
-  const filename = `FARaudit-${displayId}-${generatedAt}-${String(audit.id).slice(0, 8)}.pdf`;
+  const filename = `FARaudit-${displayId}${variantSuffix}-${generatedAt}-${String(audit.id).slice(0, 8)}.pdf`;
 
   return new Response(pdfBytes, {
     status: 200,

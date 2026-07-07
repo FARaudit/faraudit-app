@@ -55,13 +55,15 @@ export interface ScorecardTile { k: string; v: string; tone: Tone; sub: string; 
 export function scorecardTiles(d: V4Data): ScorecardTile[] {
   const v = d.verdict, cov = d.coverage, f = d.findings;
   const p0 = (f.p0 || []).length, p1 = (f.p1 || []).length, p2 = (f.p2 || []).length;
-  const pct = cov.total ? Math.round((cov.read / cov.total) * 100) : null;
   const nv = !!v.noVerdict;
   const elig = eligInfo(v);
   const tiles: ScorecardTile[] = [
     { k: "Show-stoppers", v: nv ? "Not determined" : (p0 ? String(p0) : "None"), tone: nv ? "slate" : (p0 ? "stop" : "go"), sub: nv ? "not determined" : (p0 ? "block award" : "no blockers found"), textv: nv },
     { k: "Gates to clear", v: nv ? "Not determined" : String(p1), tone: nv ? "slate" : (p1 ? "caution" : "go"), sub: nv ? "not determined" : "before you submit", textv: nv },
-    { k: "Coverage", v: pct == null ? "—" : pct + "%", tone: cov.state === "COMPLETE" ? "go" : "slate", sub: cov.read + "/" + cov.total + " docs · " + cov.state.toLowerCase(), textv: false },
+    // Coverage = read / total (never a bare %). Gate-2 ruling (Design, 2026-07-07): a
+    // percentage is score-adjacent on a score-free artifact, and it contradicted the deck
+    // cover console + provenance panel, which already speak "X / Y". read/total unifies all.
+    { k: "Coverage", v: (cov.read == null || cov.total == null) ? "—" : cov.read + " / " + cov.total, tone: cov.state === "COMPLETE" ? "go" : "slate", sub: "documents · " + cov.state.toLowerCase(), textv: false },
     elig
       ? { k: "Eligibility", v: elig.label, tone: elig.cls === "ok" ? "go" : elig.cls === "no" ? "stop" : "slate", sub: "set-aside / status", textv: true }
       : { k: "Advisories", v: String(p2), tone: "slate", sub: "clause flow-downs", textv: false },

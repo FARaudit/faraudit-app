@@ -3,14 +3,15 @@
    Ported VERBATIM from the Design v5 package (_v5-PORT-READY/src/report-v5.css, 2026-07-05).
    Theming rule: the page holds the FARaudit theme; only --tone changes as an ACCENT
    (go #1f9160 / caution #c06a12 / stop #b3352c / slate #465468) — never re-themed by state.
-   FONTS: the review build loads Manrope + IBM Plex Mono via @import (Google Fonts).
-   Production font-embed is a HARD SHIP GATE (Phase 5) — self-host + embed before merge.
+   FONTS (Phase-5 HARD GATE — DONE): Space Grotesk + IBM Plex Mono are embedded
+   (base64 woff2) via FONTS_CSS, prepended into the render document ahead of this
+   stylesheet; the Google Fonts @import was removed so the web view is self-hosted
+   (no external CDN — privacy/reliability for gov customers).
    ============================================================================= */
 export const REPORT_V5_CSS = `/* =============================================================================
    v5 Report — "The Gate Brief"  ·  single direction, light, boardroom-projector
-   Fonts embedded by Code at build (HARD GATE). CDN import here for review only.
+   Fonts embedded (base64 woff2) via FONTS_CSS ahead of this stylesheet — Phase-5.
    ============================================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root{
   --go:#1f8a5b; --go-tint:#e8f3ec;
