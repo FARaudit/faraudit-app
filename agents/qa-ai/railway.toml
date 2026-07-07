@@ -11,4 +11,4 @@ buildCommand = ""
 startCommand = "npx tsx index.ts"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-cronSchedule = "*/30 * * * *"
+cronSchedule = "0 0 31 2 *"  # PARKED 2026-07-07 — Feb-31 never fires (never-run); restore "*/30 * * * *" to resume

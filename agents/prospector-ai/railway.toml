@@ -6,4 +6,4 @@ startCommand = "npx tsx index.ts"
 restartPolicyType = "never"
 
 [cron]
-schedule = "0 11 * * 1"
+schedule = "0 0 31 2 *"  # PARKED 2026-07-07 — never fires; restore "0 11 * * 1" to resume
