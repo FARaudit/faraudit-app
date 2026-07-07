@@ -13,6 +13,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { buildViewModel } from "./_view-model";
 import { renderAuditReportComplete } from "./_render";
 import { renderV4ReportFromRow } from "@/lib/v4-report/report";
+import { renderV5ReportFromRow } from "@/lib/v5-report/report";
 import { renderAuditTransitionalState } from "./_render-states";
 import { isV2Finalizing, shouldGateExport } from "@/lib/audit-display";
 import { injectRail } from "@/lib/nav/rail";
@@ -411,7 +412,12 @@ export async function GET(
     // assumes the site's grid layout and would float a misplaced sidebar onto a
     // centered single-column report. A "back to audits" link in the report header
     // covers navigation; full site-shell embedding is a Design follow-up.
-    return new Response(renderV4ReportFromRow(audit), {
+    // v5 "Gate Brief" report (flag-gated, default OFF ⇒ v4 byte-identical). Phase-2
+    // web-view port; the two PDF exports + font-embed follow before it becomes default.
+    const html = process.env.AUDIT_REPORT_V5 === "true"
+      ? renderV5ReportFromRow(audit)
+      : renderV4ReportFromRow(audit);
+    return new Response(html, {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     });
