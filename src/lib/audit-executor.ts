@@ -1,16 +1,14 @@
 // FA-116 — shared audit execution core.
 //
-// Extracted verbatim from src/app/api/audit/route.ts's try-block so the sync
-// route and the resident audit-worker run the IDENTICAL pipeline: V1 3-call
-// engine → persist complete → V2 shadow (inline-bytes or metadata-only,
-// errors swallowed) → best-effort corpus inserts. Any future change to audit
-// persistence lands in both consumers automatically — the alternative
-// (worker re-implementing the block) is the V2-drift class that bit
-// agents/audit-ai/audit-engine.ts (vendored copy lacks runAuditV2).
+// The one pipeline the sync route, the resident audit-worker, and the watcher all
+// run, so their behavior can never drift. executeAudit() routes into the AGENTIC V3
+// engine (executeAgenticPrimary) — persist complete → best-effort corpus inserts.
+// (T3 truth fix 2026-07-07: the old header described a "V1 3-call engine → persist →
+// V2 shadow" pipeline; V1/V2 are RETIRED — V3 is the sole engine.)
 //
 // Error contract:
 //   - Engine/SAM/content errors THROW — caller marks the audits row failed.
-//   - V2 shadow + corpus failures are swallowed (parity with route).
+//   - Corpus failures are swallowed (parity with route).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchSolicitationByNoticeId, type Solicitation } from "@/lib/sam";
@@ -65,22 +63,8 @@ export interface AuditExecutionResult {
   bid_recommendation: string | null;
 }
 
-// FA-160 — write current_stage to audits for the real-time progress UI.
-// Best-effort: a stage-write failure must never block or fail the audit.
-async function markStage(
-  supabase: SupabaseClient,
-  auditId: string,
-  stage: "retrieval" | "extraction" | "verdict" | "assembly"
-): Promise<void> {
-  try {
-    await supabase
-      .from("audits")
-      .update({ current_stage: stage, stage_updated_at: new Date().toISOString() })
-      .eq("id", auditId);
-  } catch {
-    /* never block the audit on a stage write */
-  }
-}
+// T3 (2026-07-07) — removed the dead executor.ts markStage: the live V3 path has
+// its own markStage in audit-executor-v3.ts; this copy had zero callers.
 
 // ━━ RC7 PART B (2026-06-19) — WALL-CLOCK BUDGETS for the pre-V2 phases ━━
 //
@@ -108,29 +92,10 @@ async function markStage(
 //     `.catch(() => null)` path already does (proceed without SAM facts → leave
 //     them to extraction / honest-unknown). Pure win: a hang now degrades
 //     gracefully instead of stalling.
-//
-//   V1_OVERALL_BUDGET_MS — the parallel three-call runAudit. A clean run lands
-//     in ~1-3 min; with one slow call + Opus retry it can reach ~9-10 min. 11
-//     min is above even that retry-heavy envelope, so a normal/slow-but-
-//     succeeding run never trips it. A run still in V1 past 11 min is genuinely
-//     pathological (stuck/abandoned upstream call), NOT "succeeding" — so a
-//     breach throws a plain Error → the worker's decideRunFailureMode routes it
-//     to terminal 'fail' (NOT DegradedRunError, which would RE-RUN the same
-//     pathological hang up to the 3-attempt cap). This converts a silent
-//     multi-minute (effectively forever) stall into a prompt, diagnosable
-//     terminal failure the report page can exit to.
-//
-// NOTE / HONEST SCOPE LIMIT: the heavy multi-file INGESTION
-// (assembleSamDocumentSet — many fetch + Files-API uploads, genuinely
-// unbounded) runs UPSTREAM of executeAudit, in src/app/api/audit/route.ts and
-// agents/audit-worker/worker.ts — neither in this task's edit scope. By the
-// time bytes reach executeAudit they are already in input.attachmentPdfs. What
-// executeAudit CAN bound is the cost those already-fetched attachments impose
-// on the phases it owns (V1 + V2 each process every attachment): see the
-// ATTACHMENT_SET degrade below. The true network-ingestion ceiling must be
-// added at those two upstream call sites (flagged for follow-up).
+// (T3 2026-07-07 — removed the dead V1_OVERALL_BUDGET_MS const + its V1/V2-era
+//  commentary; the parallel three-call runAudit it bounded is retired. Only the
+//  live FACTS SAM cross-ref budget below survives.)
 const FACTS_SAM_BUDGET_MS = 30 * 1000;
-const V1_OVERALL_BUDGET_MS = 11 * 60 * 1000;
 
 // T2-2 — ATTACHMENT_SET_MAX (the V1/V2 attachment-set degrade ceiling `= MAX_DOCS`)
 // removed: zero callers, an advertised backstop that never ran on the V3 path.

@@ -122,7 +122,7 @@ export function setExpertUsageSink(sink: ((u: ExpertUsage) => void) | null) { _e
  *  Extended thinking is intentionally OMITTED here: the loop reconstructs assistant turns from normalized
  *  state, and replaying tool-use turns WITH thinking blocks requires echoing them verbatim — out of scope
  *  for a stateless rebuild. Tool grounding (not CoT) is what makes this expert correct. */
-export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; betaHeaders?: string; onUsage?: (u: ExpertUsage) => void }): CallModel {
+export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: { maxTokens?: number; onUsage?: (u: ExpertUsage) => void }): CallModel {
   return async ({ system, userTask, priorToolResults, forceSubmit, signal }) => {
     const messages: Array<Record<string, unknown>> = [{ role: "user", content: userTask }];
     for (const batch of priorToolResults) {
