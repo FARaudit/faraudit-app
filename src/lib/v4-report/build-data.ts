@@ -85,17 +85,38 @@ function severityOf(f: FindingLite): "P0" | "P1" | "P2" {
   return "P2";
 }
 
-function buildFindings(all: FindingLite[]): V4Findings {
+// Split into the report's three tiers. Show-stoppers (blocks award) is sourced
+// EXCLUSIVELY from the engine `showStoppers[]` registry — Brain card-293 ruling
+// (2026-07-07): '"Show-stopper (blocks award)" = engine showStoppers[] exclusively.
+// The report tile renders that registry and may never re-derive blockers from
+// severity tags.' The union is one-way: every showStoppers[] entry renders in the
+// tile regardless of its severity tag; a severity-P0 finding NOT in showStoppers[]
+// is NOT a blocker (the engine severity classifier over-tags P0 — see ENGINE-DEFECT
+// -LEDGER) and renders as a gate/advisory by severity, with no award-blocking copy.
+function buildFindings(showStoppers: FindingLite[], all: FindingLite[]): V4Findings {
   const p0: V4Finding[] = [], p1: V4Finding[] = [], p2: V4Finding[] = [];
   const satisfied: { req: string; cite: string }[] = [];
+  const key = (f: FindingLite): string => `${s(f.requirement)}|${s(f.citation)}`;
+  const seen = new Set<string>();
+
+  // Tier 0 — the blocker registry, verbatim (any severity, deduped, met→satisfied).
+  for (const f of showStoppers) {
+    const k = key(f);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (f.disposition === "dropped") continue;
+    if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
+    p0.push(mapFinding(f));
+  }
+  // Everything else — gates (P0-non-blocker + P1) / advisories (P2). No block-award language.
   for (const f of all) {
+    const k = key(f);
+    if (seen.has(k)) continue; // already rendered as a show-stopper (or a dup)
+    seen.add(k);
     if (f.disposition === "dropped") continue;
     if (f.disposition === "met") { satisfied.push({ req: s(f.requirement), cite: s(f.citation) }); continue; }
     const v = mapFinding(f);
-    const sev = severityOf(f);
-    if (sev === "P0") p0.push(v);
-    else if (sev === "P1") p1.push(v);
-    else p2.push(v);
+    (severityOf(f) === "P2" ? p2 : p1).push(v);
   }
   return { p0, p1, p2, satisfied };
 }
@@ -219,9 +240,13 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     rationale: s(p.reason),                // VERBATIM — never paraphrase or trim
   };
 
-  // union showStoppers + findings so a blocker carried only in showStoppers still renders
-  const all = unionFindings(Array.isArray(p.showStoppers) ? p.showStoppers : [], Array.isArray(p.findings) ? p.findings : []);
-  const findings: V4Findings = buildFindings(all);
+  // union showStoppers + findings for the §L/§M/CLIN derivations (kind/citation-based,
+  // severity-agnostic — a submission/eval/CLIN row may live in either array).
+  const showStoppers = Array.isArray(p.showStoppers) ? p.showStoppers : [];
+  const all = unionFindings(showStoppers, Array.isArray(p.findings) ? p.findings : []);
+  // Findings tiers: p0 sourced EXCLUSIVELY from showStoppers[] (Brain card-293) — a
+  // severity-P0 finding not in the registry routes to Gates/Advisories, never Show-stoppers.
+  const findings: V4Findings = buildFindings(showStoppers, all);
   const coverage = buildCoverage(p, documentsComplete);
 
   // "Audited/Evaluated" date — bind the first persisted date available (Design Gate-2 flag: some run-records,
