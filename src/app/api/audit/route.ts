@@ -5,7 +5,7 @@ import { fetchPdfFromSamUrl } from "@/lib/sam-pdf";
 import { assembleSamDocumentSet, assembleUploadedDocumentSet, deriveSolTokenFromFilenames, hasEngineText, type AssembledDocumentSet, type IngestionMeta } from "@/lib/sam-attachments";
 import { extractText } from "@/lib/pdf-text-extractor";
 import { type PdfSource } from "@/lib/audit-engine";
-import { executeAudit, AuditPersistError } from "@/lib/audit-executor";
+import { executeAudit } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { uploadPdfToFilesApi } from "@/lib/anthropic-files";
@@ -513,11 +513,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ━━ Run three-call audit + persist + V2 shadow + corpus ━━
+  // ━━ Run the agentic V3 audit + persist + V2 shadow + corpus ━━
   // FA-116: pipeline body extracted to src/lib/audit-executor.ts so the
-  // resident audit-worker runs the identical code. Behavior preserved,
-  // including the historical persist-failure contract (500 with auditId,
-  // row left in 'processing' — see AuditPersistError).
+  // resident audit-worker runs the identical code. Behavior preserved.
   // N5 — the auditing firm's capability profile (open-world; socioeconomic certs only)
   // for the agentic eligibility lane. Best-effort: any error → null (unknown firm,
   // the conservative path). ONLY the agentic-V3 primary engine consults it, so skip the
@@ -573,9 +571,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    if (err instanceof AuditPersistError) {
-      return NextResponse.json({ error: message, auditId: audit.id }, { status: 500 });
-    }
     console.error("[audit POST] failed", { auditId: audit.id, message });
     await supabase
       .from("audits")

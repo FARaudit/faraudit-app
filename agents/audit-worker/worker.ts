@@ -12,7 +12,7 @@
 // route pre-attributed at enqueue time under the user's RLS session.
 
 import { createClient } from "@supabase/supabase-js";
-import { executeAudit, DegradedRunError, type AuditExecutionInput } from "@/lib/audit-executor";
+import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { AGENTIC_V3_PRIMARY_ENABLED } from "@/lib/audit-executor-v3";
 import { isAnthropicTransient } from "@/lib/anthropic-files";
@@ -386,7 +386,7 @@ async function processOne(row: UserPendingRow): Promise<void> {
     // (report page keeps waiting); the cap path fails both if it triggers.
     const mode = decideRunFailureMode(err);
     if (mode === "release") {
-      const marker = err instanceof DegradedRunError ? "degraded_run_shape" : "anthropic_5xx_degraded";
+      const marker = err instanceof TransientInputError ? "transient_input" : "anthropic_5xx_degraded";
       console.error(`[audit-worker] ${marker} ${label}: ${message} — releasing claim for re-run`);
       const released = await releaseClaim(row, `${marker}: ${message.slice(0, 400)}`);
       if (released) return;
@@ -396,8 +396,7 @@ async function processOne(row: UserPendingRow): Promise<void> {
     }
     console.error(`[audit-worker] failed ${label}: ${message}`);
     // Best-effort: flip the audits row too so the report page exits its
-    // wait state. AuditPersistError lands here as well — in the worker
-    // context a failed complete-update has no result to preserve.
+    // wait state.
     const { error: auErr } = await supabase
       .from("audits")
       .update({ status: "failed", error_message: message })
@@ -413,12 +412,11 @@ async function processOne(row: UserPendingRow): Promise<void> {
 }
 
 // FA-147 — failure routing. 'release' = transient upstream (Anthropic 5xx
-// exhaust) or structurally collapsed output: re-runnable, so the claim goes
-// back to pending (bounded by the FA-149 attempt cap). 'fail' = everything
-// else (bad input, SAM 404, persist errors): a re-run would hit the same
-// wall, so fail terminally. Exported for the FA-147 gate suite.
+// exhaust) or a transient input blip (T1-1 storage read): re-runnable, so the
+// claim goes back to pending (bounded by the FA-149 attempt cap). 'fail' =
+// everything else (bad input, SAM 404, persist errors): a re-run would hit the
+// same wall, so fail terminally. Exported for the FA-147 gate suite.
 export function decideRunFailureMode(err: unknown): "release" | "fail" {
-  if (err instanceof DegradedRunError) return "release";
   if (err instanceof TransientInputError) return "release";
   if (isAnthropicTransient(err)) return "release";
   return "fail";
