@@ -1,4 +1,14 @@
 // ── JUDGMENT-FIRST PATH (Brain cards 276/279) — PROPOSE → rail → DISPOSE ──────────────────────────────
+//
+// ⚠️ PARKED / DORMANT PROTOTYPE — NOT A LIVE SAFETY NET (T2-3, engine line-audit 2026-07-07).
+//   • The live customer audit path is the AGENTIC V3 LADDER (audit-orchestrator.runAgenticAudit). This module
+//     is NOT wired into it: `judgmentFirstEnabled()` (the AUDIT_JUDGMENT_FIRST gate) has ZERO callers in src/ or
+//     agents/, so the flag is INERT in production — flipping it ON changes nothing on the customer path.
+//   • `runJudgmentFirstAudit` (audit-package.ts) is invoked ONLY by offline proof-harnesses (oracle-set / CERT-10
+//     / diagnostics under scripts/), never by the deployed engine. Treat this whole file as a bench prototype.
+//   • It therefore adds NO runtime guard and must not be read as one. Unpark = an explicit CEO decision to wire
+//     the executor branch + a Tier-4-style runtime /verify on a real run. Until then it is $0-testable scaffolding.
+//
 // The pivot the CEO asked for: read the WHOLE solicitation and reason to a verdict + boardroom analysis the way
 // pasting it into Claude does, then let the deterministic rail GATE it. This module is the deterministic wiring;
 // both model-touching seams are INJECTED so the wiring is $0 unit-testable with stubs and paid-ready with the
@@ -12,6 +22,9 @@ import type { Verdict, Decision } from "./audit-decide";
 import type { TypedFinding, BidderProfile } from "./audit-findings";
 import { disposeVerdict, type DisposeResult } from "./audit-dispose";
 
+// DORMANT (T2-3): this helper has ZERO callers in the live path (src/ + agents/). The AUDIT_JUDGMENT_FIRST flag
+// gates nothing in production today; it exists for the offline proof-harnesses + the eventual (unparked) executor
+// branch. Kept as the single source of the flag name so wiring it later is one edit, not a grep-and-hope.
 export function judgmentFirstEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.AUDIT_JUDGMENT_FIRST === "true";
 }
