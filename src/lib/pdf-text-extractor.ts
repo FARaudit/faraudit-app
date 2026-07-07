@@ -37,15 +37,24 @@ const MIN_PAGE_MEANINGFUL_CHARS = 10;
 
 // Detect the mixed cover(text)+body(scanned) case from RELIABLE per-page text.
 // Conservative by design — a false INCOMPLETE degrades UX, a false COMPLETE is
-// catastrophic, so we require ≥3 pages AND a STRICT scanned majority: a normal
-// doc with one blank signature/divider page (majority still text) never flags,
-// but a 1-text-cover + N-scanned-body doc does. Callers MUST only pass pages
-// from real per-page extraction (pdf-parse v2) — buildPageStructure drops empty
-// pages, so a form-feed/single-block split cannot be trusted here.
+// catastrophic. T0-6 (engine line-audit 2026-07-06): the prior test fired ONLY on
+// a STRICT scanned MAJORITY (withText*2 < pages.length), so a text cover + a scanned
+// BODY that was merely HALF the doc (e.g. 2 text cover + 2 scanned body) cleared the
+// whole-doc floor on the cover text and read COMPLETE while the scanned body was
+// silently lost — a false-COMPLETE. Now flag at ≥ HALF no-text pages with a ≥2 floor:
+// it catches a real scanned body (incl. the exactly-half case the strict-majority
+// missed) while STILL tolerating an incidental blank signature/divider page (a single
+// no-text page never trips it). OCR runs FIRST (partialFromPages → needsOcr) and
+// CLEARS the flag when it recovers the body — this only rides through to has_text=false
+// where OCR genuinely cannot (serverless / truly image-only body). Callers MUST only
+// pass pages from real per-page extraction (pdf-parse v2) — buildPageStructure drops
+// empty pages, so a form-feed/single-block split cannot be trusted here.
 export function isPartialPageText(pages: PageText[]): boolean {
   if (pages.length < 3) return false;
   const withText = pages.filter((p) => meaningfulCharCount(p.text) >= MIN_PAGE_MEANINGFUL_CHARS).length;
-  return withText >= 1 && withText * 2 < pages.length;
+  if (withText === 0) return false; // whole-doc scan — the whole-doc meaningful-chars floor governs, not this per-page test
+  const noText = pages.length - withText;
+  return noText >= 2 && noText * 2 >= pages.length;
 }
 
 // SINGLE SOURCE OF TRUTH for the text-vs-vision delivery decision (2026-06-21).

@@ -20,7 +20,7 @@
 // (est ~$0.005/audit — see makeModelProceduralExtractor). Rule-64: whatever the extractor returns, only quotes
 // that are a verbatim ≥4-word span PRESENT in the section become findings — a model can never fabricate grounding.
 
-import { readSection, procurementPart, type AuditToolContext } from "./audit-tools";
+import { sectionFullText, procurementPart, type AuditToolContext } from "./audit-tools";
 import type { TypedFinding } from "./audit-findings";
 
 export const PROCEDURAL_SECTIONS = ["L", "M"] as const; // 52.212-1 instructions ≡ §L; 52.212-2 evaluation ≡ §M
@@ -101,7 +101,12 @@ export function makeModelProceduralExtractor(
 /** The pass. Pure control flow; deterministic grounding gate; the only I/O is the injected extractor. */
 export async function proceduralCoveragePass(ctx: AuditToolContext, opts?: { extract?: ProceduralExtractor }): Promise<TypedFinding[]> {
   if (procurementPart(ctx) !== "part12-commercial") return [];
-  const sections = PROCEDURAL_SECTIONS.map((k) => ({ key: k as string, text: readSection(ctx, k).text })).filter((s) => s.text.trim());
+  // T0-8 (engine line-audit 2026-07-06) — read the FULL section, not readSection's SECTION_READ_CAP (12k) HEAD.
+  // The capped head made this pass emit covered_direct findings grounded only in the head, which short-circuit
+  // completenessOf's covered_direct check (audit-orchestrator.ts:452-456) BEFORE its lensTruncated INCOMPLETE
+  // guard (:488) — so a long §L/§M's unread tail read COMPLETE. Reading the full section lets the pass ground the
+  // tail's obligations too (completenessOf already grounds against sectionFullText), closing the head-only bypass.
+  const sections = PROCEDURAL_SECTIONS.map((k) => ({ key: k as string, text: sectionFullText(ctx, k) })).filter((s) => s.text.trim());
   if (!sections.length) return [];
   const extract = opts?.extract ?? deterministicProceduralExtractor;
   let candidates: ProceduralCandidate[] = [];

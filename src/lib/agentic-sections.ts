@@ -283,10 +283,19 @@ const CLAUSE_NUM_RE = /\b2?52\.\d{3}-\d{1,4}\b/g;
 const normClauseCite = (s: string) => s.replace(/[‐-―]/g, "-").replace(/\s+/g, "");
 
 /** Build a literal-source-presence checker for clause numbers (normalizes en-dashes + whitespace so
- *  "52.219 – 14" matches "52.219-14"). */
+ *  "52.219 – 14" matches "52.219-14"). FULL-TOKEN match, not substring: a plain `includes` false-reports
+ *  a shorter clause PRESENT when the source only contains a longer sibling — "52.219-14" contains
+ *  "52.219-1", and "252.204-7012" contains "52.204-70" — which weakens the Rule-64 anti-fabrication gate
+ *  (an absent bar clause certified present, then grounded on the wrong neighbor). Anchor both ends against
+ *  an adjacent digit so only a whole clause number matches (T0-1, engine line-audit 2026-07-06). */
 export function makeClauseSourceChecker(sourceText: string): (clause: string) => boolean {
   const norm = normClauseCite(sourceText);
-  return (clause: string) => norm.includes(normClauseCite(clause));
+  return (clause: string) => {
+    const c = normClauseCite(clause);
+    if (!c) return false;
+    const esc = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex metachars (hyphen is literal outside a class)
+    return new RegExp(`(?<!\\d)${esc}(?!\\d)`).test(norm);
+  };
 }
 
 /** Replace any clause NUMBER not literally in source with an honest marker. Returns the cleaned text and

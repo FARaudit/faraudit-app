@@ -119,6 +119,25 @@ function confidenceRank(c: SectionConfidence): number {
   return { high: 3, medium: 2, low: 1, missing: 0 }[c];
 }
 
+// A table-of-contents entry ("…………53" — a dot-leader run + page number) matches the same header/title patterns
+// as a real section heading but at an EARLIER line, so — via the lowest-line dedup — it can STEAL the boundary
+// from the true header and mis-scope (or false-COMPLETE) the section (T0-7, engine line-audit 2026-07-06). A
+// heading candidate is a TOC entry when it, OR its wrapped continuation line, ends in a dot-leader page ref.
+// Shared by Pass 1 (SECTION header) / Pass 2 (title) / Pass 2c (commercial clause).
+const TOC_LEADER_RE = /\.{5,}\s*\d{1,4}\s*$/;
+// SAME-LINE only — for Pass 1 (SECTION header) + Pass 2 (title): those headings are single-line, so a real
+// header must NOT be skipped merely because the NEXT line is a TOC entry (a real §A header directly preceding
+// the TOC block would otherwise vanish — observed regression). Catches the single-line "SECTION B … …3" form.
+function isTocLine(text: string): boolean {
+  return TOC_LEADER_RE.test(text.trim());
+}
+// WRAPPED — for Pass 2c (commercial clause): the "E.5 52.212-2 EVALUATION—COMMERCIAL PRODUCTS AND COMMERCIAL"
+// TOC entry wraps its dot-leader page ref onto the NEXT line, so the i+1 look-ahead is required there. The clause
+// candidate is specific enough that a real heading directly followed by an unrelated TOC line is not a concern.
+function isTocEntry(allLines: { text: string }[], i: number, end: number): boolean {
+  return isTocLine(allLines[i].text) || (i + 1 < end && isTocLine(allLines[i + 1].text));
+}
+
 export function detectSections(doc: ExtractedDocument): SectionBag {
   const warnings: string[] = [];
   if (doc.warnings.length > 0) {
@@ -188,6 +207,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
   // Pass 1: explicit "SECTION X" headers — high confidence (primary region only — C-11)
   for (let i = 0; i < primaryEnd; i++) {
     const line = allLines[i].text.trim();
+    if (isTocLine(line)) continue; // T0-7 — a single-line TOC entry ("SECTION B … …3") must not mint a boundary that beats the real header
     for (const pat of UCF_HEADER_PATTERNS) {
       const m = pat.exec(line);
       if (m && m[1]) {
@@ -212,6 +232,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     if (foundKeys.has(key)) continue;
     for (let i = 0; i < primaryEnd; i++) {
       if (pattern.test(allLines[i].text.trim())) {
+        if (isTocLine(allLines[i].text)) continue; // T0-7 — skip a single-line TOC entry; keep scanning for the real heading
         boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: pattern.source });
         foundKeys.add(key);
         break;
@@ -251,7 +272,6 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
     L: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-1\b/i,
     M: /^(?:ADDENDUM\s+TO\s+)?(?:[A-M]\.\d+\s+)?(?:FAR\s+)?5?2\.212-2\b/i,
   };
-  const TOC_LEADER_RE = /\.{5,}\s*\d{1,4}\s*$/; // "…………53" dot-leader + page number (TOC entry)
   for (const [key, pat] of Object.entries(COMMERCIAL_CLAUSE_HEAD)) {
     if (foundKeys.has(key)) continue;
     for (let i = 0; i < primaryEnd; i++) {
@@ -266,7 +286,7 @@ export function detectSections(doc: ExtractedDocument): SectionBag {
       const afterClause = t.replace(pat, "").replace(/^[\s,.:;—–-]+/, "");
       if (/^[a-z]/.test(afterClause)) continue;
       // Skip a TOC entry: the candidate line, or its wrapped continuation, ends in a dot-leader page ref.
-      if (TOC_LEADER_RE.test(t) || (i + 1 < primaryEnd && TOC_LEADER_RE.test(allLines[i + 1].text.trim()))) continue;
+      if (isTocEntry(allLines, i, primaryEnd)) continue;
       boundaries.push({ key, lineIdx: i, confidence: "medium", matchedPattern: `COMMERCIAL_CLAUSE(${key})` });
       foundKeys.add(key);
       break;

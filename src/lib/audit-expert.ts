@@ -182,7 +182,12 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
       const resp2 = await client.messages.create({ ...req, max_tokens: EXPERT_TOKEN_CEILING }, signal ? { signal } : undefined);
       tally(resp2);
       console.log(`[expert] max_tokens retry: attempt1=max_tokens attempt2=${resp2.stop_reason ?? "?"} (max_tokens ${req.max_tokens as number}→${EXPERT_TOKEN_CEILING})`);
-      resp = resp2;
+      // T0-3 (engine line-audit 2026-07-06) — prefer the retry (fuller excerpts) ONLY when it actually
+      // re-produced submit_findings. If the retry narrates or reads a tool instead of re-submitting, KEEP
+      // attempt-1's valid submit_findings rather than discarding it (an unconditional resp=resp2 silently
+      // dropped a real finding set → the P2.6 repair pass backstops a merely-clipped excerpt).
+      const hasSubmit = (r: typeof resp) => (r.content ?? []).some((b) => b.type === "tool_use" && b.name === "submit_findings");
+      if (hasSubmit(resp2) || !hasSubmit(resp)) resp = resp2;
     }
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
