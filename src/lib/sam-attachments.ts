@@ -828,6 +828,16 @@ function truncateDocToTokens(name: string, buf: Buffer, text: string, maxDocToke
 // order (planDocumentOrder output). The form is EXEMPT — it is the solicitation
 // and must never be dropped. Tier order means the work statement is evaluated
 // before generic attachments, so generics drop first when the ceiling is hit.
+// FA-INGEST3 page-exemption predicate — SHARED by both the SAM and upload arms
+// so a text-deliverable doc (rides as a TEXT block → 0 VISION page cost) is never
+// dropped by the page ceiling. Single source of truth: T1-4 found the upload arm
+// had inlined `pages: c.pages` at Pass 2 and re-introduced the FA-INGEST3
+// regression the SAM arm had already fixed (text docs page-dropped for a limit
+// that never applies to them). Keep BOTH arms calling this so it cannot drift.
+export function isTextDeliverableForPageBudget(text: string): boolean {
+  return !!text && !text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(text) >= MIN_TEXT_CHARS_FOR_TEXT_BLOCK;
+}
+
 export function applyPageBudget<T extends { role: DocumentPlanEntry["role"]; pages: number; name?: string }>(
   docs: T[],
   maxPages = MAX_TOTAL_PAGES
@@ -932,10 +942,8 @@ export async function assembleSamDocumentSet(
   // Text-vs-vision decision shared with the engine (single source of truth in
   // pdf-text-extractor) so the page-exemption here can never drift from how the
   // engine actually delivers the doc.
-  const isTextDeliverable = (f: { text: string }): boolean =>
-    !!f.text && !f.text.startsWith("[PDF_EXTRACTION_FAILED") && meaningfulCharCount(f.text) >= MIN_TEXT_CHARS_FOR_TEXT_BLOCK;
   const { ingest: pageKept } = applyPageBudget(
-    fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: isTextDeliverable(f) ? 0 : f.pages })),
+    fetched.map((f) => ({ resourceId: f.entry.resourceId, role: f.entry.role, name: f.entry.name, pages: isTextDeliverableForPageBudget(f.text) ? 0 : f.pages })),
     MAX_TOTAL_PAGES
   );
   const pageKeptIds = new Set(pageKept.map((k) => k.resourceId));
@@ -968,7 +976,7 @@ export async function assembleSamDocumentSet(
       // A doc with no meaningful extractable text rides as a base64 VISION block
       // (the engine's textForDocOrNull would return null). The form is exempt — a
       // single huge scanned solicitation is handled via the Files-API path, not here.
-      const isVisionDoc = f.entry.role !== "form" && !isTextDeliverable(f);
+      const isVisionDoc = f.entry.role !== "form" && !isTextDeliverableForPageBudget(f.text);
       if (isVisionDoc && visionBase64Bytes + base64.length > MAX_INLINE_VISION_BYTES) {
         files.push({ name: f.entry.name, role: f.entry.role, bytes: f.entry.sizeBytes, ingested: false, reason: `inline image budget (${Math.round(MAX_INLINE_VISION_BYTES / 1048576)}MB) exceeded — scanned/image doc (keeps the request under the 32MB API limit)` });
         continue;
@@ -1090,8 +1098,13 @@ export async function assembleUploadedDocumentSet(
     counted.push({ entry: e, base64: buf.toString("base64"), buffer: buf, pages: await countPdfPages(buf), tokens, text, sourceTruncated: norm.sourceTruncated, partialPageText });
   }
   // Pass 2: trim by the page ceiling (form exempt → generics drop first).
+  // T1-4 — mirror the SAM arm's FA-INGEST3 exemption: a text-deliverable doc
+  // rides as a TEXT block (0 VISION page cost) and must never be page-dropped.
+  // This arm previously used `pages: c.pages` unconditionally and re-introduced
+  // the regression (text .docx/.xlsx/amendments dropped for a page limit that
+  // never applied to them). Shared predicate → cannot drift from the SAM arm.
   const { ingest: pageKept } = applyPageBudget(
-    counted.map((c) => ({ resourceId: c.entry.resourceId, role: c.entry.role, name: c.entry.name, pages: c.pages })),
+    counted.map((c) => ({ resourceId: c.entry.resourceId, role: c.entry.role, name: c.entry.name, pages: isTextDeliverableForPageBudget(c.text) ? 0 : c.pages })),
     MAX_TOTAL_PAGES
   );
   const pageKeptIds = new Set(pageKept.map((k) => k.resourceId));

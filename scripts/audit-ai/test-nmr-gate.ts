@@ -69,7 +69,10 @@ const ctx: AuditToolContext = { fullSource: SRC };
 const RF: Record<string, RawFinding> = {
   price: { requirement: "submit pricing for all CLINs", citation: "§B", excerpt: "pricing for all CLINs", kind: "pricing", controllability: "bidder_controls" },
   cab:   { requirement: "enclosed cab", citation: "§C", excerpt: "fully enclosed cab", kind: "technical_spec", controllability: "bidder_controls" },
-  coc:   { requirement: "Certificate of Conformance", citation: "§L", excerpt: "Certificate of Conformance", kind: "submission", controllability: "bidder_controls" },
+  // T1-12 — §L/§M are certified per-obligation (≥4-word verbatim grounding), not by a loose covered_direct.
+  // A real lens grounds an obligation with its full verbatim source span, so the excerpt is the whole §L
+  // sentence (a 3-word "Certificate of Conformance" no longer grounds "Submit a Certificate of Conformance…").
+  coc:   { requirement: "Certificate of Conformance", citation: "§L", excerpt: "Submit a Certificate of Conformance with the offer", kind: "submission", controllability: "bidder_controls" },
   eval:  { requirement: "LPTA evaluation", citation: "§M", excerpt: "Lowest-Priced Technically Acceptable", kind: "other", controllability: "bidder_controls" },
 };
 const ALL = ["B", "C", "I", "L", "M"];

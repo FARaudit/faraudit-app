@@ -191,7 +191,18 @@ export function makeAnthropicCallModel(client: SdkClient, model: string, opts?: 
     }
     const toolUses = (resp.content ?? []).filter((b) => b.type === "tool_use");
     const submit = toolUses.find((b) => b.name === "submit_findings");
-    if (submit) return { toolCalls: [], findings: (submit.input?.findings as RawFinding[]) ?? [] };
+    if (submit) {
+      // T1-10 — distinguish a GENUINE empty submit ({findings: []}) from a
+      // TRUNCATED/malformed one (a max_tokens stop clipped the tool JSON so
+      // `findings` never parsed to an array). Coalescing the latter to [] made a
+      // clipped lens look like a clean "found nothing" → it converged and propped
+      // up a false COMPLETE. Only an actual array is a valid submission; anything
+      // else returns findings:null so the loop treats the turn as no-submit and,
+      // if it never gets a valid one, ends converged:false → coverageComplete:false
+      // (the honest INCOMPLETE), never a silent clean-empty.
+      const f = submit.input?.findings;
+      return Array.isArray(f) ? { toolCalls: [], findings: f as RawFinding[] } : { toolCalls: [], findings: null };
+    }
     return { toolCalls: toolUses.map((b) => ({ id: b.id!, name: b.name!, input: b.input ?? {} })), findings: null };
   };
 }

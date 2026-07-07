@@ -255,7 +255,14 @@ export async function POST(req: NextRequest) {
       );
     }
     solicitation = await fetchSolicitationByNoticeId(noticeId);
-    if (!solicitation && !pdf) {
+    // T1-3 — 404 only when there is genuinely nothing to audit. `pdf` (the
+    // multipart File) is null on the storage arm and on multi-file uploads, so
+    // testing it alone false-404s a valid JSON+storage upload before the safeName
+    // fallback below can synthesize the solicitation. Gate on every upload signal
+    // (safeName is set by all three upload arms; pdfBuffer holds the bytes) so a
+    // not-found SAM lookup that still carries real uploaded input degrades to the
+    // upload path instead of erroring.
+    if (!solicitation && !pdf && !safeName && !pdfBuffer) {
       return NextResponse.json(
         { error: "Solicitation not found on SAM.gov. Try uploading the PDF directly, or verify the ID at sam.gov." },
         { status: 404 }

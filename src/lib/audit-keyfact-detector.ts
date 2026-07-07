@@ -90,7 +90,17 @@ export function applyKeyfactDetector(
   // eligibility_bar on BOTH signals present in the source — otherwise an incidentally-incorporated 52.219-33 in a
   // full-clause matrix (services / full-and-open) would falsely downgrade eligible to null (code-review card 215).
   const setAsideCtx = /\bset-?aside\b|women-?owned|\bWOSB\b|\bEDWOSB\b|service-disabled|\bSDVOSB\b|\bHUBZone\b|8\(a\)|small business (?:set-?aside|concern)/i.test(src);
-  const supplyCtx = /NAICS\D{0,12}(?:3[1-3]\d{3}|42\d{3}|4[45]\d{3})|schedule of supplies|manufactured|nonmanufacturer|non-manufacturer/i.test(src);
+  // T1-9 — supplyCtx must key on GENUINE supply LANGUAGE, not the clause's own
+  // name. The old regex matched "nonmanufacturer"/"non-manufacturer" — a token
+  // satisfied by the TITLE of clause 52.219-33 itself ("Nonmanufacturer Rule") —
+  // so a SERVICES set-aside that merely lists 52.219-33 in a clause matrix fired
+  // supplyCtx circularly and produced a FALSE NMR eligibility bar. Replace that
+  // circular signal with real supply descriptors: a manufacturing/wholesale/retail
+  // NAICS (31-33/42/44-45), a "schedule of supplies", the NMR-statutory "end
+  // item/end product" a nonmanufacturer supplies, an explicit "supply acquisition",
+  // or "manufactured". A services clause-matrix carries none of these; a genuine
+  // supply buy carries at least one.
+  const supplyCtx = /NAICS\D{0,12}(?:3[1-3]\d{3}|42\d{3}|4[45]\d{3})|schedule of supplies|supply acquisition|\bend items?\b|\bend products?\b|\bmanufactured\b/i.test(src);
 
   // 1) QUOTE DEADLINE — submission, verdict-inert. A deadline LABEL + a DATE on the same physical line (SF-1449
   //    Block-8 grids interleave the date with form fields on one line). The label anchor + full-date requirement

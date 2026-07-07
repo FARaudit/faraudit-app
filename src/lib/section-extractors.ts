@@ -316,10 +316,17 @@ const makeClauseRegex = (): RegExp => new RegExp(`\\b${CLAUSE_NUMBER_RE_SOURCE}\
  */
 export function extractClauseNumbers(text: string): string[] {
   if (!text) return [];
+  // T1-11 — normalize Unicode / OCR dashes (en, em, figure, minus, fullwidth) to
+  // an ASCII hyphen BEFORE the sweep, so a clause number typeset or OCR'd with a
+  // non-ASCII dash (e.g. "52.219–14") is still matched by the ASCII-hyphen clause
+  // regex and counted in the deterministic completeness floor instead of dropped.
+  // Returns canonical ASCII-hyphen clause numbers (dedup-stable). Safe here — this
+  // sweep emits clause-NUMBER tokens only, never a verbatim grounding excerpt.
+  const normalized = text.replace(/[‐-―−﹘﹣－]/g, "-");
   const re = makeClauseRegex();
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(normalized)) !== null) {
     if (!seen.has(m[0])) seen.add(m[0]);
   }
   return Array.from(seen);
