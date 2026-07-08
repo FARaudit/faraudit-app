@@ -1,0 +1,129 @@
+// GATE V2 — the completeness-gate rewrite (engine-architecture rebuild, ceo/ENGINE-ARCHITECTURE-RESEARCH-2026-07-07.md).
+//
+// THE PROBLEM IT FIXES: the V1 gate (audit-orchestrator.completenessOf → deriveVerdict:1108 `!coverageComplete`)
+// forces INCOMPLETE whenever any binding obligation sentence isn't quoted by a ≥4-word VERBATIM n-gram — even on
+// a document that was fully READ with dozens of grounded findings. That verbatim-coverage veto is the root of
+// chronic false-INCOMPLETE (0728 ×2 INCOMPLETE despite 74 grounded findings). The research is unambiguous:
+// grounding must be a graded SIGNAL, not a veto (finding #5); coverage must be IMPORTANCE-WEIGHTED so boilerplate
+// can't veto while a real disqualifier still must be caught (finding #4); abstain ("INCOMPLETE") ONLY on genuine
+// document-unreadability (finding #6), NOT because a sentence wasn't quoted.
+//
+// WHAT V2 DOES (pure, deterministic — the LLM findings are unchanged; this only re-reads the coverage signal):
+//   • UNREADABLE (unread section / truncated / dropped-at-ingest) → still INCOMPLETE. The legitimate abstention.
+//   • UNGROUNDED-BUT-READ boilerplate obligations → NO veto. They lower a coverage GRADE (surfaced), not the verdict.
+//   • an UNGROUNDED obligation carrying genuine DISQUALIFICATION language → NEEDS_HUMAN_REVIEW (escalate to a human;
+//     never a silent BID — the false-COMPLETE guardrail — and never a false-INCOMPLETE).
+//
+// This is a SIGNAL/VETO re-mapping only. It CANNOT invent coverage: an unread doc is still INCOMPLETE (that gate,
+// deriveVerdict:1115 documentsComplete===false, is correct and untouched). FLAG-GATED at the call site
+// (AUDIT_GATE_V2); with the flag off nothing here is reached and V1 is byte-identical.
+
+import type { SectionAttestation } from "./audit-orchestrator";
+
+export const GATE_V2_ENABLED = process.env.AUDIT_GATE_V2 === "true";
+
+// Markers that completenessOf embeds in an attestation's `ungrounded[]` to mean "this section could not be fully
+// READ" (as opposed to "read but an obligation wasn't quoted verbatim"). These are the GENUINE incompletes.
+const UNREADABLE_MARKER = /^\[(truncated|compressor-dropped)\]/i;
+
+// IMPORTANCE CLASSIFICATION — three-way, per Brain card-301 ruling #1: FAIL TOWARD DISQUALIFIER UNDER UNCERTAINTY.
+// An ungrounded READ obligation is:
+//   • "disqualifier" — carries explicit hard-bar language (eligibility bar / exclusion / mandatory award precondition);
+//   • "boilerplate"  — clearly administrative/submission mechanics with NO bar (the ONLY class that may flow to a
+//                      committal verdict);
+//   • "ambiguous"    — neither of the above → TREATED AS DISQUALIFYING (→ NHR, never committal).
+// WHY the ambiguous→disqualifier default (the AMENDMENT): the UNDER-tag path — a real bar mislabeled "boilerplate" —
+// is the zero-contract-loss breach vector (R-14 proves this classifier class misfires). So an unquoted, unclassifiable
+// obligation must escalate to human review, never silently pass as committal. Over-tagging costs an NHR (recoverable);
+// under-tagging costs a lost contract (not). BOILERPLATE_RE is therefore kept TIGHT — only unambiguously safe language.
+const DISQUALIFIER_RE = new RegExp([
+  "will\\s+not\\s+be\\s+considered", "deemed\\s+(?:non-?responsive|ineligible)", "shall\\s+be\\s+(?:rejected|ineligible)",
+  "is\\s+(?:required|mandatory)\\s+for\\s+award", "basis\\s+for\\s+(?:rejection|elimination)",
+  "must\\s+(?:possess|hold|maintain)\\s+(?:a\\s+)?(?:active\\s+)?(?:clearance|certification|accreditation|CMMC|facility\\s+clearance)",
+  "sole[-\\s]?source", "set[-\\s]?aside\\s+for", "eligibility\\s+(?:requirement|bar)",
+  "failure\\s+to\\s+(?:comply|submit|provide).{0,40}(?:reject|ineligible|not\\s+be\\s+considered|disqualif)",
+].join("|"), "i");
+// CLEARLY-administrative boilerplate — the ONLY ungrounded class allowed to flow to a committal verdict. Kept TIGHT
+// on purpose (see amendment above): submission mechanics, validity periods, format/copies, the standard 52.212-1
+// provision. Anything an ungrounded obligation says that ISN'T unambiguously in here defaults to disqualifier.
+const BOILERPLATE_RE = new RegExp([
+  "\\b(?:shall|must|will|are\\s+to|should)\\s+(?:submit|provide|furnish|include|complete|sign|acknowledge|return|use|insert|fill|attach|list|identify|indicate)\\b",
+  "valid\\s+for\\s+\\d+", "\\b(?:quotes?|offers?|proposals?)\\s+shall\\s+be\\s+valid\\b",
+  "page\\s+limit", "\\bfont\\b", "margins?", "single-?sided", "double-?spaced", "number\\s+of\\s+copies", "electronic\\s+cop(?:y|ies)",
+  "\\b52\\.212-1\\b", "in\\s+accordance\\s+with\\s+the\\s+(?:format|instructions)",
+  "quotes?\\s+(?:shall|must|are\\s+to)\\s+be\\s+(?:submitted|received|emailed|sent|delivered)", "offers?\\s+(?:shall|must)\\s+be\\s+submitted",
+].join("|"), "i");
+
+/** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier. */
+function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
+  if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
+  if (BOILERPLATE_RE.test(ob)) return "boilerplate";
+  return "ambiguous";
+}
+
+export interface CoverageV2 {
+  /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
+  unreadable: string[];
+  /** Read sections whose (boilerplate) obligations weren't verbatim-grounded → the FALSE-INCOMPLETE source; no veto. */
+  ungroundedRead: string[];
+  /** Ungrounded obligations carrying genuine disqualification language → escalate to NEEDS_HUMAN_REVIEW. */
+  disqualifierUncovered: Array<{ section: string; obligation: string }>;
+  /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
+  coverageGrade: number;
+}
+
+/** Re-read the V1 attestations through the V2 lens. Pure. Does NOT change any finding or invent coverage —
+ *  it only classifies WHY a section is uncovered (genuinely unreadable vs read-but-unquoted) and weights it. */
+export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 {
+  const unreadable: string[] = [];
+  const ungroundedRead: string[] = [];
+  const disqualifierUncovered: Array<{ section: string; obligation: string }> = [];
+  let coveredWeight = 0, totalWeight = 0;
+
+  for (const a of attestations) {
+    const isCovered = a.status === "covered_direct" || a.status === "covered_attested"
+      || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation";
+    // A binding-obligation section (L/M/C/F…) weighs more than an incorporated-clause list (I/K).
+    const weight = ["I", "K"].includes(a.section) ? 1 : 2;
+    totalWeight += weight;
+    if (isCovered) { coveredWeight += weight; continue; }
+
+    if (a.status === "unread") { unreadable.push(a.section); continue; }
+
+    // obligations_ungrounded — split the reasons: unreadable markers vs genuinely read-but-unquoted obligations.
+    const markers = a.ungrounded.filter((u) => UNREADABLE_MARKER.test(u));
+    const realUngrounded = a.ungrounded.filter((u) => !UNREADABLE_MARKER.test(u));
+    if (markers.length) { unreadable.push(a.section); continue; } // a truncated/dropped tail = genuine unreadability
+    if (realUngrounded.length) {
+      ungroundedRead.push(a.section);
+      // Partial credit in the grade for a section that WAS read and has some grounding (importance-weighted signal).
+      if (a.citedFindingIds.length) coveredWeight += weight * 0.5;
+      // FAIL TOWARD DISQUALIFIER (amendment): every ungrounded obligation that is NOT clearly boilerplate — both
+      // explicit disqualifiers AND ambiguous ones — escalates to NHR. Only unambiguously administrative language passes.
+      for (const ob of realUngrounded) if (importanceOf(ob) !== "boilerplate") disqualifierUncovered.push({ section: a.section, obligation: ob });
+    }
+  }
+  return {
+    unreadable,
+    ungroundedRead,
+    disqualifierUncovered,
+    coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
+  };
+}
+
+export type GateV2Outcome = { cap: "INCOMPLETE" | "NEEDS_HUMAN_REVIEW" | null; reason: string };
+
+/** Map V2 coverage → a verdict CAP (or null = no cap, the committal verdict flows). This replaces the V1 blanket
+ *  `!coverageComplete → INCOMPLETE`. Order matters: genuine unreadability first (legitimate INCOMPLETE), then a
+ *  genuinely-uncovered disqualifier (escalate, never silent-BID), else no cap — the false-INCOMPLETE is gone. */
+export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
+  if (cov.unreadable.length)
+    return { cap: "INCOMPLETE", reason: `Could not fully read binding content: §${cov.unreadable.join(", §")} (unread/truncated at ingest) — the honest incomplete.` };
+  if (cov.disqualifierUncovered.length) {
+    const d = cov.disqualifierUncovered[0];
+    return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement in §${d.section} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".` };
+  }
+  return { cap: null, reason: cov.ungroundedRead.length
+    ? `Read complete; ${cov.ungroundedRead.length} section(s) have unquoted boilerplate obligations (coverage grade ${(cov.coverageGrade * 100).toFixed(0)}%) — a signal, not a veto.`
+    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).` };
+}
