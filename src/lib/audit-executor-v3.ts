@@ -31,6 +31,7 @@ import { sweepConstructionManifest } from "./audit-construction-manifest";
 import { detectConstructionOutOfScope } from "./section-boundary-detector";
 import { isHonestFail, billable, decrementAuditQuota, recordAuditCost } from "./audit-billing";
 import { aggregate, type UsageCall } from "./audit-cost";
+import { bankRunRecord } from "./audit-run-record-bank";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
 import { isNoticedescUrl } from "./sam-description";
 
@@ -403,6 +404,39 @@ export async function executeAgenticPrimary(
     if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
   }
   if (persistErr) throw new Error(`agentic persist failed after 3 attempts: ${persistErr}`);
+
+  // RUN-RECORD BANK (AUDIT_BANK_RUN_RECORD, default-OFF) — the engine-rebuild cheap-proof multiplier. Banks a
+  // COMPLETE replayable RunRecord (real findings + inputs + coverage + fullSource) to durable storage so a fix
+  // can be graded on real data for $0 (scripts/audit-ai/pull-run-records.ts → replay → gold-corpus-score.ts).
+  // FLAG-GATED + best-effort. Gate-2 hardening: the ENTIRE call (incl. arg construction — property reads, billable())
+  // is wrapped in a caller-side try/catch so NOTHING here — even a throw building the args, even with the flag OFF —
+  // can fail a finished, persisted, paid audit (the internal try/catch could not protect arg evaluation). Flag OFF ⇒
+  // pure no-op (byte-identical). manifestComplete is banked as the EFFECTIVE value the run USED (…&& !constructionOOS),
+  // matching what auditPackage received, so the $0 replay reproduces the real verdict. See audit-run-record-bank.ts.
+  try {
+    await bankRunRecord(supabase, {
+      auditId,
+      sol: solicitation?.solicitationNumber || solicitation?.noticeId || auditId,
+      startedAt: generatedAt,
+      flags: {
+        AUDIT_SECTION_M_DEPTH: process.env.AUDIT_SECTION_M_DEPTH,
+        AUDIT_PROCUREMENT_TYPE_SECTIONS: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS,
+        AUDIT_CHUNKED_INGEST: process.env.AUDIT_CHUNKED_INGEST,
+      },
+      result: res,
+      input: {
+        fullSource,
+        bidderProfile,
+        naics: solicitation?.naicsCode ?? null,
+        setAside: solicitation?.typeOfSetAside ?? null,
+        manifestComplete: manifestComplete && !constructionOOS,
+      },
+      billing: { honestFail, billable: billable(honestFail) },
+      commercialHonestFail: process.env.AUDIT_PROCUREMENT_TYPE_SECTIONS === "true",
+    });
+  } catch (bankErr) {
+    console.warn(`[RUN-RECORD-BANK] call-site guard (audit unaffected): ${bankErr instanceof Error ? bankErr.message : String(bankErr)}`);
+  }
 
   // STEP 9 (AUDIT_HONESTFAIL_NO_CHARGE, default-OFF) — USAGE LEDGER (Brain schema B). Append ONE usage_events
   // row per COMPLETED audit, with `billable` stamped at decision time: a customer is charged ONLY for a delivered
