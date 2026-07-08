@@ -13,6 +13,7 @@
 
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability } from "./audit-findings";
+import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -1105,15 +1106,34 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
-  if (!inp.coverageComplete)
-    return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded.", dispositions, []);
+  // GATE V2 (AUDIT_GATE_V2, default OFF — ceo/ENGINE-ARCHITECTURE-RESEARCH): the V1 line below vetoed a verdict
+  // whenever any binding obligation wasn't quoted by a ≥4-word VERBATIM n-gram — the root of chronic false-
+  // INCOMPLETE (a fully-read doc with 74 grounded findings still capped INCOMPLETE). V2 re-maps that signal:
+  // INCOMPLETE ONLY on genuine unreadability, a genuinely-uncovered DISQUALIFIER → NHR, else NO cap. Flag OFF or
+  // coverageV2 absent ⇒ the exact V1 line runs (byte-identical). Proof: scripts/audit-ai/prove-gate-v2.ts.
+  if (GATE_V2_ENABLED && inp.coverageV2) {
+    const v2 = gateV2Outcome(inp.coverageV2);
+    if (v2.cap === "INCOMPLETE") return mk("INCOMPLETE", honestFailEligible(), v2.reason, dispositions, []);
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), v2.reason, dispositions, []);
+    // cap === null ⇒ no coverage veto; the documentsComplete gate (1b) below still applies (genuine unreadability).
+  } else if (!inp.coverageComplete) {
+    return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
+  }
 
   // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
   //     engine could not confirm it read in full (unfetched / scanned-no-text / mid-doc truncated / over-budget
   //     drop) caps EVERY pole to INCOMPLETE, committal included: an unread binding doc could carry OR waive a bar,
   //     so no verdict can be certified over a partial read. Explicit `=== false` ⇒ callers that omit it are unchanged.
   if (inp.documentsComplete === false)
-    return mk("INCOMPLETE", honestFailEligible(), "Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated).", dispositions, []);
+    return mk("INCOMPLETE", honestFailEligible(), "Document set not complete — a posted binding document could not be confirmed read in full (unfetched, scanned/no-text, or truncated)." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
+
+  // 1c. AMENDMENT A (Brain card-304, F bake-off) — Candidate A's citation-grounded unread/missing-material signals are
+  //     manifest-ADJACENT: a package can pass the deterministic manifest gate yet Candidate A observe a referenced
+  //     attachment that is absent from the input. That can neither be waived nor decided over → NEEDS_HUMAN_REVIEW,
+  //     never committal. Uses nhrEligible() (an undetermined verdict never asserts eligible=false — Gate-2 finding #4).
+  //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
+  if (inp.unreadEvidence && inp.unreadEvidence.length)
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${inp.unreadEvidence.map((u) => u.note).join("; ").slice(0, 220)}.`, dispositions, []);
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)

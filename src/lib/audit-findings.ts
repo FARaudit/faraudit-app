@@ -167,6 +167,11 @@ export interface VerdictInputs {
   // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
   // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
   documentsComplete?: boolean;
+  // Brain card #320 ruling — an INCOMPLETE verdict must NAME the gap (which doc/section could not be confirmed
+  // read/grounded), never a generic "coverage not complete". Populated by the orchestrator from the deterministic
+  // signals (uncovered docs + missing binding sections). Optional/absent ⇒ reasons render as before (byte-identical
+  // for pure-unit callers). Consumed ONLY to enrich the honest-fail reason strings — never affects the verdict.
+  coverageGap?: string;
   // Brain card 284 / I8 — the assembled source, threaded so `firmStatus` can GROUND a closed-world INELIGIBLE bar
   // (an ungrounded/model-named requiredAttribute → NHR, never a false INELIGIBLE). Default undefined ⇒ the grounding
   // gate is SKIPPED (pure-unit callers stay byte-identical); the orchestrator always supplies ctx.fullSource.
@@ -178,4 +183,15 @@ export interface VerdictInputs {
   // eligible for a set-aside it detected but could not verify, even if the proposer failed to emit a properly-typed
   // eligibility_bar finding. Default undefined ⇒ byte-identical (no clamp); flag-gated at the orchestrator.
   detectedUnverifiableEligibilityGate?: boolean;
+  // GATE V2 (AUDIT_GATE_V2, default OFF — ceo/ENGINE-ARCHITECTURE-RESEARCH) — the completeness-gate rewrite's
+  // coverage signal, computed in the orchestrator from the section attestations (audit-gate-v2.gradeCoverageV2).
+  // When supplied AND the flag is on, deriveVerdict replaces the blanket `!coverageComplete → INCOMPLETE` veto
+  // with: INCOMPLETE only on genuine UNREADABILITY, a genuinely-uncovered DISQUALIFIER → NHR, else NO cap
+  // (ungrounded boilerplate no longer forces false-INCOMPLETE). Default undefined ⇒ byte-identical (V1 unchanged).
+  coverageV2?: { unreadable: string[]; ungroundedRead: string[]; disqualifierUncovered: Array<{ section: string; obligation: string }>; coverageGrade: number };
+  // AMENDMENT A (Brain card-304, F bake-off) — Candidate A (LLM-native judgment) may emit citation-grounded signals of
+  // unread/missing material it OBSERVES that the deterministic manifest gate did not catch (e.g. a referenced attachment
+  // absent from the input). It carries NO verdict authority: deriveVerdict treats it as manifest-ADJACENT →
+  // NEEDS_HUMAN_REVIEW, never a committal verdict over unseen material. Absent/empty ⇒ byte-identical (no effect).
+  unreadEvidence?: Array<{ citation: string; note: string }>;
 }
