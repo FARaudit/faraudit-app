@@ -119,6 +119,15 @@ export interface TypedFinding {
   // sole source) is co-stated. Marker only; deriveVerdict reads controllability/cautionFloor.
   orEqualCarveout?: boolean;
   nmrGuard?: boolean; // FORK-7 (Brain card 240) — set when the NMR firm-status gate re-typed this finding onto the who-can-win path (marker only; deriveVerdict reads controllability/kind).
+  // ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329) — set when the deterministic allow-list re-typed a hard
+  // eligibility/`no_one_can_move` show-stopper whose cited clause is NOT in an enumerated bidder-eligibility / size /
+  // set-aside authority (FAR 19 / 52.219-x / 13 CFR 121-128 / 52.204-8 / 52.212-3 / 52.209) → bidder_controls +
+  // cautionFloor. Kills the fabricated-WTO/TAA/publicizing-disqualifier class at the taxonomy level: a bidder-directed
+  // eligibility bar is VALID only when grounded in a genuine eligibility authority (allow-by-authority, not a Part-25/
+  // Part-5 block-list). NEVER fires on a genuine structural bar (clearance/QPL/sole-source), a positive set-aside, a
+  // temporal/delivery impossibility, or a verified universal defect — all preserved. Marker only; deriveVerdict reads
+  // controllability/cautionFloor, not this field.
+  eligibilityAuthorityGuard?: boolean;
   // TEMPORAL SHARED-ARO / SEQUENTIAL-GATE NARROWING (Brain card 140, Step 7) — set on the FAT precondition
   // finding when the Step-2 universal-impossibility (no_one_can_move → NO_BID) was DECLINED under the Option-B
   // four-prong gate and the finding was floored to a KO-clarify caution instead (cautionFloor) — i.e. a temporal

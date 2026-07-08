@@ -19,7 +19,7 @@ import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -878,6 +878,17 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      → bidder_controls (the bidder obtains the bond). Narrow FAR-clause-specific regexes; NEVER touches a verified
   //      universal defect. Reduces false honest-fail NHR on routine construction clauses. Flag off ⇒ unchanged.
   findings = applyRoutineClauseOvertypeGuard(findings, { enabled: process.env.AUDIT_ROUTINE_CLAUSE_GUARD === "true" });
+
+  // P4.4-ter — ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329), default-OFF (=== "true"). Kills the fabricated
+  //      trade-agreement / end-product-origin / publicizing DISQUALIFIER class (live root, audit a80a9a13): a lens
+  //      that types a "not subject to WTO GPA/FTA, per FAR 5.101" statement as a hard bidder show-stopper inflates
+  //      the abstain → forces NHR. Allow-by-AUTHORITY: a hard eligibility/no_one_can_move bar is valid ONLY if its
+  //      cited clause is an enumerated bidder-eligibility/size/set-aside authority (FAR 19 / 52.219-x / 13 CFR
+  //      121-128 / 52.204-8 / 52.212-3 / 52.209); else → bidder_controls + cautionFloor. NEVER touches a verified
+  //      universal defect, a temporal/delivery impossibility, a genuine structural bar (clearance/QPL/sole-source),
+  //      or a positive set-aside — all preserved. Runs after the sibling over-type guards; deriveVerdict untouched.
+  //      Flag off ⇒ findings pass through unchanged.
+  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true" });
 
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
