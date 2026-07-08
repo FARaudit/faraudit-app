@@ -502,6 +502,28 @@ function fmtDayMonYear(d: Date | null): string {
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+// BRAIN #329 RENDER-COHERENCE P0 (facet B) — the response deadline's TIME cutoff must NEVER be dropped: a missed
+// 16:30 PT cutoff is a contract-loss vector via the display layer. fmtDayMonYear renders the UTC instant, which both
+// strips the time AND (for an evening-Pacific deadline) shifts the DATE across midnight-UTC. This formatter reads the
+// wall-clock date + time + offset STRAIGHT FROM THE RAW ISO STRING (e.g. "2026-07-08T16:30:00-07:00"), so the stated
+// local cutoff is preserved verbatim with its numeric UTC offset (no zone-name guessing, no UTC conversion). Falls
+// back to date-only when the raw carries no explicit time (a bare "2026-07-08" or an unparseable value).
+const ISO_DEADLINE_RE = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?/;
+function fmtDeadlineFull(raw: unknown, fallback: Date | null): string {
+  if (typeof raw === "string") {
+    const m = raw.match(ISO_DEADLINE_RE);
+    if (m) {
+      const [, y, mo, da, hh, mi, off] = m;
+      const dateStr = `${Number(da)} ${MONTHS_SHORT[Number(mo) - 1]} ${y}`;
+      // No time component, or a bare midnight with no offset → treat as a date-only deadline (show date alone).
+      if (hh === undefined || (hh === "00" && mi === "00" && !off)) return dateStr;
+      const offLabel = !off || off === "Z" ? "UTC" : `UTC${off.replace(":", "").replace(/([+-])(\d{2})(\d{2})/, "$1$2:$3").replace("+", "+").replace("-", "−")}`;
+      return `${dateStr} · ${hh}:${mi} (${offLabel})`;
+    }
+  }
+  return fmtDayMonYear(fallback);
+}
+
 // FA-E2E Fix 3 (2026-06-18): the SOURCE-extracted offer-due date must win over
 // SAM metadata when they conflict. SAM's responseDeadLine is frequently stale
 // or wrong (FA487726: SAM said 18 Jun while the SF-1442 said 11 Jun -> the
@@ -2678,10 +2700,22 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const dfarsCount = Array.isArray(compJson.dfars_clauses) ? (compJson.dfars_clauses as unknown[]).length : 0;
   const docType = String(audit.document_type ?? "");
   const persistedNotSol = (compJson.is_not_solicitation ?? audit.is_not_solicitation) as boolean | undefined;
+  // BRAIN #329 RENDER-COHERENCE P0 — the derived fallback below keys on compJson.far_clauses/dfars_clauses (which the
+  // current engine leaves empty; clauses live on the audit-row columns + inside cj.v3.findings) and audit.document_type
+  // (null on the live-proof audit a80a9a13). With document_type null + those cj arrays absent, farCount===0 &&
+  // dfarsCount===0 → the heuristic FALSE-FIRED "Not a solicitation" on a fully-audited RFQ (42 grounded findings + a
+  // real NHR verdict), rendering a near-empty shell (Set-aside "Not in documents" despite SAM HZC). GATE the derived
+  // branch on the engine NOT having produced a substantive audit: a real verdict pole + findings means it IS a
+  // solicitation, full stop. The EXPLICIT persisted flag still wins (a genuine engine "not a solicitation" call).
+  const v3ForNotSol = (compJson.v3 ?? {}) as { findings?: unknown[]; verdict?: string };
+  const engineProducedAudit =
+    (Array.isArray(v3ForNotSol.findings) && v3ForNotSol.findings.length > 0) ||
+    (typeof v3ForNotSol.verdict === "string" && v3ForNotSol.verdict.length > 0 && v3ForNotSol.verdict !== "NOT_A_SOLICITATION");
   const isNotSolicitation = typeof persistedNotSol === "boolean"
     ? persistedNotSol
-    : (docType === "Other" || docType === "Award Notice" || docType === "attachment" ||
-       (!isMetadataOnly && farCount === 0 && dfarsCount === 0));
+    : (!engineProducedAudit &&
+       (docType === "Other" || docType === "Award Notice" || docType === "attachment" ||
+        (!isMetadataOnly && farCount === 0 && dfarsCount === 0)));
 
   // PRELIMINARY-READ ADAPTIVE MODES classifier (HANDOFF Jun 4 2026).
   // Three cases the panel adapts to:
@@ -3330,7 +3364,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     qa_deadline: qaDeadlineDate ? fmtDayMonYear(qaDeadlineDate) : "",
     qa_days: fmtKdCountdown(qaDays),
     qa_days_num: qaDays != null ? String(Math.max(0, qaDays)) : "",
-    response_deadline: fmtDayMonYear(responseDeadline),
+    // #329 facet B: preserve the stated TIME cutoff. When SAM is the controlling source, format from the RAW ISO
+    // (keeps 16:30 + offset); when the doc-parsed offer-due wins, fmtDeadlineFull falls back to date-only on the Date.
+    response_deadline: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline),
     response_days: fmtKdCountdown(responseDays),
     response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
     response_deadline_short: fmtDueShort(responseDeadline),

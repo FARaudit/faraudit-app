@@ -633,6 +633,91 @@ export function applyClauseSemanticsGuard(findings: TypedFinding[], opts?: { ena
   });
 }
 
+// ── ELIGIBILITY-AUTHORITY ALLOW-LIST (Brain card 329 — allow-by-authority, not a Part-25/Part-5 block-list) ──────
+// Override-slot guard (same layer as the sibling over-type guards, BEFORE deriveVerdict; deriveVerdict UNTOUCHED).
+// ROOT (live audit a80a9a13, /panel #329 + adversarial red-team UNANIMOUS): a lens STOCHASTICALLY over-types a
+// TRADE-AGREEMENT / END-PRODUCT-ORIGIN / PUBLICIZING statement ("items are not subject to the WTO GPA/FTA, per FAR
+// 5.101(4)(iii)") as a hard bidder show-stopper (no_one_can_move) — a FABRICATED disqualifier: FAR 5.101 is
+// PUBLICIZING; trade agreements are FAR Part 25.4 = END-PRODUCT ORIGIN, NOT bidder eligibility, and are VOID on a SB
+// set-aside per 25.401(a)(1). A raw no_one_can_move with no verified-defect mark inflates the abstain → forces NHR
+// (deriveVerdict `unmarkedUniversalClaim`). DOCTRINE (allow-list, not block-list): a hard eligibility / who-can-
+// compete show-stopper is STRUCTURALLY VALID only if its cited clause sits in an ENUMERATED bidder-eligibility /
+// size / set-aside AUTHORITY. Everything else is structurally ineligible for that type → re-typed off the bar path.
+// HARD EXCLUSIONS (each preserves a legitimate hard-bar class the allow-list must NEVER touch — conservative, zero-
+// contract-loss): (1) a VERIFIED universal defect (universalDefect/verifiedBy); (2) a TEMPORAL/delivery impossibility
+// (temporal_conflict lens / fat_precondition|delivery_window sweep / temporalEvidence); (3) a GENUINE STRUCTURAL bar
+// (STRUCTURAL_BAR_RE_114 / NON_SELF_CLEARABLE_BAR_RE — sole-source/QPL/QML/clearance/CMMC/TDP), whose real authority
+// is FAR 6/9.2/DFARS, not FAR 19 — kept by LANGUAGE, so its citation is never required to match; (4) a POSITIVE
+// socioeconomic/size SET-ASIDE (isPositiveSetAside), routed by eligibility in the award-basis guard even with a weak
+// citation. POSITIVE TRIGGER: fires only on a bar that PRESENTS as a bidder-eligibility / origin / trade-agreement
+// exclusion (kind eligibility_bar, OR the who-can-compete / origin vocabulary) — so a genuine unverified TECHNICAL
+// universal impossibility that is NOT eligibility-framed is left to its existing NHR path, never downgraded. Re-type
+// = bidder_controls + curableInWindow + cautionFloor (a visible caution → BID_WITH_CAUTION floor; never a silent
+// clean BID, never a forced NHR); requiredAttribute cleared so a phantom can't pin eligibility=null. Flag-gated;
+// OFF (default) ⇒ findings unchanged byte-for-byte (Rule 61). Pure → gate-tested.
+// Enumerated genuine bidder-eligibility / size / set-aside authorities (the ALLOW side). Digit-boundary anchored so
+// 52.219-x ≠ 52.2190, 19.x ≠ 190.x. 13 CFR 121-128 = SBA size + socioeconomic program regs. 52.204-8 / 52.212-3 =
+// annual/commercial offeror reps (size + socioeconomic self-certs). 52.209 = responsibility/qualification-to-award.
+// Enumerated authorities (panel-corrected, Brain card 329 review): FAR 19 (3- AND 4-digit sections + bare subpart
+// 19.1x); 52.219-x AND VAAR 852.219-x (own branch — the (?<!\d) 52.219 lookbehind rejects the "852." prefix); FAR
+// "part/subpart 19"; VAAR part 819; 13 CFR 121-128 incl. "Part"/"§" forms (size + socioeconomic program regs); the
+// VA Veterans-First statute/reg stack (38 U.S.C. 8127/8128, 38 CFR 74 — a DISTINCT authority the SME flagged); the
+// Small Business Act statute (15 U.S.C. 644/637/657); 52.204-8 / 52.212-3 (annual/commercial offeror reps);
+// 52.209-x (responsibility/qualification-to-award). Digit-boundary anchored (52.219-3 ≠ 52.2190).
+const ELIGIBILITY_AUTHORITY_RE = /(?<!\d)52\.219-\d{1,2}\b|(?<!\d)852\.219-\d{1,2}\b|(?<!\d)19\.\d{3,4}\b|\b19\.1[1-9]\b|\bFAR\s+(?:part\s+|subpart\s+)?19\b|\b(?:sub-?)?part\s+19\b|\bVAAR\b|\b819\.\d|13\s*C\.?F\.?R\.?\s*(?:part\s+|§\s*)?12[1-8]\b|38\s*U\.?S\.?C\.?\s*(?:§\s*)?812[78]\b|38\s*C\.?F\.?R\.?\s*(?:part\s+)?74\b|15\s*U\.?S\.?C\.?\s*(?:§\s*)?(?:644|637|657[abf])\b|(?<!\d)52\.204-8\b|(?<!\d)52\.212-3\b|(?<!\d)52\.209-\d{1,2}\b/i;
+// GENUINE non-set-aside bidder-eligibility bars that isPositiveSetAside + the structural regexes do NOT catch but
+// which must NEVER be softened to a caution (red-team real-bar-suppression class): export control (ITAR/EAR = a
+// US-person/registration eligibility constraint) and foreign ownership/control (FOCI). Over-keeping here is the
+// conservative (zero-contract-loss) direction — it can only leave a bar as a bar (→ NHR), never create a false BID.
+const GENUINE_NONSETASIDE_ELIG_KEEP_RE = /export.?control|\bITAR\b|international traffic in arms|arms export|export administration regulation|\bEAR\b|\bFOCI\b|foreign ownership|foreign.?owned|foreign control|owned or controlled by a foreign/i;
+// The POSITIVE eligibility / who-can-compete / origin trigger — the bar must PRESENT as a bidder-directed exclusion.
+const ELIGIBILITY_CLAIM_RE = /\bel[ie]gib|\bineligib|\bdisqualif|\bexclud|not\s+subject\s+to|\bWTO\b|\bGPA\b|\bTAA\b|free\s+trade|trade\s+agreement|buy\s+american|\bBAA\b|(?:domestic|foreign|non-?domestic)\s+end\s+product|country\s+of\s+origin|end\s+product|reserved\s+(?:for|exclusively)|restricted\s+to|who\s+(?:can|may)\s+(?:bid|compete|offer|be\s+awarded)/i;
+/** Re-type a phantom-cite hard eligibility show-stopper off the bar path (Brain card 329). Pure → gate-tested.
+ *  FIRES only on a hard bar (no_one_can_move, or bidder_cannot_move+eligibility_bar) that presents as a bidder-
+ *  eligibility / origin exclusion, is NOT a verified universal defect / temporal impossibility / genuine structural
+ *  bar / positive set-aside, AND whose citation is NOT in the enumerated eligibility/size/set-aside authority list.
+ *  Re-types → bidder_controls + curable + cautionFloor (visible caution, never silent BID, never forced NHR).
+ *  Flag-gated; OFF (default) ⇒ unchanged. */
+export function applyEligibilityAuthorityAllowlist(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f): TypedFinding => {
+    const hardBar = f.controllability === "no_one_can_move" || (f.controllability === "bidder_cannot_move" && f.kind === "eligibility_bar");
+    if (!hardBar) return f;                                                       // only hard eligibility/universal bars are candidates
+    // (1) VERIFIED universal defect — evidence-backed contradictory/unmeetable terms → never touched.
+    if (f.universalDefect || f.verifiedBy) return f;
+    // (2) TEMPORAL / delivery impossibility (the moat's genuine universal bars) → never touched. Kept by MARKER
+    //     (lens/sweep/temporalEvidence) AND, per red-team re-review, by LANGUAGE too — a lens-typed delivery/window
+    //     impossibility that lacks its sweep marker must still be preserved (mirrors the structural-bar language keep).
+    if (f.lens === "temporal_conflict" || f.sweepArchetype === "fat_precondition" || f.sweepArchetype === "delivery_window" || f.temporalEvidence) return f;
+    const hay = `${f.requirement} ${f.excerpt ?? ""} ${f.requiredAttribute ?? ""}`;
+    if (DELIVERY_IMPOSSIBILITY_RE.test(hay) || WINDOW_CONFLICT_RE.test(hay)) return f;
+    // (3) GENUINE STRUCTURAL bar (clearance/QPL/sole-source/CMMC/TDP) — kept by LANGUAGE (its authority is FAR 6/9.2/
+    //     DFARS, not FAR 19), so its citation is never required to match the eligibility allow-list. Read the full hay
+    //     incl. excerpt: keeping a bar is the conservative direction (sibling-guard discipline).
+    if (STRUCTURAL_BAR_RE_114.test(hay) || NON_SELF_CLEARABLE_BAR_RE.test(hay)) return f;
+    // (3b) GENUINE non-set-aside eligibility bar (export-control/ITAR/EAR/FOCI/foreign-ownership) — not caught by the
+    //      structural regexes or isPositiveSetAside, must NEVER be softened (red-team real-bar-suppression class).
+    if (GENUINE_NONSETASIDE_ELIG_KEEP_RE.test(hay)) return f;
+    // (4) POSITIVE socioeconomic/size SET-ASIDE — routed by eligibility in the award-basis guard even with a weak cite.
+    if (isPositiveSetAside(f)) return f;
+    // (4b) GENUINE SIZE DISQUALIFICATION — isPositiveSetAside DELIBERATELY excludes size bars (SIZE_DISQUALIFICATION_RE),
+    //      so without this the citation regex is a size bar's SOLE backstop → a real "other than small is ineligible /
+    //      exceeds the size standard" bar could be downgraded on a citation-format technicality (SME CRITICAL). Keep it.
+    if (SIZE_DISQUALIFICATION_RE.test(hay)) return f;
+    // POSITIVE TRIGGER: an eligibility-framed bar. A kind==eligibility_bar bar always qualifies; otherwise the
+    // who-can-compete / origin vocabulary must be present (so a genuine unverified TECHNICAL universal impossibility
+    // that is NOT eligibility-framed keeps its existing NHR path). Trigger reads requirement+excerpt+attribute.
+    if (f.kind !== "eligibility_bar" && !ELIGIBILITY_CLAIM_RE.test(hay)) return f;
+    // VALID iff cited in a genuine eligibility/size/set-aside authority (allow-by-authority). Citation OR requirement
+    // may carry the authority (a lens sometimes states "FAR 52.219-6" in the requirement, not the citation field).
+    if (ELIGIBILITY_AUTHORITY_RE.test(`${f.citation ?? ""} ${f.requirement}`)) return f; // real authority → keep, route by eligibility/firmStatus
+    // PHANTOM: a bidder-eligibility bar whose cite is not a recognized eligibility authority. Structurally ineligible
+    // to be a show-stopper → re-type off the bar path (visible caution, never silent BID / forced NHR).
+    return { ...f, controllability: "bidder_controls", curableInWindow: true, cautionFloor: true, requiredAttribute: undefined, eligibilityAuthorityGuard: true,
+      requirement: `${f.requirement} — [cited clause is not a recognized bidder-eligibility/set-aside authority (FAR 19 / 13 CFR 121-128); treated as informational, not a show-stopper — confirm]` };
+  });
+}
+
 // ── STRUCTURAL-BAR WHITELIST (Brain card 114 — the general rule the per-pattern guards were special cases of) ──
 // A non-curable `bidder_cannot_move` bar under a NULL (unknown) profile routes to NEEDS_HUMAN_REVIEW (step 5b).
 // The lenses STOCHASTICALLY over-type bidder-RESOLVABLE compliance/representation/clarification items as such bars
