@@ -25,6 +25,7 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
+import { GATE_V2_ENABLED, gradeCoverageV2 } from "./audit-gate-v2";
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against.
  *  C-8 (Brain C.f): expanded {B,C,H,I,L,M} → {B,C,D,E,F,H,I,K,L,M}. §D (packaging/marking), §E (inspection &
@@ -168,13 +169,23 @@ export function coreMissingFor(ctx: AuditToolContext, opts?: { commercialHonestF
     // Commercial core EQUIVALENTS: 52.212-1 ≡ §L, 52.212-2 ≡ §M. Cap ONLY when BOTH absent (a single one missing is
     // plausibly inline/by-reference — no false scare).
     const bothAbsent = !present("L") && !present("M");
-    if (opts?.commercialHonestFail) return bothAbsent ? ["52.212-1", "52.212-2"] : []; // Brain card 135 Step 8 — unchanged; OFF ⇒ byte-identical for GENUINE commercial
-    // Layer-2 (Brain card 262 · adversarial-review finding D) — FLAG-INDEPENDENT close of the misclassified-commercial
-    // bypass: a SOW-only source classifies part12-commercial off a STRAY "SF 1449"/"RFQ" string yet has NO recognized
-    // primary FORM (form_identified===false) and located neither 52.212-1 nor 52.212-2 → it is the 80NSSC SOW-only
-    // class hiding in the commercial branch → cap regardless of the flag. A REAL commercial RFQ has form_identified=true
-    // (its SF-1449 IS the form) → unaffected, so flag-OFF stays byte-identical for genuine commercial buys.
+    // ── IMPOSTOR CAP (Brain card 262 · adversarial-review finding D) — FLAG-INDEPENDENT, runs FIRST so it survives
+    //   the FAR-applicability fix below: a SOW-only source classifies part12-commercial off a STRAY "SF 1449"/"RFQ"
+    //   string yet has NO recognized primary FORM (form_identified===false) and located neither 52.212-1 nor 52.212-2
+    //   → the 80NSSC SOW-only class hiding in the commercial branch → cap regardless of any flag. A REAL commercial
+    //   RFQ has form_identified=true (its SF-1449/SF-18 IS the form) → unaffected.
     if (requiresLM && opts?.formIdentified === false && bothAbsent) return ["52.212-1", "52.212-2"];
+    // ── FAR-CLAUSE-APPLICABILITY FIX (AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY, default OFF). Deep-research 2026-07-08,
+    //   primary FAR text (acquisition.gov/far/12.301 + 52.252-1): on a GENUINE commercial buy, 52.212-1 (Instructions)
+    //   is MANDATORY but INCORPORATED BY REFERENCE via SF-1449/SF-18 Block 27a — its FULL TEXT IS EXPECTED ABSENT from
+    //   the body — and 52.212-2 (Evaluation) is DISCRETIONARY (12.301(c) "the CO may insert"). Absence-in-body of either
+    //   is therefore NOT a completeness defect, and an item incorporated by reference has "the same force and effect as
+    //   if given in full text" (52.252-1/-2). This SUPERSEDES the card-135-Step-8 both-absent commercial cap, which
+    //   wrongly treated by-reference / discretionary absence as suspicious → the FA442726Q1068 false-INCOMPLETE (form
+    //   identified, both absent-in-body, correctly by-reference/discretionary). Flag ON ⇒ genuine commercial never
+    //   false-flags 52.212-1/-2 (the impostor cap above still fires). Flag OFF ⇒ byte-identical to card-135 Step 8.
+    if (process.env.AUDIT_COMMERCIAL_CLAUSE_APPLICABILITY === "true") return [];
+    if (opts?.commercialHonestFail) return bothAbsent ? ["52.212-1", "52.212-2"] : []; // Brain card 135 Step 8 — legacy; OFF ⇒ byte-identical for GENUINE commercial
     return [];
   }
   if (part === "unknown") {
@@ -751,7 +762,12 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
   // later tranche; this is detection + fail-safe only.
   const amendmentUnresolved = process.env.AUDIT_AMENDMENT_RESOLUTION === "true" && amendmentSupersessionUnresolved(ctx.fullSource);
-  const coverageComplete = allConverged && missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
+  // Brain card #320 ruling — `allConverged` (per-lens react-loop self-signal) is DEMOTED to telemetry only: it
+  // measures answer STABILITY, not coverage — a category error that keys the false-INCOMPLETE veto off a flaky
+  // signal (external research whnm9ishz + engine panel wf_d2d5e1cd). Completeness now rests on the DETERMINISTIC
+  // signals only (binding sections located + per-doc coverage + amendment fail-safe). `allConverged` is retained in
+  // the trace log below (never a verdict gate). Correct in BOTH flag states; GATE_V2 additionally remaps the veto.
+  const coverageComplete = missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
   if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const provCount: Record<string, number> = {};
@@ -902,7 +918,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const detectedUnverifiableEligibilityGate = process.env.AUDIT_SETASIDE_ELIG_CLAMP === "true"
     && bidderProfile == null
     && !!ctx.constructionManifest?.elements.some((e) => e.key === "set_aside" && e.present);
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate };
+  // GATE V2 (AUDIT_GATE_V2, default OFF — ceo/ENGINE-ARCHITECTURE-RESEARCH): re-read the SAME attestations through
+  // the importance-weighted / grounding-as-signal lens and thread the result so deriveVerdict can replace the
+  // blanket `!coverageComplete → INCOMPLETE` veto (the false-INCOMPLETE root) with abstain-only-on-unreadability.
+  // Flag OFF ⇒ coverageV2 absent ⇒ deriveVerdict runs the exact V1 line (byte-identical). Proven: scripts/audit-ai/prove-gate-v2*.ts.
+  // Brain card #320 — NAME the gap so an INCOMPLETE tells the customer WHICH doc/section blocked a verdict
+  // (deterministic signals only; never affects the verdict, only enriches the honest-fail reason).
+  const coverageGap = [
+    docCoverage.uncovered?.length ? `document(s) not confirmed read/grounded: ${docCoverage.uncovered.join(", ")}` : "",
+    missing.length ? `binding section(s) not located: ${missing.join(", ")}` : "",
+    coreMissing.length ? `required section(s) absent: ${coreMissing.join(", ")}` : "",
+  ].filter(Boolean).join("; ") || undefined;
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
