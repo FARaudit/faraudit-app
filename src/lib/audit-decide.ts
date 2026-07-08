@@ -1185,9 +1185,16 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   const manifestUnverifiableGate = inp.detectedUnverifiableEligibilityGate === true;
   const eligibilityUnverified = tristate && (unverifiedGates.length > 0 || manifestUnverifiableGate);
   const committalEligible = (): boolean | null => (eligibilityUnverified ? null : true);
-  const committalCaution = (): string => (eligibilityUnverified
-    ? `⚠ ELIGIBILITY NOT VERIFIED — confirm ${unverifiedGates.length ? unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ") : "the set-aside / socioeconomic eligibility gate"} before relying on award eligibility (bidder profile not provided). `
-    : "");
+  const committalCaution = (): string => {
+    if (!eligibilityUnverified) return "";
+    const gates = unverifiedGates.length ? unverifiedGates.map((g) => g.requiredAttribute || g.requirement).join("; ") : "the set-aside / socioeconomic eligibility gate";
+    // Coherence (Brain #329 follow-up): the parenthetical must be TRUE to the input — a customer WITH a capability
+    // statement on file was wrongly told "(bidder profile not provided)". When a profile IS present but does not
+    // establish these specific gates (e.g. an SDVOSB cert vs a size/NMR/HUBZone gate; size/NMR are non-self-clearable),
+    // say so. Null profile → unchanged wording (byte-identical for the no-profile callers).
+    const provenance = inp.bidderProfile == null ? "bidder profile not provided" : "your profile on file does not establish these";
+    return `⚠ ELIGIBILITY NOT VERIFIED — confirm ${gates} before relying on award eligibility (${provenance}). `;
+  };
   const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
