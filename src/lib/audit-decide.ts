@@ -12,7 +12,7 @@
 // `switch` here, not prose in a prompt — that is the entire point.
 
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
-import type { VerdictInputs, TypedFinding, BidderProfile, Controllability } from "./audit-findings";
+import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
 import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
@@ -386,6 +386,10 @@ const SAM_SETASIDE_CANON: ReadonlyArray<{ re: RegExp; canon: string }> = [
   { re: /^WOSB(SS)?$/i, canon: "se:wosb" },
   { re: /^(VSA|VSS|VOSB)$/i, canon: "se:vosb" },
   { re: /^(SBA|SBP)$/i, canon: "sb:total" },
+  // NOTE: Indian Economic Enterprise (ISBEE/IEE/BI) and Local-Area (LAS) SAM codes are intentionally NOT mapped —
+  // there is no doc-side 52.219 producer for them, so a mapping could only ever fire ONE-sided (pre-live review #334);
+  // an unmapped SAM code → canonicalizeSamSetAside null → no conflict (conservative, no false NHR). Add only with a
+  // matching doc-side notice detector.
 ];
 export function canonicalizeSamSetAside(raw: string | null | undefined): string | null {
   const s = (raw ?? "").trim();
@@ -396,11 +400,13 @@ export function canonicalizeSamSetAside(raw: string | null | undefined): string 
 // Human-readable label for a canonical program (for the CO-clarification message).
 const SETASIDE_LABEL: Record<string, string> = {
   "se:8a": "8(a)", "se:hubzone": "HUBZone", "se:sdvosb": "SDVOSB", "se:edwosb": "EDWOSB",
-  "se:wosb": "WOSB", "se:vosb": "VOSB", "sb:total": "Total Small Business",
+  "se:wosb": "WOSB", "se:vosb": "VOSB", "sb:total": "Total Small Business", "se:indian": "Indian Economic Enterprise (Buy Indian)",
 };
 const setAsideLabel = (canon: string): string => SETASIDE_LABEL[canon] ?? canon;
 // A set-aside CITATION (52.219-x family) → canonical program. -6/-7 = Total-SB; -3/-4 = HUBZone; -27 = SDVOSB;
-// -29 = EDWOSB; -30 = WOSB; -18 = 8(a) award. (-13/-14 LOS, -8/-9 subcontracting: NOT a program → ignored.)
+// -29 = EDWOSB; -30 = WOSB; -18 = 8(a) award. NOT a base-solicitation pool program → ignored: -14 = Limitations on
+// Subcontracting, -8/-9 = subcontracting utilization/plan, -13 = Notice of Set-Aside of ORDERS (order-level under an
+// MAC — out of scope here; the base solicitation's set-aside governs the audit, not a future order's).
 function citationSetAsideCanon(hay: string): string | null {
   if (/52\.219-30\b/.test(hay)) return "se:wosb";
   if (/52\.219-29\b/.test(hay)) return "se:edwosb";
@@ -410,27 +416,198 @@ function citationSetAsideCanon(hay: string): string | null {
   if (/52\.219-[67]\b/.test(hay)) return "sb:total";
   return null;
 }
-/** Detect a SAM-vs-document set-aside conflict (Brain #332). Pure. Returns the conflict (both programs + a
- *  CO-clarification note) when SAM names a program the document's set-aside findings do NOT carry AND the document
- *  names a DIFFERENT program; undefined otherwise (SAM code unknown, doc set-aside unidentified, or they agree). */
-export function detectSetAsideConflict(samSetAside: string | null | undefined, findings: TypedFinding[]): { sam: string; doc: string; note: string } | undefined {
-  const samCanon = canonicalizeSamSetAside(samSetAside);
-  if (!samCanon) return undefined; // no authoritative SAM program → no basis to conflict
-  // Doc-detected set-aside programs: from a genuine set-aside finding's canonical requiredAttribute OR its set-aside
-  // citation. Restricted to isPositiveSetAside findings (+ any explicit 52.219 set-aside citation) so incidental text
-  // never false-conflicts.
-  const docCanons = new Set<string>();
-  for (const f of findings) {
-    const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
-    const positive = isPositiveSetAside(f);
-    if (positive && f.requiredAttribute) { const a = canonicalizeEligibilityAttr(f.requiredAttribute); if (a) docCanons.add(a); }
-    const byCite = citationSetAsideCanon(hay);
-    if (byCite && (positive || byCite === "sb:total")) docCanons.add(byCite); // a 52.219-6 Total-SB clause counts even if isPositiveSetAside is silent
+
+// ── SET-ASIDE NOTICE DETECTOR (Brain #334, Direction C part A) ────────────────────────────────────────────────
+// The governing set-aside NOTICE clause(s) in a solicitation's clause matrix were systematically NOT surfaced as
+// findings (FA1068: every lens missed 52.219-3 HUBZone + 52.219-6 Total-SB → the verdict never considered the
+// set-aside eligibility basis AND detectSetAsideConflict was STARVED). This deterministic clause-matrix scan emits
+// one grounded eligibility finding per set-aside NOTICE marked applicable, and gives detectSetAsideConflict a
+// raw-source doc-side program set (part B) that does not depend on the lenses. NOT LLM judgment.
+//
+// Only clauses that DEFINE THE ELIGIBLE POOL (mutually exclusive) count as a set-aside notice. Deliberately EXCLUDES
+// 52.219-4 (HUBZone PRICE-EVALUATION PREFERENCE — rides on top of ANY competition, not a pool definer) and
+// 52.219-8/-14/-33 (subcontracting utilization / limitations / nonmanufacturer — obligations, not pool definers).
+// (Contrast citationSetAsideCanon above, which maps -3 AND -4 → hubzone for finding-text matching; here -4 is out.)
+const SETASIDE_NOTICE_SPECS: ReadonlyArray<{ num: RegExp; canon: string; clause: string }> = [
+  { num: /52\.219-3\b/,    canon: "se:hubzone", clause: "FAR 52.219-3 (Notice of HUBZone Set-Aside or Sole-Source Award)" },
+  { num: /52\.219-27\b/,   canon: "se:sdvosb",  clause: "FAR 52.219-27 (Notice of SDVOSB Set-Aside)" },
+  { num: /52\.219-29\b/,   canon: "se:edwosb",  clause: "FAR 52.219-29 (Notice of EDWOSB Set-Aside)" },
+  { num: /52\.219-30\b/,   canon: "se:wosb",    clause: "FAR 52.219-30 (Notice of WOSB Set-Aside)" },
+  { num: /52\.219-18\b/,   canon: "se:8a",      clause: "FAR 52.219-18 (Notice of 8(a) Set-Aside/Award)" },
+  { num: /52\.219-[67]\b/, canon: "sb:total",   clause: "FAR 52.219-6/-7 (Notice of Total/Partial Small Business Set-Aside)" },
+];
+// A FAR/DFARS clause NUMBER token (52.xxx-N / 252.xxx-N). Every clause-matrix row begins with one, so it is the
+// reliable, format-independent row boundary — NOT the "RFO/Clause/Provision" anchor WORDS (pre-live review #334:
+// those words also appear MID-row as a designation column or a "(see FAR 19.502)" prescription, truncating the row
+// before its Yes/No cell; and flattened PDF extraction drops them entirely, letting the window bleed into a later
+// clause's cell). `19.502` (a FAR PART, no -N suffix) is deliberately NOT matched, so a mid-row part reference never
+// splits a row. Global-flag instances are created per call site.
+const CLAUSE_NUMBER_RE = /\b\d{2,3}\.\d{2,4}-\d+\b/;
+// The clause-matrix ROW for the clause at `at`, plus the clause number's offset WITHIN that row. Bounded between the
+// PREVIOUS and NEXT clause numbers around `at` on its physical line — so it reads only this clause's neighbourhood
+// (a leading applicability column is kept, adjacent rows' cells excluded, a mid-row "(see FAR 19.x)" never truncates).
+// The search is a bounded window AROUND `at` (not a whole flattened line), so a clause far into a newline-free blob is
+// still read correctly (pre-live review #334 fix: the old `lineStart+400` cap dropped clauses past char 400).
+function setAsideRowWindow(src: string, at: number): string {
+  const lineStart = src.lastIndexOf("\n", at) + 1;
+  let lineEnd = src.indexOf("\n", at);
+  if (lineEnd < 0) lineEnd = src.length;
+  const backLimit = Math.max(lineStart, at - 200);
+  const fwdLimit = Math.min(lineEnd, at + 300);
+  const seg = src.slice(backLimit, fwdLimit);
+  const rel = at - backLimit;                                            // THIS clause number's offset within seg
+  // row END = the next clause number after this one within seg. Blank THIS number first so it isn't re-found.
+  const numLen = seg.slice(rel).match(/^\d{2,3}\.\d{2,4}-\d+[A-Za-z]?/)?.[0].length ?? 8;
+  const afterCur = seg.slice(0, rel) + " ".repeat(numLen) + seg.slice(rel + numLen);
+  const nextRel = afterCur.slice(rel).search(new RegExp(CLAUSE_NUMBER_RE.source));
+  const end = nextRel >= 0 ? rel + nextRel : seg.length;
+  // row START = just after the PREVIOUS clause number within seg (drops the prior row's cell), else seg start.
+  const prev = [...seg.slice(0, rel).matchAll(new RegExp(CLAUSE_NUMBER_RE.source, "g"))].pop();
+  const start = prev ? prev.index + prev[0].length : 0;
+  return seg.slice(start, Math.max(start, end));
+}
+// Applicable ⇔ the LAST applicability marker in the row is a POSITIVE one. "Last" (not "nearest") is chosen for
+// SAFETY: the dominant matrix layout is a TRAILING applicability column, where the last marker is this clause's own
+// cell; "nearest" would grab a preceding clause's trailing cell → a FALSE positive (the dangerous direction). Cost:
+// a LEADING-column matrix PACKED multiple-clauses-per-line (rare) reads as not-applicable → a conservative MISS, never
+// a false conflict (newline-separated leading columns still work — one marker per row). Recognizes only UNAMBIGUOUS
+// markers: positive Yes / standalone X (incl. col-0) / checkmark ✓✔☑; negative No / N/A / "Not Applicable". NOT the
+// words "Applicable"/"Applies"/"Incorporated" — prose-common ("as applicable"), they would MANUFACTURE conflicts.
+function setAsideRowApplicable(row: string): boolean {
+  const marks = row.match(/\bNot\s+Applicable\b|\b(?:Yes|No|N\/A)\b|[✓✔☑]|(?:(?<=\s)|^)X(?=\s|$)/gi);
+  if (!marks || !marks.length) return false;
+  return /^(?:yes|x|[✓✔☑])$/i.test(marks[marks.length - 1].trim());
+}
+export interface SetAsideNoticeHit { canon: string; clause: string; excerpt: string; }
+/** Deterministic scan of the raw source clause matrix for set-aside NOTICE clauses marked applicable. Pure.
+ *  Dedups by canonical program (one hit each). Returns [] when none is marked applicable (conservative). */
+export function detectSetAsideNotices(source: string | null | undefined): SetAsideNoticeHit[] {
+  const src = source ?? "";
+  if (!src) return [];
+  const out = new Map<string, SetAsideNoticeHit>();
+  for (const spec of SETASIDE_NOTICE_SPECS) {
+    const re = new RegExp(spec.num.source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      const row = setAsideRowWindow(src, m.index);
+      if (!setAsideRowApplicable(row)) continue;
+      // Excerpt = the grounded set-aside IDENTITY only. 52.219-3's official title is "Notice of HUBZone Set-Aside
+      // OR SOLE-SOURCE AWARD" — the verbatim "Sole-Source" tail would trip the structural-bar guard (isPositiveSetAside)
+      // and mis-route the finding. End the span at the first "Set-Aside" token (still a verbatim source substring); for
+      // a notice with no "Set-Aside" token (e.g. -18 "Notice of 8(a) Award"), drop any sole-source tail as a fallback.
+      const saMatch = row.match(/^[\s\S]*?set[\s-]?aside/i);
+      const excerpt = (saMatch ? saMatch[0] : row.split(/\bsole[\s-]?source/i)[0]).replace(/\s+$/, "").trim().slice(0, 240);
+      if (!out.has(spec.canon)) out.set(spec.canon, { canon: spec.canon, clause: spec.clause, excerpt });
+      break; // one applicable row per program is enough
+    }
   }
+  return [...out.values()];
+}
+// Plain-language requirement + the profile-matched required attribute per program (so the finding routes through the
+// SAME positive-set-aside eligibility machinery every set-aside finding uses — isPositiveSetAside + the award-basis
+// overtype guard soften it to a curable caution under a null/open-world profile; firmStatus governs a closed-world one).
+const SETASIDE_NOTICE_REQ: Record<string, string> = {
+  "se:hubzone": "HUBZone Set-Aside: this acquisition is set aside for SBA-certified HUBZone small business concerns; only certified HUBZone firms are eligible for award.",
+  "sb:total":   "Total Small Business Set-Aside: this acquisition is set aside for small business concerns; only firms small under the assigned NAICS size standard are eligible for award.",
+  "se:sdvosb":  "SDVOSB Set-Aside: this acquisition is set aside for Service-Disabled Veteran-Owned Small Business concerns; only SBA-verified SDVOSBs are eligible for award.",
+  "se:edwosb":  "EDWOSB Set-Aside: this acquisition is set aside for Economically Disadvantaged Women-Owned Small Business concerns; only certified EDWOSBs are eligible for award.",
+  "se:wosb":    "WOSB Set-Aside: this acquisition is set aside for Women-Owned Small Business concerns; only certified WOSBs are eligible for award.",
+  "se:8a":      "8(a) Set-Aside/Award: this acquisition is offered under the SBA 8(a) Business Development program; only 8(a)-certified concerns are eligible for award.",
+};
+// requiredAttribute uses the CANONICAL program token (matches what a closed-world profile stores in `held`) so
+// deriveVerdict's firmStatus reconciles a holder → satisfies → BID (pre-live review #334 / Brain #338). The human-
+// readable program name lives in `requirement` (SETASIDE_NOTICE_REQ) for display.
+const SETASIDE_NOTICE_ATTR: Record<string, string> = {
+  "se:hubzone": "se:hubzone", "sb:total": "sb:total",
+  "se:sdvosb": "se:sdvosb", "se:edwosb": "se:edwosb", "se:wosb": "se:wosb", "se:8a": "se:8a",
+};
+/** Emit one grounded positive-set-aside eligibility finding per set-aside notice marked applicable (Brain #334-A).
+ *  Pure. Grounds the verdict basis and the report; the finding rides the existing positive-set-aside path. */
+export function emitSetAsideNoticeFindings(source: string | null | undefined): TypedFinding[] {
+  return detectSetAsideNotices(source).map((n) => ({
+    requirement: SETASIDE_NOTICE_REQ[n.canon] ?? `Set-aside applies (${setAsideLabel(n.canon)}).`,
+    citation: n.clause,
+    excerpt: n.excerpt,
+    kind: "eligibility_bar" as RequirementKind,
+    controllability: "bidder_cannot_move" as Controllability,
+    requiredAttribute: SETASIDE_NOTICE_ATTR[n.canon] ?? setAsideLabel(n.canon),
+    curableInWindow: false,
+    grounded: true,
+    lens: "setaside_notice_detector",
+  }));
+}
+/** Add set-aside-notice findings that no existing finding already covers (dedup by canonical program), so a lens
+ *  that DID surface the set-aside is not duplicated. Pure; returns the input array unchanged when nothing is added. */
+export function mergeSetAsideNoticeFindings(findings: TypedFinding[], notices: TypedFinding[]): TypedFinding[] {
+  const have = new Set<string>();
+  for (const f of findings) { const c = findingSetAsideCanon(f); if (c) have.add(c); }
+  const add = notices.filter((n) => {
+    const c = canonicalizeEligibilityAttr(n.requiredAttribute ?? "") ?? citationSetAsideNoticeCanon(n.citation);
+    return c ? !have.has(c) : true;
+  });
+  return add.length ? [...findings, ...add] : findings;
+}
+// Pool-definer citation canon for the CONFLICT UNION — like citationSetAsideCanon but EXCLUDES 52.219-4 (HUBZone
+// PRICE-EVALUATION preference: rides on any competition, not a pool definer — pre-live review #334). So a lens-
+// surfaced -4 finding no longer injects a phantom HUBZone pool alongside a genuine Total-SB set-aside.
+function citationSetAsideNoticeCanon(hay: string): string | null {
+  if (/52\.219-30\b/.test(hay)) return "se:wosb";
+  if (/52\.219-29\b/.test(hay)) return "se:edwosb";
+  if (/52\.219-27\b/.test(hay)) return "se:sdvosb";
+  if (/52\.219-18\b/.test(hay)) return "se:8a";
+  if (/52\.219-3\b/.test(hay)) return "se:hubzone";       // -3 only, NOT -4
+  if (/52\.219-[67]\b/.test(hay)) return "sb:total";
+  return null;
+}
+// The doc-side pool-definer program a FINDING contributes to the set-aside union (conflict detection + merge dedup),
+// or null. Applies the SAME pool-definer criterion detectSetAsideNotices uses (pre-live review #334): a price-
+// preference-only finding (52.219-4 / "price evaluation preference", no genuine pool-definer notice co-cited)
+// contributes NOTHING; and a prose-only Total-SB (no clause number) is canonicalized so a lens-surfaced Total-SB
+// still both conflicts and dedups symmetrically.
+function findingSetAsideCanon(f: TypedFinding): string | null {
+  const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
+  const byCite = citationSetAsideNoticeCanon(hay);
+  if (byCite) return byCite;                                     // a genuine pool-definer notice citation
+  if (!isPositiveSetAside(f)) return null;
+  if (/price[-\s]?evaluation preference|52\.219-4\b/i.test(hay) && !/52\.219-(?:3|6|7|18|27|29|30)\b/.test(hay)) return null; // price-pref only, no pool-definer
+  if (f.requiredAttribute) { const a = canonicalizeEligibilityAttr(f.requiredAttribute); if (a) return a; }
+  if (/total small business|small business set[\s-]?aside/i.test(hay)) return "sb:total"; // prose-only Total-SB
+  return null;
+}
+/** Detect a set-aside conflict (Brain #332 + #334-B). Pure. Doc-side programs come from the RAW clause matrix
+ *  (authoritative, does not depend on the lenses) UNIONED with the findings. Returns a conflict (both programs +
+ *  a CO-clarification note) when EITHER (a) TWO OR MORE mutually-exclusive set-aside programs are marked applicable
+ *  in the document — a genuine ambiguity the engine must NOT self-resolve, fires INDEPENDENT of SAM (the line-431
+ *  short-circuit fix: doc carrying HUBZone ALONGSIDE Total-SB is NOT "agreement"), OR (b) the document names a
+ *  SINGLE program DIFFERENT from SAM's. Undefined otherwise (no doc set-aside identified, or a single doc program
+ *  that equals SAM / has no SAM to differ from). */
+export function detectSetAsideConflict(samSetAside: string | null | undefined, findings: TypedFinding[], source?: string | null): { sam: string; doc: string; note: string } | undefined {
+  const samCanon = canonicalizeSamSetAside(samSetAside);
+  // Doc-detected set-aside programs — UNION of two sources (Brain #334-B):
+  //   (1) the RAW clause matrix (detectSetAsideNotices) — authoritative, complete, independent of the lenses; and
+  //   (2) the findings (a genuine positive set-aside's canonical requiredAttribute OR its 52.219 citation) — a
+  //       belt-and-suspenders catch for a prose-only set-aside a lens surfaced but the matrix scan didn't.
+  // The union biases toward SURFACING ambiguity (→ NHR, the zero-contract-loss pole), never toward a silent pick.
+  const docCanons = new Set<string>();
+  for (const n of detectSetAsideNotices(source)) docCanons.add(n.canon);
+  for (const f of findings) { const c = findingSetAsideCanon(f); if (c) docCanons.add(c); } // pool-definers only (excludes -4 price-pref)
   if (docCanons.size === 0) return undefined;      // doc set-aside not identified → no conflict (conservative)
-  if (docCanons.has(samCanon)) return undefined;   // doc carries the SAM program → agreement, no conflict
+  // (a) DOC-INTERNAL MULTI-PROGRAM (Brain #334-B) — two or more mutually-exclusive set-aside programs marked
+  //     applicable is itself an NHR trigger, INDEPENDENT of SAM. A line item can't be set aside under two pools;
+  //     "the doc also carries the SAM program" must NOT read as agreement (the old line-534 short-circuit did).
+  if (docCanons.size >= 2) {
+    const progs = [...docCanons].map(setAsideLabel);
+    return {
+      sam: samCanon ? setAsideLabel(samCanon) : "(no single program recorded in SAM)",
+      doc: progs.join(" / "),
+      note: `The solicitation marks MULTIPLE mutually-exclusive set-aside programs applicable (${progs.join(", ")})${samCanon ? `, and SAM records ${setAsideLabel(samCanon)}` : ""}. These define DIFFERENT eligible pools and a line item cannot be set aside under more than one — confirm the governing set-aside (and which CLINs it covers) with the Contracting Officer before bidding.`,
+    };
+  }
+  // (b) SINGLE doc program vs SAM (original Brain #332 root: SAM=HUBZone vs a lone doc Total-SB clause).
+  if (!samCanon) return undefined;                 // a single doc program with no SAM to differ from → it's the basis, not a conflict
+  if (docCanons.has(samCanon)) return undefined;   // doc program == SAM → agreement, no conflict
   const doc = [...docCanons].map(setAsideLabel).join(" / ");
-  return { sam: setAsideLabel(samCanon), doc, note: "Confirm the governing set-aside with the Contracting Officer before bidding — the eligible pool differs between the two." };
+  return { sam: setAsideLabel(samCanon), doc, note: "Confirm the governing set-aside with the Contracting Officer before bidding — the eligible pool differs between SAM and the solicitation document." };
 }
 
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" | "caution" }): TypedFinding[] {
@@ -1294,8 +1471,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     loss both ways), so the engine must NEVER silently adopt one → NEEDS_HUMAN_REVIEW naming BOTH values for CO
   //     clarification. Dominates the verdict (checked before verifier-soundness and every findings-derived pole).
   //     Absent ⇒ byte-identical (orchestrator supplies it only under AUDIT_SETASIDE_CONFLICT_GATE).
+  //     The `note` carries the case-accurate explanation (SAM-vs-doc mismatch OR doc-internal multi-program), so it
+  //     LEADS the reason — a hard-coded "SAM names a different program" lead is incoherent for a doc-internal conflict
+  //     where SAM records no single program (pre-live review #334). SAM/document values follow as supporting detail.
   if (inp.setAsideConflict)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Set-aside conflict — SAM (system of record) and the solicitation document name DIFFERENT set-aside programs; this changes who is eligible to bid and must be confirmed with the Contracting Officer before relying on eligibility. SAM: ${inp.setAsideConflict.sam}; document: ${inp.setAsideConflict.doc}. ${inp.setAsideConflict.note}`, dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Set-aside conflict — the eligible pool is ambiguous and must be confirmed with the Contracting Officer before relying on eligibility. ${inp.setAsideConflict.note} (SAM: ${inp.setAsideConflict.sam}; document: ${inp.setAsideConflict.doc}.)`, dispositions, []);
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)
