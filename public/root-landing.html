@@ -254,12 +254,62 @@
   .foot-links a:hover{color:var(--ink-2)}
   .foot-copy{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute-2);letter-spacing:.02em}
 
+  /* ───────── lifecycle rail (02) ───────── */
+  .lifecycle{margin-top:54px;position:relative}
+  .lc-rail{position:relative;display:grid;grid-template-columns:repeat(6,1fr)}
+  .lc-rail::before{
+    content:"";position:absolute;top:11px;left:8.34%;right:8.34%;height:2px;z-index:0;
+    background:linear-gradient(90deg,rgba(55,138,221,.16),var(--accent) 16%,var(--accent) 84%,rgba(55,138,221,.16));
+  }
+  .lc-stage{position:relative;z-index:1;text-align:center;padding:0 16px}
+  .lc-node{
+    width:24px;height:24px;border-radius:50%;margin:0 auto 22px;display:grid;place-items:center;
+    background:var(--bg);border:2px solid var(--accent);box-shadow:0 0 0 5px rgba(55,138,221,.09);
+  }
+  .lc-node::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .lc-stage.edge .lc-node{box-shadow:0 0 0 5px rgba(55,138,221,.16), 0 0 24px -2px rgba(55,138,221,.75)}
+  .lc-num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--accent);margin-bottom:9px}
+  .lc-label{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35;text-wrap:balance}
+  .lc-when{
+    display:inline-block;margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+    letter-spacing:.05em;color:var(--accent-light);background:rgba(55,138,221,.10);
+    border:1px solid rgba(55,138,221,.24);padding:3px 8px;border-radius:5px;white-space:nowrap;
+  }
+
+  /* ───────── SOW influence schematic (03) ───────── */
+  .sow-split{display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;margin-top:6px}
+  .sow-panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .sow-head{padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card-soft);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .sow-head .ttl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+  .sow-body{padding:18px}
+  .sow-doc{border:1px solid var(--line);border-radius:10px;background:var(--card-soft);padding:13px 14px}
+  .sow-doc .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .sow-doc .dh .nm{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .sow-line{height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin-bottom:8px}
+  .sow-line:last-child{margin-bottom:0}
+  .sow-line.hl{background:linear-gradient(90deg,var(--accent),var(--accent-deep));box-shadow:0 0 12px -3px rgba(55,138,221,.6)}
+  .sow-line.w80{width:80%}.sow-line.w60{width:60%}.sow-line.w90{width:90%}.sow-line.w45{width:45%}
+  .sow-mid{display:flex;align-items:center;gap:11px;padding:11px 2px;color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+  .sow-mid .ln{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(55,138,221,.45),transparent)}
+  .sow-score{margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}
+  .sow-score .top{display:flex;align-items:center;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+  .sow-score .top .tag{color:var(--accent-light);background:rgba(55,138,221,.10);border:1px solid rgba(55,138,221,.24);padding:2px 8px;border-radius:5px}
+  .sow-meter{height:8px;border-radius:5px;background:rgba(255,255,255,.05);overflow:hidden}
+  /* H2 — honest-illustrative: 71% (odd fraction) + feathered mask edge, ZERO digits. Do not tidy to 75%/50% or a hard edge. */
+  .sow-meter i{display:block;height:100%;width:71%;border-radius:5px;background:linear-gradient(90deg,var(--accent-deep),var(--accent));-webkit-mask:linear-gradient(90deg,#000 78%,transparent);mask:linear-gradient(90deg,#000 78%,transparent)}
+
   /* responsive */
   @media (max-width:920px){
     .hero-grid,.split{grid-template-columns:1fr;gap:40px}
     .hero h1{font-size:42px}
     .sec-head h2{font-size:32px}
     .nav-links a:not(.btn){display:none}
+    .sow-split{grid-template-columns:1fr;gap:40px}
+    .lc-rail{grid-template-columns:1fr;gap:4px}
+    .lc-rail::before{display:none}
+    .lc-stage{text-align:left;display:grid;grid-template-columns:24px 1fr;gap:14px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
+    .lc-node{margin:1px 0 0}
+    .lc-when{margin-top:8px}
   }
 </style>
 </head>
@@ -377,17 +427,85 @@
       <h2>First signal to recompete alert.</h2>
     </div>
     <p class="reveal feat-intro" style="max-width:680px">Pre-Sol synopsis detection 60–90 days before the solicitation drops. RFI response drafting. The full audit. Pre-submission checklist. Post-award compliance. Recompete alert 180 days out. Not alerts — drafted action at every stage. One system, the whole arc.</p>
+    <div class="lifecycle reveal">
+      <div class="lc-rail">
+        <div class="lc-stage edge">
+          <div class="lc-node"></div>
+          <div class="lc-num">01</div>
+          <div class="lc-label">Pre-Sol synopsis detection</div>
+          <div class="lc-when">60–90 days out</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">02</div>
+          <div class="lc-label">RFI response drafting</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">03</div>
+          <div class="lc-label">The full audit</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">04</div>
+          <div class="lc-label">Pre-submission checklist</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">05</div>
+          <div class="lc-label">Post-award compliance</div>
+        </div>
+        <div class="lc-stage edge">
+          <div class="lc-node"></div>
+          <div class="lc-num">06</div>
+          <div class="lc-label">Recompete alert</div>
+          <div class="lc-when">180 days out</div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- ───────── 03 PROOF ───────── -->
 <section class="band">
   <div class="wrap">
-    <div class="sec-head reveal" style="max-width:720px">
-      <div class="eyebrow"><span class="idx">03</span> Proof</div>
-      <h2>The SOW Influence Tracker.</h2>
+    <div class="sow-split">
+      <div class="reveal">
+        <div class="sec-head" style="max-width:none;margin-bottom:0">
+          <div class="eyebrow"><span class="idx">03</span> Proof</div>
+          <h2>The SOW Influence Tracker.</h2>
+        </div>
+        <p class="feat-intro" style="max-width:520px;margin-top:22px;margin-bottom:0">When the final solicitation drops, FARaudit cross-references your RFI response against it — a match score and the exact phrases that carried through. Proof your upstream work shaped the requirement. No other platform produces this.</p>
+      </div>
+
+      <div class="reveal sow-panel">
+        <div class="sow-head">
+          <span class="ttl">SOW Influence Tracker</span>
+          <span class="badge naics">cross-reference</span>
+        </div>
+        <div class="sow-body">
+          <div class="sow-doc">
+            <div class="dh"><span class="nm">Your RFI response</span><span class="badge doc">RFI</span></div>
+            <div class="sow-line w90"></div>
+            <div class="sow-line hl w80"></div>
+            <div class="sow-line w60"></div>
+            <div class="sow-line hl w45"></div>
+          </div>
+          <div class="sow-mid"><span class="ln"></span>phrases carried through<span class="ln"></span></div>
+          <div class="sow-doc">
+            <div class="dh"><span class="nm">Final solicitation</span><span class="badge naics">RFP</span></div>
+            <div class="sow-line w80"></div>
+            <div class="sow-line hl w90"></div>
+            <div class="sow-line w45"></div>
+            <div class="sow-line hl w60"></div>
+          </div>
+          <div class="sow-score">
+            <div class="top"><span>Match score</span><span class="tag">Traceable to source</span></div>
+            <div class="sow-meter"><i></i></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <p class="reveal feat-intro" style="max-width:680px">When the final solicitation drops, FARaudit cross-references your RFI response against it — a match score and the exact phrases that carried through. Proof your upstream work shaped the requirement. No other platform produces this.</p>
   </div>
 </section>
 
