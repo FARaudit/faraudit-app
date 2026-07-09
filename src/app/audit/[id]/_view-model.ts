@@ -518,7 +518,13 @@ function fmtDeadlineFull(raw: unknown, fallback: Date | null): string {
       // No time component, or a bare midnight with no offset → treat as a date-only deadline (show date alone).
       if (hh === undefined || (hh === "00" && mi === "00" && !off)) return dateStr;
       const offLabel = !off || off === "Z" ? "UTC" : `UTC${off.replace(":", "").replace(/([+-])(\d{2})(\d{2})/, "$1$2:$3").replace("+", "+").replace("-", "−")}`;
-      return `${dateStr} · ${hh}:${mi} (${offLabel})`;
+      // Card 330 item 2 (Brain-ratified): render the wall-clock cutoff in 12-hour form ("4:30 PM"), uppercase
+      // meridiem with a leading space, no periods — SAM notices state cutoffs in 12h local, so this mirrors the
+      // source 1:1 (the numeric UTC offset already removes AM/PM ambiguity). Noon/midnight → 12:00 PM / 12:00 AM.
+      const hourNum = Number(hh);
+      const meridiem = hourNum >= 12 ? "PM" : "AM";
+      const hour12 = hourNum % 12 || 12;
+      return `${dateStr} · ${hour12}:${mi} ${meridiem} (${offLabel})`;
     }
   }
   return fmtDayMonYear(fallback);
@@ -796,6 +802,23 @@ const SET_ASIDE_LABEL: Record<string, string> = {
   "8A":                          "8(a) Set-Aside (competitive)",
   "8A_COMPETED":                 "8(a) Competitive",
   "8A_SOLE_SOURCE":              "8(a) Sole-Source",
+  // Card-355 R3 (Brain #342): SAM.gov `typeOfSetAside` CODES arrive verbatim on the
+  // authoritative audit.set_aside column (Rule 64 metadata-first). The map above only
+  // held human-readable strings, so a code like "HZC" fell through to "—" — FA1068's
+  // HUBZone set-aside rendered blank despite SAM carrying HZC. Decode the SAM enum here.
+  "SBP":                         "Small Business — Partial",
+  "HZC":                         "HUBZone Small Business",
+  "HZS":                         "HUBZone Sole-Source",
+  "8AN":                         "8(a) Sole-Source",
+  "SDVOSBS":                     "Service-Disabled Veteran-Owned Small Business (SDVOSB) — Sole-Source",
+  "WOSBSS":                      "Women-Owned Small Business (WOSB) — Sole-Source",
+  "EDWOSBSS":                    "Economically Disadvantaged WOSB (EDWOSB) — Sole-Source",
+  "VSA":                         "Veteran-Owned Small Business (VOSB)",
+  "VSS":                         "Veteran-Owned Small Business (VOSB) — Sole-Source",
+  "LAS":                         "Local Area Set-Aside",
+  "IEE":                         "Indian Economic Enterprise",
+  "ISBEE":                       "Indian Small Business Economic Enterprise",
+  "BI":                          "Buy Indian Set-Aside",
 };
 
 function normalizeSetAside(s: unknown): string {
@@ -2056,15 +2079,25 @@ function deriveComplianceMatrix(
         k === "clause_flowdown" ? "Clause" : k === "submission" ? "Section L" : k === "pricing" ? "Pricing" :
         k === "eligibility_bar" ? "Eligibility" : k === "past_performance" ? "Past performance" : "Solicitation";
       for (const f of v3f) {
-        const requirement = String(f.requirement ?? f.excerpt ?? "").trim();
+        // Card-355 BUILD3 defect 1: the row LABEL is the finding's own requirement, NEVER the raw excerpt
+        // (an excerpt as a title is noise). No requirement → drop the row (the excerpt belongs in expandable
+        // evidence, not the matrix title). All V3 findings carry `requirement`, so this drops nothing real.
+        const rawReq = String(f.requirement ?? "").trim();
+        if (!rawReq) continue;
+        // defect 2: word-boundary truncation via truncateOnWord, not a mid-word slice(0,400).
+        const requirement = sanitizeDisplayText(truncateOnWord(rawReq, 400));
         if (!requirement) continue;
         const kind = String(f.kind ?? "");
+        const disp = String(f.disposition ?? "");
+        // defect 3: status ties to kind + disposition (not a coarse all-else→clear). boilerplate is never a
+        // risk/action; eligibility_bar is the gate/risk axis; an open gate_to_clear obligation is an action.
         const status: "action" | "risk" | "clear" =
-          kind === "eligibility_bar" ? "risk" :
           kind === "boilerplate" ? "clear" :
-          String(f.disposition ?? "") === "gate_to_clear" ? "action" : "clear";
+          kind === "eligibility_bar" ? "risk" :
+          disp === "gate_to_clear" ? "action" :
+          "clear";
         const source = String(f.citation ?? "").trim() || srcForKind(kind);
-        rows.push({ requirement: requirement.slice(0, 400), source, status });
+        rows.push({ requirement, source, status });
       }
     }
   }
