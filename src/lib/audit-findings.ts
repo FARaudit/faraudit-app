@@ -203,4 +203,12 @@ export interface VerdictInputs {
   // absent from the input). It carries NO verdict authority: deriveVerdict treats it as manifest-ADJACENT →
   // NEEDS_HUMAN_REVIEW, never a committal verdict over unseen material. Absent/empty ⇒ byte-identical (no effect).
   unreadEvidence?: Array<{ citation: string; note: string }>;
+  // Brain #332 — SAM-vs-DOCUMENT set-aside CONFLICT (source-of-truth defect). SAM is the system of record for the
+  // set-aside PROGRAM; the doc-grounded findings carry the incorporated set-aside clause. When they name DIFFERENT
+  // eligibility programs (live root: SAM=HUBZone `HZC` vs a 52.219-6 Total-Small-Business clause in the doc), adopting
+  // EITHER silently INVERTS who is eligible (an ineligible firm bids, OR an eligible firm walks) — a zero-contract-loss
+  // failure in both directions. When present this DOMINATES the verdict → NEEDS_HUMAN_REVIEW naming BOTH values for CO
+  // clarification; the engine never silently picks a pool (Rule 64: a conflict this material must surface, not be
+  // resolved by fiat). Computed in the orchestrator (flag-gated AUDIT_SETASIDE_CONFLICT_GATE); absent ⇒ byte-identical.
+  setAsideConflict?: { sam: string; doc: string; note: string };
 }

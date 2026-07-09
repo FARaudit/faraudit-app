@@ -156,8 +156,26 @@ function buildClins(all: FindingLite[]): V4Clins | { grounded: false } {
 // ── key dates: audit-row response_deadline is the ONLY persisted date VALUE. FindingLite carries no date
 // value field, so finding-derived milestones would render valueless rows — omit them (never fabricate; a
 // timeline of empty dates is worse than none). Additional milestones await a persisted date value upstream. ──
+// Brain #329 render-coherence (LIVE-PATH fix) — v4-report is the renderer for every agentic_v3 audit, so the
+// deadline formatting must live HERE (the earlier fix in the V1-legacy _view-model.ts never reached the live
+// report). Format the raw response-deadline ISO into a customer-facing cutoff, preserving the stated wall-clock
+// time + offset (never UTC-converted, never dropped, no date-shift across midnight-UTC). Date-only sources render
+// date-only. Mirrors the web view-model's fmtDeadlineFull so both paths agree. A missed cutoff is a contract-loss
+// vector — the time must always show. Pure.
+const MONTHS_SHORT_V4 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const ISO_DEADLINE_RE_V4 = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?/;
+export function fmtDeadline(raw: string): string {
+  const m = raw.match(ISO_DEADLINE_RE_V4);
+  if (!m) return raw; // unparseable → show as-is, never drop
+  const [, y, mo, da, hh, mi, off] = m;
+  const dateStr = `${Number(da)} ${MONTHS_SHORT_V4[Number(mo) - 1]} ${y}`;
+  if (hh === undefined || (hh === "00" && mi === "00" && !off)) return dateStr; // date-only source
+  const offLabel = !off || off === "Z" ? "UTC" : `UTC${off.replace(":", "").replace(/([+-])(\d{2})(\d{2})/, "$1$2:$3").replace("-", "−")}`;
+  return `${dateStr} · ${hh}:${mi} (${offLabel})`;
+}
+
 function buildDates(responseDeadline: string): V4Date[] {
-  return responseDeadline ? [{ label: "Quote/Proposal due", value: responseDeadline, kind: "gate" }] : [];
+  return responseDeadline ? [{ label: "Offers due", value: fmtDeadline(responseDeadline), kind: "gate" }] : [];
 }
 
 // ── ENGINE-5-ROOT #2 (S7-1 / S8-04) — deadline conflict caveat ───────────────────────────────
@@ -262,7 +280,9 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   if (agency) facts.push({ k: "Agency", v: agency });
   if (naics) facts.push({ k: "NAICS", v: naics, mono: true });
   if (setAside) facts.push({ k: "Set-aside", v: setAside });
-  if (responseDeadline) facts.push({ k: "Delivery", v: responseDeadline, sub: deadlineConflictNote(responseDeadline, cj) ?? "response due" });
+  // #329: label is "Offers due" (this is the RESPONSE deadline, not a delivery date — the old "Delivery" mislabel
+  // was a customer-facing error) and the value is formatted to preserve the wall-clock cutoff + offset.
+  if (responseDeadline) facts.push({ k: "Offers due", v: fmtDeadline(responseDeadline), sub: deadlineConflictNote(responseDeadline, cj) ?? undefined });
   const docType = deriveDocType(s(audit.notice_type), pole);
 
   // ── verdict ──
