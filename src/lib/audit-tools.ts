@@ -9,6 +9,8 @@
 import { detectSections, type FormatType } from "./section-boundary-detector";
 import { makeClauseSourceChecker } from "./agentic-sections";
 import type { ConstructionManifest } from "./audit-construction-manifest";
+import { isBindingDoc } from "./sam-attachments";
+import { isEnvOn } from "./env-flags";
 
 const asDoc = (text: string) => ({
   pages: [{ pageNum: 1, text, lines: text.split("\n").map((l) => l.trim()).filter(Boolean) }],
@@ -184,7 +186,80 @@ export function findInSource(ctx: AuditToolContext, phrase: string, limit = 3): 
   return { phrase, hits };
 }
 
-/** The tool DEFINITIONS the agentic expert is given (Anthropic tool-use schema). The expert calls these
+// ── ATTACHMENT COVERAGE (Brain #347 — read_document, flag AUDIT_ATTACHMENT_COVERAGE) ────────────────────────
+// ROOT (card #347): the lens toolset had NO read path to a binding document that isn't a UCF section — read_section
+// reads A–M only, so a standalone binding ATTACHMENT (Security Requirements, RFI answers, a standalone SOW, a wage
+// determination) was unreachable → 0 grounded findings in it → uncovered → false-ish INCOMPLETE. read_document gives
+// the lens that path. Flag-gated: the tool is exposed ONLY when the flag is on ⇒ flag-OFF tool list is byte-identical.
+export const ATTACHMENT_COVERAGE_ENABLED = isEnvOn(process.env.AUDIT_ATTACHMENT_COVERAGE);
+
+/** ReDoS-PROOF parse of the assembled source into DOCUMENT regions (Gauntlet #349 R3). The delimiter
+ *  "==== DOCUMENT: name ====" is always written on its OWN line by assembleFullSource, so we scan LINE-BY-LINE with
+ *  pure string ops (startsWith/endsWith/slice) — never a backtracking regex. The prior split regex (.+?)/([^=]{1,300}?)
+ *  with \s+…\s+ around a whitespace-matching class was empirically quadratic (16k spaces ≈ 43s). A line that does NOT
+ *  both start and end with "====" is rejected in O(1), so a pathological whitespace run can't blow up. Byte-identical
+ *  regions to the old split on well-formed input. Exported + shared so audit-orchestrator.docRegions uses the same. */
+const DOC_NAME_RE = /^DOCUMENT:\s*(.+)$/; // runs ONLY on the bounded inner slice between the ==== fences — linear, no overlap
+export function parseDocRegions(src: string): Array<{ name: string; text: string }> {
+  const out: Array<{ name: string; text: string }> = [];
+  let name: string | null = null;
+  let buf: string[] = [];
+  for (const line of (src ?? "").split("\n")) {
+    const t = line.trim();
+    let hitName: string | null = null;
+    if (t.length >= 8 && t.startsWith("====") && t.endsWith("====")) {
+      const inner = t.slice(4, -4).trim();
+      const m = DOC_NAME_RE.exec(inner);
+      if (m) hitName = m[1].trim();
+    }
+    if (hitName !== null) { if (name !== null) out.push({ name, text: buf.join("\n") }); name = hitName; buf = []; }
+    else if (name !== null) buf.push(line);
+  }
+  if (name !== null) out.push({ name, text: buf.join("\n") });
+  return out;
+}
+
+/** DOCUMENT regions with the isPrimary flag (first region). Parses the "==== DOCUMENT: name ====" delimiter that ONLY
+ *  fullSource carries (assembleFullSource writes one per doc when >1). groundingSource is the delimiter-less `docs.join`
+ *  used for substring GROUNDING, so region-parsing it would collapse to a single primary and readDocument could never
+ *  resolve a named attachment (the feature would be INERT). In the live LOSSLESS path fullSource IS the whole binding
+ *  text. Single-doc / no-delimiter ⇒ the whole source is primary. (Gauntlet #350 R6 — reverts the R3 groundingSource
+ *  preference; region parsing needs delimiters, not raw full text.) */
+function docRegionsOf(ctx: AuditToolContext): Array<{ name: string; text: string; isPrimary: boolean }> {
+  const src = ctx.fullSource ?? "";
+  const regions = parseDocRegions(src);
+  if (regions.length === 0) return [{ name: "(primary solicitation)", text: src, isPrimary: true }];
+  return regions.map((r, i) => ({ ...r, isPrimary: i === 0 }));
+}
+
+/** The BINDING attachments the coverage checklist (C) requires the panel to read — every non-primary document region
+ *  that isBindingDoc accepts (a genuine binding attachment, not an offeror-fill/reference form). Pure, $0. */
+export function listBindingDocuments(ctx: AuditToolContext): string[] {
+  return docRegionsOf(ctx)
+    .filter((r) => !r.isPrimary && isBindingDoc({ role: "attachment", name: r.name }))
+    .map((r) => r.name);
+}
+
+// A binding attachment is read WHOLE on-demand (one doc per tool call), so it gets a larger cap than a UCF section
+// slice — sized so a typical SOW / security-requirements / wage-determination attachment fits in one read and can be
+// honestly attested. `truncated` stays honest for a genuine giant; the caller MUST treat a truncated read as NOT
+// provably-read-whole (Gauntlet #349 blocker F1) so a no-obligation attestation over a partial view can't cover it.
+export const DOC_READ_CAP = Number(process.env.AGENTIC_DOC_READ_CAP) || 40000;
+/** Tool (A) — read a binding ATTACHMENT's text by name (fuzzy: case-insensitive substring, min 4 chars, either
+ *  direction), so the lens can ground obligations that live outside the UCF sections read_section covers. `truncated`
+ *  = the doc exceeds DOC_READ_CAP (a partial read — NOT provably-read-whole). Deterministic, $0. */
+export function readDocument(ctx: AuditToolContext, name: string): { name: string; present: boolean; text: string; truncated: boolean } {
+  const q = (name || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const regions = docRegionsOf(ctx).filter((r) => !r.isPrimary);
+  // Match on exact, or substring EITHER direction but only for a query of real length (a 1–3 char query must not
+  // fuzzy-match every doc → wrong-doc read). Exact match always wins if present.
+  const hit = regions.find((r) => r.name.toLowerCase() === q)
+    ?? (q.length >= 4 ? regions.find((r) => { const n = r.name.toLowerCase(); return n.includes(q) || q.includes(n); }) : undefined);
+  if (!hit) return { name, present: false, text: "", truncated: false };
+  return { name: hit.name, present: true, text: hit.text.slice(0, DOC_READ_CAP), truncated: hit.text.length > DOC_READ_CAP };
+}
+
+/** The base tool DEFINITIONS the agentic expert is given (Anthropic tool-use schema). The expert calls these
  *  in its react loop; the harness executes them deterministically via runAuditTool. */
 export const AUDIT_TOOLS = [
   { name: "read_section", description: "Read the text of a UCF section (A–M) of this solicitation. Use to inspect §C specs, §L instructions, §M evaluation, §I clauses, §B pricing, etc. before asserting any requirement.", input_schema: { type: "object", additionalProperties: false, required: ["key"], properties: { key: { type: "string", description: "UCF section letter, e.g. C, L, M, I, B" } } } },
@@ -192,12 +267,22 @@ export const AUDIT_TOOLS = [
   { name: "find_in_source", description: "Find verbatim spans of the document containing a phrase, to GROUND a finding in the exact source text. An empty result means the phrase is not in the document.", input_schema: { type: "object", additionalProperties: false, required: ["phrase"], properties: { phrase: { type: "string", description: "The exact phrase to locate in the source" } } } },
 ] as const;
 
+/** The read_document tool (A) — appended to the tool list ONLY when AUDIT_ATTACHMENT_COVERAGE is on. */
+export const READ_DOCUMENT_TOOL = { name: "read_document", description: "Read the full text of a named binding ATTACHMENT (e.g. a Statement of Work, Security Requirements, answered RFI, wage determination) that is NOT a UCF section. Use to ground obligations that live in attachments. An absent result means no such document is in the package.", input_schema: { type: "object", additionalProperties: false, required: ["name"], properties: { name: { type: "string", description: "The attachment name or a distinctive substring of it" } } } } as const;
+
+/** The tool list for a lens run — base tools, plus read_document when attachment coverage is enabled. Flag-OFF ⇒
+ *  identical to AUDIT_TOOLS (byte-for-byte), so prod is unchanged until the capability is Gauntleted on. */
+export function auditToolsFor(enabled: boolean = ATTACHMENT_COVERAGE_ENABLED): ReadonlyArray<typeof AUDIT_TOOLS[number] | typeof READ_DOCUMENT_TOOL> {
+  return enabled ? [...AUDIT_TOOLS, READ_DOCUMENT_TOOL] : AUDIT_TOOLS;
+}
+
 /** Dispatch a tool call from the expert loop to its deterministic executor. Pure, $0. */
 export function runAuditTool(ctx: AuditToolContext, name: string, input: Record<string, unknown>): unknown {
   switch (name) {
     case "read_section": return readSection(ctx, String(input.key ?? ""));
     case "lookup_clause": return lookupClause(ctx, String(input.clause ?? ""));
     case "find_in_source": return findInSource(ctx, String(input.phrase ?? ""));
+    case "read_document": return readDocument(ctx, String(input.name ?? ""));
     default: return { error: `unknown tool: ${name}` };
   }
 }

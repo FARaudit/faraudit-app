@@ -13,13 +13,13 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -243,6 +243,17 @@ function obligationsOf(text: string): { obligations: string[]; truncated: boolea
     .filter((s) => s.length > 12 && /\b(shall|must|provide|submit|furnish|required|quote|deliver)\b/i.test(s));
   return { obligations: all.slice(0, MAX_OBLIGATIONS), truncated: all.length > MAX_OBLIGATIONS };
 }
+// HARD-BAR obligation language (Gauntlet #349 R2) — a disqualifying/eligibility obligation an attachment attestation
+// must NEVER be allowed to suppress (it must be GROUNDED as a finding, never merely "attested no-obligation"). Narrow
+// by design: only the clearest bar signals, so soft admin over-detections (RFI questions, blank-form field labels)
+// remain attestable and route to the verifier/panel honesty gate.
+// R7 D1/D2/D4 (Gauntlet Gate-2) — verb group carries BOTH mandatory verbs ("shall" is the dominant federal one; a bare
+// `must` group let "Contractor shall hold/maintain/be certified" MISS → attestation-honored false-COMPLETE). The
+// be-<qualifier> clause allows a BOUNDED intervening cert token ("must be CMMC Level 2 certified" / "ISO 9001:2015
+// certified") — {0,40}? is length-capped so it stays ReDoS-safe. Cert keywords (cmmc/as9100/iso 9001) and a SCOPED
+// "limited to <small-business/program>" catch set-aside/cert bars with no program keyword. All HARD_BAR_RE consumers
+// (lines 387/411/460) are flag-ON only, so this broadening is flag-OFF byte-identical.
+const HARD_BAR_RE = /\bshall not\b|\b(?:shall|must) (?:hold|possess|maintain)\b|\b(?:shall|must) be [\w /:.\-]{0,40}?(?:certified|cleared|registered|accredited|licensed)\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\beligib(?:le|ility)\b|\bineligible\b|\bset[\s-]?aside\b|\brestricted to\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bmust be a\b|\brequired to (?:hold|possess|maintain|have|be)\b/i;
 
 // ── Commercial §L false-INCOMPLETE fix (ENGINE-5-ROOT #1, clears P0 S3-1 + S6-1) ──────────────
 // On a FAR Part-12 commercial (SF1449) buy, §L (Instructions to Offerors) is the INCORPORATED
@@ -328,17 +339,39 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string): 
  *  (assembleFullSource writes one per doc when >1). `isPrimary` marks the FIRST region (the primary solicitation).
  *  Single-doc packages carry no delimiter → one primary region. */
 export function docRegions(fullSource: string): Array<{ name: string; text: string; isPrimary: boolean }> {
-  const parts = (fullSource ?? "").split(/={4}\s+DOCUMENT:\s+(.+?)\s+={4}/); // EXACT assembleFullSource delimiter (4 equals) — strict, matches section-boundary-detector
-  if (parts.length <= 1) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
-  const out: Array<{ name: string; text: string; isPrimary: boolean }> = [];
-  for (let i = 1; i + 1 < parts.length; i += 2) out.push({ name: parts[i], text: parts[i + 1] ?? "", isPrimary: out.length === 0 });
-  return out;
+  // ReDoS-PROOF shared parser (Gauntlet #349 R3) — replaces the quadratic split regex (empirically 16k spaces ≈ 43s;
+  // reachable in prod today via any attachment body). Byte-identical regions on well-formed input.
+  const regions = parseDocRegions(fullSource ?? "");
+  if (regions.length === 0) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
+  return regions.map((r, i) => ({ ...r, isPrimary: i === 0 }));
 }
 
-export function documentsCovered(fullSource: string, findings: TypedFinding[]): { complete: boolean; uncovered: string[] } {
+export function documentsCovered(
+  fullSource: string,
+  findings: TypedFinding[],
+  opts?: { docsRead?: string[]; attestations?: string[] },
+): { complete: boolean; uncovered: string[] } {
   const regions = docRegions(fullSource);
   if (regions.length <= 1) return { complete: true, uncovered: [] }; // single-doc package — section completeness governs
   const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
+  // Brain #347 (flag AUDIT_ATTACHMENT_COVERAGE) — a binding attachment the panel READ but that genuinely carries no
+  // operative obligation for the bidder can be covered by a PROVABLY-READ "no operative obligation" attestation. It is
+  // honoured ONLY when the doc is BOTH attested AND in docsRead (the lens actually read_document'd it): attested-but-
+  // not-read = rubber-stamp = REJECTED (stays uncovered → the safe direction, never a false COMPLETE). A fabricated
+  // FINDING can never cover a doc either — an ungrounded excerpt is dropped upstream (isGrounded), so it never reaches
+  // `findings` here. Opts absent (flag off) ⇒ both sets empty ⇒ byte-identical to the prior behaviour.
+  // Join docsRead/attestations to regions by an EXACT (punctuation-preserving) name key — `norm` strips punctuation
+  // and would let two DISTINCT attachments whose names differ only in punctuation collide, so one attestation could
+  // cover BOTH (Gauntlet #349 R2). docsRead/attestations already carry RESOLVED region names, so exact keying matches.
+  const nameKey = (s: string) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const readSet = new Set((opts?.docsRead ?? []).map(nameKey));
+  const attSet = new Set((opts?.attestations ?? []).map(nameKey));
+  // CROSS-ATTACHMENT uniqueness (Gauntlet #349 R4, flag-on only — opts present). The grounded-finding predicate below
+  // excludes excerpts shared with the PRIMARY; it must ALSO exclude excerpts shared with ANOTHER attachment, else a
+  // finding grounded in attachment A (a flow-down phrase A and B both carry) would falsely certify B as analyzed →
+  // false COMPLETE. Opts absent (flag off) ⇒ gate off ⇒ byte-identical to prior behaviour.
+  const crossAttGate = opts != null;
+  const otherAttNorms = crossAttGate ? regions.filter((x) => !x.isPrimary).map((x) => ({ name: x.name, t: norm(x.text) })) : [];
   const uncovered: string[] = [];
   for (const r of regions) {
     if (r.isPrimary) continue;                                           // primary solicitation — handled by section completeness
@@ -348,12 +381,44 @@ export function documentsCovered(fullSource: string, findings: TypedFinding[]): 
     // NOT analyzed — its obligations were never extractable, so "0 obligations" is not proof of coverage. Flag it
     // uncovered ⇒ INCOMPLETE (the safe direction); never let a content-loss doc pass as read_no_obligation.
     if (!hasEngineText(r.text)) { uncovered.push(r.name); continue; }
-    if (!obligationsOf(r.text).obligations.length) continue;             // read_no_obligation — a genuinely-read thin binding attachment is covered
+    const obs = obligationsOf(r.text).obligations;
+    if (!obs.length) {
+      // DETERMINISTIC FLOOR on the read_no_obligation valve too (Gauntlet #350 ADD-7 — the SECOND hard-bar bypass): a
+      // VERB-LESS clearance/eligibility/set-aside bar (e.g. a bare "HUBZone Small Business Set-Aside" heading, orch:379
+      // live-defect class) yields ZERO obligation SENTENCES, so obligationsOf is empty — yet it is a real disqualifier.
+      // It must NOT take the free no-obligation pass. Fall through to the grounded-finding-in-region check below (only a
+      // finding that actually ANALYZED it, or — rejected here too — an attestation, can cover it). Scan the WHOLE region
+      // (not the capped obligationsOf list), mirroring the attestation floor at HARD_BAR_RE.exec below. Flag-gated on
+      // crossAttGate (opts present) ⇒ flag-OFF byte-identical.
+      if (!(crossAttGate && HARD_BAR_RE.test(r.text))) continue;         // no hard-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
+      console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — HARD-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
+    }
     const nRegion = norm(r.text);
     // A finding proves this attachment was ANALYZED only if its excerpt is grounded IN the attachment AND is not a
     // coincidental duplicate of a phrase already present in the PRIMARY (a flow-down sentence appearing in both) —
     // else a primary finding could falsely certify an unanalyzed attachment (a false COMPLETE, the dangerous direction).
-    if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
+    if (findings.some((f) => {
+      const ex = norm(f.excerpt || "");
+      if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
+      if (crossAttGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false; // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
+      return true;
+    })) continue;
+    const nName = nameKey(r.name);
+    if (attSet.has(nName) && readSet.has(nName)) {
+      // Brain #347/#348 — a provably-read "no operative obligation" attestation covers the doc, with honesty deferred
+      // to the verifier/panel (Gate 4). DETERMINISTIC FLOOR (Gauntlet #349 R2): an attestation may NEVER suppress a
+      // HARD-BAR obligation the deterministic detector positively found (clearance/eligibility/set-aside/"shall not"/
+      // must-hold) — that is the dangerous "model attests a real disqualifier away → false COMPLETE" case. If any
+      // obligationsOf hit is hard-bar language, the attestation is REJECTED (must be GROUNDED, else stays uncovered →
+      // INCOMPLETE). Soft over-detections (RFI questions, blank-form field labels) still route to the panel. Always
+      // logged — the obligationsOf-vs-attestation contradiction is never silent.
+      // Scan the WHOLE region text for hard-bar language, NOT just the capped obligationsOf list (which stops at
+      // MAX_OBLIGATIONS=200 — a bar past #200 would otherwise be invisible to the floor; Gauntlet #349 R3).
+      const hardHit = HARD_BAR_RE.exec(r.text);
+      if (!hardHit) { console.log(`[coverage] attestation honored for "${r.name}" — provably-read, no hard-bar obligation (obligationsOf soft-detected ${obs.length}; honesty = verifier/panel gate)`); continue; }
+      console.warn(`[coverage] attestation REJECTED for "${r.name}" — HARD-BAR language present ("${hardHit[0].slice(0, 90)}"); requires a grounded finding, not an attestation → uncovered`);
+    }
+    uncovered.push(r.name);
   }
   return { complete: uncovered.length === 0, uncovered };
 }
@@ -383,6 +448,10 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
   const attByName = new Map((ctx.constructionManifest?.docAttestations ?? []).map((a) => [a.name, a]));
   const primaryNorm = norm(regions.find((r) => r.isPrimary)?.text ?? "");
   const uncovered: string[] = [];
+  // R7 D3 / R8 P2 (Gauntlet Gate-2) — CROSS-ATTACHMENT excerpt norms, built ONCE (mirrors documentsCovered's line-368
+  // hoist; the per-region rebuild was O(N²·L)). Keyed by name so the in-loop check can exclude the current region.
+  // Flag-gated under AUDIT_ATTACHMENT_COVERAGE ⇒ empty flag-OFF ⇒ byte-identical to legacy.
+  const otherAttNorms = ATTACHMENT_COVERAGE_ENABLED ? regions.filter((x) => !x.isPrimary).map((x) => ({ name: x.name, t: norm(x.text) })) : [];
   for (const r of regions) {
     if (r.isPrimary) continue;
     if (!isBindingDoc({ role: "attachment", name: r.name })) continue; // offeror-fill exempt
@@ -392,9 +461,24 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
     // span + full-text hash at ingest) attests the doc was read + its binding content captured, without a proposer
     // finding — reduces per-doc passes. Insufficient alone for a doc carrying NO element (e.g. a drawings/spec set).
     if (ctx.constructionManifest?.elements.some((e) => e.present && e.sourceDoc === r.name)) continue;
-    if (att.groundableObligations === 0) continue;                     // ATTESTED read-and-empty (obligation-free full text)
+    if (att.groundableObligations === 0) {
+      // DETERMINISTIC FLOOR on the construction read-and-empty valve too (Gauntlet #350 ADD-7 — the THIRD emitter of the
+      // hard-bar-bypass class, parallel to documentsCovered's read_no_obligation valve): a VERB-LESS clearance/
+      // eligibility/set-aside bar yields 0 groundable obligation SENTENCES yet is a real disqualifier; it must NOT attest
+      // read-and-empty. Fall through to the grounded-finding-in-region check below. Flag-gated (AUDIT_ATTACHMENT_COVERAGE)
+      // ⇒ flag-OFF byte-identical, so this part36 path goes live with the rest of the arc under one gate.
+      if (!(ATTACHMENT_COVERAGE_ENABLED && HARD_BAR_RE.test(r.text))) continue;   // ATTESTED read-and-empty (obligation-free full text)
+      console.warn(`[coverage] construction read-and-empty valve REJECTED for "${r.name}" — HARD-BAR language present though groundableObligations=0 (verb-less bar); requires a grounded finding → uncovered`);
+    }
     const nRegion = norm(r.text);                                      // has obligations ⇒ require a grounded finding-in-doc
-    if (!findings.some((f) => { const ex = norm(f.excerpt || ""); return ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex); })) uncovered.push(r.name);
+    // an excerpt shared with ANOTHER attachment (a flow-down phrase in both) must NOT certify THIS doc as analyzed
+    // → false COMPLETE; exclude it (mirrors documentsCovered line ~397).
+    if (!findings.some((f) => {
+      const ex = norm(f.excerpt || "");
+      if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
+      if (otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false;   // shared with ANOTHER attachment → doesn't prove THIS one analyzed
+      return true;
+    })) uncovered.push(r.name);
   }
   return { complete: uncovered.length === 0, uncovered };
 }
@@ -623,6 +707,8 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const perLens: Record<string, number> = {};
   const trace: AuditResult["trace"] = {};
   const sectionsRead = new Set<string>();
+  const docsRead = new Set<string>();          // Brain #347 — union of read_document'd binding attachments (provably-read)
+  const attestedDocs = new Set<string>();      // Brain #347 — union of "read, no operative obligation" attestations
   let findings: TypedFinding[] = [];
   let allConverged: boolean;
 
@@ -647,6 +733,8 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
       perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
       runs[i].sectionsRead.forEach((s) => sectionsRead.add(s));
+      runs[i].docsRead.forEach((d) => docsRead.add(d));
+      runs[i].attestations.forEach((a) => attestedDocs.add(a));
       trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
     });
     allConverged = runs.every((r) => r.converged);
@@ -755,9 +843,20 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   });
   // C-2 (Brain C.f) — a binding ATTACHMENT ingested-with-text but unanalyzed (no finding grounded in it, and it
   // carries obligations) is an incomplete read, just like an unread section.
+  // Brain #347 (flag AUDIT_ATTACHMENT_COVERAGE) — pass the provably-read docs + honest-empty attestations so a
+  // binding attachment the panel READ (and grounded an obligation in, OR attested no-obligation) is covered. Opts
+  // only supplied when the flag is on ⇒ flag-OFF is byte-identical (documentsCovered's opts default to empty sets).
+  const attCoverageOpts = ATTACHMENT_COVERAGE_ENABLED ? { docsRead: [...docsRead], attestations: [...attestedDocs] } : undefined;
+  // SOURCE (Gauntlet #350 R6 — REVERTS the R3 groundingSource alignment): documentsCovered parses DOCUMENT regions by
+  // the "==== DOCUMENT: name ====" delimiter, which ONLY fullSource carries (assembleFullSource writes one per doc when
+  // >1). groundingSource is `docs.map(d=>d.text).join` — DELIMITER-LESS → parseDocRegions finds 0 regions → collapses
+  // to a single primary → documentsCovered short-circuits COMPLETE (the false-COMPLETE bypass #1). R3's concern (a
+  // digest fullSource may compress a disqualifier away) is unreachable via groundingSource (can't region-parse it) AND
+  // already handled upstream: chunked-ingest content-loss forces documents_complete=false, and in the live LOSSLESS
+  // path fullSource IS the whole binding text WITH delimiters.
   const docCoverage = (ctx.constructionManifest && procurementPart(ctx) === "part36-construction")
     ? constructionDocumentsCovered(ctx, findings)   // Brain card 289 — sealed full-text attestation for attachments
-    : documentsCovered(ctx.fullSource, findings);
+    : documentsCovered(ctx.fullSource, findings, attCoverageOpts);
   // Brain card 288 RULING 2 — interim amendment-resolution fail-safe (flag-gated; OFF ⇒ byte-identical). Unresolved
   // SF-30 supersession → INCOMPLETE, never a decided verdict over possibly-superseded terms. Full resolution is a
   // later tranche; this is detection + fail-safe only.
@@ -956,7 +1055,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // Brain #332 + #334-B — set-aside conflict. detectSetAsideConflict now also reads the RAW clause matrix (not only
   // findings): SAM-vs-doc AND doc-internal multi-program ambiguity both DOMINATE → NHR (CO clarification), never a
   // silent pick. Flag-gated (default-OFF); flag off ⇒ undefined ⇒ deriveVerdict byte-identical.
-  const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true"
+  // #2 SET-ASIDE STRUCTURAL-IMPOSSIBILITY DOWNGRADE (Brain #344, flag AUDIT_SETASIDE_STRUCTURAL_DOWNGRADE, default OFF).
+  //   When SAM + the doc AGREE on ONE governing program AND the un-scrubbed-matrix structural tell is present
+  //   (52.219-3 set-aside + 52.219-4 price-preference both applicable = mutually-exclusive = un-scrubbed), the STRAY
+  //   pool-definer notice is re-typed to a non-blocking P2 doc-integrity flag (surfaced, verdict-inert) and the
+  //   multi-program conflict is SUPPRESSED → committal-<governing> instead of NHR. HARD: only the structural tell
+  //   licenses this; SAM/doc agreement alone never does. Flag OFF ⇒ downgrade null ⇒ byte-identical to today.
+  const structuralDowngrade = applySetAsideStructuralDowngrade(findings, ctx.fullSource, opts.setAside, { enabled: process.env.AUDIT_SETASIDE_STRUCTURAL_DOWNGRADE === "true" });
+  findings = structuralDowngrade.findings;
+  if (structuralDowngrade.downgrade) {
+    console.log(`[orchestrator] set-aside structural downgrade: governing ${structuralDowngrade.downgrade.governing}; stray notice(s) [${structuralDowngrade.downgrade.strays.join(", ")}] → P2 doc-integrity flag; conflict SUPPRESSED (committal-${structuralDowngrade.downgrade.governing})`);
+  }
+  const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true" && !structuralDowngrade.downgrade
     ? detectSetAsideConflict(opts.setAside, findings, ctx.fullSource)
     : undefined;
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };

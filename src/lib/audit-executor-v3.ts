@@ -20,6 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor";
 import { buildAgenticDocs, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { assembleFullSourceLossless } from "./agentic-lossless-ingest";
+import { resolveDocSupersession, AMENDMENT_SUPERSESSION_ENABLED, isSf30Cover } from "./agentic-ingest";
 import { extractDocumentDeadlines } from "./audit-deadline-extract";
 import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocReadMode } from "./agentic-chunked-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
@@ -125,7 +126,7 @@ export async function executeAgenticPrimary(
   // GAP A — assemble the engine's single fullSource string from the intake docs
   // (notice body + primary + every attachment). Reuses the same extraction the shadow path uses.
   const primaryBytes = input.pdfBuffer ?? (input.pdfBase64 ? Buffer.from(input.pdfBase64, "base64") : null);
-  const docs = await buildAgenticDocs({
+  let docs = await buildAgenticDocs({
     primaryName: input.primaryDocName ?? "primary solicitation",
     primaryBytes,
     primaryText: input.extractedText ?? null,
@@ -134,6 +135,26 @@ export async function executeAgenticPrimary(
   });
   if (noticeBody) {
     console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: L1 notice body ingested as first-class doc (${noticeBody.text.length} chars)`);
+  }
+  // ── #1 AMENDMENT SUPERSESSION (Brain #344 — flag AUDIT_AMENDMENT_SUPERSESSION, default OFF) ──
+  // The engine ingests original + Amdt01/02 CONCATENATED, so a superseded deadline/POC/CLIN reads as a
+  // co-equal grounded fact and manufactures a FALSE internal conflict (the FA1068 wrong-pole NHR root).
+  // This pass drops a base doc ONLY when a higher-numbered COMPLETE amendment provably subsumes EVERY
+  // binding line of it (positive-subsumption proof); an uncertain pairing is RETAINED + labelled
+  // "possibly superseded", never silently dropped (completeness-first). Named exclusions are logged.
+  // Flag-OFF ⇒ this block never runs ⇒ byte-identical to today.
+  if (AMENDMENT_SUPERSESSION_ENABLED && docs.length > 1) {
+    const decisions = resolveDocSupersession(docs.map((d) => ({ name: d.name, text: d.text, isSf30: isSf30Cover(d.name, d.text) })));
+    const dropped = decisions.filter((x) => x.status === "superseded");
+    const labelled = decisions.filter((x) => x.status === "possibly_superseded");
+    if (dropped.length > 0) {
+      const supersededNames = new Set(dropped.map((x) => x.name));
+      docs = docs.filter((d) => !supersededNames.has(d.name));
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SUPERSESSION — dropped ${dropped.length} proven-subsumed doc(s): ${dropped.map((x) => `${x.name} ⇐ ${x.supersededBy}`).join("; ")}`);
+    }
+    if (labelled.length > 0) {
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: SUPERSESSION — RETAINED + labelled possibly-superseded (uncertain pairing, read in full): ${labelled.map((x) => `${x.name} (later: ${x.supersededBy})`).join("; ")}`);
+    }
   }
   // Budgeted assembly (limit N3/N4) — bounds a pathological multi-MB package by
   // dropping WHOLE overflow docs (named, never a silent mid-doc cut). `truncated`
