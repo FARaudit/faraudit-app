@@ -35,7 +35,7 @@ export default function PrivacyPage() {
           We will post material changes on this page and notify active users 30 days in advance via the email on file.
         </Block>
         <Block title="Contact">
-          <a href="mailto:jose@faraudit.com" className="text-accent">jose@faraudit.com</a> · FARaudit · Operated under Woof Management LLC.
+          <a href="mailto:jose@faraudit.com" className="text-accent">jose@faraudit.com</a> · FARaudit · Operated under FARaudit Inc., a Delaware corporation.
         </Block>
       </section>
     </main>
