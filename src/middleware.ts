@@ -17,6 +17,7 @@ const PUBLIC = [
   "/sign-in.html",
   "/pricing.html",
   "/how-it-works.html",
+  "/learn.html",
   "/root-landing.html",
   "/site.css",
   "/auth.css"

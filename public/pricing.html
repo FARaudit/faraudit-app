@@ -8,6 +8,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="site.css" />
+<style>
+  /* pricing principles (Design card 364) */
+  .principles{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .prin{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px 24px;box-shadow:var(--shadow)}
+  .prin::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),rgba(55,138,221,0))}
+  .prin .pn{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.16em;color:var(--accent);margin-bottom:16px}
+  .prin h3{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:var(--ink);margin-bottom:10px;text-wrap:balance}
+  .prin p{font-size:13.5px;line-height:1.6;color:var(--ink-2);text-wrap:pretty}
+  @media (max-width:920px){.principles{grid-template-columns:1fr;gap:14px}}
+</style>
 </head>
 <body data-screen-label="pricing">
 
@@ -37,6 +47,29 @@
       <p class="reveal lede">FARaudit is priced as a flat platform rate — no per-audit metering, no surprise line items. We share exact terms during your access review, matched to your pipeline. Design partners lock founding terms and shape the roadmap. Whether you're a solo BD director or a full capture team — terms are matched to your pipeline during review.</p>
       <div class="reveal ctas">
         <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── PRICING PRINCIPLES ───────── -->
+<section class="band" style="padding-top:24px;padding-bottom:24px">
+  <div class="wrap">
+    <div class="principles reveal">
+      <div class="prin">
+        <div class="pn">01</div>
+        <h3>Flat platform rate</h3>
+        <p>No per-audit metering — no surprise line items.</p>
+      </div>
+      <div class="prin">
+        <div class="pn">02</div>
+        <h3>Matched to your pipeline</h3>
+        <p>We share exact terms during your access review.</p>
+      </div>
+      <div class="prin">
+        <div class="pn">03</div>
+        <h3>Founding terms</h3>
+        <p>Design partners lock founding terms and shape the roadmap.</p>
       </div>
     </div>
   </div>
