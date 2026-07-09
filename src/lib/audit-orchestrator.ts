@@ -728,7 +728,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     trace["judgment"] = { converged: true, turns: 1, sectionsRead: [...sectionsRead], tools: [] };
     allConverged = true;
   } else {
+    const _tExp = Date.now();
     const runs = await Promise.all(experts.map((spec) => runAgenticExpert(spec, ctx, { callModel, maxTurns, signal })));
+    console.log(`[timing] expert-phase ${Date.now() - _tExp}ms · turns/lens ${experts.map((s, i) => `${s.key}:${runs[i].turns}`).join(" ")} · docsRead=${runs.reduce((n, r) => n + r.docsRead.length, 0)}`);
     experts.forEach((spec, i) => {
       runs[i].findings.forEach((f, j) => { f.id = `${spec.key}#${j}`; });
       perLens[spec.key] = runs[i].findings.length; findings.push(...runs[i].findings);
@@ -780,7 +782,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   if (judgmentLayerEnabled() && opts.judgmentReason) {
     const early = completenessOf(ctx, required, findings, sectionsRead);
     const ungrounded = early.attestations.flatMap((a) => a.ungrounded);
+    const _tJ1 = Date.now();
     const j1 = await runJudgmentProducer(findings, ctx.fullSource, ungrounded, { reason: opts.judgmentReason, log: (m) => console.log(`[j1] ${m}`) });
+    console.log(`[timing] j1 ${Date.now() - _tJ1}ms`);
     findings = j1.findings; judgmentCost = j1.cost;
   }
 
@@ -790,7 +794,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
 
   // P2 — adversarial cross-examination → verifierSound + the surviving (possibly re-typed) finding set.
   //      bidderProfile flows in so the verifier can compute the knife-edge escalation set deterministically.
+  const _tVer = Date.now();
   const ver = await verify(ctx, findings, { bidderProfile });
+  console.log(`[timing] verify(P2) ${Date.now() - _tVer}ms`);
   findings = ver.survived;
   const verifierDrops = ver.correctedDrops ?? []; // card 274 RULING 1 — persisted to AuditResult (telemetry-visible)
 
@@ -798,7 +804,9 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //       finding: 3-state entailment vs the cited excerpt + source (never J-1's reasoning) → VERIFIED writes
   //       verifiedBy; REFUTED strips the mark; UNVERIFIABLE leaves it unverified (NHR wall holds). Gated: flag + caller.
   if (judgmentLayerEnabled() && opts.judgmentEntail) {
+    const _tJ2 = Date.now();
     const j2 = await runJudgmentVerifier(findings, ctx.fullSource, { entail: opts.judgmentEntail, log: (m) => console.log(`[j2] ${m}`) });
+    console.log(`[timing] j2 ${Date.now() - _tJ2}ms`);
     findings = j2.findings;
     judgmentCost = { ...judgmentCost, j2Calls: j2.cost.j2Calls, j2InTokens: j2.cost.j2InTokens, j2OutTokens: j2.cost.j2OutTokens, degraded: { j1: judgmentCost.degraded.j1, j2: j2.cost.degraded.j2 } };
     console.log(`[judgment-cost] j1Calls=${judgmentCost.j1Calls} j1In=${judgmentCost.j1InTokens} j1Out=${judgmentCost.j1OutTokens} j2Calls=${judgmentCost.j2Calls} j2In=${judgmentCost.j2InTokens} j2Out=${judgmentCost.j2OutTokens} degraded=j1:${judgmentCost.degraded.j1}/j2:${judgmentCost.degraded.j2}`);
