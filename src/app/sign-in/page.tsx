@@ -93,7 +93,7 @@ function SignInForm() {
               </svg>
             </div>
           </div>
-          <div className="bp-foot mono">SOC 2 Type II · FedRAMP-aligned · SAM.gov synced 2m ago</div>
+          <div className="bp-foot mono">SAM.gov synced 2m ago</div>
         </aside>
 
         {/* ── RIGHT FORM PANEL ── */}
@@ -173,7 +173,7 @@ function SignInForm() {
               </form>
             )}
 
-            <p className="alt">New to FARaudit? <a href="/access.html">Request access&nbsp;→</a></p>
+            <p className="alt">New to FARaudit? <a href="/access">Request access&nbsp;→</a></p>
           </div>
           <div className="legal mono">© 2026 FARaudit Inc. · Dover, DE</div>
         </main>
