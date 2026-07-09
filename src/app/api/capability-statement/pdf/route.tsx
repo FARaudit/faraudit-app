@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 
 const styles = StyleSheet.create({
   page: { padding: 56, paddingBottom: 70, fontSize: 10, fontFamily: "Helvetica", color: "#0f172a" },
-  header: { borderBottom: "2pt solid #C9A84C", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
+  header: { borderBottom: "2pt solid #378ADD", paddingBottom: 14, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" },
   brand: { fontSize: 18, fontWeight: 700, color: "#0f172a" },
-  brandGold: { color: "#C9A84C" },
+  brandGold: { color: "#378ADD" },
   meta: { fontSize: 8, color: "#475569", textAlign: "right" },
   companyName: { fontSize: 22, fontWeight: 700, color: "#0f172a", marginTop: 8, marginBottom: 10 },
   contactGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
@@ -19,10 +19,10 @@ const styles = StyleSheet.create({
   contactLine: { fontSize: 9, color: "#0f172a", lineHeight: 1.5, marginBottom: 2 },
   contactLineRight: { fontSize: 9, color: "#0f172a", lineHeight: 1.5, marginBottom: 2, textAlign: "right" },
   section: { marginBottom: 12 },
-  sectionEyebrow: { fontSize: 8, color: "#C9A84C", letterSpacing: 1.5, marginBottom: 4 },
+  sectionEyebrow: { fontSize: 8, color: "#378ADD", letterSpacing: 1.5, marginBottom: 4 },
   body: { fontSize: 10, color: "#0f172a", lineHeight: 1.5 },
   small: { fontSize: 9, color: "#475569", lineHeight: 1.5 },
-  pastRow: { borderLeft: "2pt solid #C9A84C", paddingLeft: 8, marginBottom: 8 },
+  pastRow: { borderLeft: "2pt solid #378ADD", paddingLeft: 8, marginBottom: 8 },
   footer: { position: "absolute", bottom: 30, left: 40, right: 40, textAlign: "center", fontSize: 8, color: "#94a3b8" }
 });
 

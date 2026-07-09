@@ -8,7 +8,7 @@ const SURFACE = "#06101a";
 const TEXT_1 = "#e2eaf4";
 const TEXT_2 = "#5a7fa0";
 const TEXT_3 = "#3d5b75";
-const GOLD = "#c4a44a";
+const GOLD = "#378ADD";
 
 const TOUR = [
   {
@@ -135,7 +135,7 @@ export default function LearnPage() {
           </div>
         </Section>
 
-        <div style={{ marginTop: 48, padding: "20px 24px", background: "rgba(196,164,74,0.08)", border: `1px solid ${GOLD}33`, borderRadius: 10 }}>
+        <div style={{ marginTop: 48, padding: "20px 24px", background: "rgba(55,138,221,0.08)", border: `1px solid ${GOLD}33`, borderRadius: 10 }}>
           <p style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: GOLD, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 8 }}>
             Ready
           </p>

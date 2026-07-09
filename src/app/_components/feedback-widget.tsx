@@ -66,9 +66,9 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
         style={{
-          background: "rgba(201,168,76,.14)",
-          color: "#C9A84C",
-          border: "1px solid rgba(201,168,76,.35)",
+          background: "rgba(55, 138, 221,.14)",
+          color: "#378ADD",
+          border: "1px solid rgba(55, 138, 221,.35)",
           borderRadius: 4,
           padding: "5px 10px",
           fontFamily: "'JetBrains Mono', monospace",
@@ -106,24 +106,24 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
           right: 18,
           width: "min(420px, calc(100vw - 36px))",
           background: "#060F1C",
-          border: "1px solid rgba(201,168,76,.25)",
+          border: "1px solid rgba(55, 138, 221,.25)",
           borderRadius: 8,
           padding: 20,
           zIndex: 101,
           fontFamily: "Inter, system-ui, sans-serif",
-          color: "#F5F0E8",
+          color: "#EEF3FA",
           boxShadow: "0 12px 40px rgba(0,0,0,.6)"
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#C9A84C" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#378ADD" }}>
             Send Feedback
           </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close"
-            style={{ background: "none", border: "none", color: "rgba(245,240,232,.5)", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}
+            style={{ background: "none", border: "none", color: "rgba(238, 243, 250,.5)", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}
           >
             ×
           </button>
@@ -131,14 +131,14 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           {(["Bug Report", "Feature Request", "General Feedback"] as FeedbackType[]).map((t) => (
-            <label key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer", color: type === t ? "#C9A84C" : "rgba(245,240,232,.7)" }}>
+            <label key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, cursor: "pointer", color: type === t ? "#378ADD" : "rgba(238, 243, 250,.7)" }}>
               <input
                 type="radio"
                 name="feedback-type"
                 value={t}
                 checked={type === t}
                 onChange={() => setType(t)}
-                style={{ accentColor: "#C9A84C" }}
+                style={{ accentColor: "#378ADD" }}
               />
               {t}
             </label>
@@ -154,9 +154,9 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
           style={{
             width: "100%",
             background: "#03080F",
-            border: "1px solid rgba(201,168,76,.18)",
+            border: "1px solid rgba(55, 138, 221,.18)",
             borderRadius: 4,
-            color: "#F5F0E8",
+            color: "#EEF3FA",
             padding: 10,
             fontSize: 13,
             fontFamily: "inherit",
@@ -180,8 +180,8 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
             disabled={status.kind === "sending"}
             style={{
               background: "transparent",
-              border: "1px solid rgba(245,240,232,.18)",
-              color: "rgba(245,240,232,.7)",
+              border: "1px solid rgba(238, 243, 250,.18)",
+              color: "rgba(238, 243, 250,.7)",
               padding: "8px 14px",
               borderRadius: 4,
               fontSize: 12,
@@ -195,7 +195,7 @@ export default function FeedbackWidget({ userEmail }: { userEmail: string | null
             onClick={submit}
             disabled={status.kind === "sending" || !description.trim()}
             style={{
-              background: "#C9A84C",
+              background: "#378ADD",
               border: "none",
               color: "#03080F",
               padding: "8px 14px",

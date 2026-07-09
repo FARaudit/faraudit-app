@@ -158,7 +158,7 @@ export default function NaicsCombobox({
             maxHeight: 280,
             overflowY: "auto",
             background: "#060F1C",
-            border: "1px solid rgba(201,168,76,.25)",
+            border: "1px solid rgba(55, 138, 221,.25)",
             borderRadius: 4,
             boxShadow: "0 8px 24px rgba(0,0,0,.4)"
           }}
@@ -176,10 +176,10 @@ export default function NaicsCombobox({
                   padding: "7px 12px",
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 11,
-                  color: isHighlighted ? "#C9A84C" : "#E2E8F2",
-                  background: isHighlighted ? "rgba(201,168,76,.08)" : "transparent",
+                  color: isHighlighted ? "#378ADD" : "#E2E8F2",
+                  background: isHighlighted ? "rgba(55, 138, 221,.08)" : "transparent",
                   cursor: "pointer",
-                  borderBottom: "1px solid rgba(201,168,76,.06)"
+                  borderBottom: "1px solid rgba(55, 138, 221,.06)"
                 }}
               >
                 {opt.code === "" ? (

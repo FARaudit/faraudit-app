@@ -286,13 +286,13 @@ export default function Navigation(_: { initialPinned: boolean }) {
         <svg className={styles.shield} width="22" height="22" viewBox="0 0 28 28" fill="none">
           <path
             d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z"
-            stroke="#C9A84C"
+            stroke="#378ADD"
             strokeWidth="1.4"
-            fill="rgba(201,168,76,.1)"
+            fill="rgba(55, 138, 221,.1)"
             opacity=".9"
           />
-          <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" strokeWidth=".9" opacity=".7" />
-          <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" strokeWidth=".9" opacity=".5" />
+          <line x1="10" y1="13" x2="18" y2="13" stroke="#378ADD" strokeWidth=".9" opacity=".7" />
+          <line x1="10" y1="16" x2="16" y2="16" stroke="#378ADD" strokeWidth=".9" opacity=".5" />
         </svg>
         <span className={styles.wordmark}>
           FAR<span className={styles.wordmarkAccent}>audit</span>

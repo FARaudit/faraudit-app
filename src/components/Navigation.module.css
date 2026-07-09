@@ -25,20 +25,20 @@
   --void: #030810;
   --void2: #060F1C;
   --void3: #0A1628;
-  --gold: #C9A84C;
-  --gold2: #DFB96A;
-  --gold3: #F0D48E;
-  --text: #F5F0E8;
-  --text2: #E8E2D4;
-  --t80: rgba(245, 240, 232, 0.80);
-  --t60: rgba(245, 240, 232, 0.60);
-  --t40: rgba(245, 240, 232, 0.40);
-  --t25: rgba(245, 240, 232, 0.25);
-  --t12: rgba(245, 240, 232, 0.12);
+  --gold: #378ADD;
+  --gold2: #6DB1EE;
+  --gold3: #B5D4F4;
+  --text: #EEF3FA;
+  --text2: #D5DEEA;
+  --t80: rgba(238, 243, 250, 0.80);
+  --t60: rgba(238, 243, 250, 0.60);
+  --t40: rgba(238, 243, 250, 0.40);
+  --t25: rgba(238, 243, 250, 0.25);
+  --t12: rgba(238, 243, 250, 0.12);
   --red: #EF4444;
   --green: #4ADE80;
-  --border: rgba(201, 168, 76, 0.10);
-  --border2: rgba(201, 168, 76, 0.20);
+  --border: rgba(55, 138, 221, 0.10);
+  --border2: rgba(55, 138, 221, 0.20);
   --mono: 'JetBrains Mono', monospace;
   --serif: 'Fraunces', Georgia, serif;
 
@@ -147,11 +147,11 @@
 }
 .navItem:hover {
   color: var(--text2);
-  background: rgba(201, 168, 76, 0.03);
+  background: rgba(55, 138, 221, 0.03);
 }
 .navItem.active {
   color: var(--gold2);
-  background: rgba(201, 168, 76, 0.07);
+  background: rgba(55, 138, 221, 0.07);
   border-left-color: var(--gold);
 }
 
@@ -190,9 +190,9 @@
   border: 1px solid rgba(220, 38, 38, 0.22);
 }
 .badgeGold {
-  background: rgba(201, 168, 76, 0.12);
+  background: rgba(55, 138, 221, 0.12);
   color: var(--gold);
-  border: 1px solid rgba(201, 168, 76, 0.20);
+  border: 1px solid rgba(55, 138, 221, 0.20);
 }
 .badgeGreen {
   background: rgba(74, 222, 128, 0.10);
