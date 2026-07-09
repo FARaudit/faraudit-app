@@ -39,6 +39,15 @@ export function isGrounded(ctx: AuditToolContext, f: RawFinding): boolean {
   return findInSource(ctx, f.excerpt).hits.length > 0;
 }
 
+// Gate-3 PERF (attachment-coverage live run 6cbabeae): the binding-attachment COVERAGE SWEEP runs on ONE lens only,
+// not all 5. Coverage unions docsRead/attestations across lenses (audit-orchestrator.ts ~736), so a single lens
+// reading each binding doc ONCE suffices; fanning the read-EACH mandate to every lens was 5× redundant (each lens
+// balloons its own read_document transcript) and blew the 270s overall budget. contracts_attorney owns
+// eligibility/§I clauses/flow-downs — the natural home for security-requirements / set-aside / clause attachments.
+const COVERAGE_LENS_KEY = process.env.AUDIT_COVERAGE_LENS_KEY || "contracts_attorney";
+// The coverage lens reads MANY binding docs, so it needs more react turns than the default 8 (≈10 docs > 8 turns).
+const COVERAGE_LENS_MAX_TURNS = Number(process.env.AUDIT_COVERAGE_LENS_MAX_TURNS) || 14;
+
 /** Run ONE agentic expert as a tool-using react loop. Returns grounded TypedFindings (facts), or [] if it
  *  never converged. Pure control flow + deterministic grounding; the only nondeterminism is inside the
  *  injected model call, and its output is hard-gated by isGrounded before anything is accepted. */
@@ -47,7 +56,7 @@ export async function runAgenticExpert(
   ctx: AuditToolContext,
   opts: { callModel: CallModel; maxTurns?: number; signal?: AbortSignal },
 ): Promise<{ findings: TypedFinding[]; turns: number; dropped: number; converged: boolean; sectionsRead: string[]; docsRead: string[]; attestations: string[]; trace: Array<{ turn: number; tools: Array<{ name: string; input: Record<string, unknown> }> }> }> {
-  const maxTurns = opts.maxTurns ?? 8;
+  const baseMaxTurns = opts.maxTurns ?? 8;
   const priorToolResults: ToolResult[][] = [];
   // PURE-OBSERVER trace (Brain card-48 guardrail 1): logging only, ZERO behavior change. Records every tool
   // the agent called per turn + the sections it read, so thin-vs-bug is adjudicated from the trace, not the verdict.
@@ -58,7 +67,12 @@ export async function runAgenticExpert(
   // with the HONEST-EMPTY-FIRST-CLASS mandate: read each, then EITHER ground ≥1 verbatim obligation OR attest it has
   // no operative obligation. Honest-empty PASSES; inventing a finding FAILS (the grounding backstop drops a fabricated
   // excerpt anyway). Flag-OFF (or no binding attachments) ⇒ userTask is byte-identical to today.
-  const bindingDocs = ATTACHMENT_COVERAGE_ENABLED ? listBindingDocuments(ctx) : [];
+  // ONLY the designated coverage lens runs the binding-attachment sweep (Gate-3 perf fix) — other lenses get an
+  // empty list ⇒ byte-identical to their flag-OFF userTask. Flag-OFF ⇒ every lens gets [] ⇒ byte-identical to today.
+  const isCoverageLens = ATTACHMENT_COVERAGE_ENABLED && spec.key === COVERAGE_LENS_KEY;
+  const bindingDocs = isCoverageLens ? listBindingDocuments(ctx) : [];
+  // The coverage lens gets extra turns to read all binding docs; every other lens keeps the default (unchanged).
+  const maxTurns = bindingDocs.length ? Math.max(baseMaxTurns, COVERAGE_LENS_MAX_TURNS) : baseMaxTurns;
   // Attachment names are DOCUMENT-source-derived (attacker-influenceable via a crafted filename or a fake delimiter
   // in an attachment body), so a raw name could smuggle an instruction into this mandate (Gauntlet #349 injection
   // channel). Sanitize before interpolation: strip newlines + "====" delimiter tokens, collapse whitespace, cap
