@@ -19,7 +19,7 @@ import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -812,6 +812,19 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      and firmStatus skips it. NEVER touches a non-brand-name bar (QPL/clearance). Flag off ⇒ unchanged.
   findings = applyOrEqualCarveout(findings, { enabled: process.env.AUDIT_OREQUAL_CARVEOUT === "true" });
 
+  // Brain #334 (Direction C, part A) — deterministic set-aside NOTICE detector. The governing set-aside notice(s) in
+  // the clause matrix were systematically NOT surfaced as findings (FA1068: all lenses missed 52.219-3 HUBZone +
+  // 52.219-6 Total-SB), so the verdict never considered the set-aside eligibility basis AND detectSetAsideConflict was
+  // STARVED. Emit one grounded eligibility finding per notice marked applicable (dedup vs a lens finding that already
+  // covers it). Placed HERE — BEFORE the award-basis/firm-status guard chain (pre-live review #334, Brain #338 reversal
+  // of #335) — so a single set-aside rides the SAME positive-set-aside path as a lens-surfaced one: null/open-world →
+  // softened to a curable BID_WITH_CAUTION (verify-language, no no-bid phrasing); closed-world holder → BID (firmStatus
+  // reconciles the canonical requiredAttribute); non-holder → INELIGIBLE. A multi-program doc still → NHR (the conflict
+  // gate below reads the raw matrix independently and DOMINATES). Same flag as the gate (one revert unit).
+  if (process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true") {
+    findings = mergeSetAsideNoticeFindings(findings, emitSetAsideNoticeFindings(ctx.fullSource));
+  }
+
   // P4.3 — AWARD-BASIS OVER-TYPE GUARD (Brain card 108; Fork-3 card 226/238). FLAG-DRIFT CORRECTED (card 240 §5):
   //      the guard is DEFAULT-ON — `enabled = AUDIT_AWARDBASIS_OVERTYPE_GUARD !== "false"` (`setAsideOvertypeGuardOpts`,
   //      audit-decide.ts:410) — and is verdict-affecting by default, RATIFIED by CEO Rule-61 on the Fork-3 ship
@@ -940,12 +953,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     missing.length ? `binding section(s) not located: ${missing.join(", ")}` : "",
     coreMissing.length ? `required section(s) absent: ${coreMissing.join(", ")}` : "",
   ].filter(Boolean).join("; ") || undefined;
-  // Brain #332 — SAM-vs-DOCUMENT set-aside CONFLICT. The SAM set-aside (opts.setAside, the system-of-record program,
-  // previously "plumb-only" and DROPPED here) is compared against the doc-grounded set-aside in the findings; a genuine
-  // program mismatch (live root: SAM=HZC/HUBZone vs a 52.219-6 Total-SB clause) DOMINATES the verdict → NHR (CO
-  // clarification), never a silent pick. Flag-gated (default-OFF); flag off ⇒ undefined ⇒ deriveVerdict byte-identical.
+  // Brain #332 + #334-B — set-aside conflict. detectSetAsideConflict now also reads the RAW clause matrix (not only
+  // findings): SAM-vs-doc AND doc-internal multi-program ambiguity both DOMINATE → NHR (CO clarification), never a
+  // silent pick. Flag-gated (default-OFF); flag off ⇒ undefined ⇒ deriveVerdict byte-identical.
   const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true"
-    ? detectSetAsideConflict(opts.setAside, findings)
+    ? detectSetAsideConflict(opts.setAside, findings, ctx.fullSource)
     : undefined;
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
