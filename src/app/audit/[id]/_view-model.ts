@@ -468,6 +468,9 @@ export interface AuditViewModel {
   // true, ALL "metadata-only / Locked / Fetch from SAM.gov" scaffolding must be
   // suppressed/stripped regardless of is_unscored or per-section counts.
   report_has_real_content: boolean;
+  is_nhr: boolean;                  // NHR pole (honest-fail/NEEDS_HUMAN_REVIEW/INCOMPLETE/OUT_OF_SCOPE)
+  nhr_reason: string;               // engine reason string, verbatim — the Human-review slate tag
+  nhr_findings_count: number;       // findings produced despite no score — "see the N findings below"
   // FA-E2E Fix 2 (2026-06-18): REAL clause/trap counts so the metadata-only
   // locked teasers stop rendering hardcoded "4 DFARS traps / 9 clauses"
   // literals. Populated from compliance_json; the renderer strips the teaser
@@ -2766,6 +2769,19 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     _ingFar > 0 || _ingDfars > 0 || _clinCount > 0 ||
     engineProducedAudit || _docsComplete;
   const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !reportHasRealContent;
+  // Card-355 R1/BUILD1 (Brain #342): the NHR "Human review" slate signal. An NHR pole (honest-fail /
+  // NEEDS_HUMAN_REVIEW / INCOMPLETE / OUT_OF_SCOPE) that nevertheless analyzed the full doc must render the
+  // neutral Human-review slate — NOT the scored masthead, which leaks a committal word (e.g. CAUTION) onto a
+  // no-verdict audit. Gated with is_unscored + report_has_real_content in the renderer so a non-NHR score-null
+  // audit (mis-detected primary doc, FA-195-v2) still keeps its scored masthead.
+  const _v3reason = (compJson.v3 ?? {}) as { verdict?: string; reason?: string; findings?: unknown[] };
+  const isNhr =
+    compJson.honest_fail === true ||
+    ["NEEDS_HUMAN_REVIEW", "INCOMPLETE", "OUT_OF_SCOPE"].includes(String(_v3reason.verdict ?? "").toUpperCase());
+  const nhrReason =
+    sanitizeDisplayText(String(_v3reason.reason ?? "")) ||
+    "A person needs to reconcile the findings before this is a bid / no-bid call.";
+  const nhrFindingsCount = Array.isArray(_v3reason.findings) ? _v3reason.findings.length : 0;
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
   // both populated and missing-flag rows.
@@ -3284,6 +3300,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code — we derive the same shape from existing fields so legacy rows
     // still render the Exec Summary surface cleanly.
     exec_verdict: (() => {
+      // Card-355 R1 (Brain #342): a reviewed NHR has NO committal verdict — the exec "bottom line" must match the
+      // Human-review masthead, never leak "CAUTION" (the recommendation union canonicalizes NHR→CAUTION; that
+      // structural leak is filed as a defect, this neutralizes the visible surface).
+      if (isNhr && isUnscored && reportHasRealContent) return "HUMAN REVIEW";
       const eng = compJson.executive_summary as { verdict?: string } | undefined;
       return eng?.verdict ?? (verdict.word === "GO" ? "GO" : verdict.word === "DECLINE" ? "NO-BID" : "CAUTION");
     })(),
@@ -3534,6 +3554,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     is_metadata_only: !!isMetadataOnly,
     report_has_real_content: !!reportHasRealContent,
+    is_nhr: isNhr,
+    nhr_reason: nhrReason,
+    nhr_findings_count: nhrFindingsCount,
     // FA-E2E Fix 2: real counts for the locked-teaser placeholders.
     far_clause_count: farCount,
     dfars_clause_count: dfarsCount,

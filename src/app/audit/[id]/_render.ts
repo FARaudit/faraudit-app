@@ -402,7 +402,7 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
 //                       its data-state="locked" so the print rule doesn't fire,
 //                       AND stamp data-prelim-mode = fetch/watch/upload on it
 //                       (drives the CSS .pm-head/.pm-cta visibility selectors).
-function pickVerdictBlock(html: string, mode: "scored" | "preliminary", prelimMode?: "fetch" | "watch" | "upload"): string {
+function pickVerdictBlock(html: string, mode: "scored" | "preliminary", prelimMode?: "fetch" | "watch" | "upload" | "reviewed"): string {
   if (mode === "scored") {
     const idx = html.indexOf('<div class="mh-verdict v-unscored"');
     if (idx === -1) return html;
@@ -546,9 +546,12 @@ function revealLockedSectionsForUnscored(html: string): string {
 function stripLockedScaffoldingForRealContent(html: string): string {
   let out = html;
   // 1. Preliminary masthead — uniquely identified by data-field="preliminary_block".
+  // Card-355 BUILD1: only strip the STILL-LOCKED metadata-only scaffolding. pickVerdictBlock removes
+  // data-state="locked" when it converts this block into the reviewed NHR "Human review" slate, so requiring
+  // data-state="locked" here leaves that slate intact — it IS the legitimate masthead for a real-content NHR.
   out = removeElementByOpenRe(
     out,
-    /<div\b[^>]*\bdata-field="preliminary_block"[^>]*>/,
+    /<div\b(?=[^>]*\bdata-field="preliminary_block")[^>]*\bdata-state="locked"[^>]*>/,
     "div"
   );
   // 2. "moment" locked teaser — <section class="moment" data-state="locked">.
@@ -2375,6 +2378,29 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // web + PDF in lockstep (no need for [data-state="locked"] CSS gymnastics
     // since the sections are physically gone).
     html = removeNotSolicitationSections(html);
+  } else if (vm.is_unscored && vm.report_has_real_content && vm.is_nhr) {
+    // Card-355 R1/BUILD1 (Brain #342): an NHR that analyzed the full doc renders the NEUTRAL "Human review"
+    // slate — never a committal word. The prior FA-195-v2 fall-through to the scored block (below) leaked
+    // verdict_word "CAUTION" onto a no-verdict audit (filed as the canonicalization-leak defect). Reuse the
+    // .v-unscored prelim chassis with the new data-prelim-mode="reviewed": engine reason verbatim + a pointer
+    // to the findings that WERE produced. The report body (§04/§05/matrix/findings) renders unchanged below.
+    html = pickVerdictBlock(html, "preliminary", "reviewed");
+    html = replaceFieldText(html, "nhr_reason", vm.nhr_reason);
+    html = replaceFieldText(html, "nhr_findings_count", String(vm.nhr_findings_count));
+    // exec "bottom line" must match the Human-review masthead, not the template-default "CAUTION" (this binding
+    // otherwise only runs in the scored branch). vm.exec_verdict is neutralized to "HUMAN REVIEW" for a reviewed NHR.
+    html = replaceFieldText(html, "exec_verdict", vm.exec_verdict);
+    if (vm.prelim_has_deadline) {
+      html = replaceFieldText(html, "response_days_num", vm.response_days_num);
+      html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
+    } else {
+      html = removePrelimDeadlineTile(html);
+    }
+    if (vm.set_aside_eligibility) {
+      html = replaceFieldText(html, "set_aside_eligibility", vm.set_aside_eligibility);
+    } else {
+      html = removePrelimSetasideNote(html);
+    }
   } else if (vm.is_unscored && !vm.report_has_real_content) {
     // FA-195-v2: a scored-null report that nevertheless read its documents in
     // full (report_has_real_content) must NOT take the "Preliminary · SAM
