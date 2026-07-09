@@ -371,6 +371,68 @@ export function isPositiveSetAside(f: TypedFinding): boolean {
     && !SIZE_DISQUALIFICATION_RE.test(hay) && !SUBCONTRACTING_GOAL_RE.test(hay);
 }
 
+// ── SAM-vs-DOCUMENT SET-ASIDE CONFLICT DETECTION (Brain #332 — source-of-truth defect) ───────────────────────
+// SAM's `typeOfSetAside` code is the system of record for the set-aside PROGRAM; the doc-grounded findings carry the
+// incorporated set-aside clause. When they name DIFFERENT programs the engine must NOT silently adopt one (that
+// inverts eligibility → zero-contract-loss both ways) — it surfaces the conflict → NHR. Pure; conservative (fires
+// only when BOTH the SAM code AND a doc set-aside are confidently identified AND they genuinely differ). Flag-gated
+// at the orchestrator; the helper itself is pure + always safe to call (returns undefined when no basis to conflict).
+// SAM typeOfSetAside code → canonical program (mirrors canonicalizeEligibilityAttr's se: space; sb:total for Total-SB).
+const SAM_SETASIDE_CANON: ReadonlyArray<{ re: RegExp; canon: string }> = [
+  { re: /^8AN?$/i, canon: "se:8a" },
+  { re: /^HZ[CS]$/i, canon: "se:hubzone" },
+  { re: /^SDVOSB[CS]?$/i, canon: "se:sdvosb" },
+  { re: /^EDWOSB(SS)?$/i, canon: "se:edwosb" },
+  { re: /^WOSB(SS)?$/i, canon: "se:wosb" },
+  { re: /^(VSA|VSS|VOSB)$/i, canon: "se:vosb" },
+  { re: /^(SBA|SBP)$/i, canon: "sb:total" },
+];
+export function canonicalizeSamSetAside(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  for (const c of SAM_SETASIDE_CANON) if (c.re.test(s)) return c.canon;
+  return null; // unknown/unmapped code → no basis to conflict (conservative, never a false conflict)
+}
+// Human-readable label for a canonical program (for the CO-clarification message).
+const SETASIDE_LABEL: Record<string, string> = {
+  "se:8a": "8(a)", "se:hubzone": "HUBZone", "se:sdvosb": "SDVOSB", "se:edwosb": "EDWOSB",
+  "se:wosb": "WOSB", "se:vosb": "VOSB", "sb:total": "Total Small Business",
+};
+const setAsideLabel = (canon: string): string => SETASIDE_LABEL[canon] ?? canon;
+// A set-aside CITATION (52.219-x family) → canonical program. -6/-7 = Total-SB; -3/-4 = HUBZone; -27 = SDVOSB;
+// -29 = EDWOSB; -30 = WOSB; -18 = 8(a) award. (-13/-14 LOS, -8/-9 subcontracting: NOT a program → ignored.)
+function citationSetAsideCanon(hay: string): string | null {
+  if (/52\.219-30\b/.test(hay)) return "se:wosb";
+  if (/52\.219-29\b/.test(hay)) return "se:edwosb";
+  if (/52\.219-27\b/.test(hay)) return "se:sdvosb";
+  if (/52\.219-18\b/.test(hay)) return "se:8a";
+  if (/52\.219-[34]\b/.test(hay)) return "se:hubzone";
+  if (/52\.219-[67]\b/.test(hay)) return "sb:total";
+  return null;
+}
+/** Detect a SAM-vs-document set-aside conflict (Brain #332). Pure. Returns the conflict (both programs + a
+ *  CO-clarification note) when SAM names a program the document's set-aside findings do NOT carry AND the document
+ *  names a DIFFERENT program; undefined otherwise (SAM code unknown, doc set-aside unidentified, or they agree). */
+export function detectSetAsideConflict(samSetAside: string | null | undefined, findings: TypedFinding[]): { sam: string; doc: string; note: string } | undefined {
+  const samCanon = canonicalizeSamSetAside(samSetAside);
+  if (!samCanon) return undefined; // no authoritative SAM program → no basis to conflict
+  // Doc-detected set-aside programs: from a genuine set-aside finding's canonical requiredAttribute OR its set-aside
+  // citation. Restricted to isPositiveSetAside findings (+ any explicit 52.219 set-aside citation) so incidental text
+  // never false-conflicts.
+  const docCanons = new Set<string>();
+  for (const f of findings) {
+    const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
+    const positive = isPositiveSetAside(f);
+    if (positive && f.requiredAttribute) { const a = canonicalizeEligibilityAttr(f.requiredAttribute); if (a) docCanons.add(a); }
+    const byCite = citationSetAsideCanon(hay);
+    if (byCite && (positive || byCite === "sb:total")) docCanons.add(byCite); // a 52.219-6 Total-SB clause counts even if isPositiveSetAside is silent
+  }
+  if (docCanons.size === 0) return undefined;      // doc set-aside not identified → no conflict (conservative)
+  if (docCanons.has(samCanon)) return undefined;   // doc carries the SAM program → agreement, no conflict
+  const doc = [...docCanons].map(setAsideLabel).join(" / ");
+  return { sam: setAsideLabel(samCanon), doc, note: "Confirm the governing set-aside with the Contracting Officer before bidding — the eligible pool differs between the two." };
+}
+
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" | "caution" }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f) => {
@@ -1226,6 +1288,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
   if (inp.unreadEvidence && inp.unreadEvidence.length)
     return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${inp.unreadEvidence.map((u) => u.note).join("; ").slice(0, 220)}.`, dispositions, []);
+
+  // 1d. SET-ASIDE CONFLICT (Brain #332) — SAM (system of record) and the document name DIFFERENT set-aside programs.
+  //     This changes WHO is eligible (an ineligible firm could bid, or an eligible firm could walk — zero-contract-
+  //     loss both ways), so the engine must NEVER silently adopt one → NEEDS_HUMAN_REVIEW naming BOTH values for CO
+  //     clarification. Dominates the verdict (checked before verifier-soundness and every findings-derived pole).
+  //     Absent ⇒ byte-identical (orchestrator supplies it only under AUDIT_SETASIDE_CONFLICT_GATE).
+  if (inp.setAsideConflict)
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Set-aside conflict — SAM (system of record) and the solicitation document name DIFFERENT set-aside programs; this changes who is eligible to bid and must be confirmed with the Contracting Officer before relying on eligibility. SAM: ${inp.setAsideConflict.sam}; document: ${inp.setAsideConflict.doc}. ${inp.setAsideConflict.note}`, dispositions, []);
 
   // 2. Verification soundness — if adversarial verification did not succeed, the findings aren't trustworthy.
   if (!inp.verifierSound)

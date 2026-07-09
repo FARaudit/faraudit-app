@@ -19,7 +19,7 @@ import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -940,7 +940,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     missing.length ? `binding section(s) not located: ${missing.join(", ")}` : "",
     coreMissing.length ? `required section(s) absent: ${coreMissing.join(", ")}` : "",
   ].filter(Boolean).join("; ") || undefined;
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
+  // Brain #332 — SAM-vs-DOCUMENT set-aside CONFLICT. The SAM set-aside (opts.setAside, the system-of-record program,
+  // previously "plumb-only" and DROPPED here) is compared against the doc-grounded set-aside in the findings; a genuine
+  // program mismatch (live root: SAM=HZC/HUBZone vs a 52.219-6 Total-SB clause) DOMINATES the verdict → NHR (CO
+  // clarification), never a silent pick. Flag-gated (default-OFF); flag off ⇒ undefined ⇒ deriveVerdict byte-identical.
+  const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true"
+    ? detectSetAsideConflict(opts.setAside, findings)
+    : undefined;
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
