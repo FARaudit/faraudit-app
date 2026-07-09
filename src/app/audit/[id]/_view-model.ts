@@ -2044,6 +2044,30 @@ function deriveComplianceMatrix(
     if (!f.name) continue;
     rows.push({ requirement: f.name, source: "Section M", status: "clear" });
   }
+  // RENDER-COHERENCE P0 (Gate-1 DRAFT — Design to confirm 1:1): the agentic-V3 engine emits typed findings in
+  // compJson.v3.findings, NOT the legacy far_clauses/submission_requirements/evaluation_factors this matrix reads. When
+  // those legacy fields produced NOTHING (rows empty) but V3 findings exist, surface them so a fully-analyzed V3 audit
+  // renders its requirements instead of an empty shell. Gated on rows.length===0 ⇒ legacy audits are byte-identical.
+  // First-pass kind→status + citation→source mapping; the section/kind grouping + copy are a Design decision.
+  if (rows.length === 0) {
+    const v3f = ((compJson.v3 ?? {}) as { findings?: Array<Record<string, unknown>> }).findings;
+    if (Array.isArray(v3f)) {
+      const srcForKind = (k: string): string =>
+        k === "clause_flowdown" ? "Clause" : k === "submission" ? "Section L" : k === "pricing" ? "Pricing" :
+        k === "eligibility_bar" ? "Eligibility" : k === "past_performance" ? "Past performance" : "Solicitation";
+      for (const f of v3f) {
+        const requirement = String(f.requirement ?? f.excerpt ?? "").trim();
+        if (!requirement) continue;
+        const kind = String(f.kind ?? "");
+        const status: "action" | "risk" | "clear" =
+          kind === "eligibility_bar" ? "risk" :
+          kind === "boilerplate" ? "clear" :
+          String(f.disposition ?? "") === "gate_to_clear" ? "action" : "clear";
+        const source = String(f.citation ?? "").trim() || srcForKind(kind);
+        rows.push({ requirement: requirement.slice(0, 400), source, status });
+      }
+    }
+  }
   return rows;
 }
 
@@ -2671,6 +2695,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // Gate audits ran on a real source and produced a decision — not unscored.
   // The unscored branch only fires when the engine literally couldn't score
   // (metadata-only, no PDF).
+  // RENDER-COHERENCE P0 (Gate-1, audit 530702bb): the agentic-V3 engine emits its audit in compJson.v3.{findings,verdict}.
+  // engineProducedAudit is the shared "this is a real, fully-analyzed audit" signal used by reportHasRealContent (below)
+  // + isNotSolicitation. is_unscored INTENTIONALLY stays true for an honest-fail/NHR run (score IS null) — per FA-195-v2
+  // the masthead routing keys off report_has_real_content (which now recognizes V3), NOT off flipping is_unscored, so the
+  // scored block renders with an honest "not yet scored" score area rather than the "upload the PDF" teaser.
+  const _v3 = (compJson.v3 ?? {}) as { findings?: unknown[]; verdict?: string };
+  const engineProducedAudit =
+    (Array.isArray(_v3.findings) && _v3.findings.length > 0) ||
+    (typeof _v3.verdict === "string" && _v3.verdict.length > 0 && _v3.verdict !== "NOT_A_SOLICITATION");
   const isUnscored = verdictMode !== "gate" && (rawScore === null || scoreConfidenceRaw === "unscored");
   // FA-195: never render the "Locked / metadata-only / Fetch from SAM.gov"
   // teasers on an audit that actually read its documents in full. pdf_source
@@ -2688,10 +2721,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // scaffolding must be driven off this one flag (NOT is_unscored, NOT per-section
   // counts, NOT pdf_source alone) — those disagreed and leaked the contradiction
   // (the 5-sol sweep found it visible on #2/#3/#5 while files were read in full).
+  // RENDER-COHERENCE P0 (Gate-1 root cause, audit 530702bb): the agentic-V3 engine (AUDIT_AGENTIC_V3_PRIMARY, live)
+  // writes its output to compJson.v3.{findings,verdict} + compJson.documents_complete/doc_count — NOT to the legacy
+  // ingestion/far_clauses/clin_line_items keys this check historically read. So a fully-analyzed V3 audit (33 grounded
+  // findings + a real NHR verdict) scored reportHasRealContent=false → fell through to the "metadata-only / upload the
+  // PDF" empty shell. Recognize the V3 output so a real V3 audit is never treated as a metadata-only shell.
+  const _docsComplete = compJson.documents_complete === true || (typeof compJson.doc_count === "number" && compJson.doc_count > 0);
   const reportHasRealContent =
     v2Shadow?.path === "pdf" ||
     ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0)) ||
-    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0;
+    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0 ||
+    engineProducedAudit || _docsComplete;
   const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !reportHasRealContent;
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
@@ -2707,10 +2747,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // real NHR verdict), rendering a near-empty shell (Set-aside "Not in documents" despite SAM HZC). GATE the derived
   // branch on the engine NOT having produced a substantive audit: a real verdict pole + findings means it IS a
   // solicitation, full stop. The EXPLICIT persisted flag still wins (a genuine engine "not a solicitation" call).
-  const v3ForNotSol = (compJson.v3 ?? {}) as { findings?: unknown[]; verdict?: string };
-  const engineProducedAudit =
-    (Array.isArray(v3ForNotSol.findings) && v3ForNotSol.findings.length > 0) ||
-    (typeof v3ForNotSol.verdict === "string" && v3ForNotSol.verdict.length > 0 && v3ForNotSol.verdict !== "NOT_A_SOLICITATION");
+  // engineProducedAudit is hoisted above (shared with isUnscored + reportHasRealContent).
   const isNotSolicitation = typeof persistedNotSol === "boolean"
     ? persistedNotSol
     : (!engineProducedAudit &&
