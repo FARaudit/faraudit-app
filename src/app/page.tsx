@@ -3,6 +3,15 @@ import path from "node:path";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 import LandingClient from "./_components/landing-client";
+import type { Metadata } from "next";
+
+// Per-route metadata: Next.js injects the / <meta name="description"> from this
+// export (field-level override of the root layout default). The rendered / head
+// comes from the React tree, NOT public/root-landing.html's own <head>.
+export const metadata: Metadata = {
+  description:
+    "A bid/no-bid verdict federal contractors can trust — from first government signal to recompete alert."
+};
 
 // Auth-aware: signed-in visitors jump to /command-center; otherwise the
 // Claude Design landing page renders. Renders are dynamic because we read
