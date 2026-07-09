@@ -384,9 +384,9 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
         <div className="topbar">
           <div className="tb-brand">
             <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
-              <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" strokeWidth="1.4" fill="rgba(201,168,76,.1)" opacity=".9"/>
-              <line x1="10" y1="13" x2="18" y2="13" stroke="#C9A84C" strokeWidth=".9" opacity=".7"/>
-              <line x1="10" y1="16" x2="16" y2="16" stroke="#C9A84C" strokeWidth=".9" opacity=".5"/>
+              <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#378ADD" strokeWidth="1.4" fill="rgba(55, 138, 221,.1)" opacity=".9"/>
+              <line x1="10" y1="13" x2="18" y2="13" stroke="#378ADD" strokeWidth=".9" opacity=".7"/>
+              <line x1="10" y1="16" x2="16" y2="16" stroke="#378ADD" strokeWidth=".9" opacity=".5"/>
             </svg>
             <div className="tb-wordmark">FAR<span>audit</span></div>
           </div>
@@ -590,25 +590,25 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                   ) : (
                     <div className="sit-value red">{auditP0Count}</div>
                   )}
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Solicitations with compliance traps that could disqualify your bid or cost you money on delivery.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--red)", marginTop: 10, borderTop: "1px solid rgba(220,38,38,.15)", paddingTop: 8 }}>Review P0 Flags →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--amber)" }} onClick={() => setFilter("≤7 Days")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--amber)", marginBottom: 8 }}>⏱ Expiring This Week</div>
                   <div className="sit-value gold">{stats.exp}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Submission deadlines closing in 7 days or less. Missed windows are permanent — no extensions after closing time.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--amber)", marginTop: 10, borderTop: "1px solid rgba(245,158,11,.15)", paddingTop: 8 }}>View Expiring →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--gold)" }} onClick={() => setTab("opportunities")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--gold2)", marginBottom: 8 }}>● Live on SAM.gov Now</div>
                   <div className="sit-value gold">{stats.total}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(201,168,76,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Active federal solicitations posted right now across your NAICS codes. Updated by sam-ingest cron — every one is a potential contract.</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--gold)", marginTop: 10, borderTop: "1px solid rgba(55, 138, 221,.15)", paddingTop: 8 }}>Open SAM.gov Feed →</div>
                 </button>
                 <button className="sit-card" style={{ borderTop: "3px solid var(--green)" }} onClick={() => setTab("past-audits")}>
                   <div className="sit-label" style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", color: "var(--green)", marginBottom: 8 }}>✓ Your Audit Activity</div>
                   <div className="sit-value green">{counter.audits}</div>
-                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(245,240,232,.85)", lineHeight: 1.55, marginTop: 6 }}>Audits completed total. {counter.traps} compliance traps caught — every clause read, every trap flagged, every KO email drafted.</div>
+                  <div className="sit-sub" style={{ fontSize: 11, color: "rgba(238, 243, 250,.85)", lineHeight: 1.55, marginTop: 6 }}>Audits completed total. {counter.traps} compliance traps caught — every clause read, every trap flagged, every KO email drafted.</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--green)", marginTop: 10, borderTop: "1px solid rgba(74,222,128,.15)", paddingTop: 8 }}>View Recent Audits →</div>
                 </button>
               </div>
@@ -617,8 +617,8 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
               <button className="upload-bar" onClick={() => setTab("audit")}>
                 <div className="upload-icon-wrap">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M10 2v11M6 6l4-4 4 4" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#C9A84C" strokeWidth="1.5" strokeLinecap="round" opacity=".6"/>
+                    <path d="M10 2v11M6 6l4-4 4 4" stroke="#378ADD" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#378ADD" strokeWidth="1.5" strokeLinecap="round" opacity=".6"/>
                   </svg>
                 </div>
                 <div className="upload-copy">
@@ -1001,7 +1001,7 @@ export default function HomeClient({ user, counter, opportunities: initialOpport
                       const auC = auditColors[r.auditStatusCls] ?? auditColors.none;
                       const dlColors: Record<string, string> = { urg: "var(--red)", soon: "var(--amber)", ok: "var(--t60)", exp: "var(--t40)", none: "var(--t40)" };
                       const rc = r.risk === "rp0" ? "var(--red)" : r.risk === "rp1" ? "var(--amber)" : r.risk === "rp2" ? "var(--blue)" : "var(--gold)";
-                      const rb = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(201,168,76,.08)";
+                      const rb = r.risk === "rp0" ? "rgba(220,38,38,.14)" : r.risk === "rp1" ? "rgba(245,158,11,.11)" : r.risk === "rp2" ? "rgba(96,165,250,.10)" : "rgba(55, 138, 221,.08)";
 
                       const onOpenAudit = () => {
                         setAuditPrefill({
@@ -1777,16 +1777,16 @@ function RunAuditPanel({ prefill, active, onPrefillClear }: { prefill?: RunAudit
       <form className="audit-center" onSubmit={submit}>
         <div className="audit-hero-icon">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#C9A84C" strokeWidth="1.2" fill="rgba(201,168,76,.08)"/>
-            <polyline points="9,14 12.5,17.5 19,11" stroke="#C9A84C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <path d="M14 2L24 7V15C24 20.5 19.5 25 14 26C8.5 25 4 20.5 4 15V7L14 2Z" stroke="#378ADD" strokeWidth="1.2" fill="rgba(55, 138, 221,.08)"/>
+            <polyline points="9,14 12.5,17.5 19,11" stroke="#378ADD" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
           </svg>
         </div>
         <div className="audit-hero-title">Run a New Audit</div>
         <div className="audit-hero-sub">Upload any federal solicitation PDF. FARaudit runs three sequential intelligence calls — Overview · FAR/DFARS Compliance · Risk Extraction — and delivers a ranked report with a KO clarification email drafted and ready to send.</div>
         {prefill?.notice_id && (
           <div style={{
-            background: "rgba(201,168,76,0.06)",
-            border: "1px solid rgba(201,168,76,0.25)",
+            background: "rgba(55, 138, 221,0.06)",
+            border: "1px solid rgba(55, 138, 221,0.25)",
             borderRadius: 3,
             padding: "10px 14px",
             marginBottom: 14,
@@ -2014,8 +2014,8 @@ function PastAuditsPanel({
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
                   padding: "5px 12px", borderRadius: 2,
-                  background: active ? "rgba(201,168,76,.14)" : "transparent",
-                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  background: active ? "rgba(55, 138, 221,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(55, 138, 221,.32)" : "var(--border)"}`,
                   color: active ? "var(--gold)" : "var(--t40)",
                   cursor: "pointer"
                 }}
@@ -2047,7 +2047,7 @@ function PastAuditsPanel({
           {filtered.map((a) => {
             const r = riskFromScore(a.compliance_score);
             const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
-            const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(201,168,76,.08)";
+            const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(55, 138, 221,.08)";
             const recColor = a.recommendation === "PROCEED" ? "var(--green)" : a.recommendation === "DECLINE" ? "var(--red)" : "var(--amber)";
             const isPinned = pinned.has(a.id);
             const isBusy = pinBusy.has(a.id);
@@ -2081,8 +2081,8 @@ function PastAuditsPanel({
                   style={{
                     fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
                     padding: "3px 8px", borderRadius: 2,
-                    background: isPinned ? "rgba(74,222,128,.10)" : "rgba(201,168,76,.08)",
-                    border: `1px solid ${isPinned ? "rgba(74,222,128,.32)" : "rgba(201,168,76,.32)"}`,
+                    background: isPinned ? "rgba(74,222,128,.10)" : "rgba(55, 138, 221,.08)",
+                    border: `1px solid ${isPinned ? "rgba(74,222,128,.32)" : "rgba(55, 138, 221,.32)"}`,
                     color: isPinned ? "var(--green)" : "var(--gold)",
                     cursor: isBusy ? "wait" : "pointer",
                     opacity: isBusy ? 0.6 : 1
@@ -2194,8 +2194,8 @@ function DeadlineCalendar({ rows, onPick }: { rows: CalendarRow[]; onPick: (row:
                   onClick={() => onPick(r)}
                   style={{
                     fontFamily: "var(--mono)", fontSize: 8, color: "var(--gold)",
-                    background: "rgba(201,168,76,.06)",
-                    border: "1px solid rgba(201,168,76,.18)",
+                    background: "rgba(55, 138, 221,.06)",
+                    border: "1px solid rgba(55, 138, 221,.18)",
                     borderRadius: 2,
                     padding: "2px 4px",
                     textAlign: "left",
@@ -2389,7 +2389,7 @@ function AgencyIntelPanel({ agencies }: { agencies: AgencyRow[] }) {
                   <div>
                     <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 6 }}>Recent solicitations</div>
                     {a.recent.slice(0, 3).map((r) => (
-                      <a key={r.id} href={auditHref(r)} style={{ display: "block", textDecoration: "none", padding: "4px 0", borderBottom: "1px solid rgba(201,168,76,.05)" }}>
+                      <a key={r.id} href={auditHref(r)} style={{ display: "block", textDecoration: "none", padding: "4px 0", borderBottom: "1px solid rgba(55, 138, 221,.05)" }}>
                         <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>{r.notice_id || "—"}</span>
                         <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", marginLeft: 8 }}>
                           {r.title ? r.title.slice(0, 50) + (r.title.length > 50 ? "…" : "") : "—"}
@@ -2442,7 +2442,7 @@ const inputStyle: React.CSSProperties = {
 type KanbanStage = "tracking" | "bidding" | "submitted" | "awarded" | "lost";
 const STAGES: { key: KanbanStage; label: string; color: string; bg: string }[] = [
   { key: "tracking",  label: "Tracking",  color: "var(--t60)",  bg: "rgba(148,163,184,.04)" },
-  { key: "bidding",   label: "Bidding",   color: "var(--gold)", bg: "rgba(201,168,76,.04)" },
+  { key: "bidding",   label: "Bidding",   color: "var(--gold)", bg: "rgba(55, 138, 221,.04)" },
   { key: "submitted", label: "Submitted", color: "var(--blue)", bg: "rgba(96,165,250,.04)" },
   { key: "awarded",   label: "Awarded",   color: "var(--green)",bg: "rgba(74,222,128,.04)" },
   { key: "lost",      label: "Lost",      color: "var(--red)",  bg: "rgba(220,38,38,.04)" }
@@ -2610,7 +2610,7 @@ function PipelineKanban({ audits }: { audits: AuditRow[] }) {
                     onClick={() => { window.location.href = auditHref(a); }}
                     style={{
                       background: "var(--void3)",
-                      border: `1px solid ${isDragging ? "rgba(201,168,76,.6)" : "var(--border)"}`,
+                      border: `1px solid ${isDragging ? "rgba(55, 138, 221,.6)" : "var(--border)"}`,
                       borderRadius: 2,
                       padding: "10px 12px",
                       cursor: busyId === a.id ? "wait" : "grab",
@@ -3118,8 +3118,8 @@ function BudgetPanel(_props: { naicsOptions: string[] }) {
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
                   padding: "5px 12px", borderRadius: 2,
-                  background: active ? "rgba(201,168,76,.14)" : "transparent",
-                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  background: active ? "rgba(55, 138, 221,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(55, 138, 221,.32)" : "var(--border)"}`,
                   color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
                 }}
               >
@@ -3257,8 +3257,8 @@ function DefenseNewsPanel() {
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
                   padding: "5px 12px", borderRadius: 2,
-                  background: active ? "rgba(201,168,76,.14)" : "transparent",
-                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  background: active ? "rgba(55, 138, 221,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(55, 138, 221,.32)" : "var(--border)"}`,
                   color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
                 }}
               >
@@ -3298,7 +3298,7 @@ function DefenseNewsPanel() {
                   {n.ai_insight}
                 </div>
               ) : (
-                <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", lineHeight: 1.5 }}>
+                <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(55, 138, 221,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--t60)", lineHeight: 1.5 }}>
                   <strong style={{ color: "var(--gold)" }}>How this affects your bids:</strong> {n.relevance}
                 </div>
               )}
@@ -3470,7 +3470,7 @@ function TeamingPartnersPanel(_props: { naicsOptions: string[] }) {
                   onClick={(e) => { e.stopPropagation(); setDraftFor(p); }}
                   style={{
                     fontFamily: "var(--mono)", fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
-                    color: "var(--gold)", background: "rgba(201,168,76,.08)",
+                    color: "var(--gold)", background: "rgba(55, 138, 221,.08)",
                     border: "1px solid var(--border2)", borderRadius: 2, padding: "4px 8px", cursor: "pointer"
                   }}
                 >
@@ -3925,7 +3925,7 @@ function MetricBlock({ label, value, pct, color, sub }: { label: string; value: 
         <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", letterSpacing: ".12em", textTransform: "uppercase" }}>{label}</span>
         <span style={{ fontFamily: "var(--mono)", fontSize: 10, color, fontWeight: 700 }}>{value}</span>
       </div>
-      <div style={{ height: 3, background: "rgba(201,168,76,.06)", borderRadius: 2, overflow: "hidden" }}>
+      <div style={{ height: 3, background: "rgba(55, 138, 221,.06)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, opacity: 0.6 }} />
       </div>
       <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--t40)", marginTop: 4 }}>{sub}</div>
@@ -4084,7 +4084,7 @@ function RegulatoryPanel() {
               <div style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.3, marginBottom: 6 }}>{u.title}</div>
               {u.summary && <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--t60)", lineHeight: 1.5 }}>{u.summary.slice(0, 280)}{u.summary.length > 280 ? "…" : ""}</div>}
               {u.affects_clauses.length > 0 && (
-                <div style={{ marginTop: 8, padding: "6px 10px", background: "rgba(201,168,76,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "rgba(55, 138, 221,.04)", borderRadius: 2, fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)" }}>
                   Affects: {u.affects_clauses.slice(0, 5).join(" · ")}
                 </div>
               )}
@@ -4153,8 +4153,8 @@ function CMMCPanel() {
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
                   padding: "5px 12px", borderRadius: 2,
-                  background: active ? "rgba(201,168,76,.14)" : "transparent",
-                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  background: active ? "rgba(55, 138, 221,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(55, 138, 221,.32)" : "var(--border)"}`,
                   color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
                 }}
               >
@@ -4172,7 +4172,7 @@ function CMMCPanel() {
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--gold)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Implementation checklist</div>
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {level.checklist.map((c, i) => (
-                <li key={i} style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)", lineHeight: 1.5, padding: "6px 0", borderBottom: "1px solid rgba(201,168,76,.05)", display: "flex", gap: 8 }}>
+                <li key={i} style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text)", lineHeight: 1.5, padding: "6px 0", borderBottom: "1px solid rgba(55, 138, 221,.05)", display: "flex", gap: 8 }}>
                   <span style={{ color: "var(--gold)" }}>—</span>
                   <span>{c}</span>
                 </li>
@@ -4269,8 +4269,8 @@ function LaborRatesPanel(_props: { naicsOptions: string[] }) {
                   fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700,
                   letterSpacing: ".08em", textTransform: "uppercase",
                   padding: "5px 12px", borderRadius: 2,
-                  background: active ? "rgba(201,168,76,.14)" : "transparent",
-                  border: `1px solid ${active ? "rgba(201,168,76,.32)" : "var(--border)"}`,
+                  background: active ? "rgba(55, 138, 221,.14)" : "transparent",
+                  border: `1px solid ${active ? "rgba(55, 138, 221,.32)" : "var(--border)"}`,
                   color: active ? "var(--gold)" : "var(--t40)", cursor: "pointer"
                 }}
               >
@@ -4314,7 +4314,7 @@ function CapTagList({ label, values, onChange }: { label: string; values: string
       <label style={fieldLabelStyle}>{label}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
         {values.map((v, i) => (
-          <span key={`${v}-${i}`} style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 2, background: "rgba(201,168,76,.08)", border: "1px solid var(--border2)", color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span key={`${v}-${i}`} style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 2, background: "rgba(55, 138, 221,.08)", border: "1px solid var(--border2)", color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4 }}>
             {v}
             <button
               type="button"

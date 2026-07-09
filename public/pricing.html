@@ -2,12 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Pricing — FARaudit</title>
+<title>Plans — FARaudit</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="description" content="FARaudit is a flat platform rate matched to your pipeline. Access is by application — terms shared during review." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="site.css" />
+<style>
+  /* pricing principles (Design card 364) */
+  .principles{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .prin{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px 24px;box-shadow:var(--shadow)}
+  .prin::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),rgba(55,138,221,0))}
+  .prin .pn{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.16em;color:var(--accent);margin-bottom:16px}
+  .prin h3{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:var(--ink);margin-bottom:10px;text-wrap:balance}
+  .prin p{font-size:13.5px;line-height:1.6;color:var(--ink-2);text-wrap:pretty}
+  @media (max-width:920px){.principles{grid-template-columns:1fr;gap:14px}}
+</style>
 </head>
 <body data-screen-label="pricing">
 
@@ -20,9 +31,10 @@
     </a>
     <div class="nav-links">
       <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
+      <a href="/pricing">Plans</a>
+      <a href="/learn">Learn</a>
       <a href="/sign-in">Sign in</a>
-      <a class="btn btn-primary" href="/access.html">Request Access</a>
+      <a class="btn btn-primary" href="/access">Request Access</a>
     </div>
   </div>
 </nav>
@@ -31,101 +43,34 @@
 <section class="page-hero">
   <div class="wrap">
     <div class="inner">
-      <div class="reveal eyebrow center">Pricing</div>
-      <h1 class="reveal">Federal Contract Intelligence.<br/><span class="accent">Priced for every stage.</span></h1>
-      <p class="reveal lede">Start as a solo BD director. Scale to a full capture team. Every plan includes the full three-call audit engine and the live intelligence feed.</p>
+      <div class="reveal eyebrow center">Plans</div>
+      <h1 class="reveal">Priced for teams that bid to win.</h1>
+      <p class="reveal lede">FARaudit is priced as a flat platform rate — no per-audit metering, no surprise line items. We share exact terms during your access review, matched to your pipeline. Design partners lock founding terms and shape the roadmap. Whether you're a solo BD director or a full capture team — you're in scope.</p>
+      <div class="reveal ctas">
+        <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ───────── TIERS ───────── -->
-<section class="band" style="padding-top:56px">
+<!-- ───────── PRICING PRINCIPLES ───────── -->
+<section class="band" style="padding-top:24px;padding-bottom:24px">
   <div class="wrap">
-    <div class="price-grid">
-
-      <!-- Design Partner (featured) -->
-      <div class="reveal tier featured">
-        <div class="ttag">Founding Rate</div>
-        <div class="tname">Design Partner</div>
-        <div class="tprice"><span class="amt">$1,250</span><span class="per">/mo</span></div>
-        <div class="tmeta">Rate locked 12 months</div>
-        <div class="tslots">Design partners shape the roadmap</div>
-        <div class="tdivider"></div>
-        <div class="tfeats">
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Full <b>three-call audit engine</b></span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Upstream synopsis + RFI drafting</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Weighted pipeline + CO email drafts</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span><b>Direct line</b> to the product team</span></div>
-        </div>
-        <div class="tspacer"></div>
-        <a class="btn btn-primary" style="justify-content:center" href="/access.html">Apply for access&nbsp;→</a>
+    <div class="principles reveal">
+      <div class="prin">
+        <div class="pn">01</div>
+        <h3>Flat platform rate</h3>
+        <p>No per-audit metering — no surprise line items.</p>
       </div>
-
-      <!-- Standard -->
-      <div class="reveal tier">
-        <div class="ttag">Full Platform</div>
-        <div class="tname">Standard</div>
-        <div class="tprice"><span class="amt">$2,500</span><span class="per">/mo</span></div>
-        <div class="tmeta">100 audits / month · 3 seats</div>
-        <div class="tdivider"></div>
-        <div class="tfeats">
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Everything in Design Partner</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span><b>100 audits</b> / month</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>3 seats · shared pipeline</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Defense spending + news signals</span></div>
-        </div>
-        <div class="tspacer"></div>
-        <a class="btn btn-ghost" style="justify-content:center" href="/access.html">Request Access</a>
+      <div class="prin">
+        <div class="pn">02</div>
+        <h3>Matched to your pipeline</h3>
+        <p>We share exact terms during your access review.</p>
       </div>
-
-      <!-- Enterprise -->
-      <div class="reveal tier">
-        <div class="ttag">5+ Seats</div>
-        <div class="tname">Enterprise</div>
-        <div class="tprice"><span class="amt">Custom</span></div>
-        <div class="tmeta">Unlimited audits · API access</div>
-        <div class="tdivider"></div>
-        <div class="tfeats">
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Everything in Standard</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span><b>Unlimited audits</b> · 5+ seats</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>API access + SSO</span></div>
-          <div class="tfeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>Dedicated success manager</span></div>
-        </div>
-        <div class="tspacer"></div>
-        <a class="btn btn-ghost" style="justify-content:center" href="/access.html">Talk to us</a>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- ───────── INCLUDED EVERYWHERE ───────── -->
-<section class="band deep" style="padding:80px 0">
-  <div class="wrap">
-    <div class="sec-head reveal" style="max-width:620px;margin-bottom:36px">
-      <div class="eyebrow">Included on every plan</div>
-      <h2 style="font-size:32px">The intelligence layer<br/>comes standard.</h2>
-    </div>
-    <div class="incl-grid">
-      <div class="reveal incl">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg></div>
-        <h4>Live SAM.gov sync</h4>
-        <p>Every notice scored against your profile the moment it posts — synced to SAM.gov, USAspending and FPDS.</p>
-      </div>
-      <div class="reveal incl">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg></div>
-        <h4>FAR/DFARS trap library</h4>
-        <p>Hex-chrome, covered telecom, CMMC, Xinjiang and Buy American — the clauses that quietly disqualify bids.</p>
-      </div>
-      <div class="reveal incl">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
-        <h4>Compliance audit trail</h4>
-        <p>Every finding timestamped and exportable — defensible documentation for protest and post-award review.</p>
-      </div>
-      <div class="reveal incl">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></div>
-        <h4>FedRAMP-aligned security</h4>
-        <p>SOC 2 Type II controls, encryption at rest and in transit, and role-based access on every account.</p>
+      <div class="prin">
+        <div class="pn">03</div>
+        <h3>Founding terms</h3>
+        <p>Design partners lock founding terms and shape the roadmap.</p>
       </div>
     </div>
   </div>
@@ -141,19 +86,15 @@
     <div class="faq reveal">
       <div class="q">
         <h4>What counts as an audit?</h4>
-        <p>One full three-call pass on a single solicitation — document classification, CLIN and FAR/DFARS review, and trap detection. Re-running an amended solicitation counts as a new audit.</p>
+        <p>One full audit pass on a single solicitation — document classification, CLIN and FAR/DFARS review, and trap detection, verified against source text. Re-running an amended solicitation counts as a new audit.</p>
       </div>
       <div class="q">
-        <h4>Can I change plans later?</h4>
-        <p>Yes. Move between Design Partner, Standard and Enterprise at any time. The founding rate stays locked for 12 months from signup even as you add seats.</p>
+        <h4>How does access work?</h4>
+        <p>You apply, we review your pipeline within one business day, and we onboard a limited number of design partners. Exact terms are shared during the review.</p>
       </div>
       <div class="q">
-        <h4>Where does the data come from?</h4>
-        <p>FARaudit reads directly from SAM.gov, USAspending and FPDS, refreshed continuously. Synopsis scanning runs at 06:15 CT daily across nine defense NAICS codes.</p>
-      </div>
-      <div class="q">
-        <h4>How is my pipeline data secured?</h4>
-        <p>SOC 2 Type II controls with FedRAMP-aligned architecture, encryption at rest and in transit, and role-based access. Your profile and pipeline are never shared across accounts. <a href="/access.html">Request access</a> for the full security brief.</p>
+        <h4>We bid mostly civilian agencies — does FARaudit cover that?</h4>
+        <p>FARaudit is defense-first by design, and the same FAR engine reads civilian federal solicitations. If your pipeline is federal, it's in scope.</p>
       </div>
     </div>
   </div>
@@ -163,8 +104,8 @@
 <section class="cta-band">
   <div class="cta-inner reveal">
     <h2>Ready to start upstream?</h2>
-    <p><b>Design partners shape the roadmap.</b> Founding rate locked at signup.</p>
-    <a class="btn btn-primary btn-lg" href="/access.html">Apply for Design Partner access&nbsp;→</a>
+    <p><b>Design partners shape the roadmap.</b></p>
+    <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
   </div>
 </section>
 
@@ -177,9 +118,10 @@
     </a>
     <div class="foot-links">
       <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
+      <a href="/pricing">Plans</a>
+      <a href="/learn">Learn</a>
       <a href="/sign-in">Sign in</a>
-      <a href="/access.html">Request Access</a>
+      <a href="/access">Request Access</a>
     </div>
     <div class="foot-copy">© 2026 FARaudit Inc. · Dover, DE</div>
   </div>

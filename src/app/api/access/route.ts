@@ -78,10 +78,10 @@ Submitted: ${new Date().toISOString()}
 Source: public/access.html`;
 
   const html = `<div style="font-family:'JetBrains Mono',monospace;background:#03080f;color:#c8dff2;padding:24px;max-width:560px;line-height:1.7;font-size:13px">
-    <div style="font-size:11px;color:#c4a44a;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">New Access Request</div>
+    <div style="font-size:11px;color:#378ADD;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">New Access Request</div>
     <div style="font-size:18px;color:#fff;font-weight:600;margin-bottom:20px">${esc(firstName)} ${esc(lastName)} · ${esc(company)}</div>
     <table style="border-collapse:collapse;width:100%">
-      <tr><td style="padding:4px 0;color:#5a7fa0;width:140px">Email</td><td style="color:#fff"><a href="mailto:${esc(email)}" style="color:#c4a44a">${esc(email)}</a></td></tr>
+      <tr><td style="padding:4px 0;color:#5a7fa0;width:140px">Email</td><td style="color:#fff"><a href="mailto:${esc(email)}" style="color:#378ADD">${esc(email)}</a></td></tr>
       <tr><td style="padding:4px 0;color:#5a7fa0">Role</td><td style="color:#fff">${esc(role)}</td></tr>
       <tr><td style="padding:4px 0;color:#5a7fa0">NAICS</td><td style="color:#fff">${esc(naics)}</td></tr>
       <tr><td style="padding:4px 0;color:#5a7fa0">Revenue band</td><td style="color:#fff">${esc(revenue)}</td></tr>

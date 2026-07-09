@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <title>FARaudit — Federal Contract Intelligence</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="description" content="A bid/no-bid verdict federal contractors can trust — from first government signal to recompete alert." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -235,35 +236,7 @@
   }
   .caught svg{width:15px;height:15px}
   .caught .mono-time{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:12px;color:rgba(110,231,183,0.7);letter-spacing:.02em}
-
-  /* ───────── pricing ───────── */
-  .price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:8px}
-  .tier{
-    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 24px;display:flex;flex-direction:column;
-    box-shadow:var(--shadow);position:relative;transition:transform .2s, border-color .2s, box-shadow .2s;
-  }
-  .tier:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
-  .tier.featured{
-    border-color:var(--accent);
-    transform:translateY(-6px);
-    box-shadow:0 0 0 1px var(--accent), 0 0 30px -2px rgba(55,138,221,0.5), var(--shadow-lg);
-    animation:featGlow 3.4s ease-in-out infinite;
-  }
-  .tier.featured:hover{transform:translateY(-9px)}
-  @keyframes featGlow{
-    0%,100%{box-shadow:0 0 0 1px var(--accent), 0 0 24px -4px rgba(55,138,221,0.42), var(--shadow-lg)}
-    50%{box-shadow:0 0 0 1px var(--accent), 0 0 42px 1px rgba(55,138,221,0.72), var(--shadow-lg)}
-  }
-  .tier .ttag{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
-  .tier.featured .ttag{color:var(--accent-light)}
-  .tier .tname{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--ink);margin-bottom:14px}
-  .tier .tprice{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
-  .tier .tprice .amt{font-family:"IBM Plex Mono",monospace;font-size:38px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
-  .tier .tprice .per{font-size:14px;color:var(--mute);font-weight:500}
-  .tier .tmeta{font-size:13px;color:var(--ink-2);min-height:20px;margin-bottom:18px}
-  .tier .tslots{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#6ee7b7;margin-bottom:18px}
-  .tier .tslots::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
-  .tier .tspacer{flex:1}
+  .panel-caption{padding:11px 18px;border-top:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);line-height:1.5}
 
   /* final CTA */
   .cta-band{padding:104px 0;position:relative;overflow:hidden;background:var(--page-bg);border-top:1px solid var(--line)}
@@ -281,13 +254,62 @@
   .foot-links a:hover{color:var(--ink-2)}
   .foot-copy{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--mute-2);letter-spacing:.02em}
 
+  /* ───────── lifecycle rail (02) ───────── */
+  .lifecycle{margin-top:54px;position:relative}
+  .lc-rail{position:relative;display:grid;grid-template-columns:repeat(6,1fr)}
+  .lc-rail::before{
+    content:"";position:absolute;top:11px;left:8.34%;right:8.34%;height:2px;z-index:0;
+    background:linear-gradient(90deg,rgba(55,138,221,.16),var(--accent) 16%,var(--accent) 84%,rgba(55,138,221,.16));
+  }
+  .lc-stage{position:relative;z-index:1;text-align:center;padding:0 16px}
+  .lc-node{
+    width:24px;height:24px;border-radius:50%;margin:0 auto 22px;display:grid;place-items:center;
+    background:var(--bg);border:2px solid var(--accent);box-shadow:0 0 0 5px rgba(55,138,221,.09);
+  }
+  .lc-node::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .lc-stage.edge .lc-node{box-shadow:0 0 0 5px rgba(55,138,221,.16), 0 0 24px -2px rgba(55,138,221,.75)}
+  .lc-num{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--accent);margin-bottom:9px}
+  .lc-label{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35;text-wrap:balance}
+  .lc-when{
+    display:inline-block;margin-top:11px;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+    letter-spacing:.05em;color:var(--accent-light);background:rgba(55,138,221,.10);
+    border:1px solid rgba(55,138,221,.24);padding:3px 8px;border-radius:5px;white-space:nowrap;
+  }
+
+  /* ───────── SOW influence schematic (03) ───────── */
+  .sow-split{display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;margin-top:6px}
+  .sow-panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .sow-head{padding:13px 16px;border-bottom:1px solid var(--line);background:var(--card-soft);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .sow-head .ttl{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+  .sow-body{padding:18px}
+  .sow-doc{border:1px solid var(--line);border-radius:10px;background:var(--card-soft);padding:13px 14px}
+  .sow-doc .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .sow-doc .dh .nm{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .sow-line{height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin-bottom:8px}
+  .sow-line:last-child{margin-bottom:0}
+  .sow-line.hl{background:linear-gradient(90deg,var(--accent),var(--accent-deep));box-shadow:0 0 12px -3px rgba(55,138,221,.6)}
+  .sow-line.w80{width:80%}.sow-line.w60{width:60%}.sow-line.w90{width:90%}.sow-line.w45{width:45%}
+  .sow-mid{display:flex;align-items:center;gap:11px;padding:11px 2px;color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+  .sow-mid .ln{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(55,138,221,.45),transparent)}
+  .sow-score{margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}
+  .sow-score .top{display:flex;align-items:center;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+  .sow-score .top .tag{color:var(--accent-light);background:rgba(55,138,221,.10);border:1px solid rgba(55,138,221,.24);padding:2px 8px;border-radius:5px}
+  .sow-meter{height:8px;border-radius:5px;background:rgba(255,255,255,.05);overflow:hidden}
+  /* H2 — honest-illustrative: 71% (odd fraction) + feathered mask edge, ZERO digits. Do not tidy to 75%/50% or a hard edge. */
+  .sow-meter i{display:block;height:100%;width:71%;border-radius:5px;background:linear-gradient(90deg,var(--accent-deep),var(--accent));-webkit-mask:linear-gradient(90deg,#000 78%,transparent);mask:linear-gradient(90deg,#000 78%,transparent)}
+
   /* responsive */
   @media (max-width:920px){
     .hero-grid,.split{grid-template-columns:1fr;gap:40px}
-    .price-grid{grid-template-columns:1fr}
     .hero h1{font-size:42px}
     .sec-head h2{font-size:32px}
     .nav-links a:not(.btn){display:none}
+    .sow-split{grid-template-columns:1fr;gap:40px}
+    .lc-rail{grid-template-columns:1fr;gap:4px}
+    .lc-rail::before{display:none}
+    .lc-stage{text-align:left;display:grid;grid-template-columns:24px 1fr;gap:14px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
+    .lc-node{margin:1px 0 0}
+    .lc-when{margin-top:8px}
   }
 </style>
 </head>
@@ -302,9 +324,10 @@
     </a>
     <div class="nav-links">
       <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
+      <a href="/pricing">Plans</a>
+      <a href="/learn">Learn</a>
       <a href="/sign-in">Sign in</a>
-      <a class="btn btn-primary" href="/access.html">Request Access</a>
+      <a class="btn btn-primary" href="/access">Request Access</a>
     </div>
   </div>
 </nav>
@@ -316,10 +339,10 @@
     <div class="hero-grid">
       <div class="hero-copy">
         <div class="reveal live-pill">Federal Contract Intelligence</div>
-        <h1 class="reveal">Most contractors start at Stage&nbsp;03.<br/><span class="accent">You start at Stage&nbsp;01.</span></h1>
-        <p class="reveal lede">FARaudit covers seven of eight acquisition stages — starting 60–90 days before the solicitation drops. Pre-Sol synopses, RFI response drafting, the full three-call audit engine, and post-award compliance.</p>
+        <h1 class="reveal">A bid/no-bid verdict you can trust —<br/><span class="accent">because it tells you when it can't.</span></h1>
+        <p class="reveal lede">FARaudit runs the full federal BD arc — from the first government signal to recompete alert. Every finding cites the source line. When the documents can't support a verdict, it says so instead of guessing. It will never talk you into a loser — or out of a winnable contract.</p>
         <div class="reveal hero-cta">
-          <a class="btn btn-primary btn-lg" href="/access.html">Request Access&nbsp;→</a>
+          <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
           <a class="seehow" href="#how">See how it works <span class="arrow">↓</span></a>
         </div>
       </div>
@@ -349,59 +372,17 @@
   </div>
 </section>
 
-<!-- ───────── SECTION 01 ───────── -->
+<!-- ───────── 01 TRUST ───────── -->
 <section class="band" id="how">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <div class="eyebrow"><span class="idx">01</span> Upstream Intelligence</div>
-      <h2>60–90 days before<br/>the solicitation drops.</h2>
-    </div>
-    <div class="split">
-      <div class="reveal">
-        <p class="feat-intro">Synopsis Scanner detects Pre-Solicitation notices at 06:15 CT daily across 9 defense NAICS codes — and generates a strategic CO contact email before competitors know the requirement exists.</p>
-        <div class="feat-list">
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">Synopsis analysis <span>+ urgency score 0–100</span></div></div>
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">CO contact email <span>— single-question SME positioning</span></div></div>
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">RFI response drafter <span>— solution-first, agency terminology mirrored</span></div></div>
-        </div>
-      </div>
-
-      <!-- stage coverage panel -->
-      <div class="reveal panel">
-        <div class="panel-head">
-          <span class="eyebrow">Stage Coverage</span>
-          <span class="live-pill" style="margin-left:auto">7 of 8</span>
-        </div>
-        <div class="panel-body" style="padding-top:6px;padding-bottom:6px">
-          <div class="stages">
-            <div class="stage off"><span class="sidx">00</span><span class="stitle">Govt need identified</span><span class="stag">Upstream</span></div>
-            <div class="stage on"><span class="sidx">01</span><span class="stitle">Pre-Sol Synopsis</span><span class="stag">Active</span></div>
-            <div class="stage on"><span class="sidx">02</span><span class="stitle">Sources Sought / RFI</span><span class="stag">Active</span></div>
-            <div class="stage on"><span class="sidx">03</span><span class="stitle">Solicitation drops</span><span class="stag">Active</span></div>
-            <div class="stage on"><span class="sidx">04–07</span><span class="stitle">Proposal → Award</span><span class="stag">Active</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ───────── DOCUMENT / TRAP EXAMPLE ───────── -->
-<section class="band deep">
   <div class="wrap">
     <div class="split" style="align-items:center">
       <div class="reveal">
-        <div class="eyebrow" style="margin-bottom:18px"><span class="idx">02</span> Three-Call Audit Engine</div>
-        <h2 style="font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1.12">Every trap. Every clause.<br/><span style="color:#fff">Fully audited.</span></h2>
-        <p class="feat-intro" style="margin-top:22px">A pre-step classifies your document type — SOW, PWS, or SOO — because that changes your entire bid strategy. Three calls then handle CLIN ambiguities, FAR/DFARS compliance, and DFARS trap detection. No token truncation on large IDIQs.</p>
-        <div class="feat-list">
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">SOW / PWS / SOO classifier <span>— bid strategy before clause checking</span></div></div>
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">CLIN ambiguity + FOB conflict detection <span>with CO email draft</span></div></div>
-          <div class="feat"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div class="ft">6 DFARS traps <span>— hex-chrome, covered telecom, CMMC, Xinjiang, Buy American</span></div></div>
-        </div>
+        <div class="eyebrow"><span class="idx">01</span> Trust</div>
+        <h2 style="font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1.12;margin:18px 0 22px">A verdict that admits<br/>what it can't verify.</h2>
+        <p class="feat-intro">Six independent expert lenses. An adversarial verifier that tags every claim VERIFIED, UNVERIFIABLE, or REFUTED against source text. Missing sections return INCOMPLETE — never a confident guess on unread documents. Anyone can hand you a confident recommendation. FARaudit renders a verdict it can defend — or tells you it can't.</p>
       </div>
 
-      <!-- audit result panel -->
+      <!-- FA301626Q0068 proof card -->
       <div class="reveal panel">
         <div class="panel-head" style="justify-content:space-between">
           <div>
@@ -432,58 +413,108 @@
           All three caught
           <span class="mono-time">4 min</span>
         </div>
+        <div class="panel-caption">Live Air Force RFQ — two P0 traps and one disqualifying DFARS clause caught in four minutes.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ───────── PRICING ───────── -->
-<section class="band" id="pricing">
+<!-- ───────── 02 ECOSYSTEM ───────── -->
+<section class="band deep">
   <div class="wrap">
-    <div class="sec-head reveal" style="max-width:680px">
-      <div class="eyebrow">Pricing</div>
-      <h2>Federal Contract Intelligence.<br/><span class="mute">Priced for every stage.</span></h2>
-      <p class="feat-intro" style="margin-top:18px;margin-bottom:0">Start as a solo BD director. Scale to a full team.</p>
+    <div class="sec-head reveal" style="max-width:720px">
+      <div class="eyebrow"><span class="idx">02</span> Ecosystem</div>
+      <h2>First signal to recompete alert.</h2>
     </div>
-    <div class="price-grid">
-      <div class="reveal tier featured">
-        <div class="ttag">Founding Rate</div>
-        <div class="tname">Design Partner</div>
-        <div class="tprice"><span class="amt">$1,250</span><span class="per">/mo</span></div>
-        <div class="tmeta">Rate locked 12 months</div>
-        <div class="tslots">Design partners shape the roadmap</div>
-        <div class="tspacer"></div>
-        <a class="btn btn-primary" style="justify-content:center" href="/access.html">Apply for access</a>
+    <p class="reveal feat-intro" style="max-width:680px">Pre-Sol synopsis detection 60–90 days before the solicitation drops. RFI response drafting. The full audit. Pre-submission checklist. Post-award compliance. Recompete alert 180 days out. Not alerts — drafted action at every stage. One system, the whole arc.</p>
+    <div class="lifecycle reveal">
+      <div class="lc-rail">
+        <div class="lc-stage edge">
+          <div class="lc-node"></div>
+          <div class="lc-num">01</div>
+          <div class="lc-label">Pre-Sol synopsis detection</div>
+          <div class="lc-when">60–90 days out</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">02</div>
+          <div class="lc-label">RFI response drafting</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">03</div>
+          <div class="lc-label">The full audit</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">04</div>
+          <div class="lc-label">Pre-submission checklist</div>
+        </div>
+        <div class="lc-stage">
+          <div class="lc-node"></div>
+          <div class="lc-num">05</div>
+          <div class="lc-label">Post-award compliance</div>
+        </div>
+        <div class="lc-stage edge">
+          <div class="lc-node"></div>
+          <div class="lc-num">06</div>
+          <div class="lc-label">Recompete alert</div>
+          <div class="lc-when">180 days out</div>
+        </div>
       </div>
-      <div class="reveal tier">
-        <div class="ttag">Full Platform</div>
-        <div class="tname">Standard</div>
-        <div class="tprice"><span class="amt">$2,500</span><span class="per">/mo</span></div>
-        <div class="tmeta">100 audits / month · 3 seats</div>
-        <div class="tspacer"></div>
-        <a class="btn btn-ghost" style="justify-content:center" href="/access.html">Request Access</a>
-      </div>
-      <div class="reveal tier">
-        <div class="ttag">5+ Seats</div>
-        <div class="tname">Enterprise</div>
-        <div class="tprice"><span class="amt">Custom</span></div>
-        <div class="tmeta">Unlimited audits · API access</div>
-        <div class="tspacer"></div>
-        <a class="btn btn-ghost" style="justify-content:center" href="/access.html">Talk to us</a>
-      </div>
-    </div>
-    <div style="text-align:center;margin-top:28px">
-      <a class="seehow" style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--ink-2)" href="/pricing">See full pricing <span style="color:var(--accent)">→</span></a>
     </div>
   </div>
 </section>
 
-<!-- ───────── FINAL CTA ───────── -->
+<!-- ───────── 03 PROOF ───────── -->
+<section class="band">
+  <div class="wrap">
+    <div class="sow-split">
+      <div class="reveal">
+        <div class="sec-head" style="max-width:none;margin-bottom:0">
+          <div class="eyebrow"><span class="idx">03</span> Proof</div>
+          <h2>The SOW Influence Tracker.</h2>
+        </div>
+        <p class="feat-intro" style="max-width:520px;margin-top:22px;margin-bottom:0">When the final solicitation drops, FARaudit cross-references your RFI response against it — a match score and the exact phrases that carried through. Proof your upstream work shaped the requirement. No other platform produces this.</p>
+      </div>
+
+      <div class="reveal sow-panel">
+        <div class="sow-head">
+          <span class="ttl">SOW Influence Tracker</span>
+          <span class="badge naics">cross-reference</span>
+        </div>
+        <div class="sow-body">
+          <div class="sow-doc">
+            <div class="dh"><span class="nm">Your RFI response</span><span class="badge doc">RFI</span></div>
+            <div class="sow-line w90"></div>
+            <div class="sow-line hl w80"></div>
+            <div class="sow-line w60"></div>
+            <div class="sow-line hl w45"></div>
+          </div>
+          <div class="sow-mid"><span class="ln"></span>phrases carried through<span class="ln"></span></div>
+          <div class="sow-doc">
+            <div class="dh"><span class="nm">Final solicitation</span><span class="badge naics">RFP</span></div>
+            <div class="sow-line w80"></div>
+            <div class="sow-line hl w90"></div>
+            <div class="sow-line w45"></div>
+            <div class="sow-line hl w60"></div>
+          </div>
+          <div class="sow-score">
+            <div class="top"><span>Match score</span><span class="tag">Traceable to source</span></div>
+            <div class="sow-meter"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── ACCESS BAND ───────── -->
 <section class="cta-band">
   <div class="cta-inner reveal">
-    <h2>Ready to start upstream?</h2>
-    <p><b>Design partners shape the roadmap.</b> Founding rate locked at signup.</p>
-    <a class="btn btn-primary btn-lg" href="/access.html">Apply for Design Partner access&nbsp;→</a>
+    <h2>Access is by application.</h2>
+    <p>We onboard a limited number of design partners who shape the roadmap. Tell us about your pipeline — we review every application within one business day.</p>
+    <a class="btn btn-primary btn-lg" href="/access">Request access&nbsp;→</a>
   </div>
 </section>
 
@@ -496,9 +527,10 @@
     </a>
     <div class="foot-links">
       <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
+      <a href="/pricing">Plans</a>
+      <a href="/learn">Learn</a>
       <a href="/sign-in">Sign in</a>
-      <a href="/access.html">Request Access</a>
+      <a href="/access">Request Access</a>
     </div>
     <div class="foot-copy">© 2026 FARaudit Inc. · Dover, DE</div>
   </div>

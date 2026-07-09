@@ -29,7 +29,7 @@ export default function TermsPage() {
           We may suspend or terminate accounts that violate these terms or that exhibit signals of automated abuse. You may close your account at any time from the Settings page; data deletion is irreversible.
         </Block>
         <Block title="Limitation of liability">
-          Service is provided AS IS. To the maximum extent permitted, FARaudit and Woof Management LLC are not liable for indirect, incidental, or consequential damages, lost profits, or lost contract awards. Our aggregate liability for any claim is limited to the amount you paid in the 12 months preceding the claim.
+          Service is provided AS IS. To the maximum extent permitted, FARaudit and FARaudit Inc., a Delaware corporation are not liable for indirect, incidental, or consequential damages, lost profits, or lost contract awards. Our aggregate liability for any claim is limited to the amount you paid in the 12 months preceding the claim.
         </Block>
         <Block title="Governing law">
           These terms are governed by the laws of the State of Delaware, without regard to conflict-of-law rules. Disputes will be resolved in the state and federal courts located in Delaware.
@@ -38,7 +38,7 @@ export default function TermsPage() {
           We may update these terms by posting a new effective date here and notifying active users 30 days in advance via email.
         </Block>
         <Block title="Contact">
-          <a href="mailto:jose@faraudit.com" className="text-accent">jose@faraudit.com</a> · FARaudit · Operated under Woof Management LLC.
+          <a href="mailto:jose@faraudit.com" className="text-accent">jose@faraudit.com</a> · FARaudit · Operated under FARaudit Inc.
         </Block>
       </section>
     </main>

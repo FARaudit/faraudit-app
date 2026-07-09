@@ -43,8 +43,8 @@ export default function MobileAdvisory() {
         position: "sticky",
         top: 0,
         zIndex: 200,
-        background: "rgba(201,168,76,0.10)",
-        borderBottom: "1px solid rgba(201,168,76,0.28)",
+        background: "rgba(55, 138, 221,0.10)",
+        borderBottom: "1px solid rgba(55, 138, 221,0.28)",
         padding: "10px 14px",
         fontSize: 12,
         lineHeight: 1.5,
@@ -57,7 +57,7 @@ export default function MobileAdvisory() {
     >
       <span style={{ flex: 1 }}>
         FARaudit is built for tablet and desktop.{" "}
-        <strong style={{ color: "#C9A84C" }}>Open on iPad or laptop</strong> for full Intelligence access.
+        <strong style={{ color: "#378ADD" }}>Open on iPad or laptop</strong> for full Intelligence access.
       </span>
       <button
         type="button"

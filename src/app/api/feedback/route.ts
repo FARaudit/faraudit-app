@@ -49,9 +49,9 @@ export async function POST(req: Request) {
     const timestamp = body.timestamp || new Date().toISOString();
 
     const html = `<div style="font-family:'JetBrains Mono',monospace;background:#03080f;color:#c8dff2;padding:24px;max-width:560px;line-height:1.7;font-size:13px">
-      <div style="font-size:11px;color:#c4a44a;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">FARaudit Feedback · ${esc(type)}</div>
+      <div style="font-size:11px;color:#378ADD;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px">FARaudit Feedback · ${esc(type)}</div>
       <div style="font-size:15px;color:#fff;font-weight:600;margin-bottom:18px">From: ${esc(userEmail)}</div>
-      <div style="background:#060f1c;border-left:3px solid #c4a44a;padding:14px;margin-bottom:18px;color:#f5f0e8;white-space:pre-wrap;font-family:inherit">${esc(description)}</div>
+      <div style="background:#060f1c;border-left:3px solid #378ADD;padding:14px;margin-bottom:18px;color:#EEF3FA;white-space:pre-wrap;font-family:inherit">${esc(description)}</div>
       <table style="border-collapse:collapse;width:100%;font-size:11px">
         <tr><td style="padding:3px 0;color:#5a7fa0;width:80px">Page</td><td style="color:#c8dff2">${esc(url)}</td></tr>
         <tr><td style="padding:3px 0;color:#5a7fa0">Sent</td><td style="color:#c8dff2">${esc(timestamp)}</td></tr>
@@ -112,7 +112,7 @@ Your answer goes directly to me.
 Founder, FARaudit`,
       html: `<div style="font-family:monospace;background:#03080f;color:#c8dff2;padding:24px;max-width:480px">
         <p style="font-size:14px;color:#fff;margin-bottom:16px">Quick question:</p>
-        <p style="font-size:16px;font-weight:500;color:#c4a44a;margin-bottom:20px">
+        <p style="font-size:16px;font-weight:500;color:#378ADD;margin-bottom:20px">
           How useful was that audit — on a scale of 1 to 10?
         </p>
         <p style="font-size:13px;color:#5a7fa0;margin-bottom:20px">

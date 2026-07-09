@@ -64,7 +64,7 @@ export async function GET(req: Request) {
         to: process.env.CEO_EMAIL,
         subject: `Marketing AI · ${dayName} · ${contentType.replace(/_/g, " ")} ready`,
         html: `<div style="font-family:monospace;background:#03080f;color:#c8dff2;padding:24px;max-width:600px">
-          <p style="color:#c4a44a;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px">FARaudit Marketing AI · ${dayName}</p>
+          <p style="color:#378ADD;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px">FARaudit Marketing AI · ${dayName}</p>
           <p style="font-size:13px;color:#5a7fa0;margin-bottom:16px">Content type: ${contentType.replace(/_/g, " ")}</p>
           <div style="background:#06101a;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:16px;margin-bottom:14px;white-space:pre-wrap;font-size:13px;color:#e8ecf2;line-height:1.6">${content}</div>
           <p style="font-size:11px;color:#243a52">Copy the content above · Open LinkedIn · Paste · Post · 08:30–10:30 CT window</p>

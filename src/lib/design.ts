@@ -17,7 +17,7 @@ export const tokens = {
   gain:      "#10B981",
   loss:      "#EF4444",
   warn:      "#F59E0B",
-  gold:      "#D4AF37"
+  gold:      "#378ADD"
 } as const;
 
 export const PRIORITY_BADGES: Record<"P0" | "P1" | "P2", { color: string; bg: string; label: string }> = {

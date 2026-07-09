@@ -10,7 +10,7 @@ const SURFACE = "#06101a";
 const TEXT_1 = "#e2eaf4";
 const TEXT_2 = "#5a7fa0";
 const TEXT_3 = "#3d5b75";
-const GOLD = "#c4a44a";
+const GOLD = "#378ADD";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
