@@ -14,7 +14,7 @@ const TOUR = [
   {
     n: "01",
     title: "Upload a solicitation",
-    body: "Drop the PDF on /audit. We accept FBO/SAM RFQ/RFP/IFB packages up to 50MB. Multi-volume? Concatenate first or upload Section L/M separately."
+    body: "Drop the PDF into Run Audit from your workspace. We accept FBO/SAM RFQ/RFP/IFB packages up to 50MB. Multi-volume? Concatenate first or upload Section L/M separately."
   },
   {
     n: "02",
@@ -140,9 +140,9 @@ export default function LearnPage() {
             Ready
           </p>
           <p style={{ fontSize: 16, color: TEXT_1, marginBottom: 12, lineHeight: 1.5 }}>
-            Upload your first solicitation. Free. No card.
+            Ready to see it on your own solicitation?
           </p>
-          <Link href="/audit" style={{ display: "inline-block", padding: "10px 20px", background: GOLD, color: BG, textDecoration: "none", fontFamily: "Syne, sans-serif", fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
+          <Link href="/access" style={{ display: "inline-block", padding: "10px 20px", background: GOLD, color: BG, textDecoration: "none", fontFamily: "Syne, sans-serif", fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
             Request Access →
           </Link>
         </div>
