@@ -29,6 +29,7 @@ import { extractNonPdfText, nonPdfKind, textToPdfBuffer } from "./nonpdf-extract
 import { extractText, MIN_TEXT_CHARS_FOR_TEXT_BLOCK, meaningfulCharCount } from "./pdf-text-extractor";
 import { looksGarbled } from "./pdf-ocr";
 import { samFetchWithKey } from "./sam-url-guard";
+import { isEnvOn } from "./env-flags";
 
 const SAM_API_KEY = process.env.SAM_API_KEY;
 const FETCH_TIMEOUT_MS = 30000;
@@ -195,10 +196,39 @@ export interface IngestionFileMeta {
 // questionnaire / checklist is AMBIGUOUS (it can carry binding CLIN/pricing/technical structure), so under
 // "unknown/ambiguous role = BINDING" it is NO LONGER auto-exempted — it must reach the engine as text (worst
 // case a genuinely-blank one over-flags INCOMPLETE, the SAFE honest-fail direction; a false COMPLETE is not).
+// A recognized OFFEROR-FILL / REFERENCE-SUBMISSION template — a form the offeror (or its references) fills OUT, not a
+// performance obligation ON the offeror. Non-binding ⇒ exempt from the per-attachment coverage cap (Brain #346): a
+// blank Past-Performance Questionnaire carries no operative obligations, so requiring a grounded finding in it forces
+// a false INCOMPLETE. TARGETED — only unambiguous reference/submission forms; a binding doc that merely contains a
+// questionnaire section is NOT matched (name must BE the reference form). Never broaden to a bare "questionnaire"
+// (a Security/Facility questionnaire can be binding) — that would risk a false COMPLETE (the dangerous direction).
+// The ALWAYS-ON offeror-fill exemption (pre-existing, prod-today): reps & certs / fillable templates.
 const OFFEROR_FILL_RE = /\b(reps?\s*(?:and|&)?\s*certs?|representations?\s*(?:and|&)?\s*certifications?|fillable|fill[- ]?in(?:able)?)\b/i;
+// The QUESTIONNAIRE exemption (Brain #346) is FLAG-GATED behind AUDIT_ATTACHMENT_COVERAGE (Gauntlet #349 R3): it only
+// applies when the attachment-coverage feature is on, so with the flag OFF isBindingDoc is byte-identical to prod-today
+// (a questionnaire stays binding — no flag-off classification drift, no flag-off false-COMPLETE). NARROW: only a "past
+// performance questionnaire" / PPQ / "reference questionnaire" (unambiguous reference-fill forms), never a bare
+// "questionnaire"/"rating form" (which can carry a body obligation).
+const QUESTIONNAIRE_FILL_RE = /\b(past[\s-]?performance\s+questionnaire|ppq|reference\s+questionnaire)\b/i;
+// BINDING-CONTENT OVERRIDE (Gauntlet #349 blocker F2) — a real binding-content token in the name WINS over the
+// offeror-fill exemption, so a BUNDLED / compound attachment ("Past Performance Questionnaire AND Technical
+// Requirements", "Reps and Certs and SOW") is NOT silently exempted. OFFEROR_FILL_RE is a \b-SUBSTRING test, so
+// without this a compound name carrying real obligations would flip binding→exempt → a false COMPLETE (the dangerous
+// direction, and it fires prod-today since isBindingDoc is un-gated). Fail-SAFE: only ever makes a doc MORE binding.
+const BINDING_CONTENT_RE = /statement of work|\bsow\b|\bpws\b|\bsoo\b|scope of work|\bclin\b|specification|\bspec\b|technical requirement|performance work statement|wage determination|\bwd\b|\bsca\b|\bcba\b|security requirement|\bqasp\b|deliverable|\bcdrl\b/i;
 export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; name: string }): boolean {
   if (f.role === "form" || f.role === "amendment") return true;      // primary solicitation + amendments are always binding
-  return !OFFEROR_FILL_RE.test(f.name.replace(/[_.\-+]+/g, " "));      // attachment: binding UNLESS a recognized offeror-fill template
+  const n = f.name.replace(/[_.\-+]+/g, " ");
+  // FLAG-OFF (prod-today): binding UNLESS a reps&certs / fillable template — byte-identical to `return !OFFEROR_FILL_RE.test(n)`.
+  if (OFFEROR_FILL_RE.test(n)) return false;
+  // FLAG-ON only (Gauntlet #349 R4 — BOTH the questionnaire exemption AND the binding-content override are gated, so
+  // flag-off classification never drifts): a compound name carrying real binding content (SOW/spec/CLIN/…) is BINDING
+  // even if it also names a questionnaire (fail-safe override); a PURE reference questionnaire/PPQ is exempt.
+  if (isEnvOn(process.env.AUDIT_ATTACHMENT_COVERAGE)) {
+    if (BINDING_CONTENT_RE.test(n)) return true;                      // compound / binding-content name → binding (override)
+    if (QUESTIONNAIRE_FILL_RE.test(n)) return false;                  // pure reference questionnaire / PPQ → exempt
+  }
+  return true;                                                        // default: binding
 }
 
 // has_text for the COMPLETENESS contract asks "did the engine actually receive this doc's text?" — so it uses

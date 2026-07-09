@@ -449,11 +449,18 @@ const CLAUSE_NUMBER_RE = /\b\d{2,3}\.\d{2,4}-\d+\b/;
 // The search is a bounded window AROUND `at` (not a whole flattened line), so a clause far into a newline-free blob is
 // still read correctly (pre-live review #334 fix: the old `lineStart+400` cap dropped clauses past char 400).
 function setAsideRowWindow(src: string, at: number): string {
+  // WRAPPED-ROW SUPPORT (flag AUDIT_SETASIDE_WRAPPED_ROWS, default OFF — Gauntlet 2026-07-08). Real SAM matrices
+  // WRAP one logical row across several PHYSICAL lines (clause# / wrapped title / date / "Yes" each on its own
+  // line — FA1068 marks 52.219-3/-4/-6 all "Yes" this way, but the physical-line window below reads only the
+  // clause#+partial-title line and MISSES the "Yes" cell → set-asides under-read → wrong conflict pole). When ON,
+  // the window spans newlines up to a char cap; the prev/next clause-number bounds (not the physical line) are what
+  // prevent bleed into an adjacent row's cell. Flag OFF ⇒ the exact physical-line window as before (byte-identical).
+  const spanWrapped = process.env.AUDIT_SETASIDE_WRAPPED_ROWS === "true";
   const lineStart = src.lastIndexOf("\n", at) + 1;
   let lineEnd = src.indexOf("\n", at);
   if (lineEnd < 0) lineEnd = src.length;
-  const backLimit = Math.max(lineStart, at - 200);
-  const fwdLimit = Math.min(lineEnd, at + 300);
+  const backLimit = spanWrapped ? Math.max(0, at - 300) : Math.max(lineStart, at - 200);
+  const fwdLimit = spanWrapped ? Math.min(src.length, at + 400) : Math.min(lineEnd, at + 300);
   const seg = src.slice(backLimit, fwdLimit);
   const rel = at - backLimit;                                            // THIS clause number's offset within seg
   // row END = the next clause number after this one within seg. Blank THIS number first so it isn't re-found.
@@ -608,6 +615,110 @@ export function detectSetAsideConflict(samSetAside: string | null | undefined, f
   if (docCanons.has(samCanon)) return undefined;   // doc program == SAM → agreement, no conflict
   const doc = [...docCanons].map(setAsideLabel).join(" / ");
   return { sam: setAsideLabel(samCanon), doc, note: "Confirm the governing set-aside with the Contracting Officer before bidding — the eligible pool differs between SAM and the solicitation document." };
+}
+
+// ── #2 SET-ASIDE STRUCTURAL-IMPOSSIBILITY DOWNGRADE (Brain #344, co-required with #1) ──────────────────────────
+// A clause matrix that marks BOTH 52.219-3 (HUBZone SET-ASIDE — restricts competition to HUBZone firms) AND
+// 52.219-4 (HUBZone PRICE-EVALUATION PREFERENCE — applies in FULL & OPEN competition) applicable is STRUCTURALLY
+// IMPOSSIBLE as a live procurement: a set-aside and a full-and-open price preference cannot both govern one
+// requirement. Their co-presence PROVES the matrix was not scrubbed for this buy, so a STRAY pool-definer notice
+// alongside the governing program is copy-paste residue, not a genuine second program. This structural tell is the
+// ONLY thing that licenses collapsing a multi-program conflict to the governing program — SAM/synopsis agreement
+// ALONE never does (a genuine tiered / multi-CLIN set-aside is indistinguishable without the tell → stays NHR).
+// NOTE: 52.219-4 is deliberately EXCLUDED from the pool-definer set (detectSetAsideNotices), so it never inflates
+// docCanons — it is read here purely as the un-scrubbed-matrix signature.
+const STRUCTURAL_IMPOSSIBILITY_PAIRS: ReadonlyArray<{ a: RegExp; b: RegExp; note: string }> = [
+  {
+    a: /52\.219-3\b/,
+    b: /52\.219-4\b/,
+    note: "FAR 52.219-3 (HUBZone SET-ASIDE) and 52.219-4 (HUBZone PRICE-EVALUATION PREFERENCE) are both marked applicable — a set-aside restricts competition to HUBZone firms while the price preference applies only in full and open competition; they cannot both govern one requirement, which proves the clause matrix was not scrubbed for this buy",
+  },
+];
+
+export interface StructuralImpossibility { present: boolean; evidence: string | null; }
+/** Detect the un-scrubbed-matrix structural tell — a mutually-exclusive clause pair BOTH marked applicable in the
+ *  raw clause matrix (grounded via the SAME row-applicability logic detectSetAsideNotices uses). Pure. */
+export function detectSetAsideStructuralImpossibility(source: string | null | undefined): StructuralImpossibility {
+  const src = source ?? "";
+  if (!src) return { present: false, evidence: null };
+  const applicableRow = (re: RegExp): string | null => {
+    const g = new RegExp(re.source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = g.exec(src))) {
+      const row = setAsideRowWindow(src, m.index);
+      if (setAsideRowApplicable(row)) return row.replace(/\s+/g, " ").trim().slice(0, 200);
+    }
+    return null;
+  };
+  for (const pair of STRUCTURAL_IMPOSSIBILITY_PAIRS) {
+    const ea = applicableRow(pair.a);
+    const eb = applicableRow(pair.b);
+    if (ea && eb) return { present: true, evidence: `${pair.note} [row A: ${ea} · row B: ${eb}]` };
+  }
+  return { present: false, evidence: null };
+}
+
+export interface SetAsideStructuralDowngrade { governing: string; strays: string[]; note: string; evidence: string; }
+/** #2 — decide whether a multi-program set-aside conflict is a DOC-INTEGRITY artifact that collapses to the governing
+ *  program. Applies ONLY when ALL THREE hold: (a) SAM records a single program (samCanon); (b) the doc DECLARES that
+ *  program (samCanon ∈ docCanons — SAM/synopsis and the doc AGREE on the governing program); (c) the structural-
+ *  impossibility tell is present. (a)+(b) alone NEVER downgrade — only (c) licenses it; without (c) a genuine tiered/
+ *  multi-CLIN set-aside is indistinguishable → stays a conflict → NHR. Returns the governing + stray program(s), or
+ *  null. Pure — does not mutate findings (the orchestrator applies the re-type via applySetAsideStructuralDowngrade). */
+export function setAsideStructuralDowngrade(samSetAside: string | null | undefined, findings: TypedFinding[], source?: string | null): SetAsideStructuralDowngrade | null {
+  const samCanon = canonicalizeSamSetAside(samSetAside);
+  if (!samCanon) return null;                          // (a) no single SAM program → no governing anchor
+  const docCanons = new Set<string>();
+  for (const n of detectSetAsideNotices(source)) docCanons.add(n.canon);
+  for (const f of findings) { const c = findingSetAsideCanon(f); if (c) docCanons.add(c); }
+  if (!docCanons.has(samCanon)) return null;           // (b) doc does not declare SAM's program → not agreement, not our case
+  if (docCanons.size < 2) return null;                 // no stray to collapse (nothing to downgrade)
+  const tell = detectSetAsideStructuralImpossibility(source);
+  if (!tell.present) return null;                      // (c) HARD — only the structural tell licenses the downgrade
+  const strays = [...docCanons].filter((c) => c !== samCanon);
+  // (d) SCOPE THE COLLAPSE (Gauntlet F2). The tell proves the matrix is un-scrubbed, but a SPECIFIC socioeconomic
+  //     stray (SDVOSB / 8(a) / WOSB / EDWOSB / VOSB) is almost never template residue — it signals a GENUINE second
+  //     eligible pool. Only a GENERIC Total-Small-Business notice (sb:total) is the classic un-scrubbed default that
+  //     rides alongside a specific governing program. If ANY stray is a specific socioeconomic program, DO NOT
+  //     collapse — keep the conflict → NHR (fail-toward-human-review, never silently mask a real eligibility bar).
+  if (strays.some((c) => c !== "sb:total")) return null;
+  return {
+    governing: samCanon,
+    strays,
+    note: `Governing set-aside is ${setAsideLabel(samCanon)} (SAM and the solicitation agree). The additionally-marked ${strays.map(setAsideLabel).join(", ")} notice(s) are residue of an un-scrubbed clause matrix — downgraded to a documentary-integrity flag (verify with the Contracting Officer, but not a bid bar).`,
+    evidence: tell.evidence ?? "",
+  };
+}
+
+/** Apply the #2 downgrade: re-type each STRAY program's set-aside finding to a non-blocking P2 documentary-integrity
+ *  flag (kind→other, bidder_controls, requiredAttribute dropped) so ONLY the governing program drives eligibility →
+ *  committal-<governing> instead of NHR. The stray stays IN the findings (surfaced in the report, never hidden) but
+ *  is verdict-inert. Returns the re-typed findings + the downgrade decision (null ⇒ untouched). The caller must ALSO
+ *  suppress the conflict signal when `downgrade` is non-null (the raw matrix still carries both clauses). Pure. */
+export function applySetAsideStructuralDowngrade(
+  findings: TypedFinding[],
+  source: string | null | undefined,
+  samSetAside: string | null | undefined,
+  opts?: { enabled?: boolean },
+): { findings: TypedFinding[]; downgrade: SetAsideStructuralDowngrade | null } {
+  if (!opts?.enabled) return { findings, downgrade: null };
+  const downgrade = setAsideStructuralDowngrade(samSetAside, findings, source);
+  if (!downgrade) return { findings, downgrade: null };
+  const strays = new Set(downgrade.strays);
+  const next = findings.map((f) => {
+    const c = findingSetAsideCanon(f);
+    if (!c || !strays.has(c)) return f;
+    return {
+      ...f,
+      kind: "other" as RequirementKind,
+      controllability: "bidder_controls" as Controllability,
+      requiredAttribute: undefined,
+      curableInWindow: true,
+      severity: "P2" as const,
+      requirement: `Documentary-integrity flag: a ${setAsideLabel(c)} set-aside notice appears in an un-scrubbed clause matrix alongside the governing ${setAsideLabel(downgrade.governing)} set-aside — not a separate eligibility pool for this buy. ${downgrade.evidence} Confirm with the Contracting Officer.`,
+    };
+  });
+  return { findings: next, downgrade };
 }
 
 export function applyAwardBasisOvertypeGuard(findings: TypedFinding[], profile: BidderProfile | null, opts?: { enabled?: boolean; normalizeNoOneCanMoveSetAside?: boolean; setAsideOvertypeDisposition?: "nhr" | "caution" }): TypedFinding[] {

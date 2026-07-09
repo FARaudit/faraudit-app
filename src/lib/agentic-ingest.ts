@@ -77,7 +77,7 @@ export function anchorKey(name: string): string {
   return n.replace(/[^a-z0-9]+/g, " ").trim().toUpperCase() || "UNKEYED";
 }
 
-const isSf30 = (name: string): boolean => SF30_RE.test(name);
+export const isSf30 = (name: string): boolean => SF30_RE.test(name);
 
 /** Build the coverage ledger for a package. Deterministic, no LLM. Clusters by
  *  logical doc, then within each cluster distinguishes byte-identical copies
@@ -299,6 +299,163 @@ export function resolveAmendments(ledger: CoverageLedger, amendmentText: string)
   // ±250-char window over concatenated SF-30 text) is too cross-bleed-prone to
   // silently drop a binding document on. Coverage never suffers; cost-trim waits.
   return { ...ledger, resolutions };
+}
+
+// ── #1 Amendment supersession (Brain #344 — flag AUDIT_AMENDMENT_SUPERSESSION) ─
+// resolveAmendments (above) produces HINTS only and drops NOTHING. This pass turns
+// a hint into an ACTUAL doc-level drop, but ONLY behind a HARD bar plus a POSITIVE
+// FULL-CONTENT subsumption proof — the exact opposite discipline of a filename-only
+// drop. It fails TOWARD keep-and-label: a superseded-looking doc we cannot PROVE is
+// wholly contained in its successor is RETAINED (read in full) with a "possibly
+// superseded" label, never silently dropped.
+//
+// SCOPE (pre-live review, Gauntlet 2026-07-08): this pass safely handles an ADDITIVE
+// amendment — a later complete re-issue whose text is a strict SUPERSET of the base
+// (base kept verbatim + new content appended). It DELIBERATELY does NOT drop a base
+// whose fields were CHANGED (a moved deadline/POC/CLIN), because the old values are
+// by definition absent from the successor → subsumption fails → keep-and-label. A
+// changed-field full-replacement drop requires an explicit Item-14 "in its entirety"
+// proof (resolveAmendments.proofFound) and is a SEPARATE follow-on (not this pass).
+// Flag-OFF ⇒ never runs.
+export const AMENDMENT_SUPERSESSION_ENABLED = isEnvOn(process.env.AUDIT_AMENDMENT_SUPERSESSION);
+
+// SF-30 form header language — the markers of the amendment COVER SHEET (block 14 patch form),
+// distinct from a complete re-issued document that merely quotes amendment language.
+const SF30_FORM_RE = /standard form 30|amendment of solicitation|modification of contract|the above[\s-]?numbered solicitation is amended|item 14/i;
+/** Classify a package doc as an SF-30 COVER SHEET (a short field-patch form → field-level #1B,
+ *  never a doc-level successor) vs a COMPLETE document. STRICTER than isSf30(name): a long doc
+ *  named "Amendment 02.pdf" is a complete re-issue (a valid successor), NOT a cover — the
+ *  name-only regex conflates the two and would make #1A no-op on real amendment naming (Gauntlet
+ *  F1). A cover is identified by SF-30 form-header language OR a name match on a SHORT file. */
+export function isSf30Cover(name: string, text: string): boolean {
+  const body = text ?? "";
+  if (SF30_FORM_RE.test(body.slice(0, 4000))) return body.length < 20000; // form language + short ⇒ cover; long ⇒ a complete doc that quotes it
+  return isSf30(name) && body.length < 6000;                              // name says amendment AND short ⇒ cover; long ⇒ complete re-issue
+}
+
+/** Version-cluster key — anchorKey with an AMENDMENT/MOD marker+number stripped
+ *  from the free-text stem, so "Synopsis" and "Synopsis Amendment 01" share a key.
+ *  SEPARATE from anchorKey (which stays conservative for the coverage ledger — it
+ *  deliberately does NOT cluster differently-named versions). Used ONLY to nominate
+ *  doc-level supersession CANDIDATES; the 4-part bar + subsumption proof gate any
+ *  real drop, and the default is keep-and-label — so a false cluster here can, at
+ *  worst, LABEL a retained doc, never drop a binding one. Coded (J-/C-/SECTION-)
+ *  keys are left untouched: their "-NN" is a section suffix, not an amendment tag. */
+export function versionClusterKey(name: string): string {
+  const ak = anchorKey(name);
+  if (/^[JC]-/.test(ak) || /^SECTION-/.test(ak)) return ak;
+  // Strip a real amendment/mod version marker (marker + number — a bare "AMENDMENT"
+  // with no number is not a version tag and is NOT stripped, so "Amendment to PWS"
+  // keeps its identity). anchorKey uppercases, so match uppercase markers.
+  const stripped = ak
+    .replace(/\b(?:AMENDMENT|AMEND|AMD|MODIFICATION|MOD)[\s_.\-]*0*\d{1,4}\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return stripped || ak;
+}
+
+export interface SupersessionInput {
+  name: string;
+  text: string;
+  isSf30: boolean;
+}
+
+export interface SupersessionDecision {
+  name: string;
+  /** superseded → excluded from fullSource (proven fully contained in a later,
+   *  higher-numbered complete doc). possibly_superseded → RETAINED + labelled
+   *  (a candidate we could not PROVE is subsumed). operative → unaffected. */
+  status: "superseded" | "possibly_superseded" | "operative";
+  supersededBy: string | null;
+  reason: string;
+}
+
+// A SUBSTANTIVE line is any real content line (not blank, not a rule/divider). We require the
+// successor to contain EVERY substantive line of the base — not just its obligation lines — so a
+// base whose unique content is non-obligation DATA (a delivery schedule, CLIN quantities, a POC,
+// pricing) can never be silently dropped as "provably superseded" when that data is absent from
+// the successor (Gauntlet F4). Obligation-lexicon-only containment was unsafe: it ignored data.
+function substantiveLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim().toLowerCase())
+    .filter((l) => l.length >= 15 && /[a-z0-9]/.test(l) && !/^[=_\-·•*\s.]+$/.test(l));
+}
+
+/** POSITIVE full-content subsumption proof — is `lower` a strict CONTENT SUBSET of `higher`?
+ *  TRUE only when EVERY substantive line of the lower appears verbatim (whitespace-normalized) in
+ *  the higher — i.e. the higher is an ADDITIVE superset of the lower. A lower with no substantive
+ *  lines cannot be proven subsumed (return false → keep) — we never drop on absence of evidence.
+ *  ANY line changed/reworded/removed in the later doc fails containment → keep-and-label (the SAFE
+ *  direction). Requiring ALL lines (not one boilerplate line) also defeats a coincidental single
+ *  substring match — a genuinely distinct doc will not have EVERY line coincidentally present. */
+function higherSubsumesLower(higher: string, lower: string): boolean {
+  const H = higher.replace(/\s+/g, " ").toLowerCase();
+  const lines = substantiveLines(lower);
+  if (lines.length === 0) return false;
+  // Perf guard (security review 2026-07-08) — full-content containment is O(lines · |H|). On a pathological
+  // multi-MB pair, BAIL toward KEEP (the safe direction — never a silent drop, never a quadratic-scan perf
+  // cliff) rather than run the scan. ~50M char-ops ≈ well under 100ms; real docs are far below this.
+  if (lines.length * H.length > 50_000_000) return false;
+  return lines.every((l) => H.includes(l));
+}
+
+/** Doc-level (#1A) supersession decision. Clusters docs by versionClusterKey, then
+ *  within each multi-version cluster nominates the highest-amendment-numbered COMPLETE
+ *  doc as operative and evaluates each lower COMPLETE doc against the HARD bar:
+ *    (1) same version cluster · (2) both are complete docs (neither an SF-30 cover, per
+ *    isSf30Cover — a CONTENT check, not the name-only isSf30) · (3) strictly-higher
+ *    amendment number on the successor · (4) the successor is an ADDITIVE superset —
+ *    it contains EVERY substantive line of the lower (full-content subsumption).
+ *  ALL four ⇒ superseded (drop with proof). Any missing ⇒ possibly_superseded when a
+ *  version marker is present (keep + label), else operative. Pure + deterministic.
+ *  SF-30 covers are field-level (#1B) — routed out here, never doc-level dropped.
+ *  NOTE: `isSf30` on SupersessionInput means "is an SF-30 COVER" (compute via isSf30Cover). */
+export function resolveDocSupersession(docs: SupersessionInput[]): SupersessionDecision[] {
+  const clusters = new Map<string, SupersessionInput[]>();
+  for (const d of docs) {
+    const k = versionClusterKey(d.name);
+    const g = clusters.get(k) ?? [];
+    g.push(d);
+    clusters.set(k, g);
+  }
+
+  const byName = new Map<string, SupersessionDecision>();
+  for (const d of docs) byName.set(d.name, { name: d.name, status: "operative", supersededBy: null, reason: "" });
+
+  for (const group of clusters.values()) {
+    if (group.length < 2) continue;
+    // The successor: highest amendment-numbered COMPLETE doc in the cluster.
+    let successor: SupersessionInput | null = null;
+    let maxNum = -1;
+    for (const d of group) {
+      if (d.isSf30) continue; // (2) an SF-30 cover is never a doc-level successor — #1B handles its field patches
+      const n = parseAmendmentNumber(d.name);
+      if (n !== null && n > maxNum) { maxNum = n; successor = d; }
+    }
+    if (!successor) continue; // no numbered complete successor → nothing to supersede against
+    for (const d of group) {
+      if (d.name === successor.name) continue;
+      const dec = byName.get(d.name)!;
+      const n = parseAmendmentNumber(d.name);
+      // (2) SF-30 cover in the cluster stays operative (field-level #1B, not dropped here).
+      if (d.isSf30) { dec.reason = "SF-30 cover — field-level (#1B), retained"; continue; }
+      // (3) strictly-higher successor number.
+      if (n !== null && n >= maxNum) continue; // same/greater number → not a lower version
+      // (4) positive subsumption proof.
+      if (higherSubsumesLower(successor.text, d.text)) {
+        dec.status = "superseded";
+        dec.supersededBy = successor.name;
+        dec.reason = `fully subsumed by higher amendment ${successor.name} (every substantive line present — additive superset) — dropped with proof`;
+      } else {
+        dec.status = "possibly_superseded";
+        dec.supersededBy = successor.name;
+        dec.reason = `later version ${successor.name} present but does not provably contain all content (changed/removed line) — RETAINED + labelled (fail-toward-keep)`;
+      }
+    }
+  }
+
+  return Array.from(byName.values());
 }
 
 /** Flag-gate for the agentic path. OFF by default — prod is unchanged until the
