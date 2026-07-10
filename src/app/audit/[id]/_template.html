@@ -1465,16 +1465,16 @@ button{font-family:inherit}
           <!-- Card-355 BUILD1 · reviewed = NHR analyzed in full but no scored verdict (findings conflict). Neutral slate,
                engine reason verbatim (data-field="nhr_reason"), points DOWN to the findings — never a committal word. -->
           <div class="pm-head" data-pm="reviewed">
-            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5v.01"/></svg></span>Analyzed in full · Review needed</p>
-            <p class="mhv-word">Human<br>review</p>
+            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5v.01"/></svg></span><span data-field="nhr_label">Analyzed in full · Review needed</span></p>
+            <p class="mhv-word" data-field="nhr_word">Human<br>review</p>
             <p class="mhv-tag" data-field="nhr_reason">A person needs to reconcile the findings before this is a bid / no-bid call.</p>
           </div>
           <div class="mhv-metrics mhv-metrics--prelim">
             <!-- Tile A — RESPONSE DEADLINE (omit entire tile if response_deadline is null) -->
             <div class="mhv-metric" data-field="prelim_deadline_tile">
-              <div class="n"><span data-field="response_days_num">28</span><span class="u">days</span></div>
+              <div class="n"><span data-field="prelim_deadline_date">8 Jul 2026</span></div>
               <div class="k">Response deadline</div>
-              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-field="response_deadline_short">due 2 Jul</span></div>
+              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-field="prelim_deadline_time">4:30 PM (UTC−06:00)</span></div>
             </div>
             <!-- Tile B — SET-ASIDE FIT (set_aside is always present from SAM; eligibility note optional) -->
             <div class="mhv-metric" data-field="prelim_setaside_tile">

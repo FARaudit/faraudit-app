@@ -1784,7 +1784,10 @@ function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
   //    value off the TONE class — idempotent.
   out = replaceFieldInner(out, "recommendation", escapeHtml(vm.verdict_word));
   // 2. Exec card .es-vw verdict word.
-  out = replaceFieldInner(out, "exec_verdict", escapeHtml(vm.verdict_word));
+  // Card-360 item 1 (Brain): on an honest-fail pole NO committal word (BID/CAUTION/NO-BID) may render in the exec
+  // "Bottom line" (this pass otherwise clobbers it back to the canonicalized verdict_word "CAUTION"). vm.exec_verdict
+  // is neutralized to the pole word for a reviewed NHR; scored audits stay byte-identical (is_nhr=false).
+  out = replaceFieldInner(out, "exec_verdict", escapeHtml(vm.is_nhr ? vm.exec_verdict : vm.verdict_word));
   // 3. §06 gate-card surfaces:
   //    .gate-verdict (inside .gc-h)         ← gate_card.verdict_text
   //    .gc-lead                              ← gate_card.lead_text
@@ -2385,14 +2388,19 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // .v-unscored prelim chassis with the new data-prelim-mode="reviewed": engine reason verbatim + a pointer
     // to the findings that WERE produced. The report body (§04/§05/matrix/findings) renders unchanged below.
     html = pickVerdictBlock(html, "preliminary", "reviewed");
+    // Card-360 item 2 (Brain): pole-accurate masthead word + label (W9126 = INCOMPLETE, not "Human review").
+    html = replaceFieldInner(html, "nhr_word", vm.nhr_word); // raw — vm.nhr_word carries <br> for the 2-line word
+    html = replaceFieldText(html, "nhr_label", vm.nhr_label);
     html = replaceFieldText(html, "nhr_reason", vm.nhr_reason);
     html = replaceFieldText(html, "nhr_findings_count", String(vm.nhr_findings_count));
     // exec "bottom line" must match the Human-review masthead, not the template-default "CAUTION" (this binding
     // otherwise only runs in the scored branch). vm.exec_verdict is neutralized to "HUMAN REVIEW" for a reviewed NHR.
     html = replaceFieldText(html, "exec_verdict", vm.exec_verdict);
     if (vm.prelim_has_deadline) {
-      html = replaceFieldText(html, "response_days_num", vm.response_days_num);
-      html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
+      // Card-360 item 3 (Card-330 permanent): absolute date primary + time/offset two-tier — never an "N days" countdown.
+      html = replaceFieldText(html, "prelim_deadline_date", vm.prelim_deadline_date);
+      if (vm.prelim_deadline_time) html = replaceFieldText(html, "prelim_deadline_time", vm.prelim_deadline_time);
+      else html = removeFieldElement(html, "prelim_deadline_time");
     } else {
       html = removePrelimDeadlineTile(html);
     }
@@ -2414,8 +2422,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // .pm-head + .pm-cta show via CSS attribute selectors.
     html = pickVerdictBlock(html, "preliminary", vm.rendered_prelim_mode);
     if (vm.prelim_has_deadline) {
-      html = replaceFieldText(html, "response_days_num", vm.response_days_num);
-      html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
+      // Card-360 item 3 (Card-330 permanent): absolute date primary + time/offset two-tier — never an "N days" countdown.
+      html = replaceFieldText(html, "prelim_deadline_date", vm.prelim_deadline_date);
+      if (vm.prelim_deadline_time) html = replaceFieldText(html, "prelim_deadline_time", vm.prelim_deadline_time);
+      else html = removeFieldElement(html, "prelim_deadline_time");
     } else {
       html = removePrelimDeadlineTile(html);
     }
@@ -2513,11 +2523,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // is omitted, so no orphan separators are possible.
   if (vm.has_response_deadline) {
     html = replaceFieldText(html, "response_deadline", vm.response_deadline);
-    if (vm.response_days) {
-      html = replaceFieldText(html, "response_days", vm.response_days);
-    } else {
-      html = removeKdCnt(html, "response_deadline");
-    }
+    // Card-360 item 3 (Card-330 permanent ruling): drop the stale "in N days" countdown chip — keep the absolute
+    // date + two-tier line. A saved export reading "in 8 days" goes stale = contract-loss vector.
+    html = removeKdCnt(html, "response_deadline");
   } else {
     html = removeKdItem(html, "response_deadline");
     // tl-sub empty-state guard (Option B) — when response_deadline unknown,
@@ -2531,12 +2539,8 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeRailDeadline(html);
   } else {
     html = replaceFieldText(html, "qa_deadline", vm.qa_deadline);
-    if (vm.qa_days) {
-      html = replaceFieldText(html, "qa_days", vm.qa_days);
-      html = replaceFieldText(html, "qa_days_num", vm.qa_days_num);
-    } else {
-      html = removeKdCnt(html, "qa_deadline");
-    }
+    // Card-360 item 3 (Card-330 permanent ruling): no stale "in N days" countdown chip on the questions-due date either.
+    html = removeKdCnt(html, "qa_deadline");
     // Phase A.0 + Phase 2 #4 — .kd-note honors data-hide-when-empty="key_dates_note".
     // Render real note only when vm.key_dates_note is non-empty; otherwise
     // strip the .kd-note entirely (no demo-text default leaks). The canonical
