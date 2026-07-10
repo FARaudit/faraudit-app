@@ -36,10 +36,15 @@ eq("B1 · proprietary/TDP impossibility w/ LPTA-in-excerpt → NOT downgraded (s
 const capacityImposs = tf({ requirement: "required quantity exceeds total industry production capacity within the period", excerpt: "best value trade-off among non-price factors", controllability: "no_one_can_move", lens: "ko" });
 eq("B1 · capacity-exceeded impossibility w/ best-value-in-excerpt → NOT downgraded",
   applyAwardBasisOvertypeGuard([capacityImposs], null, ON)[0].controllability, "no_one_can_move");
-// Gold-preserving: a GENUINE award-basis mis-type (requirement IS the methodology) still downgrades.
+// Post-66bc15e (Brain card 275 RULING 1 — NHR POLE): the clause that silently re-typed a `no_one_can_move`
+// AWARD-BASIS finding → `bidder_controls` was REMOVED — that was a silent clean BID off an unverified
+// heuristic downgrade, and it pre-empted the Fork-2 `unmarkedUniversalClaim → NHR` safety. A genuine
+// award-basis mis-type (NOT a positive set-aside) now STAYS `no_one_can_move` and flows to deriveVerdict
+// Fork-2 → NEEDS_HUMAN_REVIEW — never a silent downgrade. (The set-aside softeners below are the separate
+// FORK-3 doctrine and still fire; only the award-basis silent-downgrade path was removed.)
 const realAwardBasis = tf({ requirement: "award on a lowest price technically acceptable (LPTA) evaluation methodology", excerpt: "The Government will award to the LPTA offeror.", controllability: "no_one_can_move", lens: "ko" });
-eq("B1 · genuine LPTA award-basis mis-type → still downgraded (gold preserved)",
-  applyAwardBasisOvertypeGuard([realAwardBasis], null, ON)[0].controllability, "bidder_controls");
+eq("B1 · genuine LPTA award-basis mis-type → NOT silently downgraded (stays no_one_can_move → NHR, card 275)",
+  applyAwardBasisOvertypeGuard([realAwardBasis], null, ON)[0].controllability, "no_one_can_move");
 
 // ── B-1b (final-greenlight EXPLOIT-3) — set-aside in the EXCERPT must not soften a structural bar ──
 const clearanceSetasideExcerpt = tf({ requirement: "Offeror must possess a Top Secret facility security clearance prior to award", excerpt: "...set aside for SDVOSB concerns. The contractor facility must hold a Top Secret clearance.", controllability: "bidder_cannot_move", curableInWindow: false, kind: "eligibility_bar" });

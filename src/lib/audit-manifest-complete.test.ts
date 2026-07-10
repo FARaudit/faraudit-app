@@ -44,8 +44,13 @@ eq("T11 · all binding docs have_text → complete",
   agenticManifestComplete(ing({ files_total: 2, files_ingested: 2, files: [textSOW, file({ name: "M.pdf", has_text: true })] }), false, true), true);
 eq("T12 · blank OFFEROR-FILL form (reps & certs) with no text → still complete (non-binding, exempt)",
   agenticManifestComplete(ing({ files_total: 2, files_ingested: 2, files: [textSOW, blankRepsCerts] }), false, true), true);
-eq("T13 · legacy record (has_text undefined) → complete (backward-compatible, no false regression)",
-  agenticManifestComplete(ing({ files_total: 2, files_ingested: 2, files: [textSOW, legacyNoField] }), false, true), true);
+// Post-5bb6820 (C-group tranche, Brain C.b / C-18, CEO Rule-61 card 251): bindingContentLossDocs changed from
+// `has_text === false` to `has_text !== true` — an ingested BINDING doc whose text status is UNKNOWN
+// (has_text undefined, e.g. a legacy record written before the field) is a CONTENT LOSS, not silently complete.
+// This DELIBERATELY flips such legacy records to INCOMPLETE on replay: the ruled, fail-SAFE direction (unknown ⇒
+// cannot certify complete), never a false COMPLETE. (Not a backward-compat regression — an intentional ruling.)
+eq("T13 · legacy record (has_text undefined) on a BINDING doc → INCOMPLETE (unknown text = content loss, C-18 fail-safe)",
+  agenticManifestComplete(ing({ files_total: 2, files_ingested: 2, files: [textSOW, legacyNoField] }), false, true), false);
 
 // content-loss enumerator + binding classifier
 eq("T14 · bindingContentLossDocs names ONLY the scanned binding doc",

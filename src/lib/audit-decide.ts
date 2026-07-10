@@ -70,6 +70,9 @@ export function logicalShowStopperCount(showStoppers: DecidedFinding[]): number 
 // a profile-PROVEN fail/satisfy is anchored to a known fact, not contestable — so #3's Dillon bars, proven
 // fails, are NOT knife-edge); AND (b) bumping its disposition ONE NOTCH flips the top-line verdict. Only
 // disqualifying-class findings can move the verdict, so only they are tested. Pure + auditable.
+// Card #374 ADD-7 (field-strip class): this is an INTENTIONAL minimal projection, NOT an orphan — knife-edge testing
+// deliberately holds coverage/verifier/conflict at a clean baseline to ISOLATE a single finding's disposition effect;
+// spreading the caller's other VerdictInputs fields here would corrupt that isolation. Do not "spread-preserve" this.
 const provisional = (findings: TypedFinding[], profile: BidderProfile | null): VerdictInputs =>
   ({ findings, bidderProfile: profile, coverageComplete: true, verifierSound: true, conflict: false });
 
@@ -1546,6 +1549,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     return `⚠ ELIGIBILITY NOT VERIFIED — confirm ${gates} before relying on award eligibility (${provenance}). `;
   };
   const nhrEligible = (): boolean | null => (tristate ? null : true); // honest-fail NHR → null under the flag; OFF ⇒ true (unchanged)
+
+  // 0. PRIMARY INDETERMINATE (Gauntlet Card #370 R1) — before any coverage/eligibility reasoning: on a multi-doc package
+  //    where NO document confidently reads as the base solicitation (identity detection found no solicitation form / UCF
+  //    structure on a non-amendment doc), the engine cannot tell the solicitation from its attachments/amendments. That
+  //    is a manifest/readability failure and DOMINATES → NEEDS_HUMAN_REVIEW (honest-fail), never a silent first-doc
+  //    default. Computed + flag-gated (AUDIT_ATTACHMENT_COVERAGE) in the orchestrator; absent/false ⇒ byte-identical.
+  if (inp.primaryIndeterminate)
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "Could not confidently identify the base solicitation among the uploaded documents (no document carries a solicitation form or contract structure) — human review required to confirm which document is the solicitation before an audit can be relied on.", dispositions, []);
 
   // 1. Coverage first — you cannot decide over content you did not read/ground (honest-fail, no false green).
   // GATE V2 (AUDIT_GATE_V2, default OFF — ceo/ENGINE-ARCHITECTURE-RESEARCH): the V1 line below vetoed a verdict

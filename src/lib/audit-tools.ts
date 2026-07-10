@@ -219,17 +219,65 @@ export function parseDocRegions(src: string): Array<{ name: string; text: string
   return out;
 }
 
-/** DOCUMENT regions with the isPrimary flag (first region). Parses the "==== DOCUMENT: name ====" delimiter that ONLY
- *  fullSource carries (assembleFullSource writes one per doc when >1). groundingSource is the delimiter-less `docs.join`
- *  used for substring GROUNDING, so region-parsing it would collapse to a single primary and readDocument could never
- *  resolve a named attachment (the feature would be INERT). In the live LOSSLESS path fullSource IS the whole binding
- *  text. Single-doc / no-delimiter ⇒ the whole source is primary. (Gauntlet #350 R6 — reverts the R3 groundingSource
- *  preference; region parsing needs delimiters, not raw full text.) */
+// PRIMARY-DOCUMENT IDENTITY (Gauntlet Card #370 RULING 1 — write-order primary detection is a defect, same failure
+// class as amendment/supersession blindness: on an amended multi-doc buy assembleFullSource may write an amendment
+// FIRST, so `i === 0` tags the amendment as the solicitation and the real solicitation as an attachment). resolvePrimary
+// keys the primary off DOCUMENT IDENTITY, not write-order: a solicitation FORM (SF-1449/1442/33/18) or UCF section
+// density scores a doc as the primary; an AMENDMENT marker (SF-30 / "AMENDMENT OF SOLICITATION" / am_/mod filename)
+// DISQUALIFIES a doc from primary candidacy outright — even one that copies the base solicitation's form. Fail-toward:
+// when no doc confidently qualifies (`confident=false`), the CALLER routes to a manifest/readability honest-fail (NHR),
+// never a silent first-doc default. Head-scan only (forms/UCF headers live at the top) → linear, $0.
+const SOLICITATION_FORM_RE = /\bSF ?1449\b|SOLICITATION\/CONTRACT\/ORDER FOR COMMERCIAL|STANDARD FORM 1449|\bSF ?1442\b|SOLICITATION,? OFFER,? AND AWARD|STANDARD FORM 1442|\bSF ?33\b|STANDARD FORM 33|\bSF ?18\b|REQUEST FOR QUOTATIONS?\b/i;
+// SF-30 amendment IDENTITY — the SF-30 form TITLE ("AMENDMENT OF SOLICITATION/MODIFICATION OF CONTRACT") or the form
+// number, in the doc HEAD only (the form title sits at the very top). Deliberately NOT a bare "AMENDMENT OF SOLICITATION"
+// substring: that phrase appears in base-solicitation §L amendment-acknowledgment instructions (52.215-1/52.214-3, SF-1449
+// block 14) and a loose match would FALSE-DISQUALIFY the real primary → spurious primaryIndeterminate/NHR (Card #370
+// code-review finding). Named amendments (am_/amd/mod + digit) are caught by filename regardless; this body regex is the
+// backstop for an UN-named SF-30. Blind-ultracode #372 fixes: (1) match the SF-30 form TITLE only (drop the bare
+// "standard form 30" substring, which a CONFORMED base solicitation can carry in its amendment-acknowledgment block →
+// false-disqualify); (2) scan the SAME 20000-char head window resolvePrimary uses — a 3000-char window let a cover-paged
+// SF-30 (title past char 3000) evade disqualification while its "Request for Quotations" body still scored it as primary.
+const AMENDMENT_DOC_RE = /amendment of solicitation[\s\/]{0,3}modification of contract\b/i;
+const AMENDMENT_NAME_RE = /(?:^|[^a-z])(?:am|amd|amend(?:ment)?|mod(?:ification)?)[_\- .]?\d/i;
+const isAmendmentRegion = (r: { name: string; text: string }) =>
+  AMENDMENT_NAME_RE.test(r.name) || AMENDMENT_DOC_RE.test(r.text.slice(0, 20000));
+/** Pick the primary solicitation region by IDENTITY (Card #370 R1). Returns the chosen index and whether the pick is
+ *  CONFIDENT (a real solicitation form / strong UCF structure was found on a non-amendment doc). `confident=false` on a
+ *  multi-doc package means no doc looks like the solicitation → the caller must fail-toward NHR. `index` is a best-effort
+ *  non-amendment fallback purely so downstream region math stays total; it is NEVER trusted when confident=false. */
+export function resolvePrimary(regions: Array<{ name: string; text: string }>): { index: number; confident: boolean } {
+  if (regions.length === 0) return { index: -1, confident: false };
+  if (regions.length === 1) return { index: 0, confident: true };
+  let best = -1, bestScore = -1;
+  regions.forEach((r, i) => {
+    if (isAmendmentRegion(r)) return;                                   // amendment markers DISQUALIFY from primary
+    const head = r.text.slice(0, 20000);
+    // UCF density: LINE-ANCHORED "SECTION X" headers only (a real UCF solicitation prints them as headings), NOT inline
+    // "see Section C" cross-references — else a compliance-matrix / flow-down attachment that merely cites UCF sections
+    // could out-score the true solicitation and be confidently mis-picked as primary (Card #370 code-review finding).
+    const ucf = Math.min((r.text.match(/^\s*SECTION [A-M]\b/gim) || []).length, 13);
+    const score = (SOLICITATION_FORM_RE.test(head) ? 100 : 0) + ucf * 5;
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  // CONFIDENT only when a real solicitation form OR strong UCF density (≥5 sections) was found on a non-amendment doc.
+  if (best >= 0 && bestScore >= 25) return { index: best, confident: true };
+  const firstNonAmend = regions.findIndex((r) => !isAmendmentRegion(r)); // best-effort fallback (NHR-routed, never trusted)
+  return { index: firstNonAmend >= 0 ? firstNonAmend : 0, confident: false };
+}
+
+/** DOCUMENT regions with the isPrimary flag. Parses the "==== DOCUMENT: name ====" delimiter that ONLY fullSource
+ *  carries (assembleFullSource writes one per doc when >1). groundingSource is the delimiter-less `docs.join` used for
+ *  substring GROUNDING, so region-parsing it would collapse to a single primary and readDocument could never resolve a
+ *  named attachment (the feature would be INERT). In the live LOSSLESS path fullSource IS the whole binding text.
+ *  Single-doc / no-delimiter ⇒ the whole source is primary. (Gauntlet #350 R6 — reverts the R3 groundingSource
+ *  preference; region parsing needs delimiters, not raw full text.) PRIMARY pick: identity-based (resolvePrimary,
+ *  Card #370 R1) when the attachment-coverage flag is ON; write-order `i === 0` when OFF (flag-OFF byte-identical). */
 function docRegionsOf(ctx: AuditToolContext): Array<{ name: string; text: string; isPrimary: boolean }> {
   const src = ctx.fullSource ?? "";
   const regions = parseDocRegions(src);
   if (regions.length === 0) return [{ name: "(primary solicitation)", text: src, isPrimary: true }];
-  return regions.map((r, i) => ({ ...r, isPrimary: i === 0 }));
+  const primaryIdx = ATTACHMENT_COVERAGE_ENABLED ? resolvePrimary(regions).index : 0;
+  return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
 }
 
 /** The BINDING attachments the coverage checklist (C) requires the panel to read — every non-primary document region

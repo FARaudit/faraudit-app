@@ -159,7 +159,11 @@ runBool("T26 · plain V1 done (no V2 arm) → export OPEN", shouldGateExport(noV
 // honest_fail + documents_complete (analysis_phase is always "done"). Gate on
 // BOTH (CEO 2026-06-28). These rows carry engine:"agentic_v3" so they take the
 // new branch and never the V1 finalizing rules.
-const v3Clean = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: false, documents_complete: true } };
+// Post-0ce6e0e (#137 CUSTOMER-TRUST): shouldGateExport gates when `comp.v3 == null` (schema-drift / partial
+// write → no report payload → 409, mirroring the renderer's fallback so the PDF route can't serve a blank doc
+// with a 200). A genuinely-clean row must therefore ALSO carry a non-null v3 report payload to export OPEN;
+// the old fixture omitted it and now (correctly) gates. Add a payload so this row proves the real clean path.
+const v3Clean = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: false, documents_complete: true, v3: { verdict: "BID" } } };
 const v3HonestFail = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: true, documents_complete: true } };
 const v3PartialDocs = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: false, documents_complete: false } };
 const v3Both = { compliance_json: { engine: "agentic_v3", analysis_phase: "done", honest_fail: true, documents_complete: false } };
