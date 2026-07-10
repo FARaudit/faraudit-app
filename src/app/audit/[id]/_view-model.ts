@@ -347,6 +347,8 @@ export interface AuditViewModel {
   // Short-form date prefixed with "due " (e.g. "due 6 Jul") for the prelim
   // tile's .mhv-note line. Empty when response_deadline is null.
   response_deadline_short: string;
+  prelim_deadline_date: string;     // absolute date, prelim tile primary (Card-330: no countdown)
+  prelim_deadline_time: string;     // time+offset, prelim tile two-tier secondary
   award_date: string;
   // Derived fiscal-quarter for the .cnt span next to award_date (e.g. "Q4 FY26").
   // Empty when award_date is null OR uncomputable → renderer drops the .cnt span.
@@ -468,6 +470,11 @@ export interface AuditViewModel {
   // true, ALL "metadata-only / Locked / Fetch from SAM.gov" scaffolding must be
   // suppressed/stripped regardless of is_unscored or per-section counts.
   report_has_real_content: boolean;
+  is_nhr: boolean;                  // NHR pole (honest-fail/NEEDS_HUMAN_REVIEW/INCOMPLETE/OUT_OF_SCOPE)
+  nhr_reason: string;               // engine reason string, verbatim — the Human-review slate tag
+  nhr_findings_count: number;       // findings produced despite no score — "see the N findings below"
+  nhr_word: string;                 // pole-accurate masthead word (may carry <br>): Human review / Incomplete / Out of scope
+  nhr_label: string;                // pole-accurate slate eyebrow label
   // FA-E2E Fix 2 (2026-06-18): REAL clause/trap counts so the metadata-only
   // locked teasers stop rendering hardcoded "4 DFARS traps / 9 clauses"
   // literals. Populated from compliance_json; the renderer strips the teaser
@@ -518,7 +525,13 @@ function fmtDeadlineFull(raw: unknown, fallback: Date | null): string {
       // No time component, or a bare midnight with no offset → treat as a date-only deadline (show date alone).
       if (hh === undefined || (hh === "00" && mi === "00" && !off)) return dateStr;
       const offLabel = !off || off === "Z" ? "UTC" : `UTC${off.replace(":", "").replace(/([+-])(\d{2})(\d{2})/, "$1$2:$3").replace("+", "+").replace("-", "−")}`;
-      return `${dateStr} · ${hh}:${mi} (${offLabel})`;
+      // Card 330 item 2 (Brain-ratified): render the wall-clock cutoff in 12-hour form ("4:30 PM"), uppercase
+      // meridiem with a leading space, no periods — SAM notices state cutoffs in 12h local, so this mirrors the
+      // source 1:1 (the numeric UTC offset already removes AM/PM ambiguity). Noon/midnight → 12:00 PM / 12:00 AM.
+      const hourNum = Number(hh);
+      const meridiem = hourNum >= 12 ? "PM" : "AM";
+      const hour12 = hourNum % 12 || 12;
+      return `${dateStr} · ${hour12}:${mi} ${meridiem} (${offLabel})`;
     }
   }
   return fmtDayMonYear(fallback);
@@ -796,6 +809,23 @@ const SET_ASIDE_LABEL: Record<string, string> = {
   "8A":                          "8(a) Set-Aside (competitive)",
   "8A_COMPETED":                 "8(a) Competitive",
   "8A_SOLE_SOURCE":              "8(a) Sole-Source",
+  // Card-355 R3 (Brain #342): SAM.gov `typeOfSetAside` CODES arrive verbatim on the
+  // authoritative audit.set_aside column (Rule 64 metadata-first). The map above only
+  // held human-readable strings, so a code like "HZC" fell through to "—" — FA1068's
+  // HUBZone set-aside rendered blank despite SAM carrying HZC. Decode the SAM enum here.
+  "SBP":                         "Small Business — Partial",
+  "HZC":                         "HUBZone Small Business",
+  "HZS":                         "HUBZone Sole-Source",
+  "8AN":                         "8(a) Sole-Source",
+  "SDVOSBS":                     "Service-Disabled Veteran-Owned Small Business (SDVOSB) — Sole-Source",
+  "WOSBSS":                      "Women-Owned Small Business (WOSB) — Sole-Source",
+  "EDWOSBSS":                    "Economically Disadvantaged WOSB (EDWOSB) — Sole-Source",
+  "VSA":                         "Veteran-Owned Small Business (VOSB)",
+  "VSS":                         "Veteran-Owned Small Business (VOSB) — Sole-Source",
+  "LAS":                         "Local Area Set-Aside",
+  "IEE":                         "Indian Economic Enterprise",
+  "ISBEE":                       "Indian Small Business Economic Enterprise",
+  "BI":                          "Buy Indian Set-Aside",
 };
 
 function normalizeSetAside(s: unknown): string {
@@ -2044,6 +2074,40 @@ function deriveComplianceMatrix(
     if (!f.name) continue;
     rows.push({ requirement: f.name, source: "Section M", status: "clear" });
   }
+  // RENDER-COHERENCE P0 (Gate-1 DRAFT — Design to confirm 1:1): the agentic-V3 engine emits typed findings in
+  // compJson.v3.findings, NOT the legacy far_clauses/submission_requirements/evaluation_factors this matrix reads. When
+  // those legacy fields produced NOTHING (rows empty) but V3 findings exist, surface them so a fully-analyzed V3 audit
+  // renders its requirements instead of an empty shell. Gated on rows.length===0 ⇒ legacy audits are byte-identical.
+  // First-pass kind→status + citation→source mapping; the section/kind grouping + copy are a Design decision.
+  if (rows.length === 0) {
+    const v3f = ((compJson.v3 ?? {}) as { findings?: Array<Record<string, unknown>> }).findings;
+    if (Array.isArray(v3f)) {
+      const srcForKind = (k: string): string =>
+        k === "clause_flowdown" ? "Clause" : k === "submission" ? "Section L" : k === "pricing" ? "Pricing" :
+        k === "eligibility_bar" ? "Eligibility" : k === "past_performance" ? "Past performance" : "Solicitation";
+      for (const f of v3f) {
+        // Card-355 BUILD3 defect 1: the row LABEL is the finding's own requirement, NEVER the raw excerpt
+        // (an excerpt as a title is noise). No requirement → drop the row (the excerpt belongs in expandable
+        // evidence, not the matrix title). All V3 findings carry `requirement`, so this drops nothing real.
+        const rawReq = String(f.requirement ?? "").trim();
+        if (!rawReq) continue;
+        // defect 2: word-boundary truncation via truncateOnWord, not a mid-word slice(0,400).
+        const requirement = sanitizeDisplayText(truncateOnWord(rawReq, 400));
+        if (!requirement) continue;
+        const kind = String(f.kind ?? "");
+        const disp = String(f.disposition ?? "");
+        // defect 3: status ties to kind + disposition (not a coarse all-else→clear). boilerplate is never a
+        // risk/action; eligibility_bar is the gate/risk axis; an open gate_to_clear obligation is an action.
+        const status: "action" | "risk" | "clear" =
+          kind === "boilerplate" ? "clear" :
+          kind === "eligibility_bar" ? "risk" :
+          disp === "gate_to_clear" ? "action" :
+          "clear";
+        const source = String(f.citation ?? "").trim() || srcForKind(kind);
+        rows.push({ requirement, source, status });
+      }
+    }
+  }
   return rows;
 }
 
@@ -2671,6 +2735,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // Gate audits ran on a real source and produced a decision — not unscored.
   // The unscored branch only fires when the engine literally couldn't score
   // (metadata-only, no PDF).
+  // RENDER-COHERENCE P0 (Gate-1, audit 530702bb): the agentic-V3 engine emits its audit in compJson.v3.{findings,verdict}.
+  // engineProducedAudit is the shared "this is a real, fully-analyzed audit" signal used by reportHasRealContent (below)
+  // + isNotSolicitation. is_unscored INTENTIONALLY stays true for an honest-fail/NHR run (score IS null) — per FA-195-v2
+  // the masthead routing keys off report_has_real_content (which now recognizes V3), NOT off flipping is_unscored, so the
+  // scored block renders with an honest "not yet scored" score area rather than the "upload the PDF" teaser.
+  const _v3 = (compJson.v3 ?? {}) as { findings?: unknown[]; verdict?: string };
+  const engineProducedAudit =
+    (Array.isArray(_v3.findings) && _v3.findings.length > 0) ||
+    (typeof _v3.verdict === "string" && _v3.verdict.length > 0 && _v3.verdict !== "NOT_A_SOLICITATION");
   const isUnscored = verdictMode !== "gate" && (rawScore === null || scoreConfidenceRaw === "unscored");
   // FA-195: never render the "Locked / metadata-only / Fetch from SAM.gov"
   // teasers on an audit that actually read its documents in full. pdf_source
@@ -2688,11 +2761,43 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // scaffolding must be driven off this one flag (NOT is_unscored, NOT per-section
   // counts, NOT pdf_source alone) — those disagreed and leaked the contradiction
   // (the 5-sol sweep found it visible on #2/#3/#5 while files were read in full).
+  // RENDER-COHERENCE P0 (Gate-1 root cause, audit 530702bb): the agentic-V3 engine (AUDIT_AGENTIC_V3_PRIMARY, live)
+  // writes its output to compJson.v3.{findings,verdict} + compJson.documents_complete/doc_count — NOT to the legacy
+  // ingestion/far_clauses/clin_line_items keys this check historically read. So a fully-analyzed V3 audit (33 grounded
+  // findings + a real NHR verdict) scored reportHasRealContent=false → fell through to the "metadata-only / upload the
+  // PDF" empty shell. Recognize the V3 output so a real V3 audit is never treated as a metadata-only shell.
+  const _docsComplete = compJson.documents_complete === true || (typeof compJson.doc_count === "number" && compJson.doc_count > 0);
   const reportHasRealContent =
     v2Shadow?.path === "pdf" ||
     ((_ing.files_total ?? 0) > 0 && (_ing.files_ingested ?? 0) >= (_ing.files_total ?? 0)) ||
-    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0;
+    _ingFar > 0 || _ingDfars > 0 || _clinCount > 0 ||
+    engineProducedAudit || _docsComplete;
   const isMetadataOnly = compJson.pdf_source === "sam_unavailable" && !reportHasRealContent;
+  // Card-355 R1/BUILD1 (Brain #342): the NHR "Human review" slate signal. An NHR pole (honest-fail /
+  // NEEDS_HUMAN_REVIEW / INCOMPLETE / OUT_OF_SCOPE) that nevertheless analyzed the full doc must render the
+  // neutral Human-review slate — NOT the scored masthead, which leaks a committal word (e.g. CAUTION) onto a
+  // no-verdict audit. Gated with is_unscored + report_has_real_content in the renderer so a non-NHR score-null
+  // audit (mis-detected primary doc, FA-195-v2) still keeps its scored masthead.
+  const _v3reason = (compJson.v3 ?? {}) as { verdict?: string; reason?: string; findings?: unknown[] };
+  const isNhr =
+    compJson.honest_fail === true ||
+    ["NEEDS_HUMAN_REVIEW", "INCOMPLETE", "OUT_OF_SCOPE"].includes(String(_v3reason.verdict ?? "").toUpperCase());
+  const nhrReason =
+    sanitizeDisplayText(String(_v3reason.reason ?? "")) ||
+    "A person needs to reconcile the findings before this is a bid / no-bid call.";
+  const nhrFindingsCount = Array.isArray(_v3reason.findings) ? _v3reason.findings.length : 0;
+  // Card-360 item 2 (Brain): the slate word + label must be POLE-ACCURATE, not a blanket "Human review".
+  // W9126's pole is INCOMPLETE, not NEEDS_HUMAN_REVIEW — "Human review" would mislabel it. Word carries the
+  // <br> for the 2-line masthead; the reason string underneath stays verbatim regardless.
+  const _nhrPole = String(_v3reason.verdict ?? "").toUpperCase();
+  const nhrWord =
+    _nhrPole === "INCOMPLETE" ? "Incomplete" :
+    _nhrPole === "OUT_OF_SCOPE" ? "Out of<br>scope" :
+    "Human<br>review";
+  const nhrLabel =
+    _nhrPole === "INCOMPLETE" ? "Coverage incomplete · Review needed" :
+    _nhrPole === "OUT_OF_SCOPE" ? "Outside scope · Review needed" :
+    "Analyzed in full · Review needed";
   // Fallback derivation matches what the engine computes when the row was
   // written by post-13f4743 code, so the rendering stays consistent across
   // both populated and missing-flag rows.
@@ -2707,10 +2812,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // real NHR verdict), rendering a near-empty shell (Set-aside "Not in documents" despite SAM HZC). GATE the derived
   // branch on the engine NOT having produced a substantive audit: a real verdict pole + findings means it IS a
   // solicitation, full stop. The EXPLICIT persisted flag still wins (a genuine engine "not a solicitation" call).
-  const v3ForNotSol = (compJson.v3 ?? {}) as { findings?: unknown[]; verdict?: string };
-  const engineProducedAudit =
-    (Array.isArray(v3ForNotSol.findings) && v3ForNotSol.findings.length > 0) ||
-    (typeof v3ForNotSol.verdict === "string" && v3ForNotSol.verdict.length > 0 && v3ForNotSol.verdict !== "NOT_A_SOLICITATION");
+  // engineProducedAudit is hoisted above (shared with isUnscored + reportHasRealContent).
   const isNotSolicitation = typeof persistedNotSol === "boolean"
     ? persistedNotSol
     : (!engineProducedAudit &&
@@ -3214,6 +3316,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // code — we derive the same shape from existing fields so legacy rows
     // still render the Exec Summary surface cleanly.
     exec_verdict: (() => {
+      // Card-355 R1 (Brain #342): a reviewed NHR has NO committal verdict — the exec "bottom line" must match the
+      // Human-review masthead, never leak "CAUTION" (the recommendation union canonicalizes NHR→CAUTION; that
+      // structural leak is filed as a defect, this neutralizes the visible surface).
+      if (isNhr && isUnscored && reportHasRealContent) return nhrWord.replace("<br>", " ").toUpperCase();
       const eng = compJson.executive_summary as { verdict?: string } | undefined;
       return eng?.verdict ?? (verdict.word === "GO" ? "GO" : verdict.word === "DECLINE" ? "NO-BID" : "CAUTION");
     })(),
@@ -3370,6 +3476,11 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     response_days: fmtKdCountdown(responseDays),
     response_days_num: responseDays != null ? String(Math.max(0, responseDays)) : "",
     response_deadline_short: fmtDueShort(responseDeadline),
+    // Card-360 item 3 (Brain / Card-330 permanent ruling): the prelim deadline tile shows the ABSOLUTE DATE as
+    // primary — never an "N days" countdown that goes stale on a saved export — with time+offset as the two-tier
+    // secondary line. Split off the fmtDeadlineFull "date · time (offset)" string.
+    prelim_deadline_date: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ")[0],
+    prelim_deadline_time: fmtDeadlineFull(samResponseDeadline ? audit.response_deadline : null, responseDeadline).split(" · ").slice(1).join(" · "),
     award_date: awardDateDate ? fmtDayMonYear(awardDateDate) : "",
     award_quarter: awardQuarterStr,
     urgent_field: urgentField,
@@ -3464,6 +3575,11 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     is_metadata_only: !!isMetadataOnly,
     report_has_real_content: !!reportHasRealContent,
+    is_nhr: isNhr,
+    nhr_reason: nhrReason,
+    nhr_findings_count: nhrFindingsCount,
+    nhr_word: nhrWord,
+    nhr_label: nhrLabel,
     // FA-E2E Fix 2: real counts for the locked-teaser placeholders.
     far_clause_count: farCount,
     dfars_clause_count: dfarsCount,

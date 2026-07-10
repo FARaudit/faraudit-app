@@ -402,7 +402,7 @@ function setVerdictClass(html: string, verdictClass: "v-go" | "v-caution" | "v-d
 //                       its data-state="locked" so the print rule doesn't fire,
 //                       AND stamp data-prelim-mode = fetch/watch/upload on it
 //                       (drives the CSS .pm-head/.pm-cta visibility selectors).
-function pickVerdictBlock(html: string, mode: "scored" | "preliminary", prelimMode?: "fetch" | "watch" | "upload"): string {
+function pickVerdictBlock(html: string, mode: "scored" | "preliminary", prelimMode?: "fetch" | "watch" | "upload" | "reviewed"): string {
   if (mode === "scored") {
     const idx = html.indexOf('<div class="mh-verdict v-unscored"');
     if (idx === -1) return html;
@@ -546,9 +546,12 @@ function revealLockedSectionsForUnscored(html: string): string {
 function stripLockedScaffoldingForRealContent(html: string): string {
   let out = html;
   // 1. Preliminary masthead — uniquely identified by data-field="preliminary_block".
+  // Card-355 BUILD1: only strip the STILL-LOCKED metadata-only scaffolding. pickVerdictBlock removes
+  // data-state="locked" when it converts this block into the reviewed NHR "Human review" slate, so requiring
+  // data-state="locked" here leaves that slate intact — it IS the legitimate masthead for a real-content NHR.
   out = removeElementByOpenRe(
     out,
-    /<div\b[^>]*\bdata-field="preliminary_block"[^>]*>/,
+    /<div\b(?=[^>]*\bdata-field="preliminary_block")[^>]*\bdata-state="locked"[^>]*>/,
     "div"
   );
   // 2. "moment" locked teaser — <section class="moment" data-state="locked">.
@@ -1781,7 +1784,10 @@ function applyCanonicalVerdict(html: string, vm: AuditViewModel): string {
   //    value off the TONE class — idempotent.
   out = replaceFieldInner(out, "recommendation", escapeHtml(vm.verdict_word));
   // 2. Exec card .es-vw verdict word.
-  out = replaceFieldInner(out, "exec_verdict", escapeHtml(vm.verdict_word));
+  // Card-360 item 1 (Brain): on an honest-fail pole NO committal word (BID/CAUTION/NO-BID) may render in the exec
+  // "Bottom line" (this pass otherwise clobbers it back to the canonicalized verdict_word "CAUTION"). vm.exec_verdict
+  // is neutralized to the pole word for a reviewed NHR; scored audits stay byte-identical (is_nhr=false).
+  out = replaceFieldInner(out, "exec_verdict", escapeHtml(vm.is_nhr ? vm.exec_verdict : vm.verdict_word));
   // 3. §06 gate-card surfaces:
   //    .gate-verdict (inside .gc-h)         ← gate_card.verdict_text
   //    .gc-lead                              ← gate_card.lead_text
@@ -2375,6 +2381,34 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // web + PDF in lockstep (no need for [data-state="locked"] CSS gymnastics
     // since the sections are physically gone).
     html = removeNotSolicitationSections(html);
+  } else if (vm.is_unscored && vm.report_has_real_content && vm.is_nhr) {
+    // Card-355 R1/BUILD1 (Brain #342): an NHR that analyzed the full doc renders the NEUTRAL "Human review"
+    // slate — never a committal word. The prior FA-195-v2 fall-through to the scored block (below) leaked
+    // verdict_word "CAUTION" onto a no-verdict audit (filed as the canonicalization-leak defect). Reuse the
+    // .v-unscored prelim chassis with the new data-prelim-mode="reviewed": engine reason verbatim + a pointer
+    // to the findings that WERE produced. The report body (§04/§05/matrix/findings) renders unchanged below.
+    html = pickVerdictBlock(html, "preliminary", "reviewed");
+    // Card-360 item 2 (Brain): pole-accurate masthead word + label (W9126 = INCOMPLETE, not "Human review").
+    html = replaceFieldInner(html, "nhr_word", vm.nhr_word); // raw — vm.nhr_word carries <br> for the 2-line word
+    html = replaceFieldText(html, "nhr_label", vm.nhr_label);
+    html = replaceFieldText(html, "nhr_reason", vm.nhr_reason);
+    html = replaceFieldText(html, "nhr_findings_count", String(vm.nhr_findings_count));
+    // exec "bottom line" must match the Human-review masthead, not the template-default "CAUTION" (this binding
+    // otherwise only runs in the scored branch). vm.exec_verdict is neutralized to "HUMAN REVIEW" for a reviewed NHR.
+    html = replaceFieldText(html, "exec_verdict", vm.exec_verdict);
+    if (vm.prelim_has_deadline) {
+      // Card-360 item 3 (Card-330 permanent): absolute date primary + time/offset two-tier — never an "N days" countdown.
+      html = replaceFieldText(html, "prelim_deadline_date", vm.prelim_deadline_date);
+      if (vm.prelim_deadline_time) html = replaceFieldText(html, "prelim_deadline_time", vm.prelim_deadline_time);
+      else html = removeFieldElement(html, "prelim_deadline_time");
+    } else {
+      html = removePrelimDeadlineTile(html);
+    }
+    if (vm.set_aside_eligibility) {
+      html = replaceFieldText(html, "set_aside_eligibility", vm.set_aside_eligibility);
+    } else {
+      html = removePrelimSetasideNote(html);
+    }
   } else if (vm.is_unscored && !vm.report_has_real_content) {
     // FA-195-v2: a scored-null report that nevertheless read its documents in
     // full (report_has_real_content) must NOT take the "Preliminary · SAM
@@ -2388,8 +2422,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // .pm-head + .pm-cta show via CSS attribute selectors.
     html = pickVerdictBlock(html, "preliminary", vm.rendered_prelim_mode);
     if (vm.prelim_has_deadline) {
-      html = replaceFieldText(html, "response_days_num", vm.response_days_num);
-      html = replaceFieldText(html, "response_deadline_short", vm.response_deadline_short);
+      // Card-360 item 3 (Card-330 permanent): absolute date primary + time/offset two-tier — never an "N days" countdown.
+      html = replaceFieldText(html, "prelim_deadline_date", vm.prelim_deadline_date);
+      if (vm.prelim_deadline_time) html = replaceFieldText(html, "prelim_deadline_time", vm.prelim_deadline_time);
+      else html = removeFieldElement(html, "prelim_deadline_time");
     } else {
       html = removePrelimDeadlineTile(html);
     }
@@ -2487,11 +2523,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // is omitted, so no orphan separators are possible.
   if (vm.has_response_deadline) {
     html = replaceFieldText(html, "response_deadline", vm.response_deadline);
-    if (vm.response_days) {
-      html = replaceFieldText(html, "response_days", vm.response_days);
-    } else {
-      html = removeKdCnt(html, "response_deadline");
-    }
+    // Card-360 item 3 (Card-330 permanent ruling): drop the stale "in N days" countdown chip — keep the absolute
+    // date + two-tier line. A saved export reading "in 8 days" goes stale = contract-loss vector.
+    html = removeKdCnt(html, "response_deadline");
   } else {
     html = removeKdItem(html, "response_deadline");
     // tl-sub empty-state guard (Option B) — when response_deadline unknown,
@@ -2505,12 +2539,8 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     html = removeRailDeadline(html);
   } else {
     html = replaceFieldText(html, "qa_deadline", vm.qa_deadline);
-    if (vm.qa_days) {
-      html = replaceFieldText(html, "qa_days", vm.qa_days);
-      html = replaceFieldText(html, "qa_days_num", vm.qa_days_num);
-    } else {
-      html = removeKdCnt(html, "qa_deadline");
-    }
+    // Card-360 item 3 (Card-330 permanent ruling): no stale "in N days" countdown chip on the questions-due date either.
+    html = removeKdCnt(html, "qa_deadline");
     // Phase A.0 + Phase 2 #4 — .kd-note honors data-hide-when-empty="key_dates_note".
     // Render real note only when vm.key_dates_note is non-empty; otherwise
     // strip the .kd-note entirely (no demo-text default leaks). The canonical

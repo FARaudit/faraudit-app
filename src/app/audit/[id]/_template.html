@@ -254,6 +254,14 @@ button{font-family:inherit}
 .v-unscored .pm-head,.v-unscored .pm-cta{display:none}
 .v-unscored[data-prelim-mode="fetch"] .pm-head[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-head[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-head[data-pm="upload"]{display:block}
 .v-unscored[data-prelim-mode="fetch"] .pm-cta[data-pm="fetch"],.v-unscored[data-prelim-mode="watch"] .pm-cta[data-pm="watch"],.v-unscored[data-prelim-mode="upload"] .pm-cta[data-pm="upload"]{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+/* Card-355 BUILD1 — the net-new "reviewed" NHR variant on the same neutral .v-unscored chassis (Human-review slate) */
+.v-unscored[data-prelim-mode="reviewed"] .pm-head[data-pm="reviewed"]{display:block}
+.mhv-review-foot{display:none;margin-top:16px;flex-direction:column;gap:9px}
+.v-unscored[data-prelim-mode="reviewed"] .mhv-review-foot{display:flex}
+.mhv-seepoint{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.24);border-radius:10px;padding:11px 13px;line-height:1.35}
+.mhv-seepoint svg{width:15px;height:15px;flex:none;stroke:rgba(255,255,255,.9)}
+.mhv-nocharge{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;letter-spacing:.04em;color:rgba(255,255,255,.62);display:flex;align-items:center;gap:6px;padding-left:2px}
+.mhv-nocharge svg{width:11px;height:11px;flex:none;stroke:rgba(255,255,255,.7)}
 .v-unscored .pm-cta .mhv-cta{margin-top:0}
 .mhv-cta.is-tracking{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.45)}
 .mhv-cta-2{display:inline-flex;align-items:center;justify-content:center;height:32px;color:rgba(255,255,255,.8);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;border-radius:8px;transition:color .15s}
@@ -1454,12 +1462,19 @@ button{font-family:inherit}
             <p class="mhv-word">Preliminary<br>read</p>
             <p class="mhv-tag">We&rsquo;ve read the SAM.gov metadata. Upload the solicitation to unlock your scored verdict, the clause-level compliance map, and the specific traps in this RFP.</p>
           </div>
+          <!-- Card-355 BUILD1 · reviewed = NHR analyzed in full but no scored verdict (findings conflict). Neutral slate,
+               engine reason verbatim (data-field="nhr_reason"), points DOWN to the findings — never a committal word. -->
+          <div class="pm-head" data-pm="reviewed">
+            <p class="mhv-label"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5v.01"/></svg></span><span data-field="nhr_label">Analyzed in full · Review needed</span></p>
+            <p class="mhv-word" data-field="nhr_word">Human<br>review</p>
+            <p class="mhv-tag" data-field="nhr_reason">A person needs to reconcile the findings before this is a bid / no-bid call.</p>
+          </div>
           <div class="mhv-metrics mhv-metrics--prelim">
             <!-- Tile A — RESPONSE DEADLINE (omit entire tile if response_deadline is null) -->
             <div class="mhv-metric" data-field="prelim_deadline_tile">
-              <div class="n"><span data-field="response_days_num">28</span><span class="u">days</span></div>
+              <div class="n"><span data-field="prelim_deadline_date">8 Jul 2026</span></div>
               <div class="k">Response deadline</div>
-              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-field="response_deadline_short">due 2 Jul</span></div>
+              <div class="mhv-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-field="prelim_deadline_time">4:30 PM (UTC−06:00)</span></div>
             </div>
             <!-- Tile B — SET-ASIDE FIT (set_aside is always present from SAM; eligibility note optional) -->
             <div class="mhv-metric" data-field="prelim_setaside_tile">
@@ -1479,6 +1494,12 @@ button{font-family:inherit}
           </div>
           <div class="pm-cta" data-pm="upload">
             <a class="mhv-cta" data-upload>Upload the solicitation PDF &rarr;</a>
+          </div>
+          <!-- Card-355 BUILD1 · reviewed foot — honest "no score" pointer to the findings that WERE produced. A direct
+               child (NOT a .pm-cta — those interactive blocks are stripped from the static report). Shown only in reviewed
+               mode via the data-prelim-mode CSS. No-charge line OMITTED (card-355 R2: not enforced in the quota path yet). -->
+          <div class="mhv-review-foot">
+            <div class="mhv-seepoint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12l7 7 7-7"/></svg><span>No score was issued — see the <span data-field="nhr_findings_count">0</span> findings below.</span></div>
           </div>
         </div>
       </header>
