@@ -13,7 +13,7 @@
 // callModel + verify are INJECTED → the whole cycle is unit-testable with stubs ($0). The real run is PAID.
 
 import { runAgenticExpert, isGrounded, type CallModel, type ExpertSpec } from "./audit-expert";
-import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
+import { readSection, sectionFullText, procurementPart, requiresProposalSections, materializeSections, parseDocRegions, resolvePrimary, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
@@ -42,7 +42,7 @@ const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 /** Telemetry record for a finding the skeptic dropped (Brain card 274 RULING 1). `empty_corrected` = a refuted
  *  finding whose `corrected` object was non-substantive (the false-INELIGIBLE/NO_BID resurrection hole, now closed);
  *  `overturned` = a plain upheld=false drop. Persisted so every drop is auditable, never silent. */
-export interface CorrectedDrop { index: number; id?: string; requirement: string; citation: string; refutation: string; dropReason: "empty_corrected" | "overturned"; }
+export interface CorrectedDrop { index: number; id?: string; requirement: string; citation: string; refutation: string; dropReason: "empty_corrected" | "overturned" | "entailment_fail"; }
 export interface VerifyResult { sound: boolean; survived: TypedFinding[]; rejected: TypedFinding[]; correctedDrops?: CorrectedDrop[]; }
 /** P2 — adversarial cross-examination. Default impl is an agentic skeptic; injected as a stub in tests.
  *  bidderProfile is passed so the verifier can compute the deterministic knife-edge set (Brain card-54/55). */
@@ -243,17 +243,26 @@ function obligationsOf(text: string): { obligations: string[]; truncated: boolea
     .filter((s) => s.length > 12 && /\b(shall|must|provide|submit|furnish|required|quote|deliver)\b/i.test(s));
   return { obligations: all.slice(0, MAX_OBLIGATIONS), truncated: all.length > MAX_OBLIGATIONS };
 }
-// HARD-BAR obligation language (Gauntlet #349 R2) — a disqualifying/eligibility obligation an attachment attestation
-// must NEVER be allowed to suppress (it must be GROUNDED as a finding, never merely "attested no-obligation"). Narrow
-// by design: only the clearest bar signals, so soft admin over-detections (RFI questions, blank-form field labels)
-// remain attestable and route to the verifier/panel honesty gate.
-// R7 D1/D2/D4 (Gauntlet Gate-2) — verb group carries BOTH mandatory verbs ("shall" is the dominant federal one; a bare
-// `must` group let "Contractor shall hold/maintain/be certified" MISS → attestation-honored false-COMPLETE). The
-// be-<qualifier> clause allows a BOUNDED intervening cert token ("must be CMMC Level 2 certified" / "ISO 9001:2015
-// certified") — {0,40}? is length-capped so it stays ReDoS-safe. Cert keywords (cmmc/as9100/iso 9001) and a SCOPED
-// "limited to <small-business/program>" catch set-aside/cert bars with no program keyword. All HARD_BAR_RE consumers
-// (lines 387/411/460) are flag-ON only, so this broadening is flag-OFF byte-identical.
-const HARD_BAR_RE = /\bshall not\b|\b(?:shall|must) (?:hold|possess|maintain)\b|\b(?:shall|must) be [\w /:.\-]{0,40}?(?:certified|cleared|registered|accredited|licensed)\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\beligib(?:le|ility)\b|\bineligible\b|\bset[\s-]?aside\b|\brestricted to\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bmust be a\b|\brequired to (?:hold|possess|maintain|have|be)\b/i;
+// ELIGIBILITY-BAR obligation language — the deterministic INCOMPLETE floor's CHARTER (Gauntlet Card #370 RULING 2). An
+// attachment attestation may never suppress a BIDDER-ELIGIBILITY / DISQUALIFIER bar (it must be GROUNDED as a finding,
+// never merely "attested no-obligation"). The allow-list is scoped to eligibility semantics ONLY — clearance, set-aside,
+// size standard, certification, registration, debarment — mirroring the eligibility show-stopper narrowing (FAR 19 /
+// 13 CFR 121–128 precedent). RULING 2 NARROWED this from the former HARD_BAR_RE: a bare `\bshall not\b` performance
+// obligation and generic `\bmust be a\b` are NOT eligibility bars — they belong to the A+C coverage mandate (the doc
+// must still be provably-read + ground-or-attest) and Gate-4 verifier/panel adjudication, and must NOT trip
+// deterministic INCOMPLETE alone (attesting-read a drawings/construction doc that only carries "SHALL NOT DEVIATE FROM
+// THE PLANS" was an UNDER_ABSTAIN manufacturing vector on every construction buy, and contradicted the Card #347
+// honest-empty ruling). "shall not" is NOT deleted as a coverage-relevance signal — obligationsOf still detects it, so
+// the doc stays coverage-required; it just can no longer force INCOMPLETE by itself. The be-<qualifier> clause allows a
+// BOUNDED cert token ("must be CMMC Level 2 certified") — {0,40}? length-capped, ReDoS-safe. Two W9126-drawings-grounded
+// refinements (Card #370 calibration, real construction text — no synthetics): (a) OFFEROR-vs-WORK — a credential on the
+// OFFEROR ("offeror shall be certified") is eligibility, a credential on the WORK/AGENT ("drawings shall be sealed BY a
+// licensed engineer", "work performed BY certified welders") is performance → the be-<qualifier> clause tempers out an
+// intervening "by"; (b) SET-ASIDE requires a socioeconomic qualifier (small-business/HUBZone/SDVOSB/… before, or
+// "for/program/concern" after) so a construction "SET ASIDE for re-use" is not read as a socioeconomic set-aside — the
+// specific program tokens (hubzone/sdvosb/8(a)/cmmc/clearance/debarred) stay standalone (no construction homograph). All
+// ELIGIBILITY_BAR_RE consumers are flag-ON only, so both the narrowing and the additions are flag-OFF byte-identical.
+const ELIGIBILITY_BAR_RE = /\b(?:shall|must|required to) (?:hold|possess|maintain|have) [\w /:.\-]{0,40}?(?:clearance|certif|accredit|licens|registration|registered|eligib)\b|\b(?:shall|must|required to) be (?:(?!\bby\b)[\w /:.\-]){0,40}?(?:certified|registered|accredited|licensed)\b|\bcleared (?:to|at|for)\s(?:the\s)?(?:secret|top[\s-]?secret|ts[\s/]?sci|sci|confidential|interim)\b|\bregistered in sam\b|\bactive sam(?:\.gov)? registration\b|\b(?:facility|security|personnel) clearance\b|\btop secret\b|\bsecret\b.{0,20}\bclearance\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\bsize standard\b|\bdebarr?ed\b|\bexcluded part(?:y|ies)\b|\bsam exclusion\b|\beligib(?:le|ility)\b|\bineligible\b|\b(?:small[\s-]?business|total|competitive|partial|hubzone|sdvosb|wosb|edwosb|service[\s-]?disabled|women[\s-]?owned|veteran[\s-]?owned|8\s?\(?a\)?)[\s\w%,\-]{0,20}?set[\s-]?aside\b|\bset[\s-]?aside[\s\w%,\-]{0,20}?(?:small[\s-]?business|concern|program)\b|\brestricted to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled|certified|eligib)\b|\blimited to\s[\w,\- ]{0,30}?(?:small[\s-]?business|concern|offeror|firm|8\s?\(?a\)?|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled)\b|\b8\s?\(?a\)?\b|\bsdvosb\b|\bhubzone\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b/i;
 
 // ── Commercial §L false-INCOMPLETE fix (ENGINE-5-ROOT #1, clears P0 S3-1 + S6-1) ──────────────
 // On a FAR Part-12 commercial (SF1449) buy, §L (Instructions to Offerors) is the INCORPORATED
@@ -336,14 +345,17 @@ function groundedBy(obligation: string, findings: TypedFinding[], sec: string): 
  *  A binding attachment with obligations but NO grounding finding is ingested-with-text-but-UNANALYZED → uncovered ⇒
  *  the read cannot read COMPLETE. Single-doc packages (no delimiter) → covered (section completeness governs). */
 /** Parse the assembled fullSource into (name, text) document regions by the "==== DOCUMENT: name ====" delimiter
- *  (assembleFullSource writes one per doc when >1). `isPrimary` marks the FIRST region (the primary solicitation).
- *  Single-doc packages carry no delimiter → one primary region. */
+ *  (assembleFullSource writes one per doc when >1). `isPrimary` marks the primary solicitation: identity-based
+ *  (resolvePrimary — Card #370 R1: solicitation form / UCF density, amendments DISQUALIFIED) when the attachment-
+ *  coverage flag is ON, write-order (first region) when OFF (flag-OFF byte-identical). Single-doc packages carry no
+ *  delimiter → one primary region. */
 export function docRegions(fullSource: string): Array<{ name: string; text: string; isPrimary: boolean }> {
   // ReDoS-PROOF shared parser (Gauntlet #349 R3) — replaces the quadratic split regex (empirically 16k spaces ≈ 43s;
   // reachable in prod today via any attachment body). Byte-identical regions on well-formed input.
   const regions = parseDocRegions(fullSource ?? "");
   if (regions.length === 0) return [{ name: "(primary solicitation)", text: fullSource ?? "", isPrimary: true }];
-  return regions.map((r, i) => ({ ...r, isPrimary: i === 0 }));
+  const primaryIdx = ATTACHMENT_COVERAGE_ENABLED ? resolvePrimary(regions).index : 0;
+  return regions.map((r, i) => ({ ...r, isPrimary: i === primaryIdx }));
 }
 
 export function documentsCovered(
@@ -388,33 +400,42 @@ export function documentsCovered(
       // live-defect class) yields ZERO obligation SENTENCES, so obligationsOf is empty — yet it is a real disqualifier.
       // It must NOT take the free no-obligation pass. Fall through to the grounded-finding-in-region check below (only a
       // finding that actually ANALYZED it, or — rejected here too — an attestation, can cover it). Scan the WHOLE region
-      // (not the capped obligationsOf list), mirroring the attestation floor at HARD_BAR_RE.exec below. Flag-gated on
-      // crossAttGate (opts present) ⇒ flag-OFF byte-identical.
-      if (!(crossAttGate && HARD_BAR_RE.test(r.text))) continue;         // no hard-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
-      console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — HARD-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
+      // (not the capped obligationsOf list), mirroring the attestation floor at ELIGIBILITY_BAR_RE.exec below. Flag-gated
+      // on crossAttGate (opts present) ⇒ flag-OFF byte-identical. Card #370 R2: floor is ELIGIBILITY-only — a verb-less
+      // performance "shall not" no longer fires here (routes to Gate-4), only a true eligibility/disqualifier bar does.
+      if (!(crossAttGate && ELIGIBILITY_BAR_RE.test(r.text))) continue;         // no eligibility-bar (or flag off) ⇒ genuinely-read thin binding attachment is covered
+      console.warn(`[coverage] read_no_obligation valve REJECTED for "${r.name}" — ELIGIBILITY-BAR language present though obligationsOf found no obligation SENTENCE (verb-less bar); requires a grounded finding → uncovered`);
     }
     const nRegion = norm(r.text);
     // A finding proves this attachment was ANALYZED only if its excerpt is grounded IN the attachment AND is not a
     // coincidental duplicate of a phrase already present in the PRIMARY (a flow-down sentence appearing in both) —
     // else a primary finding could falsely certify an unanalyzed attachment (a false COMPLETE, the dangerous direction).
+    // Card #372 PIECE B — COVERAGE KEYS TO VERIFIER OUTCOME: coverage credit requires a VERIFIED, DECISION-BEARING finding.
+    // The caller passes the verifier-SURVIVED set (ver.survived — REFUTED findings already removed), so with PIECE A's
+    // entailment scope a fabricated real-excerpt/invented-requirement finding is refuted and never reaches here. This
+    // filter adds the decision-bearing half: a `dropped` (boilerplate/non-operative) survivor credits NOTHING, so only a
+    // finding the engine would actually act on can lift the INCOMPLETE veto. Flag-gated on crossAttGate ⇒ flag-OFF
+    // byte-identical (a `dropped` finding still counted before).
     if (findings.some((f) => {
       const ex = norm(f.excerpt || "");
       if (!(ex.length > 0 && nRegion.includes(ex) && !primaryNorm.includes(ex))) return false;
+      if (crossAttGate && disposeFinding(f) === "dropped") return false;   // #372 B — boilerplate/dropped finding is not decision-bearing → credits no coverage
       if (crossAttGate && otherAttNorms.some((o) => o.name !== r.name && o.t.includes(ex))) return false; // excerpt shared with ANOTHER attachment → doesn't prove THIS one analyzed
       return true;
     })) continue;
     const nName = nameKey(r.name);
     if (attSet.has(nName) && readSet.has(nName)) {
       // Brain #347/#348 — a provably-read "no operative obligation" attestation covers the doc, with honesty deferred
-      // to the verifier/panel (Gate 4). DETERMINISTIC FLOOR (Gauntlet #349 R2): an attestation may NEVER suppress a
-      // HARD-BAR obligation the deterministic detector positively found (clearance/eligibility/set-aside/"shall not"/
-      // must-hold) — that is the dangerous "model attests a real disqualifier away → false COMPLETE" case. If any
-      // obligationsOf hit is hard-bar language, the attestation is REJECTED (must be GROUNDED, else stays uncovered →
-      // INCOMPLETE). Soft over-detections (RFI questions, blank-form field labels) still route to the panel. Always
-      // logged — the obligationsOf-vs-attestation contradiction is never silent.
-      // Scan the WHOLE region text for hard-bar language, NOT just the capped obligationsOf list (which stops at
+      // to the verifier/panel (Gate 4). DETERMINISTIC FLOOR (Gauntlet #349 R2, narrowed by Card #370 R2): an attestation
+      // may NEVER suppress a BIDDER-ELIGIBILITY / DISQUALIFIER bar the deterministic detector positively found (clearance/
+      // set-aside/size standard/certification/registration/debarment) — the dangerous "model attests a real disqualifier
+      // away → false COMPLETE" case. A bare performance "shall not" is NOT such a bar (Card #370 R2) → it no longer fires
+      // this floor and routes to Gate-4. If any ELIGIBILITY_BAR_RE hit is present, the attestation is REJECTED (must be
+      // GROUNDED, else stays uncovered → INCOMPLETE). Soft over-detections (RFI questions, blank-form field labels) still
+      // route to the panel. Always logged — the obligationsOf-vs-attestation contradiction is never silent.
+      // Scan the WHOLE region text for eligibility-bar language, NOT just the capped obligationsOf list (which stops at
       // MAX_OBLIGATIONS=200 — a bar past #200 would otherwise be invisible to the floor; Gauntlet #349 R3).
-      const hardHit = HARD_BAR_RE.exec(r.text);
+      const hardHit = ELIGIBILITY_BAR_RE.exec(r.text);
       if (!hardHit) { console.log(`[coverage] attestation honored for "${r.name}" — provably-read, no hard-bar obligation (obligationsOf soft-detected ${obs.length}; honesty = verifier/panel gate)`); continue; }
       console.warn(`[coverage] attestation REJECTED for "${r.name}" — HARD-BAR language present ("${hardHit[0].slice(0, 90)}"); requires a grounded finding, not an attestation → uncovered`);
     }
@@ -465,10 +486,11 @@ export function constructionDocumentsCovered(ctx: AuditToolContext, findings: Ty
       // DETERMINISTIC FLOOR on the construction read-and-empty valve too (Gauntlet #350 ADD-7 — the THIRD emitter of the
       // hard-bar-bypass class, parallel to documentsCovered's read_no_obligation valve): a VERB-LESS clearance/
       // eligibility/set-aside bar yields 0 groundable obligation SENTENCES yet is a real disqualifier; it must NOT attest
-      // read-and-empty. Fall through to the grounded-finding-in-region check below. Flag-gated (AUDIT_ATTACHMENT_COVERAGE)
-      // ⇒ flag-OFF byte-identical, so this part36 path goes live with the rest of the arc under one gate.
-      if (!(ATTACHMENT_COVERAGE_ENABLED && HARD_BAR_RE.test(r.text))) continue;   // ATTESTED read-and-empty (obligation-free full text)
-      console.warn(`[coverage] construction read-and-empty valve REJECTED for "${r.name}" — HARD-BAR language present though groundableObligations=0 (verb-less bar); requires a grounded finding → uncovered`);
+      // read-and-empty. Card #370 R2: the floor is ELIGIBILITY-only — a construction "shall not deviate"/boilerplate no
+      // longer trips it (routes to Gate-4), only a true eligibility bar does. Fall through to the grounded-finding check
+      // below. Flag-gated (AUDIT_ATTACHMENT_COVERAGE) ⇒ flag-OFF byte-identical, so this part36 path goes live with the arc.
+      if (!(ATTACHMENT_COVERAGE_ENABLED && ELIGIBILITY_BAR_RE.test(r.text))) continue;   // ATTESTED read-and-empty (obligation-free full text)
+      console.warn(`[coverage] construction read-and-empty valve REJECTED for "${r.name}" — ELIGIBILITY-BAR language present though groundableObligations=0 (verb-less bar); requires a grounded finding → uncovered`);
     }
     const nRegion = norm(r.text);                                      // has obligations ⇒ require a grounded finding-in-doc
     // an excerpt shared with ANOTHER attachment (a flow-down phrase in both) must NOT certify THIS doc as analyzed
@@ -1077,7 +1099,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   const setAsideConflict = process.env.AUDIT_SETASIDE_CONFLICT_GATE === "true" && !structuralDowngrade.downgrade
     ? detectSetAsideConflict(opts.setAside, findings, ctx.fullSource)
     : undefined;
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
+  // Card #370 R1 — PRIMARY INDETERMINATE (flag-gated): a multi-doc package where identity detection cannot confidently
+  // name the base solicitation → NHR fail-toward (never a silent first-doc default). Flag OFF ⇒ undefined ⇒ byte-identical.
+  const _primaryRegions = ATTACHMENT_COVERAGE_ENABLED ? docRegions(ctx.fullSource) : [];
+  const primaryIndeterminate = ATTACHMENT_COVERAGE_ENABLED && _primaryRegions.length > 1 && !resolvePrimary(_primaryRegions).confident;
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }

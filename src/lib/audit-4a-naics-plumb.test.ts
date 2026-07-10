@@ -30,7 +30,12 @@ const F: Record<string, RawFinding> = {
   price: { requirement: "submit pricing for all CLINs", citation: "§B", excerpt: "pricing for all CLINs", kind: "pricing", controllability: "bidder_controls" },
   cab:   { requirement: "enclosed cab", citation: "§C", excerpt: "fully enclosed cab", kind: "technical_spec", controllability: "bidder_controls" },
   setA:  { requirement: "small-business set-aside (firm qualifies)", citation: "§I", excerpt: "52.219-6", kind: "eligibility_bar", controllability: "already_satisfied" },
-  coc:   { requirement: "Certificate of Conformance", citation: "§L", excerpt: "Certificate of Conformance", kind: "submission", controllability: "bidder_controls" },
+  // Post-566737e (Tier-1 T1-12): §L/§M are PER_OBLIGATION_SECTIONS — a single §L-cited finding no longer
+  // short-circuits the whole section covered; each §L obligation sentence must be grounded by a ≥4-word
+  // verbatim n-gram (groundedBy). The old 3-word excerpt "Certificate of Conformance" no longer grounds the
+  // "Submit a Certificate of Conformance…" obligation → §L read ungrounded → false INCOMPLETE. Extend the
+  // excerpt to a genuine ≥4-word verbatim span so the scaffold is a REAL clean BID under the new contract.
+  coc:   { requirement: "Certificate of Conformance", citation: "§L", excerpt: "Submit a Certificate of Conformance", kind: "submission", controllability: "bidder_controls" },
   eval:  { requirement: "LPTA evaluation", citation: "§M", excerpt: "Lowest-Priced Technically Acceptable", kind: "other", controllability: "bidder_controls" },
 };
 const ALL = ["B", "C", "I", "L", "M"];

@@ -28,7 +28,13 @@ eq("P2 · footer-only body pages count as scanned → partial", isPartialPageTex
 // Normal docs must NOT false-flag (a false INCOMPLETE degrades UX).
 eq("P3 · all-text doc → not partial", isPartialPageText([textPage(1), textPage(2), textPage(3), textPage(4)]), false);
 eq("P4 · one blank signature/divider page among text → not partial (majority still text)", isPartialPageText([textPage(1), textPage(2), textPage(3), scanPage(4)]), false);
-eq("P5 · exactly half scanned → not partial (needs STRICT majority)", isPartialPageText([textPage(1), textPage(2), scanPage(3), scanPage(4)]), false);
+// Post-bba9e4d (Tier-0 T0-6, engine line-audit 2026-07-06): the detector was DELIBERATELY changed from a
+// STRICT scanned majority (withText*2 < pages.length) to ≥ HALF no-text pages with a ≥2 floor
+// (noText >= 2 && noText*2 >= pages.length). The old strict-majority let a text cover + a scanned BODY that
+// was merely HALF the doc (this exact 2-text-cover + 2-scanned-body shape) clear the whole-doc floor on the
+// cover text and read COMPLETE while the scanned body was silently lost — a false-COMPLETE. Now the
+// exactly-half case correctly reads PARTIAL (the single-blank-page tolerance is still proven by P4: 1 of 4).
+eq("P5 · exactly half scanned → PARTIAL (≥-half no-text floor catches the silent-body false-COMPLETE, T0-6)", isPartialPageText([textPage(1), textPage(2), scanPage(3), scanPage(4)]), true);
 // Guards.
 eq("P6 · <3 pages → never partial (too small to judge)", isPartialPageText([textPage(1), scanPage(2)]), false);
 eq("P7 · fully scanned (0 text pages) → not partial (handled by the whole-doc floor, not this signal)", isPartialPageText([scanPage(1), scanPage(2), scanPage(3)]), false);

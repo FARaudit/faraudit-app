@@ -211,4 +211,11 @@ export interface VerdictInputs {
   // clarification; the engine never silently picks a pool (Rule 64: a conflict this material must surface, not be
   // resolved by fiat). Computed in the orchestrator (flag-gated AUDIT_SETASIDE_CONFLICT_GATE); absent ⇒ byte-identical.
   setAsideConflict?: { sam: string; doc: string; note: string };
+  // Gauntlet Card #370 RULING 1 — PRIMARY-DOCUMENT INDETERMINATE. On a multi-doc package, primary detection now keys off
+  // document IDENTITY (solicitation form / UCF density; amendments disqualified), not write-order. When NO document
+  // confidently qualifies as the solicitation (resolvePrimary confident=false), the engine cannot know which doc is the
+  // base solicitation vs an attachment/amendment — a manifest/readability failure. It DOMINATES → NEEDS_HUMAN_REVIEW
+  // (honest-fail), never a silent first-doc default. Computed in the orchestrator (flag-gated AUDIT_ATTACHMENT_COVERAGE);
+  // absent/false ⇒ byte-identical.
+  primaryIndeterminate?: boolean;
 }

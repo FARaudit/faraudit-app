@@ -9,7 +9,7 @@
 //
 // The skeptic is INJECTED → unit-testable with a stub ($0). makeStructuredSkeptic wires the real model.
 
-import { findInSource, type AuditToolContext } from "./audit-tools";
+import { findInSource, ATTACHMENT_COVERAGE_ENABLED, type AuditToolContext } from "./audit-tools";
 import type { VerifyFn, VerifyResult, CorrectedDrop } from "./audit-orchestrator";
 import type { TypedFinding, BidderProfile, Controllability } from "./audit-findings";
 import { knifeEdgeIndices } from "./audit-decide";
@@ -17,7 +17,7 @@ import { knifeEdgeIndices } from "./audit-decide";
 /** One skeptic ruling on a finding (by its index in the set). upheld=false ⇒ overturned (dropped). When
  *  `corrected` is present, the skeptic RE-TYPES the finding instead — escalation feeds deriveVerdict better
  *  inputs; it never re-derives the top-line itself (Brain card-54 point 3). */
-export interface SkepticVerdict { index: number; upheld: boolean; reason: string; corrected?: { controllability?: Controllability; curableInWindow?: boolean } }
+export interface SkepticVerdict { index: number; upheld: boolean; reason: string; entailmentFail?: boolean; corrected?: { controllability?: Controllability; curableInWindow?: boolean } }
 /** The adversarial challenger over the finding set. opts.escalateIdx = the knife-edge subset to scrutinize. */
 export type SkepticFn = (ctx: AuditToolContext, findings: TypedFinding[], opts?: { escalateIdx?: number[] }) => Promise<SkepticVerdict[]>;
 
@@ -72,6 +72,19 @@ export function makeAgenticVerifier(skeptic: SkepticFn): VerifyFn {
     let unresolvedVerdictDriving = 0;
     grounded.forEach((f, i) => {
       const v = byIdx.get(i);
+      // Card #373 Option 1 — ENTAILMENT HARD-DROP, STRUCTURALLY DOMINANT. Evaluated FIRST, before the substantive
+      // (corrected) and upheld branches: a fabricated finding (the skeptic set entailmentFail=true because the
+      // `requirement` is not supported by its own `excerpt`) is DROPPED regardless of any `corrected` payload — so a
+      // re-typed overturn can NEVER resurrect it (the blind-ultracode #373 bypass: {upheld:false, corrected:{...}}
+      // formerly took the substantive branch and survived re-typed). ORDERING IS LOAD-BEARING — this branch MUST
+      // precede `substantive`; a reordering regression is locked in _prove-card373. Flag-gated on
+      // ATTACHMENT_COVERAGE_ENABLED ⇒ flag-OFF the skeptic never emits entailmentFail (prompt + schema gated) and
+      // this branch never fires ⇒ byte-identical.
+      if (ATTACHMENT_COVERAGE_ENABLED && v?.entailmentFail === true) {
+        rejected.push(f); // hard drop — no corrected override, no upheld override
+        correctedDrops.push({ index: i, id: f.id, requirement: f.requirement, citation: f.citation, refutation: v.reason, dropReason: "entailment_fail" });
+        return;
+      }
       // RE-TYPE requires a SUBSTANTIVE correction (Brain card 274 RULING 1). An empty/non-substantive
       // `corrected:{}` used to be truthy → the finding survived UNCHANGED even when the skeptic REFUTED it
       // (upheld=false) → false INELIGIBLE/NO_BID (the catastrophic ZERO-CONTRACT-LOSS hole). A correction only
@@ -156,7 +169,7 @@ export function makeTieredSkeptic(base: SkepticFn, escalate: SkepticFn): Skeptic
     const contested = contestedIdx.map((i) => findings[i]).filter(Boolean);
     const escVerdicts = await escalate(ctx, contested);                             // Opus re-judges/re-types ONLY the contested subset
     const escByOrig = new Map<number, SkepticVerdict>();
-    escVerdicts.forEach((v) => { const orig = contestedIdx[v.index]; if (orig !== undefined) escByOrig.set(orig, { index: orig, upheld: v.upheld, reason: v.reason, corrected: v.corrected }); });
+    escVerdicts.forEach((v) => { const orig = contestedIdx[v.index]; if (orig !== undefined) escByOrig.set(orig, { ...v, index: orig }); }); // Card #374 ADD-7: SPREAD-PRESERVE by default (only `index` is remapped) — the field-by-field rebuild silently orphaned entailmentFail (blind-ultracode #373-delta P0); spread guarantees any future SkepticVerdict field survives the tiered merge
     // RULING 2 (Brain card 274) — NEVER pass through the lenient base (Sonnet) type on an UNRESOLVED knife-edge.
     // If the escalation returned no ruling for one or more contested findings (empty-return-on-contested-set, or a
     // partial cover), we cannot trust the base classification → THROW so makeAgenticVerifier's catch routes the run
@@ -190,7 +203,15 @@ export function makeStructuredSkeptic(
   const SYSTEM = [
     "You are an adversarial federal-contracting skeptic cross-examining another analyst's findings.",
     "Each finding is ALREADY grounded in a verbatim source excerpt — do NOT re-litigate whether the text exists.",
-    "Challenge ONLY the classification. Overturn a finding (upheld=false) when its controllability is wrong:",
+    // Gauntlet Card #372 PIECE A — ENTAILMENT scope (flag-gated AUDIT_ATTACHMENT_COVERAGE; flag-OFF prompt byte-identical).
+    // The old "challenge ONLY classification" blanket left a blind spot: a REAL verbatim excerpt carrying an INVENTED
+    // requirement passed grounding and the skeptic waved it through, letting a fabricated finding falsely "cover" an
+    // attachment (fabrication Vector 2). The excerpt's EXISTENCE is settled; its SUFFICIENCY for the stated requirement is not.
+    ...(ATTACHMENT_COVERAGE_ENABLED ? [
+      "ENTAILMENT (first-class signal `entailmentFail`): set `entailmentFail:true` on any finding whose `requirement` asserts an obligation, restriction, eligibility bar, or fact that its OWN `excerpt` does not actually state or support — a real quote does NOT license an invented requirement; the excerpt must SUBSTANTIATE the requirement, not merely coexist with it. A finding with entailmentFail:true is DROPPED outright, regardless of any `corrected` type you supply.",
+      "SCOPE entailmentFail STRICTLY to requirement↔excerpt NON-SUPPORT. It is NOT a classification disagreement: when the excerpt DOES support the requirement but the controllability TYPE is wrong, leave entailmentFail UNSET and use `corrected` instead. Over-flagging entailmentFail on a genuinely-supported requirement is itself a defect — it manufactures false-INCOMPLETEs. Default entailmentFail=false; set it only when the excerpt plainly fails to support the stated requirement.",
+    ] : []),
+    `Challenge ${ATTACHMENT_COVERAGE_ENABLED ? "" : "ONLY "}the classification. Overturn a finding (upheld=false) when its controllability is wrong:`,
     "  a requirement the bidder could satisfy by doing the work (source/price/configure/document/submit) that was",
     "  labeled bidder_cannot_move; OR routine standard FAR boilerplate labeled as a gate; OR an already_satisfied/",
     "  cannot_move call the excerpt does not support. Uphold (upheld=true) when the classification is defensible.",
@@ -209,6 +230,7 @@ export function makeStructuredSkeptic(
   const SCHEMA = { type: "object", additionalProperties: false, required: ["verdicts"], properties: { verdicts: { type: "array", items: {
     type: "object", additionalProperties: false, required: ["index", "upheld", "reason"],
     properties: { index: { type: "integer" }, upheld: { type: "boolean" }, reason: { type: "string" },
+      ...(ATTACHMENT_COVERAGE_ENABLED ? { entailmentFail: { type: "boolean" } } : {}), // Card #373 Option 1 — flag-gated ⇒ flag-OFF schema byte-identical
       corrected: { type: "object", additionalProperties: false, properties: { // card 274 RULING 1 — an empty corrected:{} is rejected in CODE (makeAgenticVerifier `substantive` check); NOT via a JSON-schema `minProperties` (the Anthropic structured-output API 400s on `minProperties` → the skeptic call throws → sound=false → universal honest-fail; the code check is the real enforcement)
         controllability: { type: "string", enum: ["bidder_controls", "bidder_cannot_move", "no_one_can_move", "already_satisfied"] },
         curableInWindow: { type: "boolean" } } } } } } } };
