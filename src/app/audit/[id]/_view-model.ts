@@ -2200,11 +2200,19 @@ function deriveComplianceMatrix(
         //    (P1c fix: pinning ONLY to the §04 flag set silently collapsed real gate_to_clear
         //    pricing/technical obligations to 'clear' — ultracode d49bba0.)
         //  · routing OFF — unchanged kind+disposition logic (byte-identical legacy behavior).
+        // Condition-1 carve-out (CEO card #385): evaluation-METHODOLOGY rows are not
+        // offeror ACTIONS — they describe HOW the offer is scored, not something to do.
+        //   · kind 'other' is the general/methodology catch-all ("Statement of Requirement").
+        //   · a §M / "evaluation" citation is the evaluation scheme (mirror the legacy §M
+        //     evaluation_factors handling above, which is always 'clear').
+        // Severity can't separate these (an eval-scheme row can be P0), so the rule is
+        // kind/section, applied FIRST — before the gate_to_clear→action mapping.
+        const isEvalMethodology = kind === "other" || /\bsection\s*m\b|evaluat/i.test(source);
         const status: "action" | "risk" | "clear" = routingOn
-          ? (flagClauses.has(norm(source)) ? "action" :
+          ? (isEvalMethodology ? "clear" :
+             flagClauses.has(norm(source)) ? "action" :
              disp === "gate_to_clear" ? "action" :
              riskCites.has(norm(source)) ? "risk" :
-             kind === "eligibility_bar" ? "risk" :
              "clear")
           : (kind === "boilerplate" ? "clear" :
              kind === "eligibility_bar" ? "risk" :
@@ -3120,13 +3128,29 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // and reads as a second, contradicting deadline. Generic timing instructions with
   // no concrete date ("submit via PIEE before the response deadline") are kept.
   const _MONTHS_RE = "(?:January|February|March|April|May|June|July|August|September|October|November|December)";
+  const _DATE_RE = `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`;
   const _statesConcreteDeadline = (s: string): boolean =>
     /\b(?:no later than|due (?:date|no later|by)|deadline|submit(?:ted)?\s+(?:by|before))/i.test(s) &&
-    new RegExp(
-      // "Month D, YYYY"  OR  "D Month YYYY"  OR  "MM/DD/YYYY"
-      `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`,
-      "i"
-    ).test(s);
+    new RegExp(_DATE_RE, "i").test(s);
+  // Condition-2 guard (CEO card #385): a routed submission finding is dropped ONLY when it
+  // is PURELY a due-date restatement (the date already lives in the masthead/timeline). A
+  // submission finding carrying a deadline PLUS an operative obligation ("submit Volume II in
+  // PDF by DATE") must SURVIVE — blanket "drop anything mentioning the date" is the UNDER-TAG
+  // vanish class. Detect date-only conservatively + bias to KEEP: short line, states a concrete
+  // deadline, and almost NOTHING substantive remains once the date + deadline/submission
+  // scaffolding is stripped. Anything longer or carrying an artifact/format/method survives.
+  const _isDateOnlySubmission = (s: string): boolean => {
+    const t = s.trim();
+    if (t.length > 120) return false; // long line presumes an obligation → keep
+    if (!_statesConcreteDeadline(t)) return false;
+    const residue = t
+      .replace(new RegExp(_DATE_RE, "gi"), " ")
+      .replace(/\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?/gi, " ") // clock times
+      .replace(/\b(?:no later than|due|date|deadline|submit(?:ted)?|before|by|on|at|proposals?|offers?|quotes?|responses?|shall|must|be|are|is|the|to|received|for|no|later|than|time|local|est|cst|edt|cdt|pst|pdt|mst|pm|am|hours?)\b/gi, " ")
+      .replace(/[^a-zA-Z]+/g, "")
+      .trim();
+    return residue.length < 10; // essentially no operative content beyond the deadline
+  };
   const _legacySubmissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
     ? (compJson.submission_requirements as SubmissionRequirementVM[])
         .filter((r) => !_statesConcreteDeadline(String(r?.requirement ?? "")))
@@ -3135,16 +3159,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         requirement: sanitizeDisplayText(r.requirement)
       }))
     : [];
-  // arc #3: agentic_v3 leaves compJson.submission_requirements undefined, so §L would
-  // render empty. When routing is on and the legacy field produced nothing, feed §L from
-  // the routed `submission`-kind findings. NO deadline re-filter here: a routed submission
-  // finding is a DISTINCT §L requirement, not a legacy stale-deadline duplicate — and it is
-  // excluded from §07, so _statesConcreteDeadline would silently drop it from EVERY surface
-  // (ultracode P2). The legacy stale-deadline concern only applies to compJson.submission_requirements.
-  // Flag OFF ⇒ v3routed.submission is [] ⇒ this is the legacy array unchanged.
+  // arc #3: agentic_v3 leaves compJson.submission_requirements undefined, so §L would render
+  // empty. When routing is on and the legacy field produced nothing, feed §L from the routed
+  // `submission`-kind findings — dropping ONLY findings that are PURELY a due-date restatement
+  // (Condition-2 guard), NOT any obligation that happens to name a date. A dropped date-only row
+  // loses no information (the date shows in the masthead/timeline). Flag OFF ⇒ v3routed.submission
+  // is [] ⇒ this is the legacy array unchanged.
   const submissionRequirements: SubmissionRequirementVM[] =
     _legacySubmissionRequirements.length === 0 && v3routed.submission.length > 0
-      ? v3routed.submission
+      ? v3routed.submission.filter((r) => !_isDateOnlySubmission(r.requirement))
       : _legacySubmissionRequirements;
   // FA-report-batch: derive the "N to clear" pill from the ACTUAL rendered rows
   // (status !== "ok"), not the AI's separate submission_summary string — they were
