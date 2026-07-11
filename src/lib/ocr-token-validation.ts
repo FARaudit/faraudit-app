@@ -88,7 +88,10 @@ export interface ExcerptScan {
  *  IMPORTANT: `validUnverified` being empty does NOT mean "excerpt is clean" — it means no KNOWN-format token was
  *  found; free-text misreads are out of scope for structural validation (that is confidence/vision territory). */
 export function scanOcrExcerpt(excerpt: string): ExcerptScan {
-  const candidates = (excerpt || "").split(/\s+/).map((w) => w.replace(/[^\w$().,\/-]+$/g, "").replace(/^[^\w$]+/g, "")).filter(Boolean);
+  // Strip surrounding non-token chars, THEN a trailing sentence-punctuation run (.,;:) — a decision token never
+  // legitimately ends in one, and keeping it (the class permits internal "." / ",") hid an end-of-sentence token
+  // like "541511." or "$1,3OO." from validation → a gate blind spot. Internal "."/"," (52.212-1, $1,300.00) survive.
+  const candidates = (excerpt || "").split(/\s+/).map((w) => w.replace(/[^\w$().,\/-]+$/g, "").replace(/^[^\w$]+/g, "").replace(/[.,;:]+$/g, "")).filter(Boolean);
   const decisionTokens: TokenVerdict[] = [];
   for (const c of candidates) { const v = validateToken(c); if (v) decisionTokens.push(v); }
   return {

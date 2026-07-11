@@ -14,6 +14,7 @@ export interface PageText {
 
 import { ocrPdfToText, looksGarbled } from "./pdf-ocr";
 import { isEnvOn } from "./env-flags";
+import { scanOcrExcerpt, type ExcerptScan } from "./ocr-token-validation";
 
 export interface ExtractedDocument {
   pages: PageText[];
@@ -30,6 +31,11 @@ export interface ExtractedDocument {
   // from reliable per-page structure (pdf-parse v2 pages[]); OCR-recovered and
   // single-block reads leave it undefined (falsy).
   partialPageText?: boolean;
+  // Lever-3 STEP-2 OCR-accuracy gate (layer-2). Set ONLY when extractionMethod==="ocr" — the deterministic
+  // structural partition of the OCR text's decision-bearing tokens (suspect_misread vs format-valid residual).
+  // Feeds the has_text completeness gate (fail-toward-NHR) + the executor's layer-3 vision confirmation. Undefined
+  // for native/garbled-native reads (no OCR ⇒ no OCR-accuracy question). See ocr-accuracy-gate.ts.
+  ocrScan?: ExcerptScan;
 }
 
 // Reliable per-page floor for the mixed cover+scanned detection above. A page
@@ -169,12 +175,22 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
           warnings.push(
             `OCR parse-tier applied: native text was ${looksGarbled(rawText) ? "garbled" : "missing"} (${meaningfulLength} meaningful chars) → recovered ${meaningfulCharCount(ocrText)} clean chars via self-host OCR.`
           );
+          // Layer-2 (OCR-accuracy gate): deterministically partition the recovered text's decision-bearing tokens
+          // so the completeness gate can fail-toward-NHR on a caught misread / unconfirmed residual (see
+          // ocr-accuracy-gate.ts). Runs ONLY on OCR-recovered text — this is where an OCR misread can enter.
+          const ocrScan = scanOcrExcerpt(ocrText);
+          if (ocrScan.suspect.length > 0 || ocrScan.validUnverified.length > 0) {
+            warnings.push(
+              `OCR-ACCURACY-GATE: ${ocrScan.suspect.length} caught misread(s) + ${ocrScan.validUnverified.length} format-valid residual token(s) — pending fail-toward-NHR unless confirmed.`
+            );
+          }
           return {
             pages: buildPageStructure(ocrText, pageCount),
             rawText: ocrText,
             pageCount,
             extractionMethod: "ocr",
             warnings,
+            ocrScan,
           };
         }
       }
