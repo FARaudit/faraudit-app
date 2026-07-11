@@ -1050,7 +1050,11 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      universal defect, a temporal/delivery impossibility, a genuine structural bar (clearance/QPL/sole-source),
   //      or a positive set-aside — all preserved. Runs after the sibling over-type guards; deriveVerdict untouched.
   //      Flag off ⇒ findings pass through unchanged.
-  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true" });
+  //      B2 (Brain card 421 Fork-2, sub-flag AUDIT_BOA_IDIQ_HOLDER_KEEP, default-OFF): a BOA/IDIQ/BPA/GWAC holder-
+  //      status bar has no FAR-19 authority, so the allow-list would phantom-demote it to a caution. Holder status
+  //      is an UNSTATED profile attribute — keep the bar so it routes to NEEDS_HUMAN_REVIEW ("confirm holder
+  //      status"), never a silent caution, never INELIGIBLE (that needs a closed-world profile — a future path).
+  findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true", boaIdiqKeep: process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP === "true" });
 
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
