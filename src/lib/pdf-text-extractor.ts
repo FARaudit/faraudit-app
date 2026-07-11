@@ -13,6 +13,7 @@ export interface PageText {
 }
 
 import { ocrPdfToText, looksGarbled } from "./pdf-ocr";
+import { isEnvOn } from "./env-flags";
 
 export interface ExtractedDocument {
   pages: PageText[];
@@ -157,8 +158,12 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       // whole-doc floor (cover text) so the first two conditions miss it, but its
       // scanned body still needs OCR to recover. Where OCR is a no-op (serverless,
       // binary absent) the flag rides through on the return below → honest INCOMPLETE.
+      // Lever-3 STEP-2 (flag AUDIT_WORKER_OCR, default OFF → byte-identical): gate the OCR invocation so INSTALLING the
+      // worker OCR binary (nixpacks) does NOT auto-activate OCR for every scanned doc — activation is a deliberate flag
+      // flip after the OCR-accuracy Gauntlet clears. Flag OFF ⇒ ocrPdfToText never called ⇒ identical to today (where
+      // the binary was absent and OCR no-op'd anyway); the partialFromPages content-loss warning below still fires.
       const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText) || partialFromPages;
-      if (needsOcr) {
+      if (needsOcr && isEnvOn(process.env.AUDIT_WORKER_OCR)) {
         const ocrText = await ocrPdfToText(pdfBuffer);
         if (ocrText && meaningfulCharCount(ocrText) > meaningfulLength && !looksGarbled(ocrText)) {
           warnings.push(
