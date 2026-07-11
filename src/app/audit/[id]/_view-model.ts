@@ -33,6 +33,11 @@ export interface Risk {
   // customers can tell a clause-grounded finding from a pattern guess.
   // Default for legacy audit rows that pre-date the engine flag: "inferred".
   provenance: "verified" | "inferred";
+  // arc #3 — set to "v3_routed" for risks synthesized from agentic_v3 findings
+  // (routeV3Findings). Used to EXCLUDE them from the KO-email CO-address scan
+  // (extractCoFromFactSet), so a disqualifier's verbatim excerpt can never seed
+  // ko_email.to with a non-CO government mailbox. undefined on all legacy rows.
+  origin?: "v3_routed";
   // Engine-emitted category (RiskFinding.category vocabulary: "Disqualification",
   // "DFARS_Trap", "Technical", "Schedule", "Price", "Evaluation", "Compliance",
   // plus lowercase variants from custom detectors — "pricing", "market-structure",
@@ -2031,10 +2036,92 @@ function deriveTimelineGates(
   return gates;
 }
 
+// ── Card 355 BUILD2 · arc #3 — AUDIT_V3_SECTION_ROUTING ──────────────────────
+// The agentic_v3 engine emits typed findings in compJson.v3.findings. Legacy
+// audits populate compJson.{evaluation_factors,submission_requirements,far_clauses};
+// v3 leaves those undefined, so today ALL v3 findings render in the §07 matrix
+// while §L/§M/§C/§05 render empty. This routes findings by `kind` to the report's
+// EXISTING section surfaces.
+//
+// FABRICATION GUARD (Cards #372/#373 doctrine): only route kinds whose fields map
+// 1:1 to a target VM WITHOUT synthesizing structure —
+//   submission      → §L SubmissionRequirementVM  (requirement + disposition)
+//   eligibility_bar → §05 Risk                     (requirement + citation + severity)
+//   clause_flowdown → §04 ComplianceFlag           (citation + requirement + severity)
+// pricing / technical_spec / other / unknown STAY in §07 as "Statement of
+// Requirement" — §C/CLIN (ClinLineItem) and §M (EvaluationFactorVM) need structured
+// line-item / coverage-% fields findings don't carry; synthesizing them = fabrication.
+// boilerplate is dropped (informational). Flag OFF ⇒ empty extras + no §07 exclusion
+// ⇒ byte-identical legacy render on every audit.
+const V3_ROUTING_ON = process.env.AUDIT_V3_SECTION_ROUTING === "true";
+// Kinds lifted OUT of §07 when routing is on (their rows now render in §L/§05/§04).
+// boilerplate is NOT here on purpose: it is dropped from §07 ONLY when the engine
+// ALSO marks disposition==='dropped' (both signals must agree) — a boilerplate-typed
+// row with a live disposition stays visible in §07 so an LLM mis-type of a real gate
+// can't silently vanish. See the disposition-gated drop in the matrix loop.
+const V3_ROUTED_KINDS = new Set(["submission", "eligibility_bar", "clause_flowdown"]);
+interface V3RoutedExtras {
+  submission: SubmissionRequirementVM[];
+  risks: Risk[];
+  flags: ComplianceFlag[];
+  on: boolean; // true iff routing is active for THIS audit (flag ON + engine agentic_v3)
+}
+function routeV3Findings(compJson: Record<string, unknown>): V3RoutedExtras {
+  const off: V3RoutedExtras = { submission: [], risks: [], flags: [], on: false };
+  if (!V3_ROUTING_ON) return off;
+  if (String(compJson.engine ?? "") !== "agentic_v3") return off;
+  const v3f = ((compJson.v3 ?? {}) as { findings?: Array<Record<string, unknown>> }).findings;
+  if (!Array.isArray(v3f)) return off;
+  const submission: SubmissionRequirementVM[] = [];
+  const risks: Risk[] = [];
+  const flags: ComplianceFlag[] = [];
+  for (const f of v3f) {
+    if (!f || typeof f !== "object") continue; // null/garbage element guard (matches mapRisks/mapComplianceFlags)
+    const req = sanitizeDisplayText(truncateOnWord(String(f.requirement ?? "").trim(), 400));
+    if (!req) continue; // no requirement → belongs in expandable evidence, not a routed row
+    const kind = String(f.kind ?? "");
+    const disp = String(f.disposition ?? "");
+    const cite = String(f.citation ?? "").trim();
+    const sev = String(f.severity ?? "");
+    if (kind === "submission") {
+      const met = disp === "met";
+      submission.push({ requirement: req, status: met ? "ok" : "todo", meta: met ? "Clear" : "Action" });
+    } else if (kind === "eligibility_bar") {
+      // P1b: an eligibility_bar is a Disqualification — never LOW. Default a MISSING
+      // severity to 'high' (not 'low'), else pickHeadlineRisk demotes the single most
+      // critical finding out of the headline. Only an explicit P1/P2 lowers it.
+      risks.push({
+        title: req,
+        severity: sev === "P1" ? "med" : sev === "P2" ? "low" : "high",
+        citation: cite,
+        description: sanitizeDisplayText(String(f.excerpt ?? "")),
+        faraudit_action: "",
+        provenance: cite ? "verified" : "inferred",
+        category: "Disqualification",
+        origin: "v3_routed"
+      });
+    } else if (kind === "clause_flowdown") {
+      // P1b: default a MISSING severity to P1 (not P2) — an unscored flowdown obligation
+      // should not undercount the §04 scorecard pills. Only an explicit P2 lowers it.
+      flags.push({
+        clause: cite || req,
+        title: req,
+        severity: sev === "P0" ? "P0" : sev === "P2" ? "P2" : "P1",
+        description: sanitizeDisplayText(String(f.excerpt ?? "")),
+        required_action: ""
+      });
+    }
+    // else pricing / technical_spec / other / unknown / boilerplate → left for §07.
+    // (boilerplate is dropped from §07 only when disposition==='dropped' — see the matrix loop.)
+  }
+  return { submission, risks, flags, on: true };
+}
+
 function deriveComplianceMatrix(
   compJson: Record<string, unknown>,
   risks: Risk[],
-  complianceFlags: ComplianceFlag[]
+  complianceFlags: ComplianceFlag[],
+  routingOn = false
 ): Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> {
   const rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> = [];
   // Build a lowercase set of citations from the risk register so clauses cited
@@ -2086,6 +2173,7 @@ function deriveComplianceMatrix(
         k === "clause_flowdown" ? "Clause" : k === "submission" ? "Section L" : k === "pricing" ? "Pricing" :
         k === "eligibility_bar" ? "Eligibility" : k === "past_performance" ? "Past performance" : "Solicitation";
       for (const f of v3f) {
+        if (!f || typeof f !== "object") continue; // null/garbage element guard
         // Card-355 BUILD3 defect 1: the row LABEL is the finding's own requirement, NEVER the raw excerpt
         // (an excerpt as a title is noise). No requirement → drop the row (the excerpt belongs in expandable
         // evidence, not the matrix title). All V3 findings carry `requirement`, so this drops nothing real.
@@ -2096,14 +2184,40 @@ function deriveComplianceMatrix(
         if (!requirement) continue;
         const kind = String(f.kind ?? "");
         const disp = String(f.disposition ?? "");
-        // defect 3: status ties to kind + disposition (not a coarse all-else→clear). boilerplate is never a
-        // risk/action; eligibility_bar is the gate/risk axis; an open gate_to_clear obligation is an action.
-        const status: "action" | "risk" | "clear" =
-          kind === "boilerplate" ? "clear" :
-          kind === "eligibility_bar" ? "risk" :
-          disp === "gate_to_clear" ? "action" :
-          "clear";
+        // arc #3: when routing is on, kinds lifted to §L/§05/§04 no longer render in §07.
+        if (routingOn && V3_ROUTED_KINDS.has(kind)) continue;
+        // arc #3 boilerplate hardening: drop boilerplate from §07 ONLY when the engine
+        // ALSO marks disposition==='dropped' (both signals agree). A boilerplate-typed row
+        // with a LIVE disposition stays visible — an LLM mis-type of a real gate can't vanish.
+        if (routingOn && kind === "boilerplate" && disp === "dropped") continue;
         const source = String(f.citation ?? "").trim() || srcForKind(kind);
+        // defect 3 / change-3: status derivation.
+        //  · routing ON — action items for the ROUTED kinds now live in §L/§04, so those never
+        //    reach here. The kinds that STAY in §07 (pricing/technical_spec/other/past_performance)
+        //    have NO §04 or risk-register representation — the §07 row is their ONLY surface — so we
+        //    must preserve the engine's disposition signal: an open gate_to_clear obligation is an
+        //    'action', a §04-flagged clause is 'action', a risk-register cite is 'risk', else 'clear'.
+        //    (P1c fix: pinning ONLY to the §04 flag set silently collapsed real gate_to_clear
+        //    pricing/technical obligations to 'clear' — ultracode d49bba0.)
+        //  · routing OFF — unchanged kind+disposition logic (byte-identical legacy behavior).
+        // Condition-1 carve-out (CEO card #385): evaluation-METHODOLOGY rows are not
+        // offeror ACTIONS — they describe HOW the offer is scored, not something to do.
+        //   · kind 'other' is the general/methodology catch-all ("Statement of Requirement").
+        //   · a §M / "evaluation" citation is the evaluation scheme (mirror the legacy §M
+        //     evaluation_factors handling above, which is always 'clear').
+        // Severity can't separate these (an eval-scheme row can be P0), so the rule is
+        // kind/section, applied FIRST — before the gate_to_clear→action mapping.
+        const isEvalMethodology = kind === "other" || /\bsection\s*m\b|evaluat/i.test(source);
+        const status: "action" | "risk" | "clear" = routingOn
+          ? (isEvalMethodology ? "clear" :
+             flagClauses.has(norm(source)) ? "action" :
+             disp === "gate_to_clear" ? "action" :
+             riskCites.has(norm(source)) ? "risk" :
+             "clear")
+          : (kind === "boilerplate" ? "clear" :
+             kind === "eligibility_bar" ? "risk" :
+             disp === "gate_to_clear" ? "action" :
+             "clear");
         rows.push({ requirement, source, status });
       }
     }
@@ -2168,6 +2282,11 @@ const CO_EMAIL_DENYLIST = new Set<string>([
 function extractCoFromFactSet(risks: Risk[], compJson: Record<string, unknown>): string | null {
   const parts: string[] = [];
   for (const r of risks) {
+    // arc #3 P1a: a v3-routed risk's description is a disqualifier's VERBATIM source
+    // excerpt — it can contain a non-CO government mailbox (registration/helpdesk/a
+    // referenced agency) that must NEVER be bound as the contracting officer. Skip it;
+    // the CO 'to' comes only from Section L / legacy fact surfaces.
+    if (r.origin === "v3_routed") continue;
     // faraudit_action is FARaudit-authored advice prose (it names submission
     // mailboxes like webptsmh@navy.mil) — never a source for the real CO.
     for (const v of [r.title, r.description]) {
@@ -2961,11 +3080,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const conf = confidenceLabel(audit.document_type_confidence);
 
   // Compliance + risks
-  const complianceFlags = mapComplianceFlags(compJson, risksJson);
+  // arc #3 (AUDIT_V3_SECTION_ROUTING): route agentic_v3 typed findings into the
+  // existing §L/§05/§04 surfaces. Empty extras + on=false when flag OFF ⇒ every
+  // spread below is a no-op ⇒ byte-identical legacy render.
+  const v3routed = routeV3Findings(compJson);
+  const complianceFlags = [...mapComplianceFlags(compJson, risksJson), ...v3routed.flags];
   // FA-153 — appeal-flavored actions get their deadline math re-anchored to
   // original issuance (or an honest "verify on SAM.gov" when unknown).
   const naicsAppealBinding = deriveNaicsAppealBinding(audit, compJson);
-  const risks = bindNaicsAppealRiskActions(mapRisks(risksJson), naicsAppealBinding);
+  const risks = [...bindNaicsAppealRiskActions(mapRisks(risksJson), naicsAppealBinding), ...v3routed.risks];
   const headlineRisk = pickHeadlineRisk(risks);
   const scoreFactors = deriveScoreFactors();
   const clinLineItems = mapClins(compJson, risks);
@@ -3005,14 +3128,30 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   // and reads as a second, contradicting deadline. Generic timing instructions with
   // no concrete date ("submit via PIEE before the response deadline") are kept.
   const _MONTHS_RE = "(?:January|February|March|April|May|June|July|August|September|October|November|December)";
+  const _DATE_RE = `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`;
   const _statesConcreteDeadline = (s: string): boolean =>
     /\b(?:no later than|due (?:date|no later|by)|deadline|submit(?:ted)?\s+(?:by|before))/i.test(s) &&
-    new RegExp(
-      // "Month D, YYYY"  OR  "D Month YYYY"  OR  "MM/DD/YYYY"
-      `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`,
-      "i"
-    ).test(s);
-  const submissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
+    new RegExp(_DATE_RE, "i").test(s);
+  // Condition-2 guard (CEO card #385): a routed submission finding is dropped ONLY when it
+  // is PURELY a due-date restatement (the date already lives in the masthead/timeline). A
+  // submission finding carrying a deadline PLUS an operative obligation ("submit Volume II in
+  // PDF by DATE") must SURVIVE — blanket "drop anything mentioning the date" is the UNDER-TAG
+  // vanish class. Detect date-only conservatively + bias to KEEP: short line, states a concrete
+  // deadline, and almost NOTHING substantive remains once the date + deadline/submission
+  // scaffolding is stripped. Anything longer or carrying an artifact/format/method survives.
+  const _isDateOnlySubmission = (s: string): boolean => {
+    const t = s.trim();
+    if (t.length > 120) return false; // long line presumes an obligation → keep
+    if (!_statesConcreteDeadline(t)) return false;
+    const residue = t
+      .replace(new RegExp(_DATE_RE, "gi"), " ")
+      .replace(/\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?/gi, " ") // clock times
+      .replace(/\b(?:no later than|due|date|deadline|submit(?:ted)?|before|by|on|at|proposals?|offers?|quotes?|responses?|shall|must|be|are|is|the|to|received|for|no|later|than|time|local|est|cst|edt|cdt|pst|pdt|mst|pm|am|hours?)\b/gi, " ")
+      .replace(/[^a-zA-Z]+/g, "")
+      .trim();
+    return residue.length < 10; // essentially no operative content beyond the deadline
+  };
+  const _legacySubmissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
     ? (compJson.submission_requirements as SubmissionRequirementVM[])
         .filter((r) => !_statesConcreteDeadline(String(r?.requirement ?? "")))
         .map((r) => ({
@@ -3020,6 +3159,16 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         requirement: sanitizeDisplayText(r.requirement)
       }))
     : [];
+  // arc #3: agentic_v3 leaves compJson.submission_requirements undefined, so §L would render
+  // empty. When routing is on and the legacy field produced nothing, feed §L from the routed
+  // `submission`-kind findings — dropping ONLY findings that are PURELY a due-date restatement
+  // (Condition-2 guard), NOT any obligation that happens to name a date. A dropped date-only row
+  // loses no information (the date shows in the masthead/timeline). Flag OFF ⇒ v3routed.submission
+  // is [] ⇒ this is the legacy array unchanged.
+  const submissionRequirements: SubmissionRequirementVM[] =
+    _legacySubmissionRequirements.length === 0 && v3routed.submission.length > 0
+      ? v3routed.submission.filter((r) => !_isDateOnlySubmission(r.requirement))
+      : _legacySubmissionRequirements;
   // FA-report-batch: derive the "N to clear" pill from the ACTUAL rendered rows
   // (status !== "ok"), not the AI's separate submission_summary string — they were
   // emitted independently and didn't reconcile ("21 to clear" over 20 open rows /
@@ -3408,7 +3557,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     timeline_gates: deriveTimelineGates(audit, compJson, responseDeadline),
 
-    compliance_matrix: deriveComplianceMatrix(compJson, risks, complianceFlags),
+    compliance_matrix: deriveComplianceMatrix(compJson, risks, complianceFlags, v3routed.on),
     matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
 
     ko_email: koCard,
