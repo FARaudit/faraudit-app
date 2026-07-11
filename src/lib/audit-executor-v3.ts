@@ -35,6 +35,9 @@ import { aggregate, type UsageCall } from "./audit-cost";
 import { bankRunRecord } from "./audit-run-record-bank";
 import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-attachments";
 import { isNoticedescUrl } from "./sam-description";
+import { isEnvOn } from "./env-flags";
+import { confirmResidualTokens } from "./ocr-accuracy-gate";
+import { makeVisionConfirmer } from "./ocr-vision-confirm";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -221,6 +224,55 @@ export async function executeAgenticPrimary(
   }
 
   await markStage(supabase, auditId, "verdict");
+
+  // ── OCR-ACCURACY LAYER 3 (Brain card #415 — flag AUDIT_WORKER_OCR, default OFF) ──
+  // A binding doc recovered by OCR that carries a format-valid RESIDUAL (plausible-but-unproven decision token — the
+  // format-valid-misread class 52.212-1→52.212-7, $1,300→$1,800) was held at has_text=false by the deterministic gate
+  // (layers 2+4, sam-attachments) — a conservative content-loss. Layer-3 gives that residual ONE chance to clear: a
+  // narrow INDEPENDENT vision re-read of the SAME document. Confirmed (vision reads the identical value) → flip
+  // has_text=true so the content counts toward a committal verdict. Not confirmed / no base64 / no key → the doc STAYS
+  // content-loss (fail-toward-NHR) — so a failed match can only cost an abstain, NEVER a false committal. Vision is the
+  // CONFIRMER, never a co-voter; disagreement fails toward NHR (confirmResidualTokens owns that). Flag OFF ⇒ no OCR ⇒
+  // no ocr_residual ⇒ this block is inert (byte-identical). Runs BEFORE manifestComplete so the recovery propagates to
+  // the verdict cap, the reconciliation banner, and bindingContentLossDocs uniformly.
+  if (isEnvOn(process.env.AUDIT_WORKER_OCR) && input.ingestion) {
+    const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
+    if (residualDocs.length > 0) {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
+      // display-name vs source-name skew still matches; a miss just leaves the doc content-loss (safe).
+      const normName = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/i, "").replace(/[^a-z0-9]+/g, "");
+      const b64ByName = new Map<string, string>();
+      const poisoned = new Set<string>(); // a normName that two DIFFERENT docs share is ambiguous → never match (else
+      // a residual could be confirmed against the WRONG document's image = a false COMPLETE). Fail-toward-NHR instead.
+      const addName = (name: string, b64: string) => {
+        const k = normName(name);
+        if (!k || poisoned.has(k)) return;
+        const existing = b64ByName.get(k);
+        if (existing !== undefined && existing !== b64) { b64ByName.delete(k); poisoned.add(k); return; }
+        b64ByName.set(k, b64);
+      };
+      const primaryB64 = input.pdfBase64 ?? (input.pdfBuffer ? input.pdfBuffer.toString("base64") : null);
+      if (primaryB64) { addName(input.primaryDocName ?? "primary solicitation", primaryB64); addName("primary solicitation", primaryB64); }
+      for (const a of input.attachmentPdfs ?? []) addName(a.name, a.base64);
+      for (const f of residualDocs) {
+        const b64 = b64ByName.get(normName(f.name)); // poisoned/ambiguous key → undefined → held content-loss (safe)
+        if (!apiKey || !b64) {
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (no ${apiKey ? "base64 match" : "API key"}) → fail-toward-NHR`);
+          continue;
+        }
+        const confirmer = makeVisionConfirmer({ base64: b64, docName: f.name, apiKey, model: modelFor("crossdoc"), signal, onUsage: (u) => usageCalls.push(u) });
+        const r = await confirmResidualTokens(f.ocr_residual ?? [], confirmer, { docName: f.name });
+        if (r.confirmed) {
+          f.has_text = true;
+          delete f.ocr_suspect;
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" RECOVERED (${r.detail}) → has_text=true`);
+        } else {
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})`);
+        }
+      }
+    }
+  }
 
   // GAP B — run the proven engine. bidderProfile is the firm's OPEN-WORLD capability
   // profile (N5; socioeconomic certs only) when the auditing user has a capability

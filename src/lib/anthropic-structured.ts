@@ -35,6 +35,11 @@ export interface StructuredCallOpts {
   /** Per-run usage tally (concurrency-safe — each audit owns its own callback). Emitted alongside the legacy
    *  global sink. Best-effort: a throw here never affects the call result. */
   onUsage?: (u: StructuredUsage) => void;
+  /** Optional structured user-content BLOCKS (e.g. a base64-PDF `document` block + a text block) — when present,
+   *  they REPLACE the plain `userPrompt` string as the user message content, so a caller can send VISION content
+   *  through this same schema-validated call path (OCR-accuracy layer-3). Absent ⇒ the string path (byte-identical
+   *  to every existing caller). The beta header already carries `pdfs-2024-09-25`, so PDF document blocks are valid. */
+  userContent?: unknown[];
 }
 
 export interface StructuredCallResult {
@@ -105,7 +110,9 @@ export async function callStructuredClaude(opts: StructuredCallOpts): Promise<St
     max_tokens: maxTokens,
     ...(/^claude-sonnet-/i.test(model) ? { temperature: 0 } : {}),
     system: systemField,
-    messages: [{ role: "user", content: userPrompt }],
+    // userContent (structured blocks — e.g. a base64-PDF document block for OCR-accuracy layer-3 vision) REPLACES the
+    // plain string when present; absent ⇒ the string path (byte-identical to every existing caller).
+    messages: [{ role: "user", content: opts.userContent ?? userPrompt }],
     output_config: { format: { type: "json_schema", schema } },
   };
   // Transient server-overload / rate-limit are retried with exponential backoff —
