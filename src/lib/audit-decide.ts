@@ -1023,6 +1023,14 @@ const ELIGIBILITY_AUTHORITY_RE = /(?<!\d)52\.219-\d{1,2}\b|(?<!\d)852\.219-\d{1,
 // US-person/registration eligibility constraint) and foreign ownership/control (FOCI). Over-keeping here is the
 // conservative (zero-contract-loss) direction — it can only leave a bar as a bar (→ NHR), never create a false BID.
 const GENUINE_NONSETASIDE_ELIG_KEEP_RE = /export.?control|\bITAR\b|international traffic in arms|arms export|export administration regulation|\bEAR\b|\bFOCI\b|foreign ownership|foreign.?owned|foreign control|owned or controlled by a foreign/i;
+// B2 (Brain card 421 Fork-2) — a genuine bidder-eligibility bar keyed to HOLDER status on an existing acquisition
+// vehicle (BOA/IDIQ/BPA/GWAC/MAS/FSS/MATOC on-ramp). Holder status is an UNSTATED profile attribute: under a null /
+// open-world profile it is unknown, so the bar must ROUTE TO NEEDS_HUMAN_REVIEW ("confirm holder status"), NEVER a
+// silent caution (the phantom-cite demotion) and NEVER INELIGIBLE (that needs closedWorld:true — a FUTURE path). Its
+// authority is the vehicle's own ordering/eligibility terms, not FAR 19, so ELIGIBILITY_AUTHORITY_RE never matches it —
+// without this keep-class it falls through to the phantom demotion. Keeping is the conservative (zero-contract-loss)
+// direction: it can only leave a bar as a bar (→ NHR), never create a false BID. Own flag; matches requirement+excerpt.
+const BOA_IDIQ_HOLDER_BAR_RE = /(?:\b(?:BOA|IDIQ|ID\/IQ|BPA|GWAC|MAS|FSS|MATOC|SATOC|IDC)\b|basic ordering agreement|blanket purchase agreement|multiple[- ]award schedule|federal supply schedule|indefinite[- ]delivery(?:\/indefinite[- ]quantity)?|governmentwide acquisition contract)[^.\n]{0,60}?(?:holder|awardee|on-?ramp|participant|restricted|limited\s+to|eligible|reserved|open\s+only)|(?:holder|awardee|participant)s?\s+of\s+(?:the\s+|an?\s+|this\s+|these\s+)?(?:BOA|IDIQ|ID\/IQ|BPA|GWAC|MAS|FSS|MATOC|SATOC|basic ordering agreement|blanket purchase agreement|multiple[- ]award schedule|federal supply schedule|contract|vehicle|schedule)|(?:only|restricted to|limited to|reserved for|open only to|must be an?|must hold an?)\s+[^.\n]{0,40}?(?:contract|schedule|vehicle|agreement|BOA|IDIQ|BPA|GWAC)\s+holders?/i;
 // The POSITIVE eligibility / who-can-compete / origin trigger — the bar must PRESENT as a bidder-directed exclusion.
 const ELIGIBILITY_CLAIM_RE = /\bel[ie]gib|\bineligib|\bdisqualif|\bexclud|not\s+subject\s+to|\bWTO\b|\bGPA\b|\bTAA\b|free\s+trade|trade\s+agreement|buy\s+american|\bBAA\b|(?:domestic|foreign|non-?domestic)\s+end\s+product|country\s+of\s+origin|end\s+product|reserved\s+(?:for|exclusively)|restricted\s+to|who\s+(?:can|may)\s+(?:bid|compete|offer|be\s+awarded)/i;
 /** Re-type a phantom-cite hard eligibility show-stopper off the bar path (Brain card 329). Pure → gate-tested.
@@ -1031,7 +1039,7 @@ const ELIGIBILITY_CLAIM_RE = /\bel[ie]gib|\bineligib|\bdisqualif|\bexclud|not\s+
  *  bar / positive set-aside, AND whose citation is NOT in the enumerated eligibility/size/set-aside authority list.
  *  Re-types → bidder_controls + curable + cautionFloor (visible caution, never silent BID, never forced NHR).
  *  Flag-gated; OFF (default) ⇒ unchanged. */
-export function applyEligibilityAuthorityAllowlist(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+export function applyEligibilityAuthorityAllowlist(findings: TypedFinding[], opts?: { enabled?: boolean; boaIdiqKeep?: boolean }): TypedFinding[] {
   if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
   return findings.map((f): TypedFinding => {
     const hardBar = f.controllability === "no_one_can_move" || (f.controllability === "bidder_cannot_move" && f.kind === "eligibility_bar");
@@ -1051,6 +1059,12 @@ export function applyEligibilityAuthorityAllowlist(findings: TypedFinding[], opt
     // (3b) GENUINE non-set-aside eligibility bar (export-control/ITAR/EAR/FOCI/foreign-ownership) — not caught by the
     //      structural regexes or isPositiveSetAside, must NEVER be softened (red-team real-bar-suppression class).
     if (GENUINE_NONSETASIDE_ELIG_KEEP_RE.test(hay)) return f;
+    // (3c) B2 — BOA/IDIQ/BPA/GWAC HOLDER-STATUS eligibility bar. Its authority is the vehicle's ordering terms, not
+    //      FAR 19, so ELIGIBILITY_AUTHORITY_RE never matches it → without this it would fall to the phantom demotion.
+    //      Holder status is an UNSTATED profile attribute (null/open-world → unknown) → KEEP the bar so it routes to
+    //      NEEDS_HUMAN_REVIEW ("confirm holder status"), never a silent caution. NEVER INELIGIBLE here (that needs
+    //      closedWorld:true — a FUTURE path, not built). Sub-flag gated (boaIdiqKeep); keeping is zero-contract-loss.
+    if (opts?.boaIdiqKeep && BOA_IDIQ_HOLDER_BAR_RE.test(hay)) return f;
     // (4) POSITIVE socioeconomic/size SET-ASIDE — routed by eligibility in the award-basis guard even with a weak cite.
     if (isPositiveSetAside(f)) return f;
     // (4b) GENUINE SIZE DISQUALIFICATION — isPositiveSetAside DELIBERATELY excludes size bars (SIZE_DISQUALIFICATION_RE),
