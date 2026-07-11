@@ -171,6 +171,12 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
       const needsOcr = meaningfulLength < MIN_TEXT_CHARS_FOR_TEXT_BLOCK || looksGarbled(rawText) || partialFromPages;
       if (needsOcr && isEnvOn(process.env.AUDIT_WORKER_OCR)) {
         const ocrText = await ocrPdfToText(pdfBuffer);
+        // [OCR-DIAG] (Brain card #419 step 4 — close the wage-det telemetry gap). Log the OCR outcome for EVERY
+        // OCR-attempted doc: did OCR fire, what did it yield, was it garbled, and (on accept) the gate partition.
+        // Without this, an image-only content-loss doc (the FA8137 Wage-Det) gave no evidence of whether OCR ran,
+        // failed, or was gate-held. Only emits under the flag (the OCR path), so flag-OFF stays byte-identical.
+        const ocrYield = ocrText ? meaningfulCharCount(ocrText) : 0;
+        const ocrGarbled = ocrText ? looksGarbled(ocrText) : false;
         if (ocrText && meaningfulCharCount(ocrText) > meaningfulLength && !looksGarbled(ocrText)) {
           warnings.push(
             `OCR parse-tier applied: native text was ${looksGarbled(rawText) ? "garbled" : "missing"} (${meaningfulLength} meaningful chars) → recovered ${meaningfulCharCount(ocrText)} clean chars via self-host OCR.`
@@ -184,6 +190,7 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
               `OCR-ACCURACY-GATE: ${ocrScan.suspect.length} caught misread(s) + ${ocrScan.validUnverified.length} format-valid residual token(s) — pending fail-toward-NHR unless confirmed.`
             );
           }
+          console.error(`[OCR-DIAG] bytes=${pdfBuffer.length} OCR ACCEPTED: native=${meaningfulLength} → ocr=${ocrYield} chars · suspect=${ocrScan.suspect.length} residual=${ocrScan.validUnverified.length}`);
           return {
             pages: buildPageStructure(ocrText, pageCount),
             rawText: ocrText,
@@ -193,6 +200,9 @@ export async function extractText(pdfBuffer: Buffer): Promise<ExtractedDocument>
             ocrScan,
           };
         }
+        // OCR was attempted but NOT used — the wage-det telemetry gap. Log WHY so a content-loss doc is evidenced,
+        // not silent: null (OCR failed/timed-out/binary-absent), garbled OCR (rejected), or not-better-than-native.
+        console.error(`[OCR-DIAG] bytes=${pdfBuffer.length} OCR NOT USED: native=${meaningfulLength} ocr=${ocrText ? ocrYield : "null"} garbled=${ocrGarbled} → doc stays image-only/content-loss`);
       }
 
       // Reached here means OCR did NOT recover (fits-under-floor whole read, or

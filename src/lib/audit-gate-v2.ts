@@ -87,12 +87,35 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bsize\\s+standard\\b", "\\bpast\\s+performance\\b", "\\bbond(?:ing|ed)?\\b", "\\baccounting\\s+system\\b",
 ].join("|"), "i");
 
-/** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier. */
-function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
+// ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
+// procedural offeror-RIGHTS boilerplate: a debriefing is a post-decision ENTITLEMENT of the offeror (FAR 15.506),
+// and award/exclusion notification is a Government procedure — neither imposes any eligibility or award precondition.
+// FA813726R0033 /panel (audit be69ce16, 2026-07-11) was UNANIMOUS-adjacent (ex-KO/contracts-atty/proposal/source-
+// selection + red-team AUTO-F): "Offerors desiring a debriefing must make their request IAW FAR 15.505 or 15.506"
+// (FAR 52.215-1(f)(4) boilerplate) was mis-typed ambiguous → disqualifierUncovered → a FALSE NHR. Same class + same
+// vector as the ARC #2 protest allow-list. SAME two guards apply: (1) DEBRIEF_NOTIFY_RE keeps ONLY the unambiguous
+// offeror-rights phrases (a "debrief" is never a bar; the 15.50x sections are debriefing/notification procedure); (2)
+// the flip additionally requires NO eligibility-bar signal (BAR_SIGNAL_RE) — a compound sentence that pairs a real
+// bar with a debriefing mention stays on the safe ambiguous→NHR pole. Flag-OFF ⇒ not consulted ⇒ byte-identical.
+const DEBRIEF_ALLOWLIST_ENABLED = process.env.AUDIT_DEBRIEF_ALLOWLIST === "true";
+const DEBRIEF_NOTIFY_RE = new RegExp([
+  "\\bdebrief(?:ing|ed|ings)?\\b",                                   // a debriefing is always a post-decision offeror RIGHT
+  "\\b15\\.50[356]\\b",                                              // FAR 15.503 notifications · 15.505 preaward · 15.506 postaward debriefing
+  "unsuccessful\\s+offerors?",                                       // the notification/debriefing context
+  "notif(?:y|ication)\\s+(?:of\\s+)?(?:unsuccessful\\s+)?offerors?", // award/exclusion notification procedure
+  "notification\\s+of\\s+(?:award|exclusion)",
+].join("|"), "i");
+
+/** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
+ *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the protest + debriefing families
+ *  must never silently narrow. */
+export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
   // ARC #2 — protest/disputes procedural language, ONLY when the sentence carries no eligibility-bar signal.
   if (PROTEST_ALLOWLIST_ENABLED && PROTEST_DISPUTES_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
+  // ARC #A — debriefing/notification offeror-rights procedural language, same no-bar-signal guard.
+  if (DEBRIEF_ALLOWLIST_ENABLED && DEBRIEF_NOTIFY_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
   return "ambiguous";
 }
 
