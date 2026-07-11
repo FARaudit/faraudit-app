@@ -176,6 +176,12 @@ export interface VerdictInputs {
   // (an unread binding doc could carry OR waive a bar — you cannot certify any verdict on a partial read).
   // Default undefined ⇒ no cap (unchanged), so callers that don't supply it stay byte-identical.
   documentsComplete?: boolean;
+  // B3 (Brain card 421 Fork-3) — an UNGROUNDED hard bidder-eligibility / disqualifier bar in the SAM notice body
+  // (mandatory site visit / set-aside / clearance) that the attachment-scoped coverage floor never saw. Its OWN gate
+  // (not the coverageComplete veto) so it SURVIVES the GATE_V2 remap — a coverageV2 'no-cap' must not wave a real
+  // notice-body bar through. Fail-toward-disqualifier → NEEDS_HUMAN_REVIEW, never a committal. Default undefined ⇒ no
+  // gate (unchanged); the flag-OFF orchestrator never sets it ⇒ byte-identical.
+  noticeBodyBarUngrounded?: boolean;
   // Brain card #320 ruling — an INCOMPLETE verdict must NAME the gap (which doc/section could not be confirmed
   // read/grounded), never a generic "coverage not complete". Populated by the orchestrator from the deterministic
   // signals (uncovered docs + missing binding sections). Optional/absent ⇒ reasons render as before (byte-identical

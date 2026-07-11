@@ -1587,6 +1587,14 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
     return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
   }
 
+  // 1a-notice. B3 (Brain card 421 Fork-3, flag-gated in the orchestrator) — an UNGROUNDED hard eligibility / disqualifier
+  //     bar in the SAM notice body (mandatory site visit / set-aside / clearance) that the attachment-scoped coverage
+  //     floor never saw. Its OWN gate, run AFTER the GATE_V2 / coverage block so a coverageV2 'no-cap' remap can NEVER
+  //     wave a real notice-body bar through (the coverageComplete veto is bypassed whenever GATE_V2 + coverageV2 are on).
+  //     Fail-toward-disqualifier → NEEDS_HUMAN_REVIEW, never a committal. Absent/false ⇒ byte-identical (flag-OFF).
+  if (inp.noticeBodyBarUngrounded)
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions, []);
+
   // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
   //     engine could not confirm it read in full (unfetched / scanned-no-text / mid-doc truncated / over-budget
   //     drop) caps EVERY pole to INCOMPLETE, committal included: an unread binding doc could carry OR waive a bar,

@@ -32,6 +32,11 @@ export interface AuditToolContext {
   // "digest routes, source grounds". Present only on the per-doc-decomposition path (AUDIT_PERDOC_DECOMP); when
   // absent, grounding falls back to fullSource (byte-identical). Deterministic substring only — an 11MB corpus is fine.
   groundingSource?: string;
+  // B3 (Brain card 421 Fork-3) — the raw SAM notice-body text (solicitation.description), threaded from the executor
+  // so the notice-body eligibility floor scans it directly, delimiter-independent (a single-doc package drops the
+  // "==== DOCUMENT ====" delimiter, so a synopsis-only notice is otherwise unfindable by name). Absent ⇒ the floor
+  // falls back to the named region in fullSource, and (flag-OFF) is never read at all → byte-identical.
+  noticeBodyText?: string;
 }
 
 const sectionsOf = (ctx: AuditToolContext): Record<string, string> => {

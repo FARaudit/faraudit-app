@@ -17,6 +17,7 @@ import { readSection, sectionFullText, procurementPart, requiresProposalSections
 import { constructionRequired, constructionCoreMissing, constructionCoverage } from "./audit-construction-manifest";
 import { runSectionFinder, type SectionFinderCall } from "./audit-section-finder";
 import { isBindingDoc, hasEngineText } from "./sam-attachments";
+import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
@@ -450,6 +451,58 @@ export function documentsCovered(
     uncovered.push(r.name);
   }
   return { complete: uncovered.length === 0, uncovered };
+}
+
+// B3 (Brain card 421 Fork-3) — NOTICE-BODY deterministic ELIGIBILITY-BAR floor. documentsCovered runs ELIGIBILITY_BAR_RE
+// ONLY on non-primary binding ATTACHMENTS (`if (r.isPrimary) continue`), so a hard bidder-eligibility / disqualifier bar
+// stated in the SAM NOTICE BODY — a MANDATORY pre-proposal site visit that gates eligibility, a set-aside, a clearance —
+// is invisible to the floor whenever the notice body is resolved as the PRIMARY region (synopsis-only / ITO notices) or
+// the package is single-region (documentsCovered short-circuits COMPLETE at regions.length<=1). The site-visit arm lives
+// INSIDE ELIGIBILITY_BAR_RE but only ran attachment-scoped — this is the notice-body extension (Card #421 Fork-3).
+// BOUNDED: scans ONLY the "SAM Notice Body" region, never the whole primary solicitation PDF (that would OVER_ABSTAIN on
+// incidental "eligible"/"secret"/"set aside" prose). Direction = FAIL-TOWARD-DISQUALIFIER: an ELIGIBILITY_BAR_RE hit that
+// NO grounded, decision-bearing finding already covers forces INCOMPLETE (→ NEEDS_HUMAN_REVIEW, the safe abstain — never
+// a committal (Gauntlet WRONG_VERDICT=0), never a silent clean BID (UNDER_ABSTAIN=0)). The grounded-finding escape hatch
+// is the OVER_ABSTAIN control: if the engine already surfaced the bar as a decision-bearing finding, the verdict path
+// owns it and the floor stays silent. Benign notice bodies (site-visit ENCOURAGED-not-required, informational BOA/holder
+// mentions) do not match ELIGIBILITY_BAR_RE's mandatory-attendance / socioeconomic-set-aside arms → floor never fires.
+// Own flag AUDIT_NOTICE_BODY_ELIG_FLOOR; OFF ⇒ never called ⇒ byte-identical (Rule 61). Pure → gate-tested.
+export function noticeBodyEligibilityUngrounded(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): boolean {
+  // Prefer the EXPLICIT notice-body text (delimiter-independent). The assembled fullSource DROPS the
+  // "==== DOCUMENT: … ====" delimiter for a single-doc package (assembleFullSource writes it only when docs>1), so a
+  // SYNOPSIS-ONLY notice collapses to one unnamed "(primary solicitation)" region and would be unfindable by name →
+  // UNDER_ABSTAIN on the charter case. The executor passes noticeBody.text through ctx; region-by-name is the fallback
+  // for the delimited multi-doc package (and the unit tests). BOUNDED either way — only the notice-body text is scanned.
+  const noticeText = (noticeBodyText && noticeBodyText.trim())
+    ? noticeBodyText
+    : (docRegions(fullSource).find((r) => r.name === NOTICE_BODY_DOC_NAME)?.text ?? "");
+  if (!hasEngineText(noticeText)) return false;                          // no notice-body text / unreadable → nothing to floor
+  const nNotice = norm(noticeText);                                      // regex + excerpt spans share this coordinate space
+  // Decision-bearing (non-`dropped`) findings grounded IN the notice body, as [start,end) spans over nNotice. A finding
+  // COVERS a bar only when its grounded span OVERLAPS the bar's matched span — so a benign decision-bearing finding
+  // grounded ELSEWHERE in the notice can never mask an eligibility bar (the UNDER_ABSTAIN=0 guarantee). A `dropped`
+  // (boilerplate) finding is not decision-bearing and credits nothing (mirrors documentsCovered #372 B).
+  const covering: Array<[number, number]> = [];
+  for (const f of findings) {
+    if (disposeFinding(f) === "dropped") continue;
+    const ex = norm(f.excerpt || "");
+    if (!ex) continue;
+    const s = nNotice.indexOf(ex);
+    if (s >= 0) covering.push([s, s + ex.length]);
+  }
+  // EVERY eligibility-bar occurrence must be covered by an overlapping decision-bearing finding; ANY ungrounded bar →
+  // fail-toward-disqualifier. Global scan (not just the first hit) so a second, unsurfaced bar is never masked. Bias =
+  // fire (abstain): OVER_ABSTAIN is a reduction target, UNDER_ABSTAIN is a hard zero. ELIGIBILITY_BAR_RE is bounded-
+  // quantifier (ReDoS-reviewed); a global clone is linear over the notice text.
+  const scan = new RegExp(ELIGIBILITY_BAR_RE.source, "gi");
+  for (const m of nNotice.matchAll(scan)) {
+    const hs = m.index ?? 0, he = hs + m[0].length;
+    if (!covering.some(([s, e]) => s < he && hs < e)) {
+      console.warn(`[coverage] notice-body ELIGIBILITY-BAR floor: ungrounded bar in "${NOTICE_BODY_DOC_NAME}" ("${m[0].slice(0, 90)}") → fail-toward-disqualifier (INCOMPLETE)`);
+      return true;
+    }
+  }
+  return false;
 }
 
 /** T0-5 (engine line-audit 2026-07-06) — partition the residue-doctrine's UNVERIFIED INFORMATIONAL findings out
@@ -916,8 +969,15 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // signal (external research whnm9ishz + engine panel wf_d2d5e1cd). Completeness now rests on the DETERMINISTIC
   // signals only (binding sections located + per-doc coverage + amendment fail-safe). `allConverged` is retained in
   // the trace log below (never a verdict gate). Correct in BOTH flag states; GATE_V2 additionally remaps the veto.
+  // B3 (Brain card 421 Fork-3, flag AUDIT_NOTICE_BODY_ELIG_FLOOR, default-OFF): an ungrounded hard eligibility bar in
+  // the SAM notice body (mandatory site visit / set-aside / clearance) that documentsCovered's attachment-scoped floor
+  // never sees. Routed through its OWN verdict gate (noticeBodyBarUngrounded), NOT the coverageComplete veto — the
+  // latter is BYPASSED when GATE_V2 + coverageV2 are on (audit-decide:1581), which is the prod flag state. Flag off ⇒
+  // short-circuits false ⇒ never set on VerdictInputs ⇒ byte-identical.
+  const noticeBodyBarUngrounded = process.env.AUDIT_NOTICE_BODY_ELIG_FLOOR === "true" && noticeBodyEligibilityUngrounded(ctx.fullSource, findings, ctx.noticeBodyText);
   const coverageComplete = missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
   if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
+  if (noticeBodyBarUngrounded) console.log(`[orchestrator] notice-body eligibility floor: ungrounded hard bar in notice body → NEEDS_HUMAN_REVIEW (fail-safe, B3)`);
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const provCount: Record<string, number> = {};
     for (const p of findingProvenance(ctx.fullSource, findings)) provCount[p.doc] = (provCount[p.doc] ?? 0) + 1;
@@ -1127,7 +1187,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // name the base solicitation → NHR fail-toward (never a silent first-doc default). Flag OFF ⇒ undefined ⇒ byte-identical.
   const _primaryRegions = ATTACHMENT_COVERAGE_ENABLED ? docRegions(ctx.fullSource) : [];
   const primaryIndeterminate = ATTACHMENT_COVERAGE_ENABLED && _primaryRegions.length > 1 && !resolvePrimary(_primaryRegions).confident;
-  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
+  const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
     for (const f of findings) { kc[f.kind] = (kc[f.kind] ?? 0) + 1; const d = disposeFinding(f); dc[d] = (dc[d] ?? 0) + 1; }
