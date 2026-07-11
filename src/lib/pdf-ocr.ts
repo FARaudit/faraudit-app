@@ -20,6 +20,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isEnvOn } from "./env-flags";
 
 // Hard cap so a pathological scan can't hang the audit. OCR of a normal
 // solicitation attachment finishes well under this.
@@ -38,7 +39,15 @@ export function looksGarbled(text: string): boolean {
   const len = sample.replace(/\s+/g, "").length;
   if (len < 300) return false; // too short to judge here; the low-yield path handles it
   const commonHits = (sample.match(COMMON_WORDS_RE) || []).length;
-  const per1k = commonHits / (sample.length / 1000);
+  // DENOMINATOR (flag AUDIT_TXT_INGEST): the metric is "common words per 1k chars
+  // of TEXT", but the legacy divisor is sample.length INCLUDING whitespace. A
+  // clean columnar layout (SCA wage determinations, CLIN/price tables) is ~50-60%
+  // whitespace padding, which halves the density and false-flags real text as
+  // garbled — the exact defect that keeps CBP's wage determinations out. Whitespace
+  // is not mojibake, so dividing by non-whitespace text length (`len`) is correct.
+  // True mojibake has ~0 common words regardless of divisor, so the garble catch
+  // is preserved. Flag-OFF ⇒ legacy divisor ⇒ byte-identical.
+  const per1k = commonHits / ((isEnvOn(process.env.AUDIT_TXT_INGEST) ? len : sample.length) / 1000);
   // Clean gov text ≈ 15–40 common words / 1k chars; garbled ≈ 0. 3 is a safe floor.
   return per1k < 3;
 }

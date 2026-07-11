@@ -1,10 +1,17 @@
-// Non-PDF attachment text extractor (.docx / .xlsx) — deterministic, no LLM.
+// Non-PDF attachment text extractor (.docx / .xlsx / .txt) — deterministic, no LLM.
 //
 // Bug (P0, 2026-06-20): the SAM document-set assembly skipped every .docx/.xlsx
 // member as "non-PDF (not inlineable)". But §M Evaluation addenda, Price
 // Schedules, ELIN/CLIN pricing, and wage tables are frequently delivered as
 // .docx/.xlsx (FA301626R0018 §M came back blank; N4008526R0065 couldn't price
 // because the ELINS .xlsx was dropped). Those documents are decision-critical.
+//
+// .txt extension (2026-07-10, flag AUDIT_TXT_INGEST): the SAME class, one format
+// later — Davis-Bacon / SCA wage determinations are commonly posted as plain
+// .txt (CBP 70B01C26R00000096 posted 10 of them). They were dropped as
+// "unsupported attachment type" ⇒ documents_complete=false ⇒ false-INCOMPLETE on
+// otherwise-clean solicitations. Plain text is the easiest format to ingest (it
+// IS text — no extraction library), so .txt rides the identical wrap-to-PDF path.
 //
 // Approach: extract a .docx (mammoth) or .xlsx (exceljs) to PLAIN TEXT, then
 // wrap that text in a minimal, valid PDF. The wrapped PDF rides the EXACT same
@@ -15,12 +22,28 @@
 // Honest-fallback contract: a member that can't be extracted returns null and
 // the caller flags it (never fabricated, never silently dropped).
 
-export type NonPdfKind = "docx" | "xlsx" | null;
+export type NonPdfKind = "docx" | "xlsx" | "txt" | null;
 
 export function nonPdfKind(name: string): NonPdfKind {
   if (/\.docx$/i.test(name)) return "docx";
   if (/\.xlsx$/i.test(name)) return "xlsx";
+  if (/\.txt$/i.test(name)) return "txt";
   return null;
+}
+
+// .txt → plain text, verbatim. It IS text already — no library, no parse. Decode
+// as UTF-8 (the modern default; strip a leading BOM), then normalize CRLF/CR to
+// LF so the downstream wrapper's line splitter is consistent. Davis-Bacon / SCA
+// wage determinations are the common .txt case (flag AUDIT_TXT_INGEST) and are
+// plain ASCII, so UTF-8 decode is lossless; any stray high byte is handled by the
+// wrapper's toWinAnsiSafe pass. No fabrication: an empty file yields "" → the
+// caller flags it null (honest fallback), exactly like the .docx/.xlsx path.
+function extractTxtText(buffer: Buffer): string {
+  return buffer
+    .toString("utf-8")
+    .replace(/^﻿/, "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
 }
 
 // .docx → plain text (mammoth's raw-text extractor; ignores styling).
@@ -80,7 +103,10 @@ export async function extractNonPdfText(name: string, buffer: Buffer): Promise<s
   const kind = nonPdfKind(name);
   if (!kind) return null;
   try {
-    const text = kind === "docx" ? await extractDocxText(buffer) : await extractXlsxText(buffer);
+    const text =
+      kind === "docx" ? await extractDocxText(buffer)
+      : kind === "xlsx" ? await extractXlsxText(buffer)
+      : extractTxtText(buffer);
     if (!text || text.length === 0) {
       // DIAGNOSTIC (2026-07-06): the EMPTY-yield path was previously invisible — it just
       // returned null with no log, so a .docx that carries text (confirmed in the gold
