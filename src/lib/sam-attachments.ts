@@ -734,7 +734,9 @@ function reconcileNearDuplicates(files: IngestionFileMeta[]): number {
 // extractNonPdfText + textToPdfBuffer), so §M evaluation addenda, price
 // schedules, ELIN/CLIN pricing and wage tables (frequently delivered as
 // .docx/.xlsx) reach the section/clause/fact extractors. Other non-PDF types
-// (.zip drawing dumps, images) stay non-ingestible.
+// (.zip drawing dumps, images) stay non-ingestible. NOTE: .txt is admitted
+// separately in applyBudget behind AUDIT_TXT_INGEST (kept OUT of this const so
+// flag-OFF admission stays byte-identical); it rides the same extract→wrap path.
 const INGESTIBLE_EXT = /\.(pdf|docx|xlsx)$/i;
 
 // Budget application — pure, exported for the gate suite. Decides which plan
@@ -767,8 +769,13 @@ export function applyBudget(plan: DocumentPlanEntry[], solicitationNumber?: stri
     (a.sizeBytes ?? Infinity) - (b.sizeBytes ?? Infinity) ||
     a.name.localeCompare(b.name)
   );
+  // .txt ingest (flag AUDIT_TXT_INGEST) — admit plain-text attachments (Davis-Bacon /
+  // SCA wage determinations are the common case). Flag-OFF ⇒ txtOn=false ⇒ the
+  // admission test + skip reason are BYTE-IDENTICAL to legacy (.txt stays dropped).
+  const txtOn = isEnvOn(process.env.AUDIT_TXT_INGEST);
   for (const e of fillOrder) {
-    if (!INGESTIBLE_EXT.test(e.name)) { skipped.push({ entry: e, reason: "unsupported attachment type (not PDF/DOCX/XLSX)" }); continue; }
+    const ingestible = INGESTIBLE_EXT.test(e.name) || (txtOn && /\.txt$/i.test(e.name));
+    if (!ingestible) { skipped.push({ entry: e, reason: `unsupported attachment type (not PDF/DOCX/XLSX${txtOn ? "/TXT" : ""})` }); continue; }
     if (e.sizeBytes == null) { skipped.push({ entry: e, reason: "size unknown — excluded from budget" }); continue; }
     if (ingest.length >= maxDocs) { skipped.push({ entry: e, reason: `document cap (${maxDocs}) reached` }); continue; }
     if (total + e.sizeBytes > maxTotal) { skipped.push({ entry: e, reason: `download budget (${Math.round(maxTotal / 1048576)}MB) exceeded` }); continue; }
@@ -800,12 +807,21 @@ async function normalizeToPdf(name: string, raw: Buffer): Promise<{ buf: Buffer;
       // inventory/ELINS sheet can't hog the token budget and starve other docs.
       // Keep the structure + a representative sample; honest truncation note.
       // .docx prose is left intact (bounded later by MAX_DOC_TOKENS if needed).
+      // .txt (Gauntlet F1, 2026-07-10): UNLIKE .docx (bounded in practice by a real
+      // document's length), a raw .txt can be an arbitrary multi-MB blob — wrapping
+      // + pdf-parsing the full text BEFORE the token cap applies is O(filesize)
+      // wasted work (a 50MB .txt → ~10k-page synthetic PDF). Cap it at the source
+      // too (prose cap MAX_DOC_TOKENS), mirroring the xlsx guard, so the wrap/parse
+      // cost is bounded by what the model will actually read. Tiny wage-det .txt
+      // (~44KB) are far under the cap ⇒ never truncated ⇒ read in full.
       let sourceTruncated = false;
-      if (kind === "xlsx") {
-        const maxChars = Math.floor(MAX_XLSX_DOC_TOKENS * CHARS_PER_TOKEN);
+      if (kind === "xlsx" || kind === "txt") {
+        const maxChars = Math.floor((kind === "xlsx" ? MAX_XLSX_DOC_TOKENS : MAX_DOC_TOKENS) * CHARS_PER_TOKEN);
         if (text.length > maxChars) {
-          text = text.slice(0, Math.max(0, maxChars - 130)) +
-            "\n\n[… spreadsheet truncated for the analysis budget — representative rows shown; full line-item file on SAM.gov …]";
+          const note = kind === "xlsx"
+            ? "\n\n[… spreadsheet truncated for the analysis budget — representative rows shown; full line-item file on SAM.gov …]"
+            : "\n\n[… text file truncated for the analysis budget — head shown; full file on SAM.gov …]";
+          text = text.slice(0, Math.max(0, maxChars - note.length)) + note;
           // S1 (Brain card 274) — the TAIL was cut at the source (before the token-budget pass), so the doc's
           // token count is already under budget and the downstream truncated flag would otherwise read false →
           // documents_complete=true on a partial wage/ELIN price sheet. Report it so the caller ORs it into
@@ -1008,7 +1024,7 @@ export async function assembleSamDocumentSet(
     }
     const dl = await downloadPdf(e.url, e.name);
     if (!dl) {
-      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "download failed or not a PDF" });
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx/.txt)" : "download failed or not a PDF" });
       continue;
     }
     const buf = dl.buf;
@@ -1184,7 +1200,7 @@ export async function assembleUploadedDocumentSet(
     // extracted to text + wrapped into a PDF so it ingests like the SAM arm.
     const norm = raw ? await normalizeToPdf(e.name, raw) : null;
     if (!norm) {
-      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx)" : "not a valid PDF (magic-byte check)" });
+      files.push({ name: e.name, role: e.role, bytes: e.sizeBytes, ingested: false, reason: nonPdfKind(e.name) ? "text extraction failed (.docx/.xlsx/.txt)" : "not a valid PDF (magic-byte check)" });
       continue;
     }
     const buf = norm.buf;
