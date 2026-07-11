@@ -140,7 +140,7 @@ export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 
 
   for (const a of attestations) {
     const isCovered = a.status === "covered_direct" || a.status === "covered_attested"
-      || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation";
+      || a.status === "covered_attested_boilerplate" || a.status === "covered_boilerplate_signal" || a.status === "read_no_obligation";
     // A binding-obligation section (L/M/C/F…) weighs more than an incorporated-clause list (I/K).
     const weight = ["I", "K"].includes(a.section) ? 1 : 2;
     totalWeight += weight;

@@ -25,7 +25,15 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
-import { GATE_V2_ENABLED, gradeCoverageV2 } from "./audit-gate-v2";
+import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf } from "./audit-gate-v2";
+
+// B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
+// obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
+// missing — the FA8137 false "§L/§M uncovered" root (findings quote bars, never the canned §L instruction litany, so
+// un-quoted boilerplate alone flipped a fully-read section to missing). INVARIANT (Brain, non-negotiable): a genuine
+// ungrounded §L/§M DISQUALIFIER or ambiguous obligation (importanceOf!=="boilerplate") — or any [truncated] marker —
+// STILL escalates exactly as today (stays obligations_ungrounded → missing → NHR/INCOMPLETE). Flag OFF ⇒ byte-identical.
+const COVERAGE_LEDGER_V2 = process.env.AUDIT_COVERAGE_LEDGER_V2 === "true";
 
 /** UCF sections that carry binding obligations — the ones completeness is measured against.
  *  C-8 (Brain C.f): expanded {B,C,H,I,L,M} → {B,C,D,E,F,H,I,K,L,M}. §D (packaging/marking), §E (inspection &
@@ -230,7 +238,7 @@ function hasConflict(findings: TypedFinding[]): boolean {
   return false;
 }
 
-export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "covered_attested_boilerplate" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; sectionHash?: string; }
+export interface SectionAttestation { section: string; status: "covered_direct" | "covered_attested" | "covered_attested_boilerplate" | "covered_boilerplate_signal" | "read_no_obligation" | "unread" | "obligations_ungrounded"; obligations: string[]; citedFindingIds: string[]; ungrounded: string[]; sectionHash?: string; }
 
 // C-7 (Brain C.c) — the obligation-extraction cap. Raised 25 → 200 so a normal binding section is fully proven
 // (25 silently dropped obligations #26+ was a false-COMPLETE hole). If a section still exceeds 200 obligation
@@ -667,7 +675,10 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // INCOMPLETE. FAIL-SAFE stack: an unread §L never reaches here (`unread` at line 466); a read §L
     // with zero §L findings has direct.length===0 → filter does NOT fire → full per-obligation proof.
     let obligationSet = obligations;
-    if (sec === "L" && direct.length > 0 && procurementPart(ctx) === "part12-commercial") {
+    // Fork-1(ii): the 52.212-1 pre-filter was part12-commercial-only; extend it to Part-15/Part-36 under the B1 flag
+    // so a construction/negotiated §L that incorporates the canned FAR provision isn't vetoed by its boilerplate.
+    // (A no-op where no 52.212-1 boilerplate is present — safe, fail-toward-covered on boilerplate only.)
+    if (sec === "L" && direct.length > 0 && (procurementPart(ctx) === "part12-commercial" || (COVERAGE_LEDGER_V2 && procurementPart(ctx) !== "unknown"))) {
       obligationSet = obligations.filter((ob) => !isFar52121Boilerplate(ob));
     }
     // C-3/C-7: a section the LENS could only partially read (lensTruncated) or whose obligation set overflowed the
@@ -680,9 +691,18 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     const cited = new Set<string>(); const ungrounded: string[] = [];
     for (const ob of obligationSet) { const ids = groundedBy(ob, findings, sec); if (ids.length) ids.forEach((i) => cited.add(i)); else ungrounded.push(ob); }
     if (obTruncated) ungrounded.push(`[truncated] §${sec} has more than ${MAX_OBLIGATIONS} obligation sentences — tail not proven`);
-    attestations.push({ section: sec, status: ungrounded.length ? "obligations_ungrounded" : "covered_attested", obligations: obligationSet, citedFindingIds: [...cited], ungrounded });
+    // Fork-1(i): a READ §L/§M whose ungrounded obligations are ALL boilerplate (and none are a [truncated] marker) →
+    // covered-with-signal, not missing. Any disqualifier/ambiguous ungrounded obligation, or a truncation marker,
+    // keeps status obligations_ungrounded → escalates (the non-negotiable invariant). Only PER_OBLIGATION §L/§M.
+    let status: SectionAttestation["status"];
+    if (!ungrounded.length) status = "covered_attested";
+    else if (COVERAGE_LEDGER_V2 && PER_OBLIGATION_SECTIONS.has(sec)
+      && ungrounded.every((u) => !/^\[(truncated|compressor-dropped)\]/i.test(u) && importanceOf(u) === "boilerplate"))
+      status = "covered_boilerplate_signal";
+    else status = "obligations_ungrounded";
+    attestations.push({ section: sec, status, obligations: obligationSet, citedFindingIds: [...cited], ungrounded });
   }
-  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "read_no_obligation").map((a) => a.section);
+  const covered = attestations.filter((a) => a.status === "covered_direct" || a.status === "covered_attested" || a.status === "covered_attested_boilerplate" || a.status === "covered_boilerplate_signal" || a.status === "read_no_obligation").map((a) => a.section);
   return { covered, missing: required.filter((s) => !covered.includes(s)), attestations };
 }
 
