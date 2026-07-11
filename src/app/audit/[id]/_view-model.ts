@@ -2031,10 +2031,81 @@ function deriveTimelineGates(
   return gates;
 }
 
+// ── Card 355 BUILD2 · arc #3 — AUDIT_V3_SECTION_ROUTING ──────────────────────
+// The agentic_v3 engine emits typed findings in compJson.v3.findings. Legacy
+// audits populate compJson.{evaluation_factors,submission_requirements,far_clauses};
+// v3 leaves those undefined, so today ALL v3 findings render in the §07 matrix
+// while §L/§M/§C/§05 render empty. This routes findings by `kind` to the report's
+// EXISTING section surfaces.
+//
+// FABRICATION GUARD (Cards #372/#373 doctrine): only route kinds whose fields map
+// 1:1 to a target VM WITHOUT synthesizing structure —
+//   submission      → §L SubmissionRequirementVM  (requirement + disposition)
+//   eligibility_bar → §05 Risk                     (requirement + citation + severity)
+//   clause_flowdown → §04 ComplianceFlag           (citation + requirement + severity)
+// pricing / technical_spec / other / unknown STAY in §07 as "Statement of
+// Requirement" — §C/CLIN (ClinLineItem) and §M (EvaluationFactorVM) need structured
+// line-item / coverage-% fields findings don't carry; synthesizing them = fabrication.
+// boilerplate is dropped (informational). Flag OFF ⇒ empty extras + no §07 exclusion
+// ⇒ byte-identical legacy render on every audit.
+const V3_ROUTING_ON = process.env.AUDIT_V3_SECTION_ROUTING === "true";
+// Kinds lifted OUT of §07 when routing is on (their rows now render in §L/§05/§04).
+const V3_ROUTED_KINDS = new Set(["submission", "eligibility_bar", "clause_flowdown", "boilerplate"]);
+interface V3RoutedExtras {
+  submission: SubmissionRequirementVM[];
+  risks: Risk[];
+  flags: ComplianceFlag[];
+  on: boolean; // true iff routing is active for THIS audit (flag ON + engine agentic_v3)
+}
+function routeV3Findings(compJson: Record<string, unknown>): V3RoutedExtras {
+  const off: V3RoutedExtras = { submission: [], risks: [], flags: [], on: false };
+  if (!V3_ROUTING_ON) return off;
+  if (String(compJson.engine ?? "") !== "agentic_v3") return off;
+  const v3f = ((compJson.v3 ?? {}) as { findings?: Array<Record<string, unknown>> }).findings;
+  if (!Array.isArray(v3f)) return off;
+  const submission: SubmissionRequirementVM[] = [];
+  const risks: Risk[] = [];
+  const flags: ComplianceFlag[] = [];
+  for (const f of v3f) {
+    const req = sanitizeDisplayText(truncateOnWord(String(f.requirement ?? "").trim(), 400));
+    if (!req) continue; // no requirement → belongs in expandable evidence, not a routed row
+    const kind = String(f.kind ?? "");
+    const disp = String(f.disposition ?? "");
+    const cite = String(f.citation ?? "").trim();
+    const sev = String(f.severity ?? "");
+    if (kind === "boilerplate") continue; // dropped — informational
+    if (kind === "submission") {
+      const met = disp === "met";
+      submission.push({ requirement: req, status: met ? "ok" : "todo", meta: met ? "Clear" : "Action" });
+    } else if (kind === "eligibility_bar") {
+      risks.push({
+        title: req,
+        severity: sev === "P0" ? "high" : sev === "P1" ? "med" : "low",
+        citation: cite,
+        description: sanitizeDisplayText(String(f.excerpt ?? "")),
+        faraudit_action: "",
+        provenance: cite ? "verified" : "inferred",
+        category: "Disqualification"
+      });
+    } else if (kind === "clause_flowdown") {
+      flags.push({
+        clause: cite || req,
+        title: req,
+        severity: sev === "P0" ? "P0" : sev === "P1" ? "P1" : "P2",
+        description: sanitizeDisplayText(String(f.excerpt ?? "")),
+        required_action: ""
+      });
+    }
+    // else pricing / technical_spec / other / unknown → left for §07 (see V3_ROUTED_KINDS exclusion).
+  }
+  return { submission, risks, flags, on: true };
+}
+
 function deriveComplianceMatrix(
   compJson: Record<string, unknown>,
   risks: Risk[],
-  complianceFlags: ComplianceFlag[]
+  complianceFlags: ComplianceFlag[],
+  routingOn = false
 ): Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> {
   const rows: Array<{ requirement: string; source: string; status: "action" | "risk" | "clear" }> = [];
   // Build a lowercase set of citations from the risk register so clauses cited
@@ -2096,14 +2167,21 @@ function deriveComplianceMatrix(
         if (!requirement) continue;
         const kind = String(f.kind ?? "");
         const disp = String(f.disposition ?? "");
-        // defect 3: status ties to kind + disposition (not a coarse all-else→clear). boilerplate is never a
-        // risk/action; eligibility_bar is the gate/risk axis; an open gate_to_clear obligation is an action.
-        const status: "action" | "risk" | "clear" =
-          kind === "boilerplate" ? "clear" :
-          kind === "eligibility_bar" ? "risk" :
-          disp === "gate_to_clear" ? "action" :
-          "clear";
+        // arc #3: when routing is on, kinds lifted to §L/§05/§04 no longer render in §07.
+        if (routingOn && V3_ROUTED_KINDS.has(kind)) continue;
         const source = String(f.citation ?? "").trim() || srcForKind(kind);
+        // defect 3 / change-3: status derivation.
+        //  · routing ON — re-pin 'action' to the SAME §04 renderable-flag set the legacy
+        //    rows use (FA-127 coherence): offeror-action items now live in §L/§04, so a §07
+        //    row is 'action' ONLY if its clause is a §04 flag, 'risk' if in the risk register,
+        //    else a standard/reference requirement ('clear'). Kills the false "N need action".
+        //  · routing OFF — unchanged kind+disposition logic (byte-identical legacy behavior).
+        const status: "action" | "risk" | "clear" = routingOn
+          ? (flagClauses.has(norm(source)) ? "action" : riskCites.has(norm(source)) ? "risk" : "clear")
+          : (kind === "boilerplate" ? "clear" :
+             kind === "eligibility_bar" ? "risk" :
+             disp === "gate_to_clear" ? "action" :
+             "clear");
         rows.push({ requirement, source, status });
       }
     }
@@ -2961,11 +3039,15 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const conf = confidenceLabel(audit.document_type_confidence);
 
   // Compliance + risks
-  const complianceFlags = mapComplianceFlags(compJson, risksJson);
+  // arc #3 (AUDIT_V3_SECTION_ROUTING): route agentic_v3 typed findings into the
+  // existing §L/§05/§04 surfaces. Empty extras + on=false when flag OFF ⇒ every
+  // spread below is a no-op ⇒ byte-identical legacy render.
+  const v3routed = routeV3Findings(compJson);
+  const complianceFlags = [...mapComplianceFlags(compJson, risksJson), ...v3routed.flags];
   // FA-153 — appeal-flavored actions get their deadline math re-anchored to
   // original issuance (or an honest "verify on SAM.gov" when unknown).
   const naicsAppealBinding = deriveNaicsAppealBinding(audit, compJson);
-  const risks = bindNaicsAppealRiskActions(mapRisks(risksJson), naicsAppealBinding);
+  const risks = [...bindNaicsAppealRiskActions(mapRisks(risksJson), naicsAppealBinding), ...v3routed.risks];
   const headlineRisk = pickHeadlineRisk(risks);
   const scoreFactors = deriveScoreFactors();
   const clinLineItems = mapClins(compJson, risks);
@@ -3012,7 +3094,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       `${_MONTHS_RE}\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+${_MONTHS_RE}\\s+\\d{4}|\\d{1,2}/\\d{1,2}/\\d{2,4}`,
       "i"
     ).test(s);
-  const submissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
+  const _legacySubmissionRequirements: SubmissionRequirementVM[] = Array.isArray(compJson.submission_requirements)
     ? (compJson.submission_requirements as SubmissionRequirementVM[])
         .filter((r) => !_statesConcreteDeadline(String(r?.requirement ?? "")))
         .map((r) => ({
@@ -3020,6 +3102,14 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
         requirement: sanitizeDisplayText(r.requirement)
       }))
     : [];
+  // arc #3: agentic_v3 leaves compJson.submission_requirements undefined, so §L would
+  // render empty. When routing is on and the legacy field produced nothing, feed §L from
+  // the routed `submission`-kind findings (already sanitized/deadline-safe in the helper).
+  // Flag OFF ⇒ v3routed.submission is [] ⇒ this is the legacy array unchanged.
+  const submissionRequirements: SubmissionRequirementVM[] =
+    _legacySubmissionRequirements.length === 0 && v3routed.submission.length > 0
+      ? v3routed.submission.filter((r) => !_statesConcreteDeadline(r.requirement))
+      : _legacySubmissionRequirements;
   // FA-report-batch: derive the "N to clear" pill from the ACTUAL rendered rows
   // (status !== "ok"), not the AI's separate submission_summary string — they were
   // emitted independently and didn't reconcile ("21 to clear" over 20 open rows /
@@ -3408,7 +3498,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
 
     timeline_gates: deriveTimelineGates(audit, compJson, responseDeadline),
 
-    compliance_matrix: deriveComplianceMatrix(compJson, risks, complianceFlags),
+    compliance_matrix: deriveComplianceMatrix(compJson, risks, complianceFlags, v3routed.on),
     matrix_export_url: `/api/audit/${audit.id}/matrix.pdf`,
 
     ko_email: koCard,
