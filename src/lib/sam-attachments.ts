@@ -658,21 +658,63 @@ function amendmentNumber(name: string): string | null {
 //      identity beyond the base/amendment family → never group it;
 //  (C) entries with DIFFERENT amendment numbers are distinct documents → never
 //      share a group (fold the amendment # into the group key).
+// ── Lever-1 B (Card #394) — name-axis PRIMARY IDENTITY ───────────────────────────
+// dedupeNearDuplicates runs PRE-download (names+sizes only). A dropped doc is gone BEFORE
+// download/extraction, so resolvePrimary (audit-tools, TEXT-based) can only re-rank docs that
+// SURVIVED dedupe — there is NO downstream recovery of a pre-download base drop. **dedupe is the
+// SOLE base-retention line**, so the belt's false-negative coverage must be airtight.
+// CEO ruling 1: FAILS TOWARD RETENTION — GENEROUS on the positive/protect side, NARROW on the
+// role-token/negative side; ambiguity → PROTECTED. A false-positive base-ID = one extra un-deduped
+// near-dup (cosmetic); a false-negative = the catastrophic base-drop (§L/§M fabricated-absent) we fix.
+//
+// ROLE_TOKEN_RE = ONLY true AMENDMENT markers (a separate SF-30 change doc). Deliberately EXCLUDES
+// 'conformed'/'revised'/'revision'/'version'/'final' — a conformed/revised solicitation is a VERSION
+// of the BASE (the most-auditable base doc), not an amendment; striking it would UN-protect the base
+// (ultracode P1 on 7e26537). Left `(?:^|[^a-z])` + right `(?![a-z])` (NOT \b) so a token glued to '_'
+// or a digit still matches (`amendment_0001`, `W9126_amendment`, `amendment0002` — mainstream SAM
+// underscore naming the old trailing-\b missed), while `amended`/`command`/`recommendation` do not.
+export const ROLE_TOKEN_RE = /(?:^|[^a-z])(?:amendment|amend|amd|modification|mod)(?![a-z])/i;
+// GENEROUS base signal — a solicitation FORM number, or "solicitation"/"combined synopsis"/RFP/RFQ.
+const SOLICITATION_FORM_NAME_RE = /\bsf[ _-]?1449\b|\bsf[ _-]?1442\b|\bsf[ _-]?33\b|\bsf[ _-]?18\b|\bsolicitation\b|\bcombined synopsis\b|\brequest for (?:quotation|proposal)s?\b|\brf[pq]\b/i;
+/** True when the NAME identifies a BASE solicitation (Lever-1 B belt). Generous positive, narrow
+ *  amendment-only negative, ambiguity → protected. dedupe is the sole base-retention line. */
+export function isBaseSolicitationName(name: string, solicitationNumber?: string | null): boolean {
+  if (!name) return false;
+  if (ROLE_TOKEN_RE.test(name)) return false;                 // narrow: a true amendment marker ⇒ not the base
+  if (SOLICITATION_FORM_NAME_RE.test(name)) return true;      // generous: form / "solicitation" ⇒ base
+  const sk = solicitationNumber ? norm(solicitationNumber) : "";
+  return !!sk && norm(name).includes(sk);                     // generous: carries the sol# ⇒ base candidate
+}
+/** The specific amendment role word in a name (letters only), or "" — used to keep two DIFFERENT
+ *  number-less amendments ("… - Amendment.pdf" vs "… - Modification.pdf") in distinct dedupe groups. */
+function roleTokenWord(name: string): string {
+  return (name.match(ROLE_TOKEN_RE)?.[0] ?? "").replace(/[^a-z]/gi, "").toLowerCase();
+}
+
 export function dedupeNearDuplicates(plan: DocumentPlanEntry[], solicitationNumber?: string | null): {
   kept: DocumentPlanEntry[];
   dropped: Array<{ entry: DocumentPlanEntry; reason: string }>;
 } {
+  const guardOn = isEnvOn(process.env.AUDIT_DEDUPE_PRIMARY_GUARD);
   const solKey = solicitationNumber ? norm(solicitationNumber) : "";
   const groups = new Map<string, DocumentPlanEntry[]>();
   for (const e of plan) {
+    // BELT (Lever-1 B, flag ON) — a base solicitation is NEVER a dedupe drop victim: pulled out
+    // of grouping by IDENTITY (isBaseSolicitationName), independent of the key. Load-bearing on the
+    // adversarial name shape (descriptive prefix + bare "-amendment" sibling) where the key alone
+    // would collide. REPLACES the failing "prefer the larger" mechanism for the base (CEO ruling 2).
+    if (guardOn && isBaseSolicitationName(e.name, solicitationNumber)) { groups.set(`__base_${e.resourceId}`, [e]); continue; }
     const k = dedupeKey(e.name);
-    // Guard A — empty key (no alphanumerics after normalization) OR a key that is
-    // only the solicitation number (the base/amendment family) → never group; each
-    // is a distinct binding doc.
-    if (!k || (solKey && k.replace(/\s+/g, "") === solKey)) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
-    // Guard C — a different amendment number can never share a group.
+    // Guard A — never group the base/amendment family. flag ON: fire when the key CONTAINS the sol#
+    // (A-i suspenders), so a descriptive "Solicitation - " prefix can't defeat it; OFF: equals-only (legacy).
+    const solFamily = !!solKey && (guardOn ? k.replace(/\s+/g, "").includes(solKey) : k.replace(/\s+/g, "") === solKey);
+    if (!k || solFamily) { groups.set(`__unique_${e.resourceId}`, [e]); continue; }
+    // Guard C — a different amendment number is distinct. flag ON also: a number-less role token is
+    // distinct from a non-role sibling AND from a DIFFERENT number-less role word (::role_<word>), so
+    // "… - Amendment.pdf" and "… - Modification.pdf" of one base are never merged into each other.
     const amd = amendmentNumber(e.name);
-    const groupKey = amd ? `${k}::amd${amd}` : k;
+    const roleTag = guardOn && !amd && ROLE_TOKEN_RE.test(e.name) ? `::role_${roleTokenWord(e.name)}` : "";
+    const groupKey = amd ? `${k}::amd${amd}` : `${k}${roleTag}`;
     (groups.get(groupKey) ?? groups.set(groupKey, []).get(groupKey)!).push(e);
   }
   const kept: DocumentPlanEntry[] = [];
