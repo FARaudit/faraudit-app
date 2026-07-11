@@ -216,6 +216,18 @@ const QUESTIONNAIRE_FILL_RE = /\b(past[\s-]?performance\s+questionnaire|ppq|refe
 // without this a compound name carrying real obligations would flip binding→exempt → a false COMPLETE (the dangerous
 // direction, and it fires prod-today since isBindingDoc is un-gated). Fail-SAFE: only ever makes a doc MORE binding.
 const BINDING_CONTENT_RE = /statement of work|\bsow\b|\bpws\b|\bsoo\b|scope of work|\bclin\b|specification|\bspec\b|technical requirement|performance work statement|wage determination|\bwd\b|\bsca\b|\bcba\b|security requirement|\bqasp\b|deliverable|\bcdrl\b/i;
+// Lever-3 STEP-1 (Card #406, flag AUDIT_SIGNIN_NONBINDING) — a PURE attendance record: sign-in sheet / attendance
+// roster / sign-up sheet. TIGHT: only these roster forms, never "site visit instructions/requirements/agenda" (those
+// carry the mandatory-attendance obligation). Paired with ROSTER_OBLIGATION_GUARD_RE as the fail-toward-binding guard.
+const SITE_VISIT_ROSTER_RE = /\b(sign[\s-]?in(?:\s+sheet)?|sign[\s-]?up\s+sheet|attendance\s+(?:sheet|roster|log|record|list))\b/i;
+// Obligation-bearing site-visit signals that KEEP a doc binding even if it also names a roster (compound-name fail-safe;
+// complements BINDING_CONTENT_RE which covers SOW/spec/CLIN/wage-det). Protects the Root-2 site-visit ELIGIBILITY bar —
+// the roster exclusion must never eat a mandatory-attendance disqualifier (adversarial "Site Visit Sign-In &
+// Requirements", "Mandatory Site Visit Instructions" stay binding via this guard).
+// No trailing \b — match plurals/variants ("requirements", "mandatory") and fail TOWARD binding: over-matching this
+// guard only keeps a doc binding (cosmetic), never excludes a binder (catastrophic). Card #406 adversarial test proved
+// the \b-terminated form missed the plural "Requirements" and let the roster exclusion eat the bar.
+const ROSTER_OBLIGATION_GUARD_RE = /\b(instruction|requirement|mandator|agenda)/i;
 export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; name: string }): boolean {
   if (f.role === "form" || f.role === "amendment") return true;      // primary solicitation + amendments are always binding
   const n = f.name.replace(/[_.\-+]+/g, " ");
@@ -228,6 +240,16 @@ export function isBindingDoc(f: { role: "form" | "amendment" | "attachment"; nam
     if (BINDING_CONTENT_RE.test(n)) return true;                      // compound / binding-content name → binding (override)
     if (QUESTIONNAIRE_FILL_RE.test(n)) return false;                  // pure reference questionnaire / PPQ → exempt
   }
+  // Lever-3 STEP-1 (flag AUDIT_SIGNIN_NONBINDING, default OFF → byte-identical): a pure sign-in / attendance ROSTER is
+  // an attendance record with ZERO offeror bid/no-bid obligation → non-binding, so a scanned roster never forces a
+  // false content-loss INCOMPLETE. FAIL-TOWARD-BINDING ordering (CEO card #406): excluded ONLY when the name carries
+  // NEITHER real binding content (BINDING_CONTENT_RE) NOR a site-visit obligation signal (ROSTER_OBLIGATION_GUARD_RE),
+  // so the Root-2 mandatory-attendance eligibility bar stays binding. Kept-binding roster = cosmetic; binder-excluded =
+  // catastrophic → the two guards make the catastrophic direction unreachable.
+  if (isEnvOn(process.env.AUDIT_SIGNIN_NONBINDING)
+      && SITE_VISIT_ROSTER_RE.test(n)
+      && !BINDING_CONTENT_RE.test(n)
+      && !ROSTER_OBLIGATION_GUARD_RE.test(n)) return false;
   return true;                                                        // default: binding
 }
 
