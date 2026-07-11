@@ -54,10 +54,45 @@ const BOILERPLATE_RE = new RegExp([
   "quotes?\\s+(?:shall|must|are\\s+to)\\s+be\\s+(?:submitted|received|emailed|sent|delivered)", "offers?\\s+(?:shall|must)\\s+be\\s+submitted",
 ].join("|"), "i");
 
+// ARC #2 (flag AUDIT_PROTEST_CLAUSE_ALLOWLIST) — the FAR 52.233 PROTEST / DISPUTES family is procedural
+// boilerplate for bid/no-bid: it imposes ZERO offeror eligibility or award precondition (protest-filing
+// mechanics, the disputes procedure). It was falling to "ambiguous" → disqualifier → NHR — the exact false
+// honest-fail the CBP /panel caught (FAR 52.233-2 "Service of Protest" text — "…served on the Contracting
+// Officer… Government Accountability Office…" — mis-typed as a §M disqualifier). Allow-list it OUT.
+//
+// PRE-LIVE REVIEW HARDENING (blind skeptic): "safe-by-ordering" is INSUFFICIENT — DISQUALIFIER_RE is tight and
+// misses most real-bar phrasings, and obligations are whole SENTENCES (obligationsOf splits only on .;\n), so a
+// COMPOUND sentence ("must be a certified 8(a) participant and any protest may be filed with the GAO") would be
+// laundered to boilerplate by the protest token. TWO guards close this: (1) PROTEST_DISPUTES_RE keeps ONLY
+// unambiguous procedural phrases — bare "GAO" / "disputes clause" / bare "protest" DROPPED (too broad); (2) the
+// flip additionally requires the sentence to carry NO eligibility-bar signal (BAR_SIGNAL_RE) — any bar-ish
+// wording keeps it on the safe ambiguous→NHR pole (over-tag = recoverable NHR; under-tag = lost contract).
+// Flag-OFF ⇒ not consulted ⇒ byte-identical.
+const PROTEST_ALLOWLIST_ENABLED = process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST === "true";
+const PROTEST_DISPUTES_RE = new RegExp([
+  "\\b52\\.233-[1-4]\\b",                                  // Disputes / Service of Protest / Protest after Award / Applicable Law
+  "service\\s+of\\s+protest", "served\\s+on\\s+the\\s+contracting\\s+officer",
+  "government\\s+accountability\\s+office", "comptroller\\s+general",
+  "agency[-\\s]?level\\s+protest", "contract\\s+disputes\\s+act",
+].join("|"), "i");
+// NEGATIVE GUARD — if the SAME sentence carries ANY eligibility/award-bar signal, never allow-list it (let it
+// stay ambiguous→NHR). Tuned to catch the review's compound cases (8(a)/HUBZone/clearance/accreditation/
+// accounting-system/registered) WITHOUT matching pure protest procedure ("must be SERVED on the CO" ≠ a bar).
+const BAR_SIGNAL_RE = new RegExp([
+  "\\bmust\\s+(?:possess|hold|maintain|be\\s+(?:a\\s+|an\\s+)?(?:certified|registered|accredited|licensed|qualified|eligible|approved|current|eligibility))",
+  "\\bmust\\s+be\\s+registered\\b", "\\bregistered\\s+in\\s+sam\\b",
+  "\\beligib(?:le|ility)\\b", "\\bineligible\\b",
+  "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
+  "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
+  "\\bsize\\s+standard\\b", "\\bpast\\s+performance\\b", "\\bbond(?:ing|ed)?\\b", "\\baccounting\\s+system\\b",
+].join("|"), "i");
+
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier. */
 function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
+  // ARC #2 — protest/disputes procedural language, ONLY when the sentence carries no eligibility-bar signal.
+  if (PROTEST_ALLOWLIST_ENABLED && PROTEST_DISPUTES_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
   return "ambiguous";
 }
 
