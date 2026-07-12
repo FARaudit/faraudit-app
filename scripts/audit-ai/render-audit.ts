@@ -6,6 +6,8 @@ import { join } from "node:path";
 import * as dotenv from "dotenv";
 import { buildViewModel } from "../../src/app/audit/[id]/_view-model";
 import { renderAuditReportComplete } from "../../src/app/audit/[id]/_render";
+import { renderV4ReportFromRow } from "../../src/lib/v4-report/report";
+import { renderV5ReportFromRow } from "../../src/lib/v5-report/report";
 
 dotenv.config({ path: ".env.local", quiet: true });
 
@@ -15,17 +17,24 @@ async function main() {
   const { data: audit, error } = await admin.from("audits").select("*").eq("id", id).maybeSingle();
   if (error || !audit) { console.error("audit not found:", error?.message); process.exit(1); }
 
-  const vm = buildViewModel(audit as never, { isWatching: false, hasCapabilityStatement: true });
-  const templatePath = join(process.cwd(), "src", "app", "audit", "[id]", "_template.html");
-  const template = readFileSync(templatePath, "utf8");
-  const html = renderAuditReportComplete(template, vm as never, audit as Record<string, unknown>);
+  // Card #428 / Brain ruling — route by ENGINE exactly as /audit/[id]/route.ts:410 does, so the preview tool renders
+  // the SAME HTML prod serves (review artifacts must run through production composition). agentic_v3 → V4/V5 report
+  // (renderV4/V5ReportFromRow); legacy → the V1 view-model/template path. Prior behavior rendered V1 unconditionally,
+  // which is why the panel + Design stamp + root-C fix all measured a render prod does NOT serve for NHR audits.
+  const engine = String((audit as Record<string, unknown> as { compliance_json?: { engine?: unknown } }).compliance_json?.engine ?? "");
+  const v5On = process.env.AUDIT_REPORT_V5 === "true";
+  let html: string; let renderPath: string;
+  if (engine === "agentic_v3") {
+    html = v5On ? renderV5ReportFromRow(audit as Record<string, unknown>) : renderV4ReportFromRow(audit as Record<string, unknown>);
+    renderPath = v5On ? "v5" : "v4";
+  } else {
+    const vm = buildViewModel(audit as never, { isWatching: false, hasCapabilityStatement: true });
+    const template = readFileSync(join(process.cwd(), "src", "app", "audit", "[id]", "_template.html"), "utf8");
+    html = renderAuditReportComplete(template, vm as never, audit as Record<string, unknown>);
+    renderPath = "v1";
+  }
   const out = `/tmp/audit-${id}.html`;
   writeFileSync(out, html, "utf8");
-  const v = vm as unknown as Record<string, unknown>;
-  console.log("rendered →", out, "·", html.length, "bytes");
-  console.log("vm.set_aside:", v.set_aside);
-  console.log("vm.contract_type:", v.contract_type);
-  console.log("vm.is_metadata_only:", v.is_metadata_only);
-  console.log("vm.period_of_performance:", String(v.period_of_performance).slice(0, 110));
+  console.log("rendered →", out, "·", html.length, "bytes · engine:", engine || "(legacy)", "· render-path:", renderPath);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
