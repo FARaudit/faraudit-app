@@ -126,28 +126,20 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
 // [Offeror must select one] from the excise tax." mis-typed disqualifierUncovered → a FALSE NHR (GATE_V2 cap that
 // pre-empted the whole B-arc). Same offeror-rights/no-op family + the SAME two guards as protest/debrief.
 //
-// GATE-2 TIGHTENING (both lenses): TWO tokens dropped as bar-colliders.
-//  (1) bare "\bforeign\s+person\b" — collides with a REAL bar ("no foreign person shall have access to classified
-//      information" — ITAR 22 CFR 120.16 / FOCI / NISPOM), which dodged the original BAR_SIGNAL_RE and would have
-//      laundered to boilerplate.
-//  (2) bare "\bW-?14\b" — the contracts-attorney Gate-2 re-review caught that it launders the FAR 52.229-11(e)(2)
-//      NON-exempt foreign-offeror at-offer W-14 duty (phrased without "submit", e.g. "…is subject to the W-14
-//      withholding") to boilerplate, uncaught by BAR_SIGNAL_RE ("foreign offeror" is not a bar token). Bare W-14 is
-//      NOT load-bearing — the benign "claim exemption on Form W-14" case is already covered by the "…exemption…
-//      excise tax…" election token — so it is dropped rather than narrowed (a "must submit W-14" sentence is
-//      independently boilerplate via BOILERPLATE_RE submission mechanics; that is pre-existing and out of scope).
-// The 52.229-11 rep still matches via the clause number, the "tax on certain foreign procurements" title, "section
-// 5000C"/"5000C", and the "…exemption…excise tax…" election phrasing. The kept "5000C"/title tokens CAN appear in a
-// real foreign-person tax-DUTY sentence ("foreign persons must remit the 2 percent tax imposed by section 5000C") —
-// but that whole class is now vetoed upstream by the BAR_SIGNAL_RE duty vocabulary (foreign person / remit / withhold
-// / two-percent, added in the same PR), so it never reaches the family check. Dropping the two broad tokens
-// (foreign-person / W-14) routes those bare sentences to the SAFE ambiguous→NHR pole (over-tag = recoverable review;
-// under-tag = lost contract).
+// GATE-2 ROOT SCOPING (four contracts-attorney/red-team re-reviews): the member is now keyed ONLY to the offeror's own
+// excise-tax EXEMPTION ELECTION — the single genuinely no-op 52.229-11 frame for a domestic offeror (the FA8137 target).
+// The bare IDENTIFIER tokens that used to be here — clause number "52.229-11", the "tax on certain foreign procurements"
+// title, "section 5000C"/"5000C", and bare "W-14"/"foreign person" — were ALL REMOVED. They match ANY sentence on the
+// topic, including a REAL foreign-person tax DUTY (52.229-11(b)/(e)(2)): "foreign persons must remit the 2 percent tax…",
+// "…subject to the section 5000C two-percent withholding", "if IRS Form W-14 is not submitted…exemptions will not be
+// applied…under section 5000C". Those are bid-affecting duties on a foreign offeror, NOT no-ops, and a keyword BAR_SIGNAL_RE
+// cannot enumerate every phrasing — so the identifier-token approach was structurally leaky (four residuals, four lenses).
+// A real DUTY is never phrased as the offeror's "[full/partial/no] exemption … excise tax" self-election, so scoping to the
+// election frame is the CATEGORICAL closer: only a genuine domestic exemption election launders; every duty/identifier
+// sentence routes to the SAFE ambiguous→NHR pole (over-tag = recoverable; under-tag = lost contract). The BAR_SIGNAL_RE
+// duty vocabulary (foreign person / remit / withhold / two-percent) is kept as defense-in-depth for the whole family.
 const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
 const FOREIGN_TAX_REP_RE = new RegExp([
-  "\\b52\\.229-1[12]\\b",                                         // Tax on Certain Foreign Procurements (Notice / clause)
-  "tax\\s+on\\s+certain\\s+foreign\\s+procurements",
-  "\\bsection\\s+5000C\\b", "\\b5000C\\b",                        // IRC §5000C — tax-specific identifier
   "(?:full|partial|no)\\s+exemption[^.]{0,40}excise\\s+tax",     // the FA8137 election sentence
   "excise\\s+tax[^.]{0,40}exemption",
 ].join("|"), "i");

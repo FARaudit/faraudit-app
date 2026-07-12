@@ -38,7 +38,9 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   // ── ARC D1 — foreign-procurement-tax rep (52.229-11 domestic no-op) → boilerplate (the FA8137 bd605b88 false-NHR) ──
   ok("FA8137 verbatim §K excise-tax election → boilerplate (not disqualifier)",
     importanceOf("The offeror represents that it has claimed no exemption [Offeror must select one] from the excise tax.") === "boilerplate");
-  ok("52.229-11 Tax on Certain Foreign Procurements → boilerplate",
+  // "shall complete the representation …" is boilerplate via BOILERPLATE_RE submission mechanics (NOT the family — the
+  // bare 52.229-11/title identifier tokens were removed in Gate-2 root scoping); pins that the instruction still launders.
+  ok("52.229-11 complete-the-representation instruction → boilerplate (submission mechanics)",
     importanceOf("The offeror shall complete the representation at FAR 52.229-11 Tax on Certain Foreign Procurements.") === "boilerplate");
   // A "foreign person" STATUS sentence now routes to the SAFE ambiguous→NHR pole (BAR_SIGNAL_RE "foreign person" veto,
   // Gate-2 re-review) — over-tag = recoverable NHR. The FA8137 target (the excise-tax ELECTION above) still launders.
@@ -73,6 +75,10 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("A foreign person is subject to the section 5000C two-percent withholding on this award.") !== "boilerplate");
   ok("title-framed foreign-offeror remit duty → NOT laundered",
     importanceOf("Under Tax on Certain Foreign Procurements, a non-exempt foreign offeror must remit the two-percent tax.") !== "boilerplate");
+  // 52.229-11(e)(2) FORFEITURE duty (Gate-2 re-review #3) — no remit/withhold/percent/foreign-person token, matches ONLY
+  // the removed bare 5000C identifier; after root scoping to the election frame it no longer matches the family at all.
+  ok("5000C W-14-forfeiture consequence duty → NOT laundered",
+    importanceOf("If IRS Form W-14 is not submitted with the offer, exemptions will not be applied to any resulting contract under section 5000C.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
