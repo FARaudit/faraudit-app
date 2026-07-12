@@ -7,6 +7,7 @@ import type {
   V4Data, V4Fact, V4Verdict, V4Coverage, V4Findings, V4Finding,
   V4SubmissionL, V4EvalM, V4Clins, V4Date, V4Provenance, Tone, Pole,
 } from "@/lib/v4-report/render";
+import { reconcileOfferDueDeadlines } from "@/lib/audit-deadline-extract";
 
 // ── pole → display word + tone (Brain doctrine; honest-fail poles carry noVerdict + noCharge) ──
 const POLE_BAND: Record<string, string> = {
@@ -210,6 +211,37 @@ function deadlineConflictNote(responseDeadline: string, cj: Record<string, unkno
   return `⚠ Document states ${new Date(doc).toISOString().slice(0, 10)} — verify before submitting`;
 }
 
+// D2-A (Brain card 441, flag AUDIT_DEADLINE_RECONCILE, default-OFF) — amendment-supersession deadline COHERENCE on the V4
+// (live agentic_v3) render path. The prior behavior kept SAM's date and, on a >24h conflict, added a co-equal "⚠ Document
+// states … — verify" caveat — which presented a STALE date and the current date as peers (bd605b88: SAM 18 Jul + phantom
+// 06-24 both shown). When the document itself supersedes its offer-due date (an amendment reset, or ≥2 offer-due dates),
+// the CURRENT/controlling date should WIN the masthead and the stale/superseded dates should DEMOTE to a labeled note —
+// never co-equal. reconcileOfferDueDeadlines resolves the controlling doc date (amendment-aware, dead-date-excluding,
+// latest-wins). SAFETY RAIL (RULED, pinned in the test): this is DISPLAY-ONLY — it changes ONLY the "Offers due" fact
+// value + sub-note, NEVER open/closed (that stays SAM-authoritative, computed elsewhere). Flag OFF ⇒ the exact prior
+// behavior (SAM value + verify caveat), byte-identical (Rule 61).
+const DEADLINE_RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+export function offerDueFact(responseDeadline: string, cj: Record<string, unknown>): { value: string; sub?: string } {
+  const prior = { value: fmtDeadline(responseDeadline), sub: deadlineConflictNote(responseDeadline, cj) ?? undefined };
+  if (!DEADLINE_RECONCILE_ENABLED) return prior;
+  const r = reconcileOfferDueDeadlines(cj.deadlines);
+  const sam = Date.parse(responseDeadline);
+  if (!r.supersession || !r.controlling) return prior;               // no supersession evidence → SAM stays authoritative
+  const ctrlMs = Date.parse(r.controlling.date);
+  if (Number.isNaN(ctrlMs)) return prior;
+  const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > 24 * 60 * 60 * 1000;
+  // Controlling doc date WINS the masthead; SAM (if it differs) + every demoted/superseded date drop to a labeled note.
+  const isDead = (l: string) => /superseded|prior|previous|cancell?ed|replaced|void/i.test(l);
+  const priors = [
+    samDiffers ? `SAM metadata ${fmtDeadline(responseDeadline)} (prior)` : null,
+    ...r.demoted.map((d) => `${fmtDeadline(d.date)}${isDead(d.label) ? " (superseded)" : " (prior)"}`),
+  ].filter((x): x is string => !!x);
+  return {
+    value: fmtDeadline(r.controlling.date),
+    sub: priors.length ? `⚠ Amended — current offer-due shown; demoted: ${priors.join("; ")}` : undefined,
+  };
+}
+
 function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict: boolean): V4Coverage {
   const cov = p.coverage || { required: [], covered: [], missing: [] };
   const docs = p.documents || null;
@@ -282,7 +314,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   if (setAside) facts.push({ k: "Set-aside", v: setAside });
   // #329: label is "Offers due" (this is the RESPONSE deadline, not a delivery date — the old "Delivery" mislabel
   // was a customer-facing error) and the value is formatted to preserve the wall-clock cutoff + offset.
-  if (responseDeadline) facts.push({ k: "Offers due", v: fmtDeadline(responseDeadline), sub: deadlineConflictNote(responseDeadline, cj) ?? undefined });
+  if (responseDeadline) { const od = offerDueFact(responseDeadline, cj); facts.push({ k: "Offers due", v: od.value, sub: od.sub }); }
   const docType = deriveDocType(s(audit.notice_type), pole);
 
   // ── verdict ──
