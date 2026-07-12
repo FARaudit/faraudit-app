@@ -27,9 +27,9 @@
   var STATE = {
     rows: [],
     filter: "all",
-    // Card 366 Phase-2 filter bar — AND'd across the chip + search. NAICS/set-aside
-    // omitted here on purpose; they wait for primary to add them to the SELECT.
-    f: { time: "all", agency: "all", type: "all", rec: "all", status: "all" },
+    // Card 366 Phase-2 filter bar — AND'd across the chip + search. Card #450
+    // wired NAICS + set-aside now that fetchRecentAudits returns both columns.
+    f: { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" },
     sortKey: "score",
     sortDir: -1,
     search: ""
@@ -122,6 +122,8 @@
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
       title:  (audit.title || "Untitled").trim(),
       agency: normalizeAgency(audit.agency),
+      naics:  audit.naics_code || "—",
+      setAside: audit.set_aside || "—",
       date:   ago.label,
       age:    ago.ageHours,
       type:   audit.document_type || "—",
@@ -190,6 +192,8 @@
     if (f.type   !== "all" && a.type   !== f.type)   return false;
     if (f.rec    !== "all" && a.rec    !== f.rec)    return false;
     if (f.status !== "all" && a.status !== f.status) return false;
+    if (f.naics  !== "all" && a.naics  !== f.naics)  return false;
+    if (f.setAside !== "all" && a.setAside !== f.setAside) return false;
     return true;
   }
   function rowMatchesSearch(a) {
@@ -341,8 +345,19 @@
       + n + ' record' + (n === 1 ? '' : 's') + '</b>, newest first.';
   }
 
+  // Card #450 — live sidebar badge: replace the rail's hardcoded "15" on the
+  // Past Audits item with the real OPEN count (response deadline not yet passed)
+  // from the loaded audits. Client-side so no shared server-rail change; targets
+  // the injectRail markup by href (rail renamed Past Audits → /past-audits).
+  function writeSidebarBadge() {
+    var open = STATE.rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); }).length;
+    var el = document.querySelector('.sb-icon[href="/past-audits"] .sb-badge, .sb-icon[href="/dashboard"] .sb-badge');
+    if (el) el.textContent = String(open);
+  }
+
   function writeAll() {
     populateFilterBar();
+    writeSidebarBadge();
     // Card 366 Phase-2 — expose needs-attention count for a later Today rollup
     // (do NOT build Today here). failed OR deadline-passed.
     window.__paNeedsAttention = STATE.rows.filter(function (r) { return r.attn; }).length;
@@ -436,7 +451,7 @@
         e.preventDefault();
         STATE.filter = "all";
         STATE.search = "";
-        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all" };
+        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
         document.querySelectorAll(".fbtn").forEach(function (b) {
           b.classList.toggle("active", b.dataset.filter === "all");
@@ -471,10 +486,12 @@
     }
     fill("fAgency", distinct("agency"), "All agencies");
     fill("fType", distinct("type"), "All types");
+    fill("fNaics", distinct("naics"), "All NAICS");
+    fill("fSetAside", distinct("setAside"), "All set-asides");
   }
 
   function wireFilterBar() {
-    [["fTime", "time"], ["fAgency", "agency"], ["fType", "type"], ["fRec", "rec"], ["fStatus", "status"]].forEach(function (pair) {
+    [["fTime", "time"], ["fAgency", "agency"], ["fType", "type"], ["fRec", "rec"], ["fStatus", "status"], ["fNaics", "naics"], ["fSetAside", "setAside"]].forEach(function (pair) {
       var el = document.getElementById(pair[0]);
       if (!el || el.dataset.ccWired) return;
       el.dataset.ccWired = "1";
@@ -488,7 +505,7 @@
     if (clr && !clr.dataset.ccWired) {
       clr.dataset.ccWired = "1";
       clr.addEventListener("click", function () {
-        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all" };
+        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all", naics: "all", setAside: "all" };
         STATE.filter = "all";
         STATE.search = "";
         document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });

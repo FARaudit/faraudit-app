@@ -383,7 +383,8 @@ tr.hidden{display:none}
         </div>
 
         <!-- Card 366 Phase-2 filter bar (functional, minimal — Design polishes later).
-             NAICS + Set-aside selects are placeholders until primary adds them to the SELECT. -->
+             Card #450: NAICS + Set-aside selects now live (fetchRecentAudits returns
+             naics_code + set_aside; options populated from the loaded rows). -->
         <div class="pa-filterbar" id="paFilterbar">
           <select class="pa-filter" id="fTime" aria-label="Time aperture">
             <option value="all">All time</option>
@@ -405,8 +406,8 @@ tr.hidden{display:none}
             <option value="pending">Pending</option>
             <option value="failed">Failed</option>
           </select>
-          <!-- <select class="pa-filter" id="fNaics"><option value="all">All NAICS</option></select> -->
-          <!-- <select class="pa-filter" id="fSetAside"><option value="all">All set-asides</option></select> -->
+          <select class="pa-filter" id="fNaics" aria-label="NAICS"><option value="all">All NAICS</option></select>
+          <select class="pa-filter" id="fSetAside" aria-label="Set-aside"><option value="all">All set-asides</option></select>
           <button class="pa-filter-clear" id="paClear" type="button">Clear</button>
         </div>
 
