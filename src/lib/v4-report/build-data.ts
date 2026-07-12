@@ -258,18 +258,43 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
   };
 }
 
+// ROOT #4 COVERAGE-COHERENCE (card #453/#448, flag AUDIT_COVERAGE_COHERENCE, default-OFF) — a UCF section with
+// GROUNDED (rendered, section-anchored) findings cannot honestly be listed "missing". 64b79916 showed §L/§M
+// "missing" while 30+ grounded L/M findings rendered (masthead "100% · 9/9" vs body "L/M missing / INCOMPLETE").
+// Reconcile the coverage panel against the evidence: an evidenced section is marked COVERED (chip flips to ok) and
+// drops out of `missing`. Flag OFF ⇒ the exact prior sets (byte-identical, Rule 61).
+const COVERAGE_COHERENCE_ENABLED = process.env.AUDIT_COVERAGE_COHERENCE === "true";
 function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict: boolean): V4Coverage {
   const cov = p.coverage || { required: [], covered: [], missing: [] };
   const docs = p.documents || null;
   const required = Array.isArray(cov.required) ? cov.required : [];
   const covered = new Set(Array.isArray(cov.covered) ? cov.covered : []);
   const coreMissing = Array.isArray(cov.coreMissing) ? cov.coreMissing : [];
+  const rawMissing = Array.isArray(cov.missing) ? cov.missing : [];
+  // COVERAGE-COHERENCE reconciliation (flag-gated) — mark any section with grounded evidence as covered. The
+  // section anchor MIRRORS RE_L/RE_M (require §K or K + separator + digit; a BARE letter never matches, so
+  // "Proposal"/"M0001" can't false-evidence a section). Flag OFF ⇒ `covered` untouched ⇒ byte-identical.
+  if (COVERAGE_COHERENCE_ENABLED) {
+    const rendered = unionFindings(
+      Array.isArray(p.showStoppers) ? p.showStoppers : [],
+      Array.isArray(p.findings) ? p.findings : [],
+    ).filter((f) => f.disposition !== "dropped");
+    const evidenced = (k: string): boolean => {
+      const L = s(k).trim().toUpperCase();
+      if (!/^[A-M]$/.test(L)) return false;                          // only single UCF-section letters are anchor-checkable
+      const re = new RegExp(`§\\s*${L}\\b|(?:^|[\\s(])${L}[-.\\s]\\d`, "i");
+      return rendered.some((f) => re.test(s(f.citation)) || re.test(s(f.requirement)));
+    };
+    for (const k of new Set([...required, ...coreMissing, ...rawMissing])) if (!covered.has(k) && evidenced(k)) covered.add(k);
+  }
   // core chips = required ∪ coreMissing (a core section absent-from-package lives only in coreMissing, and
   // must still surface as a "missing" chip — matches the v3 renderer's section-key union).
   const coreKeys = Array.from(new Set([...required, ...coreMissing]));
   const core = coreKeys.map((k) => ({ k, ok: covered.has(k) }));
   // "Core section missing" = required-but-uncovered ∪ absent-from-package (coreMissing). NOT retrieval failures.
-  const missing = Array.from(new Set([...(Array.isArray(cov.missing) ? cov.missing : []), ...coreMissing]));
+  // Flag ON: an evidenced section (now in `covered`) drops out of missing; flag OFF: no covered-filter (byte-identical).
+  const missingBase = Array.from(new Set([...rawMissing, ...coreMissing]));
+  const missing = COVERAGE_COHERENCE_ENABLED ? missingBase.filter((k) => !covered.has(k)) : missingBase;
   // "Could not be parsed" = files the engine had but could NOT read/retrieve (documents.missing) — a genuine
   // parse/retrieval failure. coreMissing (never in the package) is absence, NOT a parse failure — keep them apart.
   const unreadable = (docs?.missing || []).map((m) => (m.reason ? `${m.name} — ${m.reason}` : m.name));
