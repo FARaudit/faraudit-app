@@ -202,6 +202,14 @@ console.log("\n── 10 · NOTICE-WIDE CONCLUDED FALLBACK: single visit, marker
   assert(on.length === 1 && /was held\/concluded/i.test(on[0].requirement) && /bars award unless/i.test(on[0].requirement) && !/plan to attend/i.test(on[0].requirement),
     "flag ON: single-visit notice-wide fallback → conditional-concluded frame (not 'plan to attend')");
   assert(/may 28,? 2026/i.test(on[0].requirement), "flag ON: the far event date is surfaced");
+  // Gate-2 finding: a MULTI-visit notice where the concluded visit is a plain UPDATE line (NOT a bar sentence) and the
+  // upcoming bar carries a DAY-FIRST date ("15 August 2026") must NOT reframe the upcoming visit — the single-visit
+  // guard keys off DISTINCT site-visit dates (bar + concluded), so two dates ⇒ two visits ⇒ fallback off.
+  const mv = `UPDATE 01: The initial site visit was held and concluded on May 1, 2026.${filler}A second mandatory site visit will be held on 15 August 2026; all offerors must attend it to be eligible to propose.`;
+  process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE = "true";
+  const emv = emitNoticeBodyEligBarFindings(mk(mv), []);
+  assert(!emv.some((f) => /was held\/concluded/i.test(f.requirement)) && emv.some((f) => /plan to attend/i.test(f.requirement)),
+    "flag ON multi-visit (concluded UPDATE line + day-first upcoming bar): upcoming stays LIVE, not mis-framed concluded");
   delete process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE;
 }
 
@@ -225,6 +233,18 @@ console.log("\n── 11 · BOA-HOLDER EMITTER: holder-only bar surfaced; inform
   // informational BOA (no holder-only restriction) → still emits nothing even with the flag on.
   assert(emitNoticeBodyEligBarFindings(mk(BENIGN.informationalBoa), []).filter((f) => f.lens === "notice_body_boa_holder_detector").length === 0,
     "flag ON: informational BOA (no holder-only bar) → still emits nothing (no over-fire)");
+  // Gate-2 finding: the broad keep-class regex over-matched informational vehicle mentions; the tight EMIT regex must
+  // stay silent on awardee / eligible-items / notified-holders / duration-limit / reserved-funding (no holder-only bar).
+  for (const info of [
+    "The BOA awardee will receive orders on a rotating basis over the ordering period.",
+    "Items on the Multiple Award Schedule are eligible for purchase under this vehicle.",
+    "Holders of the contract will be notified of updates as they are issued by the office.",
+    "This IDIQ is limited to a five-year ordering period with no option extensions available.",
+    "Funding under the IDIQ is reserved for option year two of this program effort as planned.",
+  ]) {
+    assert(emitNoticeBodyEligBarFindings(mk(info), []).filter((f) => f.lens === "notice_body_boa_holder_detector").length === 0,
+      `flag ON: informational vehicle mention → NO false BOA emit ("${info.slice(0, 38)}…")`);
+  }
   delete process.env.AUDIT_NOTICE_BODY_BOA_EMIT;
 }
 
