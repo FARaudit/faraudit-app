@@ -79,6 +79,12 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   // the removed bare 5000C identifier; after root scoping to the election frame it no longer matches the family at all.
   ok("5000C W-14-forfeiture consequence duty → NOT laundered",
     importanceOf("If IRS Form W-14 is not submitted with the offer, exemptions will not be applied to any resulting contract under section 5000C.") !== "boilerplate");
+  // COMPOUND award-bar + excise election (adversarial-redteam, prohibited/barred-from residual) — a REAL TAA/country-of-
+  // origin award bar comma-joined with a genuine excise election fragment must NOT launder via the election token.
+  ok("compound: prohibited-from-award + excise election → NOT laundered",
+    importanceOf("A supplier is prohibited from award and certifies no exemption from the excise tax.") !== "boilerplate");
+  ok("compound: TAA non-designated prohibited-from-award + excise election → NOT laundered",
+    importanceOf("A supplier of a non-designated country is prohibited from award, and must certify no exemption from the excise tax.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
