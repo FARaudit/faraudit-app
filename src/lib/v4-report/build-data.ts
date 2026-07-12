@@ -229,7 +229,23 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
   if (!r.supersession || !r.controlling) return prior;               // no supersession evidence → SAM stays authoritative
   const ctrlMs = Date.parse(r.controlling.date);
   if (Number.isNaN(ctrlMs)) return prior;
-  const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > 24 * 60 * 60 * 1000;
+  // SAM-FLOOR GUARD (D-3, card #444/#448 red-team adjudication) — SAM's responseDeadline is the FLOOR. A controlling
+  // doc date may WIN the masthead ONLY when it is strictly LATER than SAM (a genuine reset/extension) or SAM is
+  // absent/unparseable. A doc date EARLIER than SAM is a STALE original (or a mis-parsed/OCR'd amendment) and must
+  // NEVER beat SAM — 64b79916 would have demoted SAM 18 Jul under a stale doc 06-24. When supersession evidence
+  // exists but no doc date clears the SAM floor, the genuine reset likely lives in an image-only amendment
+  // attachment the engine cannot read — so KEEP SAM's date and flag "deadline unreconciled — verify the amendment",
+  // never a confident wrong date. (Rule 17: this masthead behavior must hold on BOTH worker + Vercel.)
+  const samKnown = !Number.isNaN(sam);
+  const DAY = 24 * 60 * 60 * 1000;
+  if (samKnown && sam - ctrlMs > DAY) {
+    return {
+      value: fmtDeadline(responseDeadline), // SAM keeps the masthead (floor) — an earlier doc date never wins
+      sub: `⚠ Deadline unreconciled — an amendment may reset the offer-due date; verify against the latest amendment (SAM metadata ${fmtDeadline(responseDeadline)} shown; document states ${fmtDeadline(r.controlling.date)}).`,
+    };
+  }
+  if (samKnown && Math.abs(sam - ctrlMs) <= DAY) return prior;        // doc controlling ≈ SAM (agree) → SAM shown cleanly
+  const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > DAY;
   // Controlling doc date WINS the masthead; SAM (if it differs) + every demoted/superseded date drop to a labeled note.
   const isDead = (l: string) => /superseded|prior|previous|cancell?ed|replaced|void/i.test(l);
   const priors = [
@@ -242,18 +258,45 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
   };
 }
 
+// ROOT #4 COVERAGE-COHERENCE (card #453/#448, flag AUDIT_COVERAGE_COHERENCE, default-OFF) — a UCF section with
+// GROUNDED (rendered, section-anchored) findings cannot honestly be listed "missing". 64b79916 showed §L/§M
+// "missing" while 30+ grounded L/M findings rendered (masthead "100% · 9/9" vs body "L/M missing / INCOMPLETE").
+// Reconcile the coverage panel against the evidence: an evidenced section is marked COVERED (chip flips to ok) and
+// drops out of `missing`. Flag OFF ⇒ the exact prior sets (byte-identical, Rule 61).
+const COVERAGE_COHERENCE_ENABLED = process.env.AUDIT_COVERAGE_COHERENCE === "true";
 function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict: boolean): V4Coverage {
   const cov = p.coverage || { required: [], covered: [], missing: [] };
   const docs = p.documents || null;
   const required = Array.isArray(cov.required) ? cov.required : [];
   const covered = new Set(Array.isArray(cov.covered) ? cov.covered : []);
   const coreMissing = Array.isArray(cov.coreMissing) ? cov.coreMissing : [];
+  const rawMissing = Array.isArray(cov.missing) ? cov.missing : [];
+  // COVERAGE-COHERENCE reconciliation (flag-gated) — mark any section with grounded evidence as covered. The
+  // section anchor MIRRORS RE_L/RE_M (require §K or K + separator + digit; a BARE letter never matches, so
+  // "Proposal"/"M0001" can't false-evidence a section). Flag OFF ⇒ `covered` untouched ⇒ byte-identical.
+  if (COVERAGE_COHERENCE_ENABLED) {
+    const rendered = unionFindings(
+      Array.isArray(p.showStoppers) ? p.showStoppers : [],
+      Array.isArray(p.findings) ? p.findings : [],
+    ).filter((f) => f.disposition !== "dropped");
+    const evidenced = (k: string): boolean => {
+      const L = s(k).trim().toUpperCase();
+      if (!/^[A-M]$/.test(L)) return false;                          // only single UCF-section letters are anchor-checkable
+      const re = new RegExp(`§\\s*${L}\\b|(?:^|[\\s(])${L}[-.\\s]\\d`, "i");
+      // Anchor on the CITATION only (mirrors RE_L/RE_M finding-bucketing) — NOT requirement prose, so an incidental
+      // "Deliverable C-2" / "phase L-1" token in a finding's text can't false-evidence a genuinely-missing section.
+      return rendered.some((f) => re.test(s(f.citation)));
+    };
+    for (const k of new Set([...required, ...coreMissing, ...rawMissing])) if (!covered.has(k) && evidenced(k)) covered.add(k);
+  }
   // core chips = required ∪ coreMissing (a core section absent-from-package lives only in coreMissing, and
   // must still surface as a "missing" chip — matches the v3 renderer's section-key union).
   const coreKeys = Array.from(new Set([...required, ...coreMissing]));
   const core = coreKeys.map((k) => ({ k, ok: covered.has(k) }));
   // "Core section missing" = required-but-uncovered ∪ absent-from-package (coreMissing). NOT retrieval failures.
-  const missing = Array.from(new Set([...(Array.isArray(cov.missing) ? cov.missing : []), ...coreMissing]));
+  // Flag ON: an evidenced section (now in `covered`) drops out of missing; flag OFF: no covered-filter (byte-identical).
+  const missingBase = Array.from(new Set([...rawMissing, ...coreMissing]));
+  const missing = COVERAGE_COHERENCE_ENABLED ? missingBase.filter((k) => !covered.has(k)) : missingBase;
   // "Could not be parsed" = files the engine had but could NOT read/retrieve (documents.missing) — a genuine
   // parse/retrieval failure. coreMissing (never in the package) is absence, NOT a parse failure — keep them apart.
   const unreadable = (docs?.missing || []).map((m) => (m.reason ? `${m.name} — ${m.reason}` : m.name));

@@ -135,5 +135,26 @@ console.log("\n── 9 · V4 renderer offerDueFact ──");
   }
 }
 
+// ── 10 · SAM-FLOOR GUARD (D-3, card #444/#448) — a controlling doc date EARLIER than SAM must NEVER win the masthead ──
+console.log("\n── 10 · SAM-floor guard (earlier-than-SAM doc date never wins) ──");
+{
+  const flagOn = process.env.AUDIT_DEADLINE_RECONCILE === "true";
+  // 64b79916 shape when the 31-Jul reset is IMAGE-ONLY (unextractable): deadlines carry only earlier dates, with
+  // supersession evidence (≥2 distinct submission dates). SAM 18 Jul must keep the masthead; 06-24 must NOT win.
+  const sam = "2026-07-18T14:00:00-05:00";
+  const cj = { deadlines: [dl("Offers due", "2026-06-24"), dl("Offers due", "2026-06-10")] };
+  const od = offerDueFact(sam, cj);
+  if (flagOn) {
+    assert(/18 Jul 2026/.test(od.value), "flag ON + SAM-floor: masthead = SAM 18 Jul (an earlier doc date 06-24 never wins)");
+    assert(!/24 Jun 2026/.test(od.value) && !/10 Jun 2026/.test(od.value), "flag ON + SAM-floor: the stale earlier doc date is NOT the masthead value");
+    assert(!!od.sub && /unreconciled/i.test(od.sub) && /verify/i.test(od.sub), "flag ON + SAM-floor: 'deadline unreconciled — verify the amendment' caveat (not a confident wrong date)");
+    // control: the genuine-reset case (doc LATER than SAM) still wins — the guard only blocks earlier-than-SAM.
+    const reset = offerDueFact(sam, { deadlines: [dl("Offers due", "2026-06-24"), dl("Revised offers due (Amendment 0001)", "2026-07-31")] });
+    assert(/31 Jul 2026/.test(reset.value), "flag ON: a genuine LATER reset (31 Jul) still wins the masthead (floor blocks only earlier dates)");
+  } else {
+    assert(/18 Jul 2026/.test(od.value), "flag OFF: masthead = SAM date (byte-identical)");
+  }
+}
+
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

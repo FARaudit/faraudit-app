@@ -14,6 +14,7 @@
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
 import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
+import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE } from "./audit-site-visit-patterns";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -1334,13 +1335,24 @@ export function disposeFinding(f: TypedFinding): Disposition {
 // bidder_controls -> excluded) · NOT curableInWindow===true (curable = a gate to clear, branch-5b parity) · NOT
 // firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
 // (byte-identical, Rule 61). Pure -> gate-tested.
-const SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
+// SITE_VISIT_RE + SITE_VISIT_CONCLUDED_RE are the SHARED contract regexes (audit-site-visit-patterns.ts) — the
+// emitter frames against the SAME CONCLUDED_RE this guard recognizes; sharing prevents a drift that would silently
+// break the conditional-concluded promotion (card #453/#454).
 function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, source?: string): boolean {
   if (f.disposition !== "disqualifying") return false;             // over-fire guard: a real bar, never a gate-to-clear
   if (f.curableInWindow === true) return false;                    // curable in-window -> a gate to clear, not a blocker (branch-5b parity)
   if (firmStatus(f, profile, source) === "satisfies") return false; // the firm PROVES it holds the bar -> not a blocker
+  const isSiteVisit = SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation
+  // STALENESS GUARD (card #453/#454 · additive to PR #201) — a SITE-VISIT bar whose SOURCE shows the visit already
+  // concluded/held is only auto-suppressed when the FINDING is MIS-FRAMED (reads as a live "must attend to be
+  // eligible" gate with no concluded frame in its own text). A CORRECTLY-FRAMED finding — the notice-body emitter's
+  // conditional-concluded finding whose own requirement/excerpt carries the concluded marker — DOES promote (its
+  // own copy supplies the "bars award unless attendance confirmed" #432 framing). Mis-framed live-sounding lens
+  // findings (concluded only in the source) stay NOT-promoted — routed to human review, never a false "go attend" P0.
+  const findingCarriesConcludedFrame = SITE_VISIT_CONCLUDED_RE.test(f.requirement ?? "") || SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? "");
+  if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source) && !findingCarriesConcludedFrame) return false;
   if (f.kind === "eligibility_bar") return true;
-  return SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
+  return isSiteVisit; // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
 }
 /** The site-visit/eligibility disqualifiers to SURFACE as bid-deciding on the notice-body NHR pole, floored to P0.
  *  Applied ONLY inside that branch (see doctrine above) — never on meta-ambiguity poles. Pure. */
