@@ -505,6 +505,75 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
   return false;
 }
 
+// D2-B (Brain card 441, flag AUDIT_NOTICE_BODY_ELIG_FLOOR — the SAME revert unit as noticeBodyEligibilityUngrounded above).
+// The detector returns a BOOLEAN (routes NHR) but emits NO finding, so the B3-severity floor (siteVisitEligStoppers,
+// audit-decide.ts) has nothing in dispositions[] to promote → an ungrounded notice-body eligibility/site-visit bar buries
+// as a P2 "advisory" instead of a bid-deciding show-stopper. This is the missing SIBLING to emitSetAsideNoticeFindings:
+// emit ONE grounded eligibility-bar finding per UNGROUNDED bar span so the floor has a disqualifier to promote.
+//   RULED CONDITION (Brain card 441, LOAD-BEARING): at most ONE finding per bar span, and a span already covered by a
+//   decision-bearing finding is NEVER re-emitted — double-promotion inflating showStoppers[] is the over-fire class.
+// Reuses the detector's EXACT notice-text resolution + covering-overlap logic (same nNotice coordinate space), so the
+// emitter and the detector agree on which spans are ungrounded. requiredAttribute is intentionally UNSET (a completed
+// site visit / notice-body bar is not firm-clearable) → firmStatus stays "unknown" → the floor promotes it (over-tag =
+// a recoverable NHR conditional bar; under-tag = a buried show-stopper). Pure → gate-tested. Flag off ⇒ never called
+// (gated on noticeBodyBarUngrounded at the call site) ⇒ byte-identical (Rule 61).
+const NOTICE_SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
+const NOTICE_CLEARANCE_RE = /\bclearance\b|\bclassified\b|\btop[\s-]?secret\b|\bts[\s/]?sci\b|\bsecret\b/i;
+export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
+  const noticeText = (noticeBodyText && noticeBodyText.trim())
+    ? noticeBodyText
+    : (docRegions(fullSource).find((r) => r.name === NOTICE_BODY_DOC_NAME)?.text ?? "");
+  if (!hasEngineText(noticeText)) return [];
+  const nNotice = norm(noticeText);
+  // covering = decision-bearing (non-`dropped`) findings grounded IN the notice body, as [start,end) spans over nNotice.
+  const covering: Array<[number, number]> = [];
+  for (const f of findings) {
+    if (disposeFinding(f) === "dropped") continue;
+    const ex = norm(f.excerpt || "");
+    if (!ex) continue;
+    const s = nNotice.indexOf(ex);
+    if (s >= 0) covering.push([s, s + ex.length]);
+  }
+  // Expand a match to its enclosing SENTENCE (bounded by .!? in the SAME nNotice coordinate space). ELIGIBILITY_BAR_RE's
+  // bare "\beligib" arm matches a lone token; the sentence is the meaningful, still-verbatim grounded excerpt, and it lets
+  // the site-visit / clearance classification read real content. Dedup on the sentence span ⇒ multiple bar hits inside one
+  // sentence collapse to ONE finding (the ruled "at most one finding per bar span").
+  const sentenceSpan = (at: number): [number, number] => {
+    let s = at; while (s > 0 && !".!?".includes(nNotice[s - 1])) s--;
+    let e = at; while (e < nNotice.length && !".!?".includes(nNotice[e])) e++;
+    return [s, e < nNotice.length ? e + 1 : e];
+  };
+  const out: TypedFinding[] = [];
+  const emitted: Array<[number, number]> = [];
+  const seenExcerpt = new Set<string>();
+  const scan = new RegExp(ELIGIBILITY_BAR_RE.source, "gi");
+  for (const m of nNotice.matchAll(scan)) {
+    const [ss, se] = sentenceSpan(m.index ?? 0);
+    if (covering.some(([s, e]) => s < se && ss < e)) continue;     // owned by a decision-bearing finding → do NOT re-emit
+    if (emitted.some(([s, e]) => s < se && ss < e)) continue;      // at most ONE finding per bar span/sentence (ruled dedup)
+    const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
+    if (!excerpt || seenExcerpt.has(excerpt)) continue;            // identical bar sentence at another position → one finding
+    seenExcerpt.add(excerpt);
+    emitted.push([ss, se]);
+    const requirement = NOTICE_SITE_VISIT_RE.test(excerpt)
+      ? `Mandatory site visit / pre-proposal conference stated in the SAM notice body — attendance gates eligibility to propose; verify and plan to attend: "${excerpt}"`
+      : NOTICE_CLEARANCE_RE.test(excerpt)
+      ? `Security/facility clearance stated as an eligibility bar in the SAM notice body — only cleared offerors are eligible; verify the firm holds it: "${excerpt}"`
+      : `Eligibility bar stated in the SAM notice body — verify the firm meets it before bidding: "${excerpt}"`;
+    out.push({
+      requirement,
+      citation: NOTICE_BODY_DOC_NAME,
+      excerpt,
+      kind: "eligibility_bar",
+      controllability: "bidder_cannot_move",
+      curableInWindow: false,
+      grounded: true,
+      lens: "notice_body_elig_detector",
+    });
+  }
+  return out;
+}
+
 /** T0-5 (engine line-audit 2026-07-06) — partition the residue-doctrine's UNVERIFIED INFORMATIONAL findings out
  *  of the claim/verdict set. Such a finding (skeptic never ruled; GUARANTEED non-bar / non-verdict-driving by the
  *  marker's guard at audit-verifier.ts:87) must NOT read as a VERIFIED finding, but is RETAINED (returned in
@@ -1187,6 +1256,14 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // name the base solicitation → NHR fail-toward (never a silent first-doc default). Flag OFF ⇒ undefined ⇒ byte-identical.
   const _primaryRegions = ATTACHMENT_COVERAGE_ENABLED ? docRegions(ctx.fullSource) : [];
   const primaryIndeterminate = ATTACHMENT_COVERAGE_ENABLED && _primaryRegions.length > 1 && !resolvePrimary(_primaryRegions).confident;
+  // D2-B (Brain card 441, flag AUDIT_NOTICE_BODY_ELIG_FLOOR) — the detector (:977) routed NHR on an ungrounded notice-body
+  // eligibility bar but emitted NO finding; emit it NOW so the in-branch B3-severity floor has a disqualifier in
+  // dispositions[] to promote. Placed AFTER every re-typing guard (so the eligibility_bar is not softened off the
+  // disqualifying pole) and gated on noticeBodyBarUngrounded (itself flag-gated at :977 ⇒ flag-OFF byte-identical). The
+  // load-bearing dedup (at most one finding per bar span; never re-emit a covered span) lives inside the emitter.
+  if (noticeBodyBarUngrounded) {
+    findings = [...findings, ...emitNoticeBodyEligBarFindings(ctx.fullSource, findings, ctx.noticeBodyText)];
+  }
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {
     const kc: Record<string, number> = {}, dc: Record<string, number> = {};
