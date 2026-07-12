@@ -24,6 +24,10 @@ import { isActionableSubmissionItem } from "@/lib/section-extractors";
 // Each test below targets a NON-actionable fragment shape a bidder can't work from;
 // the action-verb escape hatch keeps any line that states a real obligation.
 const ACTION_VERB_RE = /\b(shall|must|submit|provide|include|complete|sign|register|acknowledge|ensure|certify|furnish|deliver|identify|mark|upload|return|address)\b/i;
+// Root-C render-coherence (Brain #332/#387) — when ON, an NHR-pole audit's BODY sections render honest, pole-accurate
+// states instead of the scored "clean pass / proceed" defaults that contradict the "Human review" masthead. Default OFF
+// (Rule 61 — byte-identical when off); flipped only after Design confirms the flag-on render 1:1.
+const NHR_COHERENCE_ON = process.env.AUDIT_REPORT_NHR_COHERENCE === "true";
 function looksGarbledFragment(t: string): boolean {
   const s = t.trim();
   // Unambiguous OCR/extraction garbage — drop regardless of content.
@@ -1256,8 +1260,20 @@ function removeWinThemesSubhead(html: string): string {
 // not in metadata-only mode (locked treatment handles that path). DESIGN
 // BLOCKER A: the demo template ships 4 demo `.risk` blocks that contradict
 // a zero-risks audit; this clears them with a matching empty state.
-function setRisksEmptyState(html: string): string {
-  const innerHtml = `
+// Root-C render-coherence (Brain #332/#387, panel Gate-4 #1 defect): on an NHR pole (honest-fail / NEEDS_HUMAN_REVIEW /
+// INCOMPLETE / OUT_OF_SCOPE) the §05 empty state must NOT claim "clean pass — proceed" — that positive frame directly
+// contradicts the "Human review" masthead over an audit the engine could not clear. When `nhr.on`, render an honest,
+// pole-accurate empty state (engine reason verbatim + finding count, pointer to §07) instead. Flag-gated at the call
+// site (AUDIT_REPORT_NHR_COHERENCE); OFF ⇒ the scored "clean pass" copy renders byte-identical (Rule 61). Design owns
+// the final visual — this is the coherence LOGIC, routed to Design for the 1:1 stamp.
+function setRisksEmptyState(html: string, nhr?: { reason: string; count: number }): string {
+  const innerHtml = nhr
+    ? `
+                <div style="padding:20px 18px;border:1px dashed var(--line);border-radius:13px;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;line-height:1.6">
+                  <b style="color:var(--ink-2);font-weight:700">Human review needed — not a clean pass.</b><br>${escapeHtml(nhr.reason)}${nhr.count > 0 ? `<br>FARaudit produced ${nhr.count} finding${nhr.count === 1 ? "" : "s"} to reconcile before any bid decision — see §​07 below.` : ""}
+                </div>
+              `
+    : `
                 <div style="padding:20px 18px;border:1px dashed var(--line);border-radius:13px;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;line-height:1.6">
                   <b style="color:var(--ink-2);font-weight:700">No risks surfaced.</b><br>FARaudit ran a clean pass against this notice — proceed with the standard pre-quote checklist.
                 </div>
@@ -2701,7 +2717,9 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     const blocks = vm.risks.map((r, i) => renderRisk(r, i === 0)).join("\n                ");
     html = replaceFieldInner(html, "risks", `\n                ${blocks}\n              `);
   } else {
-    html = setRisksEmptyState(html);
+    // Root-C coherence: an NHR pole with an empty risk register must not render "clean pass — proceed" (that
+    // contradicts the "Human review" masthead). Flag-gated + is_nhr ⇒ honest state; else byte-identical (Rule 61).
+    html = setRisksEmptyState(html, NHR_COHERENCE_ON && vm.is_nhr ? { reason: vm.nhr_reason, count: vm.nhr_findings_count } : undefined);
   }
   html = setSectionPill(html, "sec-risks", vm.is_metadata_only ? "" : vm.risk_pill_text);
 
