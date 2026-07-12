@@ -110,6 +110,13 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bdisqualif(?:y|ied|ies|ication)\\b", "\\bexcluded\\s+from\\s+(?:award|consideration)\\b",
   "\\b(?:removed|eliminated|precluded)\\s+from\\s+(?:award|consideration|(?:the\\s+)?competition)\\b",
   "\\bnot\\s+be\\s+(?:selected|awarded)\\b", "\\bpassed\\s+over\\s+for\\s+award\\b", "\\bineligible\\s+for\\s+award\\b",
+  // GATE-2 HARDENING (D-1b clarification member, card #457) — the two most common bare §M rejection verbs the guard
+  // missed. DISQUALIFIER_RE already catches "will not be considered"/"deemed non-responsive", but a compound sentence
+  // whose ONLY bar token is bare "unacceptable" or "rejected" (e.g. "if the offeror believes the requirements contain
+  // an omission, its proposal will be deemed unacceptable") matched CLARIFICATION_RIGHTS_RE and laundered to boilerplate.
+  // These verbs never appear in a benign clarification-right/protest/debrief sentence, so adding them can only route a
+  // real-bar compound to the safe ambiguous→NHR pole — never re-block a genuine no-op.
+  "\\bunacceptable\\b", "\\breject(?:ed|ion|s|ing)?\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is

@@ -121,6 +121,12 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("Offerors must be a certified 8(a) participant; if an offeror believes these instructions contain an error or omission, it should notify the Contracting Officer.") !== "boilerplate");
   ok("compound: clearance BAR + error-notification → NOT laundered",
     importanceOf("Only offerors holding an active facility clearance are eligible; any omission or discrepancy should be reported to the Contracting Officer.") !== "boilerplate");
+  // GATE-2 HARDENING (card #457) — a clarification-rights frame whose ONLY bar token is a bare §M rejection verb
+  // ('unacceptable' / 'rejected') must NOT launder; these verbs were added to BAR_SIGNAL_RE.
+  ok("compound: believes-omission + sole bar token 'unacceptable' → NOT laundered",
+    importanceOf("If the offeror believes the requirements contain an omission, its proposal will be deemed unacceptable.") !== "boilerplate");
+  ok("compound: believes-error + sole bar token 'rejected' → NOT laundered",
+    importanceOf("Should an offeror believe these instructions contain an error, and fail to raise it, the proposal will be rejected.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
