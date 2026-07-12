@@ -1344,13 +1344,14 @@ function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, 
   if (f.curableInWindow === true) return false;                    // curable in-window -> a gate to clear, not a blocker (branch-5b parity)
   if (firmStatus(f, profile, source) === "satisfies") return false; // the firm PROVES it holds the bar -> not a blocker
   const isSiteVisit = SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation
-  // STALENESS GUARD (card #453 · additive to PR #201) — a SITE-VISIT bar whose SOURCE shows the visit already
-  // concluded/held is STALE: the finding may read as a live "must attend to be eligible" gate while a later
-  // SAM-body UPDATE says it closed (64b79916). Do NOT auto-promote a stale site-visit gate to P0 — the eligibility
-  // question (did the firm attend the now-closed visit?) belongs in human review, not a false "go attend it" P0.
-  // Keyed off SOURCE only (per the red-team ruling): a finding that ACCURATELY states "concluded … cannot
-  // retroactively participate" with NO separate source marker still promotes (PR #201 finding-accurate case).
-  if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source)) return false;
+  // STALENESS GUARD (card #453/#454 · additive to PR #201) — a SITE-VISIT bar whose SOURCE shows the visit already
+  // concluded/held is only auto-suppressed when the FINDING is MIS-FRAMED (reads as a live "must attend to be
+  // eligible" gate with no concluded frame in its own text). A CORRECTLY-FRAMED finding — the notice-body emitter's
+  // conditional-concluded finding whose own requirement/excerpt carries the concluded marker — DOES promote (its
+  // own copy supplies the "bars award unless attendance confirmed" #432 framing). Mis-framed live-sounding lens
+  // findings (concluded only in the source) stay NOT-promoted — routed to human review, never a false "go attend" P0.
+  const findingCarriesConcludedFrame = SITE_VISIT_CONCLUDED_RE.test(f.requirement ?? "") || SITE_VISIT_CONCLUDED_RE.test(f.excerpt ?? "");
+  if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source) && !findingCarriesConcludedFrame) return false;
   if (f.kind === "eligibility_bar") return true;
   return isSiteVisit; // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
 }

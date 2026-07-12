@@ -519,6 +519,12 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
 // (gated on noticeBodyBarUngrounded at the call site) ⇒ byte-identical (Rule 61).
 const NOTICE_SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
 const NOTICE_CLEARANCE_RE = /\bclearance\b|\bclassified\b|\btop[\s-]?secret\b|\bts[\s/]?sci\b|\bsecret\b/i;
+// COMPLETION (Brain card #453/#454) — a SAM-body / UPDATE-line past-marker that the site visit already HELD /
+// CONCLUDED / CLOSED. Mirrors SITE_VISIT_CONCLUDED_RE in audit-decide (the B3-severity staleness guard). When
+// present alongside a mandatory-attendance bar, the emitter frames the finding as CONDITIONAL-CONCLUDED (not a
+// live "plan to attend" gate) so the guard promotes it per the #432 register.
+const NOTICE_SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[^.\n]{0,80}\b(?:was\s+held|has\s+been\s+held|(?:was|is|has\s+been)\s+(?:concluded|closed|conducted)|already\s+(?:past|held|occurred|concluded)|(?:is|are)\s+now\s+(?:closed|concluded|past))\b|\b(?:held\s+and\s+(?:concluded|closed)|now\s+closed|has\s+concluded)\b[^.\n]{0,60}\bsite[\s-]?(?:visit|tour)\b/i;
+const NOTICE_EVENT_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/i;
 export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
   const noticeText = (noticeBodyText && noticeBodyText.trim())
     ? noticeBodyText
@@ -555,15 +561,32 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     if (!excerpt || seenExcerpt.has(excerpt)) continue;            // identical bar sentence at another position → one finding
     seenExcerpt.add(excerpt);
     emitted.push([ss, se]);
-    const requirement = NOTICE_SITE_VISIT_RE.test(excerpt)
-      ? `Mandatory site visit / pre-proposal conference stated in the SAM notice body — attendance gates eligibility to propose; verify and plan to attend: "${excerpt}"`
-      : NOTICE_CLEARANCE_RE.test(excerpt)
-      ? `Security/facility clearance stated as an eligibility bar in the SAM notice body — only cleared offerors are eligible; verify the firm holds it: "${excerpt}"`
-      : `Eligibility bar stated in the SAM notice body — verify the firm meets it before bidding: "${excerpt}"`;
+    // COMPLETION (Brain card #453/#454) — for a mandatory-attendance SITE-VISIT bar, if the notice body / UPDATE
+    // lines carry a concluded/held/closed past-marker, emit the finding with the TEMPORAL FRAME (event date ·
+    // concluded · attendance non-retroactive) and an excerpt that spans BOTH the bar and the concluded marker (a
+    // single verbatim span so grounding holds). That correctly-framed finding is PROMOTED as a conditional-concluded
+    // show-stopper ("bars award unless attendance confirmed", #432 register); a mis-framed live-sounding lens finding
+    // (concluded only in source) stays NOT-promoted by the built guard. Live/upcoming visit → the live-gate frame.
+    let requirement: string;
+    let outExcerpt = excerpt;
+    const concludedM = NOTICE_SITE_VISIT_CONCLUDED_RE.exec(nNotice);
+    if (NOTICE_SITE_VISIT_RE.test(excerpt) && concludedM && concludedM.index != null) {
+      const [cs, ce] = sentenceSpan(concludedM.index);
+      const concludedSentence = nNotice.slice(cs, ce).trim();
+      const eventDate = (NOTICE_EVENT_DATE_RE.exec(concludedSentence) || [])[0] || "";
+      outExcerpt = nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 400); // one verbatim span covering both
+      requirement = `Mandatory site visit stated in the SAM notice body${eventDate ? ` was held/concluded ${eventDate}` : " has concluded"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
+    } else if (NOTICE_SITE_VISIT_RE.test(excerpt)) {
+      requirement = `Mandatory site visit / pre-proposal conference stated in the SAM notice body — attendance gates eligibility to propose; verify and plan to attend: "${excerpt}"`;
+    } else if (NOTICE_CLEARANCE_RE.test(excerpt)) {
+      requirement = `Security/facility clearance stated as an eligibility bar in the SAM notice body — only cleared offerors are eligible; verify the firm holds it: "${excerpt}"`;
+    } else {
+      requirement = `Eligibility bar stated in the SAM notice body — verify the firm meets it before bidding: "${excerpt}"`;
+    }
     out.push({
       requirement,
       citation: NOTICE_BODY_DOC_NAME,
-      excerpt,
+      excerpt: outExcerpt,
       kind: "eligibility_bar",
       controllability: "bidder_cannot_move",
       curableInWindow: false,

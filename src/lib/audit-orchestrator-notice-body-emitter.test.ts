@@ -114,5 +114,48 @@ console.log("\n── 5 · FLAG-OFF byte-identical (Rule 61) ──");
   assert(emitNoticeBodyEligBarFindings(mk("Combined synopsis for commercial widgets. Quotes due 30 days after posting."), []).length === 0, "no-bar notice → emitter no-op");
 }
 
+// ── 6 · REGRESSION PAIR (Brain card #453/#454) — concluded vs upcoming mandatory site-visit framing ──
+console.log("\n── 6 · REGRESSION PAIR: concluded → conditional-concluded (no live-gate); upcoming → live gate ──");
+{
+  // (a) CONCLUDED mandatory visit — the notice/UPDATE carries a held/concluded past-marker.
+  const concludedNotice = "A mandatory pre-proposal site visit was held and concluded on May 28, 2026. Only offerors who attended the site visit are eligible to submit a proposal; attendance cannot be completed after the fact.";
+  const emittedC = emitNoticeBodyEligBarFindings(mk(concludedNotice), []);
+  assert(emittedC.length === 1, "(a) concluded: exactly one finding emitted");
+  const fc = emittedC[0];
+  assert(/held\/concluded|has concluded/i.test(fc.requirement) && /bars award unless/i.test(fc.requirement),
+    "(a) concluded: finding carries the TEMPORAL FRAME + conditional-concluded copy ('bars award unless … confirmed')");
+  assert(!/plan to attend/i.test(fc.requirement), "(a) concluded: ZERO live-gate language ('plan to attend' absent)");
+  assert(/may 28,? 2026/i.test(fc.requirement), "(a) concluded: the event date is surfaced (from the normalized notice)");
+  // excerpt spans BOTH the bar and the concluded marker (one verbatim span), and grounds by indexOf.
+  const nC = mk(concludedNotice).replace(/\s+/g, " ").trim().toLowerCase();
+  assert(nC.includes((fc.excerpt || "").toLowerCase()), "(a) concluded: combined excerpt is a verbatim substring (grounds)");
+  assert(/concluded/i.test(fc.excerpt || "") && /site visit/i.test(fc.excerpt || ""), "(a) concluded: excerpt spans both the bar and the concluded marker");
+  // END-TO-END: the correctly-framed finding PROMOTES (guard sees the concluded frame in the finding itself).
+  const dC = deriveVerdict(base({ findings: emittedC, noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: mk(concludedNotice) }));
+  assert(dC.verdict === "NEEDS_HUMAN_REVIEW", "(a) concluded: verdict stays NHR");
+  assert(inSS(dC.showStoppers, fc.requirement), "(a) concluded: conditional-concluded finding PROMOTED to a show-stopper (correctly framed)");
+
+  // (b) UPCOMING mandatory visit — no concluded marker → live-gate framing, promoted with the date.
+  const emittedU = emitNoticeBodyEligBarFindings(mk(POS.siteVisit), []);
+  const fu = emittedU[0];
+  assert(/plan to attend/i.test(fu.requirement), "(b) upcoming: LIVE-gate framing ('plan to attend')");
+  assert(!/bars award unless/i.test(fu.requirement), "(b) upcoming: NOT conditional-concluded copy");
+  const dU = deriveVerdict(base({ findings: emittedU, noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: mk(POS.siteVisit) }));
+  assert(inSS(dU.showStoppers, fu.requirement), "(b) upcoming: live mandatory site-visit bar PROMOTED (no concluded marker in source)");
+}
+
+// ── 7 · MIS-FRAMED lens finding (live text + concluded source) STAYS not-promoted (the built guard, unchanged) ──
+console.log("\n── 7 · MIS-FRAMED: live-sounding lens finding + concluded SOURCE → not promoted (guard unchanged) ──");
+{
+  const concludedNotice = "A mandatory site visit was held and concluded on May 28, 2026.";
+  const misFramed: TypedFinding = {
+    requirement: "You must attend the initial site visit to be considered eligible to propose.",
+    excerpt: "you must attend the initial site visit to be considered eligible to propose.",
+    citation: "SAM Notice Body", kind: "submission", controllability: "no_one_can_move", grounded: true, lens: "ex_ko",
+  };
+  const d = deriveVerdict(base({ findings: [misFramed], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: mk(concludedNotice) }));
+  assert(!inSS(d.showStoppers, misFramed.requirement), "mis-framed live-sounding finding (concluded only in source) NOT promoted — routed to human review");
+}
+
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
