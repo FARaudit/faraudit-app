@@ -156,6 +156,30 @@ const FOREIGN_TAX_REP_RE = new RegExp([
   "excise\\s+tax[^.]{0,40}exemption",
 ].join("|"), "i");
 
+// ARC D-1 (Brain card #445/#448, flag AUDIT_PRECEDENCE_ALLOWLIST, default-OFF) — DOCUMENT ORDER-OF-PRECEDENCE
+// boilerplate (FAR 52.215-8 "Order of Precedence—Uniform Contract Format" / 52.214-29 / a MAC-BOA ITO-vs-BOA
+// precedence clause). This is pure conflict-resolution METHODOLOGY between government instruments — it imposes
+// ZERO offeror eligibility or award precondition, so it can never disqualify anyone. Convergence run 64b79916
+// (FA813726R0033, /panel graded F, red-team-adjudicated) drove a FALSE NHR on the verbatim §L sentence "This ITO
+// shall take precedence should there be any conflict between the Basic Ordering Agreement (BOA) and this ITO."
+// mis-typed ambiguous → disqualifierUncovered → NHR cap (the exact same GATE_V2 seam as the §K protest/debrief/
+// tax members). It belongs on the offeror-rights / no-op family as a DATA ENTRY — never a new arc branch.
+//
+// SCOPING (mirror the family discipline): DOC_PRECEDENCE_RE keeps ONLY unambiguous document-order-of-precedence
+// frames — the clause numbers, the "order of precedence" term, and a precedence/govern/control verb TIED to a
+// document conflict/inconsistency ("…take precedence should there be any conflict between…"). A bare "takes
+// precedence" with no conflict/document frame is NOT matched. The SHARED negative guard (!BAR_SIGNAL_RE, applied
+// once in importanceOf) keeps any COMPOUND sentence that pairs a real eligibility bar with precedence wording
+// (e.g. "…the 8(a) set-aside eligibility requirements shall take precedence…") on the safe ambiguous→NHR pole.
+// Flag-OFF ⇒ not consulted ⇒ byte-identical.
+const PRECEDENCE_ALLOWLIST_ENABLED = process.env.AUDIT_PRECEDENCE_ALLOWLIST === "true";
+const DOC_PRECEDENCE_RE = new RegExp([
+  "\\border\\s+of\\s+precedence\\b",                                                     // 52.215-8 / 52.214-29 title + concept
+  "\\b52\\.215-8\\b", "\\b52\\.214-29\\b",                                               // the FAR order-of-precedence clauses
+  "(?:shall|will|to)\\s+take\\s+precedence[^.]{0,80}(?:conflict|inconsistenc|discrepanc|between)", // "…take precedence…conflict/between…"
+  "(?:conflict|inconsistenc|discrepanc)[^.]{0,80}(?:shall|will)\\s+(?:take\\s+precedence|govern|control|prevail)", // "…conflict…shall govern/prevail"
+].join("|"), "i");
+
 // The OFFEROR-RIGHTS / NO-OP-REPRESENTATION BOILERPLATE family (Brain card 435 D1) — procedural offeror rights or
 // no-op self-representations that impose ZERO eligibility/award precondition. DATA-DRIVEN: add a member as an ENTRY
 // here, NEVER a new arc branch. Each member carries its own enable flag; the SHARED negative guard (!BAR_SIGNAL_RE,
@@ -164,11 +188,12 @@ const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
   { name: "protest/disputes (52.233)", re: PROTEST_DISPUTES_RE, enabled: PROTEST_ALLOWLIST_ENABLED },
   { name: "debrief/notification (15.50x)", re: DEBRIEF_NOTIFY_RE, enabled: DEBRIEF_ALLOWLIST_ENABLED },
   { name: "foreign-procurement-tax rep (52.229-11)", re: FOREIGN_TAX_REP_RE, enabled: NOOP_REP_ALLOWLIST_ENABLED },
+  { name: "document order-of-precedence (52.215-8 / ITO-BOA)", re: DOC_PRECEDENCE_RE, enabled: PRECEDENCE_ALLOWLIST_ENABLED },
 ];
 
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
  *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
- *  family (protest + debriefing + foreign-procurement-tax) must never silently narrow. */
+ *  family (protest + debriefing + foreign-procurement-tax + document order-of-precedence) must never silently narrow. */
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";

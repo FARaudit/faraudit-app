@@ -12,6 +12,7 @@ export {}; // force module scope (this file uses only a dynamic import, which wo
 process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST = "true";
 process.env.AUDIT_DEBRIEF_ALLOWLIST = "true";
 process.env.AUDIT_NOOP_REP_ALLOWLIST = "true"; // ARC D1 (card 435) — foreign-procurement-tax rep family member
+process.env.AUDIT_PRECEDENCE_ALLOWLIST = "true"; // ARC D-1 (card 445/448) — document order-of-precedence family member
 
 let pass = 0, fail = 0;
 function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; console.log(`  ✗ ${label}`); } }
@@ -90,6 +91,22 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("An offeror without a facility security officer is disqualified, and certifies no exemption from the excise tax.") !== "boilerplate");
   ok("compound: excluded-from-award + excise election → NOT laundered",
     importanceOf("Non-domestic manufacturers are excluded from award and must claim no exemption from the excise tax.") !== "boilerplate");
+
+  // ── ARC D-1 — document order-of-precedence (52.215-8 / ITO-BOA) → boilerplate (the 64b79916 §L false-NHR driver) ──
+  ok("64b79916 verbatim §L ITO/BOA precedence → boilerplate (not disqualifier)",
+    importanceOf("This ITO shall take precedence should there be any conflict between the Basic Ordering Agreement (BOA) and this ITO.") === "boilerplate");
+  ok("FAR 52.215-8 Order of Precedence—UCF → boilerplate",
+    importanceOf("Any inconsistency in this solicitation shall be resolved by the order of precedence at FAR 52.215-8.") === "boilerplate");
+  ok("generic conflict→govern precedence frame → boilerplate",
+    importanceOf("In the event of a conflict between the schedule and the specifications, the schedule shall govern.") === "boilerplate");
+  // negative guard for the new member: a real eligibility bar phrased with precedence wording is NOT laundered
+  ok("compound: 8(a) set-aside eligibility BAR in a precedence frame → NOT laundered (not boilerplate)",
+    importanceOf("In the event of a conflict, the 8(a) set-aside eligibility requirements shall take precedence over all other documents.") !== "boilerplate");
+  ok("compound: clearance BAR in a precedence frame → NOT laundered",
+    importanceOf("Should there be any conflict between documents, the requirement that offerors hold a facility clearance shall control.") !== "boilerplate");
+  // scoping guard: a bare non-document "precedence" statement with no conflict/order-of-precedence frame is NOT matched
+  ok("bare 'takes precedence' with no conflict/document frame → NOT laundered by this member",
+    importanceOf("The awardee's schedule takes precedence in day-to-day site coordination.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
