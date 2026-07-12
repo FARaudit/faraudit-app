@@ -40,8 +40,10 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("The offeror represents that it has claimed no exemption [Offeror must select one] from the excise tax.") === "boilerplate");
   ok("52.229-11 Tax on Certain Foreign Procurements → boilerplate",
     importanceOf("The offeror shall complete the representation at FAR 52.229-11 Tax on Certain Foreign Procurements.") === "boilerplate");
-  ok("foreign-person representation → boilerplate",
-    importanceOf("The offeror represents that it is not a foreign person under section 5000C.") === "boilerplate");
+  // A "foreign person" STATUS sentence now routes to the SAFE ambiguous→NHR pole (BAR_SIGNAL_RE "foreign person" veto,
+  // Gate-2 re-review) — over-tag = recoverable NHR. The FA8137 target (the excise-tax ELECTION above) still launders.
+  ok("foreign-person status mention → NOT laundered (safe NHR pole, not boilerplate)",
+    importanceOf("The offeror represents that it is not a foreign person under section 5000C.") !== "boilerplate");
   ok("IRS W-14 exemption election → boilerplate",
     importanceOf("A full or partial exemption from the excise tax may be claimed on IRS Form W-14.") === "boilerplate");
   // negative guard for the new member: a real bar in the same sentence as an excise-tax mention is NOT laundered
@@ -62,6 +64,15 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   // family path not BOILERPLATE_RE) must NOT be laundered by a bare W-14 token (contracts-attorney Gate-2 re-review).
   ok("52.229-11(e)(2) foreign-offeror W-14 withholding duty → NOT laundered",
     importanceOf("Non-exempt foreign offerors are required to file IRS Form W-14 at the time of offer and are subject to the two-percent withholding.") !== "boilerplate");
+  // 52.229-11(b)/(e)(2) foreign-person tax-REMITTANCE DUTY class (contracts-attorney Gate-2 re-review #2) — the kept
+  // "5000C"/title tokens CAN match these, so the BAR_SIGNAL_RE duty vocabulary (foreign person / remit / withhold /
+  // two-percent) must veto ALL of them. These are the three verbatim residuals the lens surfaced.
+  ok("5000C remit-2%-prior-to-award duty → NOT laundered",
+    importanceOf("Offerors that are foreign persons must remit the 2 percent tax imposed by section 5000C prior to award.") !== "boilerplate");
+  ok("5000C two-percent withholding duty → NOT laundered",
+    importanceOf("A foreign person is subject to the section 5000C two-percent withholding on this award.") !== "boilerplate");
+  ok("title-framed foreign-offeror remit duty → NOT laundered",
+    importanceOf("Under Tax on Certain Foreign Procurements, a non-exempt foreign offeror must remit the two-percent tax.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",

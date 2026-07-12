@@ -85,14 +85,19 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
   "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
   "\\bsize\\s+standard\\b", "\\bpast\\s+performance\\b", "\\bbond(?:ing|ed)?\\b", "\\baccounting\\s+system\\b",
-  // GATE-2 HARDENING (PR #202, foreign-tax member) — foreign-ownership / export-control / country-of-origin / citizenship
-  // bar vocabulary the ORIGINAL guard missed. These are REAL eligibility/access bars that DO NOT appear in the benign
-  // 52.229-11 tax rep ("foreign person" / "5000C" / "excise tax"), so adding them here cannot re-block that rep. Closes
-  // the ITAR/FOCI "no foreign person shall have access to classified information" laundering vector the two Gate-2 lenses
-  // (contracts-attorney SOUND-BUT-OVERBROAD + adversarial-redteam F) both surfaced against the broad "foreign person" token.
+  // GATE-2 HARDENING (PR #202, foreign-tax member) — bar/access vocabulary the ORIGINAL guard missed. Two Gate-2 lenses
+  // (contracts-attorney + adversarial-redteam) surfaced three collision classes against the 52.229-11 tax tokens:
+  //  (a) ITAR/FOCI access + country-of-origin bars ("no foreign person shall have access…", FOCI, ITAR, TAA, Buy American);
+  //  (b) a foreign-person TAX-REMITTANCE DUTY (FAR 52.229-11(b)/(e)(2)) — "foreign persons must remit the 2 percent tax…",
+  //      "…subject to the section 5000C two-percent withholding" — a REAL at-award duty on a foreign offeror, NOT a no-op.
+  // The duty verbs (remit / withhold / two-percent) + a bare "foreign person" are the CATEGORICAL closer for class (b):
+  // they veto laundering for ANY foreign-person tax duty regardless of person/offeror/entity phrasing. They cost only the
+  // benign "is not a foreign person" self-rep → the SAFE ambiguous→NHR pole; the PRIMARY FA8137 target (the
+  // "…exemption…excise tax…" ELECTION, which carries none of these tokens) still launders correctly.
   "\\bforeign\\s+(?:national|ownership|owned|control|influence)\\b", "\\bfoci\\b", "\\bnispom\\b",
   "\\bitar\\b", "\\bexport[\\s-]?control(?:led|s)?\\b", "\\bshall\\s+have\\s+access\\b",
   "\\bcitizenship\\b", "\\bu\\.?s\\.?\\s+citizen", "\\btrade\\s+agreements?\\s+act\\b", "\\bbuy\\s+american\\b",
+  "\\bforeign\\s+person", "\\bremit(?:s|ted|tance)?\\b", "\\bwithhold(?:ing|s|holds)?\\b", "\\btwo[\\s-]?percent\\b", "\\b2\\s*percent\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
@@ -132,9 +137,12 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
 //      excise tax…" election token — so it is dropped rather than narrowed (a "must submit W-14" sentence is
 //      independently boilerplate via BOILERPLATE_RE submission mechanics; that is pre-existing and out of scope).
 // The 52.229-11 rep still matches via the clause number, the "tax on certain foreign procurements" title, "section
-// 5000C"/"5000C", and the "…exemption…excise tax…" election phrasing — all tax-specific, none collide with a bar.
-// Dropping the two broad tokens only routes a bare foreign-person / bare-W-14 sentence to the SAFE ambiguous→NHR pole
-// (over-tag = recoverable review; under-tag = lost contract).
+// 5000C"/"5000C", and the "…exemption…excise tax…" election phrasing. The kept "5000C"/title tokens CAN appear in a
+// real foreign-person tax-DUTY sentence ("foreign persons must remit the 2 percent tax imposed by section 5000C") —
+// but that whole class is now vetoed upstream by the BAR_SIGNAL_RE duty vocabulary (foreign person / remit / withhold
+// / two-percent, added in the same PR), so it never reaches the family check. Dropping the two broad tokens
+// (foreign-person / W-14) routes those bare sentences to the SAFE ambiguous→NHR pole (over-tag = recoverable review;
+// under-tag = lost contract).
 const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
 const FOREIGN_TAX_REP_RE = new RegExp([
   "\\b52\\.229-1[12]\\b",                                         // Tax on Certain Foreign Procurements (Notice / clause)
