@@ -1313,6 +1313,41 @@ export function disposeFinding(f: TypedFinding): Disposition {
   return "disqualifying"; // bidder_cannot_move
 }
 
+// ── B3-SEVERITY (Brain card 429 · flag AUDIT_SITEVISIT_SEVERITY_FLOOR, default-OFF) ───────────────────
+// FAIL-TOWARD-DISQUALIFIER on SEVERITY/BAND (not on the verdict). A COMPLETED / mandatory site-visit — or any
+// surfaced hard eligibility — disqualifier that the NOTICE-BODY ELIGIBILITY FLOOR (B3-detection) routed to
+// NEEDS_HUMAN_REVIEW must render BID-DECIDING, never a P2 "advisory". Mechanism: the V4 report's show-stopper band
+// is sourced EXCLUSIVELY from persisted showStoppers[] (Brain card-293); the notice-body-floor branch returns
+// showStoppers=[] (its driver bar is ungrounded), so a SEPARATE grounded disqualifier sitting in dispositions[]
+// falls through v4-report severityOf() into the P2 "Advisories" band — exactly what buried finding[20] on 24f0b29e.
+//
+// SCOPED IN-BRANCH (ultracode Gate-2 — the ONLY coherent pole). The promotion is applied INSIDE the
+// noticeBodyBarUngrounded NHR branch ALONE. Deliberate: every OTHER NHR pole is either already bar-carrying
+// (nonCurable / unmarkedUniversalClaim / manifest-incomplete already pass the bar as showStoppers -> it renders
+// bid-deciding without this floor) OR a META-AMBIGUITY pole where a promotion would be a FALSE committal on an NHR
+// report (setAsideConflict = eligible pool ambiguous; primaryIndeterminate = base doc not anchored; unreadEvidence
+// = the bar may be waived by an unread attachment; verifier-unsound / conflict = findings untrustworthy). A
+// post-decision floor cannot tell those poles apart (all return showStoppers=[] before the verifier/conflict
+// checks) -> the promotion lives in the branch that OWNS the pole. The customer render frames an NHR-pole
+// show-stopper as a CONDITIONAL bar (Brain/Design ruling card 432), never committal "blocks award" copy.
+// OVER-FIRE GUARDS (isSiteVisitOrEligBar): disposition===disqualifying (a benign site-visit-ENCOURAGED gate is
+// bidder_controls -> excluded) · NOT curableInWindow===true (curable = a gate to clear, branch-5b parity) · NOT
+// firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
+// (byte-identical, Rule 61). Pure -> gate-tested.
+const SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
+function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, source?: string): boolean {
+  if (f.disposition !== "disqualifying") return false;             // over-fire guard: a real bar, never a gate-to-clear
+  if (f.curableInWindow === true) return false;                    // curable in-window -> a gate to clear, not a blocker (branch-5b parity)
+  if (firmStatus(f, profile, source) === "satisfies") return false; // the firm PROVES it holds the bar -> not a blocker
+  if (f.kind === "eligibility_bar") return true;
+  return SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
+}
+/** The site-visit/eligibility disqualifiers to SURFACE as bid-deciding on the notice-body NHR pole, floored to P0.
+ *  Applied ONLY inside that branch (see doctrine above) — never on meta-ambiguity poles. Pure. */
+function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderProfile | null, source?: string): DecidedFinding[] {
+  return dispositions.filter((f) => isSiteVisitOrEligBar(f, profile, source)).map((f) => ({ ...f, severity: "P0" as const }));
+}
+
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
  *    "satisfies" — profile PROVES the firm holds the required qualification → the bar is cleared (a fact).
@@ -1593,7 +1628,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     wave a real notice-body bar through (the coverageComplete veto is bypassed whenever GATE_V2 + coverageV2 are on).
   //     Fail-toward-disqualifier → NEEDS_HUMAN_REVIEW, never a committal. Absent/false ⇒ byte-identical (flag-OFF).
   if (inp.noticeBodyBarUngrounded)
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions, []);
+    // B3-SEVERITY (card 429): on THIS pole (and only this one) surface any grounded site-visit/eligibility
+    // disqualifier in dispositions[] as a bid-deciding showStopper (P0) instead of a P2 advisory — flag-gated;
+    // flag-OFF ⇒ passes [] exactly as before (byte-identical). See doctrine at siteVisitEligStoppers.
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions,
+      inp.siteVisitSeverityFloor ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : []);
 
   // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
   //     engine could not confirm it read in full (unfetched / scanned-no-text / mid-doc truncated / over-budget
