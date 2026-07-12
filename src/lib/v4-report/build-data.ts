@@ -229,6 +229,22 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
   if (!r.supersession || !r.controlling) return prior;               // no supersession evidence → SAM stays authoritative
   const ctrlMs = Date.parse(r.controlling.date);
   if (Number.isNaN(ctrlMs)) return prior;
+  // SAM-FLOOR GUARD (D-3, card #444/#448 red-team adjudication) — SAM's responseDeadline is the FLOOR. A controlling
+  // doc date may WIN the masthead ONLY when it is strictly LATER than SAM (a genuine reset/extension) or SAM is
+  // absent/unparseable. A doc date EARLIER than SAM is a STALE original (or a mis-parsed/OCR'd amendment) and must
+  // NEVER beat SAM — 64b79916 would have demoted SAM 18 Jul under a stale doc 06-24. When supersession evidence
+  // exists but no doc date clears the SAM floor, the genuine reset likely lives in an image-only amendment
+  // attachment the engine cannot read — so KEEP SAM's date and flag "deadline unreconciled — verify the amendment",
+  // never a confident wrong date. (Rule 17: this masthead behavior must hold on BOTH worker + Vercel.)
+  const samKnown = !Number.isNaN(sam);
+  const DAY = 24 * 60 * 60 * 1000;
+  if (samKnown && sam - ctrlMs > DAY) {
+    return {
+      value: fmtDeadline(responseDeadline), // SAM keeps the masthead (floor) — an earlier doc date never wins
+      sub: `⚠ Deadline unreconciled — an amendment may reset the offer-due date; verify against the latest amendment (SAM metadata ${fmtDeadline(responseDeadline)} shown; document states ${fmtDeadline(r.controlling.date)}).`,
+    };
+  }
+  if (samKnown && Math.abs(sam - ctrlMs) <= DAY) return prior;        // doc controlling ≈ SAM (agree) → SAM shown cleanly
   const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > 24 * 60 * 60 * 1000;
   // Controlling doc date WINS the masthead; SAM (if it differs) + every demoted/superseded date drop to a labeled note.
   const isDead = (l: string) => /superseded|prior|previous|cancell?ed|replaced|void/i.test(l);
