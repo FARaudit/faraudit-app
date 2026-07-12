@@ -314,6 +314,8 @@ export async function executeAgenticPrimary(
   const groundingSource = docs.map((d) => d.text).join("\n\n");
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
+    noticeBodyText: noticeBody?.text,   // B3 (card 421 Fork-3) — delimiter-independent notice-body eligibility floor
+
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
     // Layer-2 (Brain card 262 — content-aware completeness): the SAM notice type scopes the §L/§M requirement to
     // solicitation-type buys, and form_identified corroborates whether the §L/§M-bearing primary was ingested.
