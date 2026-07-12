@@ -476,6 +476,8 @@ export interface AuditViewModel {
   // suppressed/stripped regardless of is_unscored or per-section counts.
   report_has_real_content: boolean;
   is_nhr: boolean;                  // NHR pole (honest-fail/NEEDS_HUMAN_REVIEW/INCOMPLETE/OUT_OF_SCOPE)
+  // Root-C LEAK 2 (card #423): disqualifying findings that MUST surface on the NHR gate card (never "0/0 cleared").
+  show_stoppers: Array<{ condition: string; citation: string }>;
   nhr_reason: string;               // engine reason string, verbatim — the Human-review slate tag
   nhr_findings_count: number;       // findings produced despite no score — "see the N findings below"
   nhr_word: string;                 // pole-accurate masthead word (may carry <br>): Human review / Incomplete / Out of scope
@@ -2907,6 +2909,17 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     sanitizeDisplayText(String(_v3reason.reason ?? "")) ||
     "A person needs to reconcile the findings before this is a bid / no-bid call.";
   const nhrFindingsCount = Array.isArray(_v3reason.findings) ? _v3reason.findings.length : 0;
+  // Root-C LEAK 2 (card #423): the blocking-condition set — findings the engine typed `disqualifying` (a hard bar no
+  // bidder can move). On the NHR pole these MUST surface on the .gate-card, never hide behind "0/0 cleared". Condition
+  // verbatim from the finding requirement (excerpt fallback); citation as-emitted. Derived from the real findings only.
+  const showStoppers: Array<{ condition: string; citation: string }> = (Array.isArray(_v3reason.findings) ? _v3reason.findings : [])
+    .map((f) => f as Record<string, unknown>)
+    .filter((f) => String(f.disposition ?? "") === "disqualifying")
+    .map((f) => ({
+      condition: sanitizeDisplayText(String(f.requirement ?? f.excerpt ?? "")),
+      citation: sanitizeDisplayText(String(f.citation ?? "")) || "—",
+    }))
+    .filter((s) => s.condition.length > 0);
   // Card-360 item 2 (Brain): the slate word + label must be POLE-ACCURATE, not a blanket "Human review".
   // W9126's pole is INCOMPLETE, not NEEDS_HUMAN_REVIEW — "Human review" would mislabel it. Word carries the
   // <br> for the 2-line masthead; the reason string underneath stays verbatim regardless.
@@ -3730,6 +3743,7 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     is_metadata_only: !!isMetadataOnly,
     report_has_real_content: !!reportHasRealContent,
     is_nhr: isNhr,
+    show_stoppers: showStoppers,
     nhr_reason: nhrReason,
     nhr_findings_count: nhrFindingsCount,
     nhr_word: nhrWord,

@@ -2847,6 +2847,21 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // not just DECISION_GATE verdicts.
   const gateModeActive = vm.verdict_mode === "gate" || vm.score_locked;
   html = renderGateConditions(html, vm.gate_conditions, gateModeActive);
+  // Root-C LEAK 2 (card #423) — a blocking condition can never hide. When the engine typed a `disqualifying`
+  // show-stopper, the "0/0 cleared / display:none" all-clear state is forbidden on the NHR pole: surface each
+  // condition on the .gate-card chassis as a neutral-review .nhr-block — verbatim + citation, routed to a human,
+  // never a red DECLINE. Flag-gated + is_nhr ⇒ else byte-identical (Rule 61); the block CSS ships inert until used.
+  if (NHR_COHERENCE_ON && vm.is_nhr && vm.show_stoppers.length > 0) {
+    const blocks = vm.show_stoppers.map((s) => `
+                <div class="nhr-block">
+                  <div class="nb-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4l7 3 9-3v10l-9 3-7-3"/></svg>Blocking condition · needs review</div>
+                  <p class="nb-cond">${escapeHtml(s.condition)}</p>
+                  <span class="nb-cite mono">${escapeHtml(s.citation)}</span>
+                  <div class="nb-frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5h.01"/></svg><span><b>This may disqualify the bid.</b> A reviewer must confirm (or obtain a waiver) before you rely on this opportunity.</span></div>
+                </div>`).join("\n");
+    html = replaceFieldInner(html, "gate_block", `\n                ${blocks}\n              `);
+    html = html.replace(/(<div class="gate-card" id="reco-gate")\s+style="display:none"/, "$1"); // reveal the card
+  }
   // Gap-collapse (Jun 11, Army live-DOM): when gate mode is visually active
   // but the engine emitted no gate_conditions[] (Brain doesn't emit the field
   // for score_locked yet), applyVerdictMode('gate') would reveal the masthead

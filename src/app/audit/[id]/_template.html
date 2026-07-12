@@ -718,6 +718,18 @@ button{font-family:inherit}
    [citation][chevron]), with the why/how-to-clear moved into a click-to-expand
    .g-detail. The checkbox still toggles .checked + the live 0/N count + pill. */
 .g-rows{display:flex;flex-direction:column;gap:8px}
+/* Root-C LEAK 2 (card #423) — NHR blocking-condition block: neutral-review register (graphite + one warm-amber accent), never the verdict-red klaxon. Rendered on the .gate-card chassis when show_stoppers exist on the NHR pole. */
+.nhr-block{border:1px solid var(--amber-200);border-left:4px solid var(--amber-600);border-radius:14px;background:linear-gradient(100deg,rgba(217,119,6,.06),var(--card) 58%);padding:17px 18px}
+.nhr-block + .nhr-block{margin-top:12px}
+[data-theme="dark"] .nhr-block{background:linear-gradient(100deg,rgba(217,119,6,.12),var(--card) 58%);border-color:rgba(217,119,6,.4)}
+.nhr-block .nb-flag{display:inline-flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--amber-800);margin-bottom:11px}
+[data-theme="dark"] .nhr-block .nb-flag{color:#fcd34d}
+.nhr-block .nb-flag svg{width:15px;height:15px}
+.nhr-block .nb-cond{font-size:15px;font-weight:800;color:var(--ink);line-height:1.32;letter-spacing:-.01em;margin:0 0 6px}
+.nhr-block .nb-cite{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--mute);margin-bottom:12px;display:inline-block}
+.nhr-block .nb-frame{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.nhr-block .nb-frame svg{width:15px;height:15px;color:#55657a;flex-shrink:0;margin-top:2px}
+.nhr-block .nb-frame b{color:var(--ink);font-weight:700}
 .g-row{border:1px solid var(--line);border-radius:11px;background:var(--card);overflow:hidden;transition:border-color .15s}
 .g-row.checked{border-color:var(--green-600)}
 .g-row-top{display:grid;grid-template-columns:20px auto 1fr auto;gap:13px;align-items:center;padding:12px 14px;cursor:pointer}
