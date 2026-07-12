@@ -27,6 +27,9 @@
   var STATE = {
     rows: [],
     filter: "all",
+    // Card 366 Phase-2 filter bar — AND'd across the chip + search. NAICS/set-aside
+    // omitted here on purpose; they wait for primary to add them to the SELECT.
+    f: { time: "all", agency: "all", type: "all", rec: "all", status: "all" },
     sortKey: "score",
     sortDir: -1,
     search: ""
@@ -46,6 +49,30 @@
     if (diffMs < 7 * 24 * 60 * 60 * 1000)  return { label: Math.round(diffMs / (24 * 60 * 60 * 1000)) + "d ago",ageHours: ageHours };
     if (diffMs < 30 * 24 * 60 * 60 * 1000) return { label: Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)) + "w ago", ageHours: ageHours };
     return { label: Math.round(diffMs / (30 * 24 * 60 * 60 * 1000)) + "mo ago", ageHours: ageHours };
+  }
+
+  // Card 366 Phase-1 — agency column. office_display is the buying-office code
+  // (FA4427 60 CONS LGC), NOT the agency; the real agency is the last '·'
+  // segment of the raw `agency` field. Normalize the common branches; else
+  // Title-Case the cleaned segment.
+  function normalizeAgency(raw) {
+    if (!raw) return "—";
+    var seg = String(raw).split("·").pop().trim();
+    var key = seg.replace(/,?\s*DEPARTMENT OF\s*$/i, "").replace(/^DEPARTMENT OF\s+/i, "").replace(/^DEPT OF\s+/i, "").trim();
+    var MAP = { "THE AIR FORCE": "Air Force", "AIR FORCE": "Air Force", "THE ARMY": "Army", "ARMY": "Army", "THE NAVY": "Navy", "NAVY": "Navy", "FEDERAL AVIATION ADMINISTRATION": "FAA", "VETERANS AFFAIRS": "VA" };
+    var hit = MAP[key.toUpperCase()];
+    if (hit) return hit;
+    return key.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) || "—";
+  }
+
+  // Card 366 Phase-1 — due (response_deadline) column, short readable date.
+  function dueLabel(iso) {
+    if (!iso) return "—";
+    var ms = new Date(iso).getTime();
+    if (isNaN(ms)) return "—";
+    var d = new Date(ms);
+    var MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return MO[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
   }
 
   function recommendationBucket(audit) {
@@ -86,15 +113,24 @@
     // report (gates supersede the scored tier; view-model renders "—").
     // Mirror that here so the ledger never shows a number the report hides.
     var gateMode = audit.verdict_type === "DECISION_GATE";
+    var dueTs = audit.response_deadline ? new Date(audit.response_deadline).getTime() : Infinity;
+    var st = statusBucket(audit);
+    // Card 366 Phase-2 needs-attention (LOGIC ONLY — visual is Design's): a failed
+    // audit OR a live audit whose response deadline has already passed.
+    var attn = (st === "failed") || (dueTs !== Infinity && dueTs < Date.now());
     return {
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
       title:  (audit.title || "Untitled").trim(),
+      agency: normalizeAgency(audit.agency),
       date:   ago.label,
       age:    ago.ageHours,
       type:   audit.document_type || "—",
+      due:    dueLabel(audit.response_deadline),
+      dueTs:  dueTs,
       score:  (!gateMode && typeof audit.compliance_score === "number") ? audit.compliance_score : null,
       rec:    recommendationBucket(audit),
-      status: statusBucket(audit)
+      status: st,
+      attn:   attn
     };
   }
 
@@ -122,11 +158,13 @@
       ? '<span class="rec ' + recClassStr + '">' + esc(a.rec) + '</span>'
       : '<span class="rec none">—</span>';
     var slug = encodeURIComponent(a.id);
-    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '">'
+    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '"' + (a.attn ? ' class="needs-attention"' : "") + '>'
       + '<td class="cell-id">' + esc(a.id) + '</td>'
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
-      + '<td class="cell-date">' + esc(a.date) + '</td>'
+      + '<td class="cell-agency">' + esc(a.agency) + '</td>'
       + '<td><span class="doctype">' + esc(a.type) + '</span></td>'
+      + '<td class="cell-due">' + esc(a.due) + '</td>'
+      + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td class="right">' + scoreCell + '</td>'
       + '<td>' + recCell + '</td>'
       + '<td><span class="status ' + esc(a.status) + '">' + esc(a.status) + '</span></td>'
@@ -137,8 +175,22 @@
   // ── Filter + sort + search pipeline ──
   function rowMatchesFilter(a) {
     if (STATE.filter === "all") return true;
-    if (STATE.filter === "open") return a.status !== "complete";
+    if (STATE.filter === "open")   return a.status === "pending";
+    if (STATE.filter === "failed") return a.status === "failed";
     return a.rec === STATE.filter;
+  }
+  // Card 366 Phase-2 filter bar — AND across time / agency / type / rec / status.
+  function rowMatchesBar(a) {
+    var f = STATE.f;
+    if (f.time !== "all") {
+      var maxH = f.time === "30" ? 720 : (f.time === "quarter" ? 2160 : 8760);
+      if (!(a.age <= maxH)) return false;
+    }
+    if (f.agency !== "all" && a.agency !== f.agency) return false;
+    if (f.type   !== "all" && a.type   !== f.type)   return false;
+    if (f.rec    !== "all" && a.rec    !== f.rec)    return false;
+    if (f.status !== "all" && a.status !== f.status) return false;
+    return true;
   }
   function rowMatchesSearch(a) {
     if (!STATE.search) return true;
@@ -158,6 +210,17 @@
       if (STATE.sortKey === "date") {
         return STATE.sortDir * (x.age - y.age);
       }
+      if (STATE.sortKey === "due") {
+        return STATE.sortDir * (x.dueTs - y.dueTs);
+      }
+      if (STATE.sortKey === "audited") {
+        return STATE.sortDir * (x.age - y.age);
+      }
+      if (STATE.sortKey === "agency" || STATE.sortKey === "type" || STATE.sortKey === "rec" || STATE.sortKey === "status") {
+        var xa = (x[STATE.sortKey] || "").toString().toLowerCase();
+        var ya = (y[STATE.sortKey] || "").toString().toLowerCase();
+        return STATE.sortDir * xa.localeCompare(ya);
+      }
       var xi = (x.id || "").toLowerCase();
       var yi = (y.id || "").toLowerCase();
       return STATE.sortDir * xi.localeCompare(yi);
@@ -170,21 +233,23 @@
     var body = document.getElementById("ledgerBody");
     if (!body) return;
     var sorted = sortedRows();
-    var visible = sorted.filter(function (a) { return rowMatchesFilter(a) && rowMatchesSearch(a); });
+    // Filter-bar + search define the working set the chips act on; chip narrows it.
+    var mset = sorted.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
+    var visible = mset.filter(rowMatchesFilter);
 
     if (sorted.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:36px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'No audits yet — <a href="/audit" style="color:var(--blue-600);font-weight:600;text-decoration:none">run your first audit →</a>'
         + '</td></tr>';
     } else if (visible.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" style="padding:28px 16px;text-align:center;color:var(--mute);font-size:13px">'
+      body.innerHTML = '<tr><td colspan="10" style="padding:28px 16px;text-align:center;color:var(--mute);font-size:13px">'
         + 'No audits match this filter/search. <a href="#" class="cc-clear-filters" style="color:var(--blue-600);font-weight:600;text-decoration:none">Clear →</a>'
         + '</td></tr>';
     } else {
       body.innerHTML = visible.map(buildRowHTML).join("");
     }
     var vc = document.getElementById("visCount");
-    if (vc) vc.textContent = visible.length + " of " + sorted.length;
+    if (vc) vc.textContent = visible.length + " of " + mset.length;
     wireRowClicks();
   }
 
@@ -251,13 +316,15 @@
   }
 
   function writeFilterCounts() {
-    var rows = STATE.rows;
+    // Chip counts reflect the current filter-bar + search aperture, not the raw total.
+    var rows = STATE.rows.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
     var counts = {
       all:     rows.length,
       Proceed: rows.filter(function (r) { return r.rec === "Proceed" && r.status === "complete"; }).length,
       Caution: rows.filter(function (r) { return r.rec === "Caution" && r.status === "complete"; }).length,
       Decline: rows.filter(function (r) { return r.rec === "Decline" && r.status === "complete"; }).length,
-      open:    rows.filter(function (r) { return r.status !== "complete"; }).length
+      open:    rows.filter(function (r) { return r.status === "pending"; }).length,
+      failed:  rows.filter(function (r) { return r.status === "failed"; }).length
     };
     document.querySelectorAll(".filters .fbtn").forEach(function (btn) {
       var k = btn.dataset.filter;
@@ -275,6 +342,10 @@
   }
 
   function writeAll() {
+    populateFilterBar();
+    // Card 366 Phase-2 — expose needs-attention count for a later Today rollup
+    // (do NOT build Today here). failed OR deadline-passed.
+    window.__paNeedsAttention = STATE.rows.filter(function (r) { return r.attn; }).length;
     writeKPIs();
     writeDistribution();
     writeFilterCounts();
@@ -365,11 +436,66 @@
         e.preventDefault();
         STATE.filter = "all";
         STATE.search = "";
+        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all" };
+        document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
         document.querySelectorAll(".fbtn").forEach(function (b) {
           b.classList.toggle("active", b.dataset.filter === "all");
         });
         var input = document.querySelector(".cc-search-input");
         if (input) input.value = "";
+        writeFilterCounts();
+        writeTable();
+      });
+    }
+  }
+
+  // Card 366 Phase-2 — populate the dynamic filter-bar selects (agency/type)
+  // from the live rows. Rec/Status/Time options are static in the markup.
+  function populateFilterBar() {
+    function distinct(key) {
+      var seen = {}, out = [];
+      STATE.rows.forEach(function (r) {
+        var v = r[key];
+        if (v != null && v !== "—" && !seen[v]) { seen[v] = 1; out.push(v); }
+      });
+      return out.sort();
+    }
+    function fill(id, values, allLabel) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var cur = el.value;
+      var opts = '<option value="all">' + allLabel + '</option>';
+      values.forEach(function (v) { opts += '<option value="' + esc(v) + '">' + esc(v) + '</option>'; });
+      el.innerHTML = opts;
+      if (cur && (cur === "all" || values.indexOf(cur) !== -1)) el.value = cur;
+    }
+    fill("fAgency", distinct("agency"), "All agencies");
+    fill("fType", distinct("type"), "All types");
+  }
+
+  function wireFilterBar() {
+    [["fTime", "time"], ["fAgency", "agency"], ["fType", "type"], ["fRec", "rec"], ["fStatus", "status"]].forEach(function (pair) {
+      var el = document.getElementById(pair[0]);
+      if (!el || el.dataset.ccWired) return;
+      el.dataset.ccWired = "1";
+      el.addEventListener("change", function () {
+        STATE.f[pair[1]] = el.value || "all";
+        writeFilterCounts();
+        writeTable();
+      });
+    });
+    var clr = document.getElementById("paClear");
+    if (clr && !clr.dataset.ccWired) {
+      clr.dataset.ccWired = "1";
+      clr.addEventListener("click", function () {
+        STATE.f = { time: "all", agency: "all", type: "all", rec: "all", status: "all" };
+        STATE.filter = "all";
+        STATE.search = "";
+        document.querySelectorAll(".pa-filter").forEach(function (s) { s.value = "all"; });
+        document.querySelectorAll(".fbtn").forEach(function (b) { b.classList.toggle("active", b.dataset.filter === "all"); });
+        var input = document.querySelector(".cc-search-input");
+        if (input) input.value = "";
+        writeFilterCounts();
         writeTable();
       });
     }
@@ -382,6 +508,7 @@
     wireFilters();
     wireSort();
     wireSearch();
+    wireFilterBar();
 
     // Fetch and map
     var data;

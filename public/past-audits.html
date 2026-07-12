@@ -137,6 +137,10 @@ button{font-family:inherit}
 
 /* filter tabs */
 .filters{display:flex;align-items:center;gap:6px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
+/* Card 366 Phase-2 filter bar — minimal hooks; Design polishes later. */
+.pa-filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.pa-filter{height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;cursor:pointer}
+.pa-filter-clear{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;cursor:pointer}
 .fbtn{height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;transition:all .14s}
 .fbtn:hover{border-color:var(--mute-2)}
 .fbtn .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border-radius:5px;padding:1px 6px;line-height:1.4}
@@ -347,12 +351,12 @@ tr.hidden{display:none}
           <div class="foot"><b>20%</b> of completed — clear to bid</div>
         </div>
         <div class="kpi" data-tone="red">
-          <div class="kpi-top"><p class="lbl">Traps Caught</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
+          <div class="kpi-top"><p class="lbl">Decline Calls</p><span class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
           <div class="kpi-val">4</div>
           <div class="foot">decline calls — <b>losses avoided</b></div>
         </div>
         <div class="kpi">
-          <div class="kpi-top"><p class="lbl">Avg Score · Completed</p><span class="kpi-ico navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span></div>
+          <div class="kpi-top"><p class="lbl">Avg Score · Scored</p><span class="kpi-ico navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span></div>
           <div class="kpi-val">65<span class="unit">/100</span></div>
           <div class="spark"><i style="height:64%"></i><i style="height:78%"></i><i style="height:52%"></i><i class="tall" style="height:94%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:60%"></i><i style="height:38%"></i></div>
         </div>
@@ -378,12 +382,41 @@ tr.hidden{display:none}
           </div>
         </div>
 
+        <!-- Card 366 Phase-2 filter bar (functional, minimal — Design polishes later).
+             NAICS + Set-aside selects are placeholders until primary adds them to the SELECT. -->
+        <div class="pa-filterbar" id="paFilterbar">
+          <select class="pa-filter" id="fTime" aria-label="Time aperture">
+            <option value="all">All time</option>
+            <option value="30">Last 30 days</option>
+            <option value="quarter">Last quarter</option>
+            <option value="year">Last year</option>
+          </select>
+          <select class="pa-filter" id="fAgency" aria-label="Agency"><option value="all">All agencies</option></select>
+          <select class="pa-filter" id="fType" aria-label="Type"><option value="all">All types</option></select>
+          <select class="pa-filter" id="fRec" aria-label="Recommendation">
+            <option value="all">All recommendations</option>
+            <option value="Proceed">Proceed</option>
+            <option value="Caution">Caution</option>
+            <option value="Decline">Decline</option>
+          </select>
+          <select class="pa-filter" id="fStatus" aria-label="Status">
+            <option value="all">All statuses</option>
+            <option value="complete">Complete</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+          </select>
+          <!-- <select class="pa-filter" id="fNaics"><option value="all">All NAICS</option></select> -->
+          <!-- <select class="pa-filter" id="fSetAside"><option value="all">All set-asides</option></select> -->
+          <button class="pa-filter-clear" id="paClear" type="button">Clear</button>
+        </div>
+
         <div class="filters" id="filters">
           <button class="fbtn active" data-filter="all">All <span class="n">15</span></button>
           <button class="fbtn" data-filter="Proceed">Proceed <span class="n">3</span></button>
           <button class="fbtn" data-filter="Caution">Caution <span class="n">4</span></button>
           <button class="fbtn" data-filter="Decline">Decline <span class="n">4</span></button>
           <button class="fbtn" data-filter="open">Open <span class="n">4</span></button>
+          <button class="fbtn" data-filter="failed">Failed <span class="n">0</span></button>
           <span class="spacer" style="flex:1"></span>
           <span class="sort-hint"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>Click a column header to sort</span>
         </div>
@@ -394,11 +427,13 @@ tr.hidden{display:none}
               <tr>
                 <th class="sortable" data-sort="id">Notice ID</th>
                 <th>Title</th>
-                <th class="sortable" data-sort="date">Audited</th>
-                <th>Type</th>
+                <th class="sortable" data-sort="agency">Agency</th>
+                <th class="sortable" data-sort="type">Type</th>
+                <th class="sortable" data-sort="due">Due</th>
+                <th class="sortable" data-sort="audited">Audited</th>
                 <th class="right sortable sorted" data-sort="score">Score<span class="arr">▼</span></th>
-                <th>Recommendation</th>
-                <th>Status</th>
+                <th class="sortable" data-sort="rec">Recommendation</th>
+                <th class="sortable" data-sort="status">Status</th>
                 <th class="right">Report</th>
               </tr>
             </thead>
@@ -463,8 +498,10 @@ function render(){
     return `<tr data-rec="${a.rec||''}" class="${show?'':'hidden'}">
       <td class="cell-id">${a.id}</td>
       <td class="cell-title" title="${a.title}">${a.title}</td>
-      <td class="cell-date">${a.date}</td>
+      <td class="cell-agency">—</td>
       <td><span class="doctype">${a.type}</span></td>
+      <td class="cell-due">—</td>
+      <td class="cell-date">${a.date}</td>
       <td class="right">${a.score==null?scoreCell:scoreCell}</td>
       <td>${recCell}</td>
       <td><span class="status ${a.status}">${a.status}</span></td>

@@ -61,7 +61,7 @@ export const NAV_GROUPS: RailGroup[] = [
     items: [
       { key: "today", label: "Today", href: "/command-center", icon: I.today },
       { key: "run-audit", label: "Run Audit", href: "/audit", icon: I.runAudit, badge: { text: "New", kind: "new" } },
-      { key: "past-audits", label: "Past Audits", href: "/dashboard", icon: I.pastAudits, badge: { text: "15", kind: "count" } },
+      { key: "past-audits", label: "Past Audits", href: "/past-audits", icon: I.pastAudits, badge: { text: "15", kind: "count" } },
       { key: "pipeline", label: "Pipeline", href: "/pipeline", icon: I.pipeline, badge: { text: "3", kind: "danger" } },
     ],
   },
