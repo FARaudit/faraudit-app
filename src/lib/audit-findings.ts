@@ -208,7 +208,7 @@ export interface VerdictInputs {
   // When supplied AND the flag is on, deriveVerdict replaces the blanket `!coverageComplete → INCOMPLETE` veto
   // with: INCOMPLETE only on genuine UNREADABILITY, a genuinely-uncovered DISQUALIFIER → NHR, else NO cap
   // (ungrounded boilerplate no longer forces false-INCOMPLETE). Default undefined ⇒ byte-identical (V1 unchanged).
-  coverageV2?: { unreadable: string[]; ungroundedRead: string[]; disqualifierUncovered: Array<{ section: string; obligation: string }>; coverageGrade: number };
+  coverageV2?: { unreadable: string[]; ungroundedRead: string[]; disqualifierUncovered: Array<{ section: string; obligation: string }>; ungroundedNonBarSignal?: Array<{ section: string; obligation: string }>; coverageGrade: number };
   // AMENDMENT A (Brain card-304, F bake-off) — Candidate A (LLM-native judgment) may emit citation-grounded signals of
   // unread/missing material it OBSERVES that the deterministic manifest gate did not catch (e.g. a referenced attachment
   // absent from the input). It carries NO verdict authority: deriveVerdict treats it as manifest-ADJACENT →

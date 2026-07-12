@@ -18,9 +18,10 @@ process.env.AUDIT_DEBRIEF_ALLOWLIST = "true";
 process.env.AUDIT_NOOP_REP_ALLOWLIST = "true";
 process.env.AUDIT_PRECEDENCE_ALLOWLIST = "true";
 process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
+process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
 
 (async () => {
-  const { importanceOf, hasBarSignal } = await import("../../src/lib/audit-gate-v2");
+  const { importanceOf, hasBarSignal, isGovtEvalMethodologyNonBar } = await import("../../src/lib/audit-gate-v2");
   const { replayRunRecord } = await import("../../src/lib/audit-run-record");
   const { loadRunRecord } = await import("./run-record-io");
 
@@ -29,7 +30,11 @@ process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
     const imp = importanceOf(ob);
     if (imp === "disqualifier") return "escalate";
     if (imp === "boilerplate") return "demote"; // never escalated (was excluded at :270 already)
-    return hasBarSignal(ob) ? "escalate" : "demote"; // ambiguous: belt vs demote
+    // ambiguous: belt (bar-signal-positive) escalates, EXCEPT a government-eval-methodology cost/pricing-data sentence
+    // (card #460 ruling #2) which demotes; bar-signal-negative demotes.
+    if (!hasBarSignal(ob)) return "demote";
+    if (isGovtEvalMethodologyNonBar(ob)) return "demote";
+    return "escalate";
   };
 
   // ─────────────────────────── KNOWN-REAL-BAR CORPUS ───────────────────────────
@@ -65,6 +70,11 @@ process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
     "Offers are restricted to concerns that have completed the required facility accreditation.",
     "The offeror shall demonstrate an active top secret clearance held continuously for three years.",
     "Only businesses qualified under the applicable small business size standard may compete.",
+    // card #460 narrowing adversarials (MANDATORY) — the two narrowings must NOT open a leak:
+    "If the offeror fails to correct the deficiency, its proposal will be deemed unacceptable and ineligible for award.", // real "deemed unacceptable" bar → still escalates
+    "Any proposal rated technically unacceptable in a subfactor will be excluded from award consideration.",             // real "rated unacceptable" bar → still escalates
+    "The offeror must hold a facility clearance, and certified cost or pricing data shall be evaluated for the effort.",  // clearance bar COMPOUNDED with a govt-eval cost-data sentence → must still escalate (govt-eval exception must NOT demote it)
+    "Where the thresholds of FAR 15.403-1 apply, the offeror shall be required to submit certified cost or pricing data.", // #2 offeror submission DUTY (FA8137 verbatim; not eval-framed, not boilerplate) → ruling #3 says ESCALATE
   ];
 
   const realBars = [...groupA.map((b) => ["A", b] as const), ...groupB.map((b) => ["B", b] as const)];
@@ -98,8 +108,9 @@ process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
         const imp = importanceOf(ob);
         if (imp === "boilerplate") continue;               // already handled
         const bar = hasBarSignal(ob);
-        if (imp === "ambiguous" && bar) beltHits.push(ob);  // belt keeps escalating (safe)
-        if (imp === "ambiguous" && !bar) {                  // the residuals that must dissolve
+        // classify by the REAL escalation semantics (belt + govt-eval exception), not a bare bar-signal check.
+        if (escalatesNew(ob) === "escalate") beltHits.push(ob);  // belt keeps escalating (safe)
+        else {                                                   // demoted → the residuals that dissolve
           const key = ob.slice(0, 120).toLowerCase().replace(/\s+/g, " ").trim();
           if (!residuals.has(key)) residuals.set(key, { ob, imp, bar });
         }
