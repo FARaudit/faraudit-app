@@ -80,7 +80,14 @@ const PROTEST_DISPUTES_RE = new RegExp([
 // accounting-system/registered) WITHOUT matching pure protest procedure ("must be SERVED on the CO" ≠ a bar).
 const BAR_SIGNAL_RE = new RegExp([
   "\\bmust\\s+(?:possess|hold|maintain|be\\s+(?:a\\s+|an\\s+)?(?:certified|registered|accredited|licensed|qualified|eligible|approved|current|eligibility))",
-  "\\bmust\\s+be\\s+registered\\b", "\\bregistered\\s+in\\s+sam\\b",
+  // SAM-registration bar cluster — HARDENED (card #459 corpus safety gate). The prior two tokens missed real FAR
+  // 52.204-7 registration bars phrased "shall/required to be registered", spelled-out "System for Award Management",
+  // "SAM.gov", or the bare "active/current registration" noun — those leaked as bar-signal-negative and would have
+  // silently DEMOTED under the ambiguous-signal-demotion semantics (a real eligibility bar → contract loss). All are
+  // unambiguous registration-bar vocabulary; adding them only routes a real bar toward the safe escalate pole.
+  "\\b(?:must|shall|required\\s+to)\\s+be\\s+registered\\b", "\\bregistered\\s+in\\s+sam\\b",
+  "\\bsystem\\s+for\\s+award\\s+management\\b", "\\bsam\\.gov\\b",
+  "\\b(?:active|current|valid)\\s+(?:sam(?:\\.gov)?\\s+)?registration\\b", "\\bregistration\\s+in\\s+(?:sam\\b|the\\s+system\\s+for\\s+award)\\b",
   "\\beligib(?:le|ility)\\b", "\\bineligible\\b",
   "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
   "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
@@ -110,13 +117,21 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bdisqualif(?:y|ied|ies|ication)\\b", "\\bexcluded\\s+from\\s+(?:award|consideration)\\b",
   "\\b(?:removed|eliminated|precluded)\\s+from\\s+(?:award|consideration|(?:the\\s+)?competition)\\b",
   "\\bnot\\s+be\\s+(?:selected|awarded)\\b", "\\bpassed\\s+over\\s+for\\s+award\\b", "\\bineligible\\s+for\\s+award\\b",
+  // GATE-2 HARDENING (card #460 demotion, blind-skeptic) — award-removal consequence verbs the guard missed, so a real
+  // §M "unacceptable/deficient → [consequence]" bar still ESCALATES independent of the "unacceptable" narrowing (a bar
+  // whose rejection verb isn't here must never demote). Each is an unambiguous award/consideration exclusion.
+  "\\bprecludes?\\s+(?:\\w+\\s+){0,3}?award\\b", "\\bnot\\s+(?:be\\s+)?further\\s+considered\\b",
+  "\\bcannot\\s+be\\s+(?:selected|awarded|considered)\\b", "\\b(?:removed|eliminated|excluded)\\s+from\\s+(?:the\\s+)?competitive\\s+range\\b",
+  "\\bnot\\s+eligible\\s+for\\s+award\\b",
   // GATE-2 HARDENING (D-1b clarification member, card #457) — the two most common bare §M rejection verbs the guard
   // missed. DISQUALIFIER_RE already catches "will not be considered"/"deemed non-responsive", but a compound sentence
-  // whose ONLY bar token is bare "unacceptable" or "rejected" (e.g. "if the offeror believes the requirements contain
-  // an omission, its proposal will be deemed unacceptable") matched CLARIFICATION_RIGHTS_RE and laundered to boilerplate.
-  // These verbs never appear in a benign clarification-right/protest/debrief sentence, so adding them can only route a
-  // real-bar compound to the safe ambiguous→NHR pole — never re-block a genuine no-op.
-  "\\bunacceptable\\b", "\\breject(?:ed|ion|s|ing)?\\b",
+  // whose ONLY bar token is "unacceptable" or "rejected" (e.g. "…its proposal will be deemed unacceptable") matched
+  // CLARIFICATION_RIGHTS_RE and laundered to boilerplate.
+  // BELT NARROWING (card #460 ruling #1) — "unacceptable" is CONSEQUENCE-FRAMED only (deemed/rated/found/is/are/be…
+  // unacceptable), NOT the bare word, so the §M government RATING-SCALE description ("evaluated to determine whether
+  // the proposal is acceptable or unacceptable, using the ratings…") no longer trips BAR_SIGNAL — that is evaluation
+  // methodology, not a bidder bar. A real rejection ("its proposal will be deemed unacceptable") still matches.
+  "\\b(?:deemed|rated|found|considered|assessed|be|is|are|remains?|otherwise)\\s+(?:technically\\s+)?unacceptable\\b", "\\breject(?:ed|ion|s|ing)?\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
@@ -228,6 +243,43 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
   return "ambiguous";
 }
 
+/** Does the obligation carry ANY eligibility-bar signal (the shared !BAR_SIGNAL_RE guard, positive form)? Pure,
+ *  flag-independent — exposes the existing guard for (a) the ARC-D-1c ambiguous-signal-demotion escalation semantics
+ *  (Brain card #459: ambiguous+bar-signal-positive still ESCALATES the belt; ambiguous+bar-signal-negative demotes to
+ *  the coverage-signal pole) and (b) the corpus safety proof that gates that build. No behavior change on its own. */
+export function hasBarSignal(ob: string): boolean {
+  return BAR_SIGNAL_RE.test(ob);
+}
+
+// AMBIGUOUS-SIGNAL DEMOTION (Brain card #459/#460, flag AUDIT_AMBIGUOUS_SIGNAL_DEMOTION, default-OFF). The escalation
+// semantics at gradeCoverageV2: disqualifier→escalate · ambiguous+bar-signal-POSITIVE→escalate (the belt: "uncertain
+// about a bar" still fails toward disqualifier) · ambiguous+bar-signal-NEGATIVE→DEMOTE to the coverage-signal pole
+// (ungroundedNonBarSignal — visible in the ledger, NEVER in disqualifierUncovered, NEVER silently dropped). Flag-OFF ⇒
+// ambiguous ALWAYS escalates ⇒ byte-identical. Dissolves the §L/§M benign proposal-prep residuals (formatting, POC,
+// page limits) that structurally over-escalated on a large negotiated §L, while every real bar keeps escalating.
+// Read at CALL time (not module load) so the demotion toggles per-invocation, like the notice-body emitter flags.
+const ambiguousSignalDemotionEnabled = () => process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION === "true";
+
+// GOVERNMENT-EVALUATION-FRAME refinement (card #460 ruling #2). A §M sentence whose SUBJECT is the government's
+// evaluation methodology for cost/pricing DATA — "information/data other than certified cost or pricing data MAY BE
+// REQUIRED to support price reasonableness / SHALL BE EVALUATED to support a determination" — trips BAR_SIGNAL only
+// via the "certified … data" token (a TINA data-TYPE, not a bidder certification) and states what the GOVERNMENT does,
+// not a bidder precondition. Demote it. GUARDED so it can NEVER demote a real bar: fires ONLY when (a) the sentence is
+// government-eval-framed, (b) it references cost-or-pricing DATA, and (c) removing the certified-data phrase leaves NO
+// OTHER bar signal — so a compound ("must hold a clearance; certified cost data shall be evaluated") still escalates.
+// Bid-guarantee/bond and the offeror's own "shall submit certified cost or pricing data" duty are NOT eval-framed →
+// they keep escalating (ruling #3: demoting real duties to hit a pre-declared outcome is REJECTED).
+const GOVT_EVAL_FRAME_RE = /\b(?:shall|will|may|to)\s+be\s+evaluated\b|\bevaluated\s+to\s+(?:determine|support|establish)\b|\bto\s+support\s+(?:a\s+)?(?:determination|(?:price\s+)?reasonableness|realism|analysis)\b|\bmay\s+be\s+required\s+to\s+support\b|\bthe\s+government\s+(?:will|shall|may)\s+(?:evaluate|assess|determine|consider)\b/i;
+const COST_PRICING_DATA_RE = /\b(?:certified\s+)?cost\s+(?:or|and)\s+pricing\s+data\b/i;
+export function isGovtEvalMethodologyNonBar(ob: string): boolean {
+  if (!GOVT_EVAL_FRAME_RE.test(ob) || !COST_PRICING_DATA_RE.test(ob)) return false;
+  // Strip ONLY the TINA phrase (its own optional "certified" prefix is consumed with it) — NOT a standalone
+  // "certified", which could be a real certification eligibility bar ("only offerors certified under the mentor-
+  // protege program … cost or pricing data … the Government shall evaluate"). Global so multiple occurrences all clear.
+  const stripped = ob.replace(new RegExp(COST_PRICING_DATA_RE.source, "gi"), " ");
+  return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real bar ⇒ do NOT demote
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];
@@ -235,6 +287,11 @@ export interface CoverageV2 {
   ungroundedRead: string[];
   /** Ungrounded obligations carrying genuine disqualification language → escalate to NEEDS_HUMAN_REVIEW. */
   disqualifierUncovered: Array<{ section: string; obligation: string }>;
+  /** Ungrounded, ambiguous, BAR-SIGNAL-NEGATIVE obligations (benign proposal-prep: formatting/POC/page-limits, or a
+   *  government-eval-methodology sentence) DEMOTED off the escalation path to a coverage SIGNAL (card #460). Visible
+   *  here, never in disqualifierUncovered, never dropped. Empty unless AUDIT_AMBIGUOUS_SIGNAL_DEMOTION is on.
+   *  Optional so pre-existing partial CoverageV2 literals (older callers/tests) still typecheck; readers default []. */
+  ungroundedNonBarSignal?: Array<{ section: string; obligation: string }>;
   /** Importance-weighted covered fraction in [0,1] — surfaced as a signal (never a veto). 1 when nothing required. */
   coverageGrade: number;
 }
@@ -245,6 +302,7 @@ export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 
   const unreadable: string[] = [];
   const ungroundedRead: string[] = [];
   const disqualifierUncovered: Array<{ section: string; obligation: string }> = [];
+  const ungroundedNonBarSignal: Array<{ section: string; obligation: string }> = [];
   let coveredWeight = 0, totalWeight = 0;
 
   for (const a of attestations) {
@@ -265,15 +323,26 @@ export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 
       ungroundedRead.push(a.section);
       // Partial credit in the grade for a section that WAS read and has some grounding (importance-weighted signal).
       if (a.citedFindingIds.length) coveredWeight += weight * 0.5;
-      // FAIL TOWARD DISQUALIFIER (amendment): every ungrounded obligation that is NOT clearly boilerplate — both
-      // explicit disqualifiers AND ambiguous ones — escalates to NHR. Only unambiguously administrative language passes.
-      for (const ob of realUngrounded) if (importanceOf(ob) !== "boilerplate") disqualifierUncovered.push({ section: a.section, obligation: ob });
+      // FAIL TOWARD DISQUALIFIER: an ungrounded obligation that is NOT boilerplate escalates. With the demotion flag
+      // (card #460), an AMBIGUOUS one is split by bar signal: bar-signal-positive keeps escalating (the belt), while a
+      // bar-signal-NEGATIVE ambiguous obligation (or a government-eval-methodology sentence) DEMOTES to the coverage
+      // signal (ungroundedNonBarSignal). Flag-OFF ⇒ ambiguous always escalates ⇒ byte-identical.
+      for (const ob of realUngrounded) {
+        const imp = importanceOf(ob);
+        if (imp === "boilerplate") continue;
+        if (imp === "disqualifier") { disqualifierUncovered.push({ section: a.section, obligation: ob }); continue; }
+        if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob))) {
+          ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
+        }
+        disqualifierUncovered.push({ section: a.section, obligation: ob });
+      }
     }
   }
   return {
     unreadable,
     ungroundedRead,
     disqualifierUncovered,
+    ungroundedNonBarSignal,
     coverageGrade: totalWeight === 0 ? 1 : coveredWeight / totalWeight,
   };
 }
@@ -290,7 +359,11 @@ export function gateV2Outcome(cov: CoverageV2): GateV2Outcome {
     const d = cov.disqualifierUncovered[0];
     return { cap: "NEEDS_HUMAN_REVIEW", reason: `A potential disqualifying requirement in §${d.section} could not be grounded to a finding — human verification needed: "${d.obligation.slice(0, 120)}".` };
   }
-  return { cap: null, reason: cov.ungroundedRead.length
+  const nonBar = cov.ungroundedNonBarSignal ?? [];
+  const demoted = nonBar.length
+    ? ` ${nonBar.length} ungrounded non-bar obligation(s) demoted to signal (ungrounded_nonbar_signal).`
+    : "";
+  return { cap: null, reason: (cov.ungroundedRead.length
     ? `Read complete; ${cov.ungroundedRead.length} section(s) have unquoted boilerplate obligations (coverage grade ${(cov.coverageGrade * 100).toFixed(0)}%) — a signal, not a veto.`
-    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).` };
+    : `Coverage complete (grade ${(cov.coverageGrade * 100).toFixed(0)}%).`) + demoted };
 }
