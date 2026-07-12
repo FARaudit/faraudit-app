@@ -85,6 +85,31 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
   "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
   "\\bsize\\s+standard\\b", "\\bpast\\s+performance\\b", "\\bbond(?:ing|ed)?\\b", "\\baccounting\\s+system\\b",
+  // GATE-2 HARDENING (PR #202, foreign-tax member) — bar/access vocabulary the ORIGINAL guard missed. Two Gate-2 lenses
+  // (contracts-attorney + adversarial-redteam) surfaced three collision classes against the 52.229-11 tax tokens:
+  //  (a) ITAR/FOCI access + country-of-origin bars ("no foreign person shall have access…", FOCI, ITAR, TAA, Buy American);
+  //  (b) a foreign-person TAX-REMITTANCE DUTY (FAR 52.229-11(b)/(e)(2)) — "foreign persons must remit the 2 percent tax…",
+  //      "…subject to the section 5000C two-percent withholding" — a REAL at-award duty on a foreign offeror, NOT a no-op.
+  // The duty verbs (remit / withhold / two-percent) + a bare "foreign person" are the CATEGORICAL closer for class (b):
+  // they veto laundering for ANY foreign-person tax duty regardless of person/offeror/entity phrasing. They cost only the
+  // benign "is not a foreign person" self-rep → the SAFE ambiguous→NHR pole; the PRIMARY FA8137 target (the
+  // "…exemption…excise tax…" ELECTION, which carries none of these tokens) still launders correctly.
+  "\\bforeign\\s+(?:national|ownership|owned|control|influence)\\b", "\\bfoci\\b", "\\bnispom\\b",
+  "\\bitar\\b", "\\bexport[\\s-]?control(?:led|s)?\\b", "\\bshall\\s+have\\s+access\\b",
+  "\\bcitizenship\\b", "\\bu\\.?s\\.?\\s+citizen", "\\btrade\\s+agreements?\\s+act\\b", "\\bbuy\\s+american\\b",
+  "\\bforeign\\s+person", "\\bremit(?:s|ted|tance)?\\b", "\\bwithhold(?:ing|s|holds)?\\b", "\\btwo[\\s-]?percent\\b", "\\b2\\s*percent\\b",
+  // GENERIC AWARD-BAR VERBS the guard was missing (adversarial-redteam, consistent since PR #202 v1) — these are real
+  // award/responsiveness bars in ANY family member's compound sentence (e.g. a TAA "prohibited from award" cert
+  // comma-joined with the 52.229-11 excise election). DISQUALIFIER_RE only had "will not be considered"/"deemed
+  // non-responsive"; these cover the "…from award" / "non-responsive" / "will not be awarded" phrasings it missed.
+  "\\bprohibited\\s+from\\b", "\\bbarred\\s+from\\b", "\\bnon-?responsive\\b", "\\bwill\\s+not\\s+be\\s+awarded\\b", "\\bcannot\\s+receive\\s+award\\b",
+  // CATEGORICAL award-bar/exclusion verbs — closes the "guard misses a disqualification phrasing" class family-wide
+  // (adversarial-redteam enumerated these one batch at a time; this covers the class, not one verb). All are unambiguous
+  // award/responsiveness bars that never appear in a benign excise election or protest/debrief procedural sentence, so
+  // adding them can only route a real-bar compound to the safe NHR pole — never re-block a genuine no-op.
+  "\\bdisqualif(?:y|ied|ies|ication)\\b", "\\bexcluded\\s+from\\s+(?:award|consideration)\\b",
+  "\\b(?:removed|eliminated|precluded)\\s+from\\s+(?:award|consideration|(?:the\\s+)?competition)\\b",
+  "\\bnot\\s+be\\s+(?:selected|awarded)\\b", "\\bpassed\\s+over\\s+for\\s+award\\b", "\\bineligible\\s+for\\s+award\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
@@ -106,16 +131,50 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
   "notification\\s+of\\s+(?:award|exclusion)",
 ].join("|"), "i");
 
+// ARC D1 (Brain card 435, flag AUDIT_NOOP_REP_ALLOWLIST, default-OFF) — FAR 52.229-11/-12 "Tax on Certain Foreign
+// Procurements": a §K self-REPRESENTATION that is a NO-OP for a domestic offeror. The 2% excise/withholding fires ONLY
+// if the offeror checks "is a foreign person"; a domestic small business elects "no exemption / is not a foreign
+// person" and nothing gates. FA8137 /panel (audit bd605b88) AUTO-F'd on the verbatim §K election "no exemption
+// [Offeror must select one] from the excise tax." mis-typed disqualifierUncovered → a FALSE NHR (GATE_V2 cap that
+// pre-empted the whole B-arc). Same offeror-rights/no-op family + the SAME two guards as protest/debrief.
+//
+// GATE-2 ROOT SCOPING (four contracts-attorney/red-team re-reviews): the member is now keyed ONLY to the offeror's own
+// excise-tax EXEMPTION ELECTION — the single genuinely no-op 52.229-11 frame for a domestic offeror (the FA8137 target).
+// The bare IDENTIFIER tokens that used to be here — clause number "52.229-11", the "tax on certain foreign procurements"
+// title, "section 5000C"/"5000C", and bare "W-14"/"foreign person" — were ALL REMOVED. They match ANY sentence on the
+// topic, including a REAL foreign-person tax DUTY (52.229-11(b)/(e)(2)): "foreign persons must remit the 2 percent tax…",
+// "…subject to the section 5000C two-percent withholding", "if IRS Form W-14 is not submitted…exemptions will not be
+// applied…under section 5000C". Those are bid-affecting duties on a foreign offeror, NOT no-ops, and a keyword BAR_SIGNAL_RE
+// cannot enumerate every phrasing — so the identifier-token approach was structurally leaky (four residuals, four lenses).
+// A real DUTY is never phrased as the offeror's "[full/partial/no] exemption … excise tax" self-election, so scoping to the
+// election frame is the CATEGORICAL closer: only a genuine domestic exemption election launders; every duty/identifier
+// sentence routes to the SAFE ambiguous→NHR pole (over-tag = recoverable; under-tag = lost contract). The BAR_SIGNAL_RE
+// duty vocabulary (foreign person / remit / withhold / two-percent) is kept as defense-in-depth for the whole family.
+const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
+const FOREIGN_TAX_REP_RE = new RegExp([
+  "(?:full|partial|no)\\s+exemption[^.]{0,40}excise\\s+tax",     // the FA8137 election sentence
+  "excise\\s+tax[^.]{0,40}exemption",
+].join("|"), "i");
+
+// The OFFEROR-RIGHTS / NO-OP-REPRESENTATION BOILERPLATE family (Brain card 435 D1) — procedural offeror rights or
+// no-op self-representations that impose ZERO eligibility/award precondition. DATA-DRIVEN: add a member as an ENTRY
+// here, NEVER a new arc branch. Each member carries its own enable flag; the SHARED negative guard (!BAR_SIGNAL_RE,
+// applied once in importanceOf) keeps any COMPOUND sentence carrying a real bar signal on the safe ambiguous→NHR pole.
+const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
+  { name: "protest/disputes (52.233)", re: PROTEST_DISPUTES_RE, enabled: PROTEST_ALLOWLIST_ENABLED },
+  { name: "debrief/notification (15.50x)", re: DEBRIEF_NOTIFY_RE, enabled: DEBRIEF_ALLOWLIST_ENABLED },
+  { name: "foreign-procurement-tax rep (52.229-11)", re: FOREIGN_TAX_REP_RE, enabled: NOOP_REP_ALLOWLIST_ENABLED },
+];
+
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
- *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the protest + debriefing families
- *  must never silently narrow. */
+ *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
+ *  family (protest + debriefing + foreign-procurement-tax) must never silently narrow. */
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
-  // ARC #2 — protest/disputes procedural language, ONLY when the sentence carries no eligibility-bar signal.
-  if (PROTEST_ALLOWLIST_ENABLED && PROTEST_DISPUTES_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
-  // ARC #A — debriefing/notification offeror-rights procedural language, same no-bar-signal guard.
-  if (DEBRIEF_ALLOWLIST_ENABLED && DEBRIEF_NOTIFY_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
+  // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
+  // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
+  if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
   return "ambiguous";
 }
 
