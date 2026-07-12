@@ -117,6 +117,12 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bdisqualif(?:y|ied|ies|ication)\\b", "\\bexcluded\\s+from\\s+(?:award|consideration)\\b",
   "\\b(?:removed|eliminated|precluded)\\s+from\\s+(?:award|consideration|(?:the\\s+)?competition)\\b",
   "\\bnot\\s+be\\s+(?:selected|awarded)\\b", "\\bpassed\\s+over\\s+for\\s+award\\b", "\\bineligible\\s+for\\s+award\\b",
+  // GATE-2 HARDENING (card #460 demotion, blind-skeptic) — award-removal consequence verbs the guard missed, so a real
+  // §M "unacceptable/deficient → [consequence]" bar still ESCALATES independent of the "unacceptable" narrowing (a bar
+  // whose rejection verb isn't here must never demote). Each is an unambiguous award/consideration exclusion.
+  "\\bprecludes?\\s+(?:\\w+\\s+){0,3}?award\\b", "\\bnot\\s+(?:be\\s+)?further\\s+considered\\b",
+  "\\bcannot\\s+be\\s+(?:selected|awarded|considered)\\b", "\\b(?:removed|eliminated|excluded)\\s+from\\s+(?:the\\s+)?competitive\\s+range\\b",
+  "\\bnot\\s+eligible\\s+for\\s+award\\b",
   // GATE-2 HARDENING (D-1b clarification member, card #457) — the two most common bare §M rejection verbs the guard
   // missed. DISQUALIFIER_RE already catches "will not be considered"/"deemed non-responsive", but a compound sentence
   // whose ONLY bar token is "unacceptable" or "rejected" (e.g. "…its proposal will be deemed unacceptable") matched
@@ -267,7 +273,10 @@ const GOVT_EVAL_FRAME_RE = /\b(?:shall|will|may|to)\s+be\s+evaluated\b|\bevaluat
 const COST_PRICING_DATA_RE = /\b(?:certified\s+)?cost\s+(?:or|and)\s+pricing\s+data\b/i;
 export function isGovtEvalMethodologyNonBar(ob: string): boolean {
   if (!GOVT_EVAL_FRAME_RE.test(ob) || !COST_PRICING_DATA_RE.test(ob)) return false;
-  const stripped = ob.replace(COST_PRICING_DATA_RE, " ").replace(/\bcertif(?:ied|ication)\b/gi, " ");
+  // Strip ONLY the TINA phrase (its own optional "certified" prefix is consumed with it) — NOT a standalone
+  // "certified", which could be a real certification eligibility bar ("only offerors certified under the mentor-
+  // protege program … cost or pricing data … the Government shall evaluate"). Global so multiple occurrences all clear.
+  const stripped = ob.replace(new RegExp(COST_PRICING_DATA_RE.source, "gi"), " ");
   return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real bar ⇒ do NOT demote
 }
 

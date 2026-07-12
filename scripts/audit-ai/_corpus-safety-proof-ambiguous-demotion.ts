@@ -75,6 +75,14 @@ process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
     "Any proposal rated technically unacceptable in a subfactor will be excluded from award consideration.",             // real "rated unacceptable" bar → still escalates
     "The offeror must hold a facility clearance, and certified cost or pricing data shall be evaluated for the effort.",  // clearance bar COMPOUNDED with a govt-eval cost-data sentence → must still escalate (govt-eval exception must NOT demote it)
     "Where the thresholds of FAR 15.403-1 apply, the offeror shall be required to submit certified cost or pricing data.", // #2 offeror submission DUTY (FA8137 verbatim; not eval-framed, not boilerplate) → ruling #3 says ESCALATE
+    // Gate-2 blind-skeptic leaks (card #460 ruling #4 "any miss = strengthen, re-prove") — "unacceptable" bars whose
+    // rejection verb the guard previously missed; all must ESCALATE now:
+    "An unacceptable rating in any factor precludes award.",
+    "Any unacceptable proposal shall be removed from the competitive range.",
+    "An unacceptable proposal cannot be selected for award.",
+    "A proposal with an unacceptable approach is not further considered.",
+    // a real CERTIFICATION eligibility bar hidden in a govt-eval cost-data frame → the strip-and-retest must keep it escalating:
+    "Only offerors certified under the mentor-protege program may submit cost or pricing data, which the Government shall evaluate to determine reasonableness.",
   ];
 
   const realBars = [...groupA.map((b) => ["A", b] as const), ...groupB.map((b) => ["B", b] as const)];
