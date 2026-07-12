@@ -85,6 +85,11 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("A supplier is prohibited from award and certifies no exemption from the excise tax.") !== "boilerplate");
   ok("compound: TAA non-designated prohibited-from-award + excise election → NOT laundered",
     importanceOf("A supplier of a non-designated country is prohibited from award, and must certify no exemption from the excise tax.") !== "boilerplate");
+  // categorical award-bar-verb coverage (disqualified / excluded from award / not be selected) compounded with an excise election.
+  ok("compound: disqualified + excise election → NOT laundered",
+    importanceOf("An offeror without a facility security officer is disqualified, and certifies no exemption from the excise tax.") !== "boilerplate");
+  ok("compound: excluded-from-award + excise election → NOT laundered",
+    importanceOf("Non-domestic manufacturers are excluded from award and must claim no exemption from the excise tax.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",

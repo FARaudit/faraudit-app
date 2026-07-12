@@ -103,6 +103,13 @@ const BAR_SIGNAL_RE = new RegExp([
   // comma-joined with the 52.229-11 excise election). DISQUALIFIER_RE only had "will not be considered"/"deemed
   // non-responsive"; these cover the "…from award" / "non-responsive" / "will not be awarded" phrasings it missed.
   "\\bprohibited\\s+from\\b", "\\bbarred\\s+from\\b", "\\bnon-?responsive\\b", "\\bwill\\s+not\\s+be\\s+awarded\\b", "\\bcannot\\s+receive\\s+award\\b",
+  // CATEGORICAL award-bar/exclusion verbs — closes the "guard misses a disqualification phrasing" class family-wide
+  // (adversarial-redteam enumerated these one batch at a time; this covers the class, not one verb). All are unambiguous
+  // award/responsiveness bars that never appear in a benign excise election or protest/debrief procedural sentence, so
+  // adding them can only route a real-bar compound to the safe NHR pole — never re-block a genuine no-op.
+  "\\bdisqualif(?:y|ied|ies|ication)\\b", "\\bexcluded\\s+from\\s+(?:award|consideration)\\b",
+  "\\b(?:removed|eliminated|precluded)\\s+from\\s+(?:award|consideration|(?:the\\s+)?competition)\\b",
+  "\\bnot\\s+be\\s+(?:selected|awarded)\\b", "\\bpassed\\s+over\\s+for\\s+award\\b", "\\bineligible\\s+for\\s+award\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
