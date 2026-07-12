@@ -2054,6 +2054,8 @@ function deriveTimelineGates(
 // boilerplate is dropped (informational). Flag OFF ⇒ empty extras + no §07 exclusion
 // ⇒ byte-identical legacy render on every audit.
 const V3_ROUTING_ON = process.env.AUDIT_V3_SECTION_ROUTING === "true";
+// Root-C render-coherence (card #423) — NHR-pole body honesty (matches the flag read in _render.ts). Default OFF.
+const NHR_COHERENCE_ON = process.env.AUDIT_REPORT_NHR_COHERENCE === "true";
 // Kinds lifted OUT of §07 when routing is on (their rows now render in §L/§05/§04).
 // boilerplate is NOT here on purpose: it is dropped from §07 ONLY when the engine
 // ALSO marks disposition==='dropped' (both signals must agree) — a boilerplate-typed
@@ -3678,7 +3680,10 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
       days_color_override: incumbentDaysColorOverride
     },
 
-    clin_summary: sanitizeDisplayText(overviewJson.summary) || "Scope summary not available — upload the full PDF to extract scope detail.",
+    // Root-C LEAK 4 (card #423): the "upload the full PDF" fallback is a metadata-only affordance — on a completed
+    // NHR run the document is already in hand, so it's false. Honest empty state on the NHR pole (flag-gated ⇒ else
+    // byte-identical). NHR_COHERENCE_ON defined below near V3_ROUTING_ON.
+    clin_summary: sanitizeDisplayText(overviewJson.summary) || (NHR_COHERENCE_ON && isNhr ? "Scope summary could not be surfaced from the documents as read — flagged for the human review noted above." : "Scope summary not available — upload the full PDF to extract scope detail."),
     primary_objective: sanitizeDisplayText(overviewJson.primary_objective) || "Primary objective not extracted.",
     period_of_performance: ((): string => {
       // FA-195: fall back to the deterministic top-level column when the

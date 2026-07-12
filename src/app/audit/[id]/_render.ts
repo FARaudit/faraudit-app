@@ -1345,11 +1345,18 @@ function setJumpBadge(html: string, sectionHref: string, count: number): string 
 // items. Card layout shares the same data-field anchor (<div class="clins">)
 // so we reuse replaceFieldInner which walks balanced div boundaries (a flat
 // tbody regex no longer works — children are <div class="clin"> not <tr>).
-function setClinEmptyState(html: string): string {
+// Root-C LEAK 4 (card #423) — the "upload the full PDF" CTA is a metadata-only prelim affordance; on a COMPLETED
+// NHR run the document is already in hand, so that CTA is false. On an NHR pole render an honest empty state (no
+// upload CTA) — the line items couldn't be surfaced from what was read, flagged for the human review. Flag-gated +
+// is_nhr ⇒ else the scored "upload the full PDF" copy renders byte-identical (Rule 61).
+function setClinEmptyState(html: string, nhr?: boolean): string {
+  const inner = nhr
+    ? `CLIN structure could not be surfaced from the documents as read — flagged for the human review noted above.`
+    : `CLIN structure not extracted — upload the full PDF to surface the line items.`;
   return replaceFieldInner(
     html,
     "clin_table",
-    `\n                <div class="clin-empty" style="padding:18px 16px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px;border:1px dashed var(--line);border-radius:13px">CLIN structure not extracted — upload the full PDF to surface the line items.</div>\n              `
+    `\n                <div class="clin-empty" style="padding:18px 16px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px;border:1px dashed var(--line);border-radius:13px">${inner}</div>\n              `
   );
 }
 
@@ -2404,6 +2411,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // .v-unscored prelim chassis with the new data-prelim-mode="reviewed": engine reason verbatim + a pointer
     // to the findings that WERE produced. The report body (§04/§05/matrix/findings) renders unchanged below.
     html = pickVerdictBlock(html, "preliminary", "reviewed");
+    // Root-C LEAK 4 (card #423): the masthead "Upload the solicitation PDF" / "or upload the PDF yourself" CTAs are
+    // metadata-only prelim affordances — false on a COMPLETED NHR run (the document is already in hand). Suppress them
+    // on the NHR pole. Flag-gated ⇒ else byte-identical (Rule 61).
+    if (NHR_COHERENCE_ON) {
+      html = removeElementByOpenRe(html, /<a class="mhv-cta-2"[^>]*\bdata-upload\b[^>]*>/, "a");
+      html = removeElementByOpenRe(html, /<a class="mhv-cta"[^>]*\bdata-upload\b[^>]*>/, "a");
+    }
     // Card-360 item 2 (Brain): pole-accurate masthead word + label (W9126 = INCOMPLETE, not "Human review").
     html = replaceFieldInner(html, "nhr_word", vm.nhr_word); // raw — vm.nhr_word carries <br> for the 2-line word
     html = replaceFieldText(html, "nhr_label", vm.nhr_label);
@@ -2586,6 +2600,14 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // upcoming date remains). Runs after item-drops so the target item still
   // exists when we re-apply the class.
   html = applyUrgentKdItem(html, vm.urgent_field);
+  // Root-C LEAK 1 (card #423) — on an NHR pole, kill every live countdown + urgent rail in the body: a "in N days /
+  // N days ago" clock to a date a later amendment may have retracted is false at read-time (Card-330 #4 staleness
+  // vector), and nothing is "urgent" on a timeline we never confirmed. The absolute two-tier date stays; only the
+  // .cnt countdown chip + the urgent accent are dropped. Flag-gated + is_nhr ⇒ else byte-identical (Rule 61).
+  if (NHR_COHERENCE_ON && vm.is_nhr) {
+    for (const f of ["qa_deadline", "response_deadline", "award_date"]) html = removeKdCnt(html, f);
+    html = applyUrgentKdItem(html, ""); // strip urgent everywhere — never a klaxon on a no-verdict run
+  }
   // If none of the three dates was real, drop the entire ribbon.
   if (!vm.has_response_deadline && !vm.has_qa_deadline && !vm.has_award_date) {
     html = removeKeyDates(html);
@@ -2685,7 +2707,7 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     const cards = vm.clin_line_items.map(renderClinCard).join("\n                ");
     html = replaceFieldInner(html, "clin_table", `\n                ${cards}\n              `);
   } else {
-    html = setClinEmptyState(html);
+    html = setClinEmptyState(html, NHR_COHERENCE_ON && vm.is_nhr);
   }
 
   // §04 Compliance flags — wire-or-hide the demo rows. Defense in depth:
