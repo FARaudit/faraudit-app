@@ -20,6 +20,7 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
+import { SITE_VISIT_CONCLUDED_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
@@ -519,11 +520,9 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
 // (gated on noticeBodyBarUngrounded at the call site) ⇒ byte-identical (Rule 61).
 const NOTICE_SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
 const NOTICE_CLEARANCE_RE = /\bclearance\b|\bclassified\b|\btop[\s-]?secret\b|\bts[\s/]?sci\b|\bsecret\b/i;
-// COMPLETION (Brain card #453/#454) — a SAM-body / UPDATE-line past-marker that the site visit already HELD /
-// CONCLUDED / CLOSED. Mirrors SITE_VISIT_CONCLUDED_RE in audit-decide (the B3-severity staleness guard). When
-// present alongside a mandatory-attendance bar, the emitter frames the finding as CONDITIONAL-CONCLUDED (not a
-// live "plan to attend" gate) so the guard promotes it per the #432 register.
-const NOTICE_SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[^.\n]{0,80}\b(?:was\s+held|has\s+been\s+held|(?:was|is|has\s+been)\s+(?:concluded|closed|conducted)|already\s+(?:past|held|occurred|concluded)|(?:is|are)\s+now\s+(?:closed|concluded|past))\b|\b(?:held\s+and\s+(?:concluded|closed)|now\s+closed|has\s+concluded)\b[^.\n]{0,60}\bsite[\s-]?(?:visit|tour)\b/i;
+// SITE_VISIT_CONCLUDED_RE (the SAM-body / UPDATE-line held/concluded/closed past-marker) is the SHARED contract
+// regex imported from audit-site-visit-patterns — the SAME one the B3-severity guard (audit-decide) recognizes,
+// so the emitter's conditional-concluded frame and the guard's promotion never drift (card #453/#454).
 const NOTICE_EVENT_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/i;
 export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
   const noticeText = (noticeBodyText && noticeBodyText.trim())
@@ -569,13 +568,24 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     // (concluded only in source) stays NOT-promoted by the built guard. Live/upcoming visit → the live-gate frame.
     let requirement: string;
     let outExcerpt = excerpt;
-    const concludedM = NOTICE_SITE_VISIT_CONCLUDED_RE.exec(nNotice);
-    if (NOTICE_SITE_VISIT_RE.test(excerpt) && concludedM && concludedM.index != null) {
-      const [cs, ce] = sentenceSpan(concludedM.index);
+    // Scope the concluded-marker search to a WINDOW around THIS bar sentence (not the whole notice) so a concluded
+    // marker for a DIFFERENT, earlier site visit can't mis-frame a separate live/upcoming bar as concluded. The
+    // window is generous enough to catch an adjacent SAM-body UPDATE line tied to this bar.
+    const WIN = 600;
+    const winStart = Math.max(0, ss - WIN);
+    const winEnd = Math.min(nNotice.length, se + WIN);
+    const windowText = nNotice.slice(winStart, winEnd);
+    const concludedRel = new RegExp(SITE_VISIT_CONCLUDED_RE.source, "i").exec(windowText);
+    if (NOTICE_SITE_VISIT_RE.test(excerpt) && concludedRel && concludedRel.index != null) {
+      const cAbs = winStart + concludedRel.index;
+      const [cs, ce] = sentenceSpan(cAbs);
       const concludedSentence = nNotice.slice(cs, ce).trim();
       const eventDate = (NOTICE_EVENT_DATE_RE.exec(concludedSentence) || [])[0] || "";
-      outExcerpt = nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 400); // one verbatim span covering both
-      requirement = `Mandatory site visit stated in the SAM notice body${eventDate ? ` was held/concluded ${eventDate}` : " has concluded"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
+      // ONE verbatim span covering BOTH the bar and the concluded marker; cap generously so both survive.
+      outExcerpt = nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 600);
+      // The requirement ALWAYS carries a CONCLUDED_RE-matchable frame ("site visit … was held/concluded"), with or
+      // without a parseable date — the guard keys promotion off this frame, so it must match even when eventDate="".
+      requirement = `Mandatory site visit stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
     } else if (NOTICE_SITE_VISIT_RE.test(excerpt)) {
       requirement = `Mandatory site visit / pre-proposal conference stated in the SAM notice body — attendance gates eligibility to propose; verify and plan to attend: "${excerpt}"`;
     } else if (NOTICE_CLEARANCE_RE.test(excerpt)) {

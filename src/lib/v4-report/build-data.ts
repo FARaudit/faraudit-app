@@ -245,7 +245,7 @@ export function offerDueFact(responseDeadline: string, cj: Record<string, unknow
     };
   }
   if (samKnown && Math.abs(sam - ctrlMs) <= DAY) return prior;        // doc controlling ≈ SAM (agree) → SAM shown cleanly
-  const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > 24 * 60 * 60 * 1000;
+  const samDiffers = !Number.isNaN(sam) && Math.abs(sam - ctrlMs) > DAY;
   // Controlling doc date WINS the masthead; SAM (if it differs) + every demoted/superseded date drop to a labeled note.
   const isDead = (l: string) => /superseded|prior|previous|cancell?ed|replaced|void/i.test(l);
   const priors = [
@@ -283,7 +283,9 @@ function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict
       const L = s(k).trim().toUpperCase();
       if (!/^[A-M]$/.test(L)) return false;                          // only single UCF-section letters are anchor-checkable
       const re = new RegExp(`§\\s*${L}\\b|(?:^|[\\s(])${L}[-.\\s]\\d`, "i");
-      return rendered.some((f) => re.test(s(f.citation)) || re.test(s(f.requirement)));
+      // Anchor on the CITATION only (mirrors RE_L/RE_M finding-bucketing) — NOT requirement prose, so an incidental
+      // "Deliverable C-2" / "phase L-1" token in a finding's text can't false-evidence a genuinely-missing section.
+      return rendered.some((f) => re.test(s(f.citation)));
     };
     for (const k of new Set([...required, ...coreMissing, ...rawMissing])) if (!covered.has(k) && evidenced(k)) covered.add(k);
   }

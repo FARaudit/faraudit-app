@@ -13,6 +13,7 @@
 import { emitNoticeBodyEligBarFindings, noticeBodyEligibilityUngrounded } from "./audit-orchestrator";
 import { deriveVerdict, disposeFinding } from "./audit-decide";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
+import { SITE_VISIT_CONCLUDED_RE } from "./audit-site-visit-patterns";
 import type { TypedFinding, VerdictInputs, BidderProfile } from "./audit-findings";
 
 let failures = 0;
@@ -155,6 +156,31 @@ console.log("\n── 7 · MIS-FRAMED: live-sounding lens finding + concluded SO
   };
   const d = deriveVerdict(base({ findings: [misFramed], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: mk(concludedNotice) }));
   assert(!inSS(d.showStoppers, misFramed.requirement), "mis-framed live-sounding finding (concluded only in source) NOT promoted — routed to human review");
+}
+
+// ── 8 · NO-DATE concluded (Gate-2 fix): requirement still carries a CONCLUDED_RE-matchable frame → promotes ──
+console.log("\n── 8 · NO-DATE concluded: emitted requirement matches the shared CONCLUDED_RE → promotes ──");
+{
+  const noDate = "The mandatory pre-proposal site visit has been concluded and is now closed. Only offerors who attended the site visit are eligible to submit a proposal.";
+  const f = emitNoticeBodyEligBarFindings(mk(noDate), [])[0];
+  assert(!!f && /was held\/concluded/i.test(f.requirement) && !/plan to attend/i.test(f.requirement),
+    "(no date) requirement uses 'was held/concluded (date not stated)' framing, no live-gate language");
+  assert(SITE_VISIT_CONCLUDED_RE.test(f.requirement), "(no date) requirement matches the shared CONCLUDED_RE (guard will recognize it)");
+  const d = deriveVerdict(base({ findings: [f], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: mk(noDate) }));
+  assert(inSS(d.showStoppers, f.requirement), "(no date) correctly-framed finding PROMOTES even without a parseable date");
+}
+
+// ── 9 · MULTI-VISIT (Gate-2 fix): a concluded visit far above must NOT mis-frame a separate UPCOMING visit bar ──
+console.log("\n── 9 · MULTI-VISIT: window-scoped concluded search — upcoming bar stays live, not concluded ──");
+{
+  const filler = " ".padEnd(0) + "The period of performance is twelve months from award with two option years. ".repeat(10); // >600 chars, no bar/concluded language
+  const multi = `A mandatory site visit was held and concluded on May 1, 2026. Only offerors who attended that first site visit are eligible for base work.${filler}A second mandatory site visit will be conducted on 15 August 2026. Only offerors who attend the August site visit will be eligible to submit a proposal.`;
+  const emitted = emitNoticeBodyEligBarFindings(mk(multi), []);
+  const concludedF = emitted.find((f) => /May 1, 2026/i.test(f.requirement));
+  const upcomingF = emitted.find((f) => /plan to attend/i.test(f.requirement));
+  assert(!!concludedF, "the EARLY concluded visit → conditional-concluded frame (May 1)");
+  assert(!!upcomingF && !/was held\/concluded/i.test(upcomingF.requirement),
+    "the LATER UPCOMING visit → live-gate frame, NOT mis-labeled concluded (concluded search is window-scoped to its own bar)");
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
