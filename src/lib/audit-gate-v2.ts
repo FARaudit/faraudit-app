@@ -80,7 +80,14 @@ const PROTEST_DISPUTES_RE = new RegExp([
 // accounting-system/registered) WITHOUT matching pure protest procedure ("must be SERVED on the CO" ≠ a bar).
 const BAR_SIGNAL_RE = new RegExp([
   "\\bmust\\s+(?:possess|hold|maintain|be\\s+(?:a\\s+|an\\s+)?(?:certified|registered|accredited|licensed|qualified|eligible|approved|current|eligibility))",
-  "\\bmust\\s+be\\s+registered\\b", "\\bregistered\\s+in\\s+sam\\b",
+  // SAM-registration bar cluster — HARDENED (card #459 corpus safety gate). The prior two tokens missed real FAR
+  // 52.204-7 registration bars phrased "shall/required to be registered", spelled-out "System for Award Management",
+  // "SAM.gov", or the bare "active/current registration" noun — those leaked as bar-signal-negative and would have
+  // silently DEMOTED under the ambiguous-signal-demotion semantics (a real eligibility bar → contract loss). All are
+  // unambiguous registration-bar vocabulary; adding them only routes a real bar toward the safe escalate pole.
+  "\\b(?:must|shall|required\\s+to)\\s+be\\s+registered\\b", "\\bregistered\\s+in\\s+sam\\b",
+  "\\bsystem\\s+for\\s+award\\s+management\\b", "\\bsam\\.gov\\b",
+  "\\b(?:active|current|valid)\\s+(?:sam(?:\\.gov)?\\s+)?registration\\b", "\\bregistration\\s+in\\s+(?:sam\\b|the\\s+system\\s+for\\s+award)\\b",
   "\\beligib(?:le|ility)\\b", "\\bineligible\\b",
   "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
   "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
@@ -226,6 +233,14 @@ export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambi
   // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
   if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
   return "ambiguous";
+}
+
+/** Does the obligation carry ANY eligibility-bar signal (the shared !BAR_SIGNAL_RE guard, positive form)? Pure,
+ *  flag-independent — exposes the existing guard for (a) the ARC-D-1c ambiguous-signal-demotion escalation semantics
+ *  (Brain card #459: ambiguous+bar-signal-positive still ESCALATES the belt; ambiguous+bar-signal-negative demotes to
+ *  the coverage-signal pole) and (b) the corpus safety proof that gates that build. No behavior change on its own. */
+export function hasBarSignal(ob: string): boolean {
+  return BAR_SIGNAL_RE.test(ob);
 }
 
 export interface CoverageV2 {
