@@ -106,16 +106,40 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
   "notification\\s+of\\s+(?:award|exclusion)",
 ].join("|"), "i");
 
+// ARC D1 (Brain card 435, flag AUDIT_NOOP_REP_ALLOWLIST, default-OFF) — FAR 52.229-11/-12 "Tax on Certain Foreign
+// Procurements": a §K self-REPRESENTATION that is a NO-OP for a domestic offeror. The 2% excise/withholding fires ONLY
+// if the offeror checks "is a foreign person"; a domestic small business elects "no exemption / is not a foreign
+// person" and nothing gates. FA8137 /panel (audit bd605b88) AUTO-F'd on the verbatim §K election "no exemption
+// [Offeror must select one] from the excise tax." mis-typed disqualifierUncovered → a FALSE NHR (GATE_V2 cap that
+// pre-empted the whole B-arc). Same offeror-rights/no-op family + the SAME two guards as protest/debrief.
+const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
+const FOREIGN_TAX_REP_RE = new RegExp([
+  "\\b52\\.229-1[12]\\b",                                         // Tax on Certain Foreign Procurements (Notice / clause)
+  "tax\\s+on\\s+certain\\s+foreign\\s+procurements",
+  "\\bforeign\\s+person\\b", "\\bW-?14\\b", "\\bsection\\s+5000C\\b", "\\b5000C\\b",
+  "(?:full|partial|no)\\s+exemption[^.]{0,40}excise\\s+tax",     // the FA8137 election sentence
+  "excise\\s+tax[^.]{0,40}exemption",
+].join("|"), "i");
+
+// The OFFEROR-RIGHTS / NO-OP-REPRESENTATION BOILERPLATE family (Brain card 435 D1) — procedural offeror rights or
+// no-op self-representations that impose ZERO eligibility/award precondition. DATA-DRIVEN: add a member as an ENTRY
+// here, NEVER a new arc branch. Each member carries its own enable flag; the SHARED negative guard (!BAR_SIGNAL_RE,
+// applied once in importanceOf) keeps any COMPOUND sentence carrying a real bar signal on the safe ambiguous→NHR pole.
+const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
+  { name: "protest/disputes (52.233)", re: PROTEST_DISPUTES_RE, enabled: PROTEST_ALLOWLIST_ENABLED },
+  { name: "debrief/notification (15.50x)", re: DEBRIEF_NOTIFY_RE, enabled: DEBRIEF_ALLOWLIST_ENABLED },
+  { name: "foreign-procurement-tax rep (52.229-11)", re: FOREIGN_TAX_REP_RE, enabled: NOOP_REP_ALLOWLIST_ENABLED },
+];
+
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
- *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the protest + debriefing families
- *  must never silently narrow. */
+ *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
+ *  family (protest + debriefing + foreign-procurement-tax) must never silently narrow. */
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
   if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
-  // ARC #2 — protest/disputes procedural language, ONLY when the sentence carries no eligibility-bar signal.
-  if (PROTEST_ALLOWLIST_ENABLED && PROTEST_DISPUTES_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
-  // ARC #A — debriefing/notification offeror-rights procedural language, same no-bar-signal guard.
-  if (DEBRIEF_ALLOWLIST_ENABLED && DEBRIEF_NOTIFY_RE.test(ob) && !BAR_SIGNAL_RE.test(ob)) return "boilerplate";
+  // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
+  // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
+  if (!BAR_SIGNAL_RE.test(ob) && NOOP_REP_FAMILY.some((m) => m.enabled && m.re.test(ob))) return "boilerplate";
   return "ambiguous";
 }
 

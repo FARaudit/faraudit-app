@@ -11,6 +11,7 @@
 export {}; // force module scope (this file uses only a dynamic import, which would otherwise leave it a script)
 process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST = "true";
 process.env.AUDIT_DEBRIEF_ALLOWLIST = "true";
+process.env.AUDIT_NOOP_REP_ALLOWLIST = "true"; // ARC D1 (card 435) — foreign-procurement-tax rep family member
 
 let pass = 0, fail = 0;
 function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; console.log(`  ✗ ${label}`); } }
@@ -33,6 +34,19 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("A copy of any protest shall be served on the Contracting Officer under FAR 52.233-2 Service of Protest.") === "boilerplate");
   ok("GAO protest procedure → boilerplate",
     importanceOf("Protests may be filed with the Government Accountability Office within the time frames of the Comptroller General.") === "boilerplate");
+
+  // ── ARC D1 — foreign-procurement-tax rep (52.229-11 domestic no-op) → boilerplate (the FA8137 bd605b88 false-NHR) ──
+  ok("FA8137 verbatim §K excise-tax election → boilerplate (not disqualifier)",
+    importanceOf("The offeror represents that it has claimed no exemption [Offeror must select one] from the excise tax.") === "boilerplate");
+  ok("52.229-11 Tax on Certain Foreign Procurements → boilerplate",
+    importanceOf("The offeror shall complete the representation at FAR 52.229-11 Tax on Certain Foreign Procurements.") === "boilerplate");
+  ok("foreign-person representation → boilerplate",
+    importanceOf("The offeror represents that it is not a foreign person under section 5000C.") === "boilerplate");
+  ok("IRS W-14 exemption election → boilerplate",
+    importanceOf("A full or partial exemption from the excise tax may be claimed on IRS Form W-14.") === "boilerplate");
+  // negative guard for the new member: a real bar in the same sentence as an excise-tax mention is NOT laundered
+  ok("compound: clearance BAR + excise-tax rep → NOT laundered (not boilerplate)",
+    importanceOf("The offeror must possess a facility clearance; select full or no exemption from the excise tax.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
