@@ -127,5 +127,36 @@ console.log("\n-- 10 · FIDELITY: on a NON-notice-body pole finding[20] is ALREA
     "no_one_can_move disqualifier lands in showStoppers via unmarkedUniversalClaim (floor is a no-op here, by design)");
 }
 
+// ── 64b79916 pattern — a LIVE-sounding site-visit finding ("must attend to be eligible") while the SOURCE carries a
+//    later SAM-body UPDATE saying the visit already concluded. The staleness guard (card #453) must NOT auto-promote. ──
+const siteVisitLiveSounding = (): TypedFinding => ({
+  requirement: "You must attend the initial site visit for the project to be considered eligible to propose.",
+  citation: "SAM Notice Body", excerpt: "you must attend the initial site visit for the project to be considered eligible to propose.",
+  kind: "submission", controllability: "no_one_can_move", grounded: true, lens: "ex_ko", severity: "P2",
+});
+const concludedSource = "SAM Notice Body: you must attend the initial site visit to be considered eligible to propose. UPDATE 01 - May 28, 2026: The Site Visit was held and concluded on May 28, 2026.";
+const liveSource = "SAM Notice Body: Offerors must attend the mandatory site visit to be eligible; the site visit date will be provided by amendment.";
+
+console.log("\n-- 11 · STALENESS GUARD (card #453): live-sounding site-visit finding + SOURCE shows concluded → NOT promoted --");
+{
+  const d = deriveVerdict(base({ findings: [siteVisitLiveSounding()], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: concludedSource }));
+  assert(d.verdict === "NEEDS_HUMAN_REVIEW" && d.reason.startsWith(nb), "still the notice-body NHR pole (verdict unchanged)");
+  assert(!inSS(d.showStoppers, siteVisitLiveSounding().requirement), "stale (source shows concluded) site-visit bar NOT auto-promoted to P0 — eligibility routed to human review");
+}
+
+console.log("\n-- 12 · STALENESS GUARD control: SAME finding, NO concluded source marker → still promotes (PR #201 preserved) --");
+{
+  const d = deriveVerdict(base({ findings: [siteVisitLiveSounding()], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: liveSource }));
+  assert(inSS(d.showStoppers, siteVisitLiveSounding().requirement) && ssFor(d.showStoppers, siteVisitLiveSounding().requirement)?.severity === "P0",
+    "no source concluded-marker → a live mandatory site-visit bar still promotes to P0 (guard is source-specific)");
+}
+
+console.log("\n-- 13 · STALENESS GUARD does NOT touch a non-site-visit eligibility bar even when a concluded marker is present --");
+{
+  const d = deriveVerdict(base({ findings: [eligBar()], noticeBodyBarUngrounded: true, siteVisitSeverityFloor: true, source: concludedSource }));
+  assert(inSS(d.showStoppers, eligBar().requirement) && ssFor(d.showStoppers, eligBar().requirement)?.severity === "P0",
+    "a clearance eligibility_bar still promotes (site-visit staleness guard is scoped to site-visit findings only)");
+}
+
 console.log("\n" + (failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"));
 process.exit(failures === 0 ? 0 : 1);

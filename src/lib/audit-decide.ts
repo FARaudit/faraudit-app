@@ -1335,12 +1335,24 @@ export function disposeFinding(f: TypedFinding): Disposition {
 // firmStatus==="satisfies" (the firm PROVES it holds the bar). Flag-OFF ⇒ the branch passes [] as before
 // (byte-identical, Rule 61). Pure -> gate-tested.
 const SITE_VISIT_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b|\bjob[\s-]?walk\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bwalk[\s-]?(?:through|thru)\b/i;
+// STALENESS marker (card #453 · red-team adjudication of 64b79916) — a SAM-body UPDATE line showing the site
+// visit already HELD / CONCLUDED / CLOSED. Keyed off the SOURCE (not the finding's own excerpt) per the ruling:
+// a finding may present the visit as a LIVE "must attend to be eligible" gate while a later UPDATE says it closed.
+const SITE_VISIT_CONCLUDED_RE = /\bsite[\s-]?(?:visit|tour|inspection)\b[^.\n]{0,80}\b(?:was\s+held|has\s+been\s+held|(?:was|is|has\s+been)\s+(?:concluded|closed|conducted)|already\s+(?:past|held|occurred|concluded)|(?:is|are)\s+now\s+(?:closed|concluded|past))\b|\b(?:held\s+and\s+(?:concluded|closed)|now\s+closed|has\s+concluded)\b[^.\n]{0,60}\bsite[\s-]?(?:visit|tour)\b/i;
 function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, source?: string): boolean {
   if (f.disposition !== "disqualifying") return false;             // over-fire guard: a real bar, never a gate-to-clear
   if (f.curableInWindow === true) return false;                    // curable in-window -> a gate to clear, not a blocker (branch-5b parity)
   if (firmStatus(f, profile, source) === "satisfies") return false; // the firm PROVES it holds the bar -> not a blocker
+  const isSiteVisit = SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation
+  // STALENESS GUARD (card #453 · additive to PR #201) — a SITE-VISIT bar whose SOURCE shows the visit already
+  // concluded/held is STALE: the finding may read as a live "must attend to be eligible" gate while a later
+  // SAM-body UPDATE says it closed (64b79916). Do NOT auto-promote a stale site-visit gate to P0 — the eligibility
+  // question (did the firm attend the now-closed visit?) belongs in human review, not a false "go attend it" P0.
+  // Keyed off SOURCE only (per the red-team ruling): a finding that ACCURATELY states "concluded … cannot
+  // retroactively participate" with NO separate source marker still promotes (PR #201 finding-accurate case).
+  if (isSiteVisit && source && SITE_VISIT_CONCLUDED_RE.test(source)) return false;
   if (f.kind === "eligibility_bar") return true;
-  return SITE_VISIT_RE.test(f.requirement ?? "") || SITE_VISIT_RE.test(f.excerpt ?? ""); // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
+  return isSiteVisit; // CONTENT only — NOT citation (keying P0 off a referenced doc NAME over-fires; ultracode re-review #2 P2)
 }
 /** The site-visit/eligibility disqualifiers to SURFACE as bid-deciding on the notice-body NHR pole, floored to P0.
  *  Applied ONLY inside that branch (see doctrine above) — never on meta-ambiguity poles. Pure. */
