@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto"; // Fork-5 (card 240): deterministic sha256 for the verified-defect excerpt binding (server-side, same as agentic-ingest/model-runs). Pure — no network, no randomness.
 import type { VerdictInputs, TypedFinding, BidderProfile, Controllability, RequirementKind } from "./audit-findings";
 import { GATE_V2_ENABLED, gateV2Outcome } from "./audit-gate-v2";
-import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_RE, SITE_VISIT_CONCLUDED_RE, BOA_IDIQ_HOLDER_BAR_RE } from "./audit-site-visit-patterns";
 
 export type Verdict = "BID" | "BID_WITH_CAUTION" | "NO_BID" | "INELIGIBLE" | "NEEDS_HUMAN_REVIEW" | "INCOMPLETE";
 export type Disposition = "met" | "gate_to_clear" | "disqualifying" | "dropped";
@@ -1031,7 +1031,8 @@ const GENUINE_NONSETASIDE_ELIG_KEEP_RE = /export.?control|\bITAR\b|international
 // authority is the vehicle's own ordering/eligibility terms, not FAR 19, so ELIGIBILITY_AUTHORITY_RE never matches it —
 // without this keep-class it falls through to the phantom demotion. Keeping is the conservative (zero-contract-loss)
 // direction: it can only leave a bar as a bar (→ NHR), never create a false BID. Own flag; matches requirement+excerpt.
-const BOA_IDIQ_HOLDER_BAR_RE = /(?:\b(?:BOA|IDIQ|ID\/IQ|BPA|GWAC|MAS|FSS|MATOC|SATOC|IDC)\b|basic ordering agreement|blanket purchase agreement|multiple[- ]award schedule|federal supply schedule|indefinite[- ]delivery(?:\/indefinite[- ]quantity)?|governmentwide acquisition contract)[^.\n]{0,60}?(?:holder|awardee|on-?ramp|participant|restricted|limited\s+to|eligible|reserved|open\s+only)|(?:holder|awardee|participant)s?\s+of\s+(?:the\s+|an?\s+|this\s+|these\s+)?(?:BOA|IDIQ|ID\/IQ|BPA|GWAC|MAS|FSS|MATOC|SATOC|basic ordering agreement|blanket purchase agreement|multiple[- ]award schedule|federal supply schedule|contract|vehicle|schedule)|(?:only|restricted to|limited to|reserved for|open only to|must be an?|must hold an?)\s+[^.\n]{0,40}?(?:contract|schedule|vehicle|agreement|BOA|IDIQ|BPA|GWAC)\s+holders?/i;
+// BOA_IDIQ_HOLDER_BAR_RE is the SHARED contract regex (audit-site-visit-patterns.ts) — the SAME one the notice-body
+// emitter uses to SURFACE the bar (card #461 B2), so the emit and this keep-class never drift.
 // The POSITIVE eligibility / who-can-compete / origin trigger — the bar must PRESENT as a bidder-directed exclusion.
 const ELIGIBILITY_CLAIM_RE = /\bel[ie]gib|\bineligib|\bdisqualif|\bexclud|not\s+subject\s+to|\bWTO\b|\bGPA\b|\bTAA\b|free\s+trade|trade\s+agreement|buy\s+american|\bBAA\b|(?:domestic|foreign|non-?domestic)\s+end\s+product|country\s+of\s+origin|end\s+product|reserved\s+(?:for|exclusively)|restricted\s+to|who\s+(?:can|may)\s+(?:bid|compete|offer|be\s+awarded)/i;
 /** Re-type a phantom-cite hard eligibility show-stopper off the bar path (Brain card 329). Pure → gate-tested.

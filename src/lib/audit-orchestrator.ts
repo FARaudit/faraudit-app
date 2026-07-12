@@ -20,7 +20,7 @@ import { isBindingDoc, hasEngineText } from "./sam-attachments";
 import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
-import { SITE_VISIT_CONCLUDED_RE } from "./audit-site-visit-patterns";
+import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
 import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
@@ -524,6 +524,11 @@ const NOTICE_CLEARANCE_RE = /\bclearance\b|\bclassified\b|\btop[\s-]?secret\b|\b
 // regex imported from audit-site-visit-patterns — the SAME one the B3-severity guard (audit-decide) recognizes,
 // so the emitter's conditional-concluded frame and the guard's promotion never drift (card #453/#454).
 const NOTICE_EVENT_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/i;
+// BROADER date matcher for the single-visit guard's date-count ONLY (not display) — ALSO catches the day-first
+// "15 August 2026" military/SAM format the display regex misses, so two visits stated in different date formats
+// still count as two (Gate-2: undercounting dates re-enabled the multi-visit mis-frame). Over-counting is the safe
+// direction (fallback off → human review), so a permissive date detector here can only fail toward not-reframing.
+const SV_GUARD_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/i;
 export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
   const noticeText = (noticeBodyText && noticeBodyText.trim())
     ? noticeBodyText
@@ -551,6 +556,25 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
   const out: TypedFinding[] = [];
   const emitted: Array<[number, number]> = [];
   const seenExcerpt = new Set<string>();
+  // SINGLE-VISIT guard for the notice-wide concluded fallback: the fallback may only attribute a lone concluded
+  // marker to a bar when the notice describes exactly ONE site visit — else a multi-visit notice (one concluded +
+  // one upcoming) would be mis-framed. Counting bar SENTENCES alone undercounts (a concluded visit narrated as a
+  // plain UPDATE line is not itself an eligibility-bar sentence — Gate-2 finding), so the guard ALSO keys off
+  // DISTINCT site-visit EVENT DATES across bar sentences AND concluded markers: two different dates ⇒ two visits.
+  const svBarSpans = new Set<string>();
+  const svDates = new Set<string>();
+  for (const m of nNotice.matchAll(new RegExp(ELIGIBILITY_BAR_RE.source, "gi"))) {
+    const [s, e] = sentenceSpan(m.index ?? 0);
+    const sent = nNotice.slice(s, e);
+    if (NOTICE_SITE_VISIT_RE.test(sent)) { svBarSpans.add(`${s}:${e}`); const d = SV_GUARD_DATE_RE.exec(sent); if (d) svDates.add(d[0].toLowerCase()); }
+  }
+  for (const m of nNotice.matchAll(new RegExp(SITE_VISIT_CONCLUDED_RE.source, "gi"))) {
+    const [s, e] = sentenceSpan(m.index ?? 0);
+    const d = SV_GUARD_DATE_RE.exec(nNotice.slice(s, e)); if (d) svDates.add(d[0].toLowerCase());
+  }
+  // ≤1 site-visit bar AND ≤1 distinct site-visit date. Over-counting dates (same date, two formats) only makes the
+  // guard MORE conservative (fallback off → routes to human review via the severity floor) — the safe direction.
+  const singleSiteVisit = svBarSpans.size <= 1 && svDates.size <= 1;
   const scan = new RegExp(ELIGIBILITY_BAR_RE.source, "gi");
   for (const m of nNotice.matchAll(scan)) {
     const [ss, se] = sentenceSpan(m.index ?? 0);
@@ -575,14 +599,29 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     const winStart = Math.max(0, ss - WIN);
     const winEnd = Math.min(nNotice.length, se + WIN);
     const windowText = nNotice.slice(winStart, winEnd);
-    const concludedRel = new RegExp(SITE_VISIT_CONCLUDED_RE.source, "i").exec(windowText);
-    if (NOTICE_SITE_VISIT_RE.test(excerpt) && concludedRel && concludedRel.index != null) {
-      const cAbs = winStart + concludedRel.index;
+    // Concluded-marker search: the tight ±600 WINDOW first (avoids cross-framing a DIFFERENT visit's marker onto
+    // this bar). If the window MISSES and this is a site-visit bar, a NOTICE-WIDE fallback (flag
+    // AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE, default-OFF) uses a concluded marker anywhere in the notice — but ONLY
+    // when it is UNIQUE (exactly ONE site-visit concluded marker in the whole notice body), so a lone concluded
+    // UPDATE line placed far from the original "you must attend" bar (the SAM chronological-UPDATE layout, e.g.
+    // FA813726R0033 where "held and concluded May 28" sits >600 chars from the bar) reframes the bar correctly,
+    // while a notice carrying two distinct visits (one concluded, one live) never cross-frames. Card #461.
+    const windowRel = new RegExp(SITE_VISIT_CONCLUDED_RE.source, "i").exec(windowText);
+    let cAbs: number | null = windowRel && windowRel.index != null ? winStart + windowRel.index : null;
+    const fromWindow = cAbs != null;
+    if (cAbs == null && NOTICE_SITE_VISIT_RE.test(excerpt) && singleSiteVisit && process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE === "true") {
+      const wideMatches = [...nNotice.matchAll(new RegExp(SITE_VISIT_CONCLUDED_RE.source, "gi"))];
+      if (wideMatches.length === 1 && wideMatches[0].index != null) cAbs = wideMatches[0].index;
+    }
+    if (NOTICE_SITE_VISIT_RE.test(excerpt) && cAbs != null) {
       const [cs, ce] = sentenceSpan(cAbs);
       const concludedSentence = nNotice.slice(cs, ce).trim();
       const eventDate = (NOTICE_EVENT_DATE_RE.exec(concludedSentence) || [])[0] || "";
-      // ONE verbatim span covering BOTH the bar and the concluded marker; cap generously so both survive.
-      outExcerpt = nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 600);
+      // Window path: ONE verbatim span covering BOTH bar and marker (they are close). Notice-wide path: the marker is
+      // far from the bar, so use the concluded sentence itself as the grounded excerpt (still verbatim in the notice).
+      outExcerpt = fromWindow
+        ? nNotice.slice(Math.min(ss, cs), Math.max(se, ce)).trim().slice(0, 600)
+        : concludedSentence.slice(0, 600);
       // The requirement ALWAYS carries a CONCLUDED_RE-matchable frame ("site visit … was held/concluded"), with or
       // without a parseable date — the guard keys promotion off this frame, so it must match even when eventDate="".
       requirement = `Mandatory site visit stated in the SAM notice body was held/concluded${eventDate ? ` ${eventDate}` : " (date not stated in the notice)"}; attendance is non-retroactive — this BARS AWARD unless the firm's attendance at the concluded site visit is confirmed (conditional-concluded, not a live gate): "${concludedSentence.slice(0, 200)}"`;
@@ -603,6 +642,35 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
       grounded: true,
       lens: "notice_body_elig_detector",
     });
+  }
+  // B2 (card #461, flag AUDIT_NOTICE_BODY_BOA_EMIT, default-OFF) — SURFACE a BOA/IDIQ/BPA/GWAC vehicle HOLDER-ONLY
+  // ordering restriction that ELIGIBILITY_BAR_RE does not carry. An ITO/order against a multiple-award vehicle is
+  // competable ONLY by existing holders; a non-holder cannot bid at all — the single most controlling eligibility
+  // fact, and the panel's #1 miss on FA813726R0033 ("Tinker AFB - MAC BOA Holders ONLY" 7× in body, 0× in report).
+  // Deduped vs spans a decision-bearing lens finding already owns (the B2 keep-class handles THAT one) and vs bars
+  // already emitted above. The keep-class (AUDIT_BOA_IDIQ_HOLDER_KEEP) routes the emitted bar to a conditional NHR.
+  if (process.env.AUDIT_NOTICE_BODY_BOA_EMIT === "true") {
+    const bscan = new RegExp(BOA_HOLDER_ONLY_EMIT_RE.source, "gi");
+    for (const m of nNotice.matchAll(bscan)) {
+      const [ss, se] = sentenceSpan(m.index ?? 0);
+      if (covering.some(([s, e]) => s < se && ss < e)) continue;   // a lens finding already owns it → keep-class covers that one
+      if (emitted.some(([s, e]) => s < se && ss < e)) continue;    // already surfaced as an ELIGIBILITY_BAR bar this run
+      const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
+      if (!excerpt || seenExcerpt.has(excerpt)) continue;          // identical bar sentence elsewhere → one finding
+      seenExcerpt.add(excerpt);
+      emitted.push([ss, se]);
+      out.push({
+        requirement: `Order restricted to vehicle HOLDERS ONLY (BOA/IDIQ/BPA/GWAC/MAS) stated in the SAM notice body — this ITO/order can only be proposed by an existing holder of the underlying vehicle; a firm that does not hold it CANNOT bid. Confirm the firm holds the vehicle before pursuing: "${excerpt}"`,
+        citation: NOTICE_BODY_DOC_NAME,
+        excerpt,
+        kind: "eligibility_bar",
+        controllability: "bidder_cannot_move",
+        curableInWindow: false,
+        grounded: true,
+        lens: "notice_body_boa_holder_detector",
+      });
+      break; // the holder-only gate is BINARY (hold the vehicle or not) — one grounded finding, not N restatements.
+    }
   }
   return out;
 }
