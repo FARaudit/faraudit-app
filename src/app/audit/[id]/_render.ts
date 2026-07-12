@@ -2860,7 +2860,10 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
                   <div class="nb-frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5h.01"/></svg><span><b>This may disqualify the bid.</b> A reviewer must confirm (or obtain a waiver) before you rely on this opportunity.</span></div>
                 </div>`).join("\n");
     html = replaceFieldInner(html, "gate_block", `\n                ${blocks}\n              `);
-    html = html.replace(/(<div class="gate-card" id="reco-gate")\s+style="display:none"/, "$1"); // reveal the card
+    // Design Ruling 1 (card #424): the .nhr-block REPLACES the .gate-card chassis — a card-in-a-card (two borders)
+    // dilutes the single calm "look here" signal, and on the NHR pole there's no cleared/uncleared gate list to wrap
+    // it in. Strip the chassis border/bg/padding → the .nhr-block is the standalone card (its own amber left-rail).
+    html = html.replace(/(<div class="gate-card" id="reco-gate")\s+style="display:none"/, '$1 style="border:0;background:none;padding:0"');
   }
   // Gap-collapse (Jun 11, Army live-DOM): when gate mode is visually active
   // but the engine emitted no gate_conditions[] (Brain doesn't emit the field
@@ -2966,19 +2969,26 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
       "div",
       `<div class="ck-expired-notice"><span class="ck-expired-badge">Solicitation closed — checklist is reference only</span></div>`
     );
-  } else if (NHR_COHERENCE_ON && vm.is_nhr && vm.show_stoppers.length > 0) {
+  } else if (NHR_COHERENCE_ON && vm.is_nhr && (vm.show_stoppers.length > 0 || vm.submission_gates.length > 0)) {
     // Root-C LEAK 3 (card #423): on the NHR pole the checklist shows the open gates a reviewer must clear — NOT a
     // false "submit by <date>" runway. A show-stopper the source shows already concluded/missed renders in the muted
     // "Closed" state (never a hopeful checkbox); otherwise a live "Disqualifying" gate. Verbatim + citation, real
     // findings only. Flag-gated + is_nhr ⇒ else the scored checklist renders byte-identical (Rule 61).
+    // Design Ruling 2 (card #424): Disqualifying (show-stoppers, "Closed" when the source reads concluded/past) +
+    // Required (submission-mandatory gates) as rows; the advisory gate_to_clear long-tail collapses to one roll-up line.
     const PAST_RE = /concluded|already\s+(?:held|closed|passed|occurred)|has\s+(?:passed|closed|concluded)|no longer|was held/i;
-    const items = vm.show_stoppers.map((s) => {
+    const ckItem = (text: string, cite: string, sevHtml: string, closed = false) =>
+      `<div class="ck-item${closed ? " closed" : ""}"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(text)}<span class="ck-csrc">${escapeHtml(cite)}</span></span>${sevHtml}</div>`;
+    const dqRows = vm.show_stoppers.map((s) => {
       const closed = PAST_RE.test(s.condition);
-      const sev = closed ? `<span class="ck-sev closed">Closed</span>` : `<span class="ck-sev dq">Disqualifying</span>`;
-      return `<div class="ck-item${closed ? " closed" : ""}"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(s.condition)}<span class="ck-csrc">${escapeHtml(s.citation)}</span></span>${sev}</div>`;
+      return ckItem(s.condition, s.citation, closed ? `<span class="ck-sev closed">Closed</span>` : `<span class="ck-sev dq">Disqualifying</span>`, closed);
     }).join("");
+    const reqRows = vm.submission_gates.map((s) => ckItem(s.condition, s.citation, `<span class="ck-sev req">Required</span>`)).join("");
+    const advisoryRow = vm.advisory_gate_count > 0
+      ? `<div class="ck-item"><span class="ck-box"></span><span class="ck-txt">+${vm.advisory_gate_count} advisory item${vm.advisory_gate_count === 1 ? "" : "s"} — see the full requirement landscape in §​07<span class="ck-csrc">§07</span></span><span class="ck-sev adv">Advisory</span></div>`
+      : "";
     html = setFieldInner(html, "submission_checklist_filtered", "div",
-      `<div class="ck-group"><div class="ck-gh">Open items a reviewer must clear</div>${items}</div>`);
+      `<div class="ck-group"><div class="ck-gh">Open items a reviewer must clear</div>${dqRows}${reqRows}${advisoryRow}</div>`);
     // The "N / M complete" progress readout implies a submission runway that doesn't exist on a review pole → honest.
     html = html.replace(
       '<span class="ck-prog"><b id="ckDone">0</b> / <span id="ckTotal">10</span> complete</span>',
