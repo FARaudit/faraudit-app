@@ -1345,11 +1345,18 @@ function setJumpBadge(html: string, sectionHref: string, count: number): string 
 // items. Card layout shares the same data-field anchor (<div class="clins">)
 // so we reuse replaceFieldInner which walks balanced div boundaries (a flat
 // tbody regex no longer works — children are <div class="clin"> not <tr>).
-function setClinEmptyState(html: string): string {
+// Root-C LEAK 4 (card #423) — the "upload the full PDF" CTA is a metadata-only prelim affordance; on a COMPLETED
+// NHR run the document is already in hand, so that CTA is false. On an NHR pole render an honest empty state (no
+// upload CTA) — the line items couldn't be surfaced from what was read, flagged for the human review. Flag-gated +
+// is_nhr ⇒ else the scored "upload the full PDF" copy renders byte-identical (Rule 61).
+function setClinEmptyState(html: string, nhr?: boolean): string {
+  const inner = nhr
+    ? `CLIN structure could not be surfaced from the documents as read — flagged for the human review noted above.`
+    : `CLIN structure not extracted — upload the full PDF to surface the line items.`;
   return replaceFieldInner(
     html,
     "clin_table",
-    `\n                <div class="clin-empty" style="padding:18px 16px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px;border:1px dashed var(--line);border-radius:13px">CLIN structure not extracted — upload the full PDF to surface the line items.</div>\n              `
+    `\n                <div class="clin-empty" style="padding:18px 16px;text-align:center;color:var(--mute);font-family:'IBM Plex Mono',monospace;font-size:11.5px;border:1px dashed var(--line);border-radius:13px">${inner}</div>\n              `
   );
 }
 
@@ -2404,6 +2411,13 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     // .v-unscored prelim chassis with the new data-prelim-mode="reviewed": engine reason verbatim + a pointer
     // to the findings that WERE produced. The report body (§04/§05/matrix/findings) renders unchanged below.
     html = pickVerdictBlock(html, "preliminary", "reviewed");
+    // Root-C LEAK 4 (card #423): the masthead "Upload the solicitation PDF" / "or upload the PDF yourself" CTAs are
+    // metadata-only prelim affordances — false on a COMPLETED NHR run (the document is already in hand). Suppress them
+    // on the NHR pole. Flag-gated ⇒ else byte-identical (Rule 61).
+    if (NHR_COHERENCE_ON) {
+      html = removeElementByOpenRe(html, /<a class="mhv-cta-2"[^>]*\bdata-upload\b[^>]*>/, "a");
+      html = removeElementByOpenRe(html, /<a class="mhv-cta"[^>]*\bdata-upload\b[^>]*>/, "a");
+    }
     // Card-360 item 2 (Brain): pole-accurate masthead word + label (W9126 = INCOMPLETE, not "Human review").
     html = replaceFieldInner(html, "nhr_word", vm.nhr_word); // raw — vm.nhr_word carries <br> for the 2-line word
     html = replaceFieldText(html, "nhr_label", vm.nhr_label);
@@ -2586,6 +2600,14 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // upcoming date remains). Runs after item-drops so the target item still
   // exists when we re-apply the class.
   html = applyUrgentKdItem(html, vm.urgent_field);
+  // Root-C LEAK 1 (card #423) — on an NHR pole, kill every live countdown + urgent rail in the body: a "in N days /
+  // N days ago" clock to a date a later amendment may have retracted is false at read-time (Card-330 #4 staleness
+  // vector), and nothing is "urgent" on a timeline we never confirmed. The absolute two-tier date stays; only the
+  // .cnt countdown chip + the urgent accent are dropped. Flag-gated + is_nhr ⇒ else byte-identical (Rule 61).
+  if (NHR_COHERENCE_ON && vm.is_nhr) {
+    for (const f of ["qa_deadline", "response_deadline", "award_date"]) html = removeKdCnt(html, f);
+    html = applyUrgentKdItem(html, ""); // strip urgent everywhere — never a klaxon on a no-verdict run
+  }
   // If none of the three dates was real, drop the entire ribbon.
   if (!vm.has_response_deadline && !vm.has_qa_deadline && !vm.has_award_date) {
     html = removeKeyDates(html);
@@ -2685,7 +2707,7 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
     const cards = vm.clin_line_items.map(renderClinCard).join("\n                ");
     html = replaceFieldInner(html, "clin_table", `\n                ${cards}\n              `);
   } else {
-    html = setClinEmptyState(html);
+    html = setClinEmptyState(html, NHR_COHERENCE_ON && vm.is_nhr);
   }
 
   // §04 Compliance flags — wire-or-hide the demo rows. Defense in depth:
@@ -2825,6 +2847,21 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
   // not just DECISION_GATE verdicts.
   const gateModeActive = vm.verdict_mode === "gate" || vm.score_locked;
   html = renderGateConditions(html, vm.gate_conditions, gateModeActive);
+  // Root-C LEAK 2 (card #423) — a blocking condition can never hide. When the engine typed a `disqualifying`
+  // show-stopper, the "0/0 cleared / display:none" all-clear state is forbidden on the NHR pole: surface each
+  // condition on the .gate-card chassis as a neutral-review .nhr-block — verbatim + citation, routed to a human,
+  // never a red DECLINE. Flag-gated + is_nhr ⇒ else byte-identical (Rule 61); the block CSS ships inert until used.
+  if (NHR_COHERENCE_ON && vm.is_nhr && vm.show_stoppers.length > 0) {
+    const blocks = vm.show_stoppers.map((s) => `
+                <div class="nhr-block">
+                  <div class="nb-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4l7 3 9-3v10l-9 3-7-3"/></svg>Blocking condition · needs review</div>
+                  <p class="nb-cond">${escapeHtml(s.condition)}</p>
+                  <span class="nb-cite mono">${escapeHtml(s.citation)}</span>
+                  <div class="nb-frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 11v5M12 7.5h.01"/></svg><span><b>This may disqualify the bid.</b> A reviewer must confirm (or obtain a waiver) before you rely on this opportunity.</span></div>
+                </div>`).join("\n");
+    html = replaceFieldInner(html, "gate_block", `\n                ${blocks}\n              `);
+    html = html.replace(/(<div class="gate-card" id="reco-gate")\s+style="display:none"/, "$1"); // reveal the card
+  }
   // Gap-collapse (Jun 11, Army live-DOM): when gate mode is visually active
   // but the engine emitted no gate_conditions[] (Brain doesn't emit the field
   // for score_locked yet), applyVerdictMode('gate') would reveal the masthead
@@ -2928,6 +2965,24 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
       "submission_checklist_filtered",
       "div",
       `<div class="ck-expired-notice"><span class="ck-expired-badge">Solicitation closed — checklist is reference only</span></div>`
+    );
+  } else if (NHR_COHERENCE_ON && vm.is_nhr && vm.show_stoppers.length > 0) {
+    // Root-C LEAK 3 (card #423): on the NHR pole the checklist shows the open gates a reviewer must clear — NOT a
+    // false "submit by <date>" runway. A show-stopper the source shows already concluded/missed renders in the muted
+    // "Closed" state (never a hopeful checkbox); otherwise a live "Disqualifying" gate. Verbatim + citation, real
+    // findings only. Flag-gated + is_nhr ⇒ else the scored checklist renders byte-identical (Rule 61).
+    const PAST_RE = /concluded|already\s+(?:held|closed|passed|occurred)|has\s+(?:passed|closed|concluded)|no longer|was held/i;
+    const items = vm.show_stoppers.map((s) => {
+      const closed = PAST_RE.test(s.condition);
+      const sev = closed ? `<span class="ck-sev closed">Closed</span>` : `<span class="ck-sev dq">Disqualifying</span>`;
+      return `<div class="ck-item${closed ? " closed" : ""}"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(s.condition)}<span class="ck-csrc">${escapeHtml(s.citation)}</span></span>${sev}</div>`;
+    }).join("");
+    html = setFieldInner(html, "submission_checklist_filtered", "div",
+      `<div class="ck-group"><div class="ck-gh">Open items a reviewer must clear</div>${items}</div>`);
+    // The "N / M complete" progress readout implies a submission runway that doesn't exist on a review pole → honest.
+    html = html.replace(
+      '<span class="ck-prog"><b id="ckDone">0</b> / <span id="ckTotal">10</span> complete</span>',
+      '<span class="ck-prog">Review not complete · open items below</span>'
     );
   } else {
     html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
