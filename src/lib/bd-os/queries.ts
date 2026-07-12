@@ -174,6 +174,10 @@ export interface AuditRow {
   solicitation_number: string | null;
   title: string | null;
   agency: string | null;
+  // Card #450 — Past Audits NAICS + set-aside slicers read these off the audits
+  // table (both columns exist + are 100% populated; no migration).
+  naics_code: string | null;
+  set_aside: string | null;
   recommendation: string | null;
   compliance_score: number | null;
   document_type: string | null;
@@ -252,7 +256,7 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates, office_leaf, exec_what:compliance_json->executive_summary->>what, exec_verdict:compliance_json->executive_summary->>verdict, exec_factors:compliance_json->executive_summary->>factors")
+    .select("id, notice_id, solicitation_number, title, agency, naics_code, set_aside, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates, office_leaf, exec_what:compliance_json->executive_summary->>what, exec_verdict:compliance_json->executive_summary->>verdict, exec_factors:compliance_json->executive_summary->>factors")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
