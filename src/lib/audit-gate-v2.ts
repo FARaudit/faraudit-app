@@ -180,6 +180,23 @@ const DOC_PRECEDENCE_RE = new RegExp([
   "(?:conflict|inconsistenc|discrepanc)[^.]{0,80}(?:shall|will)\\s+(?:take\\s+precedence|govern|control|prevail)", // "…conflict…shall govern/prevail"
 ].join("|"), "i");
 
+// ARC D-1b (Brain card #457, flag AUDIT_CLARIFICATION_ALLOWLIST, default-OFF) — OFFEROR CLARIFICATION / ERROR-
+// OMISSION-RIGHTS boilerplate. A §L instruction telling an offeror it MAY point out an error / omission / ambiguity /
+// unsoundness in the solicitation (and how to raise a question to the KO) is a procedural offeror RIGHT — it imposes
+// ZERO eligibility or award precondition on the bidder. Convergence run 66897b8a (D-1 held on precedence, but the §L
+// family CYCLED) drove a FALSE GATE_V2 NHR on the verbatim §L sentence: "If an offeror believes that the requirements
+// in these instructions contain an error, omission, or are otherwise unsound…" — mis-typed disqualifierUncovered,
+// pre-empting the notice-body pole. A DATA ENTRY on the offeror-rights/no-op family, same discipline as the other
+// members. CLARIFICATION_RIGHTS_RE keeps ONLY the "believes … error/omission/unsound" and "errors/omissions … brought
+// to / submitted to the CO" clarification frames; the SHARED !BAR_SIGNAL_RE guard keeps any compound real bar
+// (must-hold-clearance-and-report-errors) on the safe ambiguous→NHR pole. Flag-OFF ⇒ not consulted ⇒ byte-identical.
+const CLARIFICATION_ALLOWLIST_ENABLED = process.env.AUDIT_CLARIFICATION_ALLOWLIST === "true";
+const CLARIFICATION_RIGHTS_RE = new RegExp([
+  "\\bbelieves?\\b[^.]{0,90}\\b(?:error|omission|ambiguit|unsound|discrepanc|conflict|defect)\\b",                 // "if an offeror believes … error/omission/unsound"
+  "\\b(?:error|omission|ambiguit|discrepanc|defect)s?\\b[^.]{0,80}\\b(?:brought|reported|submitted|identified|raised|call(?:ed)?)\\b[^.]{0,40}\\b(?:contracting\\s+officer|attention|\\bCO\\b|\\bKO\\b)", // "errors … brought to the CO's attention"
+  "\\bnotify\\s+the\\s+(?:contracting\\s+officer|\\bCO\\b|\\bKO\\b)[^.]{0,80}\\b(?:error|omission|ambiguit|discrepanc|unsound|defect)\\b",  // "notify the CO of any error/omission"
+].join("|"), "i");
+
 // The OFFEROR-RIGHTS / NO-OP-REPRESENTATION BOILERPLATE family (Brain card 435 D1) — procedural offeror rights or
 // no-op self-representations that impose ZERO eligibility/award precondition. DATA-DRIVEN: add a member as an ENTRY
 // here, NEVER a new arc branch. Each member carries its own enable flag; the SHARED negative guard (!BAR_SIGNAL_RE,
@@ -189,6 +206,7 @@ const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
   { name: "debrief/notification (15.50x)", re: DEBRIEF_NOTIFY_RE, enabled: DEBRIEF_ALLOWLIST_ENABLED },
   { name: "foreign-procurement-tax rep (52.229-11)", re: FOREIGN_TAX_REP_RE, enabled: NOOP_REP_ALLOWLIST_ENABLED },
   { name: "document order-of-precedence (52.215-8 / ITO-BOA)", re: DOC_PRECEDENCE_RE, enabled: PRECEDENCE_ALLOWLIST_ENABLED },
+  { name: "offeror clarification / error-omission rights (§L)", re: CLARIFICATION_RIGHTS_RE, enabled: CLARIFICATION_ALLOWLIST_ENABLED },
 ];
 
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.

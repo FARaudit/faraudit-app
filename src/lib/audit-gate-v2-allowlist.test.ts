@@ -13,6 +13,7 @@ process.env.AUDIT_PROTEST_CLAUSE_ALLOWLIST = "true";
 process.env.AUDIT_DEBRIEF_ALLOWLIST = "true";
 process.env.AUDIT_NOOP_REP_ALLOWLIST = "true"; // ARC D1 (card 435) — foreign-procurement-tax rep family member
 process.env.AUDIT_PRECEDENCE_ALLOWLIST = "true"; // ARC D-1 (card 445/448) — document order-of-precedence family member
+process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true"; // ARC D-1b (card 457) — offeror clarification / error-omission rights member
 
 let pass = 0, fail = 0;
 function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; console.log(`  ✗ ${label}`); } }
@@ -107,6 +108,19 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   // scoping guard: a bare non-document "precedence" statement with no conflict/order-of-precedence frame is NOT matched
   ok("bare 'takes precedence' with no conflict/document frame → NOT laundered by this member",
     importanceOf("The awardee's schedule takes precedence in day-to-day site coordination.") !== "boilerplate");
+
+  // ── ARC D-1b — offeror clarification / error-omission rights (§L) → boilerplate (the 66897b8a false-NHR driver) ──
+  ok("66897b8a verbatim §L 'believes … error, omission, or … unsound' → boilerplate (not disqualifier)",
+    importanceOf("If an offeror believes that the requirements in these instructions contain an error, omission, or are otherwise unsound, the offeror should notify the Contracting Officer.") === "boilerplate");
+  ok("errors brought to the CO's attention → boilerplate",
+    importanceOf("Any errors, omissions, or ambiguities discovered in the solicitation shall be brought to the Contracting Officer's attention in writing.") === "boilerplate");
+  ok("notify the CO of any discrepancy → boilerplate",
+    importanceOf("Offerors shall notify the Contracting Officer of any discrepancy or omission in the specifications.") === "boilerplate");
+  // negative guard for the new member: a real eligibility bar compounded with a clarification-rights sentence is NOT laundered
+  ok("compound: 8(a) eligibility BAR + error-clarification rights → NOT laundered (not boilerplate)",
+    importanceOf("Offerors must be a certified 8(a) participant; if an offeror believes these instructions contain an error or omission, it should notify the Contracting Officer.") !== "boilerplate");
+  ok("compound: clearance BAR + error-notification → NOT laundered",
+    importanceOf("Only offerors holding an active facility clearance are eligible; any omission or discrepancy should be reported to the Contracting Officer.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
