@@ -48,6 +48,17 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
   ok("compound: clearance BAR + excise-tax rep → NOT laundered (not boilerplate)",
     importanceOf("The offeror must possess a facility clearance; select full or no exemption from the excise tax.") !== "boilerplate");
 
+  // ── GATE-2 REGRESSION (PR #202) — the "foreign person" laundering vector the two lenses surfaced MUST stay closed.
+  //    A real ITAR/FOCI access bar / country-of-origin bar must NEVER be laundered to boilerplate by a foreign-token. ──
+  ok("ITAR: no-foreign-person-access bar → NOT laundered (not boilerplate)",
+    importanceOf("No foreign person shall have access to classified information under this contract.") !== "boilerplate");
+  ok("FOCI: foreign-ownership/control bar → NOT laundered",
+    importanceOf("Offerors under foreign ownership, control, or influence are ineligible absent a mitigation agreement.") !== "boilerplate");
+  ok("ITAR export-control bar → NOT laundered",
+    importanceOf("The contractor must comply with ITAR export-control requirements and employ only U.S. citizens on this effort.") !== "boilerplate");
+  ok("TAA country-of-origin bar → NOT laundered",
+    importanceOf("End products must comply with the Trade Agreements Act; products of a foreign person from a non-designated country are prohibited.") !== "boilerplate");
+
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
     importanceOf("Offerors must possess an active facility clearance; unsuccessful offerors may request a debriefing.") !== "boilerplate");

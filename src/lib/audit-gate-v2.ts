@@ -85,6 +85,14 @@ const BAR_SIGNAL_RE = new RegExp([
   "\\bset[\\s-]?aside\\b", "\\b8\\s?\\(?a\\)?\\b", "\\bhubzone\\b", "\\bsdvosb\\b", "\\bwosb\\b", "\\bedwosb\\b", "\\bservice[\\s-]?disabled\\b",
   "\\bclearance\\b", "\\bcertif(?:ied|ication)\\b", "\\baccredit", "\\blicens(?:e|ed|ing)\\b",
   "\\bsize\\s+standard\\b", "\\bpast\\s+performance\\b", "\\bbond(?:ing|ed)?\\b", "\\baccounting\\s+system\\b",
+  // GATE-2 HARDENING (PR #202, foreign-tax member) — foreign-ownership / export-control / country-of-origin / citizenship
+  // bar vocabulary the ORIGINAL guard missed. These are REAL eligibility/access bars that DO NOT appear in the benign
+  // 52.229-11 tax rep ("foreign person" / "5000C" / "excise tax"), so adding them here cannot re-block that rep. Closes
+  // the ITAR/FOCI "no foreign person shall have access to classified information" laundering vector the two Gate-2 lenses
+  // (contracts-attorney SOUND-BUT-OVERBROAD + adversarial-redteam F) both surfaced against the broad "foreign person" token.
+  "\\bforeign\\s+(?:national|ownership|owned|control|influence)\\b", "\\bfoci\\b", "\\bnispom\\b",
+  "\\bitar\\b", "\\bexport[\\s-]?control(?:led|s)?\\b", "\\bshall\\s+have\\s+access\\b",
+  "\\bcitizenship\\b", "\\bu\\.?s\\.?\\s+citizen", "\\btrade\\s+agreements?\\s+act\\b", "\\bbuy\\s+american\\b",
 ].join("|"), "i");
 
 // ARC #A (flag AUDIT_DEBRIEF_ALLOWLIST) — the FAR 15.503/15.505/15.506 DEBRIEFING + AWARD-NOTIFICATION family is
@@ -112,11 +120,19 @@ const DEBRIEF_NOTIFY_RE = new RegExp([
 // person" and nothing gates. FA8137 /panel (audit bd605b88) AUTO-F'd on the verbatim §K election "no exemption
 // [Offeror must select one] from the excise tax." mis-typed disqualifierUncovered → a FALSE NHR (GATE_V2 cap that
 // pre-empted the whole B-arc). Same offeror-rights/no-op family + the SAME two guards as protest/debrief.
+//
+// GATE-2 TIGHTENING (both lenses): the bare "\bforeign\s+person\b" token was DROPPED — it is the ONE token in this
+// matcher that collides with a REAL bar ("no foreign person shall have access to classified information" — ITAR
+// 22 CFR 120.16 / FOCI / NISPOM), and that ITAR sentence dodged the original BAR_SIGNAL_RE, so it would have been
+// laundered to boilerplate. The 52.229-11 rep still matches via the clause number, the "tax on certain foreign
+// procurements" title, "section 5000C"/"5000C", "W-14", and the "…exemption…excise tax…" election phrasing — all
+// tax-specific, none collide with a bar. Dropping "foreign person" only makes a bare foreign-person sentence route
+// to the SAFE ambiguous→NHR pole (over-tag = recoverable review; under-tag = lost contract).
 const NOOP_REP_ALLOWLIST_ENABLED = process.env.AUDIT_NOOP_REP_ALLOWLIST === "true";
 const FOREIGN_TAX_REP_RE = new RegExp([
   "\\b52\\.229-1[12]\\b",                                         // Tax on Certain Foreign Procurements (Notice / clause)
   "tax\\s+on\\s+certain\\s+foreign\\s+procurements",
-  "\\bforeign\\s+person\\b", "\\bW-?14\\b", "\\bsection\\s+5000C\\b", "\\b5000C\\b",
+  "\\bW-?14\\b", "\\bsection\\s+5000C\\b", "\\b5000C\\b",         // IRS Form W-14 / IRC §5000C — tax-specific identifiers
   "(?:full|partial|no)\\s+exemption[^.]{0,40}excise\\s+tax",     // the FA8137 election sentence
   "excise\\s+tax[^.]{0,40}exemption",
 ].join("|"), "i");
