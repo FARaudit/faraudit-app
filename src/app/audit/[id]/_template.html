@@ -482,6 +482,12 @@ button{font-family:inherit}
 .ck-sev.adv{background:var(--line-3);color:var(--mute)}
 [data-theme="dark"] .ck-sev.dq{background:rgba(220,38,38,.16);color:#fca5a5}
 [data-theme="dark"] .ck-sev.req{background:rgba(217,119,6,.16);color:#fcd34d}
+/* Root-C LEAK 3 (card #423) — a gate already closed/missed renders as a distinct muted, struck "Closed" state (minus-mark box), never a hopeful pending checkbox. */
+.ck-item.closed .ck-box{border-color:var(--mute-2);background:var(--line-3)}
+.ck-item.closed .ck-box::after{content:"";position:absolute;left:4px;top:8px;width:9px;height:2px;background:var(--mute-2);border-radius:2px}
+.ck-item.closed .ck-txt{color:var(--mute);text-decoration:line-through;text-decoration-color:var(--mute-2)}
+.ck-sev.closed{background:var(--line-3);color:var(--red-700)}
+[data-theme="dark"] .ck-sev.closed{background:rgba(220,38,38,.16);color:#fca5a5}
 
 /* ═══════════ LAYOUT: main + rail ═══════════ */
 .rpt-grid{display:grid;grid-template-columns:1fr 312px;gap:18px;align-items:start}

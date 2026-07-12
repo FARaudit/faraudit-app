@@ -2966,6 +2966,24 @@ export function renderAuditReport(template: string, vm: AuditViewModel): string 
       "div",
       `<div class="ck-expired-notice"><span class="ck-expired-badge">Solicitation closed — checklist is reference only</span></div>`
     );
+  } else if (NHR_COHERENCE_ON && vm.is_nhr && vm.show_stoppers.length > 0) {
+    // Root-C LEAK 3 (card #423): on the NHR pole the checklist shows the open gates a reviewer must clear — NOT a
+    // false "submit by <date>" runway. A show-stopper the source shows already concluded/missed renders in the muted
+    // "Closed" state (never a hopeful checkbox); otherwise a live "Disqualifying" gate. Verbatim + citation, real
+    // findings only. Flag-gated + is_nhr ⇒ else the scored checklist renders byte-identical (Rule 61).
+    const PAST_RE = /concluded|already\s+(?:held|closed|passed|occurred)|has\s+(?:passed|closed|concluded)|no longer|was held/i;
+    const items = vm.show_stoppers.map((s) => {
+      const closed = PAST_RE.test(s.condition);
+      const sev = closed ? `<span class="ck-sev closed">Closed</span>` : `<span class="ck-sev dq">Disqualifying</span>`;
+      return `<div class="ck-item${closed ? " closed" : ""}"><span class="ck-box"></span><span class="ck-txt">${escapeHtml(s.condition)}<span class="ck-csrc">${escapeHtml(s.citation)}</span></span>${sev}</div>`;
+    }).join("");
+    html = setFieldInner(html, "submission_checklist_filtered", "div",
+      `<div class="ck-group"><div class="ck-gh">Open items a reviewer must clear</div>${items}</div>`);
+    // The "N / M complete" progress readout implies a submission runway that doesn't exist on a review pole → honest.
+    html = html.replace(
+      '<span class="ck-prog"><b id="ckDone">0</b> / <span id="ckTotal">10</span> complete</span>',
+      '<span class="ck-prog">Review not complete · open items below</span>'
+    );
   } else {
     html = renderSubmissionChecklist(html, vm.submission_checklist_filtered);
   }
