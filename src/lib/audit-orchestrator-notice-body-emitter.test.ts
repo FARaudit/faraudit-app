@@ -183,5 +183,50 @@ console.log("\n── 9 · MULTI-VISIT: window-scoped concluded search — upcom
     "the LATER UPCOMING visit → live-gate frame, NOT mis-labeled concluded (concluded search is window-scoped to its own bar)");
 }
 
+// ── 10 · SITE-VISIT NOTICE-WIDE CONCLUDED FALLBACK (card #461, flag AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE) ──
+// FA813726R0033 shape: ONE site visit, the "you must attend" bar and the "held and concluded" UPDATE line >600 chars
+// apart → the ±600 window alone leaves it "plan to attend". The notice-wide fallback reframes it concluded, but ONLY
+// for a SINGLE-visit notice (multi-visit stays window-scoped, test #9).
+console.log("\n── 10 · NOTICE-WIDE CONCLUDED FALLBACK: single visit, marker far from bar ──");
+{
+  const filler = "The period of performance is twelve months from award with two option years. ".repeat(10); // >600 chars
+  const farConcluded = `You must attend the initial site visit for the project to be considered eligible to propose.${filler}UPDATE 01: Site Visit was held and concluded on May 28, 2026.`;
+  // flag OFF → window misses the far marker → stays live "plan to attend" (byte-identical prior behavior).
+  delete process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE;
+  const off = emitNoticeBodyEligBarFindings(mk(farConcluded), []);
+  assert(off.length === 1 && /plan to attend/i.test(off[0].requirement) && !/was held\/concluded/i.test(off[0].requirement),
+    "flag OFF: far concluded marker missed by the window → stays live 'plan to attend' (byte-identical)");
+  // flag ON → single-visit fallback reframes concluded.
+  process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE = "true";
+  const on = emitNoticeBodyEligBarFindings(mk(farConcluded), []);
+  assert(on.length === 1 && /was held\/concluded/i.test(on[0].requirement) && /bars award unless/i.test(on[0].requirement) && !/plan to attend/i.test(on[0].requirement),
+    "flag ON: single-visit notice-wide fallback → conditional-concluded frame (not 'plan to attend')");
+  assert(/may 28,? 2026/i.test(on[0].requirement), "flag ON: the far event date is surfaced");
+  delete process.env.AUDIT_SITEVISIT_CONCLUDED_NOTICEWIDE;
+}
+
+// ── 11 · BOA-HOLDER EMITTER (card #461 B2, flag AUDIT_NOTICE_BODY_BOA_EMIT) ──
+// A vehicle HOLDER-ONLY ordering restriction that ELIGIBILITY_BAR_RE does not carry — surfaced as ONE grounded bar.
+console.log("\n── 11 · BOA-HOLDER EMITTER: holder-only bar surfaced; informational BOA + flag-off stay silent ──");
+{
+  const holderOnly = "This posting is for Tinker AFB - MAC BOA Holders ONLY. Only MAC BOA prime contractors may submit a proposal for this order.";
+  // flag OFF → not emitted (byte-identical).
+  delete process.env.AUDIT_NOTICE_BODY_BOA_EMIT;
+  assert(emitNoticeBodyEligBarFindings(mk(holderOnly), []).filter((f) => f.lens === "notice_body_boa_holder_detector").length === 0,
+    "flag OFF: BOA-holder bar NOT emitted (byte-identical)");
+  // flag ON → exactly ONE grounded BOA-holder finding (binary gate, deduped).
+  process.env.AUDIT_NOTICE_BODY_BOA_EMIT = "true";
+  const boa = emitNoticeBodyEligBarFindings(mk(holderOnly), []).filter((f) => f.lens === "notice_body_boa_holder_detector");
+  assert(boa.length === 1, "flag ON: exactly ONE BOA-holder finding (binary gate, not N restatements)");
+  assert(boa[0].kind === "eligibility_bar" && boa[0].controllability === "bidder_cannot_move" && /HOLDERS ONLY/i.test(boa[0].requirement),
+    "flag ON: BOA finding is a floor-promotable eligibility bar with holder-only copy");
+  const nH = mk(holderOnly).replace(/\s+/g, " ").trim().toLowerCase();
+  assert(nH.includes((boa[0].excerpt || "").toLowerCase()), "flag ON: BOA excerpt is a verbatim substring (grounds)");
+  // informational BOA (no holder-only restriction) → still emits nothing even with the flag on.
+  assert(emitNoticeBodyEligBarFindings(mk(BENIGN.informationalBoa), []).filter((f) => f.lens === "notice_body_boa_holder_detector").length === 0,
+    "flag ON: informational BOA (no holder-only bar) → still emits nothing (no over-fire)");
+  delete process.env.AUDIT_NOTICE_BODY_BOA_EMIT;
+}
+
 console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
