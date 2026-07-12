@@ -58,6 +58,10 @@ function ok(label: string, cond: boolean) { if (cond) pass++; else { fail++; con
     importanceOf("The contractor must comply with ITAR export-control requirements and employ only U.S. citizens on this effort.") !== "boilerplate");
   ok("TAA country-of-origin bar → NOT laundered",
     importanceOf("End products must comply with the Trade Agreements Act; products of a foreign person from a non-designated country are prohibited.") !== "boilerplate");
+  // 52.229-11(e)(2) — a NON-exempt foreign offeror's at-offer W-14 duty (phrased WITHOUT "submit", so it exercises the
+  // family path not BOILERPLATE_RE) must NOT be laundered by a bare W-14 token (contracts-attorney Gate-2 re-review).
+  ok("52.229-11(e)(2) foreign-offeror W-14 withholding duty → NOT laundered",
+    importanceOf("Non-exempt foreign offerors are required to file IRS Form W-14 at the time of offer and are subject to the two-percent withholding.") !== "boilerplate");
 
   // ── NEGATIVE GUARD — a real eligibility bar must STAY a disqualifier even with a rights token in the sentence ──
   ok("compound: debriefing + facility-clearance BAR → NOT laundered (not boilerplate)",
