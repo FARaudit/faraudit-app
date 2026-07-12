@@ -182,6 +182,11 @@ export interface VerdictInputs {
   // notice-body bar through. Fail-toward-disqualifier → NEEDS_HUMAN_REVIEW, never a committal. Default undefined ⇒ no
   // gate (unchanged); the flag-OFF orchestrator never sets it ⇒ byte-identical.
   noticeBodyBarUngrounded?: boolean;
+  // B3-SEVERITY (Brain card 429, flag AUDIT_SITEVISIT_SEVERITY_FLOOR) — when the notice-body eligibility floor
+  // routes to NHR, SURFACE any grounded site-visit/eligibility disqualifier sitting in dispositions[] as a
+  // bid-deciding showStopper (severity→P0) instead of a P2 advisory. Consumed ONLY inside the noticeBodyBarUngrounded
+  // branch (the coherent pole). Default undefined ⇒ that branch passes [] exactly as before ⇒ byte-identical.
+  siteVisitSeverityFloor?: boolean;
   // Brain card #320 ruling — an INCOMPLETE verdict must NAME the gap (which doc/section could not be confirmed
   // read/grounded), never a generic "coverage not complete". Populated by the orchestrator from the deterministic
   // signals (uncovered docs + missing binding sections). Optional/absent ⇒ reasons render as before (byte-identical
