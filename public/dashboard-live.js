@@ -55,14 +55,35 @@
   // (FA4427 60 CONS LGC), NOT the agency; the real agency is the last '·'
   // segment of the raw `agency` field. Normalize the common branches; else
   // Title-Case the cleaned segment.
+  // Resolve any raw agency org-chain (dot- or middot-separated, e.g.
+  // "Defense.Dept Of The Army.Amc.Acc.…419th Csb.W6qm Micc Fdo Ft Bragg") to a clean
+  // 1-2 word agency — the RECOGNIZABLE agency, never the buying office / DoDAAC code.
+  // Feeds both the Agency column cell AND the fAgency slicer (both read r.agency, so they match).
   function normalizeAgency(raw) {
     if (!raw) return "—";
-    var seg = String(raw).split("·").pop().trim();
-    var key = seg.replace(/,?\s*DEPARTMENT OF\s*$/i, "").replace(/^DEPARTMENT OF\s+/i, "").replace(/^DEPT OF\s+/i, "").trim();
-    var MAP = { "THE AIR FORCE": "Air Force", "AIR FORCE": "Air Force", "THE ARMY": "Army", "ARMY": "Army", "THE NAVY": "Navy", "NAVY": "Navy", "FEDERAL AVIATION ADMINISTRATION": "FAA", "VETERANS AFFAIRS": "VA" };
-    var hit = MAP[key.toUpperCase()];
-    if (hit) return hit;
-    return key.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) || "—";
+    var s = String(raw);
+    var u = s.toUpperCase();
+    if (/\bSPACE FORCE\b/.test(u)) return "Space Force";
+    if (/\bAIR FORCE\b/.test(u)) return "Air Force";
+    if (/\bMARINE\b/.test(u)) return "Marine Corps";
+    if (/\bNAV(Y|AL)\b/.test(u)) return "Navy";
+    if (/\bARMY\b/.test(u)) return "Army";
+    if (/GEOSPATIAL|\bNGA\b/.test(u)) return "NGA";
+    if (/VETERANS|\bVA\b/.test(u)) return "VA";
+    if (/FEDERAL AVIATION|\bFAA\b/.test(u)) return "FAA";
+    if (/CUSTOMS AND BORDER|\bCBP\b|HOMELAND SECURITY/.test(u)) return "Homeland Security";
+    if (/FOREST SERVICE/.test(u)) return "Forest Service";
+    if (/AGRICULTURE/.test(u)) return "Agriculture";
+    if (/ARCHITECT OF THE CAPITOL/.test(u)) return "Architect of the Capitol";
+    if (/GENERAL SERVICES|\bGSA\b/.test(u)) return "GSA";
+    if (/^DEFENSE[.·]/.test(u) || /\bDEFENSE\b/.test(u.split(/[.·]/)[0])) return "Defense";
+    // Fallback: parent dept = first segment; strip DEPARTMENT/DEPT OF + trailing office/DoDAAC codes; Title-Case.
+    var parent = s.split(/[.·]/)[0].trim();
+    parent = parent.replace(/,?\s*DEPARTMENT OF\s*$/i, "").replace(/^DEPARTMENT OF\s+/i, "").replace(/^DEPT OF\s+/i, "").trim();
+    parent = parent.replace(/\s*\b[A-Z0-9]{5,7}\b\s*$/, "").trim();
+    var MAP = { "THE AIR FORCE": "Air Force", "THE ARMY": "Army", "THE NAVY": "Navy" };
+    if (MAP[parent.toUpperCase()]) return MAP[parent.toUpperCase()];
+    return parent.toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) || "—";
   }
 
   // Card 366 Phase-1 — due (response_deadline) column, short readable date.
@@ -211,9 +232,12 @@
   function rowMatchesSearch(a) {
     if (!STATE.search) return true;
     var q = STATE.search;
-    return (a.id   && a.id.toLowerCase().indexOf(q)    !== -1)
-        || (a.title && a.title.toLowerCase().indexOf(q) !== -1)
-        || (a.type  && a.type.toLowerCase().indexOf(q)  !== -1);
+    // Placeholder promises "audits, notice IDs, NAICS…" — match notice/sol id, title, type, NAICS, agency.
+    return (a.id     && a.id.toLowerCase().indexOf(q)    !== -1)
+        || (a.title  && a.title.toLowerCase().indexOf(q) !== -1)
+        || (a.type   && a.type.toLowerCase().indexOf(q)  !== -1)
+        || (a.naics  && String(a.naics).toLowerCase().indexOf(q) !== -1)
+        || (a.agency && a.agency.toLowerCase().indexOf(q) !== -1);
   }
   function sortedRows() {
     var copy = STATE.rows.slice();
@@ -434,8 +458,11 @@
     if (!sb || sb.dataset.ccWired) return;
     sb.dataset.ccWired = "1";
     sb.style.cursor = "text";
-    sb.addEventListener("click", function () {
-      if (sb.querySelector(".cc-search-input")) return;
+    // Activate = swap the placeholder span for a live input that filters STATE.rows on keyup.
+    // Invoked by BOTH a click on the search shelf AND ⌘K / Ctrl+K (the masthead hint).
+    function activateSearch() {
+      var existing = sb.querySelector(".cc-search-input");
+      if (existing) { existing.focus(); return; }
       var placeholder = null;
       sb.querySelectorAll("span").forEach(function (s) {
         if (!s.classList.contains("kbd") && placeholder === null) placeholder = s;
@@ -452,6 +479,18 @@
         STATE.search = (input.value || "").trim().toLowerCase();
         writeTable();
       });
+    }
+    sb.addEventListener("click", activateSearch);
+    window.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        activateSearch();
+      } else if (e.key === "Escape") {
+        var input = sb.querySelector(".cc-search-input");
+        if (input && document.activeElement === input) {
+          input.value = ""; STATE.search = ""; writeTable(); input.blur();
+        }
+      }
     });
   }
 
