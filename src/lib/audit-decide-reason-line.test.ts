@@ -85,6 +85,17 @@ const band = [
   assert(deduped.some((f) => /site visit/i.test(f.requirement)), "the concluded-site-visit gate stays distinct");
 }
 {
+  // red-team regression: a SITE-VISIT bar that ALSO mentions "MAC BOA Holders" must NOT collapse into the holder gate
+  process.env.AUDIT_BAND_DEDUP = "true";
+  const tricky = [
+    mkc("This posting is for Tinker AFB - MAC BOA Holders ONLY. Mandatory site visit was held/concluded may 28, 2026", "SAM Notice Body"),
+    mkc("Order restricted to vehicle HOLDERS ONLY (BOA/IDIQ/BPA/GWAC/MAS)", "SAM Notice Body"),
+  ];
+  const d2 = dedupBandGates(tricky);
+  assert(d2.length === 2, "a site-visit bar mentioning 'MAC BOA Holders' stays DISTINCT from the holder bar (no false collapse)");
+  assert(d2.some((f) => /site visit/i.test(f.requirement)), "the site-visit gate survives (checked first)");
+}
+{
   process.env.AUDIT_BAND_DEDUP = "";
   const off = dedupBandGates(band);
   assert(off.length === 3, "flag OFF: band unchanged (3) — byte-identical");

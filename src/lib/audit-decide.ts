@@ -1370,8 +1370,10 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
 const bandDedupEnabled = () => process.env.AUDIT_BAND_DEDUP === "true";
 function gateSignature(f: DecidedFinding): string {
   const combined = `${f.requiredAttribute ?? ""} ${f.requirement ?? ""}`.toLowerCase();
-  if (/mac.?boa|boa.?holder|holders\s+only|vehicle.?hold|underlying\s+vehicle|\bidiq\b|\bbpa\b|\bgwac\b|\bmas\b/.test(combined)) return "gate:vehicle-holder";
+  // Site-visit is checked FIRST (most specific): the FA8137 notice body carries "MAC BOA Holders ONLY" adjacent to the
+  // site-visit text, so a vehicle-holder-first order would false-collapse the DISTINCT site-visit bar into the holder gate.
   if (/site\s+visit/.test(combined)) return "gate:site-visit";
+  if (/mac.?boa|boa.?holder|holders\s+only|vehicle.?hold|underlying\s+vehicle|\bidiq\b|\bbpa\b|\bgwac\b|\bmas\b/.test(combined)) return "gate:vehicle-holder";
   return `req:${(f.requirement ?? "").toLowerCase().replace(/\s+/g, " ").slice(0, 50)}`;
 }
 export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
