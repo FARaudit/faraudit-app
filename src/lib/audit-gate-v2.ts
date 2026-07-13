@@ -280,6 +280,29 @@ export function isGovtEvalMethodologyNonBar(ob: string): boolean {
   return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real bar ⇒ do NOT demote
 }
 
+// CONDITIONAL-FRAME TINA refinement (Brain card #468, flag AUDIT_CONDITIONAL_TINA_DEMOTION, default-OFF). Encodes the
+// card #460 boundary EXPLICITLY for the recurring §L benign-string family: a certified-cost-or-pricing-DATA sentence that
+// invokes the FAR 15.403-1 EXCEPTION framework ("…IAW 15.403-1…", "…none of the exceptions in FAR 15.403-1 apply, the
+// offeror shall be required to submit…") is CONDITIONAL boilerplate — 15.403-1 is the *prohibition/exceptions* clause, so
+// the "shall submit" duty fires only in the residual PCO-contingency path (no adequate price competition). Under adequate
+// price competition it is NOT required (FAR 15.403-3(b)); it imposes ZERO pre-award bidder duty → demote. GUARDED exactly
+// like the govt-eval predicate so it can NEVER demote a real bar: fires ONLY when (a) the sentence references cost-or-
+// pricing DATA, (b) it cites FAR 15.403-1 (the exception clause — NOT 15.403-3 realism nor 15.403-4 requiring), and (c)
+// removing the certified-data phrase leaves NO OTHER bar signal. The 6439ac27 driver ("403-1 apply, the offeror shall be
+// required to submit certified cost or pricing data") demotes; an UNCONDITIONAL duty with no 15.403-1 citation ("the
+// offeror shall be required to submit certified cost or pricing data prior to award") carries no 403-1 token → STAYS
+// ESCALATED (card #460 ruling #3 is NOT reversed). Read at call time; flag-OFF ⇒ never consulted ⇒ byte-identical.
+const conditionalTinaDemotionEnabled = () => process.env.AUDIT_CONDITIONAL_TINA_DEMOTION === "true";
+// FAR 15.403-1 (prohibition on obtaining certified cost or pricing data / its exceptions) — the conditional-frame marker.
+// Deliberately EXCLUDES 15.403-3 (price-analysis realism) and 15.403-4 (the REQUIRING clause) so a genuine "required per
+// 15.403-4" duty never demotes. Matches "403-1" and "15.403-1"; the trailing (?!\d) stops "403-10"/"403-1x" false hits.
+const TINA_EXCEPTION_CLAUSE_RE = /\b(?:15\.)?403-1(?!\d)\b/i;
+export function isConditionalTinaBoilerplate(ob: string): boolean {
+  if (!COST_PRICING_DATA_RE.test(ob) || !TINA_EXCEPTION_CLAUSE_RE.test(ob)) return false;
+  const stripped = ob.replace(new RegExp(COST_PRICING_DATA_RE.source, "gi"), " ");
+  return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real compound bar ⇒ do NOT demote
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];
@@ -331,7 +354,8 @@ export function gradeCoverageV2(attestations: SectionAttestation[]): CoverageV2 
         const imp = importanceOf(ob);
         if (imp === "boilerplate") continue;
         if (imp === "disqualifier") { disqualifierUncovered.push({ section: a.section, obligation: ob }); continue; }
-        if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob))) {
+        if (ambiguousSignalDemotionEnabled() && (!hasBarSignal(ob) || isGovtEvalMethodologyNonBar(ob)
+              || (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)))) {
           ungroundedNonBarSignal.push({ section: a.section, obligation: ob }); continue;
         }
         disqualifierUncovered.push({ section: a.section, obligation: ob });
