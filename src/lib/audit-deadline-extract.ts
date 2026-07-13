@@ -134,3 +134,83 @@ export function reconcileOfferDueDeadlines(deadlines: unknown): ReconciledDeadli
   const supersession = entries.some((e) => DEADLINE_AMEND_UPDATED_RE.test(e.label) || DEADLINE_DEAD_DATE_RE.test(e.label)) || distinctSubmissionDates.size >= 2;
   return { controlling: controlling ? { label: controlling.label, date: controlling.date } : null, demoted, supersession };
 }
+
+// ── Card #477 ruling 2 — the notice-body UPDATE-stack resolver (flag AUDIT_DEADLINE_UPDATE_STACK, default-OFF). ─────────
+// A SAM notice body is a newline-free blob of chronological UPDATE blocks, NEWEST-FIRST ("… UPDATE 03-July 7, 2026 … UPDATE
+// 02- June 24, 2026 … UPDATE 01 - May 28, 2026 …"). The 6a67c0f1 regression: the plain firstDate() scan harvested
+// "6-24-2026" out of a FILENAME reference ("RFI Questions 6-24-2026") inside UPDATE 02 and rendered it as the offer-due
+// date, while the real due dates ("08 July 2026", spelled-out) were invisible to the numeric-only parser. The ruled fix:
+// read the UPDATE stack newest-first; an "UPDATE NN – <date>" dateline is NEVER a due date; surface the true controlling
+// state — if the newest update RESETS the date ("a new due date will be provided"), status=reset_tbd + carry the last
+// affirmatively-stated response date as a demoted note. Display-only — never a source of open/closed. Flag OFF ⇒ no caller.
+const UPDATE_STACK_ENABLED = process.env.AUDIT_DEADLINE_UPDATE_STACK === "true";
+
+export interface NoticeBodyDeadlineState {
+  status: "reset_tbd" | "stated" | "none";
+  date: string | null;                              // ISO controlling due date when status="stated"
+  lastStated: { date: string; label: string } | null; // last affirmatively-stated due date (when reset_tbd)
+  note: string;                                     // human caveat for the render
+}
+
+const MONTHS: Record<string, number> = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+// A due-date RESET declared by the newest amendment: "New due date … will be provided", "to be determined", "TBD".
+const DUE_RESET_RE = /(?:new\s+)?(?:due\s+date|response\s+date|proposal\s+(?:response\s+)?date)[^.]{0,80}?(?:will\s+be\s+provided|to\s+be\s+(?:determined|provided)|\bTBD\b|forthcoming|once\s+(?:the\s+)?(?:new\s+)?(?:information|amendment))/i;
+// An affirmatively-STATED response/offer/proposal due date, followed (within a short window) by a parseable date. The label
+// token must be a DUE label — a filename ("RFI Questions 6-24-2026") does not match, so a filename date is never harvested.
+const STATED_DUE_RE = /(proposal\s+response\s+date|response\s+date|offers?\s+(?:are\s+)?due|proposals?\s+(?:are\s+)?due|quotes?\s+(?:are\s+)?due|closing\s+(?:date|time)|due\s+(?:no\s+later\s+than|by))\s*[:\-]?\s*([^.;]{0,48})/i;
+
+/** Parse a spelled-out ("08 July 2026", "July 7, 2026") or numeric (M/D/YYYY, YYYY-MM-DD) date to ISO. Null if none. */
+function parseAnyDate(text: string): string | null {
+  const spelled = text.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b/) // 08 July 2026
+    || text.match(/\b([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\b/);         // July 7, 2026
+  if (spelled) {
+    const dmy = /^\d/.test(spelled[1]);
+    const mo = MONTHS[(dmy ? spelled[2] : spelled[1]).toLowerCase()];
+    const d = +(dmy ? spelled[1] : spelled[2]), y = +spelled[3];
+    if (mo && d >= 1 && d <= 31 && y >= 2000 && y <= 2100) return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return firstDate(text);
+}
+
+/** Resolve the CONTROLLING offer-due state from a SAM notice body's chronological UPDATE stack. Reads newest-first by the
+ *  UPDATE number, never treats an "UPDATE NN – <date>" dateline as a due date, and reports a reset ("a new date will be
+ *  provided") with the last stated date demoted. Pure. Flag OFF ⇒ callers skip it. Display-only. */
+export function resolveNoticeBodyDeadline(noticeBody: string): NoticeBodyDeadlineState {
+  const NONE: NoticeBodyDeadlineState = { status: "none", date: null, lastStated: null, note: "" };
+  if (!UPDATE_STACK_ENABLED || !noticeBody) return NONE;
+  // Split into UPDATE blocks on the "UPDATE NN" marker; keep each block's number + the text AFTER its own dateline.
+  const marker = /UPDATE\s*0*(\d+)\s*[-–—]?\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})?/gi;
+  const blocks: Array<{ n: number; body: string }> = [];
+  const hits: Array<{ n: number; idx: number; after: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = marker.exec(noticeBody)) !== null) hits.push({ n: +m[1], idx: m.index, after: m.index + m[0].length });
+  for (let i = 0; i < hits.length; i++) {
+    const end = i + 1 < hits.length ? hits[i + 1].idx : noticeBody.length;
+    blocks.push({ n: hits[i].n, body: noticeBody.slice(hits[i].after, end) }); // body EXCLUDES this block's own dateline
+  }
+  if (blocks.length === 0) return NONE;
+  blocks.sort((a, b) => b.n - a.n); // newest UPDATE first
+
+  const statedIn = (body: string): string | null => {
+    const s = body.match(STATED_DUE_RE);
+    return s ? parseAnyDate(s[2]) : null;
+  };
+  // The last affirmatively-stated due date, scanning newest→oldest (first hit wins).
+  let lastStated: { date: string; label: string } | null = null;
+  for (const b of blocks) {
+    const d = statedIn(b.body);
+    if (d) { lastStated = { date: d, label: `UPDATE ${String(b.n).padStart(2, "0")} stated ${d}` }; break; }
+  }
+  const newest = blocks[0];
+  if (DUE_RESET_RE.test(newest.body)) {
+    const note = lastStated
+      ? `Offer-due date was RESET by the latest amendment (UPDATE ${String(newest.n).padStart(2, "0")}) — a new date will be provided; last stated was ${lastStated.date} (${lastStated.label}). Verify against the latest amendment.`
+      : `Offer-due date was RESET by the latest amendment (UPDATE ${String(newest.n).padStart(2, "0")}) — a new date will be provided. Verify against the latest amendment.`;
+    return { status: "reset_tbd", date: null, lastStated, note };
+  }
+  const newestStated = statedIn(newest.body);
+  if (newestStated) {
+    return { status: "stated", date: newestStated, lastStated: null, note: `Offer-due date ${newestStated} per the latest UPDATE (${String(newest.n).padStart(2, "0")}).` };
+  }
+  return NONE;
+}

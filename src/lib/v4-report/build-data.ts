@@ -223,6 +223,14 @@ function deadlineConflictNote(responseDeadline: string, cj: Record<string, unkno
 const DEADLINE_RECONCILE_ENABLED = process.env.AUDIT_DEADLINE_RECONCILE === "true";
 export function offerDueFact(responseDeadline: string, cj: Record<string, unknown>): { value: string; sub?: string } {
   const prior = { value: fmtDeadline(responseDeadline), sub: deadlineConflictNote(responseDeadline, cj) ?? undefined };
+  // Card #477 ruling 2 — the notice-body UPDATE-stack state (flag AUDIT_DEADLINE_UPDATE_STACK; present only when on)
+  // TAKES PRECEDENCE: it read the newest UPDATE and knows whether the due date was RESET, so it surfaces the TRUE state
+  // instead of the stale-metadata reconcile that harvested an UPDATE-header/RFI-filename date ("document states 24 Jun").
+  // SAM stays the masthead FLOOR; this only powers the caveat. Absent (flag OFF) ⇒ falls through unchanged (byte-identical).
+  const nb = cj.notice_body_deadline as { status?: string; date?: string | null; lastStated?: { date: string } | null; note?: string } | undefined;
+  if (nb && nb.status === "reset_tbd") {
+    return { value: fmtDeadline(responseDeadline), sub: `⚠ ${nb.note || "Offer-due date reset by the latest amendment — a new date will be provided; verify against the latest amendment."}` };
+  }
   if (!DEADLINE_RECONCILE_ENABLED) return prior;
   const r = reconcileOfferDueDeadlines(cj.deadlines);
   const sam = Date.parse(responseDeadline);

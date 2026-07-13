@@ -1361,6 +1361,29 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
   return dispositions.filter((f) => isSiteVisitOrEligBar(f, profile, source)).map((f) => ({ ...f, severity: "P0" as const }));
 }
 
+// Card #477 ruling 3 — the NAMED NHR reason-line (flag AUDIT_REASON_LINE_NAMED, default-OFF). When grounded eligibility
+// bars drive the notice-body NHR, the reason NAMES them (from each bar's plain-language `requirement`) instead of the
+// generic B3 fail-safe boilerplate ("a bidder-eligibility bar … could not be confirmed as analyzed"), which understated
+// the audit's own grounded analysis — the 6a67c0f1 stamp-bar #6 miss. Deduped, first-clause-trimmed, ≤3 bars. Returns
+// null when no named bar is available ⇒ the caller keeps the generic string (byte-identical). Flag-OFF ⇒ never called.
+const reasonLineNamedEnabled = () => process.env.AUDIT_REASON_LINE_NAMED === "true";
+export function namedEligibilityReason(stoppers: DecidedFinding[]): string | null {
+  const bars: string[] = [];
+  const seen = new Set<string>();
+  for (const s of stoppers) {
+    const req = (s.requirement || "").replace(/\s+/g, " ").trim();
+    if (!req) continue;
+    const phrase = ((req.split(/(?<=[.;])\s/)[0] || req)).slice(0, 140).replace(/[.;,\s]+$/, "");
+    const key = phrase.toLowerCase().slice(0, 40);
+    if (!phrase || seen.has(key)) continue;
+    seen.add(key);
+    bars.push(phrase);
+    if (bars.length >= 3) break;
+  }
+  if (bars.length === 0) return null;
+  return `Human review required to confirm eligibility — the solicitation notice states bar(s) only your firm can confirm are cleared: ${bars.map((b, i) => `(${i + 1}) ${b}`).join("; ")}.`;
+}
+
 // SEAM FILL — card #472 (residual batch, flag AUDIT_COVERAGE_NHR_STOPPER_FILL, default-OFF). The COMPANION of the
 // card-429 notice-body treatment for the OTHER coverage-NHR pole: the GATE_V2 coverage cap (gateV2Outcome cap ===
 // "NEEDS_HUMAN_REVIEW", deriveVerdict step 1). Trace (6439ac27): a §L conditional-TINA false-NHR fired the GATE_V2 cap
@@ -1659,12 +1682,16 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     floor never saw. Its OWN gate, run AFTER the GATE_V2 / coverage block so a coverageV2 'no-cap' remap can NEVER
   //     wave a real notice-body bar through (the coverageComplete veto is bypassed whenever GATE_V2 + coverageV2 are on).
   //     Fail-toward-disqualifier → NEEDS_HUMAN_REVIEW, never a committal. Absent/false ⇒ byte-identical (flag-OFF).
-  if (inp.noticeBodyBarUngrounded)
+  if (inp.noticeBodyBarUngrounded) {
     // B3-SEVERITY (card 429): on THIS pole (and only this one) surface any grounded site-visit/eligibility
     // disqualifier in dispositions[] as a bid-deciding showStopper (P0) instead of a P2 advisory — flag-gated;
     // flag-OFF ⇒ passes [] exactly as before (byte-identical). See doctrine at siteVisitEligStoppers.
-    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions,
-      inp.siteVisitSeverityFloor ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : []);
+    const noticeStoppers = inp.siteVisitSeverityFloor ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : [];
+    // Card #477 ruling 3 — name the grounded bars in the reason-line (flag-gated); null ⇒ keep the generic string.
+    const named = reasonLineNamedEnabled() ? namedEligibilityReason(noticeStoppers) : null;
+    return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), named ?? "A bidder-eligibility bar stated in the solicitation notice (e.g. a mandatory site visit, set-aside, or required clearance/registration) could not be confirmed as analyzed — human review required to confirm eligibility before the verdict can be relied on.", dispositions,
+      noticeStoppers);
+  }
 
   // 1b. DOCUMENT completeness (C-1, Brain C.e) — the SINGLE reconciliation truth. A posted binding document the
   //     engine could not confirm it read in full (unfetched / scanned-no-text / mid-doc truncated / over-budget
