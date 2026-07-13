@@ -117,7 +117,11 @@
     var st = statusBucket(audit);
     // Card 366 Phase-2 needs-attention (LOGIC ONLY — visual is Design's): a failed
     // audit OR a live audit whose response deadline has already passed.
-    var attn = (st === "failed") || (dueTs !== Infinity && dueTs < Date.now());
+    // WIRE-MAP #456 Ruling 2 — expose the trigger so the row picks the reason:
+    // failed → red status badge is the reason; deadline → keep truthful badge + amber tag.
+    var deadlinePassed = (dueTs !== Infinity && dueTs < Date.now());
+    var attn = (st === "failed") || deadlinePassed;
+    var attnType = (st === "failed") ? "failed" : (deadlinePassed ? "deadline" : null);
     return {
       id:     audit.solicitation_number || audit.notice_id || audit.id || "—",
       title:  (audit.title || "Untitled").trim(),
@@ -132,7 +136,8 @@
       score:  (!gateMode && typeof audit.compliance_score === "number") ? audit.compliance_score : null,
       rec:    recommendationBucket(audit),
       status: st,
-      attn:   attn
+      attn:   attn,
+      attnType: attnType
     };
   }
 
@@ -160,8 +165,15 @@
       ? '<span class="rec ' + recClassStr + '">' + esc(a.rec) + '</span>'
       : '<span class="rec none">—</span>';
     var slug = encodeURIComponent(a.id);
-    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '"' + (a.attn ? ' class="needs-attention"' : "") + '>'
-      + '<td class="cell-id">' + esc(a.id) + '</td>'
+    // WIRE-MAP #456 Ruling 2 — needs-attention: amber flag in the ID cell + a reason
+    // in the status cell (failed → red badge is the reason; deadline → truthful badge + amber tag).
+    var attnFlag = a.attn
+      ? '<span class="attn-flag" title="Needs attention"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.3L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.3a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>'
+      : '';
+    var statusInner = '<span class="status ' + esc(a.status) + '">' + esc(a.status) + '</span>'
+      + (a.attnType === "deadline" ? '<span class="deadline-tag">Deadline passed</span>' : '');
+    return '<tr data-rec="' + esc(a.rec || "") + '" data-sol="' + esc(a.id) + '"' + (a.attn ? ' class="needs-attention" data-attn="' + esc(a.attnType) + '"' : "") + '>'
+      + '<td class="cell-id">' + esc(a.id) + attnFlag + '</td>'
       + '<td class="cell-title" title="' + esc(a.title) + '">' + esc(a.title) + '</td>'
       + '<td class="cell-agency">' + esc(a.agency) + '</td>'
       + '<td><span class="doctype">' + esc(a.type) + '</span></td>'
@@ -169,7 +181,7 @@
       + '<td class="cell-date">' + esc(a.date) + '</td>'
       + '<td class="right">' + scoreCell + '</td>'
       + '<td>' + recCell + '</td>'
-      + '<td><span class="status ' + esc(a.status) + '">' + esc(a.status) + '</span></td>'
+      + '<td><span class="st-cell">' + statusInner + '</span></td>'
       + '<td class="right"><a class="view-link" href="/audit/' + slug + '">View<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></td>'
       + '</tr>';
   }
@@ -236,6 +248,7 @@
   function writeTable() {
     var body = document.getElementById("ledgerBody");
     if (!body) return;
+    syncSlicers();
     var sorted = sortedRows();
     // Filter-bar + search define the working set the chips act on; chip narrows it.
     var mset = sorted.filter(function (a) { return rowMatchesSearch(a) && rowMatchesBar(a); });
@@ -349,10 +362,21 @@
   // Past Audits item with the real OPEN count (response deadline not yet passed)
   // from the loaded audits. Client-side so no shared server-rail change; targets
   // the injectRail markup by href (rail renamed Past Audits → /past-audits).
+  // WIRE-MAP #456 Ruling 3 — keep the neutral `count` badge; disambiguate "open" =
+  // response-deadline-not-yet-passed, and bind open/total live with explanatory titles.
   function writeSidebarBadge() {
     var open = STATE.rows.filter(function (r) { return r.dueTs !== Infinity && r.dueTs > Date.now(); }).length;
-    var el = document.querySelector('.sb-icon[href="/past-audits"] .sb-badge, .sb-icon[href="/dashboard"] .sb-badge');
-    if (el) el.textContent = String(open);
+    var total = STATE.rows.length;
+    var link = document.querySelector('.sb-icon[href="/past-audits"], .sb-icon[href="/dashboard"]');
+    if (!link) return;
+    link.setAttribute("title", "Past Audits — " + open + " open (response deadline not yet passed) of " + total + " total");
+    var el = link.querySelector(".sb-badge");
+    if (el) {
+      el.textContent = String(open);
+      el.setAttribute("title", open + " open — response deadline not yet passed (of " + total + " total)");
+    }
+    var tip = link.querySelector(".sb-tip");
+    if (tip) tip.textContent = "Past Audits · " + open + " open";
   }
 
   function writeAll() {
@@ -475,19 +499,40 @@
       });
       return out.sort();
     }
-    function fill(id, values, allLabel) {
+    // WIRE-MAP #456 Ruling 1 — set-aside decode: show the SAM display name, filter on the raw value.
+    var SETASIDE_LABELS = { SBA: "Small Business", "8A": "8(a)", "8AN": "8(a)", HZC: "HUBZone", HZS: "HUBZone", SDVOSBC: "SDVOSB", SDVOSBS: "SDVOSB", WOSBC: "WOSB", WOSBSS: "WOSB", EDWOSBC: "EDWOSB", EDWOSBSS: "EDWOSB", VOSBC: "VOSB", VOSBS: "VOSB" };
+    function setAsideLabel(v) { if (v == null || v === "—" || v === "") return "—"; return SETASIDE_LABELS[v] || v; }
+    function fill(id, values, allLabel, labelFn) {
       var el = document.getElementById(id);
       if (!el) return;
       var cur = el.value;
       var opts = '<option value="all">' + allLabel + '</option>';
-      values.forEach(function (v) { opts += '<option value="' + esc(v) + '">' + esc(v) + '</option>'; });
+      values.forEach(function (v) { opts += '<option value="' + esc(v) + '">' + esc(labelFn ? labelFn(v) : v) + '</option>'; });
       el.innerHTML = opts;
       if (cur && (cur === "all" || values.indexOf(cur) !== -1)) el.value = cur;
     }
     fill("fAgency", distinct("agency"), "All agencies");
     fill("fType", distinct("type"), "All types");
+    // NAICS: bare code — no title in the audits row payload (WIRE-MAP fallback: "no title on file → bare code").
     fill("fNaics", distinct("naics"), "All NAICS");
-    fill("fSetAside", distinct("setAside"), "All set-asides");
+    fill("fSetAside", distinct("setAside"), "All set-asides", setAsideLabel);
+  }
+
+  // WIRE-MAP #456 Ruling 1 — pill "active" state + Clear visibility. A slicer glows
+  // blue when its value ≠ all; Clear appears only when ANY slicer / quick-chip / search
+  // is constraining the set. Called from writeTable() so every re-render stays in sync.
+  function syncSlicers() {
+    var anyActive = false;
+    document.querySelectorAll(".pa-filter").forEach(function (sel) {
+      var active = sel.value !== "all" && sel.value !== "";
+      if (active) anyActive = true;
+      var slicer = sel.closest(".pa-slicer");
+      if (slicer) slicer.classList.toggle("is-active", active);
+    });
+    if (STATE.filter && STATE.filter !== "all") anyActive = true;
+    if (STATE.search && STATE.search !== "") anyActive = true;
+    var clr = document.getElementById("paClear");
+    if (clr) clr.hidden = !anyActive;
   }
 
   function wireFilterBar() {

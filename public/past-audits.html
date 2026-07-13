@@ -138,9 +138,34 @@ button{font-family:inherit}
 /* filter tabs */
 .filters{display:flex;align-items:center;gap:6px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--card-soft);flex-wrap:wrap}
 /* Card 366 Phase-2 filter bar — minimal hooks; Design polishes later. */
-.pa-filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
-.pa-filter{height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink-2);font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;cursor:pointer}
-.pa-filter-clear{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--mute);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:700;cursor:pointer}
+/* RULING 1 — 7 slicers, one pill family (Design WIRE-MAP #456) */
+.pa-filterbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 12px}
+.pa-slicer{position:relative;display:inline-flex;align-items:center;height:34px;padding:0 30px 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--card-soft);transition:border-color .14s,background .14s,box-shadow .14s}
+.pa-slicer:hover{border-color:var(--mute-2)}
+.pa-slicer-lbl{font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-right:8px;pointer-events:none}
+.pa-slicer .pa-filter{appearance:none;-webkit-appearance:none;height:auto;border:0;background:transparent;font-family:"Manrope",sans-serif;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;outline:none;padding:0;margin:0}
+.pa-slicer-chev{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:12px;height:12px;color:var(--mute-2);pointer-events:none;transition:color .14s}
+.pa-slicer.is-active{border-color:var(--accent);background:rgba(55,138,221,.07);box-shadow:0 0 0 3px rgba(55,138,221,.08)}
+.pa-slicer.is-active .pa-slicer-lbl,.pa-slicer.is-active .pa-filter{color:var(--accent-deep)}
+.pa-slicer.is-active .pa-slicer-chev{color:var(--accent)}
+[data-theme="dark"] .pa-slicer.is-active{background:rgba(55,138,221,.14);border-color:var(--accent)}
+[data-theme="dark"] .pa-slicer.is-active .pa-slicer-lbl,[data-theme="dark"] .pa-slicer.is-active .pa-filter{color:var(--accent-light)}
+.pa-filter-clear{height:30px;padding:0 12px;border:0;background:transparent;color:var(--mute);font-family:"Manrope",sans-serif;font-size:12px;font-weight:700;cursor:pointer;border-radius:8px;transition:color .14s,background .14s}
+.pa-filter-clear:hover{color:var(--red-600);background:var(--red-50)}
+[data-theme="dark"] .pa-filter-clear:hover{color:#fca5a5;background:rgba(220,38,38,.12)}
+.pa-filter-clear[hidden]{display:none}
+/* RULING 2 — needs-attention rows: calm wash + flag + reason (Design WIRE-MAP #456) */
+tr.needs-attention{background:linear-gradient(90deg,rgba(217,119,6,.06),rgba(217,119,6,.015) 62%)}
+tr.needs-attention:hover{background:linear-gradient(90deg,rgba(217,119,6,.11),rgba(217,119,6,.04) 62%)}
+[data-theme="dark"] tr.needs-attention{background:linear-gradient(90deg,rgba(245,158,11,.11),rgba(245,158,11,.03) 62%)}
+[data-theme="dark"] tr.needs-attention:hover{background:linear-gradient(90deg,rgba(245,158,11,.17),rgba(245,158,11,.06) 62%)}
+.attn-flag{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;color:var(--amber-600);margin-left:8px;vertical-align:-2px}
+.attn-flag svg{width:14px;height:14px}
+[data-theme="dark"] .attn-flag{color:#fbbf24}
+.st-cell{display:inline-flex;flex-direction:column;align-items:flex-start;gap:5px}
+.deadline-tag{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-700)}
+.deadline-tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--amber-600)}
+[data-theme="dark"] .deadline-tag{color:#fcd34d}
 .fbtn{height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-family:"Manrope",sans-serif;font-size:12px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;transition:all .14s}
 .fbtn:hover{border-color:var(--mute-2)}
 .fbtn .n{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:700;color:var(--mute);background:var(--line-3);border-radius:5px;padding:1px 6px;line-height:1.4}
@@ -377,7 +402,7 @@ tr.hidden{display:none}
               <span class="dl proceed"><b>3</b>&nbsp;Proceed</span>
               <span class="dl caution"><b>4</b>&nbsp;Caution</span>
               <span class="dl decline"><b>4</b>&nbsp;Decline</span>
-              <span class="dl pending"><b>4</b>&nbsp;Open</span>
+              <span class="dl pending"><b>4</b>&nbsp;Pending</span>
             </div>
           </div>
         </div>
@@ -386,29 +411,50 @@ tr.hidden{display:none}
              Card #450: NAICS + Set-aside selects now live (fetchRecentAudits returns
              naics_code + set_aside; options populated from the loaded rows). -->
         <div class="pa-filterbar" id="paFilterbar">
-          <select class="pa-filter" id="fTime" aria-label="Time aperture">
-            <option value="all">All time</option>
-            <option value="30">Last 30 days</option>
-            <option value="quarter">Last quarter</option>
-            <option value="year">Last year</option>
-          </select>
-          <select class="pa-filter" id="fAgency" aria-label="Agency"><option value="all">All agencies</option></select>
-          <select class="pa-filter" id="fType" aria-label="Type"><option value="all">All types</option></select>
-          <select class="pa-filter" id="fRec" aria-label="Recommendation">
-            <option value="all">All recommendations</option>
-            <option value="Proceed">Proceed</option>
-            <option value="Caution">Caution</option>
-            <option value="Decline">Decline</option>
-          </select>
-          <select class="pa-filter" id="fStatus" aria-label="Status">
-            <option value="all">All statuses</option>
-            <option value="complete">Complete</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-          </select>
-          <select class="pa-filter" id="fNaics" aria-label="NAICS"><option value="all">All NAICS</option></select>
-          <select class="pa-filter" id="fSetAside" aria-label="Set-aside"><option value="all">All set-asides</option></select>
-          <button class="pa-filter-clear" id="paClear" type="button">Clear</button>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Time</span>
+            <select class="pa-filter" id="fTime" aria-label="Time aperture">
+              <option value="all">All time</option>
+              <option value="30">Last 30 days</option>
+              <option value="quarter">Last quarter</option>
+              <option value="year">Last year</option>
+            </select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Agency</span>
+            <select class="pa-filter" id="fAgency" aria-label="Agency"><option value="all">All agencies</option></select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Type</span>
+            <select class="pa-filter" id="fType" aria-label="Type"><option value="all">All types</option></select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Recommendation</span>
+            <select class="pa-filter" id="fRec" aria-label="Recommendation">
+              <option value="all">All recommendations</option>
+              <option value="Proceed">Proceed</option>
+              <option value="Caution">Caution</option>
+              <option value="Decline">Decline</option>
+            </select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Status</span>
+            <select class="pa-filter" id="fStatus" aria-label="Status">
+              <option value="all">All statuses</option>
+              <option value="complete">Complete</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">NAICS</span>
+            <select class="pa-filter" id="fNaics" aria-label="NAICS"><option value="all">All NAICS</option></select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <label class="pa-slicer"><span class="pa-slicer-lbl">Set-aside</span>
+            <select class="pa-filter" id="fSetAside" aria-label="Set-aside"><option value="all">All set-asides</option></select>
+            <svg class="pa-slicer-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </label>
+          <button class="pa-filter-clear" id="paClear" type="button" hidden>Clear</button>
         </div>
 
         <div class="filters" id="filters">
@@ -416,7 +462,7 @@ tr.hidden{display:none}
           <button class="fbtn" data-filter="Proceed">Proceed <span class="n">3</span></button>
           <button class="fbtn" data-filter="Caution">Caution <span class="n">4</span></button>
           <button class="fbtn" data-filter="Decline">Decline <span class="n">4</span></button>
-          <button class="fbtn" data-filter="open">Open <span class="n">4</span></button>
+          <button class="fbtn" data-filter="open">Pending <span class="n">4</span></button>
           <button class="fbtn" data-filter="failed">Failed <span class="n">0</span></button>
           <span class="spacer" style="flex:1"></span>
           <span class="sort-hint"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>Click a column header to sort</span>
