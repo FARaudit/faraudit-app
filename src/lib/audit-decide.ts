@@ -1390,6 +1390,38 @@ export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
   return Array.from(bySig.values());
 }
 
+// Card #481 (ruling-4, #436 root-6) — REFRAME (never bare-suppress) a "no set-aside is present" finding when the row's
+// set_aside field is AUTHORITATIVE (names a real program). A model lens sometimes reads the ORDER §I (no 52.219-6 clause)
+// and headlines "No set-aside is present in this solicitation" — source-TRUE at the order level but contradicting the
+// masthead's own "Set-aside: SBA" (the 41068f42 red-team's sole NO-STAMP). The reframe keeps the source-true observation
+// (no order-level 52.219-6 clause) and adds the authoritative context (the parent vehicle carries the set-aside; order
+// eligibility gates on the vehicle seat) so it no longer contradicts the masthead. Flag AUDIT_SETASIDE_REFRAME, default
+// OFF ⇒ findings untouched (byte-identical). A genuinely-unrestricted solicitation (set_aside empty/none) ⇒ NOT reframed
+// (the "no set-aside" finding is true) — the guard requires an authoritative set-aside.
+const setAsideReframeEnabled = () => process.env.AUDIT_SETASIDE_REFRAME === "true";
+// Match ONLY a finding that ASSERTS the ABSENCE of a set-aside (the masthead-contradicting claim) — not a benign mention
+// of 52.219-6. Requires "no set-aside … present/applies/exists", "no … set-aside clause", or "there is no … 52.219-6".
+const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+)?(?:is\s+|are\s+)?(?:present|applies|exists|in\s+(?:this|the))|\bno\s+(?:\S+\s+){0,3}?set[\s-]?aside\s+clause\b|there\s+is\s+no\s+(?:far\s+)?52\.219-6\b/i;
+/** True when set_aside names a real program (not empty/none/unrestricted/full-and-open). */
+export function setAsideIsAuthoritative(setAside: string | null | undefined): boolean {
+  const s = (setAside || "").trim().toLowerCase();
+  if (!s) return false;
+  // Word-boundary CONTAINS (not anchored) — SAM returns descriptive values like "Full and Open Competition" with trailing
+  // words; an anchored ^…$ would mis-read those as authoritative and reframe a genuinely unrestricted solicitation.
+  return !/\b(none|no set[\s-]?aside|n\/?a|full\s+and\s+open|unrestricted|not\s+set[\s-]?aside)\b/.test(s);
+}
+export function reframeNoSetAsideFindings<T extends { requirement: string }>(findings: T[], setAside: string | null | undefined): T[] {
+  if (!setAsideReframeEnabled() || !setAsideIsAuthoritative(setAside)) return findings;
+  const label = (setAside || "").trim();
+  // VEHICLE-AGNOSTIC reframe (red-team #481): assert ONLY what SAM records — the {label} set-aside — plus the source-true
+  // §I observation, and a verify instruction. NEVER fabricate a specific mechanism (a "BOA/IDIQ seat" would be invented on
+  // a non-vehicle set-aside, e.g. a plain 8(a) RFP). Source-defensible for ANY authoritative set_aside.
+  return findings.map((f) => {
+    if (!NO_SETASIDE_CLAIM_RE.test(f.requirement || "")) return f;
+    return { ...f, requirement: `No standalone FAR 52.219-6 set-aside clause was found in §I; however, SAM records this acquisition under the ${label} set-aside — confirm the controlling set-aside / eligibility basis against the latest solicitation and any parent contract vehicle.` };
+  });
+}
+
 // Card #477 ruling 3 — the NAMED NHR reason-line (flag AUDIT_REASON_LINE_NAMED, default-OFF). When grounded eligibility
 // bars drive the notice-body NHR, the reason NAMES them (from each bar's plain-language `requirement`) instead of the
 // generic B3 fail-safe boilerplate ("a bidder-eligibility bar … could not be confirmed as analyzed"), which understated

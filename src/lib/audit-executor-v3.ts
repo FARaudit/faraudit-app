@@ -39,7 +39,7 @@ import { isEnvOn } from "./env-flags";
 import { confirmResidualTokens } from "./ocr-accuracy-gate";
 import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
-import { clampToWord } from "./audit-decide";
+import { clampToWord, reframeNoSetAsideFindings } from "./audit-decide";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -402,6 +402,9 @@ export async function executeAgenticPrimary(
   // a half-finished verdict as if it were final. Reject so the worker's terminal path owns it.
   if (signal?.aborted) throw new Error("agentic engine aborted after verdict (overall budget) — not persisting a late-complete row");
   const generatedAt = new Date().toISOString();
+  // Card #481 (ruling-4) — reframe a "no set-aside is present" finding against the authoritative masthead set_aside so it
+  // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).
+  res.findings = reframeNoSetAsideFindings(res.findings, solicitation?.typeOfSetAside ?? null);
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
   // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,
