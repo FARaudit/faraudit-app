@@ -47,3 +47,5 @@ async function main() {
   process.exit(failures === 0 ? 0 : 1);
 }
 main();
+
+export {};

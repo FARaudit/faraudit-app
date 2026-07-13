@@ -1369,13 +1369,16 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
 const reasonLineNamedEnabled = () => process.env.AUDIT_REASON_LINE_NAMED === "true";
 
 /** Card #479 class-regression guard — clamp a DERIVED CUSTOMER-FACING string to `max` chars WITHOUT ever cutting
- *  mid-word or leaving a fake terminal period. Under the limit ⇒ returned as-is (whitespace-normalised). Over ⇒ trimmed
- *  to the last whole word, trailing punctuation stripped, explicit "…" elision appended. Use for EVERY reason/summary/
- *  rationale string that renders — a bare `.slice(0, N)` on such a string produced the 69dbbe9e "…proposed by an e." blocker. */
+ *  mid-word or leaving a fake terminal period. Under the limit ⇒ returned EXACTLY as-is (byte-identical to a prior
+ *  `.slice(0,max)` that never cut). Over ⇒ whitespace-normalised, trimmed to the last whole word, trailing punctuation
+ *  stripped, explicit "…" elision appended. Use for EVERY reason/summary/rationale string that renders — a bare
+ *  `.slice(0, N)` on such a string produced the 69dbbe9e "…proposed by an e." blocker. */
 export function clampToWord(s: string, max: number): string {
-  const t = (s || "").replace(/\s+/g, " ").trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max).replace(/\s+\S*$/, "").replace(/[.,;:]+$/, "") + "…";
+  const t = s || "";
+  if (t.length <= max) return t; // under the limit ⇒ EXACT as-is (byte-identical)
+  const norm = t.replace(/\s+/g, " ").trim();
+  if (norm.length <= max) return norm;
+  return norm.slice(0, max).replace(/\s+\S*$/, "").replace(/[.,;:]+$/, "") + "…";
 }
 
 export function namedEligibilityReason(stoppers: DecidedFinding[]): string | null {
