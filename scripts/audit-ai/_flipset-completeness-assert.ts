@@ -34,6 +34,7 @@ const LIVE_PROVEN: Record<string, string> = {
   AUDIT_DEADLINE_UPDATE_STACK: "card #477 ruling #2 — notice-body UPDATE-stack resolver; pin 10/10; merged #215",
   AUDIT_REASON_LINE_NAMED: "card #477 ruling #3 — named NHR reason-line; pin 8/8; merged #215",
   AUDIT_MAGNITUDE_LD_EMIT: "card #479 bundle — magnitude $500K-$1M + LDs $227.15 additive pricing capture; pin 9/9",
+  AUDIT_BAND_DEDUP: "card #480 — collapse duplicative MAC-BOA/vehicle-holder show-stopper pair; pin green",
 };
 
 // JUSTIFIED ABSENCES — a live-proven flag intentionally left OUT, WITH a reason (satisfies the assertion).
@@ -54,6 +55,8 @@ const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolea
   "AUDIT_OCR_TABLE_CONFIRM", "AUDIT_DEADLINE_UPDATE_STACK", "AUDIT_REASON_LINE_NAMED",
   // card #479 bundle — additive pricing capture
   "AUDIT_MAGNITUDE_LD_EMIT",
+  // card #480 — band dedup
+  "AUDIT_BAND_DEDUP",
 ];
 
 const proposedSet = new Set(PROPOSED);
