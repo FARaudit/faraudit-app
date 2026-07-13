@@ -379,12 +379,18 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
   const docType = deriveDocType(s(audit.notice_type), pole);
 
   // ── verdict ──
+  // Card #485 (Design #483 re-stamp · flag 1): the V4 port over-generalized noCharge to ALL three no-verdict poles,
+  // but the NHR pole carries NO no-charge line — Card 355 doctrine ("NHR foot: no no-charge line") + card #483
+  // checklist §1 + the V1 legacy renderer (audit-v3-report.ts, which only charged-off INCOMPLETE/OOS, never NHR).
+  // Flag AUDIT_NHR_NOCHARGE_SUPPRESS excludes NHR from the chip; INCOMPLETE/OUT_OF_SCOPE untouched.
+  // Flag OFF ⇒ NO_VERDICT_POLES.has(pole) unchanged, byte-identical (Rule 61).
+  const NHR_NOCHARGE_SUPPRESS = process.env.AUDIT_NHR_NOCHARGE_SUPPRESS === "true";
   const verdict: V4Verdict = {
     pole,
     band: POLE_BAND[pole] || pole,
     tone: POLE_TONE[pole] || "slate",
     noVerdict: NO_VERDICT_POLES.has(pole),
-    noCharge: NO_VERDICT_POLES.has(pole),
+    noCharge: NO_VERDICT_POLES.has(pole) && !(NHR_NOCHARGE_SUPPRESS && pole === "NEEDS_HUMAN_REVIEW"),
     eligible: p.eligible ?? null,          // tri-state; render suppresses the chip on OUT_OF_SCOPE (explicit pole rule)
     rationale: s(p.reason),                // VERBATIM — never paraphrase or trim
   };
