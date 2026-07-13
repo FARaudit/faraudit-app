@@ -21,6 +21,22 @@
 // Ships behind ONE default-OFF flag AUDIT_KEYFACT_DETECTOR (=== "true"); OFF ⇒ findings byte-identical.
 
 import type { TypedFinding } from "./audit-findings";
+import type { ProcurementPart } from "./audit-tools";
+
+// ROOT-5 FORM-KEYED CITATION (Brain card #474 ruling #2, flag AUDIT_FORM_KEYED_CITATION, default-OFF). The quote-
+// deadline finding hardcoded citation "SF-1449 Block 8" REGARDLESS of the detected form. On the FA8137 SF-1442
+// construction buy (run 8f56ecc4) that stamped a form that does NOT exist in the package onto a finding — a fabricated
+// citation the /panel red-team caught (AUTO-F class). Fix: key the form token to the SAME section-boundary classifier
+// the rest of the engine uses (procurementPart). INVARIANT (zero-tolerance): no form-name may appear in the citation
+// unless it IS the detected form — commercial→"SF-1449 Block 8" (correct), construction→"SF-1442" (no wrong block #),
+// UCF/unknown→form-NEUTRAL (no form-name asserted). Flag-OFF ⇒ the legacy hardcoded string (byte-identical).
+const formKeyedCitationEnabled = () => process.env.AUDIT_FORM_KEYED_CITATION === "true";
+export function deadlineCitation(part: ProcurementPart | undefined): string {
+  if (!formKeyedCitationEnabled()) return "SF-1449 Block 8 / Notice to Offerors (closing date)"; // legacy → byte-identical
+  if (part === "part12-commercial") return "SF-1449 Block 8 / Notice to Offerors (closing date)"; // SF-1449 IS the commercial cover form
+  if (part === "part36-construction") return "SF-1442 / Notice to Offerors (closing date)";       // construction cover form (no SF-1449 Block-N)
+  return "Notice to Offerors (closing date)";                                                     // part15-ucf / unknown → form-neutral, never a form-name
+}
 
 // Ratified caution string (primary-source-verified; the 500-employee ceiling + waivers are sourced to
 // 13 CFR 121.406, NOT the 52.219-33 clause text — see NMR-52.219-33-PRIMARY-SOURCE.md). PATH-AWARE: the
@@ -77,7 +93,7 @@ function verbatimSpan(src: string, re: RegExp, maxLen = 260): string | null {
 export function applyKeyfactDetector(
   findings: TypedFinding[],
   fullSource: string | undefined,
-  opts?: { enabled?: boolean },
+  opts?: { enabled?: boolean; procurementPart?: ProcurementPart },
 ): TypedFinding[] {
   if (!opts?.enabled) return findings;                        // default-OFF ⇒ byte-identical
   const src = fullSource || "";
@@ -131,7 +147,7 @@ export function applyKeyfactDetector(
     }
     if (span) add.push({
       requirement: "Quote submission deadline — submit the quote by the stated closing date/time (see excerpt) or it risks non-consideration.",
-      citation: "SF-1449 Block 8 / Notice to Offerors (closing date)",
+      citation: deadlineCitation(opts?.procurementPart),   // ROOT-5: form-keyed, never a hardcoded SF-1449 on a non-1449 buy
       excerpt: span, kind: "submission", controllability: "bidder_controls", grounded: true, lens: "keyfact_detector",
     });
   }
