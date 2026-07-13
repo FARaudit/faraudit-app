@@ -27,7 +27,8 @@ const LIVE_PROVEN: Record<string, string> = {
   AUDIT_DEADLINE_RECONCILE: "Gate-2 A at card #455, exercised #457 — REJOINS the set (ruling #4)",
   // batch-new, Gate-2-proven this batch (flag-OFF byte-identical + pins)
   AUDIT_FORM_KEYED_CITATION: "card #474 ROOT-5 fix — Gate-2 pending; pin 10/10",
-  AUDIT_LEDGER_BROAD_AMBIGUOUS: "card #474 ruling #3 fix — Gate-2 pending; pin 7/7",
+  AUDIT_LEDGER_BROAD_AMBIGUOUS: "card #474 ruling #3 — Gate-2 A, merged #212, pin 7/7",
+  AUDIT_BID_GUARANTEE_EMIT: "card #475 ruling #1 — Gate-2 A/SHIP, merged #213, pin 8/8 (§L residual clears)",
 };
 
 // JUSTIFIED ABSENCES — a live-proven flag intentionally left OUT, WITH a reason (satisfies the assertion).
@@ -43,7 +44,7 @@ const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolea
   "AUDIT_NOOP_REP_ALLOWLIST", "AUDIT_PRECEDENCE_ALLOWLIST", "AUDIT_PROTEST_CLAUSE_ALLOWLIST",
   "AUDIT_DEDUPE_PRIMARY_GUARD", "AUDIT_WORKER_OCR", "AUDIT_TXT_INGEST", "AUDIT_SIGNIN_NONBINDING",
   "AUDIT_CONDITIONAL_TINA_DEMOTION", "AUDIT_OCR_HELD_REGISTER", "AUDIT_COVERAGE_NHR_STOPPER_FILL",
-  "AUDIT_DEADLINE_RECONCILE", "AUDIT_FORM_KEYED_CITATION", "AUDIT_LEDGER_BROAD_AMBIGUOUS",
+  "AUDIT_DEADLINE_RECONCILE", "AUDIT_FORM_KEYED_CITATION", "AUDIT_LEDGER_BROAD_AMBIGUOUS", "AUDIT_BID_GUARANTEE_EMIT",
 ];
 
 const proposedSet = new Set(PROPOSED);
