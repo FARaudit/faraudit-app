@@ -93,6 +93,28 @@ export function bindingContentLossDocs(ingestion: IngestionMeta): IngestionFileM
   // mid-document truncated to fit the per-doc token budget (C-4 — the unread tail may carry a bar).
   return ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && (f.has_text !== true || f.truncated === true));
 }
+
+/** OCR-HELD REGISTER split (Brain card #471 ruling A, flag AUDIT_OCR_HELD_REGISTER). Partitions the content-loss set:
+ *  a doc whose OCR RECOVERED text but was held on unconfirmed residual tokens (ocr_residual present) is honestly an
+ *  OCR-attempted-HELD read-list entry — NOT "no machine-readable text / content not analyzed" (false on both counts).
+ *  Everything else stays the genuine no-text `missing`. Pure. Flag-OFF ⇒ every doc routes to `missing` ⇒ byte-identical.
+ *  Label/list only — never touches has_text, the hold, or documents_complete. */
+export function splitContentLoss(contentLoss: IngestionFileMeta[], ocrHeldRegisterOn: boolean): {
+  missing: Array<{ name: string; reason: string }>;
+  ocrHeld: Array<{ name: string; residuals: number; reason: string }>;
+} {
+  const missing: Array<{ name: string; reason: string }> = [];
+  const ocrHeld: Array<{ name: string; residuals: number; reason: string }> = [];
+  for (const f of contentLoss) {
+    const residuals = f.ocr_residual?.length ?? 0;
+    if (ocrHeldRegisterOn && residuals > 0) {
+      ocrHeld.push({ name: f.name, residuals, reason: `OCR-recovered; held from committal on ${residuals} unconfirmed residual token(s) — human verification recommended` });
+    } else {
+      missing.push({ name: f.name, reason: "ingested but no machine-readable text (scanned/image) — content not analyzed" });
+    }
+  }
+  return { missing, ocrHeld };
+}
 function hasBindingContentLoss(ingestion: IngestionMeta): boolean {
   return bindingContentLossDocs(ingestion).length > 0;
 }
@@ -355,6 +377,11 @@ export async function executeAgenticPrimary(
         // manifest. Both upload arms (multipart + storage) set ingestion, so this guards
         // the fabricated-SAM-provenance card the report would otherwise render for uploads.
         fromSam: isSamSol,
+        // OCR-HELD REGISTER (Brain card #471 ruling A, flag AUDIT_OCR_HELD_REGISTER) — a doc whose OCR RECOVERED text
+        // but whose residual tokens the accuracy gate could not confirm (has_text=false via unconfirmed residuals) is
+        // NOT "no machine-readable text": it's OCR-recovered-but-held. Surfaced here as a read-list caveat, never in
+        // `missing` as content-loss. Label/list only — has_text, the hold, and documents_complete are UNCHANGED.
+        ocr_held: [] as Array<{ name: string; residuals: number; reason: string }>,
         ...(ing.overflow ? { note: ing.overflow } : {}),
       }
     : isSamSol
@@ -381,7 +408,12 @@ export async function executeAgenticPrimary(
     const contentLoss = bindingContentLossDocs(ing);
     if (contentLoss.length) {
       payload.documents.complete = false;
-      for (const f of contentLoss) payload.documents.missing.push({ name: f.name, reason: "ingested but no machine-readable text (scanned/image) — content not analyzed" });
+      // OCR-HELD REGISTER (card #471 ruling A) — route an OCR-recovered-but-held doc to the read-list caveat, a genuine
+      // no-text doc to `missing`. Flag-OFF ⇒ all → `missing` ⇒ byte-identical. Never touches has_text/the hold.
+      const { missing: nlMissing, ocrHeld } = splitContentLoss(contentLoss, isEnvOn(process.env.AUDIT_OCR_HELD_REGISTER));
+      for (const m of nlMissing) payload.documents.missing.push(m);
+      const heldReg = (payload.documents as { ocr_held?: Array<{ name: string; residuals: number; reason: string }> }).ocr_held;
+      if (heldReg) for (const h of ocrHeld) heldReg.push(h);
     }
   }
   // C-1 (Brain C.e) — ONE completeness computation. `manifestComplete` (agenticManifestComplete: truncation +

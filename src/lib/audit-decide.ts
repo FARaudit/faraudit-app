@@ -1361,6 +1361,21 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
   return dispositions.filter((f) => isSiteVisitOrEligBar(f, profile, source)).map((f) => ({ ...f, severity: "P0" as const }));
 }
 
+// SEAM FILL — card #472 (residual batch, flag AUDIT_COVERAGE_NHR_STOPPER_FILL, default-OFF). The COMPANION of the
+// card-429 notice-body treatment for the OTHER coverage-NHR pole: the GATE_V2 coverage cap (gateV2Outcome cap ===
+// "NEEDS_HUMAN_REVIEW", deriveVerdict step 1). Trace (6439ac27): a §L conditional-TINA false-NHR fired the GATE_V2 cap
+// FIRST and returned showStoppers=[], STRANDING three GROUNDED bidder_cannot_move eligibility bars (BOA-holder,
+// concluded site-visit, vehicle-holder) in dispositions[] — they rendered in the P2 advisory band, never the V4
+// show-stopper band (which sources EXCLUSIVELY from persisted showStoppers[], card-293). #1 (conditional-TINA demotion)
+// removes THAT false pole; this fill is the decision-layer defense-in-depth so a GENUINE coverage-NHR cap can never
+// again strand a grounded eligibility/site-visit bar out of the persisted slot. DOCTRINE-COHERENT with card-429: the
+// GATE_V2 coverage cap is a COVERAGE pole (a specific uncovered obligation), NOT a meta-ambiguity pole (setAsideConflict
+// / primaryIndeterminate / unreadEvidence / verifier / conflict — where a promotion would be a false committal and which
+// this fill NEVER touches). Reuses the SAME siteVisitEligStoppers filter (only genuine site-visit/eligibility_bar
+// disqualifiers, floored P0, framed CONDITIONAL by the render — card 432), so a non-elig disqualifier is never promoted.
+// Flag-OFF ⇒ passes [] exactly as today (byte-identical, Rule 61).
+const coverageNhrStopperFillEnabled = () => process.env.AUDIT_COVERAGE_NHR_STOPPER_FILL === "true";
+
 /** Against a disqualifying (bidder_cannot_move) bar, the firm's status is one of three — and that, not the
  *  bar's mere presence, decides the outcome (the standing facts-vs-analysis / no-blind-INELIGIBLE doctrine):
  *    "satisfies" — profile PROVES the firm holds the required qualification → the bar is cleared (a fact).
@@ -1629,7 +1644,11 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   if (GATE_V2_ENABLED && inp.coverageV2) {
     const v2 = gateV2Outcome(inp.coverageV2);
     if (v2.cap === "INCOMPLETE") return mk("INCOMPLETE", honestFailEligible(), v2.reason, dispositions, []);
-    if (v2.cap === "NEEDS_HUMAN_REVIEW") return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), v2.reason, dispositions, []);
+    // SEAM FILL (card #472) — on the coverage-NHR cap ONLY (never INCOMPLETE: unreadable ⇒ findings untrustworthy), lift
+    // any grounded site-visit/eligibility bar in dispositions[] into the persisted showStoppers[] slot so it renders in
+    // the show-stopper band, not the P2 advisories. Same filter/flag family as the notice-body pole. OFF ⇒ [] (identical).
+    if (v2.cap === "NEEDS_HUMAN_REVIEW") return mk("NEEDS_HUMAN_REVIEW", honestFailEligible(), v2.reason, dispositions,
+      coverageNhrStopperFillEnabled() ? siteVisitEligStoppers(dispositions, inp.bidderProfile, inp.source) : []);
     // cap === null ⇒ no coverage veto; the documentsComplete gate (1b) below still applies (genuine unreadability).
   } else if (!inp.coverageComplete) {
     return mk("INCOMPLETE", honestFailEligible(), "Coverage not complete — not all binding content was read and grounded." + (inp.coverageGap ? ` Gap: ${inp.coverageGap}.` : ""), dispositions, []);
