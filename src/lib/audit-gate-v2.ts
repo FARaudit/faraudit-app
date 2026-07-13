@@ -307,12 +307,15 @@ export function isConditionalTinaBoilerplate(ob: string): boolean {
 // ledger (completenessOf → covered_boilerplate_signal) consults to decide whether an ungrounded READ §L/§M obligation
 // is a DEMOTED NON-BAR — reusing #1's exact classification predicates (isGovtEvalMethodologyNonBar +
 // isConditionalTinaBoilerplate) so the ledger and gradeCoverageV2 can NEVER hold a parallel/divergent definition of
-// "bar". Scope is DELIBERATELY narrower than gradeCoverageV2's demotion: ONLY the two TIGHT bar-guarded refinements,
-// NOT the broad ambiguous+no-bar-signal path — the ledger stays the stricter belt (card #472 scoping). Each predicate
-// is self-guarding (strips its own token, then !hasBarSignal), so a real compound bar can never pass; the CALLER also
-// hard-vetoes importanceOf==="disqualifier" upstream — the mixed-section invariant, laundering-behind-a-crowd defense.
-// Gated exactly like gradeCoverageV2's demotion (line 357): AMBIGUOUS_SIGNAL_DEMOTION governs govt-eval; conditional
-// TINA requires BOTH it and CONDITIONAL_TINA_DEMOTION. Flag-OFF on either gate ⇒ returns false ⇒ ledger byte-identical.
+// "bar". Card #472 originally scoped this NARROWER than gradeCoverageV2's demotion (only the two TIGHT bar-guarded
+// refinements — govt-eval + conditional-TINA — a deliberate "stricter belt"). Card #474 ruling #3 REVISED that on live
+// evidence (see the broad-ambiguous path + flag below): the belt was too strict on a real large §L/§M. With
+// AUDIT_LEDGER_BROAD_AMBIGUOUS on, the ledger's demotion MATCHES gradeCoverageV2 (one truth); with it off, the #472
+// stricter belt is preserved. Each of the two tight predicates is self-guarding (strips its own token, then
+// !hasBarSignal), so a real compound bar can never pass; the CALLER also hard-vetoes importanceOf==="disqualifier"
+// upstream — the mixed-section invariant, laundering-behind-a-crowd defense. Gated like gradeCoverageV2's demotion (line
+// 357): AMBIGUOUS_SIGNAL_DEMOTION governs govt-eval; conditional TINA requires BOTH it and CONDITIONAL_TINA_DEMOTION;
+// the broad path requires AMBIGUOUS_SIGNAL_DEMOTION + LEDGER_BROAD_AMBIGUOUS. Flag-OFF on the gates ⇒ byte-identical.
 // LEDGER BROAD-AMBIGUOUS DEMOTION (Brain card #474 ruling #3, flag AUDIT_LEDGER_BROAD_AMBIGUOUS, default-OFF). REVISES
 // the #472 "stricter belt" scope on live evidence. The 8f56ecc4 investigation proved the belt is TOO strict on a real
 // large §L/§M: the detector read §L (22,146 chars, high-conf) and §M (14,468, high-conf), but the ledger held BOTH
