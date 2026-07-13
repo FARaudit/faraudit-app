@@ -68,6 +68,9 @@ export interface V3ReportPayload {
     read: number;
     complete: boolean;
     missing: Array<{ name: string; reason?: string }>;
+    // OCR-HELD REGISTER (Brain card #471 ruling A, flag AUDIT_OCR_HELD_REGISTER) — docs whose OCR recovered text but
+    // were held on unconfirmed residual tokens: an honest read-list caveat, NOT the no-text `missing` class.
+    ocr_held?: Array<{ name: string; residuals: number; reason: string }>;
     note?: string;
     // Provenance for the disclosure wording. true/absent = SAM notice (retrieved from
     // SAM.gov, wording references the agency's posted manifest). false = a user UPLOAD
