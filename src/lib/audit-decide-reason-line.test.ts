@@ -4,7 +4,7 @@
 // When grounded eligibility bars drive the notice-body NHR, the reason NAMES them instead of the generic B3 boilerplate.
 // Fixtures = the real 6a67c0f1 showStopper requirements (BOA/vehicle-holder + concluded site visit). Empty ⇒ null ⇒ the
 // caller keeps the generic string (byte-identical).
-import { namedEligibilityReason, clampToWord } from "./audit-decide";
+import { namedEligibilityReason, clampToWord, dedupBandGates } from "./audit-decide";
 import type { DecidedFinding } from "./audit-decide";
 
 let failures = 0;
@@ -26,6 +26,16 @@ assert(/HOLDERS ONLY|holder of the underlying vehicle/i.test(reason ?? ""), "nam
 assert(/site visit/i.test(reason ?? "") && /concluded|may 28/i.test(reason ?? ""), "names the concluded site-visit bar");
 assert(/\(1\)/.test(reason ?? "") && /\(2\)/.test(reason ?? ""), "enumerates the bars (1)…(2)");
 console.log("  →", reason);
+
+console.log("\n── card #480 — the vehicle-holder bar renders as a COMPLETE thought (no dangling '…holder of…') ──");
+assert(!/holder of…|holder of \.|of…\./i.test(reason ?? ""), "does NOT end the clause on the dangling preposition 'holder of…' (the e8b616df blocker)");
+assert(/existing holder of the underlying vehicle/i.test(reason ?? ""), "renders the full clause '…existing holder of the underlying vehicle' as a complete thought");
+{
+  // if a bar DOES elide (pathological long clause), it must not end on a function word before the ellipsis
+  const veryLong = mk("Order restricted to holders only — " + "the offeror must be an existing holder of ".repeat(8) + "the vehicle and cannot otherwise bid");
+  const r = namedEligibilityReason([veryLong]);
+  assert(!/\s(?:of|the|a|an|to|by|for|in|on)…/i.test(r ?? ""), "on elision, no trailing dangling function-word before '…'");
+}
 
 console.log("\n── dedup: identical requirements collapse ──");
 const dupReason = namedEligibilityReason([stoppers[0], mk(stoppers[0].requirement)]);
@@ -58,5 +68,27 @@ assert(clampToWord("short string", 100) === "short string", "under limit → as-
   assert(long.split(" ").includes(lastWord), `last kept token '${lastWord}' is a WHOLE source word (no mid-word split)`);
 }
 
-console.log(`\n${failures === 0 ? "✅ ALL PASS" : "❌ " + failures + " FAIL"} — named reason-line pin`);
+console.log("\n── card #480 band dedup — MAC-BOA + vehicle-holder collapse to ONE gate, both citations preserved ──");
+const mkc = (requirement: string, citation: string, requiredAttribute?: string): DecidedFinding => ({ requirement, citation, excerpt: "", kind: "eligibility_bar", controllability: "bidder_cannot_move", grounded: true, lens: "orchestrator", disposition: "disqualifying", ...(requiredAttribute ? { requiredAttribute } : {}) } as unknown as DecidedFinding);
+const band = [
+  mkc("This ITO is issued against a pre-existing Multiple Award Contract (MAC) Basic Ordering Agreement (BOA)", "Section L §1.1–1.2", "contract:MAC-BOA-holder"),
+  mkc("Mandatory site visit stated in the SAM notice body was held/concluded may 28, 2026", "SAM Notice Body"),
+  mkc("Order restricted to vehicle HOLDERS ONLY (BOA/IDIQ/BPA/GWAC/MAS) stated in the SAM notice body", "SAM Notice Body"),
+];
+{
+  process.env.AUDIT_BAND_DEDUP = "true";
+  const deduped = dedupBandGates(band);
+  assert(deduped.length === 2, `band collapses 3 → 2 distinct gates (got ${deduped.length})`);
+  const holderGate = deduped.find((f) => !/site visit/i.test(f.requirement)); // the collapsed MAC-BOA/vehicle-holder gate
+  assert(!!holderGate, "the MAC-BOA/vehicle-holder gate survives as one bar");
+  assert(/Section L/.test(holderGate?.citation ?? "") && /SAM Notice Body/.test(holderGate?.citation ?? ""), "BOTH citations preserved on the survivor (Section L + SAM Notice Body)");
+  assert(deduped.some((f) => /site visit/i.test(f.requirement)), "the concluded-site-visit gate stays distinct");
+}
+{
+  process.env.AUDIT_BAND_DEDUP = "";
+  const off = dedupBandGates(band);
+  assert(off.length === 3, "flag OFF: band unchanged (3) — byte-identical");
+}
+
+console.log(`\n${failures === 0 ? "✅ ALL PASS" : "❌ " + failures + " FAIL"} — named reason-line + band-dedup pin`);
 process.exit(failures === 0 ? 0 : 1);

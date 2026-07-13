@@ -1358,7 +1358,34 @@ function isSiteVisitOrEligBar(f: DecidedFinding, profile: BidderProfile | null, 
 /** The site-visit/eligibility disqualifiers to SURFACE as bid-deciding on the notice-body NHR pole, floored to P0.
  *  Applied ONLY inside that branch (see doctrine above) — never on meta-ambiguity poles. Pure. */
 function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderProfile | null, source?: string): DecidedFinding[] {
-  return dispositions.filter((f) => isSiteVisitOrEligBar(f, profile, source)).map((f) => ({ ...f, severity: "P0" as const }));
+  const stoppers = dispositions.filter((f) => isSiteVisitOrEligBar(f, profile, source)).map((f) => ({ ...f, severity: "P0" as const }));
+  return dedupBandGates(stoppers);
+}
+
+// Card #480 — collapse show-stopper bars that assert the SAME eligibility GATE stated from two documents (the e8b616df
+// band over-count: [0] MAC-BOA §L 1.1–1.2 + [2] "vehicle HOLDERS ONLY" SAM-body are ONE gate — "must hold the Tinker MAC
+// BOA vehicle" — a firm cannot clear one and fail the other). Group by a gate SIGNATURE (requiredAttribute + requirement
+// tokens), keep the first, and PRESERVE the merged bar's citation on the survivor (no citation lost). Flag-gated
+// AUDIT_BAND_DEDUP, default-OFF ⇒ returns the list unchanged (byte-identical).
+const bandDedupEnabled = () => process.env.AUDIT_BAND_DEDUP === "true";
+function gateSignature(f: DecidedFinding): string {
+  const combined = `${f.requiredAttribute ?? ""} ${f.requirement ?? ""}`.toLowerCase();
+  if (/mac.?boa|boa.?holder|holders\s+only|vehicle.?hold|underlying\s+vehicle|\bidiq\b|\bbpa\b|\bgwac\b|\bmas\b/.test(combined)) return "gate:vehicle-holder";
+  if (/site\s+visit/.test(combined)) return "gate:site-visit";
+  return `req:${(f.requirement ?? "").toLowerCase().replace(/\s+/g, " ").slice(0, 50)}`;
+}
+export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
+  if (!bandDedupEnabled()) return stoppers;
+  const bySig = new Map<string, DecidedFinding>();
+  for (const f of stoppers) {
+    const sig = gateSignature(f);
+    const kept = bySig.get(sig);
+    if (!kept) { bySig.set(sig, { ...f }); continue; }
+    // merge: preserve BOTH citations on the survivor (dedupe identical strings)
+    const cites = Array.from(new Set([kept.citation, f.citation].filter(Boolean)));
+    kept.citation = cites.join("; ");
+  }
+  return Array.from(bySig.values());
 }
 
 // Card #477 ruling 3 — the NAMED NHR reason-line (flag AUDIT_REASON_LINE_NAMED, default-OFF). When grounded eligibility
@@ -1387,8 +1414,11 @@ export function namedEligibilityReason(stoppers: DecidedFinding[]): string | nul
   for (const s of stoppers) {
     const req = (s.requirement || "").replace(/\s+/g, " ").trim();
     if (!req) continue;
-    // Card #479 — take the first sentence, then WORD-BOUNDARY clamp (never mid-word; the 69dbbe9e "…proposed by an e" blocker).
-    const phrase = clampToWord((req.split(/(?<=[.;])\s/)[0] || req).replace(/[.;,\s]+$/, ""), 160);
+    // Card #480 — prefer the natural CLAUSE boundary (";"/"."): take the first clause and clamp only if it exceeds a
+    // GENEROUS limit, so a real clause renders as a complete thought instead of the e8b616df "…existing holder of…"
+    // dangling-preposition elision. On any elision, strip a trailing function-word so it never ends on a preposition/article.
+    let phrase = clampToWord((req.split(/(?<=[.;])\s/)[0] || req).replace(/[.;,\s]+$/, ""), 240);
+    if (phrase.endsWith("…")) phrase = phrase.replace(/\s+(?:of|the|a|an|to|by|for|in|on|and|or|with|at|as|from|per)\s*…$/i, "…");
     const key = phrase.toLowerCase().slice(0, 40);
     if (!phrase || seen.has(key)) continue;
     seen.add(key);
