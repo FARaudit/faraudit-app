@@ -313,10 +313,24 @@ export function isConditionalTinaBoilerplate(ob: string): boolean {
 // hard-vetoes importanceOf==="disqualifier" upstream — the mixed-section invariant, laundering-behind-a-crowd defense.
 // Gated exactly like gradeCoverageV2's demotion (line 357): AMBIGUOUS_SIGNAL_DEMOTION governs govt-eval; conditional
 // TINA requires BOTH it and CONDITIONAL_TINA_DEMOTION. Flag-OFF on either gate ⇒ returns false ⇒ ledger byte-identical.
+// LEDGER BROAD-AMBIGUOUS DEMOTION (Brain card #474 ruling #3, flag AUDIT_LEDGER_BROAD_AMBIGUOUS, default-OFF). REVISES
+// the #472 "stricter belt" scope on live evidence. The 8f56ecc4 investigation proved the belt is TOO strict on a real
+// large §L/§M: the detector read §L (22,146 chars, high-conf) and §M (14,468, high-conf), but the ledger held BOTH
+// false-missing because 40 §L + 20 §M ungrounded obligations are benign proposal-prep mechanics that classify
+// "ambiguous"+bar-NEGATIVE ("Page size shall be 8", "Arial 12 points", "counted as two pages", "responsible offeror
+// shall meet requirement spec", OPR terms) — NOT covered by the two tight refinements above. This path demotes the
+// ambiguous+bar-negative class so the ledger's coverage.missing matches gradeCoverageV2's verdict-side demotion (line
+// 357) — the two coverage systems finally agree (one truth). INVARIANT (proven on 8f56ecc4): after this demotion §M →
+// 0 blockers (covered) and §L → held by EXACTLY 1 blocker, the bid-bond ("20% IAW FAR 28", bar-POSITIVE) — a real
+// requirement that still escalates until grounded (ruling #1's grounding fast-follow). The caller vetoes
+// importanceOf==="disqualifier" FIRST, and hasBarSignal keeps every real bar escalating, so nothing real is laundered.
+// Flag-OFF ⇒ the #472 belt is byte-identical.
+const ledgerBroadAmbiguousEnabled = () => process.env.AUDIT_LEDGER_BROAD_AMBIGUOUS === "true";
 export function isLedgerDemotableNonBar(ob: string): boolean {
   if (!ambiguousSignalDemotionEnabled()) return false;
   if (isGovtEvalMethodologyNonBar(ob)) return true;
   if (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)) return true;
+  if (ledgerBroadAmbiguousEnabled() && !hasBarSignal(ob)) return true; // ruling #3: ambiguous+bar-negative → demote (matches gradeCoverageV2)
   return false;
 }
 
