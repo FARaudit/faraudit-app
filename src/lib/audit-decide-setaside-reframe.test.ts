@@ -26,6 +26,15 @@ async function main() {
   assert(f7.citation === F7.citation, "citation preserved");
   assert(out[1].requirement === OTHER.requirement, "an unrelated finding is untouched");
 
+  console.log("\n── card #482 — the STALE dropped-boilerplate finding[40] variant also reframes (no internal contradiction) ──");
+  const F40 = { requirement: "No set-aside designation found in this solicitation; no small business program eligibility bar present. (FAR 52.219-6 is NOT in this solicitation.)", citation: "boilerplate" };
+  const r40 = reframe([F40], "SBA");
+  assert(!/no set-aside designation found/i.test(r40[0].requirement), "finding[40] 'No set-aside designation found' is GONE");
+  assert(!/52\.219-6 is not in this solicitation/i.test(r40[0].requirement), "the '52.219-6 is NOT in this solicitation' contradiction is GONE");
+  assert(/no standalone far 52\.219-6/i.test(r40[0].requirement) && /SBA set-aside/i.test(r40[0].requirement), "reframed to the honest form (no §I 52.219-6 clause; SAM records the SBA set-aside)");
+  // an unrestricted sol with the finding[40] text stays untouched (the 'no set-aside' claim is TRUE there)
+  assert(reframe([F40], "Full and Open Competition")[0].requirement === F40.requirement, "unrestricted sol: finding[40] untouched");
+
   console.log("\n── red-team #481 — VEHICLE-AGNOSTIC: a non-vehicle set-aside (8(a) RFP) must NOT fabricate a BOA/IDIQ seat ──");
   const a8 = reframe([{ requirement: "No set-aside is present in this solicitation.", citation: "§I" }], "8(a)");
   assert(!/BOA|IDIQ|GWAC|vehicle\s+seat|holding the vehicle/i.test(a8[0].requirement), "does NOT invent a vehicle/BOA/IDIQ seat on a non-vehicle 8(a) set-aside");
