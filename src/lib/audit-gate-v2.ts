@@ -303,6 +303,23 @@ export function isConditionalTinaBoilerplate(ob: string): boolean {
   return !hasBarSignal(stripped); // a bar signal surviving the strip ⇒ a real compound bar ⇒ do NOT demote
 }
 
+// LEDGER DEMOTION TRUTH (Brain card #472, residual batch #3). The SINGLE predicate the orchestrator per-obligation
+// ledger (completenessOf → covered_boilerplate_signal) consults to decide whether an ungrounded READ §L/§M obligation
+// is a DEMOTED NON-BAR — reusing #1's exact classification predicates (isGovtEvalMethodologyNonBar +
+// isConditionalTinaBoilerplate) so the ledger and gradeCoverageV2 can NEVER hold a parallel/divergent definition of
+// "bar". Scope is DELIBERATELY narrower than gradeCoverageV2's demotion: ONLY the two TIGHT bar-guarded refinements,
+// NOT the broad ambiguous+no-bar-signal path — the ledger stays the stricter belt (card #472 scoping). Each predicate
+// is self-guarding (strips its own token, then !hasBarSignal), so a real compound bar can never pass; the CALLER also
+// hard-vetoes importanceOf==="disqualifier" upstream — the mixed-section invariant, laundering-behind-a-crowd defense.
+// Gated exactly like gradeCoverageV2's demotion (line 357): AMBIGUOUS_SIGNAL_DEMOTION governs govt-eval; conditional
+// TINA requires BOTH it and CONDITIONAL_TINA_DEMOTION. Flag-OFF on either gate ⇒ returns false ⇒ ledger byte-identical.
+export function isLedgerDemotableNonBar(ob: string): boolean {
+  if (!ambiguousSignalDemotionEnabled()) return false;
+  if (isGovtEvalMethodologyNonBar(ob)) return true;
+  if (conditionalTinaDemotionEnabled() && isConditionalTinaBoilerplate(ob)) return true;
+  return false;
+}
+
 export interface CoverageV2 {
   /** Sections genuinely NOT fully read (unread / truncated / dropped-at-ingest) → legitimate INCOMPLETE. */
   unreadable: string[];

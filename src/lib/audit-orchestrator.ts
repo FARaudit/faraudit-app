@@ -27,7 +27,7 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
-import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf } from "./audit-gate-v2";
+import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
 // obligation sentences are administrative BOILERPLATE (importanceOf==="boilerplate") reads COVERED-WITH-SIGNAL, not
@@ -919,8 +919,17 @@ export function completenessOf(ctx: AuditToolContext, required: string[], findin
     // keeps status obligations_ungrounded → escalates (the non-negotiable invariant). Only PER_OBLIGATION §L/§M.
     let status: SectionAttestation["status"];
     if (!ungrounded.length) status = "covered_attested";
+    // #3 (Brain card #472) — the ledger now also accepts #1's DEMOTED classes (govt-eval methodology + conditional-frame
+    // TINA non-bar) via the SHARED isLedgerDemotableNonBar truth, so a fully-read §L whose only ungrounded residual is a
+    // conditional-15.403-1 recital reads covered instead of false-missing (the 6439ac27 driver). MIXED-SECTION INVARIANT
+    // (card #472, non-negotiable): the `importanceOf(u) !== "disqualifier"` veto sits FIRST inside the .every, so even one
+    // real ungrounded disqualifier among a crowd of demotable strings fails the .every → section STAYS missing → the bar
+    // STILL escalates. isLedgerDemotableNonBar is self-guarded too (can't fire on a bar); the explicit veto is the belt.
+    // Flag-OFF (COVERAGE_LEDGER_V2 or the demotion gates) ⇒ demotable predicate returns false ⇒ byte-identical to B1.
     else if (COVERAGE_LEDGER_V2 && PER_OBLIGATION_SECTIONS.has(sec)
-      && ungrounded.every((u) => !/^\[(truncated|compressor-dropped)\]/i.test(u) && importanceOf(u) === "boilerplate"))
+      && ungrounded.every((u) => !/^\[(truncated|compressor-dropped)\]/i.test(u)
+            && importanceOf(u) !== "disqualifier"
+            && (importanceOf(u) === "boilerplate" || isLedgerDemotableNonBar(u))))
       status = "covered_boilerplate_signal";
     else status = "obligations_ungrounded";
     attestations.push({ section: sec, status, obligations: obligationSet, citedFindingIds: [...cited], ungrounded });
