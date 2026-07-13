@@ -32,6 +32,16 @@ const ARO_RE = /\b(?:ARO|after receipt of (?:order|award)|after (?:the )?date of
 const DELIVER_RE = /\b(?:deliver|delivery|shall furnish and deliver)\b/i;
 const DELIVERY_WINDOW_RE = /\b(?:within|not later than|no later than|no more than)\b/i;
 
+// BID-GUARANTEE / BOND archetype (Brain card #475 ruling #1, flag AUDIT_BID_GUARANTEE_EMIT, default-OFF). A §L §4.3-
+// style "Bid Guarantee (Bond): … required IAW FAR 28.101-1" is a REAL, groundable §L requirement a 40+-finding run
+// left ungrounded (the run 8f56ecc4 §L residual — bar-POSITIVE, so it held §L missing under the revised ledger). Same
+// shared-miss family as the site-visit emitter: ground it deterministically from source (Rule-64 verbatim) so §L's
+// last blocker clears honestly. A bid guarantee is bidder-OBTAINABLE → bidder_controls / gate_to_clear, NEVER a
+// show-stopper (construction-manifest doctrine, judgment-first:167). REQUIRES the requirement framing (not the bare
+// word "bond") so a passing mention in a submission list can't false-fire. Over-fire guard = both regexes must hit.
+const BID_GUARANTEE_RE = /\bbid\s+guarantee\b|\bbid\s+bond\b/i;
+const BID_GUARANTEE_REQUIRED_RE = /\brequired\b|\bshall\s+(?:furnish|provide|submit)\b|\bIAW\s+FAR\s+28\b|\b28\.10?1\b|\b\d{1,3}\s*(?:%|percent)\b|\bfailure\s+to\s+furnish\b/i;
+
 // Labeled human authoring notes / provenance banners — NEVER grounded (card 76-R1: the demoted conclusion
 // and any "NOT A BINDING TERM" note must stay out of grounded findings).
 const PROVENANCE_SKIP_RE = /\bHUMAN AUTHORING NOTE\b|\bNOT A BINDING TERM\b|NOT THE GOVERNMENT'?S (?:ACTUAL )?SOLICITATION|\bAUTHORING NOTE\b|\bPROVENANCE\b/i;
@@ -54,7 +64,7 @@ function nearestSection(source: string, idx: number): string | null {
   return letter;
 }
 
-interface SweepHit { archetype: string; requirementLabel: string; kind: TypedFinding["kind"]; anchor: RegExp; }
+interface SweepHit { archetype: string; requirementLabel: string; kind: TypedFinding["kind"]; anchor: RegExp; forceSection?: string; }
 
 /** Classify a binding paragraph against the high-signal archetypes (most-specific first). `anchor` is the
  *  discriminating token the excerpt window is centered on (so the duration / role-years is always captured,
@@ -75,6 +85,8 @@ function classifyAll(p: string): SweepHit[] {
     hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: named role with a quantified minimum experience", kind: "submission", anchor: YEARS_RE });
   if (CERT_RE.test(p) && PERSONNEL_RE.test(p) && !EXCLUDE_RE.test(p))
     hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: specialized professional certification/license of performing personnel", kind: "submission", anchor: CERT_RE });
+  if (process.env.AUDIT_BID_GUARANTEE_EMIT === "true" && BID_GUARANTEE_RE.test(p) && BID_GUARANTEE_REQUIRED_RE.test(p))
+    hits.push({ archetype: "bid_guarantee", requirementLabel: "Bid guarantee (bond) required with the offer — a bidder-obtainable bond (FAR 28.101); failure to furnish risks rejection", kind: "submission", anchor: BID_GUARANTEE_RE, forceSection: "L" }); // §L: furnish-with-your-offer submission instruction (grounds the §L obligation, not the crude nearestSection §C)
   if (QPL_RE.test(p)) hits.push({ archetype: "qpl", requirementLabel: "Qualified Products/Manufacturers List (QPL/QML) membership requirement", kind: "technical_spec", anchor: QPL_RE });
   if (OREQUAL_RE.test(p)) hits.push({ archetype: "or_equal", requirementLabel: "Brand-name-or-equal qualification burden (salient characteristics)", kind: "technical_spec", anchor: OREQUAL_RE });
   const seenArch = new Set<string>();
@@ -109,9 +121,10 @@ export function highSignalSweep(source: string): TypedFinding[] {
       const excerpt = windowAround(para, hit.anchor);                     // verbatim window centered on the signal
       const key = hit.archetype + "|" + excerpt.slice(0, 80).toLowerCase();
       if (seen.has(key)) continue; seen.add(key);
+      const sec = hit.forceSection ?? letter;                             // archetype may pin its own section (bid guarantee ⇒ §L submission instruction)
       out.push({
         requirement: `${hit.requirementLabel} (grounded by deterministic high-signal sweep).`,
-        citation: letter ? `§${letter} (grounding sweep)` : "(grounding sweep)",
+        citation: sec ? `§${sec} (grounding sweep)` : "(grounding sweep)",
         excerpt, kind: hit.kind, controllability: "bidder_controls", grounded: true,
         lens: "deterministic_sweep", sweepArchetype: hit.archetype,
       });

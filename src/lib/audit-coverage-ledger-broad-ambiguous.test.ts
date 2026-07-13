@@ -53,6 +53,22 @@ const broadOff = () => { process.env.AUDIT_LEDGER_BROAD_AMBIGUOUS = "false"; };
   const onBar = run({ L: L_FORMAT, M: M_OPR + REAL_BAR });
   ok("FLAG-ON: §M with a real clearance bar → STILL missing (invariant)", onBar.missing.includes("M"));
 
+  // ── #472 MIXED-SECTION PIN RE-ASSERTED UNDER THE BROADENED LEDGER (Brain card #475 ruling #1 carried condition):
+  //    ONE real ungrounded disqualifier among a CROWD of demotables (format-litany + govt-eval + conditional-TINA +
+  //    boilerplate) → the section STAYS missing and the bar STILL escalates, even with the broad path ON. Enable the
+  //    demotion families so the crowd genuinely demotes; the lone real bar must still fail the .every.
+  process.env.AUDIT_CONDITIONAL_TINA_DEMOTION = "true";
+  const CROWD =
+    L_FORMAT +                                                                                   // format-litany (ambiguous+bar-negative)
+    " The certified cost or pricing data shall be evaluated to support a determination of price reasonableness." + // govt-eval non-bar
+    " If none of the exceptions in FAR 15.403-1 apply, the offeror shall be required to submit certified cost or pricing data." + // conditional-TINA
+    REAL_BAR;                                                                                    // the ONE real bar: Top Secret facility clearance
+  const mixed = run({ L: CROWD, M: M_OPR });
+  ok("MIXED (broad ON): §L with 1 real clearance bar among a crowd of demotables → STILL missing", mixed.missing.includes("L"));
+  ok("MIXED (broad ON): §L status stays obligations_ungrounded (bar escalates)", statusOf(mixed, "L") === "obligations_ungrounded");
+  ok("MIXED (broad ON): the real clearance bar is RETAINED in §L ungrounded (not laundered by the crowd)",
+     (mixed.attestations.find((a) => a.section === "L")?.ungrounded.some((u) => /clearance/i.test(u))) === true);
+
   console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);
 })();
