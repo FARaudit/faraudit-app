@@ -501,7 +501,7 @@
     }
     // WIRE-MAP #456 Ruling 1 — set-aside decode: show the SAM display name, filter on the raw value.
     var SETASIDE_LABELS = { SBA: "Small Business", "8A": "8(a)", "8AN": "8(a)", HZC: "HUBZone", HZS: "HUBZone", SDVOSBC: "SDVOSB", SDVOSBS: "SDVOSB", WOSBC: "WOSB", WOSBSS: "WOSB", EDWOSBC: "EDWOSB", EDWOSBSS: "EDWOSB", VOSBC: "VOSB", VOSBS: "VOSB" };
-    function setAsideLabel(v) { if (v == null || v === "—" || v === "") return "—"; return SETASIDE_LABELS[v] || v; }
+    function setAsideLabel(v) { if (v == null || v === "—" || v === "" || v === "NONE" || v === "None" || v === "none") return "—"; return SETASIDE_LABELS[v] || v; }
     function fill(id, values, allLabel, labelFn) {
       var el = document.getElementById(id);
       if (!el) return;
