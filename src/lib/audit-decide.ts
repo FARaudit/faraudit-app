@@ -1399,7 +1399,9 @@ export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
 // OFF ⇒ findings untouched (byte-identical). A genuinely-unrestricted solicitation (set_aside empty/none) ⇒ NOT reframed
 // (the "no set-aside" finding is true) — the guard requires an authoritative set-aside.
 const setAsideReframeEnabled = () => process.env.AUDIT_SETASIDE_REFRAME === "true";
-const NO_SETASIDE_CLAIM_RE = /no\s+set[\s-]?aside\s+(?:is\s+|restriction\s+)?(?:is\s+)?present|there\s+is\s+no\s+(?:far\s+)?52\.219-6|no\s+(?:other\s+)?socioeconomic\s+set[\s-]?aside\s+clause/i;
+// Match ONLY a finding that ASSERTS the ABSENCE of a set-aside (the masthead-contradicting claim) — not a benign mention
+// of 52.219-6. Requires "no set-aside … present/applies/exists", "no … set-aside clause", or "there is no … 52.219-6".
+const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+)?(?:is\s+|are\s+)?(?:present|applies|exists|in\s+(?:this|the))|\bno\s+(?:\S+\s+){0,3}?set[\s-]?aside\s+clause\b|there\s+is\s+no\s+(?:far\s+)?52\.219-6\b/i;
 /** True when set_aside names a real program (not empty/none/unrestricted/full-and-open). */
 export function setAsideIsAuthoritative(setAside: string | null | undefined): boolean {
   const s = (setAside || "").trim().toLowerCase();
@@ -1409,9 +1411,12 @@ export function setAsideIsAuthoritative(setAside: string | null | undefined): bo
 export function reframeNoSetAsideFindings<T extends { requirement: string }>(findings: T[], setAside: string | null | undefined): T[] {
   if (!setAsideReframeEnabled() || !setAsideIsAuthoritative(setAside)) return findings;
   const label = (setAside || "").trim();
+  // VEHICLE-AGNOSTIC reframe (red-team #481): assert ONLY what SAM records — the {label} set-aside — plus the source-true
+  // §I observation, and a verify instruction. NEVER fabricate a specific mechanism (a "BOA/IDIQ seat" would be invented on
+  // a non-vehicle set-aside, e.g. a plain 8(a) RFP). Source-defensible for ANY authoritative set_aside.
   return findings.map((f) => {
     if (!NO_SETASIDE_CLAIM_RE.test(f.requirement || "")) return f;
-    return { ...f, requirement: `No order-level FAR 52.219-6 set-aside clause is present in §I; the parent contract vehicle carries the ${label} set-aside — order eligibility gates on holding the vehicle (BOA/IDIQ) seat, not a socioeconomic set-aside.` };
+    return { ...f, requirement: `No standalone FAR 52.219-6 set-aside clause was found in §I; however, SAM records this acquisition under the ${label} set-aside — confirm the controlling set-aside / eligibility basis against the latest solicitation and any parent contract vehicle.` };
   });
 }
 

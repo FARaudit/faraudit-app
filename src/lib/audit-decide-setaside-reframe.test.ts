@@ -21,10 +21,15 @@ async function main() {
   const out = reframe([F7, OTHER], "SBA");
   const f7 = out[0];
   assert(!/no set-aside is present/i.test(f7.requirement), "the '…no set-aside is present…' masthead-contradicting headline is GONE");
-  assert(/no order-level far 52\.219-6/i.test(f7.requirement), "keeps the source-true observation (no order-level 52.219-6 clause)");
-  assert(/SBA set-aside/i.test(f7.requirement) && /BOA/i.test(f7.requirement), "adds the authoritative context (parent vehicle carries the SBA set-aside; eligibility gates on the BOA seat)");
+  assert(/no standalone far 52\.219-6/i.test(f7.requirement), "keeps the source-true observation (no §I 52.219-6 clause)");
+  assert(/SBA set-aside/i.test(f7.requirement) && /sam records/i.test(f7.requirement), "adds the authoritative SAM context (records the SBA set-aside)");
   assert(f7.citation === F7.citation, "citation preserved");
   assert(out[1].requirement === OTHER.requirement, "an unrelated finding is untouched");
+
+  console.log("\n── red-team #481 — VEHICLE-AGNOSTIC: a non-vehicle set-aside (8(a) RFP) must NOT fabricate a BOA/IDIQ seat ──");
+  const a8 = reframe([{ requirement: "No set-aside is present in this solicitation.", citation: "§I" }], "8(a)");
+  assert(!/BOA|IDIQ|GWAC|vehicle\s+seat|holding the vehicle/i.test(a8[0].requirement), "does NOT invent a vehicle/BOA/IDIQ seat on a non-vehicle 8(a) set-aside");
+  assert(/8\(a\) set-aside/i.test(a8[0].requirement), "states the authoritative 8(a) set-aside SAM records");
 
   console.log("\n── genuinely UNRESTRICTED solicitation → the finding is TRUE, left untouched ──");
   for (const sa of [null, "", "none", "N/A", "Full and Open", "unrestricted"]) {
