@@ -32,7 +32,7 @@ async function main() {
   assert(/8\(a\) set-aside/i.test(a8[0].requirement), "states the authoritative 8(a) set-aside SAM records");
 
   console.log("\n── genuinely UNRESTRICTED solicitation → the finding is TRUE, left untouched ──");
-  for (const sa of [null, "", "none", "N/A", "Full and Open", "unrestricted"]) {
+  for (const sa of [null, "", "none", "N/A", "Full and Open", "Full and Open Competition", "unrestricted", "No set-aside used"]) {
     assert(!setAsideIsAuthoritative(sa), `setAsideIsAuthoritative(${JSON.stringify(sa)}) = false`);
     const u = reframe([F7], sa);
     assert(u[0].requirement === F7.requirement, `set_aside=${JSON.stringify(sa)} ⇒ finding untouched (the 'no set-aside' claim is true)`);

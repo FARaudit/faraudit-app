@@ -1406,7 +1406,9 @@ const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+)?(?:is\s
 export function setAsideIsAuthoritative(setAside: string | null | undefined): boolean {
   const s = (setAside || "").trim().toLowerCase();
   if (!s) return false;
-  return !/^(none|no set[\s-]?aside|n\/?a|full\s+and\s+open|unrestricted|not\s+set[\s-]?aside)$/.test(s);
+  // Word-boundary CONTAINS (not anchored) — SAM returns descriptive values like "Full and Open Competition" with trailing
+  // words; an anchored ^…$ would mis-read those as authoritative and reframe a genuinely unrestricted solicitation.
+  return !/\b(none|no set[\s-]?aside|n\/?a|full\s+and\s+open|unrestricted|not\s+set[\s-]?aside)\b/.test(s);
 }
 export function reframeNoSetAsideFindings<T extends { requirement: string }>(findings: T[], setAside: string | null | undefined): T[] {
   if (!setAsideReframeEnabled() || !setAsideIsAuthoritative(setAside)) return findings;
