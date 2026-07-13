@@ -21,7 +21,7 @@ import type { AuditExecutionInput, AuditExecutionResult } from "./audit-executor
 import { buildAgenticDocs, assembleFullSourceBudgeted, MAX_FULLSOURCE_CHARS, NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { assembleFullSourceLossless } from "./agentic-lossless-ingest";
 import { resolveDocSupersession, AMENDMENT_SUPERSESSION_ENABLED, isSf30Cover } from "./agentic-ingest";
-import { extractDocumentDeadlines } from "./audit-deadline-extract";
+import { extractDocumentDeadlines, resolveNoticeBodyDeadline } from "./audit-deadline-extract";
 import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocReadMode } from "./agentic-chunked-ingest";
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
@@ -37,7 +37,8 @@ import { isBindingDoc, type IngestionMeta, type IngestionFileMeta } from "./sam-
 import { isNoticedescUrl } from "./sam-description";
 import { isEnvOn } from "./env-flags";
 import { confirmResidualTokens } from "./ocr-accuracy-gate";
-import { makeVisionConfirmer } from "./ocr-vision-confirm";
+import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
+import { detectRateTable, gateRateTable } from "./ocr-table-gate";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -107,8 +108,20 @@ export function splitContentLoss(contentLoss: IngestionFileMeta[], ocrHeldRegist
   const ocrHeld: Array<{ name: string; residuals: number; reason: string }> = [];
   for (const f of contentLoss) {
     const residuals = f.ocr_residual?.length ?? 0;
-    if (ocrHeldRegisterOn && residuals > 0) {
-      ocrHeld.push({ name: f.name, residuals, reason: `OCR-recovered; held from committal on ${residuals} unconfirmed residual token(s) — human verification recommended` });
+    // Card #477 ruling 1a — the register-gap fix. A doc is OCR-recovered-but-held on EITHER path: (a) unconfirmed
+    // format-valid residual tokens (ocr_residual non-empty), OR (b) a CAUGHT MISREAD (ocr_suspect) — for which
+    // ocrDeterministicGate deliberately drops ocr_residual to [] (a caught misread is not vision-recoverable). Keying
+    // only on residuals.length mislabels case (b) — the numeric-dense WD (0→@ garble, suspect>0, residual=[]) — as
+    // "no machine-readable text / content not analyzed" when its OCR text WAS recovered (rode into fullSource) and
+    // held on a misread, not absent. ocr_suspect is set ONLY on an OCR-recovered doc, so it cleanly separates a
+    // recovered-but-held doc from a genuine no-text scan (ocr_suspect undefined ⇒ still `missing`). Label/list only —
+    // never touches has_text, the hold, or documents_complete. Flag-OFF ⇒ all → missing ⇒ byte-identical.
+    const ocrRecoveredHeld = f.ocr_suspect === true || residuals > 0;
+    if (ocrHeldRegisterOn && ocrRecoveredHeld) {
+      const reason = residuals > 0
+        ? `OCR-recovered; held from committal on ${residuals} unconfirmed residual token(s) — human verification recommended`
+        : "OCR-recovered; held from committal on a caught misread in a numeric-dense read (e.g. rate table) — human verification recommended";
+      ocrHeld.push({ name: f.name, residuals, reason });
     } else {
       missing.push({ name: f.name, reason: "ingested but no machine-readable text (scanned/image) — content not analyzed" });
     }
@@ -235,7 +248,7 @@ export async function executeAgenticPrimary(
   // Abort mid-ingest (budget/wall-clock) is an HONEST hard-fail — never spend the Opus auditPackage verdict on a
   // partial read, and never persist a partial digest as complete (Brain R1: abort = honest-fail, not a degrade).
   if (signal?.aborted) throw new Error("agentic engine aborted during ingest (budget/wall-clock) — honest-fail, not a partial read");
-  const fullSource = assembled.source;
+  let fullSource = assembled.source; // arc-B (card #477) may append VISION-CONFIRMED WAGE RATES before the engine reads it
   if (assembled.truncated) {
     console.warn(`[AGENTIC-V3-PRIMARY] ${auditId}: incomplete read — kept ${assembled.keptDocs}/${docs.length} docs, dropped [${assembled.droppedDocs.join(", ")}] content-loss [${assembled.contentLossDocs.join(", ")}] → documents_complete=false`);
   }
@@ -257,26 +270,29 @@ export async function executeAgenticPrimary(
   // CONFIRMER, never a co-voter; disagreement fails toward NHR (confirmResidualTokens owns that). Flag OFF ⇒ no OCR ⇒
   // no ocr_residual ⇒ this block is inert (byte-identical). Runs BEFORE manifestComplete so the recovery propagates to
   // the verdict cap, the reconciliation banner, and bindingContentLossDocs uniformly.
-  if (isEnvOn(process.env.AUDIT_WORKER_OCR) && input.ingestion) {
-    const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
-    if (residualDocs.length > 0) {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
-      // display-name vs source-name skew still matches; a miss just leaves the doc content-loss (safe).
-      const normName = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/i, "").replace(/[^a-z0-9]+/g, "");
-      const b64ByName = new Map<string, string>();
-      const poisoned = new Set<string>(); // a normName that two DIFFERENT docs share is ambiguous → never match (else
-      // a residual could be confirmed against the WRONG document's image = a false COMPLETE). Fail-toward-NHR instead.
-      const addName = (name: string, b64: string) => {
-        const k = normName(name);
-        if (!k || poisoned.has(k)) return;
-        const existing = b64ByName.get(k);
-        if (existing !== undefined && existing !== b64) { b64ByName.delete(k); poisoned.add(k); return; }
-        b64ByName.set(k, b64);
-      };
-      const primaryB64 = input.pdfBase64 ?? (input.pdfBuffer ? input.pdfBuffer.toString("base64") : null);
-      if (primaryB64) { addName(input.primaryDocName ?? "primary solicitation", primaryB64); addName("primary solicitation", primaryB64); }
-      for (const a of input.attachmentPdfs ?? []) addName(a.name, a.base64);
+  if ((isEnvOn(process.env.AUDIT_WORKER_OCR) || isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) && input.ingestion) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    // Name → base64 map over every doc the executor holds bytes for (primary + attachments). Normalised so a
+    // display-name vs source-name skew still matches; a miss just leaves the doc content-loss (safe). SHARED by the
+    // residual layer-3 (below) and the arc-B table-confirm (card #477).
+    const normName = (s: string) => s.toLowerCase().replace(/\.[a-z0-9]+$/i, "").replace(/[^a-z0-9]+/g, "");
+    const b64ByName = new Map<string, string>();
+    const poisoned = new Set<string>(); // a normName that two DIFFERENT docs share is ambiguous → never match (else
+    // a residual could be confirmed against the WRONG document's image = a false COMPLETE). Fail-toward-NHR instead.
+    const addName = (name: string, b64: string) => {
+      const k = normName(name);
+      if (!k || poisoned.has(k)) return;
+      const existing = b64ByName.get(k);
+      if (existing !== undefined && existing !== b64) { b64ByName.delete(k); poisoned.add(k); return; }
+      b64ByName.set(k, b64);
+    };
+    const primaryB64 = input.pdfBase64 ?? (input.pdfBuffer ? input.pdfBuffer.toString("base64") : null);
+    if (primaryB64) { addName(input.primaryDocName ?? "primary solicitation", primaryB64); addName("primary solicitation", primaryB64); }
+    for (const a of input.attachmentPdfs ?? []) addName(a.name, a.base64);
+
+    // ── OCR-ACCURACY LAYER 3 residual confirm (flag AUDIT_WORKER_OCR) ──
+    if (isEnvOn(process.env.AUDIT_WORKER_OCR)) {
+      const residualDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && (f.ocr_residual?.length ?? 0) > 0);
       for (const f of residualDocs) {
         const b64 = b64ByName.get(normName(f.name)); // poisoned/ambiguous key → undefined → held content-loss (safe)
         if (!apiKey || !b64) {
@@ -293,6 +309,41 @@ export async function executeAgenticPrimary(
           console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-LAYER3 — "${f.name}" held content-loss (${r.detail})`);
         }
       }
+    }
+
+    // ── OCR TABLE-CONFIRM · arc-B (Card #477 ruling 1b, flag AUDIT_OCR_TABLE_CONFIRM, default OFF) ──
+    // A numeric-dense rate table (Davis-Bacon WD) is hard-failed WHOLE by the layer-2 caught-misread rule (ocr_suspect
+    // with an empty residual — the register-gap docs) even when its wage cells read correctly, stranding the prevailing-
+    // wage floor. Give the RATE ROWS a row/column-aware vision confirm: only rows whose wage cell vision confirms EXACTLY
+    // are appended (VERBATIM) to the source so a grounded DBA finding is legitimate; a wrong/plausible rate is abstained,
+    // never trusted (WRONG_VERDICT=0). Peripheral caught misreads (decision number, dates) do NOT block the rate rows.
+    // Does NOT flip has_text (the doc stays honestly ocr_held via the register) — only CONFIRMED rows enter analysis.
+    // Flag OFF ⇒ this block never runs (byte-identical).
+    if (isEnvOn(process.env.AUDIT_OCR_TABLE_CONFIRM)) {
+      const docText = (name: string): string => {
+        const marker = `==== DOCUMENT: ${name} ====`;
+        const i = fullSource.indexOf(marker);
+        if (i < 0) return "";
+        const j = fullSource.indexOf("==== DOCUMENT:", i + marker.length);
+        return fullSource.slice(i + marker.length, j < 0 ? undefined : j);
+      };
+      const suspectDocs = input.ingestion.files.filter((f) => f.ingested && isBindingDoc(f) && f.has_text !== true && f.ocr_suspect === true);
+      const confirmedBlocks: string[] = [];
+      for (const f of suspectDocs) {
+        const scan = detectRateTable(docText(f.name));
+        if (!scan.isRateTable) continue;
+        const b64 = b64ByName.get(normName(f.name));
+        if (!apiKey || !b64) { console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-TABLE-CONFIRM — "${f.name}" rate table held (no ${apiKey ? "base64 match" : "API key"}) → stays content-loss`); continue; }
+        const confirmer = makeTableVisionConfirmer({ base64: b64, docName: f.name, apiKey, model: modelFor("crossdoc"), signal, onUsage: (u) => usageCalls.push(u) });
+        const res = await gateRateTable(docText(f.name), { docName: f.name, visionConfirm: confirmer });
+        if (res.trustedRows.length > 0) {
+          confirmedBlocks.push(`\n==== VISION-CONFIRMED WAGE RATES (${f.name}) ====\n${res.trustedText}\n`);
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-TABLE-CONFIRM — "${f.name}" ${res.metrics.trusted}/${res.metrics.total} rate rows vision-confirmed → appended for grounding (wrongTrusted=${res.metrics.wrongTrusted})`);
+        } else {
+          console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: OCR-TABLE-CONFIRM — "${f.name}" ${res.verdict} (0/${res.metrics.total} rows confirmed) → stays content-loss`);
+        }
+      }
+      if (confirmedBlocks.length) fullSource += confirmedBlocks.join("");
     }
   }
 
@@ -439,6 +490,10 @@ export async function executeAgenticPrimary(
   // SAM/document deadline conflict (build-data.ts deadlineConflictNote). SAM stays authoritative; this only powers
   // a "verify" caveat. Conservative extractor — labeled numeric/ISO dates only; empty when none confidently found.
   const documentDeadlines = extractDocumentDeadlines(fullSource);
+  // Card #477 ruling 2 — resolve the notice-body UPDATE stack (newest-first, dateline≠due-date). Captured for the render
+  // so a reset ("a new due date will be provided") surfaces the TRUE state instead of a stale metadata date or an
+  // UPDATE-header/RFI-filename leak. Flag AUDIT_DEADLINE_UPDATE_STACK OFF ⇒ status "none" ⇒ field omitted (byte-identical).
+  const noticeBodyDeadline = resolveNoticeBodyDeadline(noticeBody?.text ?? "");
   const completeUpdate = {
     overview_summary: `Agentic verdict: ${res.decision.verdict.replace(/_/g, " ")}.`,
     overview_json: { engine: "agentic_v3" },
@@ -466,6 +521,8 @@ export async function executeAgenticPrimary(
       source_truncated: assembled.truncated,
       // ENGINE-5-ROOT #2 — document-stated offer-due date(s) for the render conflict caveat (SAM stays authoritative).
       ...(documentDeadlines.length ? { deadlines: documentDeadlines } : {}),
+      // Card #477 ruling 2 — the notice-body UPDATE-stack controlling state (reset_tbd / stated), for the render caveat.
+      ...(noticeBodyDeadline.status !== "none" ? { notice_body_deadline: noticeBodyDeadline } : {}),
       ...(assembled.droppedDocs.length ? { dropped_docs: assembled.droppedDocs } : {}),
       // R3 (Brain card 271) — READ-MODE disclosure. When AUDIT_CHUNKED_INGEST is on, each doc is read either
       // "full" (verbatim whole doc) or "map-reduce" (compliance-relevant verbatim spans; NOT a full-text read).
