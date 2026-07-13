@@ -39,6 +39,7 @@ import { isEnvOn } from "./env-flags";
 import { confirmResidualTokens } from "./ocr-accuracy-gate";
 import { makeVisionConfirmer, makeTableVisionConfirmer } from "./ocr-vision-confirm";
 import { detectRateTable, gateRateTable } from "./ocr-table-gate";
+import { clampToWord } from "./audit-decide";
 
 /** The agentic V3 engine is the SOLE engine. V1/V2 are DELETED (2026-06-28) — there is no
  *  fallback path in the code at all, and no env flag can switch engines. `executeAudit` calls
@@ -497,12 +498,12 @@ export async function executeAgenticPrimary(
   const completeUpdate = {
     overview_summary: `Agentic verdict: ${res.decision.verdict.replace(/_/g, " ")}.`,
     overview_json: { engine: "agentic_v3" },
-    compliance_summary: res.decision.reason.slice(0, 600),
+    compliance_summary: clampToWord(res.decision.reason, 600),
     risks_summary: stopperCount ? `${stopperCount} show-stopper bar(s) drive this verdict.` : "No non-curable bars found.",
     risks_json: { engine: "agentic_v3", show_stoppers: stopperCount },
     compliance_score: null,
     recommendation,
-    bid_recommendation: res.decision.reason.slice(0, 600),
+    bid_recommendation: clampToWord(res.decision.reason, 600),
     status: "complete",
     current_stage: "assembly",
     completed_at: generatedAt,
@@ -520,7 +521,10 @@ export async function executeAgenticPrimary(
       doc_count: docs.length,
       source_truncated: assembled.truncated,
       // ENGINE-5-ROOT #2 — document-stated offer-due date(s) for the render conflict caveat (SAM stays authoritative).
-      ...(documentDeadlines.length ? { deadlines: documentDeadlines } : {}),
+      // Card #479 — when the UPDATE-stack resolver has a verdict it is AUTHORITATIVE over the crude firstDate extractor
+      // (which harvested the "2026-06-24" RFI-filename leak); scrub the stale deadlines[] residue in that case. Resolver
+      // "none" (flag OFF / no UPDATE stack) ⇒ legacy deadlines[] emitted exactly as before (byte-identical).
+      ...(documentDeadlines.length && noticeBodyDeadline.status === "none" ? { deadlines: documentDeadlines } : {}),
       // Card #477 ruling 2 — the notice-body UPDATE-stack controlling state (reset_tbd / stated), for the render caveat.
       ...(noticeBodyDeadline.status !== "none" ? { notice_body_deadline: noticeBodyDeadline } : {}),
       ...(assembled.droppedDocs.length ? { dropped_docs: assembled.droppedDocs } : {}),

@@ -31,7 +31,7 @@ export interface V4Grounded<T> { grounded: boolean; } // { grounded:false } sent
 export interface V4SubmissionL { grounded: true; lead?: string; rows: { vol: string; req: string; condition: string; cite: string }[]; }
 export interface V4EvalM { grounded: true; basis: string; factors: { name: string; basis: string; cite: string }[]; }
 export interface V4Clins { grounded: true; lead?: string; rows: { clin: string; title: string; type: string; qtyUnit: string; period: string }[]; }
-export interface V4Date { label: string; value: string; kind?: "gate" | string; }
+export interface V4Date { label: string; value: string; kind?: "gate" | string; sub?: string; }
 export interface V4Provenance { auditDate: string; engine: string; manifest: { name: string; read: "full" | "indexed" | "unread" }[]; }
 export interface V4Data {
   shell?: { auditId?: string };
@@ -262,6 +262,7 @@ function dates(list: V4Date[]): string {
         <div class="kd-tick" aria-hidden="true"></div>
         <div class="kd-label">${esc(d.label)}</div>
         <div class="kd-value mono">${esc(d.value)}</div>
+        ${d.sub ? `<div class="kd-sub">${esc(d.sub)}</div>` : ""}
       </div>`).join("");
   return `<section class="sec" id="dates" data-sec>
       <div class="sec-head"><span class="sec-n mono">06</span><h2>Key dates</h2></div>

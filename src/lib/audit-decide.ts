@@ -1367,13 +1367,25 @@ function siteVisitEligStoppers(dispositions: DecidedFinding[], profile: BidderPr
 // the audit's own grounded analysis — the 6a67c0f1 stamp-bar #6 miss. Deduped, first-clause-trimmed, ≤3 bars. Returns
 // null when no named bar is available ⇒ the caller keeps the generic string (byte-identical). Flag-OFF ⇒ never called.
 const reasonLineNamedEnabled = () => process.env.AUDIT_REASON_LINE_NAMED === "true";
+
+/** Card #479 class-regression guard — clamp a DERIVED CUSTOMER-FACING string to `max` chars WITHOUT ever cutting
+ *  mid-word or leaving a fake terminal period. Under the limit ⇒ returned as-is (whitespace-normalised). Over ⇒ trimmed
+ *  to the last whole word, trailing punctuation stripped, explicit "…" elision appended. Use for EVERY reason/summary/
+ *  rationale string that renders — a bare `.slice(0, N)` on such a string produced the 69dbbe9e "…proposed by an e." blocker. */
+export function clampToWord(s: string, max: number): string {
+  const t = (s || "").replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max).replace(/\s+\S*$/, "").replace(/[.,;:]+$/, "") + "…";
+}
+
 export function namedEligibilityReason(stoppers: DecidedFinding[]): string | null {
   const bars: string[] = [];
   const seen = new Set<string>();
   for (const s of stoppers) {
     const req = (s.requirement || "").replace(/\s+/g, " ").trim();
     if (!req) continue;
-    const phrase = ((req.split(/(?<=[.;])\s/)[0] || req)).slice(0, 140).replace(/[.;,\s]+$/, "");
+    // Card #479 — take the first sentence, then WORD-BOUNDARY clamp (never mid-word; the 69dbbe9e "…proposed by an e" blocker).
+    const phrase = clampToWord((req.split(/(?<=[.;])\s/)[0] || req).replace(/[.;,\s]+$/, ""), 160);
     const key = phrase.toLowerCase().slice(0, 40);
     if (!phrase || seen.has(key)) continue;
     seen.add(key);
@@ -1706,7 +1718,7 @@ export function deriveVerdict(inp: VerdictInputs): Decision {
   //     never committal. Uses nhrEligible() (an undetermined verdict never asserts eligible=false — Gate-2 finding #4).
   //     Absent/empty unreadEvidence ⇒ byte-identical (no effect). Candidate A has NO verdict authority; this routes it.
   if (inp.unreadEvidence && inp.unreadEvidence.length)
-    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${inp.unreadEvidence.map((u) => u.note).join("; ").slice(0, 220)}.`, dispositions, []);
+    return mk("NEEDS_HUMAN_REVIEW", nhrEligible(), `Unread/missing referenced material observed — human verification needed: ${clampToWord(inp.unreadEvidence.map((u) => u.note).join("; "), 220)}`, dispositions, []);
 
   // 1d. SET-ASIDE CONFLICT (Brain #332) — SAM (system of record) and the document name DIFFERENT set-aside programs.
   //     This changes WHO is eligible (an ineligible firm could bid, or an eligible firm could walk — zero-contract-

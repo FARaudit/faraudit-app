@@ -29,6 +29,11 @@ const LIVE_PROVEN: Record<string, string> = {
   AUDIT_FORM_KEYED_CITATION: "card #474 ROOT-5 fix — Gate-2 pending; pin 10/10",
   AUDIT_LEDGER_BROAD_AMBIGUOUS: "card #474 ruling #3 — Gate-2 A, merged #212, pin 7/7",
   AUDIT_BID_GUARANTEE_EMIT: "card #475 ruling #1 — Gate-2 A/SHIP, merged #213, pin 8/8 (§L residual clears)",
+  // card #477 arc — Gate-2 A/SHIP + security clean, merged #215 (main b1c4477); live-proof owed at the re-attempt run
+  AUDIT_OCR_TABLE_CONFIRM: "card #477 arc-B — table-aware WD confirm; Gauntlet 18/18 WRONG_VERDICT=0; merged #215",
+  AUDIT_DEADLINE_UPDATE_STACK: "card #477 ruling #2 — notice-body UPDATE-stack resolver; pin 10/10; merged #215",
+  AUDIT_REASON_LINE_NAMED: "card #477 ruling #3 — named NHR reason-line; pin 8/8; merged #215",
+  AUDIT_MAGNITUDE_LD_EMIT: "card #479 bundle — magnitude $500K-$1M + LDs $227.15 additive pricing capture; pin 9/9",
 };
 
 // JUSTIFIED ABSENCES — a live-proven flag intentionally left OUT, WITH a reason (satisfies the assertion).
@@ -45,6 +50,10 @@ const PROPOSED = (process.argv[2]?.split(",").map((s) => s.trim()).filter(Boolea
   "AUDIT_DEDUPE_PRIMARY_GUARD", "AUDIT_WORKER_OCR", "AUDIT_TXT_INGEST", "AUDIT_SIGNIN_NONBINDING",
   "AUDIT_CONDITIONAL_TINA_DEMOTION", "AUDIT_OCR_HELD_REGISTER", "AUDIT_COVERAGE_NHR_STOPPER_FILL",
   "AUDIT_DEADLINE_RECONCILE", "AUDIT_FORM_KEYED_CITATION", "AUDIT_LEDGER_BROAD_AMBIGUOUS", "AUDIT_BID_GUARANTEE_EMIT",
+  // card #477 arc (merged #215) — the WD/deadline/reason-line re-attempt additions
+  "AUDIT_OCR_TABLE_CONFIRM", "AUDIT_DEADLINE_UPDATE_STACK", "AUDIT_REASON_LINE_NAMED",
+  // card #479 bundle — additive pricing capture
+  "AUDIT_MAGNITUDE_LD_EMIT",
 ];
 
 const proposedSet = new Set(PROPOSED);

@@ -175,8 +175,13 @@ export function fmtDeadline(raw: string): string {
   return `${dateStr} · ${hh}:${mi} (${offLabel})`;
 }
 
-function buildDates(responseDeadline: string): V4Date[] {
-  return responseDeadline ? [{ label: "Offers due", value: fmtDeadline(responseDeadline), kind: "gate" }] : [];
+function buildDates(responseDeadline: string, cj: Record<string, unknown>): V4Date[] {
+  // Card #479 — the §06 Key Dates "Offers due" row carries the SAME reset/reconcile caveat as the masthead (offerDueFact),
+  // so a reader scanning Key Dates alone isn't misled that a reset-TBD date is firm. Under the base flags this is the bare
+  // date exactly as before (offerDueFact returns {value, sub:undefined}) → byte-identical.
+  if (!responseDeadline) return [];
+  const od = offerDueFact(responseDeadline, cj);
+  return [{ label: "Offers due", value: od.value, kind: "gate", ...(od.sub ? { sub: od.sub } : {}) }];
 }
 
 // ── ENGINE-5-ROOT #2 (S7-1 / S8-04) — deadline conflict caveat ───────────────────────────────
@@ -307,7 +312,12 @@ function buildCoverage(p: V3ReportPayload, documentsComplete: boolean, noVerdict
   const missing = COVERAGE_COHERENCE_ENABLED ? missingBase.filter((k) => !covered.has(k)) : missingBase;
   // "Could not be parsed" = files the engine had but could NOT read/retrieve (documents.missing) — a genuine
   // parse/retrieval failure. coreMissing (never in the package) is absence, NOT a parse failure — keep them apart.
-  const unreadable = (docs?.missing || []).map((m) => (m.reason ? `${m.name} — ${m.reason}` : m.name));
+  // Card #479 — surface BOTH genuine parse failures (documents.missing) AND OCR-recovered-but-held docs (documents.ocr_held,
+  // e.g. the numeric-dense Wage Determination) so the human-verification caveat reaches the reader. ocr_held is populated
+  // only under AUDIT_OCR_HELD_REGISTER; empty otherwise ⇒ byte-identical. A construction sub is told to verify the DBA rates.
+  const ocrHeldList = ((docs as { ocr_held?: Array<{ name: string; reason?: string }> } | undefined)?.ocr_held || [])
+    .map((h) => (h.reason ? `${h.name} — ${h.reason}` : `${h.name} — OCR-recovered; human verification recommended`));
+  const unreadable = [...(docs?.missing || []).map((m) => (m.reason ? `${m.name} — ${m.reason}` : m.name)), ...ocrHeldList];
   const total = docs?.posted ?? required.length;
   const rawRead = docs?.read ?? covered.size;
   const read = Math.min(rawRead, total); // never exceed total → coverage % can't blow past 100
@@ -409,7 +419,7 @@ export function buildV4Data(audit: Record<string, unknown>): V4Data {
     submissionL: buildSubmissionL(all),
     evalM: buildEvalM(all),
     clins: buildClins(all),
-    dates: buildDates(responseDeadline),
+    dates: buildDates(responseDeadline, cj),
     provenance,
   } as V4Data;
 }

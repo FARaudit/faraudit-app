@@ -42,6 +42,16 @@ const DELIVERY_WINDOW_RE = /\b(?:within|not later than|no later than|no more tha
 const BID_GUARANTEE_RE = /\bbid\s+guarantee\b|\bbid\s+bond\b/i;
 const BID_GUARANTEE_REQUIRED_RE = /\brequired\b|\bshall\s+(?:furnish|provide|submit)\b|\bIAW\s+FAR\s+28\b|\b28\.10?1\b|\b\d{1,3}\s*(?:%|percent)\b|\bfailure\s+to\s+furnish\b/i;
 
+// MAGNITUDE + LIQUIDATED-DAMAGES archetypes (Card #479, flag AUDIT_MAGNITUDE_LD_EMIT, default-OFF). Both are machine-
+// readable pricing anchors a construction offer is sized against that a prior FA8137 run left ungrounded (pricing-lens
+// additive-capture gap): the FAR 36.204 magnitude bracket ("estimated magnitude … between $500,000 and $1,000,000") and
+// the per-day LD amount ("liquidated damages … $227.15 per calendar day"). Over-fire guards: magnitude needs the word
+// "magnitude" + a dollar amount; LD needs "liquidated damages" + a per-day dollar amount. Grounded verbatim (Rule-64),
+// bidder-priced ⇒ kind:"pricing", never a show-stopper.
+const MAGNITUDE_RE = /\bmagnitude\b[^.]{0,90}?\$\s?[\d][\d,]*(?:\.\d{2})?/i;
+const LD_RE = /\bliquidated\s+damages?\b/i;
+const LD_AMOUNT_RE = /\$\s?[\d][\d,]*(?:\.\d{2})?\s*(?:per|\/)\s*(?:calendar\s+|working\s+)?day\b/i;
+
 // Labeled human authoring notes / provenance banners — NEVER grounded (card 76-R1: the demoted conclusion
 // and any "NOT A BINDING TERM" note must stay out of grounded findings).
 const PROVENANCE_SKIP_RE = /\bHUMAN AUTHORING NOTE\b|\bNOT A BINDING TERM\b|NOT THE GOVERNMENT'?S (?:ACTUAL )?SOLICITATION|\bAUTHORING NOTE\b|\bPROVENANCE\b/i;
@@ -87,6 +97,12 @@ function classifyAll(p: string): SweepHit[] {
     hits.push({ archetype: "personnel_qual", requirementLabel: "Personnel-qualification gate: specialized professional certification/license of performing personnel", kind: "submission", anchor: CERT_RE });
   if (process.env.AUDIT_BID_GUARANTEE_EMIT === "true" && BID_GUARANTEE_RE.test(p) && BID_GUARANTEE_REQUIRED_RE.test(p))
     hits.push({ archetype: "bid_guarantee", requirementLabel: "Bid guarantee (bond) required with the offer — a bidder-obtainable bond (FAR 28.101); failure to furnish risks rejection", kind: "submission", anchor: BID_GUARANTEE_RE, forceSection: "L" }); // §L: furnish-with-your-offer submission instruction (grounds the §L obligation, not the crude nearestSection §C)
+  if (process.env.AUDIT_MAGNITUDE_LD_EMIT === "true") {
+    if (MAGNITUDE_RE.test(p))
+      hits.push({ archetype: "magnitude", requirementLabel: "Estimated construction magnitude — the price-range bracket the offer is sized against (FAR 36.204)", kind: "pricing", anchor: MAGNITUDE_RE });
+    if (LD_RE.test(p) && LD_AMOUNT_RE.test(p))
+      hits.push({ archetype: "liquidated_damages", requirementLabel: "Liquidated damages assessed per day of delay — a schedule-risk pricing input", kind: "pricing", anchor: LD_AMOUNT_RE });
+  }
   if (QPL_RE.test(p)) hits.push({ archetype: "qpl", requirementLabel: "Qualified Products/Manufacturers List (QPL/QML) membership requirement", kind: "technical_spec", anchor: QPL_RE });
   if (OREQUAL_RE.test(p)) hits.push({ archetype: "or_equal", requirementLabel: "Brand-name-or-equal qualification burden (salient characteristics)", kind: "technical_spec", anchor: OREQUAL_RE });
   const seenArch = new Set<string>();
