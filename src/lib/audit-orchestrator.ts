@@ -1247,7 +1247,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      NEVER a show-stopper, NEVER flips eligible false). POST-VERIFY (skeptic can't cull). Flag off ⇒ unchanged.
   {
     const before = findings.length;
-    findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true" });
+    findings = applyKeyfactDetector(findings, ctx.fullSource, { enabled: process.env.AUDIT_KEYFACT_DETECTOR === "true", procurementPart: procurementPart(ctx) });
     for (let k = before; k < findings.length; k++) { findings[k].id = `keyfact_detector#${k - before}`; }
     if (findings.length > before) perLens["keyfact_detector"] = findings.length - before;
   }

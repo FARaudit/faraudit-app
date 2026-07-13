@@ -287,7 +287,7 @@ ${scopeBlock}
      field      — the specific field that's uncertain (e.g. "NAICS code", "Contract type", "CLIN list")
      uncertain  — one sentence stating WHAT couldn't be confirmed from the document
      assumption — one sentence stating WHAT was assumed in its place
-     resolve    — one sentence stating HOW to confirm (e.g. "Verify against SF-1449 block 10")
+     resolve    — one sentence stating HOW to confirm (e.g. ${process.env.AUDIT_FORM_KEYED_CITATION === "true" ? `"Verify against the solicitation cover form / SAM notice"` : `"Verify against SF-1449 block 10"`})
 6. Produce a plain-language verdict with urgency score 0-100.
 
 Be precise. Cite section/clause references. Do not invent facts not present in the extracted data. For risks where the source data lacks a specific clause, set trapClause to null.
