@@ -1401,7 +1401,7 @@ export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
 const setAsideReframeEnabled = () => process.env.AUDIT_SETASIDE_REFRAME === "true";
 // Match ONLY a finding that ASSERTS the ABSENCE of a set-aside (the masthead-contradicting claim) — not a benign mention
 // of 52.219-6. Requires "no set-aside … present/applies/exists", "no … set-aside clause", or "there is no … 52.219-6".
-const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+)?(?:is\s+|are\s+)?(?:present|applies|exists|in\s+(?:this|the))|\bno\s+(?:\S+\s+){0,3}?set[\s-]?aside\s+clause\b|there\s+is\s+no\s+(?:far\s+)?52\.219-6\b/i;
+const NO_SETASIDE_CLAIM_RE = /\bno\s+set[\s-]?aside\s+(?:restriction\s+|designation\s+)?(?:is\s+|are\s+)?(?:present|applies|exists|found|in\s+(?:this|the))|\bno\s+(?:\S+\s+){0,3}?set[\s-]?aside\s+clause\b|\bno\s+small\s+business\s+program\s+eligibility\s+bar|there\s+is\s+no\s+(?:far\s+)?52\.219-6\b|\b52\.219-6\s+is\s+(?:not|n['’]?t)\s+(?:in|present)/i;
 /** True when set_aside names a real program (not empty/none/unrestricted/full-and-open). */
 export function setAsideIsAuthoritative(setAside: string | null | undefined): boolean {
   const s = (setAside || "").trim().toLowerCase();
