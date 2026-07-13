@@ -1390,6 +1390,31 @@ export function dedupBandGates(stoppers: DecidedFinding[]): DecidedFinding[] {
   return Array.from(bySig.values());
 }
 
+// Card #481 (ruling-4, #436 root-6) — REFRAME (never bare-suppress) a "no set-aside is present" finding when the row's
+// set_aside field is AUTHORITATIVE (names a real program). A model lens sometimes reads the ORDER §I (no 52.219-6 clause)
+// and headlines "No set-aside is present in this solicitation" — source-TRUE at the order level but contradicting the
+// masthead's own "Set-aside: SBA" (the 41068f42 red-team's sole NO-STAMP). The reframe keeps the source-true observation
+// (no order-level 52.219-6 clause) and adds the authoritative context (the parent vehicle carries the set-aside; order
+// eligibility gates on the vehicle seat) so it no longer contradicts the masthead. Flag AUDIT_SETASIDE_REFRAME, default
+// OFF ⇒ findings untouched (byte-identical). A genuinely-unrestricted solicitation (set_aside empty/none) ⇒ NOT reframed
+// (the "no set-aside" finding is true) — the guard requires an authoritative set-aside.
+const setAsideReframeEnabled = () => process.env.AUDIT_SETASIDE_REFRAME === "true";
+const NO_SETASIDE_CLAIM_RE = /no\s+set[\s-]?aside\s+(?:is\s+|restriction\s+)?(?:is\s+)?present|there\s+is\s+no\s+(?:far\s+)?52\.219-6|no\s+(?:other\s+)?socioeconomic\s+set[\s-]?aside\s+clause/i;
+/** True when set_aside names a real program (not empty/none/unrestricted/full-and-open). */
+export function setAsideIsAuthoritative(setAside: string | null | undefined): boolean {
+  const s = (setAside || "").trim().toLowerCase();
+  if (!s) return false;
+  return !/^(none|no set[\s-]?aside|n\/?a|full\s+and\s+open|unrestricted|not\s+set[\s-]?aside)$/.test(s);
+}
+export function reframeNoSetAsideFindings<T extends { requirement: string }>(findings: T[], setAside: string | null | undefined): T[] {
+  if (!setAsideReframeEnabled() || !setAsideIsAuthoritative(setAside)) return findings;
+  const label = (setAside || "").trim();
+  return findings.map((f) => {
+    if (!NO_SETASIDE_CLAIM_RE.test(f.requirement || "")) return f;
+    return { ...f, requirement: `No order-level FAR 52.219-6 set-aside clause is present in §I; the parent contract vehicle carries the ${label} set-aside — order eligibility gates on holding the vehicle (BOA/IDIQ) seat, not a socioeconomic set-aside.` };
+  });
+}
+
 // Card #477 ruling 3 — the NAMED NHR reason-line (flag AUDIT_REASON_LINE_NAMED, default-OFF). When grounded eligibility
 // bars drive the notice-body NHR, the reason NAMES them (from each bar's plain-language `requirement`) instead of the
 // generic B3 fail-safe boilerplate ("a bidder-eligibility bar … could not be confirmed as analyzed"), which understated
