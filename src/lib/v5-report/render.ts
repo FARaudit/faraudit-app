@@ -20,6 +20,9 @@
 import type { V4Data, V4Verdict, V4Findings, V4Finding, V4Date, V4Temporal, V4SubmissionL, V4EvalM, V4Clins, V4Provenance, Tone } from "@/lib/v4-report/render";
 import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTiles, type EligInfo } from "./core";
 
+// AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
+const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
+
 const I: Record<string, string> = {
   go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>',
   caution: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
@@ -35,6 +38,14 @@ const I: Record<string, string> = {
 function offersDue(d: V4Data): V4Date | null {
   const list = d.dates || [];
   return list.find((x) => /(proposal|offer|quote|bid)s?\s+due|response\s+date|closing/i.test(x.label)) || null;
+}
+
+// Deadline value = "DATE" or "DATE · TIME (OFFSET)". Split on the first ' · ' so the
+// wall-clock cutoff renders on its own line; date-only sources carry no time. (V5_SEAL)
+function splitDeadline(value: string): { date: string; time: string } {
+  const s = String(value);
+  const ix = s.indexOf(" · ");
+  return ix >= 0 ? { date: s.slice(0, ix), time: s.slice(ix + 3) } : { date: s, time: "" };
 }
 
 // ---- COMMAND HEADER — the first screen -----------------------------------
@@ -60,12 +71,21 @@ function commandHeader(d: V4Data): string {
   const noCharge = v.noCharge ? `<span class="cmd-nocharge">No charge</span>` : "";
 
   const od = offersDue(d);
-  const clockHTML = od ? `
+  const dl = od && V5_SEAL ? splitDeadline(od.value) : null;
+  const clockHTML = !od ? "" : V5_SEAL ? `
+      <div class="cmd-clock" title="Solicitation closing — grounded fact read from source; not a schedulability judgment">
+        <span class="cmd-clock-ic">${I.clock}</span>
+        <span class="cmd-clock-body">
+          <span class="cmd-clock-k">${esc(od.label)}</span>
+          <span class="cmd-clock-v mono">${esc(dl!.date)}</span>
+          ${dl!.time ? `<span class="cmd-clock-time mono">${esc(dl!.time)}</span>` : ""}
+        </span>
+      </div>` : `
       <div class="cmd-clock" title="Solicitation closing — grounded fact, not a schedulability judgment">
         <span class="cmd-clock-ic">${I.clock}</span>
         <span class="cmd-clock-k">${esc(od.label)}</span>
         <span class="cmd-clock-v mono">${esc(od.value)}</span>
-      </div>` : "";
+      </div>`;
 
   let drivers = ([] as V4Finding[]).concat(f.p0 || [], f.p1 || []).filter((x) => x.driver === true);
   if (!drivers.length) drivers = ((f.p0 && f.p0.length ? f.p0 : (f.p1 || [])) as V4Finding[]).slice(0, 2);

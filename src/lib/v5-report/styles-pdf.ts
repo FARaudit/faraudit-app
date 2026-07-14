@@ -303,3 +303,44 @@ b,strong{font-weight:700;}
 /* screen niceties — the desk behind the sheet */
 @media screen{ body{background:#e7ebef;} }
 `;
+
+// AUDIT_V5_SEAL — "Decision Seal" verdict box (Brief). Appended AFTER REPORT_PDF_CSS
+// only when the flag is ON. NO stamp tilt/rotate; NO watermark rule (is-rep scoping in
+// the base CSS is untouched). OFF → not injected → byte-identical.
+export const REPORT_PDF_SEAL_CSS: string = `
+/* ── The Decision Seal — ported verdict box (portrait brief) ──────────────── */
+.gb-verdict.gv2{display:grid;grid-template-columns:190px 1fr;gap:26px;align-items:center;background:none;border:0;padding:0;margin:12px 0 4px;}
+.gv2[data-tone="go"]{--t:#3a7d54;--td:#245239;}
+.gv2[data-tone="caution"]{--t:#b0731a;--td:#7c4d08;}
+.gv2[data-tone="stop"]{--t:#a13a2c;--td:#6f261c;}
+.gv2[data-tone="slate"]{--t:#414e5e;--td:#28313d;}
+.gseal{border:2.5px solid var(--t);border-radius:14px;color:var(--t);padding:6px;background:color-mix(in srgb,var(--t) 4%,transparent);mix-blend-mode:multiply;box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--t) 42%,transparent);}
+.gseal-in{border:1.5px solid var(--t);border-radius:9px;padding:12px 12px 9px;text-align:center;}
+.gseal-in>*{text-shadow:.4px .3px 0 color-mix(in srgb,var(--t) 18%,transparent);}
+.gseal-ico{width:30px;height:30px;margin:0 auto 6px;color:var(--t);display:inline-flex;}
+.gseal-ico svg{width:100%;height:100%;display:block;}
+.gseal-word{font-size:17px;font-weight:800;line-height:1.05;letter-spacing:.01em;color:var(--td);text-transform:uppercase;}
+.gseal-word.lg{font-size:20px;}
+.gseal-word.xl{font-size:34px;letter-spacing:.03em;}
+.gseal-dispo{font-size:10.5px;font-weight:600;letter-spacing:.16em;color:var(--td);margin-top:7px;border-top:1.5px dashed color-mix(in srgb,var(--t) 48%,transparent);padding-top:7px;}
+.gseal-wm{margin-top:7px;font-size:8.5px;letter-spacing:.22em;color:var(--t);opacity:.5;}
+.gv2-cmd{min-width:0;}
+.gv2-kick{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--td);font-weight:600;margin-bottom:6px;}
+.gv2-word{font-size:38px;font-weight:800;letter-spacing:-.028em;color:var(--td);line-height:.98;text-transform:uppercase;margin:0 0 10px;text-wrap:balance;}
+.gchip-tight{display:inline-flex;align-items:center;gap:9px;border:1px solid #e2e7ee;border-radius:8px;padding:7px 12px;background:#fbfcfe;}
+.gchip-tight b{font-size:10px;letter-spacing:.12em;font-weight:600;color:var(--td);}
+.gchip-tight i{width:1px;height:13px;background:#e2e7ee;}
+.gchip-tight .ek{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#6b7887;}
+.gchip-tight em{font-style:normal;font-size:12px;font-weight:700;}
+.gchip-tight em[data-e="ok"]{color:#245239;}
+.gchip-tight em[data-e="no"]{color:#6f261c;}
+.gchip-tight em[data-e="nd"]{color:#7c4d08;}
+.gchip-tight em[data-e="na"]{color:#6b7887;}
+@media print{.gseal{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+/* ── Verdict box + cover atoms hold together; balance the 5-cell doc grid ─── */
+.gb-verdict.gv2{break-inside:avoid;}
+.gb-cover .gb-bl,.gb-cover .gb-dcgrid,.gb-cover .gb-cv-dates{break-inside:avoid;}
+.gb-dcgrid .gb-id:last-child:nth-child(odd){grid-column:1 / -1;border-left:none;}
+/* ── True per-section pagination: each numbered section opens a fresh page ── */
+.gb-sec + .gb-sec{break-before:page;}
+`;

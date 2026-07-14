@@ -24,7 +24,7 @@
    ============================================================================= */
 import { esc, eligInfo, TONE_LABEL, eyebrowFor, scorecardTiles, type EligInfo } from "@/lib/v5-report/core";
 import { reasoningSteps, REACHED_INTRO, splitMethod } from "@/lib/v5-report/render";
-import { REPORT_DECK_CSS } from "@/lib/v5-report/styles-deck";
+import { REPORT_DECK_CSS, REPORT_DECK_SEAL_CSS } from "@/lib/v5-report/styles-deck";
 import { FONTS_CSS } from "@/lib/v5-report/fonts";
 import { buildV4Data } from "@/lib/v4-report/build-data";
 import type { V4Data, V4Verdict, V4SubmissionL, V4EvalM, V4Finding } from "@/lib/v4-report/render";
@@ -42,6 +42,33 @@ const ICON: Record<string, string> = {
   stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>',
   slate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>',
 };
+
+// ── AUDIT_V5_SEAL — "Decision Seal" verdict box (flag-gated; default-OFF byte-identical) ──
+const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
+const SEAL_ICON: Record<string, string> = {
+  go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.4l2.6 2.6 5-5.4"/></svg>',
+  caution: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"/><path d="M12 9.6v4.4"/><path d="M12 17h.01"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>',
+  slate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>',
+};
+const STAMPWORD: Record<string, string> = { BID: "Bid", BID_WITH_CAUTION: "Bid · Caution", NO_BID: "No-Bid", INELIGIBLE: "Ineligible", NEEDS_HUMAN_REVIEW: "Needs Human Review", INCOMPLETE: "Incomplete", OUT_OF_SCOPE: "Out of Scope" };
+const DISPO: Record<string, string> = { BID: "CLEARED", BID_WITH_CAUTION: "CONDITIONAL", NO_BID: "DECLINED", INELIGIBLE: "BARRED", NEEDS_HUMAN_REVIEW: "REFERRED", INCOMPLETE: "NOT REACHED", OUT_OF_SCOPE: "NOT APPLICABLE" };
+const KICK: Record<string, string> = { BID: "Cleared on the facts read — proceed to proposal", BID_WITH_CAUTION: "Proceed, but clear the gates below first", NO_BID: "Final disposition — a universal defect blocks the field", INELIGIBLE: "Not curable here — team with a certified prime or target full-and-open", NEEDS_HUMAN_REVIEW: "Route to a human reviewer to confirm eligibility", INCOMPLETE: "Provide the missing documents to complete the read", OUT_OF_SCOPE: "No offer to make — market research only" };
+function sealStamp(v: V4Verdict): string {
+  const word = STAMPWORD[v.pole] || v.band || "";
+  const dispo = DISPO[v.pole] || "";
+  const wcls = word.length <= 4 ? "xl" : word.length <= 12 ? "lg" : "";
+  return `<div class="gseal"><div class="gseal-in">
+      <div class="gseal-ico">${SEAL_ICON[v.tone] || SEAL_ICON.slate}</div>
+      <div class="gseal-word ${wcls}">${esc(word)}</div>
+      <div class="gseal-dispo mono">${esc(dispo)}</div>
+      <div class="gseal-wm mono">FARAUDIT · GATE BRIEF</div>
+    </div></div>`;
+}
+function sealStatus(v: V4Verdict): string {
+  const e = coverElig(v);
+  return `<span class="gchip-tight">${v.noVerdict ? '<b class="mono">NO VERDICT</b><i></i>' : ""}<span class="ek mono">Eligibility</span><em data-e="${e ? e.cls : "na"}">${e ? esc(e.label) : "Not applicable"}</em></span>`;
+}
 
 const WM = `<span class="wm"><span class="wm-a">FAR</span><span class="wm-b">audit</span><span class="wm-dot"></span></span>`;
 // "VERIFIED" live pill — STATE-AWARE: only a committal audit is "verified"; an honest-fail must not claim it.
@@ -125,11 +152,18 @@ function decisionSlide(d: V4Data): Slide {
   return {
     tone, label: "Decision",
     body: `<div class="vd-body">
-        <div class="vd-plate">
+        ${V5_SEAL ? `<div class="vd-plate gv2" data-tone="${tone}">
+          ${sealStamp(v)}
+          <div class="gv2-cmd">
+            <div class="gv2-kick mono">${esc(KICK[v.pole] || eyebrow)}</div>
+            <div class="gv2-word">${esc(v.band)}</div>
+            ${sealStatus(v)}
+          </div>
+        </div>` : `<div class="vd-plate">
           <div class="vd-lead"><div class="sl-eyebrow"><span class="eb-dot"></span>${esc(eyebrow)}</div>${livePill(v)}</div>
           <div class="vd-vrow"><span class="vd-ico">${ICON[tone] || ICON.slate}</span><span class="vd-word">${esc(v.band)}</span></div>
           <div class="vd-chips">${chips.join("")}</div>
-        </div>
+        </div>`}
         <div class="vd-bl"><div class="bl-k">Bottom line</div><div class="bl-t">${esc(v.rationale || "")}</div></div>
         ${gateHTML ? `<div class="vd-facts">${gateHTML}</div>` : ""}
       </div>`,
@@ -323,7 +357,7 @@ export function renderGateDeckDocV5(d: V4Data): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FARaudit · Gate Deck · ${sol}</title>
 <style>${FONTS_CSS}</style>
-<style>${REPORT_DECK_CSS}</style>
+<style>${REPORT_DECK_CSS}</style>${V5_SEAL ? `\n<style>${REPORT_DECK_SEAL_CSS}</style>` : ""}
 </head>
 <body>
 <div class="scrollmode">${renderGateDeckBodyV5(d)}</div>
