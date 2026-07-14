@@ -231,11 +231,70 @@ const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
   { name: "offeror clarification / error-omission rights (§L)", re: CLARIFICATION_RIGHTS_RE, enabled: CLARIFICATION_ALLOWLIST_ENABLED },
 ];
 
+// ═══ LPTA EVAL-CONSEQUENCE RELEASE — OPTION 1: PURE-METHODOLOGY-ONLY (shape allowlist) ═══
+// Brain card #507 fork, CEO-ratified. Flag AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS (default-OFF).
+//
+// THE PROBLEM (why v1/#225 was reverted): a generic LPTA "quotes failing to meet the technical criteria → not
+// technically acceptable / will not be considered" §M sentence is award METHODOLOGY, not a bidder bar — but
+// DISQUALIFIER_RE's "will not be considered" token over-tags it disqualifier → false NHR (FA303026Q0020). v1 tried
+// to RELEASE it with a BLOCKLIST ("demote unless we recognize bar-vocabulary"). Two adversarial Gauntlet rounds proved
+// a blocklist is a treadmill: an eligibility gate wearing the LPTA frame with UNENUMERATED vocabulary (DD254 facility
+// security level, "U.S. nationals", Qualified Products List, a holders-only vehicle, sole-source) always slips through.
+//
+// OPTION 1 — invert to an ALLOWLIST OF SHAPE. A GENUINELY-BARE methodology sentence contains ONLY closed-vocabulary
+// methodology words (the frame + the consequence + abstract references to "criteria/requirements"). A real bar wearing
+// the frame ALWAYS injects a substantive out-of-vocabulary content word (BOA / DD254 / clearance / nationals / site /
+// visit / products / sole-source …) — that word is the tell. So: release ONLY when the LPTA frame matches AND every
+// content token is in METHODOLOGY_VOCAB. ANY out-of-vocab content word ⇒ REFUSE ⇒ the sentence keeps escalating.
+// This CANNOT be defeated by an unenumerated bar (the bar's distinctive word is, by construction, not in the tiny
+// methodology vocab) — the treadmill is closed. Cost is only conservative: an unusually-worded benign methodology
+// sentence may fail the vocab check and stay NHR (over-tag = recoverable human review; under-tag = lost contract).
+// Read at CALL time; flag-OFF ⇒ never consulted ⇒ importanceOf byte-identical.
+const lptaConsequenceReleaseEnabled = () => process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS === "true";
+// The LPTA-consequence methodology FRAME (subject = quote/offer/proposal that FAILS TO MEET the TECHNICAL
+// criteria/requirements). Necessary gate — but NOT sufficient on its own (that was v1's mistake); the vocab check below
+// is what makes it safe.
+const LPTA_CONSEQUENCE_RE = /\b(?:quote|quotation|offer|proposal)s?\b[^.]{0,90}?\b(?:fail(?:ing|s|ure)?(?:\s+to\s+meet)?|not\s+meet(?:ing)?|do(?:es)?\s+not\s+meet|that\s+(?:do\s+not|fail\s+to)\s+meet)\b[^.]{0,90}?\btechnical\b[^.]{0,40}?\b(?:criteri(?:a|on)|requirements?|factors?|standards?)\b/i;
+// Closed methodology vocabulary. A BARE LPTA-consequence sentence draws ONLY from this set (plus 1-char tokens, which
+// are never a substantive bar word). Deliberately EXCLUDES every noun that names a specific requirement/gate. Tuned so
+// the genuine FA303026Q0020 driver + common LPTA-consequence phrasings pass, while any substantive gate word fails.
+const METHODOLOGY_VOCAB = new Set<string>([
+  // subject
+  "quote","quotes","quotation","quotations","offer","offers","offeror","offerors","proposal","proposals","bid","bids","bidder","bidders","quoter","quoters",
+  // fail/meet
+  "fail","fails","failing","failure","failed","meet","meets","meeting","satisfy","satisfies","satisfying","satisfied","address","addresses","addressing","comply","complies","complying","conform","conforms","conforming",
+  // criteria (abstract)
+  "technical","technically","criterion","criteria","requirement","requirements","factor","factors","subfactor","subfactors","standard","standards","suitability","provision","provisions",
+  // consequence
+  "acceptable","unacceptable","acceptability","responsive","responsible","responsiveness","deem","deemed","deems","rate","rated","rating","ratings","found","find","consider","considered","considers","considering","consideration","evaluate","evaluated","evaluates","evaluation","reject","rejected","rejection","rejects","award","awarded","eliminate","eliminated","exclude","excluded","excluding","selection","selected","determine","determined","determination","competitive","range","further",
+  // quantifiers / abstract references
+  "one","more","all","any","each","both","either","neither","minimum","maximum","applicable","listed","enumerated","following","below","above","herein","stated","specified","identified","described","outlined","noted","set","forth","otherwise",
+  // grammar / function words
+  "not","no","will","shall","would","may","must","can","cannot","be","being","been","is","are","was","were","to","the","a","an","and","or","of","for","in","on","at","by","with","as","per","if","that","which","who","whose","their","its","it","this","these","those","such","from","than","then","when","whether","under","upon","into","full","fully","fail","up","meets",
+]);
+// SHAPE ALLOWLIST test: after the LPTA frame matches, EVERY content token (length ≥ 2) must be in METHODOLOGY_VOCAB.
+// One out-of-vocab word ⇒ a substantive requirement is embedded ⇒ refuse the release.
+function isBareLptaMethodology(ob: string): boolean {
+  if (!LPTA_CONSEQUENCE_RE.test(ob)) return false;
+  const tokens = ob.toLowerCase().split(/[^a-z]+/).filter((t) => t.length >= 2);
+  for (const t of tokens) if (!METHODOLOGY_VOCAB.has(t)) return false;
+  return true;
+}
+export function isLptaConsequenceNonBar(ob: string): boolean {
+  if (!isBareLptaMethodology(ob)) return false;
+  if (hasBarSignal(ob)) return false; // defense-in-depth belt (redundant given the allowlist, but cheap and explicit)
+  return true;
+}
+
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
  *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
  *  family (protest + debriefing + foreign-procurement-tax + document order-of-precedence) must never silently narrow. */
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
-  if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
+  if (DISQUALIFIER_RE.test(ob)) {
+    // OPTION 1 release (flag-gated + shape-allowlist guarded): a BARE LPTA eval-consequence sentence flows to
+    // ambiguous → the proven bar-signal-negative demotion. Any embedded substantive word keeps it a disqualifier.
+    if (!(lptaConsequenceReleaseEnabled() && isLptaConsequenceNonBar(ob))) return "disqualifier";
+  }
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
   // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
   // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)

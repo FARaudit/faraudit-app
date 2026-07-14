@@ -19,6 +19,7 @@ process.env.AUDIT_NOOP_REP_ALLOWLIST = "true";
 process.env.AUDIT_PRECEDENCE_ALLOWLIST = "true";
 process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
 process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
+process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; // Option 1 (card #507) — pure-methodology shape-allowlist release
 
 (async () => {
   const { importanceOf, hasBarSignal, isGovtEvalMethodologyNonBar } = await import("../../src/lib/audit-gate-v2");
@@ -83,7 +84,22 @@ process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
     "A proposal with an unacceptable approach is not further considered.",
     // a real CERTIFICATION eligibility bar hidden in a govt-eval cost-data frame → the strip-and-retest must keep it escalating:
     "Only offerors certified under the mentor-protege program may submit cost or pricing data, which the Government shall evaluate to determine reasonableness.",
+    // ── OPTION 1 (card #507) — real bars WEARING the LPTA frame. The pure-methodology shape-allowlist must REFUSE each
+    //    (an embedded substantive gate word ⇒ out-of-vocab ⇒ escalate). These are the 2-round Gauntlet leak classes:
+    "Proposals under this sole-source action that fail to meet the technical criteria will not be considered.",                                  // sole-source
+    "Quotes that fail to meet the technical criteria for this requirement set-aside for HUBZone concerns will not be considered.",                // set-aside
+    "Quotes from offerors that failed to attend the mandatory site visit and do not meet the technical criteria will not be considered.",        // concluded site visit
+    "Proposals that fail to meet the technical criteria, including holding a Basic Ordering Agreement, will not be considered for award.",        // BOA holders-only
+    "Offers that do not meet the technical requirements will not be considered; award is limited to IDIQ holders on the vehicle.",               // IDIQ holders-only
+    "Quotes that fail to meet the technical criterion of a DD254 facility security level will not be considered.",                               // DD254 facility security
+    "Proposals from firms whose personnel are not U.S. nationals fail to meet the technical criteria and will not be considered.",               // citizenship/nationals
+    "Offers that fail to meet the technical requirement of listing on the Qualified Products List will not be considered.",                       // QPL
+    "Quotes failing to meet the technical criteria for the required Secret facility clearance will not be considered.",                          // clearance in frame
+    "Proposals that fail to meet the technical criteria and are not from a certified 8(a) concern will not be considered.",                       // 8(a) in frame
   ];
+
+  // The FA303026Q0020 bare-methodology driver — the ONE sentence that MUST demote under Option 1 (no substantive word).
+  const LPTA_PIN = "Quotes failing to meet one or more Technical Criteria will deem the quote not technically acceptable and will not be considered for award.";
 
   const realBars = [...groupA.map((b) => ["A", b] as const), ...groupB.map((b) => ["B", b] as const)];
 
@@ -131,10 +147,18 @@ process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
   console.log(`  ambiguous residuals that STAY ESCALATING via belt (bar-signal-positive): ${beltHits.length}`);
   if (beltHits.length) { console.log("  ── belt-retained (ungrounded, bar-signal-positive — NOT dissolved, correctly still escalate):"); for (const b of [...new Set(beltHits)]) console.log(`     • ${b.slice(0, 110)}`); }
 
+  // GATE 3 — the FA303026Q0020 bare-methodology PIN must DEMOTE under Option 1.
+  const pinV = escalatesNew(LPTA_PIN);
+  const pinPass = pinV === "demote";
+  console.log("\n════════ GATE 3 — Option 1 bare-methodology PIN dissolves (§M false-punt driver → demote) ════════");
+  console.log(`  ${pinPass ? "✓" : "✗ STILL PUNTS"} imp=${importanceOf(LPTA_PIN)} barSignal=${hasBarSignal(LPTA_PIN)} → ${pinV}  | ${LPTA_PIN.slice(0,80)}`);
+
   console.log("\n════════ GATE VERDICT ════════");
   const barPass = leaks.length === 0;
-  console.log(`  GATE 1 (no real-bar leak): ${barPass ? "PASS ✓" : "FAIL ✗ — STOP, strengthen the net"}`);
+  console.log(`  GATE 1 (no real-bar leak, incl. LPTA-frame classes): ${barPass ? "PASS ✓" : "FAIL ✗ — STOP, strengthen the net"}`);
   console.log(`  GATE 2 (61 residuals dissolve): ${residuals.size} demote · ${beltHits.length} belt-retained`);
+  console.log(`  GATE 3 (§M bare-methodology pin demotes): ${pinPass ? "PASS ✓" : "FAIL ✗ — false-punt survives"}`);
   if (!barPass) { console.log("\n  ⛔ LEAKS:"); for (const l of leaks) console.log("    " + l); process.exit(1); }
-  console.log("\n  ✅ SAFETY GATE CLEARED — new semantics escalate 100% of known real bars; residuals demote. Build may proceed.");
+  if (!pinPass) { console.log("\n  ⛔ §M pin did not demote — the fix is a no-op."); process.exit(1); }
+  console.log("\n  ✅ SAFETY GATE CLEARED — 100% of real bars (incl. all LPTA-frame leak classes) escalate; §M pin demotes. Build may proceed.");
 })();

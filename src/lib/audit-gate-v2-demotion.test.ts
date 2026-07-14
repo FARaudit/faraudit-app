@@ -18,9 +18,10 @@ const att = (section: string, ungrounded: string[]): SectionAttestation =>
   ({ section, status: "obligations_ungrounded", obligations: ungrounded, citedFindingIds: [], ungrounded });
 
 // helpers to re-import the module fresh per flag (the demotion flag is read at module load).
-async function grade(flag: boolean, attestations: SectionAttestation[]) {
+async function grade(flag: boolean, attestations: SectionAttestation[], lpta = flag) {
   if (flag) process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true"; else delete process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION;
-  const mod = await import(`./audit-gate-v2?d=${flag}`);
+  if (lpta) process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; else delete process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS;
+  const mod = await import(`./audit-gate-v2?d=${flag}&l=${lpta}`);
   return mod.gradeCoverageV2(attestations);
 }
 
@@ -70,6 +71,30 @@ const REAL_UNACCEPTABLE = "If the offeror fails to correct the deficiency, its p
     const compound = "The offeror must hold a facility clearance, and certified cost or pricing data shall be evaluated for the effort.";
     const cov = await grade(true, [att("M", [compound])]);
     assert(inDisq(cov, compound) && !inDemoted(cov, compound), "compound (clearance bar + cost-data eval) → ESCALATE (govt-eval exception must not demote a real bar)");
+  }
+
+  // ── 5 · §M LPTA-CONSEQUENCE release — OPTION 1 pure-methodology shape-allowlist (card #507, flag AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS) ──
+  console.log("\n── 5 · Option 1: bare-methodology pin demotes; real bars wearing the LPTA frame escalate; flags-OFF byte-identical ──");
+  {
+    const LPTA_PIN = "Quotes failing to meet one or more Technical Criteria will deem the quote not technically acceptable and will not be considered for award."; // FA303026Q0020 driver — bare methodology
+    const LEAK_BOA = "Proposals that fail to meet the technical criteria, including holding a Basic Ordering Agreement, will not be considered for award."; // embedded vehicle
+    const LEAK_DD254 = "Quotes that fail to meet the technical criterion of a DD254 facility security level will not be considered."; // embedded security gate (unenumerated — allowlist catches it)
+    const LEAK_SOLESOURCE = "Proposals under this sole-source action that fail to meet the technical criteria will not be considered."; // embedded DISQUALIFIER token
+
+    // both flags ON: pin demotes (bare methodology), all embedded-bar sentences escalate
+    const on = await grade(true, [att("M", [LPTA_PIN, LEAK_BOA, LEAK_DD254, LEAK_SOLESOURCE])], true);
+    assert(inDemoted(on, LPTA_PIN) && !inDisq(on, LPTA_PIN), "Option 1: bare-methodology §M pin DEMOTES (ungrounded_nonbar_signal)");
+    assert(inDisq(on, LEAK_BOA) && !inDemoted(on, LEAK_BOA), "Option 1: embedded BOA vehicle → ESCALATE (out-of-vocab word)");
+    assert(inDisq(on, LEAK_DD254) && !inDemoted(on, LEAK_DD254), "Option 1: embedded DD254 (UNENUMERATED) → ESCALATE (shape allowlist, not blocklist)");
+    assert(inDisq(on, LEAK_SOLESOURCE) && !inDemoted(on, LEAK_SOLESOURCE), "Option 1: embedded sole-source → ESCALATE");
+
+    // LPTA flag OFF (demotion ON): pin stays disqualifier → escalates (byte-identical to pre-fix)
+    const lptaOff = await grade(true, [att("M", [LPTA_PIN])], false);
+    assert(inDisq(lptaOff, LPTA_PIN) && !inDemoted(lptaOff, LPTA_PIN), "LPTA flag OFF: pin ESCALATES (byte-identical, no release)");
+
+    // both flags OFF: pin escalates (full byte-identical)
+    const bothOff = await grade(false, [att("M", [LPTA_PIN])], false);
+    assert(inDisq(bothOff, LPTA_PIN), "both flags OFF: pin ESCALATES (prior behavior)");
   }
 
   console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
