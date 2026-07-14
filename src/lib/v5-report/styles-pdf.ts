@@ -238,6 +238,7 @@ b,strong{font-weight:700;}
 .gb-fg-h .fh-sq{width:9px; height:9px; border-radius:2px; background:var(--slate);}
 .gb-fg-h[data-sev="p0"] .fh-sq{background:var(--stop);} .gb-fg-h[data-sev="p1"] .fh-sq{background:var(--caution);}
 .gb-fg-h[data-sev="p2"] .fh-sq{background:var(--ink-3);} .gb-fg-h[data-sev="ok"] .fh-sq{background:var(--go);}
+.gb-fg-h[data-sev="review"] .fh-sq{background:var(--caution);}
 .gb-fg-h .fh-c{font-family:var(--mono); font-size:8pt; color:var(--ink-3); margin-left:auto; letter-spacing:0;}
 .gb-none{font-size:9.6pt; color:var(--ink-3); padding:10px 0;}
 
@@ -248,6 +249,9 @@ b,strong{font-weight:700;}
 .gb-fd-sev[data-sev="p0"]{background:var(--stop-t); color:var(--stop);}
 .gb-fd-sev[data-sev="p1"]{background:var(--caution-t); color:var(--caution);}
 .gb-fd-sev[data-sev="p2"]{background:var(--wash); color:var(--ink-2);}
+/* no-verdict pole — calm graphite chip (mixed-case) + warm-amber rail (Design v5 gate) */
+.gb-fd-sev[data-sev="review"]{background:var(--slate-t); color:var(--slate-d); text-transform:none; letter-spacing:.01em;}
+.gb-fd[data-sev="review"]{border-left:2.5px solid var(--caution); padding-left:11px;}
 .gb-fd-req{font-size:10.6pt; color:var(--ink); font-weight:700; line-height:1.4; margin:0; letter-spacing:-.01em;}
 .gb-fd-cite{font-family:var(--mono); font-size:8.4pt; color:var(--accent-deep); white-space:nowrap;}
 .gb-fd-ex{font-size:9.6pt; color:var(--ink-2); line-height:1.5; margin:9px 0 0 0; padding-left:13px;

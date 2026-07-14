@@ -147,11 +147,16 @@ function decision(d: V4Data): string {
 }
 
 // ---- findings ---------------------------------------------------------------
-function findingRow(fn: V4Finding, sev: "p0" | "p1" | "p2"): string {
+function findingRow(fn: V4Finding, sev: "p0" | "p1" | "p2", nv = false): string {
+  // No-verdict pole: p0 renders as calm "Blocking condition · needs review"
+  // (graphite chip + warm-amber rail), never red Show-stopper. (Design v5 gate)
+  const nvBlock = nv && sev === "p0";
+  const dsev = nvBlock ? "review" : sev;
+  const label = nvBlock ? "Blocking condition · needs review" : (sev === "p0" ? "Show-stopper" : sev === "p1" ? "Gate" : "Advisory");
   return `
-      <div class="gb-fd">
+      <div class="gb-fd"${nvBlock ? ' data-sev="review"' : ""}>
         <div class="gb-fd-top">
-          <span class="gb-fd-sev" data-sev="${sev}">${sev === "p0" ? "Show-stopper" : sev === "p1" ? "Gate" : "Advisory"}</span>
+          <span class="gb-fd-sev" data-sev="${dsev}">${label}</span>
           <span class="gb-fd-cite mono">${esc(fn.cite)}</span>
         </div>
         <p class="gb-fd-req">${esc(fn.req)}</p>
@@ -161,10 +166,14 @@ function findingRow(fn: V4Finding, sev: "p0" | "p1" | "p2"): string {
 }
 function findings(d: V4Data): string {
   const f = d.findings || ({} as V4Data["findings"]), complete = d.coverage.state === "COMPLETE";
+  const nv = d.verdict.noVerdict === true;
   const p0 = f.p0 || [], p1 = f.p1 || [], p2 = f.p2 || [];
   if (!complete && !p0.length && !p1.length && !p2.length) return ""; // incomplete-empty: omit (absence rule §2)
   const groups: string[] = [];
-  groups.push(`<div class="gb-fg"><div class="gb-fg-h" data-sev="p0"><span class="fh-sq"></span>Show-stoppers<span class="fh-c">${p0.length}</span></div>${p0.length ? p0.map((x) => findingRow(x, "p0")).join("") : '<div class="gb-none">None identified in the documents read.</div>'}</div>`);
+  // No-verdict pole: p0 group renders calm (graphite + amber), relabeled — matches the deck's calm register. (Design v5 gate)
+  const p0sev = nv ? "review" : "p0";
+  const p0title = nv ? "Blocking conditions · needs review" : "Show-stoppers";
+  groups.push(`<div class="gb-fg"><div class="gb-fg-h" data-sev="${p0sev}"><span class="fh-sq"></span>${p0title}<span class="fh-c">${p0.length}</span></div>${p0.length ? p0.map((x) => findingRow(x, "p0", nv)).join("") : '<div class="gb-none">None identified in the documents read.</div>'}</div>`);
   if (p1.length) groups.push(`<div class="gb-fg"><div class="gb-fg-h" data-sev="p1"><span class="fh-sq"></span>Gates to clear<span class="fh-c">${p1.length}</span></div>${p1.map((x) => findingRow(x, "p1")).join("")}</div>`);
   if (p2.length) groups.push(`<div class="gb-fg"><div class="gb-fg-h" data-sev="p2"><span class="fh-sq"></span>Advisories<span class="fh-c">${p2.length}</span></div>${p2.map((x) => findingRow(x, "p2")).join("")}</div>`);
   return `<div class="gb-sub">Findings</div><p class="gb-lead">Every finding carries its citation and the verbatim text it rests on.</p>${groups.join("")}`;

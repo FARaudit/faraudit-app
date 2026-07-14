@@ -303,13 +303,21 @@ function temporal(t: V4Temporal | undefined): string {
       <span class="fd-t-m mono">window <b>${t.windowDays}d</b></span>
       <span class="fd-t-status">${exceeds ? "gate exceeds the window" : "gate falls within the window"}</span></div>`;
 }
-function findingRow(f: V4Finding, sev: string, open: boolean): string {
+function findingRow(f: V4Finding, sev: string, open: boolean, nv = false): string {
+  // No-verdict pole (NHR / OOS): show-stopper-severity findings render in the
+  // calm "blocking condition · needs review" register — graphite chip + warm-
+  // amber rail, never the committal-stop red klaxon — and drop the "Decisive
+  // finding" label (nothing was decided). Surfaced + cited unchanged. Committal
+  // poles are untouched (nv=false). (Design v5 hard-gate remap; doctrine #355/#423/#425.)
+  const nvBlock = nv && sev === "p0";
+  const dsev = nvBlock ? "review" : sev;
+  const sevLabel = nvBlock ? "Blocking condition · needs review" : (SEVLAB[sev as keyof typeof SEVLAB] || "");
   return `
-    <article class="fd" data-sev="${sev}"${open ? ' data-open="1"' : ""}>
+    <article class="fd" data-sev="${dsev}"${open ? ' data-open="1"' : ""}>
       <button class="fd-top" type="button" aria-expanded="${open ? "true" : "false"}">
-        <span class="fd-sev" data-sev="${sev}">${SEVLAB[sev as keyof typeof SEVLAB] || ""}</span>
+        <span class="fd-sev" data-sev="${dsev}">${sevLabel}</span>
         <div class="fd-mid">
-          ${f.driver ? `<span class="fd-drives">${I.spark || ""}Decisive finding</span>` : ""}
+          ${f.driver && !nv ? `<span class="fd-drives">${I.spark || ""}Decisive finding</span>` : ""}
           <span class="fd-req">${esc(f.req)}</span>
         </div>
         <span class="fd-cite mono">${esc(f.cite)}</span>
@@ -322,21 +330,24 @@ function findingRow(f: V4Finding, sev: string, open: boolean): string {
       </div>
     </article>`;
 }
-function group(list: V4Finding[] | undefined, sev: string, title: string, complete: boolean): string {
+function group(list: V4Finding[] | undefined, sev: string, title: string, complete: boolean, nv = false): string {
+  const nvBlock = nv && sev === "p0";
+  const gsev = nvBlock ? "review" : sev;
+  const gtitle = nvBlock ? "Blocking conditions · needs review" : title;
   if (!list || !list.length) {
     if (!complete) return "";
-    return `<div class="fg"><div class="fg-h" data-sev="${sev}">${title}<span class="fg-c mono">0</span></div>
+    return `<div class="fg"><div class="fg-h" data-sev="${gsev}">${gtitle}<span class="fg-c mono">0</span></div>
         <div class="fg-items"><p class="fg-none">None identified in the documents read.</p></div></div>`;
   }
   const ordered = [...list].sort((a, b) => (b.driver === true ? 1 : 0) - (a.driver === true ? 1 : 0));
-  const rows = ordered.map((f) => findingRow(f, sev, sev === "p0" || f.driver === true)).join("");
-  return `<div class="fg"><div class="fg-h" data-sev="${sev}">${title}<span class="fg-c mono">${list.length}</span></div><div class="fg-items">${rows}</div></div>`;
+  const rows = ordered.map((f) => findingRow(f, sev, sev === "p0" || f.driver === true, nv)).join("");
+  return `<div class="fg"><div class="fg-h" data-sev="${gsev}">${gtitle}<span class="fg-c mono">${list.length}</span></div><div class="fg-items">${rows}</div></div>`;
 }
-function findingsBody(fd: V4Findings, complete: boolean): string {
+function findingsBody(fd: V4Findings, complete: boolean, nv = false): string {
   const groups = [
-    group(fd.p0, "p0", "Show-stoppers", complete),
-    group(fd.p1, "p1", "Gates to clear", complete),
-    group(fd.p2, "p2", "Advisories", complete),
+    group(fd.p0, "p0", "Show-stoppers", complete, nv),
+    group(fd.p1, "p1", "Gates to clear", complete, nv),
+    group(fd.p2, "p2", "Advisories", complete, nv),
   ].filter(Boolean).join("");
   const sat = (fd.satisfied && fd.satisfied.length)
     ? `<div class="fg fg-sat"><div class="fg-h" data-sev="ok">Satisfied · grounded facts<span class="fg-c mono">${fd.satisfied.length}</span></div>
@@ -345,12 +356,15 @@ function findingsBody(fd: V4Findings, complete: boolean): string {
   if (!complete && !groups && !sat) return "";
   return `<p class="disc-note">Every finding carries its citation and the verbatim text it rests on.</p>${groups}${sat}`;
 }
-function findingsSummary(fd: V4Findings): string {
+function findingsSummary(fd: V4Findings, nv = false): string {
   const p0 = (fd.p0 || []).length, p1 = (fd.p1 || []).length, p2 = (fd.p2 || []).length;
-  const tone = p0 ? "stop" : (p1 ? "caution" : "go");
-  if (!p0 && !p1 && !p2) return statusDot("go") + "No findings in the documents read";
+  // No-verdict pole never renders the red "stop" summary — p0 surfaces as a calm
+  // amber "blocking conditions · needs review", coherent with the "Not determined"
+  // scorecard aggregate. (Design v5 hard-gate remap.)
+  const tone = nv ? (p0 || p1 ? "caution" : "slate") : (p0 ? "stop" : (p1 ? "caution" : "go"));
+  if (!p0 && !p1 && !p2) return statusDot(nv ? "slate" : "go") + "No findings in the documents read";
   const seg: string[] = [];
-  if (p0) seg.push(`<b>${plur(p0, "show-stopper", "show-stoppers")}</b>`);
+  if (p0) seg.push(nv ? `<b>${plur(p0, "blocking condition", "blocking conditions")}</b> · needs review` : `<b>${plur(p0, "show-stopper", "show-stoppers")}</b>`);
   seg.push(plur(p1, "gate", "gates") + " to clear");
   if (p2) seg.push(plur(p2, "advisory", "advisories"));
   return statusDot(tone) + seg.join(" · ");
@@ -470,11 +484,12 @@ export function renderRichWebV5(d: V4Data): V5RenderResult {
     </div>`);
 
   // Tier 2 — evidence accordion (collapsed by default; findings auto-opens on show-stoppers)
+  const nvPole = d.verdict.noVerdict === true;
   const p0 = (d.findings.p0 || []).length;
-  const fBody = findingsBody(d.findings, complete);
+  const fBody = findingsBody(d.findings, complete, nvPole);
   if (fBody) {
-    parts.push(disc({ id: "findings", n: nn(), title: "Findings", summary: findingsSummary(d.findings),
-      body: fBody, open: p0 > 0, tone: p0 ? "stop" : null }));
+    parts.push(disc({ id: "findings", n: nn(), title: "Findings", summary: findingsSummary(d.findings, nvPole),
+      body: fBody, open: p0 > 0, tone: p0 ? (nvPole ? "caution" : "stop") : null }));
     sections.push({ id: "findings", label: "Findings" });
   }
 
