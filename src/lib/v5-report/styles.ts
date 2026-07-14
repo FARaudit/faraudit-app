@@ -307,11 +307,13 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .fg-h[data-sev="p1"]::before{background:var(--caution);}
 .fg-h[data-sev="p2"]::before{background:var(--ink-3);}
 .fg-h[data-sev="ok"]::before{background:var(--go);}
+.fg-h[data-sev="review"]::before{background:var(--caution);}
 .fg-c{font-size:11px; font-weight:700; letter-spacing:0; color:var(--ink-2); background:var(--line-2);
   border-radius:20px; min-width:19px; text-align:center; padding:1px 7px; line-height:1.5;}
 .fg-h[data-sev="p0"] .fg-c{background:var(--stop-tint); color:var(--stop);}
 .fg-h[data-sev="p1"] .fg-c{background:var(--caution-tint); color:var(--caution);}
 .fg-h[data-sev="ok"] .fg-c{background:var(--go-tint); color:var(--go);}
+.fg-h[data-sev="review"] .fg-c{background:var(--slate-tint); color:var(--slate);}
 .fg-none{font-size:13px; color:var(--ink-3); margin:0 0 8px; padding:13px 15px; border:1px dashed var(--line); border-radius:11px; background:none;}
 
 .fd{border:1px solid var(--line); border-radius:11px; margin-bottom:8px; overflow:hidden; background:#fff;}
@@ -323,6 +325,9 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
 .fd-sev[data-sev="p0"]{background:var(--stop-tint); color:var(--stop);}
 .fd-sev[data-sev="p1"]{background:var(--caution-tint); color:var(--caution);}
 .fd-sev[data-sev="p2"]{background:#eef1f5; color:var(--ink-2);}
+/* no-verdict pole — calm "blocking condition · needs review": graphite chip (not red, mixed-case) + warm-amber rail (Design v5 gate) */
+.fd-sev[data-sev="review"]{background:var(--slate-tint); color:var(--slate); text-transform:none; letter-spacing:.01em; font-weight:600;}
+.fd[data-sev="review"]{border-left:3px solid var(--caution);}
 .fd-req{font-size:14px; color:var(--ink); line-height:1.4;}
 .fd-mid{min-width:0; display:flex; flex-direction:column; gap:6px;}
 .fd-drives{align-self:flex-start; display:inline-flex; align-items:center; gap:5px;
