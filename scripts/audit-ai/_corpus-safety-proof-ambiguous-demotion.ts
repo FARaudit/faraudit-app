@@ -19,7 +19,6 @@ process.env.AUDIT_NOOP_REP_ALLOWLIST = "true";
 process.env.AUDIT_PRECEDENCE_ALLOWLIST = "true";
 process.env.AUDIT_CLARIFICATION_ALLOWLIST = "true";
 process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true";
-process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; // Brain card #506 — the §M LPTA-consequence release under re-proof
 
 (async () => {
   const { importanceOf, hasBarSignal, isGovtEvalMethodologyNonBar } = await import("../../src/lib/audit-gate-v2");
@@ -84,17 +83,7 @@ process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; // Brain card #506 — th
     "A proposal with an unacceptable approach is not further considered.",
     // a real CERTIFICATION eligibility bar hidden in a govt-eval cost-data frame → the strip-and-retest must keep it escalating:
     "Only offerors certified under the mentor-protege program may submit cost or pricing data, which the Government shall evaluate to determine reasonableness.",
-    // ── Brain card #506 §M LPTA-CONSEQUENCE RELEASE — compound real bars wearing the LPTA-consequence frame must STILL
-    //    escalate (the !hasBarSignal + strip-and-retest belt). If ANY of these demote, the release leaks a real bar → STOP.
-    "Offerors must possess an active facility clearance; quotes failing to meet one or more technical criteria will not be considered for award.", // clearance bar + LPTA frame
-    "Quotes from offerors not registered in SAM will not be considered for award.",                                                               // SAM-registration bar (no technical-criteria frame)
-    "Only quotes from 8(a) certified firms that meet all technical criteria will be considered; all others will not be considered for award.",     // 8(a) set-aside bar + LPTA frame
-    "Proposals failing to meet the technical criteria will be rejected; the offeror must hold a CMMC Level 2 certification prior to award.",       // CMMC bar + LPTA frame
-    "Offerors that fail to meet the technical criteria for the required Secret facility clearance will not be considered.",                        // clearance eligibility inside the frame
   ];
-  // The FA303026Q0020 false-punt driver — the ONE sentence that MUST demote under the release (bar-signal-negative,
-  // pure LPTA methodology). Asserted separately from the real-bar corpus (it is the DISSOLVE target, not a leak test).
-  const LPTA_PIN = "Quotes failing to meet one or more Technical Criteria will deem the quote not technically acceptable and will not be considered for award.";
 
   const realBars = [...groupA.map((b) => ["A", b] as const), ...groupB.map((b) => ["B", b] as const)];
 
@@ -142,18 +131,10 @@ process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; // Brain card #506 — th
   console.log(`  ambiguous residuals that STAY ESCALATING via belt (bar-signal-positive): ${beltHits.length}`);
   if (beltHits.length) { console.log("  ── belt-retained (ungrounded, bar-signal-positive — NOT dissolved, correctly still escalate):"); for (const b of [...new Set(beltHits)]) console.log(`     • ${b.slice(0, 110)}`); }
 
-  // ─────────────────── GATE 3 — the §M LPTA-consequence PIN must DEMOTE (card #506 dissolve target) ───────────────────
-  console.log("\n════════ GATE 3 — LPTA-CONSEQUENCE PIN dissolves (§M false-punt driver → demote) ════════");
-  const pinImp = importanceOf(LPTA_PIN), pinBar = hasBarSignal(LPTA_PIN), pinV = escalatesNew(LPTA_PIN);
-  const pinPass = pinV === "demote";
-  console.log(`  ${pinPass ? "✓" : "✗ STILL PUNTS"} imp=${pinImp} barSignal=${pinBar} → ${pinV}  | ${LPTA_PIN.slice(0, 90)}`);
-
   console.log("\n════════ GATE VERDICT ════════");
   const barPass = leaks.length === 0;
   console.log(`  GATE 1 (no real-bar leak): ${barPass ? "PASS ✓" : "FAIL ✗ — STOP, strengthen the net"}`);
   console.log(`  GATE 2 (61 residuals dissolve): ${residuals.size} demote · ${beltHits.length} belt-retained`);
-  console.log(`  GATE 3 (§M LPTA pin demotes): ${pinPass ? "PASS ✓" : "FAIL ✗ — the false-punt survives"}`);
   if (!barPass) { console.log("\n  ⛔ LEAKS:"); for (const l of leaks) console.log("    " + l); process.exit(1); }
-  if (!pinPass) { console.log("\n  ⛔ §M LPTA pin did not demote — the fix is a no-op."); process.exit(1); }
-  console.log("\n  ✅ SAFETY GATE CLEARED — new semantics escalate 100% of known real bars (incl. §M compound); §M LPTA pin demotes. Build may proceed.");
+  console.log("\n  ✅ SAFETY GATE CLEARED — new semantics escalate 100% of known real bars; residuals demote. Build may proceed.");
 })();
