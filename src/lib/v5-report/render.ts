@@ -23,6 +23,37 @@ import { esc, TONE_LABEL, SEVLAB, eligInfo, eyebrowFor, plur, cap, scorecardTile
 // AUDIT_V5_SEAL — "Decision Seal" masthead redesign (flag-gated; default-OFF = byte-identical).
 const V5_SEAL = process.env.AUDIT_V5_SEAL === "true";
 
+// ── Seal builder — COPY-IDENTICAL to render-pdf.ts (STAMPWORD/DISPO/KICK/SEAL_ICON/
+// sealStamp/sealStatus) so web = Executive Brief = Gate Deck 1:1. render-pdf imports
+// FROM this file, so we cannot import back (circular) — the maps are duplicated verbatim. ──
+const STAMP: Record<string, string> = { go: "CLEARED", caution: "CONDITIONAL", stop: "BLOCKED", slate: "NO VERDICT" };
+const SEAL_ICON: Record<string, string> = {
+  go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.4l2.6 2.6 5-5.4"/></svg>',
+  caution: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"/><path d="M12 9.6v4.4"/><path d="M12 17h.01"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>',
+  slate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>',
+};
+const STAMPWORD: Record<string, string> = { BID: "Bid", BID_WITH_CAUTION: "Bid · Caution", NO_BID: "No-Bid", INELIGIBLE: "Ineligible", NEEDS_HUMAN_REVIEW: "Needs Human Review", INCOMPLETE: "Incomplete", OUT_OF_SCOPE: "Out of Scope" };
+const DISPO: Record<string, string> = { BID: "CLEARED", BID_WITH_CAUTION: "CONDITIONAL", NO_BID: "DECLINED", INELIGIBLE: "BARRED", NEEDS_HUMAN_REVIEW: "REFERRED", INCOMPLETE: "NOT REACHED", OUT_OF_SCOPE: "NOT APPLICABLE" };
+const KICK: Record<string, string> = { BID: "Cleared on the facts read — proceed to proposal", BID_WITH_CAUTION: "Proceed, but clear the gates below first", NO_BID: "Final disposition — a universal defect blocks the field", INELIGIBLE: "Not curable here — team with a certified prime or target full-and-open", NEEDS_HUMAN_REVIEW: "Route to a human reviewer to confirm eligibility", INCOMPLETE: "Provide the missing documents to complete the read", OUT_OF_SCOPE: "No offer to make — market research only" };
+// Doctrine §5 — OUT_OF_SCOPE suppresses the eligibility chip (parity with render-pdf.ts coverElig).
+const coverElig = (v: V4Verdict): EligInfo => (v.pole === "OUT_OF_SCOPE" ? null : eligInfo(v));
+function sealStamp(v: V4Verdict): string {
+  const word = STAMPWORD[v.pole] || v.band || "";
+  const dispo = DISPO[v.pole] || STAMP[v.tone] || "";
+  const wcls = word.length <= 4 ? "xl" : word.length <= 12 ? "lg" : "";
+  return `<div class="gseal"><div class="gseal-in">
+      <div class="gseal-ico">${SEAL_ICON[v.tone] || SEAL_ICON.slate}</div>
+      <div class="gseal-word ${wcls}">${esc(word)}</div>
+      <div class="gseal-dispo mono">${esc(dispo)}</div>
+      <div class="gseal-wm mono">FARAUDIT · GATE BRIEF</div>
+    </div></div>`;
+}
+function sealStatus(v: V4Verdict): string {
+  const e = coverElig(v);
+  return `<span class="gchip-tight">${v.noVerdict ? '<b class="mono">NO VERDICT</b><i></i>' : ""}<span class="ek mono">Eligibility</span><em data-e="${e ? e.cls : "na"}">${e ? esc(e.label) : "Not applicable"}</em></span>`;
+}
+
 const I: Record<string, string> = {
   go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>',
   caution: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
@@ -99,6 +130,54 @@ function commandHeader(d: V4Data): string {
   // F3 — the executive bento comes from the SHARED derivation (core.scorecardTiles).
   const tilesHTML = scorecardTiles(d).map((t) =>
     `<div class="cmd-tile${t.textv ? " is-textv" : ""}" data-tone="${t.tone}"><div class="ct-v">${esc(t.v)}</div><div class="ct-k">${esc(t.k)}</div><div class="ct-sub">${esc(t.sub)}</div></div>`).join("");
+
+  if (V5_SEAL) {
+    // Record band — Agency (two-tier) · Offers due (two-tier) · Set-aside · NAICS.
+    const agencyFact = facts.find((ft) => /agency/i.test(ft.k));
+    const setFact = facts.find((ft) => /set.?aside/i.test(ft.k));
+    const naicsFact = facts.find((ft) => /naics/i.test(ft.k));
+    const AGENCY_SHORT: [RegExp, string][] = [
+      [/air force/i, "U.S. Air Force"], [/\barmy\b/i, "U.S. Army"], [/\bnavy\b/i, "U.S. Navy"],
+      [/marine/i, "U.S. Marine Corps"], [/space force/i, "U.S. Space Force"], [/coast guard/i, "U.S. Coast Guard"],
+      [/veterans|\bVA\b/i, "Dept. of Veterans Affairs"], [/general services|\bGSA\b/i, "U.S. General Services Administration"],
+      [/homeland|\bDHS\b/i, "Dept. of Homeland Security"], [/health.*human|\bHHS\b/i, "Dept. of Health & Human Services"],
+      [/\benergy\b|\bDOE\b/i, "Dept. of Energy"],
+    ];
+    const agFull = agencyFact ? agencyFact.v : "—";
+    let agMain = agFull, agSub = agencyFact && agencyFact.sub ? agencyFact.sub : "";
+    if (!agSub && agMain.indexOf(" · ") > -1) { const parts = agMain.split(" · "); agSub = parts.slice(1).join(" · "); agMain = parts[0]; }
+    const agShort = AGENCY_SHORT.find(([re]) => re.test(agFull));
+    if (agShort) agMain = agShort[1];
+    const bandHTML = `
+      <div class="cmd-band">
+        <div class="cb-cell"><div class="cb-k mono">Agency</div><div class="cb-v">${esc(agMain)}${agSub ? `<span class="cb-sec">${esc(agSub)}</span>` : ""}</div></div>
+        <div class="cb-cell"><div class="cb-k mono">Offers due</div><div class="cb-v mono">${od ? esc(dl!.date) : "—"}${od && dl!.time ? `<span class="cb-sec mono">${esc(dl!.time)}</span>` : ""}</div></div>
+        <div class="cb-cell"><div class="cb-k mono">Set-aside</div><div class="cb-v">${setFact ? esc(setFact.v) : "—"}</div></div>
+        <div class="cb-cell"><div class="cb-k mono">NAICS</div><div class="cb-v mono">${naicsFact ? esc(naicsFact.v) : "—"}</div></div>
+      </div>`;
+    return `
+    <header class="cmd" id="top" data-sec data-sec-anchor="top" data-tone="${v.tone}"${v.noVerdict ? ' data-noverdict="1"' : ""}>
+      <div class="cmd-eyebrow"><span class="cmd-badge">${esc(m.docType)}</span><span class="cmd-sol mono">${esc(m.solicitation)}</span></div>
+      <h1 class="cmd-title">${esc(m.title)}</h1>
+      ${bandHTML}
+      <div class="cmd-stage">
+        <div class="cmd-rail">
+          ${sealStamp(v)}
+          <div class="cmd-rail-status">${sealStatus(v)}${noCharge}</div>
+        </div>
+        <div class="gv2-cmd">
+          <div class="gv2-kick mono">${esc(KICK[v.pole] || eyebrow)}</div>
+          <div class="gv2-word">${esc(v.band)}</div>
+          <div class="cmd-bl">
+            <span class="cmd-bl-k">Bottom line</span>
+            <p class="cmd-bl-t">${esc(v.rationale)}</p>
+          </div>
+        </div>
+      </div>
+      ${driverHTML}
+      <div class="cmd-tiles">${tilesHTML}</div>
+    </header>`;
+  }
 
   return `
     <header class="cmd" id="top" data-sec data-sec-anchor="top" data-tone="${v.tone}"${v.noVerdict ? ' data-noverdict="1"' : ""}>
