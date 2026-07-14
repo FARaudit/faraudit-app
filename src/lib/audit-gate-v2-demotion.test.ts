@@ -18,9 +18,10 @@ const att = (section: string, ungrounded: string[]): SectionAttestation =>
   ({ section, status: "obligations_ungrounded", obligations: ungrounded, citedFindingIds: [], ungrounded });
 
 // helpers to re-import the module fresh per flag (the demotion flag is read at module load).
-async function grade(flag: boolean, attestations: SectionAttestation[]) {
+async function grade(flag: boolean, attestations: SectionAttestation[], lpta = flag) {
   if (flag) process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION = "true"; else delete process.env.AUDIT_AMBIGUOUS_SIGNAL_DEMOTION;
-  const mod = await import(`./audit-gate-v2?d=${flag}`);
+  if (lpta) process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS = "true"; else delete process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS;
+  const mod = await import(`./audit-gate-v2?d=${flag}&l=${lpta}`);
   return mod.gradeCoverageV2(attestations);
 }
 
@@ -70,6 +71,28 @@ const REAL_UNACCEPTABLE = "If the offeror fails to correct the deficiency, its p
     const compound = "The offeror must hold a facility clearance, and certified cost or pricing data shall be evaluated for the effort.";
     const cov = await grade(true, [att("M", [compound])]);
     assert(inDisq(cov, compound) && !inDemoted(cov, compound), "compound (clearance bar + cost-data eval) → ESCALATE (govt-eval exception must not demote a real bar)");
+  }
+
+  // ── 5 · §M LPTA-CONSEQUENCE release (Brain card #506, flag AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS) ──
+  console.log("\n── 5 · §M LPTA-consequence release: pin demotes, compound real bars escalate, flags-OFF byte-identical ──");
+  {
+    const LPTA_PIN = "Quotes failing to meet one or more Technical Criteria will deem the quote not technically acceptable and will not be considered for award."; // FA303026Q0020 false-punt driver
+    const LPTA_CLEARANCE = "Offerors must possess an active facility clearance; quotes failing to meet one or more technical criteria will not be considered for award."; // compound real bar
+    const LPTA_8A = "Only quotes from 8(a) certified firms that meet all technical criteria will be considered; all others will not be considered for award.";           // compound real bar
+
+    // both flags ON: pin demotes, compound bars escalate
+    const on = await grade(true, [att("M", [LPTA_PIN, LPTA_CLEARANCE, LPTA_8A])], true);
+    assert(inDemoted(on, LPTA_PIN) && !inDisq(on, LPTA_PIN), "flags ON: §M LPTA-consequence pin DEMOTES (ungrounded_nonbar_signal, not disqualifierUncovered)");
+    assert(inDisq(on, LPTA_CLEARANCE) && !inDemoted(on, LPTA_CLEARANCE), "flags ON: LPTA frame + clearance bar → ESCALATE (belt holds)");
+    assert(inDisq(on, LPTA_8A) && !inDemoted(on, LPTA_8A), "flags ON: LPTA frame + 8(a) bar → ESCALATE (belt holds)");
+
+    // LPTA flag OFF (demotion ON): pin stays a hard disqualifier → escalates (byte-identical to pre-#506)
+    const lptaOff = await grade(true, [att("M", [LPTA_PIN])], false);
+    assert(inDisq(lptaOff, LPTA_PIN) && !inDemoted(lptaOff, LPTA_PIN), "LPTA flag OFF: pin ESCALATES as a disqualifier (byte-identical, no release)");
+
+    // both flags OFF: pin escalates (full byte-identical)
+    const bothOff = await grade(false, [att("M", [LPTA_PIN])], false);
+    assert(inDisq(bothOff, LPTA_PIN), "both flags OFF: pin ESCALATES (prior behavior)");
   }
 
   console.log(`\n${failures === 0 ? "✅ ALL PASS" : `❌ ${failures} FAILURE(S)`}`);
