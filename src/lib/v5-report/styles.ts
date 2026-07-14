@@ -590,3 +590,15 @@ body{background:var(--desk); color:var(--ink); font-family:var(--font);
   .print-foot .pf-mark{ font-weight:700; color:var(--ink-2); letter-spacing:.02em; }
 }
 `;
+
+// AUDIT_V5_SEAL — "Decision Seal" masthead delta (web). Appended AFTER REPORT_V5_CSS
+// only when the flag is ON; later-rule-wins overrides the base .cmd-clock* rules and
+// adds the two-tier absolute-deadline body. OFF → not injected → byte-identical.
+export const REPORT_V5_SEAL_CSS = `
+.cmd-clock{align-items:flex-start; padding:7px 13px 7px 11px;}
+.cmd-clock-ic{margin-top:2px;}
+.cmd-clock-body{display:flex; flex-direction:column; gap:1px; min-width:0;}
+.cmd-clock-k{font-size:10.5px; letter-spacing:.07em;}
+.cmd-clock-v{font-size:13.5px; font-weight:600; line-height:1.3;}
+.cmd-clock-time{font-size:11.5px; color:var(--ink-2); font-weight:500; white-space:nowrap; letter-spacing:.01em; line-height:1.3;}
+`;
