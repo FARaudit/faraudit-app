@@ -231,45 +231,11 @@ const NOOP_REP_FAMILY: Array<{ name: string; re: RegExp; enabled: boolean }> = [
   { name: "offeror clarification / error-omission rights (§L)", re: CLARIFICATION_RIGHTS_RE, enabled: CLARIFICATION_ALLOWLIST_ENABLED },
 ];
 
-// LPTA EVALUATION-CONSEQUENCE release (Brain card #506, flag AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS, default-OFF). CERT-10
-// seq-1 (FA303026Q0020, WOSB LPTA) false-NHR'd on the generic §M sentence "Quotes failing to meet one or more Technical
-// Criteria will deem the quote not technically acceptable and will not be considered for award." That is standard LPTA
-// award-METHODOLOGY describing what happens to any non-conforming quote — NOT a bidder-specific eligibility bar. But
-// DISQUALIFIER_RE's bare "will not be considered" token classifies it "disqualifier" at importanceOf, which pre-empts
-// BOTH the NOOP_REP_FAMILY allow-list AND the proven #459/#460 ambiguous-signal demotion (both run only in the ambiguous
-// branch of gradeCoverageV2 — a sentence classified disqualifier never reaches them). So a 4th family entry is a proven
-// no-op (Brain ruling on card #505); the fix is UPSTREAM: RELEASE this frame from the disqualifier over-tag so it lands
-// as ambiguous, where the already-ON bar-signal-NEGATIVE demotion routes it to the coverage ledger (ungrounded_nonbar_
-// signal), never disqualifierUncovered → no false NHR. GUARDED exactly like the govt-eval predicate so a COMPOUND real
-// bar still escalates: fires ONLY when (a) the LPTA-consequence methodology frame is present (a quote/offer/proposal that
-// FAILS TO MEET the TECHNICAL criteria/requirements), (b) the sentence carries NO eligibility-bar signal (!hasBarSignal),
-// and (c) stripping the LPTA-consequence phrase leaves NO OTHER DISQUALIFIER_RE hard-bar trigger. Read at CALL time;
-// flag-OFF ⇒ never consulted ⇒ importanceOf byte-identical.
-const lptaConsequenceReleaseEnabled = () => process.env.AUDIT_LPTA_CONSEQUENCE_AMBIGUOUS === "true";
-// The methodology SUBJECT is mandatory (quote/offer/proposal + fail-to-meet + TECHNICAL criteria/requirements) so a real
-// "offerors must hold X" / "quotes from firms not registered in SAM" bar never matches this frame.
-const LPTA_CONSEQUENCE_RE = /\b(?:quote|quotation|offer|proposal)s?\b[^.]{0,90}?\b(?:fail(?:ing|s|ure)?(?:\s+to\s+meet)?|not\s+meet(?:ing)?|do(?:es)?\s+not\s+meet|that\s+(?:do\s+not|fail\s+to)\s+meet)\b[^.]{0,90}?\btechnical\b[^.]{0,40}?\b(?:criteri(?:a|on)|requirements?|factors?|standards?)\b/i;
-export function isLptaConsequenceNonBar(ob: string): boolean {
-  if (!LPTA_CONSEQUENCE_RE.test(ob)) return false;
-  if (hasBarSignal(ob)) return false;                        // ANY eligibility-bar signal ⇒ real compound bar ⇒ keep escalating
-  // Defense-in-depth: strip the LPTA-consequence trigger phrases; if DISQUALIFIER_RE STILL matches, another hard bar
-  // hides in the sentence ⇒ do NOT release. (Global, so multiple occurrences all clear.)
-  const stripped = ob
-    .replace(new RegExp(LPTA_CONSEQUENCE_RE.source, "gi"), " ")
-    .replace(/\bwill\s+not\s+be\s+considered(?:\s+for\s+award)?\b/gi, " ")
-    .replace(/\bnot\s+(?:be\s+)?(?:deemed\s+|rated\s+|found\s+)?technically\s+acceptable\b/gi, " ");
-  return !DISQUALIFIER_RE.test(stripped);
-}
-
 /** Three-way importance of an ungrounded obligation (Brain card-301 #1). Ambiguous defaults to disqualifier.
  *  Exported for the allow-list regression suite (audit-gate-v2-allowlist.test.ts) — the offeror-rights / no-op-rep
  *  family (protest + debriefing + foreign-procurement-tax + document order-of-precedence) must never silently narrow. */
 export function importanceOf(ob: string): "disqualifier" | "boilerplate" | "ambiguous" {
-  if (DISQUALIFIER_RE.test(ob)) {
-    // RELEASE a generic LPTA eval-consequence sentence (flag-gated + guarded) so it flows to ambiguous → demotion;
-    // otherwise it stays a hard disqualifier exactly as before. Flag-OFF ⇒ this predicate is never consulted.
-    if (!(lptaConsequenceReleaseEnabled() && isLptaConsequenceNonBar(ob))) return "disqualifier";
-  }
+  if (DISQUALIFIER_RE.test(ob)) return "disqualifier";
   if (BOILERPLATE_RE.test(ob)) return "boilerplate";
   // OFFEROR-RIGHTS / NO-OP-REP family — allow-list OUT only when the sentence carries NO eligibility-bar signal.
   // (Preserves the prior protest/debrief behavior exactly: each member still gates on its own flag + RE + !BAR_SIGNAL.)
