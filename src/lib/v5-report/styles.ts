@@ -610,16 +610,17 @@ export const REPORT_V5_SEAL_CSS = `
 .cmd[data-tone="slate"]{--t:#414e5e; --td:#28313d;}
 .cmd-band{display:grid; grid-template-columns:1.5fr 1fr 1.1fr .8fr; background:#f2f5f9;
   border:1px solid var(--line-2, #dbe0e8); border-radius:14px; overflow:hidden; margin:4px 0 24px;}
-.cmd-band .cb-cell{padding:15px 18px; border-right:1px solid var(--line, #e6eaf0); text-align:center;}
+.cmd-band .cb-cell{padding:16px 20px; border-right:1px solid #cbd3de; text-align:center;}
 .cmd-band .cb-cell:last-child{border-right:0;}
-.cmd-band .cb-k{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-deep, #1f5fa8); margin-bottom:8px; font-weight:600;}
-.cmd-band .cb-v{font-size:13.5px; font-weight:500; color:var(--ink-1, #1a2431); line-height:1.35;}
-.cmd-band .cb-v.mono{white-space:nowrap;}
-.cmd-band .cb-sec{display:block; font-size:11.5px; font-weight:400; color:var(--ink-3, #6b7887); margin-top:3px; line-height:1.3;}
+.cmd-band .cb-k{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent-deep, #1f5fa8); margin-bottom:9px; font-weight:600;}
+.cmd-band .cb-v{font-size:15px; font-weight:600; color:var(--ink-1, #1a2431); line-height:1.35;}
+.cmd-band .cb-v.mono{white-space:nowrap; font-weight:500;}
+.cmd-band .cb-sec{display:block; font-size:12px; font-weight:400; color:var(--ink-3, #6b7887); margin-top:4px; line-height:1.3;}
 .cmd-stage{display:grid; grid-template-columns:250px 1fr; gap:34px; align-items:start; margin:2px 0 6px;}
 .cmd-rail{display:flex; flex-direction:column; gap:16px; align-items:center;}
 .cmd-rail .gseal{width:100%;}
-.cmd-rail-status{display:flex; justify-content:center; width:100%;}
+.cmd-rail-status{display:flex; width:100%;}
+.cmd-rail-status .gchip-tight{width:100%; justify-content:flex-start; gap:14px;}
 .gseal{border:2.5px solid var(--t); border-radius:14px; color:var(--t); padding:6px;
   background:color-mix(in srgb, var(--t) 4%, transparent); mix-blend-mode:multiply;
   box-shadow:inset 0 0 0 .5px color-mix(in srgb, var(--t) 30%, transparent);}
@@ -639,7 +640,7 @@ export const REPORT_V5_SEAL_CSS = `
   text-transform:uppercase; margin:0 0 13px; text-wrap:balance;}
 .gv2-cmd .cmd-bl{border-left:3px solid var(--t); padding-left:17px; margin-top:2px;}
 .gv2-cmd .cmd-bl .cmd-bl-k{display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3, #6b7887); font-weight:600; margin-bottom:11px;}
-.gv2-cmd .cmd-bl .cmd-bl-t{margin:0; font-size:16px; line-height:1.5; color:var(--ink-1, #1a2431); text-wrap:pretty; max-width:66ch;}
+.gv2-cmd .cmd-bl .cmd-bl-t{margin:0; font-size:16px; line-height:1.5; color:var(--ink-1, #1a2431); text-wrap:pretty; max-width:none;}
 .cmd-tiles{margin-top:24px;}
 .gchip-tight{display:inline-flex; align-items:center; gap:10px; border:1px solid #e2e7ee; border-radius:8px;
   padding:8px 14px; background:#fbfcfe;}
@@ -651,6 +652,11 @@ export const REPORT_V5_SEAL_CSS = `
 .gchip-tight em[data-e="no"]{color:#6f261c;}
 .gchip-tight em[data-e="nd"]{color:#7c4d08;}
 .gchip-tight em[data-e="na"]{color:#6b7887;}
+/* driver rows — bigger/crisper (Card #599) */
+.cmd-drv-h{font-size:11.5px;}
+.cmd-drv{gap:12px 18px; padding:14px 18px; border:1px solid #dbe1ea; margin-bottom:9px;}
+.cmd-drv-cite{font-size:12.5px; color:var(--accent); font-weight:500;}
+.cmd-drv-req{font-size:14.5px; line-height:1.45;}
 @media (max-width:720px){
   .cmd-band{grid-template-columns:1fr 1fr;}
   .cmd-stage{grid-template-columns:1fr; gap:18px;}
