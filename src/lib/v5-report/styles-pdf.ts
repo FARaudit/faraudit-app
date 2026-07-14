@@ -343,4 +343,16 @@ export const REPORT_PDF_SEAL_CSS: string = `
 .gb-dcgrid .gb-id:last-child:nth-child(odd){grid-column:1 / -1;border-left:none;}
 /* ── True per-section pagination: each numbered section opens a fresh page ── */
 .gb-sec + .gb-sec{break-before:page;}
+/* ── Card #600 — cover-atom spacing tightened to the Design mock (flag-gated; OFF stays loose July-5 base) ── */
+.gb-cv-banner{margin-top:4px; padding-bottom:8px;}
+.gb-cv-sol{margin-top:12px;}
+.gb-cv-sol .cs-title{font-size:23pt; line-height:1.05; margin-top:6px;}
+.gb-bl{margin-top:14px;}
+.gb-bl .bl-k{margin-bottom:6px;}
+.gb-dcgrid{margin-top:13px;}
+.gb-dcgrid .gb-id{padding:8px 15px; gap:4px;}
+.gb-cv-dates{margin-top:11px;}
+.gb-cd{padding:9px 14px;}
+.gb-cv-foot{padding-top:11px;}
+.gb-rep{margin-top:8px;}
 `;
