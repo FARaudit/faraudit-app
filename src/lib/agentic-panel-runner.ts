@@ -6,7 +6,7 @@
 // Mirrors agentic-lenses.runLenses: the sanitized+sandwiched matrix is the byte-identical
 // cached system prefix shared across same-tier calls (prime-then-parallel). NOT wired into
 // the engine and NOT run until Stage 6E proves board-room quality. See the plan, Stage 6.
-import { callStructuredClaude } from "./anthropic-structured";
+import { callStructuredClaude, type StructuredUsage } from "./anthropic-structured";
 import { sanitizePdfText } from "./audit-engine";
 import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
@@ -43,8 +43,17 @@ function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>
   return process.env.AUDIT_PANEL_SONNET || "claude-sonnet-4-6";
 }
 
-const PANELIST_TIMEOUT_MS = Number(process.env.AUDIT_PANELIST_TIMEOUT_MS) || 240_000;
-const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 360_000;
+// PANEL WIRING ARC (card #523, P1c) — timeouts RE-DERIVED for the customer path. The old defaults
+// (panelist 240s, judge 360s) each EXCEEDED the 270s agentic budget (AGENTIC_V3_PRIMARY_BUDGET_MS) and the
+// 300s platform hard-kill, so a slow stage died via withBudget terminal-failed instead of a graceful panel
+// honest-fail. New ceilings bound the WORST-CASE critical path — parallel lenses (gated by the slowest) →
+// serial verifier → serial chief-judge — to 90 + 70 + 60 = 220s < 240s, leaving ≥30s headroom inside the
+// 270s budget and 80s to the platform kill. A stage that hits its ceiling AbortError is caught by the
+// lens Promise.allSettled / verifier Promise.all / judge try-catch and degrades to a panel honest-fail
+// (verified findings default UNVERIFIABLE / judgment null), never a withBudget throw. Env-overridable.
+const PANELIST_TIMEOUT_MS = Number(process.env.AUDIT_PANELIST_TIMEOUT_MS) || 90_000;  // lenses run in parallel → cost = slowest lens
+const VERIFIER_TIMEOUT_MS = Number(process.env.AUDIT_VERIFIER_TIMEOUT_MS) || 70_000;  // serial, after lenses
+const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 60_000;        // serial, after verifier
 // Per-field caps normalize density (Brain's verbosity-bias guard) WITHOUT dropping the
 // contrarian_finding — capping the whole string used to truncate it (review 2026-06-24).
 const CONTRARIAN_CHARS = 500;
@@ -56,6 +65,11 @@ const FIELD_CHARS = 650;
 async function panelCall<T>(p: {
   model: string; system: string; cachedSystemPrefix?: string; userPrompt: string;
   schema: object; maxTokens: number; ceiling: number; timeoutMs: number; label: string; signal?: AbortSignal;
+  // P1b (card #523) — cost visibility: every panel model call must land in the executor's per-run usage tally
+  // (the `label` is stage-distinct — panel:<lens>/panel:verifier/panel:gatekeeper — so aggregation yields
+  // per-stage AND per-model attribution). Without this the entire panel spend (incl. the two opus stages) is
+  // invisible to the COGS ledger.
+  onUsage?: (u: StructuredUsage) => void;
 }): Promise<T> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — panel call cannot proceed");
@@ -65,7 +79,7 @@ async function panelCall<T>(p: {
     const res = await callStructuredClaude({
       apiKey, model: p.model, system: p.system, cachedSystemPrefix: p.cachedSystemPrefix,
       userPrompt: p.userPrompt, schema: p.schema, maxTokens, timeoutMs: p.timeoutMs,
-      label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal,
+      label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal, onUsage: p.onUsage,
     });
     let parsed: T;
     try {
@@ -237,6 +251,9 @@ export async function runPanelJudge(params: {
   unroutedBinding?: string[];
   models?: Partial<Record<PanelTier, string>>;
   signal?: AbortSignal;
+  /** P1b (card #523) — per-run cost sink; the executor passes `(u) => usageCalls.push(u)` so every panel
+   *  model call is priced into the same ledger as the rest of the audit (stage-attributed via the call label). */
+  onUsage?: (u: StructuredUsage) => void;
 }): Promise<PanelResult> {
   const manifest = checkManifest(params.detectedSections);
   if (!manifest.ok) {
@@ -271,7 +288,7 @@ export async function runPanelJudge(params: {
       return panelCall<PanelistOutput>({
         model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: lensPrefix,
         userPrompt: task, schema: PANELIST_SCHEMA, maxTokens: 4_000, ceiling: 8_000,
-        timeoutMs: PANELIST_TIMEOUT_MS, label: passes.length > 1 ? `panel:${p.key}#${idx + 1}` : `panel:${p.key}`, signal: params.signal,
+        timeoutMs: PANELIST_TIMEOUT_MS, label: passes.length > 1 ? `panel:${p.key}#${idx + 1}` : `panel:${p.key}`, signal: params.signal, onUsage: params.onUsage,
       });
     };
     const settledPasses = await Promise.allSettled(passes.map(callPass));
@@ -373,7 +390,7 @@ export async function runPanelJudge(params: {
       panelCall<VerifierOutput>({
         model: modelFor(VERIFIER.tier, params.models), system: VERIFIER.system, // no cachedSystemPrefix — the verifier reads claim+excerpt pairs, NOT the matrix
         userPrompt: `LOGIC-CHECK each claim: does the CONCLUSION follow from its cited excerpt (correct reading + sound rule-application)? ECHO the [ref] in your \`ref\` field; give ONE short evidence sentence:\n\n${securitySandwich("claims", batch.map((c) => `[${c.ref}] (${c.lens}) ${c.text}`).join("\n"))}`,
-        schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: VERIFIER_OUTPUT_CEILING, timeoutMs: JUDGE_TIMEOUT_MS,
+        schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: VERIFIER_OUTPUT_CEILING, timeoutMs: VERIFIER_TIMEOUT_MS, onUsage: params.onUsage,
         label: batches.length > 1 ? `panel:verifier#${bi + 1}/${batches.length}` : "panel:verifier", signal: params.signal,
       }).then((v) => ({ ok: true as const, v })).catch((e) => ({ ok: false as const, e: e instanceof Error ? e.message : String(e) })),
     ));
@@ -418,7 +435,7 @@ export async function runPanelJudge(params: {
     model: modelFor(CHIEF_JUDGE.tier, params.models), system: CHIEF_JUDGE.system,
     userPrompt: `${securitySandwich("panel-findings", `VERIFIED FINDINGS (cite show_stoppers ONLY from these, by ref):\n${findingsBrief}\n\nPER-LENS LEAN (context for the verdict; NOT citable as show-stoppers):\n${leanBrief}${verifierNote}`)}\n\nApply your three rules and emit the final verdict.`,
     schema: CHIEF_JUDGE_SCHEMA, maxTokens: 6_000, ceiling: 12_000, timeoutMs: JUDGE_TIMEOUT_MS,
-    label: "panel:gatekeeper", signal: params.signal,
+    label: "panel:gatekeeper", signal: params.signal, onUsage: params.onUsage,
   }).catch((e) => { throw new Error(`gatekeeper+synthesizer failed: ${e instanceof Error ? e.message : e}`); });
 
   const verifiedRefs = new Set(verifiedFindings.filter((c) => c.state === "VERIFIED").map((c) => c.ref));
