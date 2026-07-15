@@ -4,6 +4,7 @@
 // from supabase-admin if available, falling back to the user's session.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 
 // ─── Tab 7: Corpus ────────────────────────────────────────────────────────
 export interface CorpusStats {
@@ -80,6 +81,8 @@ export interface OpportunityRow {
   source: string;
   status: string;
   recommendation: string | null;
+  /** R3: derived from compliance_json.v3.verdict on the matching audits row. */
+  v3_verdict: string | null;
   compliance_score: number | null;
   bid_no_bid: string | null;
   pdf_url: string | null;
@@ -146,21 +149,25 @@ export async function fetchOpportunities(
   // because the queue row never gets the AI verdict written back to it.
   const { data: completedAudits } = await client
     .from("audits")
-    .select("notice_id, compliance_score, recommendation, completed_at")
+    // R3: also select v3_verdict alias so poleToRecommendation can prefer the
+    // authoritative pole over the stale recommendation column.
+    .select("notice_id, compliance_score, recommendation, v3_verdict:compliance_json->v3->>verdict, completed_at")
     .eq("status", "complete")
     .order("completed_at", { ascending: false });
-  const auditByNotice = new Map<string, { compliance_score: number | null; recommendation: string | null }>();
-  for (const a of (completedAudits || []) as Array<{ notice_id: string | null; compliance_score: number | null; recommendation: string | null }>) {
+  const auditByNotice = new Map<string, { compliance_score: number | null; recommendation: string | null; v3_verdict: string | null }>();
+  for (const a of (completedAudits || []) as Array<{ notice_id: string | null; compliance_score: number | null; recommendation: string | null; v3_verdict: string | null }>) {
     if (!a.notice_id) continue;
     if (auditByNotice.has(a.notice_id)) continue; // first hit wins = latest by completed_at desc
-    auditByNotice.set(a.notice_id, { compliance_score: a.compliance_score, recommendation: a.recommendation });
+    auditByNotice.set(a.notice_id, { compliance_score: a.compliance_score, recommendation: a.recommendation, v3_verdict: (a.v3_verdict as string | null) ?? null });
   }
   return rawRows.map((r) => {
-    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, ...(r as object) } as OpportunityRow;
+    const base = { solicitation_number: null, document_type: null, notice_type: null, incumbent_name: null, risk_level: null, response_deadline: null, in_pipeline: false, watched: false, title_plain: null, is_audited: false, award_ceiling: null, v3_verdict: null, ...(r as object) } as OpportunityRow;
     const matched = base.notice_id ? auditByNotice.get(base.notice_id) : null;
     base.is_audited = !!matched;
     if (matched) {
       if (matched.compliance_score != null) base.compliance_score = matched.compliance_score;
+      // R3: backfill the derived pole value; recommendation column goes inert for new rows.
+      base.v3_verdict = matched.v3_verdict;
       if (matched.recommendation != null) base.recommendation = matched.recommendation;
     }
     return base;
@@ -179,6 +186,8 @@ export interface AuditRow {
   naics_code: string | null;
   set_aside: string | null;
   recommendation: string | null;
+  /** R3: extracted from compliance_json.v3.verdict; use poleToRecommendation(row) to read. */
+  v3_verdict: string | null;
   compliance_score: number | null;
   document_type: string | null;
   audit_source: string | null;
@@ -256,7 +265,9 @@ export async function fetchRecentAudits(
 ): Promise<AuditRow[]> {
   const { data, error } = await client
     .from("audits")
-    .select("id, notice_id, solicitation_number, title, agency, naics_code, set_aside, recommendation, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates, office_leaf, exec_what:compliance_json->executive_summary->>what, exec_verdict:compliance_json->executive_summary->>verdict, exec_factors:compliance_json->executive_summary->>factors")
+    // R3: v3_verdict extracts the authoritative pole (compliance_json.v3.verdict)
+    // so readers can call poleToRecommendation(row) without fetching the full JSON blob.
+    .select("id, notice_id, solicitation_number, title, agency, naics_code, set_aside, recommendation, v3_verdict:compliance_json->v3->>verdict, compliance_score, document_type, audit_source, status, created_at, completed_at, response_deadline, contract_type, outcome, bid_submitted, in_pipeline, prime_sub, verdict_type:compliance_json->verdict->>type, verdict_gates:compliance_json->verdict->gates, office_leaf, exec_what:compliance_json->executive_summary->>what, exec_verdict:compliance_json->executive_summary->>verdict, exec_factors:compliance_json->executive_summary->>factors")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);

@@ -505,7 +505,7 @@ export async function executeAgenticPrimary(
     risks_summary: stopperCount ? `${stopperCount} show-stopper bar(s) drive this verdict.` : "No non-curable bars found.",
     risks_json: { engine: "agentic_v3", show_stoppers: stopperCount },
     compliance_score: null,
-    recommendation,
+    // R3: recommendation column is RETIRED — do NOT write it; pole lives in compliance_json.v3.verdict.
     bid_recommendation: clampToWord(res.decision.reason, 600),
     status: "complete",
     current_stage: "assembly",

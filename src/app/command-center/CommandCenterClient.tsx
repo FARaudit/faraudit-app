@@ -19,6 +19,7 @@ import type {
   AuditRow,
 } from "@/lib/bd-os/queries";
 import { useTheme } from "@/lib/theme";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 import "./command-center.css";
 
 /* ─── types ──────────────────────────────────────────── */
@@ -200,6 +201,9 @@ function generateInsight(o: OpportunityRow): {
   rest: string;
 } {
   const u = urgencyClass(o);
+  // R3: derive display label from authoritative pole.
+  const _rec = poleToRecommendation(o);
+  const _recDisplay = _rec !== "REVIEW" ? _rec : null;
   if (
     (o.compliance_score ?? 100) < 40 ||
     o.bid_no_bid === "no-bid" ||
@@ -209,7 +213,7 @@ function generateInsight(o: OpportunityRow): {
       variant: "alert",
       lead: "Disqualifying clause detected.",
       rest:
-        o.recommendation?.trim() ||
+        _recDisplay ||
         "Review the audit report before committing — high compliance risk.",
     };
   }
@@ -218,7 +222,7 @@ function generateInsight(o: OpportunityRow): {
       variant: "warn",
       lead: "Watch item.",
       rest:
-        o.recommendation?.trim() ||
+        _recDisplay ||
         `Compliance score ${o.compliance_score ?? "?"} — manual review recommended before bid.`,
     };
   }
@@ -227,7 +231,7 @@ function generateInsight(o: OpportunityRow): {
       variant: "win",
       lead: "Strong fit.",
       rest:
-        o.recommendation?.trim() ||
+        _recDisplay ||
         `${o.set_aside ?? "Open"} · ${o.naics_code ?? "NAICS"} matches your past performance.`,
     };
   }
@@ -235,7 +239,7 @@ function generateInsight(o: OpportunityRow): {
     variant: "info",
     lead: "Shape the requirement.",
     rest:
-      o.recommendation?.trim() ||
+      _recDisplay ||
       `${o.document_type ?? "Notice"} · ${o.naics_code ?? "NAICS"} · ${o.set_aside ?? "Open"} — review solicitation.`,
   };
 }
@@ -1277,7 +1281,8 @@ export function CommandCenterClient({
                           {(a.status || "in progress").toUpperCase()}
                         </span>
                         <span className="val">
-                          {a.recommendation || `Score ${a.compliance_score ?? "—"}`}
+                          {/* R3: derive from authoritative pole */}
+                          {(() => { const _r = poleToRecommendation(a); return _r !== "REVIEW" ? _r : null; })() || `Score ${a.compliance_score ?? "—"}`}
                         </span>
                       </div>
                     </div>
@@ -1397,7 +1402,8 @@ export function CommandCenterClient({
                           </div>
                           <div className="mt">
                             {new Date(a.created_at).toLocaleDateString()} ·{" "}
-                            {a.recommendation ?? a.status}
+                            {/* R3: derive from authoritative pole */}
+                            {(() => { const _r = poleToRecommendation(a); return _r !== "REVIEW" ? _r : null; })() ?? a.status}
                           </div>
                         </div>
                         <span className={`sc ${tone}`}>{sc}</span>

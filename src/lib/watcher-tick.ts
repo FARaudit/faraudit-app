@@ -25,6 +25,7 @@ import { type PdfSource } from "@/lib/audit-engine"; // type-only (erased) — V
 import { executeAudit, type AuditExecutionInput } from "@/lib/audit-executor";
 import { buildBidderProfileFromCapability } from "@/lib/audit-bidder-profile";
 import { sendWatcherPostedEmail } from "@/lib/email/watcher-posted";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 
 const PDF_FILES_API_THRESHOLD_BYTES = 20_000_000;
 const MAX_TICK_PER_RUN = 25;
@@ -415,7 +416,8 @@ export async function runWatcherTick(opts: WatcherTickOptions = {}): Promise<Wat
         .select("recommendation, compliance_score, compliance_json, risks_json")
         .eq("id", newAuditId)
         .single();
-      const recommendation = (persisted?.recommendation as string | null) ?? null;
+      // R3: derive from authoritative pole; falls back to stale column for pre-R3 rows.
+      const recommendation = poleToRecommendation({ compliance_json: persisted?.compliance_json as Record<string, unknown> | null, recommendation: persisted?.recommendation as string | null });
       const complianceScore = (persisted?.compliance_score as number | null) ?? null;
       const cjForEmail = (persisted?.compliance_json ?? {}) as Record<string, unknown>;
       // Defense-in-depth false-green guard, shared by the in-app notification AND the

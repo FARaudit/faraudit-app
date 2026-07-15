@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,6 +29,7 @@ type WatchedRow = {
 type Verdict = {
   score: number | null;
   scoreConfidence: string | null;
+  /** R3: derived from compliance_json.v3.verdict via poleToRecommendation(). */
   recommendation: string | null;
 };
 
@@ -57,6 +59,8 @@ export async function GET() {
   if (auditedIds.length > 0) {
     const { data: auditRows } = await supabase
       .from("audits")
+      // R3: keep compliance_json (needed for poleToRecommendation + scoreConfidence);
+      // recommendation column still fetched as fallback for pre-R3 rows.
       .select("id, compliance_score, recommendation, compliance_json")
       .in("id", auditedIds);
     for (const a of auditRows ?? []) {
@@ -64,7 +68,8 @@ export async function GET() {
       verdicts.set(a.id as string, {
         score: (a.compliance_score as number | null) ?? null,
         scoreConfidence: (comp.score_confidence as string | null) ?? null,
-        recommendation: (a.recommendation as string | null) ?? null
+        // R3: derive from authoritative pole; falls back to stale column for old rows.
+        recommendation: poleToRecommendation({ compliance_json: a.compliance_json as Record<string, unknown> | null, recommendation: a.recommendation as string | null })
       });
     }
   }
