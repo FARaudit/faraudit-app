@@ -658,6 +658,11 @@ const SELF_CERT_BENIGN_TOKENS = new Set<string>([
   // benign regulatory-reference tokens (a self-cert clause cites its authority)
   "far", "dfars", "cfr", "clause", "clauses", "provision", "provisions", "paragraph", "paragraphs", "section",
   "sections", "accordance", "iaw", "herein", "hereof", "part", "subpart", "usc", "far's",
+  // benign URL / DOMAIN artifacts (Brain card #518 R1) — a SAM-registration sentence carries its portal address
+  // ("… active registration in the System for Award Management (SAM) database at http://www.sam.gov"); a URL is NEVER
+  // an eligibility bar, so these are the safe stoplist direction. URL/DOMAIN ARTIFACTS ONLY — 'at' and generic
+  // prepositions are handled as grammar stopwords above (never added as content-vouching tokens; wrong fail direction).
+  "http", "https", "www", "gov", "mil", "url", "website", "portal", "database", "sam.gov", "sam.gov.",
   // self-cert SUBSTANCE vocabulary (size · set-aside · SAM · reps-certs · eligibility)
   "standard", "standards", "size", "small", "set", "aside", "setaside", "women", "owned", "woman", "veteran",
   "veterans", "service", "disabled", "economically", "disadvantaged", "hubzone", "wosb", "edwosb", "sdvosb", "vosb",

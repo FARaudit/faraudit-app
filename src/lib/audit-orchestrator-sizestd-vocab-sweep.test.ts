@@ -193,6 +193,23 @@ classEscalate("affil-identity",   "The offeror must have no identity of interest
 classEscalate("affil-sizestd",    "Affiliation with any other concern will be considered in applying the small business size standard.");
 classEscalate("affil-coupled-sa", "This is a WOSB set-aside; the offeror must not be affiliated with a large business.", SET_ASIDE_META);
 
+// ── URL-BOILERPLATE (Brain card #518) — the production seq-1 SAM sentence carries a trailing portal URL
+//    ("… (sam) database at http://www.sam.gov"); URL/domain artifacts are benign, so the SAM registration DEMOTES.
+//    GUARDRAIL: a URL adjacent to a REAL third-party bar must NOT launder it — the bar noun stays content → ESCALATE. ──
+console.log("── #518 SAM-registration WITH portal URL (must DEMOTE) ──");
+classDemote("sam-url-real",   "registrations: offerors shall have and shall maintain an active registration in the system for award management (sam) database at http://www.sam.gov");
+classDemote("sam-url-eligtail","gov to be eligible for a government contract award.");
+// NOTE (card #518 R1 scope): only URL/DOMAIN artifacts entered the allowlist. A sentence with OTHER unlisted benign
+// boilerplate ("… see https://… for details") still ESCALATES (fail-safe, not a wrong committal) — logged residual,
+// tuned only if it appears in a real notice body. This probe stays within the ruled URL-artifact scope:
+classDemote("sam-active-url", "Offerors must maintain an active registration in SAM.gov at http://www.sam.gov.");
+console.log("── #518 URL-adjacent REAL bars (must ESCALATE — URL must not launder) ──");
+classEscalate("url-qpl",       "This is a WOSB set-aside; offerors must hold a QPL listing, see https://qpldocs.dla.mil.", SET_ASIDE_META);
+classEscalate("url-itar",      "This is a WOSB set-aside; ITAR registration is required at https://www.pmddtc.state.gov.", SET_ASIDE_META);
+classEscalate("url-clearance", "This is a WOSB set-aside; a facility clearance must be verified at https://www.dcsa.mil.", SET_ASIDE_META);
+classEscalate("url-cmmc",      "This is a WOSB set-aside; offerors must possess CMMC Level 2, details at http://www.acq.osd.mil.", SET_ASIDE_META);
+classEscalate("url-sam+ts",    "Offerors must be registered in SAM at https://www.sam.gov and hold a Top Secret clearance.");
+
 // ── SUPERSET property: every §509 BARE size standard still DEMOTES under the class predicate ──
 console.log("── #516 superset check — §509 bare size standards still DEMOTE ──");
 classDemote("super-dollar",   "The small business size standard is no greater than $13 million.");
