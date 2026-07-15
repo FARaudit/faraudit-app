@@ -21,7 +21,7 @@ import { NOTICE_BODY_DOC_NAME } from "./agentic-executor";
 import { proceduralCoveragePass, type ProceduralExtractor } from "./audit-procedural-coverage";
 import { repairClippedExcerpts } from "./audit-excerpt-repair";
 import { SITE_VISIT_CONCLUDED_RE, BOA_HOLDER_ONLY_EMIT_RE } from "./audit-site-visit-patterns";
-import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
+import { deriveVerdict, disposeFinding, applyCautionFloor, applyTemporalConflict, applyPreconditionOvertypeFloor, applyRoutineClauseOvertypeGuard, applyAwardBasisOvertypeGuard, setAsideOvertypeGuardOpts, applyStructuralBarWhitelist, applySetAsideFirmStatusGate, applyNmrSingleEmitter, applyNmrFirmStatusGate, applyClauseSemanticsGuard, applyOrEqualCarveout, applyEligibilityAuthorityAllowlist, applyInquiryDeadlineBenignGuard, detectSetAsideConflict, applySetAsideStructuralDowngrade, emitSetAsideNoticeFindings, mergeSetAsideNoticeFindings, EngineInvariantError, type Decision } from "./audit-decide";
 import { applyKeyfactDetector } from "./audit-keyfact-detector";
 import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type ReasonCaller, type EntailmentCaller, type JudgmentCost, zeroCost } from "./audit-judgment-layer";
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
@@ -1714,6 +1714,17 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   //      is an UNSTATED profile attribute — keep the bar so it routes to NEEDS_HUMAN_REVIEW ("confirm holder
   //      status"), never a silent caution, never INELIGIBLE (that needs a closed-world profile — a future path).
   findings = applyEligibilityAuthorityAllowlist(findings, { enabled: process.env.AUDIT_ELIGIBILITY_AUTHORITY_ALLOWLIST === "true", boaIdiqKeep: process.env.AUDIT_BOA_IDIQ_HOLDER_KEEP === "true" });
+
+  // P4.4-quater — INQUIRY-DEADLINE BENIGN GUARD (Brain card 520, R1), default-OFF (Rule 61, === "true"). A lens
+  //      mis-types an information-exchange milestone (questions/inquiries/RFI-submission window, Q&A answer-posting
+  //      date) as no_one_can_move — a routine schedule fact read as a universal impossibility → false NHR via
+  //      Fork-2's unmarkedUniversalClaim (live driver, seq-1 run 5d0477e7). SHAPE allowlist: demote a positively
+  //      information-exchange-shaped no_one_can_move finding → bidder_controls (informational). HARD BOUNDARY:
+  //      a participation-prerequisite deadline (mandatory site visit / pre-proposal conference registration,
+  //      vehicle/BOA/IDIQ enrollment/on-ramp) or a real offer-submission deadline STAYS a universal-path candidate
+  //      (veto). Ambiguity → escalate. Runs after the sibling over-type guards; deriveVerdict untouched. Flag off ⇒
+  //      findings pass through byte-identical.
+  findings = applyInquiryDeadlineBenignGuard(findings, { enabled: process.env.AUDIT_INQUIRY_DEADLINE_BENIGN === "true" });
 
   // P4.5 — DETERMINISTIC CAUTION-FLOOR (Brain card 75-R2 / 78-R1), default-OFF (Rule 61). When enabled, it
   //      marks caution-archetype findings (quantified personnel-quals / professional cert / QPL-QML / or-equal)
