@@ -84,6 +84,21 @@ const eq = (label: string, got: unknown, want: unknown) => {
   const withBar = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindings: [panelBar] });
   eq("merge-8 · grounded panel bar reaches the SOLE authority → verdict NO LONGER plain BID", withBar.decision.verdict !== "BID", true);
 
+  // ── 2c ABSENCE-GROUNDING GATE (flag AUDIT_ABSENCE_GROUNDING_GATE) — declaration ≠ presence ──
+  // A finding whose requirement falsely asserts "no Section B" while Section B is present in the package.
+  const panelFalseAbsence: TypedFinding = {
+    id: "panel:proposal:R2", requirement: "The package contains no Section B pricing schedule — coverage is incomplete.",
+    citation: "§B", excerpt: "SECTION B - SUPPLIES AND PRICES", kind: "other", controllability: "bidder_controls", grounded: true, lens: "Proposal",
+  };
+  // flag OFF (default) — the contradicted absence finding SURVIVES (gate inert, byte-identical)
+  const absOff = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindings: [panelFalseAbsence] });
+  eq("2c-1 · absence gate OFF → false 'no Section B' finding SURVIVES", absOff.findings.some((f) => f.id === "panel:proposal:R2"), true);
+  // flag ON — dropped deterministically (Section B is present)
+  process.env.AUDIT_ABSENCE_GROUNDING_GATE = "true";
+  const absOn = await runAgenticAudit({ ctx, experts, callModel: stub, panelFindings: [panelFalseAbsence] });
+  delete process.env.AUDIT_ABSENCE_GROUNDING_GATE;
+  eq("2c-2 · absence gate ON → false 'no Section B' finding DROPPED", absOn.findings.some((f) => f.id === "panel:proposal:R2"), false);
+
   console.log(`\n──────────────  ${pass} pass · ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);
 })();

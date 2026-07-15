@@ -27,6 +27,7 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
+import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
@@ -1837,6 +1838,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     findings = [...findings, ...emitSelfDeterminableCaveats(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside)];
   } else if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
     findings = [...findings, ...emitSizeStandardCaveats(ctx.fullSource, findings, ctx.noticeBodyText)];
+  }
+  // 2c (card #523) — DETERMINISTIC ABSENCE-GROUNDING over the FULL finding set (v3 lens findings + any merged panel
+  // findings), the v3-side half of Brain's declaration ≠ presence condition. DROP a finding whose requirement asserts
+  // the ABSENCE of a checkable element (UCF section / clause / named artifact) the assembled package DEMONSTRABLY
+  // CONTAINS — a producer SAYING "no Section B" is not evidence when the deterministic scan finds Section B present. A
+  // genuine-absence finding (element truly missing) is untouched → survives. Flag AUDIT_ABSENCE_GROUNDING_GATE
+  // default-OFF ⇒ byte-identical. Runs LAST (after every re-typing guard/emitter), right before deriveVerdict.
+  if (process.env.AUDIT_ABSENCE_GROUNDING_GATE === "true") {
+    const absMarkers = scanPackageMarkers(ctx.fullSource);
+    const beforeAbs = findings.length;
+    findings = findings.filter((f) => !absenceClaimContradicted(f.requirement ?? "", absMarkers));
+    if (findings.length < beforeAbs) console.log(`[orchestrator] absence-grounding: dropped ${beforeAbs - findings.length} contradicted absence finding(s) — asserted absence of an element the package contains`);
   }
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {

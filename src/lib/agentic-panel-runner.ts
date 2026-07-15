@@ -14,6 +14,7 @@ import {
 } from "./agentic-panel";
 import { assembleLensPasses, excerptInSource, LENS_SECTIONS, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
 import { panelFindingsToTyped } from "./panel-findings-bridge";
+import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import type { TypedFinding } from "./audit-findings";
 
 // ⚠ NOT YET WIRED: this flag currently GATES NOTHING — runPanelJudge has no production caller
@@ -382,7 +383,25 @@ export async function runPanelJudge(params: {
   for (const c of claims) {
     if (!c.grounded) stateByRef.set(c.ref, { state: "REFUTED", evidence: "excerpt not found in the lens's assigned source (fabricated/paraphrased grounding)" });
   }
-  const groundedClaims = claims.filter((c) => c.grounded);
+  // 2c (card #523) — DETERMINISTIC ABSENCE-GROUNDING (Brain condition 2026-07-15: declaration ≠ presence). A claim
+  // asserting the ABSENCE of a checkable element (UCF section / clause / named artifact) the package DEMONSTRABLY
+  // CONTAINS is REFUTED here, deterministically, BEFORE + independent of the model verifier — a lens SAYING "no
+  // Section B" is not evidence when the scan finds Section B present (the seq-1 bug). A GENUINE-absence claim (the
+  // element is truly missing) is left untouched → it survives to the verifier + judge. Package markers use the panel's
+  // own detected-section set (from buildPanelInputs over the real fullSource) + a clause/artifact scan of the routed
+  // source. Structural REFUTED (rank 0) can never be upgraded by the verifier overlay below.
+  const pkgMarkers = scanPackageMarkers(Object.values(params.sectionText).join("\n"), { sections: params.detectedSections });
+  let absenceRefuted = 0;
+  for (const c of claims) {
+    if (stateByRef.get(c.ref)?.state === "REFUTED") continue;
+    if (absenceClaimContradicted(c.text, pkgMarkers)) {
+      stateByRef.set(c.ref, { state: "REFUTED", evidence: "absence claim contradicted by deterministic package scan — the referenced element is present in the package (declaration ≠ presence)" });
+      absenceRefuted++;
+    }
+  }
+  if (absenceRefuted) console.log(`[panel] absence-grounding: ${absenceRefuted} claim(s) REFUTED — asserted absence of an element the package contains`);
+  // Exclude both ungrounded AND absence-contradicted claims from the (paid) verifier batch — their state is already sealed.
+  const groundedClaims = claims.filter((c) => c.grounded && stateByRef.get(c.ref)?.state !== "REFUTED");
 
   let verifier: VerifierOutput | null = null;
   let verifierFailed = false;
