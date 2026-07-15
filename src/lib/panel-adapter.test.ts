@@ -21,8 +21,9 @@ const SRC = [
   "The Offeror shall demonstrate successful delivery of personnel to at least one position.",
 ].join("\n");
 
-console.log("\n── P1a · sectionText decomposition ──");
+console.log("\n── P1a · sectionText decomposition (UCF path) ──");
 const pi = buildPanelInputs(SRC);
+assert(pi.documentClass === "ucf", `UCF §B/L/M headers → documentClass ucf (got ${pi.documentClass})`);
 assert(pi.detectedSections.has("L"), `§L detected (got ${[...pi.detectedSections].join(",")})`);
 assert(pi.detectedSections.has("M"), "§M detected");
 assert(pi.detectedSections.has("B"), "§B detected");
@@ -36,9 +37,11 @@ assert(!pi.unroutedBinding.some((l) => /questions must be submitted/i.test(l)), 
 
 console.log("\n── P1a · degenerate inputs (no crash, safe empties) ──");
 const empty = buildPanelInputs("");
-assert(empty.detectedSections.size === 0 && empty.unroutedBinding.length === 0, "empty source → empty inputs, no throw");
+assert(empty.documentClass === "commercial" && empty.detectedSections.size === 0 && empty.unroutedBinding.length === 0, "empty source → commercial class, empty inputs, no phantom sections, no throw");
+assert(empty.manifest.ok === false, "empty source → biddable-content gate !ok (panel suppressed)");
 const noHeaders = buildPanelInputs("The contractor shall furnish widgets. Delivery is required within 30 days.");
-assert(noHeaders.unroutedBinding.length >= 1, "headerless binding source → binding lines all unrouted (never lost)");
+assert(noHeaders.documentClass === "commercial", "headerless non-biddable source → commercial class");
+assert(noHeaders.manifest.ok === false, "headerless non-biddable source → gate !ok (no pricing/eval/submission → panel won't fire)");
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

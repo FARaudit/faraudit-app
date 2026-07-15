@@ -9,15 +9,22 @@
 // (`agenticManifestComplete` → deriveVerdict). The panel's own coverage floors are RETIRED, not wired.
 import { detectSections } from "./section-boundary-detector";
 import type { ExtractedDocument } from "./pdf-text-extractor";
+import { checkManifest, type ManifestResult } from "./agentic-panel";
+import { detectDocumentClass, checkBiddableContent, routeCommercialSections, FALLBACK_BUNDLE_KEYS, type DocumentClass } from "./panel-doc-class";
 
 export interface PanelInputs {
-  /** UCF key ("L","M",…) → that section's source text (from detectSections). */
+  /** UCF key ("L","M",…) → that section's source text. UCF path: from detectSections; commercial path: content-routed
+   *  (routeCommercialSections) or the whole-source single-bundle fallback. */
   sectionText: Record<string, string>;
-  /** the set of UCF keys detected in source — feeds the panel manifest gate ONLY (never the verdict). */
+  /** the set of UCF keys populated in sectionText — feeds the panel manifest gate ONLY (never the verdict). */
   detectedSections: Set<string>;
-  /** binding-obligation lines the detector routed to NO section — surfaced so the panel never loses
-   *  binding content (verifier/narrative visibility); does not affect the pole. */
+  /** binding-obligation lines routed to NO section — surfaced so the panel never loses binding content. */
   unroutedBinding: string[];
+  // card #525 (Brain ruling) — CLASS-AWARE FIRING. `documentClass` is the dispatch; `manifest` is the class-appropriate
+  // FIRING GATE (UCF → checkManifest over detected UCF sections; commercial → checkBiddableContent over source). The
+  // runner fires iff `manifest.ok`. Honest-fail preserved on both paths (genuinely incomplete → !ok, no fabrication).
+  documentClass: DocumentClass;
+  manifest: ManifestResult;
 }
 
 /** Local string→ExtractedDocument shim (mirrors agentic-sections.asExtractedDoc — kept local so the adapter
@@ -31,29 +38,65 @@ function asExtractedDoc(text: string): ExtractedDocument {
 // (binding content that landed in no section). Not a bar detector; purely a salience filter for visibility.
 const BINDING_LINE_RE = /\b(?:shall|must|will\s+(?:be\s+)?required|furnish|install|provide|submit|deliver|require[sd]?|mandatory|no\s+later\s+than)\b/i;
 
-/** P1a — build the panel's inputs from the executor's assembled fullSource. Deterministic; safe on any input
- *  (a source with no detectable UCF headers yields an empty sectionText + the whole binding set as unrouted). */
-export function buildPanelInputs(fullSource: string): PanelInputs {
-  const src = fullSource ?? "";
-  const bag = detectSections(asExtractedDoc(src));
-  const sectionText: Record<string, string> = {};
-  for (const [key, sec] of Object.entries(bag.sections)) {
-    if (sec?.text && sec.text.trim().length > 0) sectionText[key] = sec.text;
-  }
-  const detectedSections = new Set(Object.keys(sectionText));
-
-  // unroutedBinding — binding lines present in fullSource but in NONE of the routed section texts. Conservative
-  // substring containment (a line is "routed" if it appears verbatim inside any section text).
-  const routed = Object.values(sectionText);
+/** binding lines present in fullSource but in NONE of the routed section texts (conservative substring containment). */
+function computeUnrouted(src: string, routedTexts: string[]): string[] {
   const seen = new Set<string>();
-  const unroutedBinding: string[] = [];
+  const out: string[] = [];
   for (const raw of src.split("\n")) {
     const line = raw.trim();
     if (line.length < 12 || !BINDING_LINE_RE.test(line)) continue;
     if (seen.has(line)) continue;
-    if (routed.some((t) => t.includes(line))) continue;
+    if (routedTexts.some((t) => t.includes(line))) continue;
     seen.add(line);
-    unroutedBinding.push(line);
+    out.push(line);
   }
-  return { sectionText, detectedSections, unroutedBinding };
+  return out;
+}
+
+/** P1a + card #525 (class-aware) — build the panel's inputs from the executor's assembled fullSource. Dispatches on
+ *  DOCUMENT CLASS: a UCF §A–M solicitation uses the boundary detector + checkManifest gate (unchanged); a commercial/
+ *  non-UCF (SF-1449) package uses content-routed sections + the biddable-content gate, with a whole-source single-bundle
+ *  fallback when content routing can't place the core L/M content. Deterministic; safe on any input. */
+export function buildPanelInputs(fullSource: string): PanelInputs {
+  const src = fullSource ?? "";
+  const bag = detectSections(asExtractedDoc(src));
+  const ucfSectionText: Record<string, string> = {};
+  for (const [key, sec] of Object.entries(bag.sections)) {
+    if (sec?.text && sec.text.trim().length > 0) ucfSectionText[key] = sec.text;
+  }
+
+  // ── UCF path — a genuine §A–M solicitation (canonical uppercase headers). Boundary-detector sections +
+  //    checkManifest gate, UNCHANGED (Brain ruling). ──
+  if (detectDocumentClass(src) === "ucf") {
+    const detectedSections = new Set(Object.keys(ucfSectionText));
+    return {
+      sectionText: ucfSectionText,
+      detectedSections,
+      unroutedBinding: computeUnrouted(src, Object.values(ucfSectionText)),
+      documentClass: "ucf",
+      manifest: checkManifest(detectedSections),
+    };
+  }
+
+  // ── commercial / non-UCF path — biddable-content gate + content routing. Any sections the boundary detector DID
+  //    find (e.g. mixed-case "Section L/M" labels) are OVERLAID on the routed base as higher-quality slices. ──
+  const manifest = checkBiddableContent(src);
+  const routed = routeCommercialSections(src);
+  // whole-source single-bundle fallback when content routing can't place the core L/M content (assembleLensPasses
+  // dedupes identical section text across a lens's assigned keys, so every lens reads the full source ONCE). A
+  // degenerate/empty source populates NO sections (no phantom keys) — the biddable-content gate already !ok.
+  const base = routed.routed
+    ? routed.sectionText
+    : src.trim().length > 0
+      ? Object.fromEntries(FALLBACK_BUNDLE_KEYS.map((k) => [k, src]))
+      : {};
+  const sectionText = { ...base, ...ucfSectionText };
+  const detectedSections = new Set(Object.keys(sectionText));
+  return {
+    sectionText,
+    detectedSections,
+    unroutedBinding: computeUnrouted(src, Object.values(sectionText)),
+    documentClass: "commercial",
+    manifest,
+  };
 }

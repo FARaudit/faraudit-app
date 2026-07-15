@@ -263,8 +263,12 @@ export async function runPanelJudge(params: {
   /** P1b (card #523) — per-run cost sink; the executor passes `(u) => usageCalls.push(u)` so every panel
    *  model call is priced into the same ledger as the rest of the audit (stage-attributed via the call label). */
   onUsage?: (u: StructuredUsage) => void;
+  /** card #525 (class-aware firing) — the class-appropriate FIRING GATE from buildPanelInputs (UCF → checkManifest;
+   *  commercial → checkBiddableContent). When supplied, it REPLACES the runner's own checkManifest so the panel fires
+   *  correctly on non-UCF buys. Absent ⇒ checkManifest(detectedSections) (byte-identical for existing callers/tests). */
+  manifest?: ManifestResult;
 }): Promise<PanelResult> {
-  const manifest = checkManifest(params.detectedSections);
+  const manifest = params.manifest ?? checkManifest(params.detectedSections);
   if (!manifest.ok) {
     return { fired: false, manifest, panelists: [], verifier: null, judgment: null, typedFindings: [] };
   }

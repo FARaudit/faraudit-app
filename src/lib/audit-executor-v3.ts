@@ -402,10 +402,11 @@ export async function executeAgenticPrimary(
       sectionText: panelInputs.sectionText,
       detectedSections: panelInputs.detectedSections,
       unroutedBinding: panelInputs.unroutedBinding,
+      manifest: panelInputs.manifest,   // card #525 — class-aware firing gate (UCF checkManifest / commercial biddable-content)
       signal,
       onUsage: (u) => usageCalls.push(u),
     });
-    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "manifest gate" : "no verdict"}) → 0 findings`}`);
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
   }
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
