@@ -34,7 +34,7 @@ export type VerifierState = "VERIFIED" | "UNVERIFIABLE" | "REFUTED";
 //       do-the-work shape demotes. Position-checked SHAPE tests only, NO vocab blocklists.
 // PROFILE-BAR takes PRIORITY: a credential wrapped in an action verb ("submit proof of NADCAP accreditation") is
 // still HOLD-substance → (a). Consistency: SAM registration = (b) (aligned with #516 self-determinable doctrine).
-export type GateShape = "profile_bar" | "do_the_work" | "neither";
+export type GateShape = "profile_bar" | "do_the_work" | "set_aside_caution" | "neither";
 
 // Unambiguous DO-THE-WORK FORMS that carry credential-ish nouns but are fill-out-and-submit ACTIONS — checked
 // FIRST so the profile-bar credential nouns don't trip on them. Reps & certs (52.212-3) is the canonical case.
@@ -50,21 +50,49 @@ const ACQUIRABLE_CERT: RegExp[] = [
   /\b(?:become|obtain|acquire|achieve|attain|get|secure)\b[^.\n]{0,45}\b(?:certif(?:ied|ication)|accredit(?:ed|ation))\w*\b[^.\n]{0,30}\b(?:before|prior\s+to|by|no\s+later\s+than)\b[^.\n]{0,25}\b(?:award|performance|start|contract|commenc)/i,
 ];
 
-// (a) HOLD/BE a credential-status — the SUBSTANCE is a thing possessed/conferred, not an action.
+// (a) HOLD/BE a credential-status — the SUBSTANCE is a thing possessed/conferred, not an action. Checked BEFORE
+// set-aside, so a set-aside COUPLED to a genuine third-party bar (clearance / QPL / ITAR / site-visit / vehicle
+// holder / affiliation) escalates here (card #528 R2). NOTE: bare socioeconomic set-aside eligibility is NOT here
+// — it is SET_ASIDE_SHAPE (→ cautionFloor). Vehicle/incumbent holders + affiliation ARE here.
 const PROFILE_BAR_SHAPE: RegExp[] = [
   /\b(?:must|shall|required to|only\s+(?:firms?|offerors?|contractors?|entities|bidders?)\s+)?(?:hold(?:ing)?|possess(?:ing)?|already\s+have|currently\s+have|maintain\s+possession)\b/i,
   /\b(?:must|shall)\s+be\s+(?:an?|the)\s+(?:certified|accredited|cleared|licensed|listed|qualified\s+(?:source|holder|supplier)|holder|member|incumbent|eligible\s+(?:holder|concern|entity))\b/i,
   /\bletters?\s+of\s+(?:recommendation|reference|endorsement)\b|\b(?:endorsement|recommendation|attestation|reference)s?\s+from\s+[A-Za-z]/i,
   /\bbackground\s+(?:check|investigation|screening)\b|\b(?:security|facility|secret|top[- ]secret|interim|dod)\b[^.\n]{0,15}\bclearance\b|\bclearance\s+(?:level|eligibility)\b|\bfavorabl[ey]\s+adjudicat/i,
   /\b(?:NADCAP|AS\s?9100|ISO\s?900\d|ISO\/IEC|CMMI\s+(?:level|maturity)|QPL|QML|qualified\s+products?\s+list|approved\s+source\s+list)\b/i,
-  /\bset-aside\s+(?:status|category|eligibility)\b|\b(?:8\(a\)|HUBZone|SDVOSB|VOSB|WOSB|EDWOSB|SDB)\b[^.\n]{0,40}(?:certif|status|eligib|holder)/i,
-  /\b(?:certified|accredited|licensed)\b[^.\n]{0,25}\bholder\b|\bin\s+good\s+standing\b|\b(?:SBA|8\(a\))[- ]certified\b/i,
-  /\bGSA\s+(?:schedule|MAS|multiple\s+award\s+schedule)\b|\bschedule\s+contract\s+holder\b|\bcontract\s+holder\s+to\s+(?:compete|respond)/i,
+  // R2 genuine third-party bars that COUPLE-escalate a set-aside: affiliation/ostensible-sub (#517 — NOT self-determinable),
+  // ITAR/export-control, mandatory site visit / pre-proposal conference.
+  /\b(?:affiliation|ostensible\s+subcontractor|affiliate\s+(?:rule|concern)|undue\s+reliance)\b/i,
+  /\bITAR\b|\bexport[- ]control(?:led)?\b|\bDDTC\b|\b22\s?CFR\s?12[0-9]/i,
+  /\b(?:mandatory|required)\s+(?:pre[- ]proposal\s+|pre[- ]bid\s+)?(?:site\s+visit|conference)\b|\b(?:site\s+visit|pre[- ]proposal\s+conference)\s+(?:is\s+)?(?:mandatory|required)\b|\battendance\s+(?:at|is)\b[^.\n]{0,25}\b(?:mandatory|required)\b/i,
+  /\bGSA\s+(?:schedule|MAS|multiple\s+award\s+schedule)\b|\bschedule\s+contract\s+holder\b|\bcontract\s+holder\s+to\s+(?:compete|respond)|\bincumbent\s+\w+\s+holder\b/i,
   /\b(?:proof|evidence|certificate|documentation|copy)\s+of\s+(?:[\w'’.-]+\s+){0,6}?(?:accreditation|certification|certificate|clearance|licens\w*|professional\s+(?:qualification|registration|license)|membership|listing|registration\s+as)\b/i,
   // possessive + held-credential noun ("your company's certification", "its facility clearance") → HOLD-substance.
   // Bare "the" is EXCLUDED (the reps-and-certs override handles "the representations and certifications").
   /\b(?:your|our|its|their|his|her)\s+(?:[\w'’]+\s+){0,2}(?:accreditation|certification|clearance|licensure|qualification|membership|listing|credential)s?\b/i,
 ];
+
+// (a2) BARE socioeconomic / set-aside / size-standard eligibility (card #528 R1) — under a null/unknown firm profile,
+// this is a VERIFY-ELIGIBILITY caution (tristate eligible=null), NOT a fail-closed bar — aligning the bridge with
+// #516/#517. Checked AFTER PROFILE_BAR, so a set-aside coupled to a genuine bar (above) still escalates. Affiliation
+// is deliberately NOT here (it lives in PROFILE_BAR — #517: not self-determinable).
+const SET_ASIDE_SHAPE: RegExp[] = [
+  /\b(?:WOSB|EDWOSB|HUBZone|HUB\s?Zone|SDVOSB|VOSB|SDVO|SDB)\b|\b8\s?\(\s?a\s?\)/i,
+  /\b(?:women[- ]owned|service[- ]disabled\s+veteran[- ]owned|veteran[- ]owned|small\s+disadvantaged|economically\s+disadvantaged)\b/i,
+  /\b(?:total\s+)?small\s+business\s+set[- ]aside\b|\bset[- ]aside\s+for\s+(?:small|women|veteran|hubzone|8\(a\))/i,
+  /\bNAICS\b[^.\n]{0,45}\bsize\s+standard\b|\bsize\s+standard\b|\bsize\s+status\b|\bsmall\s+business\s+(?:size\s+)?(?:standard|status|eligib)/i,
+];
+
+/** Extract the set-aside program key (for requiredAttribute → the tristate's eligible=null caution). */
+function setAsideAttribute(r: string): string {
+  const m = /\b(WOSB|EDWOSB|HUBZone|SDVOSB|VOSB|SDB|8\s?\(\s?a\s?\))\b/i.exec(r);
+  if (m) return m[1].toLowerCase().replace(/\s/g, "");
+  if (/\bwomen[- ]owned\b/i.test(r)) return "wosb";
+  if (/\bservice[- ]disabled\b/i.test(r)) return "sdvosb";
+  if (/\bveteran[- ]owned\b/i.test(r)) return "vosb";
+  if (/\bsize\s+standard\b|\bNAICS\b/i.test(r)) return "size_standard";
+  return "set_aside_eligibility";
+}
 
 // (b) DO an in-window action — checked only when NO profile-bar substance is present.
 const DO_THE_WORK_SHAPE: RegExp[] = [
@@ -87,7 +115,8 @@ export function classifyGateShape(requirement: string): GateShape {
   // ("hold a clearance AND complete the reps & certs") stays profile_bar — the override can never false-demote a
   // real bar (adversarial round 2 finding). The override only reaches a bare reps-certs form with no HOLD substance.
   if (ACQUIRABLE_CERT.some((re) => re.test(r))) return "neither";
-  if (PROFILE_BAR_SHAPE.some((re) => re.test(r))) return "profile_bar";
+  if (PROFILE_BAR_SHAPE.some((re) => re.test(r))) return "profile_bar"; // coupled bar / held credential wins first (R2)
+  if (SET_ASIDE_SHAPE.some((re) => re.test(r))) return "set_aside_caution"; // bare socioeconomic/size → verify-caution (R1)
   if (DO_THE_WORK_OVERRIDE.some((re) => re.test(r))) return "do_the_work";
   if (DO_THE_WORK_SHAPE.some((re) => re.test(r))) return "do_the_work";
   return "neither";
@@ -124,15 +153,20 @@ export function panelFindingsToTyped(inp: PanelStructuredInput): TypedFinding[] 
         requirement: g.gate,
         citation: g.citation ?? "",
         excerpt,
-        // do-the-work is a submission/action obligation, never an eligibility bar; profile-bar/neither stay eligibility-class.
+        // do-the-work → submission action; set-aside caution → eligibility (but curable-caution, not a bar);
+        // profile-bar/neither → eligibility bar (fail-closed).
         kind: shape === "do_the_work" ? "submission" : "eligibility_bar",
-        controllability: shape === "met" ? "already_satisfied" : shape === "do_the_work" ? "bidder_controls" : "bidder_cannot_move",
+        controllability: shape === "met" ? "already_satisfied"
+          : (shape === "do_the_work" || shape === "set_aside_caution") ? "bidder_controls"
+          : "bidder_cannot_move",
         grounded: true, // VERIFIED ⇒ the excerpt passed the runner's structural grounding pre-filter
         lens: p.name,
       };
-      // curableInWindow: do-the-work → true (a curable, in-window action); profile-bar / neither → LEFT UNDEFINED,
-      // which IS the fail-closed-to-NHR signal (audit-findings.ts contract). met → not a bar, no curability needed.
+      // do-the-work → curable in-window action. set-aside caution (card #528 R1) → cautionFloor + requiredAttribute
+      // so deriveVerdict floors to BID_WITH_CAUTION AND (tristate) sets eligible=null "verify eligibility" — never a
+      // fail-closed NHR. profile-bar / neither → curableInWindow LEFT UNDEFINED = the fail-closed-to-NHR signal.
       if (shape === "do_the_work") f.curableInWindow = true;
+      if (shape === "set_aside_caution") { f.cautionFloor = true; f.requiredAttribute = setAsideAttribute(g.gate); }
       findings.push(f);
     });
 

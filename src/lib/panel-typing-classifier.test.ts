@@ -32,7 +32,6 @@ const PROFILE_BAR = [
   "Criminal history background check per DoDI 1402.5 required",
   "Offeror must hold an active facility clearance at time of award",
   "Contractor must possess a current Secret security clearance",
-  "Offeror must be an SBA-certified 8(a) holder in good standing",
 ];
 for (const g of PROFILE_BAR) assert(shape(g) === "profile_bar", `profile_bar: "${g.slice(0, 60)}…"`);
 
@@ -82,6 +81,29 @@ const bar = panelFindingsToTyped(mk("Offeror must hold an active facility cleara
 assert(bar.controllability === "bidder_cannot_move" && bar.curableInWindow === undefined, "profile-bar gate → bidder_cannot_move + fail-closed (curableInWindow undefined)");
 const neither = panelFindingsToTyped(mk("The offeror shall be determined responsible by the Contracting Officer"))[0];
 assert(neither.controllability === "bidder_cannot_move" && neither.curableInWindow === undefined, "neither → bidder_cannot_move + fail-closed (escalate → NHR)");
+
+// ── (a2) SET-ASIDE CAUTION (card #528 R1) — bare socioeconomic/size eligibility → verify-caution, not fail-closed ──
+console.log("\n── (a2) set-aside caution (R1) + boundaries (R2) ──");
+const SET_ASIDE = [
+  "100% Women-Owned Small Business (WOSB) set-aside — offeror must be a verified WOSB",
+  "Total Small Business Set-Aside",
+  "This is a HUBZone set-aside",
+  "Offeror must be an SBA-certified 8(a) holder in good standing",
+  "NAICS Code 711510 size standard applies to this acquisition",
+];
+for (const g of SET_ASIDE) assert(shape(g) === "set_aside_caution", `set_aside_caution: "${g.slice(0, 52)}…" (got ${shape(g)})`);
+// R2 boundaries — coupled/affiliation/held-credential still escalate (NOT demoted to caution)
+assert(shape("WOSB set-aside; offeror must also hold an active facility clearance") === "profile_bar", "R2: set-aside COUPLED with clearance → profile_bar");
+assert(shape("Ostensible subcontractor / affiliation review under the size standard") === "profile_bar", "R2: affiliation riding size → profile_bar (#517, not self-determinable)");
+assert(shape("ITAR-controlled effort under a small business set-aside") === "profile_bar", "R2: ITAR coupled → profile_bar");
+assert(shape("Mandatory site visit required for this small business set-aside") === "profile_bar", "R2: mandatory site visit coupled → profile_bar");
+// bridge outcome — set-aside caution types as curable eligibility caution (BID_WITH_CAUTION + eligible=null), never a bar
+{
+  const f = panelFindingsToTyped(mk("100% Women-Owned Small Business (WOSB) set-aside — offeror must be a verified WOSB"))[0];
+  assert(f.controllability === "bidder_controls" && f.cautionFloor === true && f.kind === "eligibility_bar" && !!f.requiredAttribute,
+    `set-aside → bidder_controls + cautionFloor + requiredAttribute=${f.requiredAttribute} (verify-eligibility caution, not fail-closed)`);
+  assert(f.curableInWindow === undefined, "set-aside caution does NOT set curableInWindow (cautionFloor drives the caution)");
+}
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
