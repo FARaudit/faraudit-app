@@ -500,7 +500,7 @@ const SIZE_STD_GENERIC_ELIGIBILITY_RE = /^eligib(?:le|ility)$/i;
 //      responsible / able) — catches copular bars like "must be U.S. citizens" that carry no action verb.
 // Both are grammatical SHAPE (a directed obligation exists), not enumerated bars. Ambiguity fails toward escalation.
 const SIZE_STD_ACTION_VERB_RE = /\b(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|obtain(?:s|ing)?|compl(?:y|ies|ying|iant|iance)|conform(?:s|ing)?|register(?:ed|ing|s)?|accredit\w*|certif\w*|licens\w*|clear(?:ed|ance)|pass(?:es|ing|ed)?|provide[sd]?|providing|furnish(?:es|ing|ed)?|satisf(?:y|ies|ying)|attend(?:s|ed|ing|ance)?)\b/i;
-const SIZE_STD_BE_OBLIGATION_RE = /\b(?:shall|must|required to|will need to)\s+be\s+(?!(?:small\b|a\s+small\b|the\s+small\b|eligible\b|responsible\b|able\b))/i;
+const SIZE_STD_BE_OBLIGATION_RE = /\b(?:shall|must|required to|will need to)\s+be\s+(?!(?:an?\s+|the\s+)?(?:small\b|eligible\b|responsible\b|able\b))/i;
 // Restriction idiom (test 2c) — the "<class> only" gate shape (e.g. vehicle "holders only", handled end-to-end by its
 // own BOA emitter but ALSO surfaced here so a size standard coupled to it never demotes). Idiomatic restriction, not a
 // bar noun; short + anchored so it does not span the size clause.
@@ -527,7 +527,233 @@ export function isBareSizeStandardSentence(sentence: string): boolean {
   return true;                                                     // size standard is the SOLE bar substance → demote
 }
 
-export function noticeBodyEligibilityUngrounded(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): boolean {
+// ── Card #516 (Brain CLASS ruling, flag AUDIT_SELF_DETERMINABLE_ELIG_CLASS default-OFF) ─────────────────────────────
+// GENERALIZES the §509 size-standard demotion to the FULL BIDDER-SELF-DETERMINABLE eligibility class. The CERT-10 seq-1
+// FA303026Q0020 run cycled benign notice-body layers — size standard → WOSB set-aside → SAM registration → a bare
+// "eligible" fragment — each a legal SELF-CERT the firm executes itself, none a firm-only third-party bar, yet each in
+// turn forced a false NHR. Rule the CLASS once instead of chasing one sentence per paid run.
+//   R1 DEMOTE→self-cert caveat: socioeconomic set-aside/program the firm self-certifies or is SBA-certified under
+//      (WOSB/EDWOSB/HUBZone/SDVOSB/veteran-/women-/service-disabled-owned/8(a)/small-business set-aside) · SAM
+//      registration (FAR 52.204-7, self-executed) · reps & certs (FAR 52.212-3, offeror-completed) · size standard.
+//   R2 RESERVE floor-NHR for genuinely THIRD-PARTY-gated bars: security/facility clearance · mandatory (unconcluded)
+//      site visit · vehicle/BOA holder-only · ITAR/export · QPL/facility certification. These stay firm_cannot_move.
+//   R3 the floor never RE-escalates a sentence already resolved as structured RECORD METADATA (`set_aside`) — the
+//      platform header already displays it; re-flagging it "needs human review" is doubly incoherent.
+//   R4 ALLOWLIST-OF-SHAPE only (the closed, statutory set of self-cert substances) — NEVER a bar-vocabulary blocklist
+//      (the #507/#515 treadmill). Ambiguity FAILS TOWARD ESCALATION (NHR), never toward demotion.
+// SAME two position-checked shape tests as isBareSizeStandardSentence (both must pass), now over the UNION of
+// self-determinable substance spans instead of the size-standard span alone.
+const SELF_DET_CLASS_ENABLED = () => process.env.AUDIT_SELF_DETERMINABLE_ELIG_CLASS === "true";
+// The closed socioeconomic set-aside PROGRAM allowlist (FAR 19 / 13 CFR 121-128). A firm bidding one of these
+// self-certifies / is SBA-certified for it — bidder-self-determinable. Position-anchored to the program token so a
+// clearance/ITAR/QPL sentence never matches (those are NOT socioeconomic programs).
+const SETASIDE_PROGRAM_RE = /\b(?:small[\s-]?business|hubzone|sdvosb|wosb|edwosb|8\s?\(?a\)?|service[\s-]?disabled(?:[\s-]?veteran[\s-]?owned)?|women[\s-]?owned|veteran[\s-]?owned|economically[\s-]?disadvantaged)[\s\w%,()\-]{0,45}?set[\s-]?aside\b|\bset[\s-]?aside\b[\s\w%,()\-]{0,25}?(?:small[\s-]?business|concern|program|hubzone|sdvosb|wosb|edwosb|women[\s-]?owned|veteran[\s-]?owned|service[\s-]?disabled|8\s?\(?a\)?)\b|\b(?:hubzone|sdvosb|wosb|edwosb)\b|\b8\s?\(?a\)?\b/i;
+// Reps & certs (FAR 52.212-3) — the offeror self-completes these; not a third-party gate.
+const REPS_CERTS_RE = /\brepresentations?\s+and\s+certifications?\b|\breps?\s+(?:and|&)\s+certs?\b|\b52\.212[\s.\-]?3\b/i;
+// SAM presence token — a "registration/registered" bar is bidder-self-determinable ONLY when it names SAM / the System
+// for Award Management (FAR 52.204-7). A bare "must be registered" WITHOUT SAM stays ambiguous → escalates (R4).
+const SAM_TOKEN_RE = /\bsam(?:\.gov)?\b|\bsystem\s+for\s+award\s+management\b/i;
+const REGISTRATION_TOKEN_RE = /\bregistr(?:ation|ations)\b|\bregister(?:ed|ing|s)?\b/i;
+// The bare socioeconomic PROGRAM tokens (ELIGIBILITY_BAR_RE sometimes matches only "service-disabled" / "veteran-owned"
+// when the "…set-aside" tail overflows its {0,20} gap). Recognized as self-determinable ONLY inside a sentence that is
+// itself a set-aside (SETASIDE_PROGRAM_RE) — a socioeconomic program is a self-cert status, never a third-party gate.
+const SOCIO_TOKEN_RE = /\b(?:hubzone|sdvosb|wosb|edwosb|8\s?\(?a\)?|service[\s-]?disabled(?:[\s-]?veteran[\s-]?owned)?|women[\s-]?owned|veteran[\s-]?owned|economically[\s-]?disadvantaged|small[\s-]?business)\b/i;
+// Classify ONE ELIGIBILITY_BAR_RE match (in the context of its SENTENCE, by CHARACTER POSITION) as bidder-self-
+// determinable. Per-match SHAPE allowlist; anything not clearly self-determinable is UNCLASSIFIED → test (1) escalates.
+// The SAM arm keys off a registration token in the MATCH plus a SAM token in a TIGHT WINDOW around the match — NOT
+// anywhere in the sentence: a "must be registered with the DDTC under ITAR" clause in a sentence that ALSO names SAM
+// elsewhere must NOT borrow that distant SAM to demote itself (the DDTC/ITAR-registration leak). The window is generous
+// enough to reach a trailing "… registration in SAM" / "… in the System for Award Management".
+function isSelfDeterminableBarText(matchText: string, sentence: string, matchStart: number, matchEnd: number): boolean {
+  const t = matchText.trim();
+  if (SIZE_STANDARD_RE.test(t)) return true;
+  if (SETASIDE_PROGRAM_RE.test(t)) return true;
+  if (REPS_CERTS_RE.test(t)) return true;
+  if (SOCIO_TOKEN_RE.test(t) && SETASIDE_PROGRAM_RE.test(sentence)) return true;    // bare socio token in a set-aside sentence
+  if (REGISTRATION_TOKEN_RE.test(t)) {                                              // SAM registration (FAR 52.204-7) — proximity-gated
+    // TIGHT window for the 3-letter "sam" (ambiguous — must be directly bound: "registration in SAM", "SAM registration",
+    // "registered in SAM"). A DISTANT sam ("shall be registered under ITAR in SAM") is NOT borrowed → escalates (R4).
+    const tightWin = sentence.slice(Math.max(0, matchStart - 12), matchEnd + 14);
+    if (/\bsam(?:\.gov)?\b/i.test(tightWin)) return true;
+    // The full phrase "System for Award Management" is unambiguous (no other registry bears that name) → wider window ok.
+    const wideWin = sentence.slice(Math.max(0, matchStart - 12), matchEnd + 42);
+    if (/\bsystem\s+for\s+award\s+management\b/i.test(wideWin)) return true;
+  }
+  return false;                                                                    // generic-eligible handled separately
+}
+// TEST (3) — THIRD-PARTY-AGENT SHAPE (positive escalation signal; the red-team #516 leak-plug). A bidder-self-
+// determinable sentence has the OFFEROR as the SOLE actor: it self-certifies, self-registers, self-completes. A
+// THIRD-PARTY GATE has an EXTERNAL actor act ON the firm/facility/personnel/product — inspect · validate · assess ·
+// adjudicate · enroll · vet · screen · accredit · authorize · badge · a "<verb> … by/from <external actor>" agent
+// clause · a named third-party artifact (QPL). ELIGIBILITY_BAR_RE cannot SEE most of these (out-of-vocabulary), and
+// TEST (1)/(2) only catch bars it enumerates — so WITHOUT this test a real third-party bar coupled to a self-cert
+// token ("WOSB set-aside; the facility is inspected by DCSA") would DEMOTE. This is a SHAPE (external-actor grammar),
+// NOT a bar-vocabulary blocklist — it is the doctrine's allowlist inverted (the offeror-as-sole-actor allowlist), and
+// ambiguity fails toward ESCALATION. Applied only OUTSIDE the self-cert substance spans (a self-cert "register/certify"
+// lives inside a span and is exempt).
+const THIRD_PARTY_ADJUDICATION_RE = /\b(?:inspect|validat|assess|adjudicat|adjudg|enroll|vett|vetted|screen|surveil|accredit|authoriz|badg|credential|examin|sponsor|endors|vouch|walk[\s-]?through|walkthrough)\w*\b/i;
+const THIRD_PARTY_ARTIFACT_RE = /\bqpl\b|\bqualified\s+products?\s+list\b|\bapproved\s+products?\s+list\b/i;
+// "<adjudication/grant verb> … by|from <EXTERNAL actor>" — the agent is a gatekeeper, not the offeror and not a benign
+// temporal/logistics "by <date/closing/email>". Self-references + benign followers are excluded so a self-cert
+// ("registered in SAM by the closing date", "certs completed by the offeror") does NOT trip it.
+const THIRD_PARTY_BY_AGENT_RE = /\b(?:approv|grant|issu|determin|qualif|list|process|clear|verif|certif|register|review|evaluat|accept|adjudicat|authoriz|inspect|validat|assess)\w*\s+(?:[\w,/:.\-]+\s+){0,3}?(?:by|from)\s+(?!(?:the\s+|a\s+|an\s+)?(?:offeror|offerors|contractor|contractors|firm|firms|quoter|quoters|vendor|vendors|bidder|bidders|you|itself|themselves|applicant|awardee|closing|close|deadline|due|award|submission|no\s+later|end\b|then|the\s+time|receipt|email|e-mail|letter|mail|hand|fax|website|portal|sam\b)\b)/i;
+function hasThirdPartyAgentShape(sentence: string, substanceSpans: Array<[number, number]>): boolean {
+  const overlaps = (s: number, e: number) => substanceSpans.some(([ss, se]) => s < se && ss < e);
+  for (const re of [THIRD_PARTY_ADJUDICATION_RE, THIRD_PARTY_ARTIFACT_RE, THIRD_PARTY_BY_AGENT_RE]) {
+    for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) {
+      const s = m.index ?? 0, e = s + m[0].length;
+      if (!overlaps(s, e)) return true;   // an external-actor gate outside every self-cert substance → escalate (R4)
+    }
+  }
+  return false;
+}
+
+// The generic "eligible/eligibility" token is intrinsically ambiguous — it is BOTH the self-cert anchor AND a benign
+// allowlist word, so a govt-conferred / enrollment eligibility phrased in only-benign words ("the Government must have
+// completed the eligibility of the offeror", "eligibility with the United States Government", "program eligibility")
+// would otherwise DEMOTE. Rather than blocklist the external actors/prepositions (a treadmill — "with"→"under"→"per"→
+// "via", "the Government"→"the United States Government"), we INVERT: the token is benign ONLY inside a tight
+// SELF-REFERENTIAL shape — the OFFEROR is eligible FOR an award / TO bid / under the size standard / as a small
+// business. EVERY OTHER eligibility phrasing is ambiguous → escalate. Closed grammatical allowlist, no actor/prep list.
+const SELF_REFERENTIAL_ELIGIBLE_RE = /\bto\s+be\s+eligible\b|\beligible\s+to\s+(?:propose|bid|submit|offer|quote|compete|participate|be\s+considered|receive|be\s+awarded|apply)\b|\beligible\s+for\s+(?:award|an?\s+award|payment|a\s+government\s+contract\b|an?\s+contract\b|the\s+(?:award|contract|acquisition|procurement|solicitation|set[\s-]?aside|reserve))|\beligib(?:le|ility)\b[\s\w,'\-]{0,45}?\bsize\s+standard\b|\bsize\s+standard\b[\s\w,'\-]{0,45}?\beligib|\beligible\s+small\s+business\b|\beligible\s+(?:concern|offeror|small\s+business\s+concern)s?\b/i;
+function hasUngovernedEligibility(sentence: string, substanceSpans: Array<[number, number]>): boolean {
+  const overlaps = (s: number, e: number) => substanceSpans.some(([ss, se]) => s < se && ss < e);
+  for (const m of sentence.matchAll(/\beligib(?:le|ility)\b/gi)) {
+    const s = m.index ?? 0, e = s + m[0].length;
+    if (overlaps(s, e)) continue;                                      // inside a size/set-aside substance span → covered
+    const ctx = sentence.slice(Math.max(0, s - 30), e + 58);          // wide enough to reach a trailing "… size standard"
+    if (SELF_REFERENTIAL_ELIGIBLE_RE.test(ctx)) continue;              // self-referential ("eligible for award / to bid …") → benign
+    return true;                                                       // any other eligibility phrasing → ambiguous → escalate
+  }
+  return false;
+}
+
+// ── TEST (4) — POSITIVE-COVERAGE (the durable, non-treadmill guard; red-team R2). ──────────────────────────────────
+// The blocklist trap (TEST 3 leaked on NOUN-form adjudications / conditional connectives it did not enumerate) is
+// closed here by INVERSION: instead of listing what is a bar, we list what is KNOWN-BENIGN (grammar + procurement
+// boilerplate + the offeror's OWN self-cert actions), MASK the recognized self-cert substance spans, and require every
+// SURVIVING word to be on that closed allowlist. ANY residual content word — "clearance", "DCSA", "investigation",
+// "QPL", "ITAR", "determination", "walkthrough", a brand-new bar noun nobody has seen — is by definition not on the
+// benign allowlist → the sentence carries an eligibility element we cannot positively vouch as self-cert → ESCALATE
+// (R4 ambiguity-fails-toward-escalation). New bars need NO new code: they are content-by-default. Numbers/money/dates
+// are ignored (a size-standard threshold "$13 million" is not "content"). Over-escalation of a legitimate self-cert
+// carrying an unlisted benign word is the SAFE direction and is tuned by adding the benign word here, never a bar.
+const SELF_CERT_BENIGN_TOKENS = new Set<string>([
+  // grammar — determiners · conjunctions · prepositions · pronouns · auxiliaries · subordinators
+  "a", "an", "the", "this", "that", "these", "those", "is", "are", "was", "were", "be", "been", "being", "am",
+  "to", "for", "of", "in", "on", "at", "as", "by", "with", "and", "or", "not", "no", "nor", "its", "their", "it",
+  "they", "them", "you", "your", "our", "under", "per", "via", "if", "then", "so", "than", "each", "all", "any",
+  "who", "which", "whose", "when", "where", "will", "shall", "must", "may", "should", "can", "would", "do", "does",
+  "up", "out", "into", "within", "upon", "prior", "before", "after", "time", "times",
+  // procurement subjects / actors (the bidder side)
+  "offeror", "offerors", "contractor", "contractors", "firm", "firms", "quoter", "quoters", "vendor", "vendors",
+  "bidder", "bidders", "concern", "concerns", "business", "businesses", "company", "companies", "applicant",
+  "applicants", "awardee", "awardees", "entity", "entities", "party", "parties", "participant", "participants",
+  "government", "agency", "united", "states", "usg",
+  // procurement boilerplate nouns
+  "acquisition", "procurement", "requirement", "requirements", "solicitation", "solicitations", "rfq", "rfp", "ifb",
+  "award", "awards", "contract", "contracts", "order", "orders", "offer", "offers", "quote", "quotes", "proposal",
+  "proposals", "bid", "bids", "response", "responses", "submission", "submissions", "due", "closing", "deadline",
+  "receipt", "naics", "code", "codes", "program", "programs", "type", "basis", "status", "purpose", "notice",
+  // benign regulatory-reference tokens (a self-cert clause cites its authority)
+  "far", "dfars", "cfr", "clause", "clauses", "provision", "provisions", "paragraph", "paragraphs", "section",
+  "sections", "accordance", "iaw", "herein", "hereof", "part", "subpart", "usc", "far's",
+  // self-cert SUBSTANCE vocabulary (size · set-aside · SAM · reps-certs · eligibility)
+  "standard", "standards", "size", "small", "set", "aside", "setaside", "women", "owned", "woman", "veteran",
+  "veterans", "service", "disabled", "economically", "disadvantaged", "hubzone", "wosb", "edwosb", "sdvosb", "vosb",
+  "total", "competitive", "partial", "unrestricted", "eligibility", "eligible", "ineligible", "eligibility",
+  "registration", "registrations", "registered", "register", "sam", "gov", "system", "management", "certification",
+  "certifications", "certified", "certify", "representation", "representations", "represent", "reps", "certs",
+  "dollar", "dollars", "usd", "million", "billion", "thousand", "employees", "employee", "receipts", "annual",
+  "average", "greater", "less", "fewer", "more", "threshold", "applicable", "designated", "self",
+  // self-cert ACTIONS (offeror acting on ITSELF) — objects of a third-party gate are NOT here, so they stay content
+  "meet", "meets", "meeting", "have", "has", "having", "hold", "holds", "holding", "maintain", "maintains",
+  "maintaining", "complete", "completes", "completed", "submit", "submits", "submitted", "provide", "provides",
+  "acknowledge", "acknowledges", "qualify", "qualifies", "sign", "signed", "active", "current", "valid",
+]);
+function positivelySelfCertCovered(sentence: string, substanceSpans: Array<[number, number]>): boolean {
+  // Mask the recognized self-cert substance spans → spaces, so their (possibly non-benign-looking) internals do not
+  // count as residual content.
+  const chars = sentence.split("");
+  for (const [s, e] of substanceSpans) for (let i = s; i < e && i < chars.length; i++) chars[i] = " ";
+  const masked = chars.join("").toLowerCase();
+  // Every surviving ALPHA word (≥3 letters; numbers/money/dates already skipped) must be on the benign allowlist.
+  for (const m of masked.matchAll(/[a-z][a-z'\-]*/gi)) {
+    const w = m[0].replace(/[^a-z]/g, "");
+    if (w.length < 3) continue;
+    if (!SELF_CERT_BENIGN_TOKENS.has(w)) return false;   // residual content the allowlist does not vouch → escalate
+  }
+  return true;
+}
+// AFFILIATION carve-out (Brain card #517 ruling #3, 13 CFR 121.103) — affiliation / ostensible-subcontractor / identity-
+// of-interest is NOT cleanly bidder-self-determinable (a firm routinely misjudges its own affiliation; it is the #1 SBA
+// size-protest killer). A sentence carrying this class must ESCALATE and may never ride the size-standard or
+// self-determinable demotion. POSITIVE ESCALATION signal (fail-safe — over-inclusion only escalates more); an explicit
+// auditable belt on top of TEST(4) positive coverage, NOT a demotion blocklist.
+const AFFILIATION_RE = /\baffiliat(?:e|es|ed|ing|ion|ions)\b|\bostensible\s+subcontractor\b|\bidentity\s+of\s+interest\b/i;
+export function isBidderSelfDeterminableSentence(sentence: string, declaredSetAside?: string | null): boolean {
+  if (AFFILIATION_RE.test(sentence)) return false;                 // 13 CFR 121.103 affiliation → not self-determinable → escalate
+  // Substance spans = the UNION of self-determinable substances present in the sentence (allowlist-of-shape).
+  const spans: Array<[number, number]> = [];
+  const collect = (re: RegExp) => { for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]); };
+  collect(SIZE_STANDARD_RE);
+  collect(SETASIDE_PROGRAM_RE);
+  collect(REPS_CERTS_RE);
+  // Add self-determinable ELIGIBILITY_BAR_RE match spans (tight, verb-inclusive) + record which bars are self-det/generic.
+  const bars: Array<{ s: number; e: number; selfDet: boolean; generic: boolean }> = [];
+  for (const m of sentence.matchAll(new RegExp(ELIGIBILITY_BAR_RE.source, "gi"))) {
+    const s = m.index ?? 0, e = s + m[0].length;
+    const generic = SIZE_STD_GENERIC_ELIGIBILITY_RE.test(m[0].trim());
+    const selfDet = isSelfDeterminableBarText(m[0], sentence, s, e);
+    bars.push({ s, e, selfDet, generic });
+    if (selfDet && !generic) spans.push([s, e]);
+  }
+  const overlaps = (s: number, e: number) => spans.some(([ss, se]) => s < se && ss < e);
+  // R3 — the record already resolved this as `set_aside` metadata: a set-aside-naming sentence is a restatement of a
+  // field the platform already displays, never a firm-only bar (belt to R1's shape allowlist; cannot demote a clearance
+  // because SETASIDE_PROGRAM_RE only matches socioeconomic programs, never a clearance/ITAR/QPL).
+  const r3SetAside = !!(declaredSetAside && declaredSetAside.trim()) && SETASIDE_PROGRAM_RE.test(sentence);
+  // Gate: demote only a sentence that actually carries a self-determinable substance, OR whose sole bar-signal is the
+  // benign generic "eligible/eligibility" token (a self-cert boilerplate fragment), OR an R3 set-aside restatement.
+  const hasSubstance = spans.length > 0;
+  const allBarsGeneric = bars.length > 0 && bars.every((b) => b.generic);
+  if (!hasSubstance && !allBarsGeneric && !r3SetAside) return false;
+  // TEST (1) — every ELIGIBILITY_BAR_RE match is self-determinable (overlaps a substance span) or the generic token.
+  for (const b of bars) {
+    if (b.generic) continue;
+    if (b.selfDet && overlaps(b.s, b.e)) continue;
+    return false;                                                  // a bar the allowlist does not recognize → escalate
+  }
+  // TEST (2) — no second imperative obligation outside the substance spans (catches out-of-vocab coupled bars, e.g.
+  // "meet the size standard and provide Berry-Amendment textiles"). Identical SHAPE grammar as the §509 predicate.
+  for (const re of [SIZE_STD_ACTION_VERB_RE, SIZE_STD_BE_OBLIGATION_RE, SIZE_STD_RESTRICTION_RE]) {
+    for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) {
+      const s = m.index ?? 0, e = s + m[0].length;
+      if (!overlaps(s, e)) return false;
+    }
+  }
+  // TEST (3) — no THIRD-PARTY-AGENT gate outside the substance spans (fast verb/artifact SHAPE catch; defense-in-depth).
+  if (hasThirdPartyAgentShape(sentence, spans)) return false;
+  // TEST (3.5) — no UNGOVERNED eligibility token: the generic "eligible/eligibility" is benign only self-referentially
+  // ("eligible for award / to bid / under the size standard"); any govt-conferred or enrollment eligibility escalates.
+  if (hasUngovernedEligibility(sentence, spans)) return false;
+  // TEST (4) — POSITIVE COVERAGE (the durable guard): every word surviving the self-cert mask must be on the closed
+  // benign allowlist. A residual content word (any bar noun, named or unnamed) → escalate. Closes the noun-form /
+  // conditional-connective / orphaned-actor leaks TEST(3) could not enumerate without becoming a treadmill.
+  if (!positivelySelfCertCovered(sentence, spans)) return false;
+  return true;                                                     // every bar + obligation is bidder-self-determinable → demote
+}
+// Unified gate: which demotion predicate the notice-body floor consults, given the two independent flags. The CLASS
+// flag (card #516) is a strict SUPERSET of the §509 size-standard flag; when it is off we fall back to the size-only
+// predicate so the currently-armed AUDIT_SIZE_STANDARD_SELF_CERT behaviour is unchanged. Both off ⇒ returns false ⇒
+// the floor is byte-identical to pre-card-509 (Rule 61).
+function isSelfCertDemotableSentence(sentence: string, declaredSetAside?: string | null): boolean {
+  if (SELF_DET_CLASS_ENABLED()) return isBidderSelfDeterminableSentence(sentence, declaredSetAside);
+  if (SIZE_STANDARD_SELF_CERT_ENABLED()) return isBareSizeStandardSentence(sentence);
+  return false;
+}
+
+export function noticeBodyEligibilityUngrounded(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null, declaredSetAside?: string | null): boolean {
   // Prefer the EXPLICIT notice-body text (delimiter-independent). The assembled fullSource DROPS the
   // "==== DOCUMENT: … ====" delimiter for a single-doc package (assembleFullSource writes it only when docs>1), so a
   // SYNOPSIS-ONLY notice collapses to one unnamed "(primary solicitation)" region and would be unfindable by name →
@@ -558,14 +784,16 @@ export function noticeBodyEligibilityUngrounded(fullSource: string, findings: Ty
   for (const m of nNotice.matchAll(scan)) {
     const hs = m.index ?? 0, he = hs + m[0].length;
     if (!covering.some(([s, e]) => s < he && hs < e)) {
-      // Card #509 — an ungrounded match whose ENCLOSING SENTENCE is a BARE size standard is bidder-self-determinable,
-      // not a firm-only bar: it does NOT count as an ungrounded eligibility bar (routes to a self-cert caveat via
-      // emitSizeStandardCaveats instead). Sentence-precise (not a window) so a WOSB/set-aside sentence elsewhere in the
-      // notice can't mask a real bare size standard. Flag-OFF ⇒ this branch never runs ⇒ byte-identical.
-      if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
+      // Card #509/#516 — an ungrounded match whose ENCLOSING SENTENCE is BIDDER-SELF-DETERMINABLE (a bare size standard,
+      // a socioeconomic set-aside the firm self-certifies, SAM registration, reps & certs, or a bare generic-eligible
+      // fragment) is NOT a firm-only bar: it does NOT count as an ungrounded eligibility bar (routes to a self-cert
+      // caveat via emitSelfDeterminableCaveats/emitSizeStandardCaveats instead). Sentence-precise (not a window) so a
+      // real third-party bar elsewhere in the notice can never be masked. Both flags OFF ⇒ this branch never runs ⇒
+      // byte-identical (Rule 61).
+      {
         let ss = hs; while (ss > 0 && !".!?".includes(nNotice[ss - 1])) ss--;
         let se = he; while (se < nNotice.length && !".!?".includes(nNotice[se])) se++;
-        if (isBareSizeStandardSentence(nNotice.slice(ss, se))) continue;
+        if (isSelfCertDemotableSentence(nNotice.slice(ss, se), declaredSetAside)) continue;
       }
       console.warn(`[coverage] notice-body ELIGIBILITY-BAR floor: ungrounded bar in "${NOTICE_BODY_DOC_NAME}" ("${m[0].slice(0, 90)}") → fail-toward-disqualifier (INCOMPLETE)`);
       return true;
@@ -597,7 +825,7 @@ const NOTICE_EVENT_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|D
 // still count as two (Gate-2: undercounting dates re-enabled the multi-visit mis-frame). Over-counting is the safe
 // direction (fallback off → human review), so a permissive date detector here can only fail toward not-reframing.
 const SV_GUARD_DATE_RE = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b|\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b/i;
-export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): TypedFinding[] {
+export function emitNoticeBodyEligBarFindings(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null, declaredSetAside?: string | null): TypedFinding[] {
   const noticeText = (noticeBodyText && noticeBodyText.trim())
     ? noticeBodyText
     : (docRegions(fullSource).find((r) => r.name === NOTICE_BODY_DOC_NAME)?.text ?? "");
@@ -650,10 +878,11 @@ export function emitNoticeBodyEligBarFindings(fullSource: string, findings: Type
     if (emitted.some(([s, e]) => s < se && ss < e)) continue;      // at most ONE finding per bar span/sentence (ruled dedup)
     const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
     if (!excerpt || seenExcerpt.has(excerpt)) continue;            // identical bar sentence at another position → one finding
-    // Card #509 — a BARE size standard is bidder-self-determinable, never a bar. The dedicated caveat emitter
-    // (emitSizeStandardCaveats) surfaces it as a gate-to-clear on the committal; skip here so it is never a bar (and
-    // not double-emitted). Flag-OFF ⇒ never skips ⇒ byte-identical.
-    if (SIZE_STANDARD_SELF_CERT_ENABLED() && isBareSizeStandardSentence(excerpt)) continue;
+    // Card #509/#516 — a BIDDER-SELF-DETERMINABLE sentence (bare size standard, socioeconomic set-aside, SAM
+    // registration, reps & certs, generic-eligible fragment) is never a firm-only bar. The dedicated caveat emitter
+    // surfaces it as a gate-to-clear on the committal; skip here so it is never a bar (and not double-emitted). Both
+    // flags OFF ⇒ never skips ⇒ byte-identical.
+    if (isSelfCertDemotableSentence(excerpt, declaredSetAside)) continue;
     seenExcerpt.add(excerpt);
     emitted.push([ss, se]);
     // COMPLETION (Brain card #453/#454) — for a mandatory-attendance SITE-VISIT bar, if the notice body / UPDATE
@@ -793,6 +1022,69 @@ export function emitSizeStandardCaveats(fullSource: string, findings: TypedFindi
       curableInWindow: true,
       grounded: true,
       lens: "notice_body_size_standard_selfcert",
+    });
+  }
+  return out;
+}
+
+/** Card #516 (Brain CLASS ruling, flag AUDIT_SELF_DETERMINABLE_ELIG_CLASS default-OFF) — the generalization of
+ *  emitSizeStandardCaveats to the FULL bidder-self-determinable class. For every ungrounded ELIGIBILITY_BAR_RE hit
+ *  whose enclosing sentence is bidder-self-determinable (isBidderSelfDeterminableSentence), surface a class-appropriate
+ *  self-cert CAVEAT (controllability bidder_controls ⇒ never a show-stopper, never downgrades the verdict) so the fact
+ *  rides a committal as a reps-&-certs reminder instead of the floor mis-typing it as a firm-only bar → false NHR.
+ *  Third-party bars (clearance / site-visit / ITAR / QPL) are NOT self-determinable → skipped here and left to the bar
+ *  path. Dedups against decision-bearing findings that already own the span. Flag-OFF ⇒ never called (gated at the call
+ *  site) ⇒ byte-identical (Rule 61). */
+export function emitSelfDeterminableCaveats(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null, declaredSetAside?: string | null): TypedFinding[] {
+  const noticeText = (noticeBodyText && noticeBodyText.trim())
+    ? noticeBodyText
+    : (docRegions(fullSource).find((r) => r.name === NOTICE_BODY_DOC_NAME)?.text ?? "");
+  if (!hasEngineText(noticeText)) return [];
+  const nNotice = norm(noticeText);
+  const covering: Array<[number, number]> = [];
+  for (const f of findings) {
+    if (disposeFinding(f) === "dropped") continue;
+    const ex = norm(f.excerpt || "");
+    if (!ex) continue;
+    const s = nNotice.indexOf(ex);
+    if (s >= 0) covering.push([s, s + ex.length]);
+  }
+  const sentenceSpan = (at: number): [number, number] => {
+    let s = at; while (s > 0 && !".!?".includes(nNotice[s - 1])) s--;
+    let e = at; while (e < nNotice.length && !".!?".includes(nNotice[e])) e++;
+    return [s, e < nNotice.length ? e + 1 : e];
+  };
+  const out: TypedFinding[] = [];
+  const seen = new Set<string>();
+  for (const m of nNotice.matchAll(new RegExp(ELIGIBILITY_BAR_RE.source, "gi"))) {
+    const [ss, se] = sentenceSpan(m.index ?? 0);
+    if (covering.some(([s, e]) => s < se && ss < e)) continue;   // a decision-bearing finding already surfaces it
+    const excerpt = nNotice.slice(ss, se).trim().slice(0, 240);
+    if (!excerpt || seen.has(excerpt)) continue;
+    if (!isBidderSelfDeterminableSentence(excerpt, declaredSetAside)) continue;   // a third-party bar → leave to the bar path
+    seen.add(excerpt);
+    // Class-appropriate self-cert reminder (all bidder_controls / curable).
+    let requirement: string;
+    if (SETASIDE_PROGRAM_RE.test(excerpt)) {
+      requirement = `A bid is viable ONLY if the firm holds the required SBA certification for this set-aside program at offer — WOSB/EDWOSB (13 CFR 127), SDVOSB/VOSB (13 CFR 128), 8(a) (13 CFR 124) and HUBZone (13 CFR 126) are SBA-certification-gated (self-certification was eliminated); confirm active certification in SAM before bidding: "${excerpt}"`;
+    } else if (REGISTRATION_TOKEN_RE.test(excerpt) && SAM_TOKEN_RE.test(excerpt)) {
+      requirement = `Confirm the firm holds an active SAM registration (FAR 52.204-7) — bidder-self-executed; verify it is active before bidding: "${excerpt}"`;
+    } else if (REPS_CERTS_RE.test(excerpt)) {
+      requirement = `Confirm the firm's representations & certifications (FAR 52.212-3) are complete and current in SAM — offeror-self-completed: "${excerpt}"`;
+    } else if (SIZE_STANDARD_RE.test(excerpt)) {
+      requirement = `Confirm the firm meets the applicable SBA small-business size standard — self-certified in SAM (FAR 52.212-3 reps & certs); verify size status before bidding: "${excerpt}"`;
+    } else {
+      requirement = `Confirm the firm meets the stated bidder-self-determinable eligibility condition before bidding: "${excerpt}"`;
+    }
+    out.push({
+      requirement,
+      citation: NOTICE_BODY_DOC_NAME,
+      excerpt,
+      kind: "eligibility_bar",
+      controllability: "bidder_controls",
+      curableInWindow: true,
+      grounded: true,
+      lens: "notice_body_self_determinable_selfcert",
     });
   }
   return out;
@@ -1276,7 +1568,7 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // never sees. Routed through its OWN verdict gate (noticeBodyBarUngrounded), NOT the coverageComplete veto — the
   // latter is BYPASSED when GATE_V2 + coverageV2 are on (audit-decide:1581), which is the prod flag state. Flag off ⇒
   // short-circuits false ⇒ never set on VerdictInputs ⇒ byte-identical.
-  const noticeBodyBarUngrounded = process.env.AUDIT_NOTICE_BODY_ELIG_FLOOR === "true" && noticeBodyEligibilityUngrounded(ctx.fullSource, findings, ctx.noticeBodyText);
+  const noticeBodyBarUngrounded = process.env.AUDIT_NOTICE_BODY_ELIG_FLOOR === "true" && noticeBodyEligibilityUngrounded(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside);
   const coverageComplete = missing.length === 0 && required.length > 0 && docCoverage.complete && !amendmentUnresolved;
   if (amendmentUnresolved) console.log(`[orchestrator] amendment-resolution: unresolved SF-30 supersession → INCOMPLETE (fail-safe, interim)`);
   if (noticeBodyBarUngrounded) console.log(`[orchestrator] notice-body eligibility floor: ungrounded hard bar in notice body → NEEDS_HUMAN_REVIEW (fail-safe, B3)`);
@@ -1495,14 +1787,17 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
   // disqualifying pole) and gated on noticeBodyBarUngrounded (itself flag-gated at :977 ⇒ flag-OFF byte-identical). The
   // load-bearing dedup (at most one finding per bar span; never re-emit a covered span) lives inside the emitter.
   if (noticeBodyBarUngrounded) {
-    findings = [...findings, ...emitNoticeBodyEligBarFindings(ctx.fullSource, findings, ctx.noticeBodyText)];
+    findings = [...findings, ...emitNoticeBodyEligBarFindings(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside)];
   }
-  // Card #509 (flag AUDIT_SIZE_STANDARD_SELF_CERT, default-OFF) — surface any BARE NAICS size-standard statement in the
-  // notice body as a bidder-self-determinable gate-to-clear CAVEAT (never a bar), so it rides a committal verdict as a
-  // reps-&-certs self-cert reminder instead of blocking it. Runs regardless of the bar gate (the demotion in
-  // noticeBodyEligibilityUngrounded means a bare size standard no longer fires that gate); flag-OFF ⇒ never called ⇒
-  // byte-identical. The emitter dedups against decision-bearing findings that already own the span.
-  if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
+  // Card #509/#516 (flags AUDIT_SIZE_STANDARD_SELF_CERT · AUDIT_SELF_DETERMINABLE_ELIG_CLASS, both default-OFF) —
+  // surface a bidder-self-determinable eligibility statement in the notice body as a gate-to-clear CAVEAT (never a bar),
+  // so it rides a committal verdict as a reps-&-certs self-cert reminder instead of blocking it. Runs regardless of the
+  // bar gate (the demotion in noticeBodyEligibilityUngrounded means these no longer fire that gate). The CLASS flag is a
+  // superset (set-aside/SAM/reps-certs/size); when it is on it OWNS the caveat emission (else size-only). Both OFF ⇒
+  // never called ⇒ byte-identical. Each emitter dedups against decision-bearing findings that already own the span.
+  if (SELF_DET_CLASS_ENABLED()) {
+    findings = [...findings, ...emitSelfDeterminableCaveats(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside)];
+  } else if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
     findings = [...findings, ...emitSizeStandardCaveats(ctx.fullSource, findings, ctx.noticeBodyText)];
   }
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
