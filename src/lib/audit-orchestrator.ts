@@ -472,17 +472,59 @@ export function documentsCovered(
 // Card #509 (Brain-ratified, flag AUDIT_SIZE_STANDARD_SELF_CERT default-OFF) — a BARE NAICS size-standard statement is
 // bidder-self-determinable (SBA self-cert via FAR 52.212-3 reps & certs). It must DEMOTE to a coverage caveat on a
 // committal verdict — never drive a verdict-blocking notice-body NHR bar (the CERT-10 seq-1 FA303026Q0020 false-punt:
-// "the small business size standard is no greater than $13 million." mis-typed as a firm-only eligibility bar). The
-// guardrail is an ALLOWLIST OF SELF-DETERMINABLE SHAPE, fail-direction toward NHR: demote ONLY when the sentence's SOLE
-// eligibility substance is a size standard. Any COUPLED substantive bar (named vehicle · security level · citizenship/
-// nationality · QPL · site visit · named set-aside program · SAM registration) keeps the sentence escalating. Any size
-// standard the flag does not demote stays exactly as before. SIZE_STANDARD_RE mirrors ELIGIBILITY_BAR_RE's own
-// `\bsize standard\b` arm, so every span the floor flags via that token is recognized here.
+// "the small business size standard is no greater than $13 million." mis-typed as a firm-only eligibility bar).
+//
+// DOCTRINE (Brain, engine-wide, PERMANENT — card #515): no release/demotion decision may rest on a BLOCKLIST of bar
+// vocabulary (v1 used COUPLED_BAR_SUBSTANCE_RE and leaked on every unenumerated bar — NADCAP/ITAR/TAA/… — the #507
+// treadmill). SHAPE ALLOWLIST ONLY; ambiguity fails toward ESCALATION (NHR), never toward demotion. isBareSizeStandard-
+// Sentence therefore demotes ONLY when the size standard is the sentence's SOLE eligibility-bar substance, decided by
+// TWO shape tests (both must pass), NEITHER of which enumerates bar vocabulary:
+//   (1) ELIGIBILITY_BAR_RE coverage: run the engine's OWN bar detector over the sentence; EVERY match must overlap a
+//       size-standard span. Any non-overlapping bar match → a second bar the engine recognizes → coupled → escalate.
+//   (2) Second-obligation shape: outside the size-standard clause, the sentence must carry no OTHER imperative
+//       obligation (must/shall/required-to + a non-"meet" action verb, or a bare-imperative "hold/possess/… <noun>").
+//       This is a SHAPE signal (a second directed requirement exists), not a bar list — it catches coupled bars whose
+//       NOUN is out of ELIGIBILITY_BAR_RE's vocabulary (NADCAP/TAA/Berry/FedRAMP/…), closing the (1)-only residue.
+// CARVE-OUT: the generic `eligible`/`eligibility` token co-occurs benignly in a bare sentence ("must be ELIGIBLE under
+// the size standard") — it is NOT a second substantive bar and is EXCLUDED from test (1). "ineligible" is NOT carved
+// out (it more often marks a real bar) — fail toward escalation. Span-overlap is CHARACTER-RANGE (half-open [s,e)):
+// ranges overlap iff s1 < e2 && s2 < e1 — deterministic, position-based (token overlap would need a tokenizer and drift).
 const SIZE_STANDARD_RE = /\bsize standard\b/i;
-const COUPLED_BAR_SUBSTANCE_RE = /\bclearance\b|\bclassified\b|\btop[\s-]?secret\b|\bts[\s/]?sci\b|\bsci\b|\bsecret\b|\bcmmc\b|\bas9100\b|\biso\s?9001\b|\bdd[\s-]?254\b|\bqualified products?\b|\bqpl\b|\bcitizens?\b|\bcitizenship\b|\bnational(?:s|ity)\b|\bu\.?s\.?\s+persons?\b|\bsite[\s-]?(?:visit|tour|inspection)\b|\bpre[\s-]?(?:proposal|bid)\s+(?:conference|meeting)\b|\bjob[\s-]?walk\b|\bwalk[\s-]?(?:through|thru)\b|\b(?:boa|idiq|bpa|gwac|mas)\b|\bholders?\s+only\b|\bregistered in sam\b|\bactive sam\b|\bdebarr?ed\b|\bexcluded part(?:y|ies)\b|\b8\s?\(?a\)?\b|\bhubzone\b|\bsdvosb\b|\bwosb\b|\bedwosb\b|\bservice[\s-]?disabled\b|\bwomen[\s-]?owned\b|\bveteran[\s-]?owned\b/i;
+const SIZE_STD_GENERIC_ELIGIBILITY_RE = /^eligib(?:le|ility)$/i;
+// Second-obligation SHAPE (test 2) — two POSITION-checked signals, NEITHER a bar-noun list:
+//  (a) ACTION-VERB: the closed grammar of solicitation obligation verbs ("you must <do>"). Its presence anywhere
+//      outside the size-standard span means the sentence directs a SECOND requirement (hold/obtain/comply/…), so the
+//      out-of-vocab coupled bars ELIGIBILITY_BAR_RE cannot see (NADCAP/TAA/Berry/FedRAMP/ISO-27001/…) still escalate.
+//      "meet"/"be" are NOT here (they are the size standard's own predicate → would self-trip a bare sentence).
+//  (b) BE-OBLIGATION: "must/shall be <X>" where X is NOT a size-standard-benign predicate (small / eligible /
+//      responsible / able) — catches copular bars like "must be U.S. citizens" that carry no action verb.
+// Both are grammatical SHAPE (a directed obligation exists), not enumerated bars. Ambiguity fails toward escalation.
+const SIZE_STD_ACTION_VERB_RE = /\b(?:hold|holds|holding|possess(?:es|ing)?|maintain(?:s|ing)?|obtain(?:s|ing)?|compl(?:y|ies|ying|iant|iance)|conform(?:s|ing)?|register(?:ed|ing|s)?|accredit\w*|certif\w*|licens\w*|clear(?:ed|ance)|pass(?:es|ing|ed)?|provide[sd]?|providing|furnish(?:es|ing|ed)?|satisf(?:y|ies|ying)|attend(?:s|ed|ing|ance)?)\b/i;
+const SIZE_STD_BE_OBLIGATION_RE = /\b(?:shall|must|required to|will need to)\s+be\s+(?!(?:small\b|a\s+small\b|the\s+small\b|eligible\b|responsible\b|able\b))/i;
+// Restriction idiom (test 2c) — the "<class> only" gate shape (e.g. vehicle "holders only", handled end-to-end by its
+// own BOA emitter but ALSO surfaced here so a size standard coupled to it never demotes). Idiomatic restriction, not a
+// bar noun; short + anchored so it does not span the size clause.
+const SIZE_STD_RESTRICTION_RE = /\bholders?\s+only\b|\bonly\s+holders?\b/i;
 const SIZE_STANDARD_SELF_CERT_ENABLED = () => process.env.AUDIT_SIZE_STANDARD_SELF_CERT === "true";
 export function isBareSizeStandardSentence(sentence: string): boolean {
-  return SIZE_STANDARD_RE.test(sentence) && !COUPLED_BAR_SUBSTANCE_RE.test(sentence);
+  if (!SIZE_STANDARD_RE.test(sentence)) return false;
+  const sizeSpans = [...sentence.matchAll(new RegExp(SIZE_STANDARD_RE.source, "gi"))].map((m) => [m.index ?? 0, (m.index ?? 0) + m[0].length] as [number, number]);
+  const overlapsSize = (s: number, e: number) => sizeSpans.some(([ss, se]) => s < se && ss < e);
+  // Test (1) — every ELIGIBILITY_BAR_RE match must be the size standard (or the benign generic-eligibility token).
+  for (const m of sentence.matchAll(new RegExp(ELIGIBILITY_BAR_RE.source, "gi"))) {
+    const s = m.index ?? 0, e = s + m[0].length;
+    if (overlapsSize(s, e)) continue;
+    if (SIZE_STD_GENERIC_ELIGIBILITY_RE.test(m[0].trim())) continue;
+    return false;                                                  // a second recognized bar → coupled → escalate
+  }
+  // Test (2) — no second imperative obligation outside the size-standard clause (catches out-of-vocab coupled bars).
+  for (const re of [SIZE_STD_ACTION_VERB_RE, SIZE_STD_BE_OBLIGATION_RE, SIZE_STD_RESTRICTION_RE]) {
+    for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) {
+      const s = m.index ?? 0, e = s + m[0].length;
+      if (!overlapsSize(s, e)) return false;                       // a directed obligation that is not the size standard → coupled
+    }
+  }
+  return true;                                                     // size standard is the SOLE bar substance → demote
 }
 
 export function noticeBodyEligibilityUngrounded(fullSource: string, findings: TypedFinding[], noticeBodyText?: string | null): boolean {
