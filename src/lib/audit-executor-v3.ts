@@ -28,6 +28,7 @@ import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
 import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
 import { buildPanelInputs } from "./panel-adapter";
+import { foldPanelReason } from "./panel-findings-bridge";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
@@ -426,6 +427,13 @@ export async function executeAgenticPrimary(
   // Card #481 (ruling-4) — reframe a "no set-aside is present" finding against the authoritative masthead set_aside so it
   // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).
   res.findings = reframeNoSetAsideFindings(res.findings, solicitation?.typeOfSetAside ?? null);
+  // P2d (card #523) — chief-judge REASON synthesis. Fold the panel judge's rationale into the derived reason
+  // (derived-reason-FIRST, dedup, bounded; NEVER overrides the pole — the judge is narrative-only). Gated on the
+  // panel having actually CONTRIBUTED verified facts (typedFindings.length > 0), so an honest-fail judgment
+  // ("all lenses failed") never leaks into a committal reason. Flag-OFF ⇒ panelResult null ⇒ untouched.
+  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale) {
+    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelResult.judgment.rationale) };
+  }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
   // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,

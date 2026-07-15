@@ -5,7 +5,7 @@
 // VerdictInputs.findings (2b); deriveVerdict stays the SOLE authority. A VERIFIED *unmet* hard gate fails
 // CLOSED to human review (bidder_cannot_move + curableInWindow UNDEFINED) — never a blind INELIGIBLE/NO_BID.
 // A residual risk is advisory (bidder_controls) — never a bar. UNVERIFIABLE/REFUTED/unmapped facts are dropped.
-import { panelFindingsToTyped, type PanelStructuredInput, type VerifierState } from "./panel-findings-bridge";
+import { panelFindingsToTyped, foldPanelReason, type PanelStructuredInput, type VerifierState } from "./panel-findings-bridge";
 import type { PanelistOutput } from "./agentic-panel-runner";
 import { deriveVerdict } from "./audit-decide";
 import type { TypedFinding } from "./audit-findings";
@@ -101,6 +101,23 @@ const refMap = (entries: Array<[string, VerifierState]>): Map<string, { state: V
   const fs = panelFindingsToTyped({ panelists, stateByRef: refMap([["cap:G2", "VERIFIED"], ["cap:R1", "VERIFIED"]]) });
   const ids = fs.map((f: TypedFinding) => f.id).sort();
   assert(fs.length === 2 && ids[0] === "panel:cap:G2" && ids[1] === "panel:cap:R1", `ref indexing exact (got ${ids.join(",")})`);
+}
+
+// ── 7. foldPanelReason (P2d) — derived reason authoritative, dedup, never overrides ──
+{
+  const derived = "No non-curable bars found; the firm can compete.";
+  // fresh narrative → appended after the derived reason, under the Expert panel: clause
+  const folded = foldPanelReason(derived, "The wage determination should be confirmed before pricing.");
+  assert(folded.startsWith(derived), "derived reason stays FIRST (authoritative)");
+  assert(folded.includes("Expert panel:") && folded.includes("wage determination"), "fresh panel narrative appended");
+  // duplicate narrative → nothing appended (reason-dedup)
+  const dup = foldPanelReason(derived, "No non-curable bars found.");
+  assert(dup === derived, "duplicate panel narrative → derived reason unchanged (dedup)");
+  // empty panel rationale → derived unchanged
+  assert(foldPanelReason(derived, "") === derived, "empty panel rationale → derived unchanged");
+  // bounded — a runaway rationale is capped
+  const huge = foldPanelReason("Base.", "x".repeat(50) + ". " + "y ".repeat(400) + ".");
+  assert(huge.length < 500, "folded reason is bounded (maxAdd cap)");
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);

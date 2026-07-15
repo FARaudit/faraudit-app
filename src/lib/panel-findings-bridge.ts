@@ -85,3 +85,23 @@ export function panelFindingsToTyped(inp: PanelStructuredInput): TypedFinding[] 
   }
   return findings;
 }
+
+/** P2d (card #523) — chief-judge REASON synthesis. The panel judge is REASON/narrative ONLY (its `.verdict` is
+ *  log-only under the wired architecture); `deriveVerdict` already produced the AUTHORITATIVE pole + reason. This
+ *  folds the judge's rationale in as SUPPORTING narrative, derived-reason-FIRST, and ONLY the sentences it adds that
+ *  are not already present (reason-dedup) — it can NEVER override or contradict the derived reason. Bounded so the
+ *  downstream clampToWord can't be blown out. Pure → gate-testable. Caller gates on the panel actually contributing. */
+export function foldPanelReason(derivedReason: string, panelRationale: string, maxAdd = 400): string {
+  const derived = (derivedReason ?? "").trim();
+  const panel = (panelRationale ?? "").trim();
+  if (!panel) return derived;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const derivedNorm = norm(derived);
+  // keep only panel sentences whose normalized core isn't already carried by the derived reason (dedup)
+  const fresh = panel.split(/(?<=[.!?])\s+/).map((s) => s.trim())
+    .filter((s) => { const n = norm(s); return n.length >= 12 && !derivedNorm.includes(n); });
+  if (!fresh.length) return derived; // the panel adds nothing the derived reason doesn't already say
+  let addition = fresh.join(" ");
+  if (addition.length > maxAdd) addition = addition.slice(0, maxAdd).replace(/\s+\S*$/, "") + "…";
+  return derived ? `${derived} Expert panel: ${addition}` : `Expert panel: ${addition}`;
+}
