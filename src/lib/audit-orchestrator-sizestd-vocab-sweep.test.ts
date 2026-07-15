@@ -183,6 +183,16 @@ classDemote("be-an-eligible-sb",   "The offeror must be an eligible small busine
 classDemote("elig-under-size",     "Offerors must be eligible under the applicable small business size standard.");
 classDemote("elig-for-award",      "Offerors must be registered in SAM to be eligible for award.");
 
+// ── AFFILIATION carve-out (Brain card #517 ruling #3, 13 CFR 121.103) — affiliation / ostensible-subcontractor /
+//    identity-of-interest is NOT bidder-self-determinable; it must ESCALATE even riding a size-standard / set-aside. ──
+console.log("── #517 affiliation carve-out (must ESCALATE) ──");
+classEscalate("affil-ride-size",  "The offeror must not be affiliated with a concern whose receipts exceed the size standard.");
+classEscalate("affil-affiliates", "The size standard applies to the concern together with its affiliates.");
+classEscalate("affil-ostensible", "This is a WOSB set-aside; award is barred where an ostensible subcontractor relationship exists.", SET_ASIDE_META);
+classEscalate("affil-identity",   "The offeror must have no identity of interest with another concern under the size standard.");
+classEscalate("affil-sizestd",    "Affiliation with any other concern will be considered in applying the small business size standard.");
+classEscalate("affil-coupled-sa", "This is a WOSB set-aside; the offeror must not be affiliated with a large business.", SET_ASIDE_META);
+
 // ── SUPERSET property: every §509 BARE size standard still DEMOTES under the class predicate ──
 console.log("── #516 superset check — §509 bare size standards still DEMOTE ──");
 classDemote("super-dollar",   "The small business size standard is no greater than $13 million.");

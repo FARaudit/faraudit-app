@@ -685,7 +685,14 @@ function positivelySelfCertCovered(sentence: string, substanceSpans: Array<[numb
   }
   return true;
 }
+// AFFILIATION carve-out (Brain card #517 ruling #3, 13 CFR 121.103) — affiliation / ostensible-subcontractor / identity-
+// of-interest is NOT cleanly bidder-self-determinable (a firm routinely misjudges its own affiliation; it is the #1 SBA
+// size-protest killer). A sentence carrying this class must ESCALATE and may never ride the size-standard or
+// self-determinable demotion. POSITIVE ESCALATION signal (fail-safe — over-inclusion only escalates more); an explicit
+// auditable belt on top of TEST(4) positive coverage, NOT a demotion blocklist.
+const AFFILIATION_RE = /\baffiliat(?:e|es|ed|ing|ion|ions)\b|\bostensible\s+subcontractor\b|\bidentity\s+of\s+interest\b/i;
 export function isBidderSelfDeterminableSentence(sentence: string, declaredSetAside?: string | null): boolean {
+  if (AFFILIATION_RE.test(sentence)) return false;                 // 13 CFR 121.103 affiliation → not self-determinable → escalate
   // Substance spans = the UNION of self-determinable substances present in the sentence (allowlist-of-shape).
   const spans: Array<[number, number]> = [];
   const collect = (re: RegExp) => { for (const m of sentence.matchAll(new RegExp(re.source, "gi"))) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]); };
