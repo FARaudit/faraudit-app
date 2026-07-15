@@ -81,7 +81,7 @@ Respectfully,
 [EMAIL] · [PHONE]
 
 — —
-Audit reference: #${auditId} · Recommendation: ${poleToRecommendation({ compliance_json: audit.compliance_json as Record<string, unknown> | null, recommendation: audit.recommendation as string | null }) || "pending"}
+Audit reference: #${auditId} · Recommendation: ${(() => { const r = poleToRecommendation({ compliance_json: audit.compliance_json as Record<string, unknown> | null, recommendation: audit.recommendation as string | null }); return r === "REVIEW" ? "pending" : r; })()}
 This is a draft; review and tailor before sending.`;
 
   return NextResponse.json({ subject, body: emailBody });

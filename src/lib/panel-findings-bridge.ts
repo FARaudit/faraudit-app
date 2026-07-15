@@ -212,6 +212,12 @@ export function foldPanelReason(derivedReason: string, panelRationale: string, m
   const derived = (derivedReason ?? "").trim();
   const panel = (panelRationale ?? "").trim();
   if (!panel) return derived;
+  // ultra #236 bug_007 (defense-in-depth): the runner's coverage/show-stopper floors can rewrite the judge rationale
+  // with an honest-fail prefix EVEN on a committal judge verdict (enforceVerifiedShowStoppers keeps NO_BID/INELIGIBLE
+  // while prefixing "[honest-fail]"). An honest-fail narrative must NEVER fold into a committal derived reason — it
+  // would contradict the pole. Reject the whole rationale when it opens with such a marker (the executor ALSO gates on
+  // a committal judge verdict; this catches the committal-verdict + floored-rationale case).
+  if (/^\s*\[(?:INCOMPLETE|honest-fail|NEEDS[_\s]HUMAN[_\s]REVIEW|OUT[_\s]OF[_\s]SCOPE)/i.test(panel)) return derived;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   const derivedNorm = norm(derived);
   // keep only panel sentences whose normalized core isn't already carried by the derived reason (dedup)

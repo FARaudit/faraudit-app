@@ -397,16 +397,27 @@ export async function executeAgenticPrimary(
   // proceeds on the v3 lens findings alone, never blocked by the panel. The judge is REASON-only (2d, not yet folded).
   let panelResult: PanelResult | null = null;
   if (AGENTIC_PANEL_ENABLED) {
-    const panelInputs = buildPanelInputs(fullSource);
-    panelResult = await runPanelJudge({
-      sectionText: panelInputs.sectionText,
-      detectedSections: panelInputs.detectedSections,
-      unroutedBinding: panelInputs.unroutedBinding,
-      manifest: panelInputs.manifest,   // card #525 — class-aware firing gate (UCF checkManifest / commercial biddable-content)
-      signal,
-      onUsage: (u) => usageCalls.push(u),
-    });
-    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
+    try {
+      const panelInputs = buildPanelInputs(fullSource);
+      panelResult = await runPanelJudge({
+        sectionText: panelInputs.sectionText,
+        detectedSections: panelInputs.detectedSections,
+        unroutedBinding: panelInputs.unroutedBinding,
+        manifest: panelInputs.manifest,   // card #525 — class-aware firing gate (UCF checkManifest / commercial biddable-content)
+        signal,
+        onUsage: (u) => usageCalls.push(u),
+      });
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
+    } catch (e) {
+      // DOCTRINE (ultra #236 bug_005): the panel NEVER blocks the audit. runPanelJudge honest-fails gracefully for
+      // lens/verifier failures, but the chief-judge call RETHROWS (retry-ladder ceiling / rate-limit / AbortError
+      // after the paid lens+verifier work). Without this catch that throw would crash the customer audit AFTER they
+      // were charged, stranding the row in 'processing'. Degrade to panel-off → deriveVerdict proceeds on the v3 lens
+      // findings alone. EXCEPT an overall-budget abort, which must still own the terminal-failed path (never a silent degrade).
+      if (signal?.aborted) throw e;
+      panelResult = null;
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel threw (${e instanceof Error ? e.message : e}) → degraded to panel-off; rail proceeds on v3 findings`);
+    }
   }
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
@@ -429,10 +440,14 @@ export async function executeAgenticPrimary(
   // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).
   res.findings = reframeNoSetAsideFindings(res.findings, solicitation?.typeOfSetAside ?? null);
   // P2d (card #523) — chief-judge REASON synthesis. Fold the panel judge's rationale into the derived reason
-  // (derived-reason-FIRST, dedup, bounded; NEVER overrides the pole — the judge is narrative-only). Gated on the
-  // panel having actually CONTRIBUTED verified facts (typedFindings.length > 0), so an honest-fail judgment
-  // ("all lenses failed") never leaks into a committal reason. Flag-OFF ⇒ panelResult null ⇒ untouched.
-  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale) {
+  // (derived-reason-FIRST, dedup, bounded; NEVER overrides the pole — the judge is narrative-only). Gated on BOTH
+  // (a) the panel having CONTRIBUTED verified facts, AND (b) the judge verdict being a COMMITTAL pole (ultra #236
+  // bug_007): the runner's enforceCoverageFloor / enforceVerifiedShowStoppers can rewrite the judge rationale with an
+  // "[INCOMPLETE …]" / "[honest-fail]" prefix EVEN when verified findings exist (e.g. non-empty unroutedBinding), so
+  // gating only on typedFindings would leak an honest-fail rationale into a committal derived reason — contradicting
+  // the pole. Skip the fold on INCOMPLETE / NEEDS_HUMAN_REVIEW / OUT_OF_SCOPE judge verdicts. Flag-OFF ⇒ untouched.
+  const COMMITTAL_JUDGE_VERDICT = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
+  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelResult.judgment.verdict)) {
     res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelResult.judgment.rationale) };
   }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);

@@ -4,7 +4,6 @@
 // from supabase-admin if available, falling back to the user's session.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { poleToRecommendation } from "@/lib/verdict-pole";
 
 // ─── Tab 7: Corpus ────────────────────────────────────────────────────────
 export interface CorpusStats {

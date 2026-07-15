@@ -1468,11 +1468,14 @@ function raVerdict(a: AuditRow): { cls: "is-proceed" | "is-caution" | "is-nobid"
   if (ev === "NO-BID" || ev === "NOBID") return { cls: "is-nobid", label: "NO-BID" };
   if (ev === "CAUTION") return { cls: "is-caution", label: "CAUTION" };
   if (ev === "PROCEED" || ev === "GO" || ev === "BID") return { cls: "is-proceed", label: "PROCEED" };
-  // R3: derive from authoritative pole.
+  // R3: derive from authoritative pole. NOTE (ultra #236 bug_001/008): poleToRecommendation never returns falsy — it
+  // returns "REVIEW" as the fail-safe for rows with NO pole (legacy null recommendation + no v3.verdict). Folding
+  // REVIEW into CAUTION here would (a) make the score fallback below dead code and (b) regress a legacy score-90 row
+  // from PROCEED to CAUTION. So REVIEW FALLS THROUGH to the score inference (matches CommandCenter's REVIEW→null guard).
   const rec = poleToRecommendation(a);
   if (rec === "DECLINE") return { cls: "is-nobid", label: "NO-BID" };
   if (rec === "PROCEED") return { cls: "is-proceed", label: "PROCEED" };
-  if (rec === "PROCEED_WITH_CAUTION" || rec === "REVIEW") return { cls: "is-caution", label: "CAUTION" };
+  if (rec === "PROCEED_WITH_CAUTION") return { cls: "is-caution", label: "CAUTION" };
   if (a.compliance_score != null) {
     if (a.compliance_score >= 70) return { cls: "is-proceed", label: "PROCEED" };
     if (a.compliance_score < 40) return { cls: "is-nobid", label: "NO-BID" };
@@ -2051,7 +2054,9 @@ function PastAuditsPanel({
             const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
             const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(55, 138, 221,.08)";
             // R3: derive from authoritative pole.
-            const _rec = poleToRecommendation(a);
+            // ultra #236 bug_004: poleToRecommendation never returns falsy (REVIEW is its no-pole fail-safe), so fold
+            // REVIEW→null — matching CommandCenter — so a legacy null-recommendation row renders "—" (not "REVIEW").
+            const _rec = (() => { const r = poleToRecommendation(a); return r !== "REVIEW" ? r : null; })();
             const recColor = _rec === "PROCEED" ? "var(--green)" : _rec === "DECLINE" ? "var(--red)" : "var(--amber)";
             const isPinned = pinned.has(a.id);
             const isBusy = pinBusy.has(a.id);

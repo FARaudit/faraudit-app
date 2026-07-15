@@ -118,6 +118,12 @@ const refMap = (entries: Array<[string, VerifierState]>): Map<string, { state: V
   // bounded — a runaway rationale is capped
   const huge = foldPanelReason("Base.", "x".repeat(50) + ". " + "y ".repeat(400) + ".");
   assert(huge.length < 500, "folded reason is bounded (maxAdd cap)");
+  // ultra #236 bug_007 — an honest-fail-prefixed rationale NEVER folds into a committal reason (would contradict the pole)
+  const derivedBid = "No non-curable bars found; the firm can compete.";
+  assert(foldPanelReason(derivedBid, "[INCOMPLETE — coverage not achieved; NO eligibility determination was made] The audit could not read all required content.") === derivedBid,
+    "honest-fail [INCOMPLETE …] rationale → derived committal reason UNCHANGED");
+  assert(foldPanelReason(derivedBid, "[honest-fail] gate verdict cited no VERIFIED finding.") === derivedBid,
+    "[honest-fail] prefixed rationale → derived reason UNCHANGED");
 }
 
 console.log(`\n${failures === 0 ? "✅ ALL GREEN" : `❌ ${failures} FAILURE(S)`}`);
