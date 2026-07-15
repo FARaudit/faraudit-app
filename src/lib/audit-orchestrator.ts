@@ -27,6 +27,7 @@ import { judgmentLayerEnabled, runJudgmentProducer, runJudgmentVerifier, type Re
 import { highSignalSweep, boilerplateTrapSweep } from "./audit-grounding-sweep";
 import { createHash } from "node:crypto";
 import type { TypedFinding, BidderProfile, VerdictInputs } from "./audit-findings";
+import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
 import { GATE_V2_ENABLED, gradeCoverageV2, importanceOf, isLedgerDemotableNonBar } from "./audit-gate-v2";
 
 // B1 (Brain card #421 Fork-1) — §L/§M coverage-ledger honors boilerplate. A READ §L/§M whose ONLY ungrounded
@@ -103,6 +104,13 @@ export interface OrchestratorInput {
   // is RE-GROUNDED here against real source with the SAME isGrounded check the lenses use — the proposer never
   // self-asserts grounding (audit-judgment-first.ts). Absent ⇒ the ladder path (P1 experts) is byte-identical.
   seedFindings?: TypedFinding[];
+  // PANEL WIRING ARC (card #523, P2a-wire) — the expert panel's VERIFIED typed facts (panel-findings-bridge),
+  // supplied by the executor ONLY when AUDIT_PANEL_JUDGE is on. Distinct from `seedFindings`: these are ADDITIVE
+  // to the P1 lens findings (the panel is a co-producer, not a replacement) — they are UNIONed into the finding set
+  // BEFORE dedup + every re-typing guard (so a panel finding is treated exactly like a lens finding) and
+  // RE-GROUNDED against the assembled source with the same isGrounded gate. deriveVerdict stays the SOLE authority.
+  // Absent/empty ⇒ byte-identical (flag-OFF customer path never sets it).
+  panelFindings?: TypedFinding[];
 }
 
 export interface AuditResult {
@@ -1436,6 +1444,21 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     allConverged = runs.every((r) => r.converged);
   }
 
+  // P1.4 — PANEL FINDINGS MERGE (card #523, P2a-wire). The expert panel (agentic-panel-runner) is a FINDINGS
+  //         PRODUCER: its VERIFIED claims arrive here already typed by panel-findings-bridge and are UNIONed into the
+  //         finding set the deterministic rail disposes over — deriveVerdict remains the SOLE authority. Merged HERE
+  //         (before the sweeps + dedup + every re-typing guard) so a panel finding is treated EXACTLY like a lens
+  //         finding: same protective over-type softening, same dedup collapse. RE-GROUNDED against the assembled
+  //         source with the SAME isGrounded gate the seed path uses — a panel excerpt not verbatim in ctx.fullSource
+  //         is DROPPED (fail-safe, Rule 64 / I3). Panel ids ("panel:<ref>") are preserved for provenance. Only the
+  //         executor supplies opts.panelFindings, and ONLY under AUDIT_PANEL_JUDGE ⇒ flag-OFF is byte-identical.
+  if (opts.panelFindings?.length) {
+    const reground = opts.panelFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+    reground.forEach((f, j) => { f.id = f.id ?? `panel#${j}`; });
+    if (reground.length) { perLens["panel"] = reground.length; findings.push(...reground); }
+    console.log(`[orchestrator] panel merge: ${opts.panelFindings.length} verified typed finding(s) → ${reground.length} re-grounded (${opts.panelFindings.length - reground.length} dropped: excerpt not in assembled source)`);
+  }
+
   // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE
   //         step 1 — flip UNCOMMITTED, pending Brain review of the live runs). Grounds the failing archetypes
   //         (personnel quals / FAT preconditions / delivery windows / QPL / or-equal) directly from source so
@@ -1815,6 +1838,18 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
     findings = [...findings, ...emitSelfDeterminableCaveats(ctx.fullSource, findings, ctx.noticeBodyText, opts.setAside)];
   } else if (SIZE_STANDARD_SELF_CERT_ENABLED()) {
     findings = [...findings, ...emitSizeStandardCaveats(ctx.fullSource, findings, ctx.noticeBodyText)];
+  }
+  // 2c (card #523) — DETERMINISTIC ABSENCE-GROUNDING over the FULL finding set (v3 lens findings + any merged panel
+  // findings), the v3-side half of Brain's declaration ≠ presence condition. DROP a finding whose requirement asserts
+  // the ABSENCE of a checkable element (UCF section / clause / named artifact) the assembled package DEMONSTRABLY
+  // CONTAINS — a producer SAYING "no Section B" is not evidence when the deterministic scan finds Section B present. A
+  // genuine-absence finding (element truly missing) is untouched → survives. Flag AUDIT_ABSENCE_GROUNDING_GATE
+  // default-OFF ⇒ byte-identical. Runs LAST (after every re-typing guard/emitter), right before deriveVerdict.
+  if (process.env.AUDIT_ABSENCE_GROUNDING_GATE === "true") {
+    const absMarkers = scanPackageMarkers(ctx.fullSource);
+    const beforeAbs = findings.length;
+    findings = findings.filter((f) => !absenceClaimContradicted(f.requirement ?? "", absMarkers));
+    if (findings.length < beforeAbs) console.log(`[orchestrator] absence-grounding: dropped ${beforeAbs - findings.length} contradicted absence finding(s) — asserted absence of an element the package contains`);
   }
   const inputs: VerdictInputs = { findings, bidderProfile, coverageComplete, verifierSound: ver.sound, conflict, documentsComplete: opts.manifestComplete, manifestComplete: manifestComplete(ctx) && coreMissing.length === 0, source: ctx.fullSource, detectedUnverifiableEligibilityGate, coverageGap, setAsideConflict, primaryIndeterminate, ...(noticeBodyBarUngrounded ? { noticeBodyBarUngrounded: true } : {}), ...(process.env.AUDIT_SITEVISIT_SEVERITY_FLOOR === "true" ? { siteVisitSeverityFloor: true } : {}), ...(GATE_V2_ENABLED ? { coverageV2: gradeCoverageV2(attestations) } : {}) };
   if (process.env.CONSTRUCTION_DEBUG === "true") {

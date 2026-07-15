@@ -7,6 +7,7 @@ import {
   fetchRecentAudits,
   fetchHomeStats,
 } from "@/lib/bd-os/queries";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 
 export const dynamic = "force-dynamic";
 
@@ -119,8 +120,9 @@ export async function GET() {
       const tsRaw = a.completed_at || a.created_at;
       const ts = tsRaw ? new Date(tsRaw).getTime() : NaN;
       if (isNaN(ts) || (nowMs - ts) > dayMs) return false;
-      const rec = (a.recommendation || "").toLowerCase();
-      return a.bid_no_bid === "no-bid" || rec.indexOf("disqualif") !== -1 || rec.indexOf("no bid") !== -1;
+      // R3: derive from pole; "DECLINE" maps to NO_BID/INELIGIBLE verdicts.
+      const rec = poleToRecommendation(a).toLowerCase();
+      return a.bid_no_bid === "no-bid" || rec === "decline";
     }).length;
 
     const pursuitsAdvanced = (pipelineRows as any[]).filter((c) => {

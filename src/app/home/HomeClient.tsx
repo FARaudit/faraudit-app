@@ -14,6 +14,7 @@ import type {
   DefenseSpendingRow
 } from "@/lib/bd-os/queries";
 import { auditDisplayName, auditHref, displaySolicitationId } from "@/lib/audit-display";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 import NaicsCombobox from "@/components/NaicsCombobox";
 import FeedbackWidget from "@/app/_components/feedback-widget";
 
@@ -1367,7 +1368,7 @@ function enrichRow(row: OpportunityRow): Enriched {
     if (row.compliance_score < 40) label = "P0";
     else if (row.compliance_score < 70) label = "P1";
     else label = "P2";
-  } else if (row.recommendation === "DECLINE") {
+  } else if (poleToRecommendation(row) === "DECLINE") {
     label = "P0";
   }
   if (row.response_deadline) {
@@ -1467,10 +1468,14 @@ function raVerdict(a: AuditRow): { cls: "is-proceed" | "is-caution" | "is-nobid"
   if (ev === "NO-BID" || ev === "NOBID") return { cls: "is-nobid", label: "NO-BID" };
   if (ev === "CAUTION") return { cls: "is-caution", label: "CAUTION" };
   if (ev === "PROCEED" || ev === "GO" || ev === "BID") return { cls: "is-proceed", label: "PROCEED" };
-  const rec = (a.recommendation || "").toUpperCase();
+  // R3: derive from authoritative pole. NOTE (ultra #236 bug_001/008): poleToRecommendation never returns falsy — it
+  // returns "REVIEW" as the fail-safe for rows with NO pole (legacy null recommendation + no v3.verdict). Folding
+  // REVIEW into CAUTION here would (a) make the score fallback below dead code and (b) regress a legacy score-90 row
+  // from PROCEED to CAUTION. So REVIEW FALLS THROUGH to the score inference (matches CommandCenter's REVIEW→null guard).
+  const rec = poleToRecommendation(a);
   if (rec === "DECLINE") return { cls: "is-nobid", label: "NO-BID" };
   if (rec === "PROCEED") return { cls: "is-proceed", label: "PROCEED" };
-  if (rec.includes("CAUTION")) return { cls: "is-caution", label: "CAUTION" };
+  if (rec === "PROCEED_WITH_CAUTION") return { cls: "is-caution", label: "CAUTION" };
   if (a.compliance_score != null) {
     if (a.compliance_score >= 70) return { cls: "is-proceed", label: "PROCEED" };
     if (a.compliance_score < 40) return { cls: "is-nobid", label: "NO-BID" };
@@ -2048,7 +2053,11 @@ function PastAuditsPanel({
             const r = riskFromScore(a.compliance_score);
             const rc = r.cls === "rk0" ? "var(--red)" : r.cls === "rk1" ? "var(--amber)" : "var(--gold)";
             const bg = r.cls === "rk0" ? "rgba(220,38,38,.14)" : r.cls === "rk1" ? "rgba(245,158,11,.11)" : "rgba(55, 138, 221,.08)";
-            const recColor = a.recommendation === "PROCEED" ? "var(--green)" : a.recommendation === "DECLINE" ? "var(--red)" : "var(--amber)";
+            // R3: derive from authoritative pole.
+            // ultra #236 bug_004: poleToRecommendation never returns falsy (REVIEW is its no-pole fail-safe), so fold
+            // REVIEW→null — matching CommandCenter — so a legacy null-recommendation row renders "—" (not "REVIEW").
+            const _rec = (() => { const r = poleToRecommendation(a); return r !== "REVIEW" ? r : null; })();
+            const recColor = _rec === "PROCEED" ? "var(--green)" : _rec === "DECLINE" ? "var(--red)" : "var(--amber)";
             const isPinned = pinned.has(a.id);
             const isBusy = pinBusy.has(a.id);
             return (
@@ -2071,7 +2080,7 @@ function PastAuditsPanel({
                   ? <span className="sr-badge" style={{ color: rc, background: bg, border: `1px solid ${rc}40` }}>{a.compliance_score}</span>
                   : <span className="sr-date">—</span>}
                 <span className="sr-badge" style={{ color: recColor, background: "transparent", border: `1px solid ${recColor}40` }}>
-                  {a.recommendation ? a.recommendation.replace(/_/g, " ") : "—"}
+                  {_rec ? _rec.replace(/_/g, " ") : "—"}
                 </span>
                 <button
                   type="button"
@@ -2454,7 +2463,9 @@ function stageOf(a: AuditRow): KanbanStage {
   if (outcome === "won")  return "awarded";
   if (outcome === "lost") return "lost";
   if (submitted)          return "submitted";
-  if (a.recommendation === "PROCEED" || a.recommendation === "PROCEED_WITH_CAUTION") return "bidding";
+  // R3: derive from authoritative pole.
+  const _stageRec = poleToRecommendation(a);
+  if (_stageRec === "PROCEED" || _stageRec === "PROCEED_WITH_CAUTION") return "bidding";
   return "tracking";
 }
 

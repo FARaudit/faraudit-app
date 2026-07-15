@@ -26,6 +26,9 @@ import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocR
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
+import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
+import { buildPanelInputs } from "./panel-adapter";
+import { foldPanelReason } from "./panel-findings-bridge";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
@@ -386,8 +389,39 @@ export async function executeAgenticPrimary(
   // Brain card 291 — grounding corpus = the pre-compression full text (all docs), so per-doc-decomposition findings
   // ground against source, not the digest. Only consumed when AUDIT_PERDOC_DECOMP is on; otherwise inert.
   const groundingSource = docs.map((d) => d.text).join("\n\n");
+  // PANEL WIRING ARC (card #523, P2a-wire) — run the 6-lens expert panel as a FINDINGS PRODUCER and feed its
+  // VERIFIED typed facts into the SAME auditPackage that derives the verdict (deriveVerdict = SOLE authority). Gated
+  // on AUDIT_PANEL_JUDGE (default-OFF ⇒ panelFindings undefined ⇒ auditPackage byte-identical). Panel inputs are the
+  // deterministic P1a adapter over the assembled fullSource; every panel model call lands in usageCalls (same COGS
+  // ledger) via onUsage. A panel honest-fail (manifest gate / all-lenses-failed) yields typedFindings=[] — the rail
+  // proceeds on the v3 lens findings alone, never blocked by the panel. The judge is REASON-only (2d, not yet folded).
+  let panelResult: PanelResult | null = null;
+  if (AGENTIC_PANEL_ENABLED) {
+    try {
+      const panelInputs = buildPanelInputs(fullSource);
+      panelResult = await runPanelJudge({
+        sectionText: panelInputs.sectionText,
+        detectedSections: panelInputs.detectedSections,
+        unroutedBinding: panelInputs.unroutedBinding,
+        manifest: panelInputs.manifest,   // card #525 — class-aware firing gate (UCF checkManifest / commercial biddable-content)
+        signal,
+        onUsage: (u) => usageCalls.push(u),
+      });
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel [${panelInputs.documentClass}] ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "gate: " + panelResult.manifest.missing.join(", ") : "no verdict"}) → 0 findings`}`);
+    } catch (e) {
+      // DOCTRINE (ultra #236 bug_005): the panel NEVER blocks the audit. runPanelJudge honest-fails gracefully for
+      // lens/verifier failures, but the chief-judge call RETHROWS (retry-ladder ceiling / rate-limit / AbortError
+      // after the paid lens+verifier work). Without this catch that throw would crash the customer audit AFTER they
+      // were charged, stranding the row in 'processing'. Degrade to panel-off → deriveVerdict proceeds on the v3 lens
+      // findings alone. EXCEPT an overall-budget abort, which must still own the terminal-failed path (never a silent degrade).
+      if (signal?.aborted) throw e;
+      panelResult = null;
+      console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel threw (${e instanceof Error ? e.message : e}) → degraded to panel-off; rail proceeds on v3 findings`);
+    }
+  }
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
+    panelFindings: panelResult?.typedFindings,   // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical)
     noticeBodyText: noticeBody?.text,   // B3 (card 421 Fork-3) — delimiter-independent notice-body eligibility floor
 
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
@@ -405,6 +439,17 @@ export async function executeAgenticPrimary(
   // Card #481 (ruling-4) — reframe a "no set-aside is present" finding against the authoritative masthead set_aside so it
   // stops contradicting the "Set-aside: SBA" header (display-only, no verdict impact). Flag-OFF ⇒ untouched (byte-identical).
   res.findings = reframeNoSetAsideFindings(res.findings, solicitation?.typeOfSetAside ?? null);
+  // P2d (card #523) — chief-judge REASON synthesis. Fold the panel judge's rationale into the derived reason
+  // (derived-reason-FIRST, dedup, bounded; NEVER overrides the pole — the judge is narrative-only). Gated on BOTH
+  // (a) the panel having CONTRIBUTED verified facts, AND (b) the judge verdict being a COMMITTAL pole (ultra #236
+  // bug_007): the runner's enforceCoverageFloor / enforceVerifiedShowStoppers can rewrite the judge rationale with an
+  // "[INCOMPLETE …]" / "[honest-fail]" prefix EVEN when verified findings exist (e.g. non-empty unroutedBinding), so
+  // gating only on typedFindings would leak an honest-fail rationale into a committal derived reason — contradicting
+  // the pole. Skip the fold on INCOMPLETE / NEEDS_HUMAN_REVIEW / OUT_OF_SCOPE judge verdicts. Flag-OFF ⇒ untouched.
+  const COMMITTAL_JUDGE_VERDICT = new Set(["BID", "BID_WITH_CAUTION", "NO_BID", "INELIGIBLE"]);
+  if (panelResult?.typedFindings.length && panelResult.judgment?.rationale && COMMITTAL_JUDGE_VERDICT.has(panelResult.judgment.verdict)) {
+    res.decision = { ...res.decision, reason: foldPanelReason(res.decision.reason, panelResult.judgment.rationale) };
+  }
   const payload = buildV3Payload(res.decision, res.coverage, res.findings, generatedAt);
 
   // FAIL-SAFE — reconcile what we READ against SAM's posted manifest (input.ingestion,
@@ -505,7 +550,7 @@ export async function executeAgenticPrimary(
     risks_summary: stopperCount ? `${stopperCount} show-stopper bar(s) drive this verdict.` : "No non-curable bars found.",
     risks_json: { engine: "agentic_v3", show_stoppers: stopperCount },
     compliance_score: null,
-    recommendation,
+    // R3: recommendation column is RETIRED — do NOT write it; pole lives in compliance_json.v3.verdict.
     bid_recommendation: clampToWord(res.decision.reason, 600),
     status: "complete",
     current_stage: "assembly",

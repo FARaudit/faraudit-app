@@ -142,9 +142,14 @@ export function assembleLensPasses(
   const missingSections: string[] = [];
   // 1) build blocks; chunk any single section that alone exceeds budget (header preserved per part).
   const blocks: Array<{ key: string; text: string }> = [];
+  const seenRaw = new Set<string>(); // card #525 — commercial whole-source fallback assigns the SAME source under
+  //                                    several of a lens's keys; dedupe identical text so the lens reads it ONCE
+  //                                    (normal UCF section texts differ, so this never collides on the UCF path).
   for (const key of assigned) {
     const raw = (sectionText[key] ?? "").trim();
     if (!raw) { missingSections.push(key); continue; }
+    if (seenRaw.has(raw)) continue;
+    seenRaw.add(raw);
     const header = `## SECTION ${key}`;
     const full = `${header}\n${raw}`;
     if (full.length <= budget) { blocks.push({ key, text: full }); continue; }

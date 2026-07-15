@@ -6,13 +6,16 @@
 // Mirrors agentic-lenses.runLenses: the sanitized+sandwiched matrix is the byte-identical
 // cached system prefix shared across same-tier calls (prime-then-parallel). NOT wired into
 // the engine and NOT run until Stage 6E proves board-room quality. See the plan, Stage 6.
-import { callStructuredClaude } from "./anthropic-structured";
+import { callStructuredClaude, type StructuredUsage } from "./anthropic-structured";
 import { sanitizePdfText } from "./audit-engine";
 import {
   PANELISTS, VERIFIER, CHIEF_JUDGE, PANELIST_SCHEMA, VERIFIER_SCHEMA, CHIEF_JUDGE_SCHEMA,
   checkManifest, type ManifestResult, type PanelTier,
 } from "./agentic-panel";
 import { assembleLensPasses, excerptInSource, LENS_SECTIONS, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
+import { panelFindingsToTyped } from "./panel-findings-bridge";
+import { scanPackageMarkers, absenceClaimContradicted } from "./absence-grounding-gate";
+import type { TypedFinding } from "./audit-findings";
 
 // ⚠ NOT YET WIRED: this flag currently GATES NOTHING — runPanelJudge has no production caller
 // (only the proof driver + tests). Flipping AUDIT_PANEL_JUDGE on Railway does NOT activate the panel
@@ -43,8 +46,17 @@ function modelFor(tier: PanelTier, override?: Partial<Record<PanelTier, string>>
   return process.env.AUDIT_PANEL_SONNET || "claude-sonnet-4-6";
 }
 
-const PANELIST_TIMEOUT_MS = Number(process.env.AUDIT_PANELIST_TIMEOUT_MS) || 240_000;
-const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 360_000;
+// PANEL WIRING ARC (card #523, P1c) — timeouts RE-DERIVED for the customer path. The old defaults
+// (panelist 240s, judge 360s) each EXCEEDED the 270s agentic budget (AGENTIC_V3_PRIMARY_BUDGET_MS) and the
+// 300s platform hard-kill, so a slow stage died via withBudget terminal-failed instead of a graceful panel
+// honest-fail. New ceilings bound the WORST-CASE critical path — parallel lenses (gated by the slowest) →
+// serial verifier → serial chief-judge — to 90 + 70 + 60 = 220s < 240s, leaving ≥30s headroom inside the
+// 270s budget and 80s to the platform kill. A stage that hits its ceiling AbortError is caught by the
+// lens Promise.allSettled / verifier Promise.all / judge try-catch and degrades to a panel honest-fail
+// (verified findings default UNVERIFIABLE / judgment null), never a withBudget throw. Env-overridable.
+const PANELIST_TIMEOUT_MS = Number(process.env.AUDIT_PANELIST_TIMEOUT_MS) || 90_000;  // lenses run in parallel → cost = slowest lens
+const VERIFIER_TIMEOUT_MS = Number(process.env.AUDIT_VERIFIER_TIMEOUT_MS) || 70_000;  // serial, after lenses
+const JUDGE_TIMEOUT_MS = Number(process.env.AUDIT_JUDGE_TIMEOUT_MS) || 60_000;        // serial, after verifier
 // Per-field caps normalize density (Brain's verbosity-bias guard) WITHOUT dropping the
 // contrarian_finding — capping the whole string used to truncate it (review 2026-06-24).
 const CONTRARIAN_CHARS = 500;
@@ -56,6 +68,11 @@ const FIELD_CHARS = 650;
 async function panelCall<T>(p: {
   model: string; system: string; cachedSystemPrefix?: string; userPrompt: string;
   schema: object; maxTokens: number; ceiling: number; timeoutMs: number; label: string; signal?: AbortSignal;
+  // P1b (card #523) — cost visibility: every panel model call must land in the executor's per-run usage tally
+  // (the `label` is stage-distinct — panel:<lens>/panel:verifier/panel:gatekeeper — so aggregation yields
+  // per-stage AND per-model attribution). Without this the entire panel spend (incl. the two opus stages) is
+  // invisible to the COGS ledger.
+  onUsage?: (u: StructuredUsage) => void;
 }): Promise<T> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set — panel call cannot proceed");
@@ -65,7 +82,7 @@ async function panelCall<T>(p: {
     const res = await callStructuredClaude({
       apiKey, model: p.model, system: p.system, cachedSystemPrefix: p.cachedSystemPrefix,
       userPrompt: p.userPrompt, schema: p.schema, maxTokens, timeoutMs: p.timeoutMs,
-      label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal,
+      label: `${p.label}${maxTokens > p.maxTokens ? ` @${maxTokens}` : ""}`, signal: p.signal, onUsage: p.onUsage,
     });
     let parsed: T;
     try {
@@ -210,6 +227,12 @@ export interface PanelResult {
    *  the panel did not see binding content ⇒ coverage MUST be INCOMPLETE upstream (honesty rule). */
   droppedSectionsForBudget?: string[];
   judgment: ChiefJudgeOutput | null;
+  // P2a (card #523) — the panel's VERIFIED facts, typed for `VerdictInputs.findings`. This is the seam the
+  // executor merges into deriveVerdict (the SOLE authority); the `judgment` above is REASON/narrative only
+  // (`.verdict` is log-only under the wired architecture). Empty on any honest-fail (manifest gate, all-lenses
+  // failed) — the panel produced no VERIFIED fact, so it contributes nothing to the verdict. Only VERIFIED
+  // claims cross this seam (2b); an unmet gate fails closed to NHR. See panel-findings-bridge.ts.
+  typedFindings: TypedFinding[];
 }
 
 /** #5 — ONE COVERAGE TRUTH. The single authoritative answer to "did the audit read everything it
@@ -237,10 +260,17 @@ export async function runPanelJudge(params: {
   unroutedBinding?: string[];
   models?: Partial<Record<PanelTier, string>>;
   signal?: AbortSignal;
+  /** P1b (card #523) — per-run cost sink; the executor passes `(u) => usageCalls.push(u)` so every panel
+   *  model call is priced into the same ledger as the rest of the audit (stage-attributed via the call label). */
+  onUsage?: (u: StructuredUsage) => void;
+  /** card #525 (class-aware firing) — the class-appropriate FIRING GATE from buildPanelInputs (UCF → checkManifest;
+   *  commercial → checkBiddableContent). When supplied, it REPLACES the runner's own checkManifest so the panel fires
+   *  correctly on non-UCF buys. Absent ⇒ checkManifest(detectedSections) (byte-identical for existing callers/tests). */
+  manifest?: ManifestResult;
 }): Promise<PanelResult> {
-  const manifest = checkManifest(params.detectedSections);
+  const manifest = params.manifest ?? checkManifest(params.detectedSections);
   if (!manifest.ok) {
-    return { fired: false, manifest, panelists: [], verifier: null, judgment: null };
+    return { fired: false, manifest, panelists: [], verifier: null, judgment: null, typedFindings: [] };
   }
 
   // ── 5 lenses, each reading its ASSIGNED SOURCE sections (Step 2 per-section fan-out) ──
@@ -271,7 +301,7 @@ export async function runPanelJudge(params: {
       return panelCall<PanelistOutput>({
         model: modelFor(p.tier, params.models), system: p.system, cachedSystemPrefix: lensPrefix,
         userPrompt: task, schema: PANELIST_SCHEMA, maxTokens: 4_000, ceiling: 8_000,
-        timeoutMs: PANELIST_TIMEOUT_MS, label: passes.length > 1 ? `panel:${p.key}#${idx + 1}` : `panel:${p.key}`, signal: params.signal,
+        timeoutMs: PANELIST_TIMEOUT_MS, label: passes.length > 1 ? `panel:${p.key}#${idx + 1}` : `panel:${p.key}`, signal: params.signal, onUsage: params.onUsage,
       });
     };
     const settledPasses = await Promise.allSettled(passes.map(callPass));
@@ -306,7 +336,7 @@ export async function runPanelJudge(params: {
   // gate's post-gate sibling). Honest-fail, no charge, no further model calls.
   if (panelists.every((p) => p.output === null)) {
     return {
-      fired: true, manifest, panelists, verifier: null,
+      fired: true, manifest, panelists, verifier: null, typedFindings: [],
       droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
       judgment: {
         verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [], show_stoppers: [],
@@ -357,7 +387,25 @@ export async function runPanelJudge(params: {
   for (const c of claims) {
     if (!c.grounded) stateByRef.set(c.ref, { state: "REFUTED", evidence: "excerpt not found in the lens's assigned source (fabricated/paraphrased grounding)" });
   }
-  const groundedClaims = claims.filter((c) => c.grounded);
+  // 2c (card #523) — DETERMINISTIC ABSENCE-GROUNDING (Brain condition 2026-07-15: declaration ≠ presence). A claim
+  // asserting the ABSENCE of a checkable element (UCF section / clause / named artifact) the package DEMONSTRABLY
+  // CONTAINS is REFUTED here, deterministically, BEFORE + independent of the model verifier — a lens SAYING "no
+  // Section B" is not evidence when the scan finds Section B present (the seq-1 bug). A GENUINE-absence claim (the
+  // element is truly missing) is left untouched → it survives to the verifier + judge. Package markers use the panel's
+  // own detected-section set (from buildPanelInputs over the real fullSource) + a clause/artifact scan of the routed
+  // source. Structural REFUTED (rank 0) can never be upgraded by the verifier overlay below.
+  const pkgMarkers = scanPackageMarkers(Object.values(params.sectionText).join("\n"), { sections: params.detectedSections });
+  let absenceRefuted = 0;
+  for (const c of claims) {
+    if (stateByRef.get(c.ref)?.state === "REFUTED") continue;
+    if (absenceClaimContradicted(c.text, pkgMarkers)) {
+      stateByRef.set(c.ref, { state: "REFUTED", evidence: "absence claim contradicted by deterministic package scan — the referenced element is present in the package (declaration ≠ presence)" });
+      absenceRefuted++;
+    }
+  }
+  if (absenceRefuted) console.log(`[panel] absence-grounding: ${absenceRefuted} claim(s) REFUTED — asserted absence of an element the package contains`);
+  // Exclude both ungrounded AND absence-contradicted claims from the (paid) verifier batch — their state is already sealed.
+  const groundedClaims = claims.filter((c) => c.grounded && stateByRef.get(c.ref)?.state !== "REFUTED");
 
   let verifier: VerifierOutput | null = null;
   let verifierFailed = false;
@@ -373,7 +421,7 @@ export async function runPanelJudge(params: {
       panelCall<VerifierOutput>({
         model: modelFor(VERIFIER.tier, params.models), system: VERIFIER.system, // no cachedSystemPrefix — the verifier reads claim+excerpt pairs, NOT the matrix
         userPrompt: `LOGIC-CHECK each claim: does the CONCLUSION follow from its cited excerpt (correct reading + sound rule-application)? ECHO the [ref] in your \`ref\` field; give ONE short evidence sentence:\n\n${securitySandwich("claims", batch.map((c) => `[${c.ref}] (${c.lens}) ${c.text}`).join("\n"))}`,
-        schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: VERIFIER_OUTPUT_CEILING, timeoutMs: JUDGE_TIMEOUT_MS,
+        schema: VERIFIER_SCHEMA, maxTokens: 4_000, ceiling: VERIFIER_OUTPUT_CEILING, timeoutMs: VERIFIER_TIMEOUT_MS, onUsage: params.onUsage,
         label: batches.length > 1 ? `panel:verifier#${bi + 1}/${batches.length}` : "panel:verifier", signal: params.signal,
       }).then((v) => ({ ok: true as const, v })).catch((e) => ({ ok: false as const, e: e instanceof Error ? e.message : String(e) })),
     ));
@@ -418,7 +466,7 @@ export async function runPanelJudge(params: {
     model: modelFor(CHIEF_JUDGE.tier, params.models), system: CHIEF_JUDGE.system,
     userPrompt: `${securitySandwich("panel-findings", `VERIFIED FINDINGS (cite show_stoppers ONLY from these, by ref):\n${findingsBrief}\n\nPER-LENS LEAN (context for the verdict; NOT citable as show-stoppers):\n${leanBrief}${verifierNote}`)}\n\nApply your three rules and emit the final verdict.`,
     schema: CHIEF_JUDGE_SCHEMA, maxTokens: 6_000, ceiling: 12_000, timeoutMs: JUDGE_TIMEOUT_MS,
-    label: "panel:gatekeeper", signal: params.signal,
+    label: "panel:gatekeeper", signal: params.signal, onUsage: params.onUsage,
   }).catch((e) => { throw new Error(`gatekeeper+synthesizer failed: ${e instanceof Error ? e.message : e}`); });
 
   const verifiedRefs = new Set(verifiedFindings.filter((c) => c.state === "VERIFIED").map((c) => c.ref));
@@ -433,10 +481,15 @@ export async function runPanelJudge(params: {
   // COVERAGE floor applied LAST — incomplete coverage DOMINATES every other verdict (you cannot judge
   // eligibility on content you never read). Forces INCOMPLETE + the unread list (Brain ruling).
   const final = enforceCoverageFloor(afterStoppers, { droppedSections: droppedForBudget, unroutedBinding: params.unroutedBinding });
+  // P2a (card #523) — TYPE the panel's VERIFIED facts for deriveVerdict. This reads the SAME `stateByRef`
+  // the judge's findingsBrief was built from, so the facts crossing to the verdict authority and the facts
+  // the judge narrated are one set (no divergence). The judge's `.verdict` is REASON/narrative only under
+  // the wired architecture; deriveVerdict (executor, sole authority) consumes `typedFindings`.
+  const typedFindings = panelFindingsToTyped({ panelists, stateByRef });
   return {
     fired: true, manifest, panelists, verifier, verifierError: verifierError || undefined,
     droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
-    judgment: final,
+    judgment: final, typedFindings,
   };
 }
 

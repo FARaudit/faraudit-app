@@ -8,6 +8,7 @@
 
 import { displaySolicitationId, auditDisplayName } from "@/lib/audit-display";
 import { isActionableSubmissionItem, looksLikeOrgName, looksLikeSetAsideValue } from "@/lib/section-extractors";
+import { poleToRecommendation } from "@/lib/verdict-pole";
 import { suppressContradictedConfidenceNotes } from "./_v2-render-surfaces";
 import type { AuditConfidenceNote } from "@/lib/audit-judgment";
 
@@ -2832,7 +2833,9 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
   const risksJson = (audit.risks_json as Record<string, unknown>) || {};
   const overviewJson = (audit.overview_json as Record<string, unknown>) || {};
 
-  const verdict = mapVerdict(audit.recommendation);
+  // R3: derive verdict from authoritative pole (compliance_json.v3.verdict);
+  // falls back to stale recommendation column for pre-R3 rows.
+  const verdict = mapVerdict(poleToRecommendation({ compliance_json: audit.compliance_json as Record<string, unknown> | null, recommendation: audit.recommendation as string | null }));
   // Fix 2 (2026-06-05 — Ruling 1 wiring): read the typed verdict the engine
   // persisted to complianceJson.verdict. When DECISION_GATE, suppress the
   // numeric fit_score (set to null per spec) and tag verdict_mode='gate' so
@@ -3602,12 +3605,12 @@ export function buildViewModel(audit: AuditRow, opts?: { isWatching?: boolean; h
     // Canonicalization layer (Brain ruling 2026-06-06) — single-source verdict
     // + canonical gate prose tied to actual gate count + days-to-deadline.
     verdict_word: (() => {
-      // FA-126 — the stored audits.recommendation column is the single
-      // source of truth (same field the ledger, masthead pill, and PDF
-      // read). compJson.verdict.recommendation is fallback only, for legacy
-      // rows written before the column was populated.
+      // R3: derive from authoritative pole (compliance_json.v3.verdict).
+      // poleToRecommendation falls back to audit.recommendation for pre-R3 rows,
+      // then to compJson.verdict.recommendation for very old rows.
       const v = (compJson.verdict ?? null) as { recommendation?: string } | null;
-      const rec = (audit.recommendation as string | undefined) ?? v?.recommendation ?? "";
+      const legacyFallback = (audit.recommendation as string | undefined) ?? v?.recommendation ?? undefined;
+      const rec = poleToRecommendation({ compliance_json: audit.compliance_json as Record<string, unknown> | null, recommendation: legacyFallback ?? null });
       if (rec === "PROCEED") return "BID";
       if (rec === "DECLINE") return "NO-BID";
       return "CAUTION";
