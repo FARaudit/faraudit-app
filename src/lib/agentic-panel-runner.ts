@@ -13,6 +13,8 @@ import {
   checkManifest, type ManifestResult, type PanelTier,
 } from "./agentic-panel";
 import { assembleLensPasses, excerptInSource, LENS_SECTIONS, makeClauseSourceChecker, stripFabricatedClauses, type PanelLensKey } from "./agentic-sections";
+import { panelFindingsToTyped } from "./panel-findings-bridge";
+import type { TypedFinding } from "./audit-findings";
 
 // ⚠ NOT YET WIRED: this flag currently GATES NOTHING — runPanelJudge has no production caller
 // (only the proof driver + tests). Flipping AUDIT_PANEL_JUDGE on Railway does NOT activate the panel
@@ -224,6 +226,12 @@ export interface PanelResult {
    *  the panel did not see binding content ⇒ coverage MUST be INCOMPLETE upstream (honesty rule). */
   droppedSectionsForBudget?: string[];
   judgment: ChiefJudgeOutput | null;
+  // P2a (card #523) — the panel's VERIFIED facts, typed for `VerdictInputs.findings`. This is the seam the
+  // executor merges into deriveVerdict (the SOLE authority); the `judgment` above is REASON/narrative only
+  // (`.verdict` is log-only under the wired architecture). Empty on any honest-fail (manifest gate, all-lenses
+  // failed) — the panel produced no VERIFIED fact, so it contributes nothing to the verdict. Only VERIFIED
+  // claims cross this seam (2b); an unmet gate fails closed to NHR. See panel-findings-bridge.ts.
+  typedFindings: TypedFinding[];
 }
 
 /** #5 — ONE COVERAGE TRUTH. The single authoritative answer to "did the audit read everything it
@@ -257,7 +265,7 @@ export async function runPanelJudge(params: {
 }): Promise<PanelResult> {
   const manifest = checkManifest(params.detectedSections);
   if (!manifest.ok) {
-    return { fired: false, manifest, panelists: [], verifier: null, judgment: null };
+    return { fired: false, manifest, panelists: [], verifier: null, judgment: null, typedFindings: [] };
   }
 
   // ── 5 lenses, each reading its ASSIGNED SOURCE sections (Step 2 per-section fan-out) ──
@@ -323,7 +331,7 @@ export async function runPanelJudge(params: {
   // gate's post-gate sibling). Honest-fail, no charge, no further model calls.
   if (panelists.every((p) => p.output === null)) {
     return {
-      fired: true, manifest, panelists, verifier: null,
+      fired: true, manifest, panelists, verifier: null, typedFindings: [],
       droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
       judgment: {
         verdict: "NEEDS_HUMAN_REVIEW", fit_score: 0, eligible: false, preserved_dissent: [], show_stoppers: [],
@@ -450,10 +458,15 @@ export async function runPanelJudge(params: {
   // COVERAGE floor applied LAST — incomplete coverage DOMINATES every other verdict (you cannot judge
   // eligibility on content you never read). Forces INCOMPLETE + the unread list (Brain ruling).
   const final = enforceCoverageFloor(afterStoppers, { droppedSections: droppedForBudget, unroutedBinding: params.unroutedBinding });
+  // P2a (card #523) — TYPE the panel's VERIFIED facts for deriveVerdict. This reads the SAME `stateByRef`
+  // the judge's findingsBrief was built from, so the facts crossing to the verdict authority and the facts
+  // the judge narrated are one set (no divergence). The judge's `.verdict` is REASON/narrative only under
+  // the wired architecture; deriveVerdict (executor, sole authority) consumes `typedFindings`.
+  const typedFindings = panelFindingsToTyped({ panelists, stateByRef });
   return {
     fired: true, manifest, panelists, verifier, verifierError: verifierError || undefined,
     droppedSectionsForBudget: droppedForBudget.length ? droppedForBudget : undefined,
-    judgment: final,
+    judgment: final, typedFindings,
   };
 }
 

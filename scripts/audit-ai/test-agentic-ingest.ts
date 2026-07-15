@@ -451,7 +451,7 @@ check("#4 reduce: findings concatenated across chunks + deduped (CMMC once, both
 check("#4 reduce: single-chunk output passes through unchanged", mergePanelistOutputs([mp]) === mp);
 // ── Stage-6 completion #5: ONE COVERAGE TRUTH (panel layer governs, not the MAP statement) ──
 const okManifest = { ok: true, missing: [] as string[], statement: "ok" } as PanelResult["manifest"];
-const mkPanel = (over: Partial<PanelResult>): PanelResult => ({ fired: true, manifest: okManifest, panelists: [], verifier: null, judgment: { verdict: "BID", fit_score: 70, rationale: "ok", show_stoppers: [], preserved_dissent: [], eligible: true }, ...over });
+const mkPanel = (over: Partial<PanelResult>): PanelResult => ({ fired: true, manifest: okManifest, panelists: [], verifier: null, typedFindings: [], judgment: { verdict: "BID", fit_score: 70, rationale: "ok", show_stoppers: [], preserved_dissent: [], eligible: true }, ...over });
 check("#5 coverageTruth: clean panel → COMPLETE", coverageTruth(mkPanel({})).complete === true);
 check("#5 coverageTruth: manifest did not fire → INCOMPLETE (lists missing)", (() => { const c = coverageTruth(mkPanel({ fired: false, manifest: { ok: false, missing: ["L", "M"], statement: "x" } as PanelResult["manifest"] })); return !c.complete && c.reason.includes("L"); })());
 check("#5 coverageTruth: an INCOMPLETE verdict → coverage NOT complete (carries the reason)", (() => { const c = coverageTruth(mkPanel({ judgment: { verdict: "INCOMPLETE", fit_score: 0, rationale: "unread §B", show_stoppers: [], preserved_dissent: [], eligible: false } })); return !c.complete && c.reason.includes("unread §B"); })());
