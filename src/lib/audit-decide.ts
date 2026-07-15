@@ -585,6 +585,47 @@ function findingSetAsideCanon(f: TypedFinding): string | null {
   if (/total small business|small business set[\s-]?aside/i.test(hay)) return "sb:total"; // prose-only Total-SB
   return null;
 }
+// ── SUBSET-AWARE SET-ASIDE CONFLICT (card #534 Brain ruling, flag AUDIT_SETASIDE_SUBSET_AWARE, default OFF) ──────
+// Roots the conflict gate in set-THEORY. The socioeconomic programs are all SUBSETS of the small-business pool — a
+// WOSB/EDWOSB/SDVOSB/8(a)/HUBZone set-aside IS a small-business set-aside restricted further to that program — so a
+// {se:*, sb:total} pairing is NESTED, not competing (the narrower program governs). EDWOSB ⊂ WOSB likewise. A GENUINE
+// conflict is two NON-NESTED governing markings (e.g. WOSB vs HUBZone — different, neither contains the other).
+const SETASIDE_SUPERSETS: Record<string, ReadonlyArray<string>> = {
+  "se:wosb":    ["sb:total"],
+  "se:edwosb":  ["sb:total", "se:wosb"],    // EDWOSB ⊂ WOSB ⊂ small business
+  "se:vosb":    ["sb:total"],               // VOSB ⊂ small business
+  "se:sdvosb":  ["sb:total", "se:vosb"],    // SDVOSB ⊂ VOSB ⊂ small business
+  "se:8a":      ["sb:total"],
+  "se:hubzone": ["sb:total"],
+};
+// a is nested within b ⇔ b is a superset/ancestor of a (b broader, a narrower).
+const isNestedSetAside = (a: string, b: string): boolean => (SETASIDE_SUPERSETS[a] ?? []).includes(b);
+// Reduce a canon set to its maximal-specificity ANTICHAIN: drop any canon that is a SUPERSET of another present canon
+// (the narrower program governs). The remainder is pairwise non-nested — size ≥ 2 ⇔ a genuine multi-pool conflict.
+function reduceNestedSetAsides(canons: Set<string>): Set<string> {
+  const present = [...canons];
+  return new Set(present.filter((c) => !present.some((o) => o !== c && isNestedSetAside(o, c))));
+}
+// Root B — MARKING SOURCE. A set-aside program is a MARKING only from operative text (SF block 10 / masthead / §L
+// operative set-aside statement / SAM field) — NEVER a by-reference clause-table entry. A finding whose set-aside
+// signal is a clause "incorporated by reference" (with no operative "set aside for …" framing) is boilerplate residue,
+// not a governing marking, and must not feed the conflict union (card #534: the FA303026Q0020 52.219-6 by-ref leak).
+const SETASIDE_BY_REFERENCE_RE = /incorporated by reference|clauses?\s+incorporated|by reference/i;
+const SETASIDE_OPERATIVE_MARKING_RE = /set[\s-]?aside for|reserved (?:for|exclusively)|restricted to|100\s*(?:%|percent)|this (?:acquisition|requirement|solicitation|procurement) is (?:a |being )?set[\s-]?aside|is (?:a )?100/i;
+function isByReferenceMarkingOnly(f: TypedFinding): boolean {
+  // Gate purely on OPERATIVE-MARKING EVIDENCE (Gauntlet round 2). A marking is operative text — a masthead / SF block 10
+  // / §L "set aside FOR …" statement / SAM field — NOT a clause-table entry incorporated by reference. Typed-ness
+  // (requiredAttribute) is deliberately NOT the discriminator: the panel bridge (card #528) types set-aside findings,
+  // so a TYPED 52.219-6/-3 by-reference boilerplate would wrongly survive and re-open card #534. A genuine governing
+  // second pool is stated operatively (it IS the governing set-aside) → its "set aside for" text survives this gate; a
+  // bare clause-table citation with the noun-form FAR title ("Notice of Total Small Business Set-Aside … incorporated by
+  // reference") carries no operative trigger → drops. A finding with BOTH by-ref AND operative "set aside for" text →
+  // operative evidence wins (not dropped). Note: findings from an APPLICABLE matrix row (emitSetAsideNoticeFindings)
+  // carry operative "set aside for …" requirement text, so they always survive this gate.
+  const hay = `${f.citation ?? ""} ${f.requirement ?? ""} ${f.excerpt ?? ""}`;
+  return SETASIDE_BY_REFERENCE_RE.test(hay) && !SETASIDE_OPERATIVE_MARKING_RE.test(hay);
+}
+
 /** Detect a set-aside conflict (Brain #332 + #334-B). Pure. Doc-side programs come from the RAW clause matrix
  *  (authoritative, does not depend on the lenses) UNIONED with the findings. Returns a conflict (both programs +
  *  a CO-clarification note) when EITHER (a) TWO OR MORE mutually-exclusive set-aside programs are marked applicable
@@ -599,15 +640,23 @@ export function detectSetAsideConflict(samSetAside: string | null | undefined, f
   //   (2) the findings (a genuine positive set-aside's canonical requiredAttribute OR its 52.219 citation) — a
   //       belt-and-suspenders catch for a prose-only set-aside a lens surfaced but the matrix scan didn't.
   // The union biases toward SURFACING ambiguity (→ NHR, the zero-contract-loss pole), never toward a silent pick.
+  const subsetAware = process.env.AUDIT_SETASIDE_SUBSET_AWARE === "true";
   const docCanons = new Set<string>();
   for (const n of detectSetAsideNotices(source)) docCanons.add(n.canon);
-  for (const f of findings) { const c = findingSetAsideCanon(f); if (c) docCanons.add(c); } // pool-definers only (excludes -4 price-pref)
+  for (const f of findings) {
+    if (subsetAware && isByReferenceMarkingOnly(f)) continue; // root B — by-reference clause-table entry is not a marking
+    const c = findingSetAsideCanon(f); if (c) docCanons.add(c);     // pool-definers only (excludes -4 price-pref)
+  }
   if (docCanons.size === 0) return undefined;      // doc set-aside not identified → no conflict (conservative)
+  // Root A (card #534) — collapse NESTED programs (WOSB/EDWOSB/… ⊂ small business; EDWOSB ⊂ WOSB) so a {se:*, sb:total}
+  // pairing is a refinement, not a competition. Flag OFF ⇒ effectiveDoc === docCanons ⇒ byte-identical.
+  const effectiveDoc = subsetAware ? reduceNestedSetAsides(docCanons) : docCanons;
   // (a) DOC-INTERNAL MULTI-PROGRAM (Brain #334-B) — two or more mutually-exclusive set-aside programs marked
   //     applicable is itself an NHR trigger, INDEPENDENT of SAM. A line item can't be set aside under two pools;
   //     "the doc also carries the SAM program" must NOT read as agreement (the old line-534 short-circuit did).
-  if (docCanons.size >= 2) {
-    const progs = [...docCanons].map(setAsideLabel);
+  //     With subset-awareness the count is over NON-NESTED programs only (a genuine multi-pool ambiguity).
+  if (effectiveDoc.size >= 2) {
+    const progs = [...effectiveDoc].map(setAsideLabel);
     return {
       sam: samCanon ? setAsideLabel(samCanon) : "(no single program recorded in SAM)",
       doc: progs.join(" / "),
@@ -616,8 +665,15 @@ export function detectSetAsideConflict(samSetAside: string | null | undefined, f
   }
   // (b) SINGLE doc program vs SAM (original Brain #332 root: SAM=HUBZone vs a lone doc Total-SB clause).
   if (!samCanon) return undefined;                 // a single doc program with no SAM to differ from → it's the basis, not a conflict
-  if (docCanons.has(samCanon)) return undefined;   // doc program == SAM → agreement, no conflict
-  const doc = [...docCanons].map(setAsideLabel).join(" / ");
+  if (effectiveDoc.has(samCanon)) return undefined;   // doc program == SAM → agreement, no conflict
+  if (subsetAware) {
+    // DIRECTION MATTERS. A doc program NESTED WITHIN SAM (doc is the NARROWER refinement — e.g. SAM=Total-SB vs
+    // doc=WOSB) → the doc governs, no conflict. The REVERSE — SAM narrower than a BROADER doc program (e.g. SAM=HUBZone
+    // vs doc=Total-SB, the original Brain #332 root) — STAYS a conflict: the doc under-restricts vs the system of record.
+    const [d] = [...effectiveDoc];
+    if (isNestedSetAside(d, samCanon)) return undefined;
+  }
+  const doc = [...effectiveDoc].map(setAsideLabel).join(" / ");
   return { sam: setAsideLabel(samCanon), doc, note: "Confirm the governing set-aside with the Contracting Officer before bidding — the eligible pool differs between SAM and the solicitation document." };
 }
 
