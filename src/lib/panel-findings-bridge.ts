@@ -24,6 +24,75 @@ import type { PanelistOutput } from "./agentic-panel-runner";
 
 export type VerifierState = "VERIFIED" | "UNVERIFIABLE" | "REFUTED";
 
+// ── TWO-ALLOWLIST SHAPE CLASSIFIER (card #526, Brain ruling 2026-07-15) ──────────────────────────────
+// A VERIFIED *unmet* named_hard_gate types by SHAPE — the discriminator is HOLD-vs-DO:
+//   (a) PROFILE-BAR  → a credential / status / standing the firm must HOLD or BE (held cert, endorsement from a
+//       named authority, background-check standing, set-aside category, exclusivity/holder-only). → fail-closed bar.
+//   (b) DO-THE-WORK  → an ACTION performable in the bid/performance window (submit / provide / price / register /
+//       email / attend / format / comply-with-structure / obtain-in-window). → bidder_controls (curable).
+//   (c) NEITHER cleanly → NHR. Escalation is the RESIDUAL — nothing defaults to bidder_controls; only a CLEAN
+//       do-the-work shape demotes. Position-checked SHAPE tests only, NO vocab blocklists.
+// PROFILE-BAR takes PRIORITY: a credential wrapped in an action verb ("submit proof of NADCAP accreditation") is
+// still HOLD-substance → (a). Consistency: SAM registration = (b) (aligned with #516 self-determinable doctrine).
+export type GateShape = "profile_bar" | "do_the_work" | "neither";
+
+// Unambiguous DO-THE-WORK FORMS that carry credential-ish nouns but are fill-out-and-submit ACTIONS — checked
+// FIRST so the profile-bar credential nouns don't trip on them. Reps & certs (52.212-3) is the canonical case.
+const DO_THE_WORK_OVERRIDE: RegExp[] = [
+  /\brepresentations?\s+and\s+certifications?\b|\breps?\s+and\s+certs?\b|\b52\.212-3\b|\b(?:annual|online)\s+representations\b/i,
+];
+
+// In-window ACQUIRABLE credential ("become / obtain X certified/certification BEFORE award/performance") — genuinely
+// ambiguous (a credential, yet obtainable in-window) → escalate to NEITHER (never demote). Checked before profile-bar.
+// NOTE: restricted to CERTS/ACCREDITATION — a facility/security clearance is long-lead + structural (NOT
+// in-window-acquirable), so it stays a profile-bar even with "prior to start" language.
+const ACQUIRABLE_CERT: RegExp[] = [
+  /\b(?:become|obtain|acquire|achieve|attain|get|secure)\b[^.\n]{0,45}\b(?:certif(?:ied|ication)|accredit(?:ed|ation))\w*\b[^.\n]{0,30}\b(?:before|prior\s+to|by|no\s+later\s+than)\b[^.\n]{0,25}\b(?:award|performance|start|contract|commenc)/i,
+];
+
+// (a) HOLD/BE a credential-status — the SUBSTANCE is a thing possessed/conferred, not an action.
+const PROFILE_BAR_SHAPE: RegExp[] = [
+  /\b(?:must|shall|required to|only\s+(?:firms?|offerors?|contractors?|entities|bidders?)\s+)?(?:hold(?:ing)?|possess(?:ing)?|already\s+have|currently\s+have|maintain\s+possession)\b/i,
+  /\b(?:must|shall)\s+be\s+(?:an?|the)\s+(?:certified|accredited|cleared|licensed|listed|qualified\s+(?:source|holder|supplier)|holder|member|incumbent|eligible\s+(?:holder|concern|entity))\b/i,
+  /\bletters?\s+of\s+(?:recommendation|reference|endorsement)\b|\b(?:endorsement|recommendation|attestation|reference)s?\s+from\s+[A-Za-z]/i,
+  /\bbackground\s+(?:check|investigation|screening)\b|\b(?:security|facility|secret|top[- ]secret|interim|dod)\b[^.\n]{0,15}\bclearance\b|\bclearance\s+(?:level|eligibility)\b|\bfavorabl[ey]\s+adjudicat/i,
+  /\b(?:NADCAP|AS\s?9100|ISO\s?900\d|ISO\/IEC|CMMI\s+(?:level|maturity)|QPL|QML|qualified\s+products?\s+list|approved\s+source\s+list)\b/i,
+  /\bset-aside\s+(?:status|category|eligibility)\b|\b(?:8\(a\)|HUBZone|SDVOSB|VOSB|WOSB|EDWOSB|SDB)\b[^.\n]{0,40}(?:certif|status|eligib|holder)/i,
+  /\b(?:certified|accredited|licensed)\b[^.\n]{0,25}\bholder\b|\bin\s+good\s+standing\b|\b(?:SBA|8\(a\))[- ]certified\b/i,
+  /\bGSA\s+(?:schedule|MAS|multiple\s+award\s+schedule)\b|\bschedule\s+contract\s+holder\b|\bcontract\s+holder\s+to\s+(?:compete|respond)/i,
+  /\b(?:proof|evidence|certificate|documentation|copy)\s+of\s+(?:[\w'’.-]+\s+){0,6}?(?:accreditation|certification|certificate|clearance|licens\w*|professional\s+(?:qualification|registration|license)|membership|listing|registration\s+as)\b/i,
+  // possessive + held-credential noun ("your company's certification", "its facility clearance") → HOLD-substance.
+  // Bare "the" is EXCLUDED (the reps-and-certs override handles "the representations and certifications").
+  /\b(?:your|our|its|their|his|her)\s+(?:[\w'’]+\s+){0,2}(?:accreditation|certification|clearance|licensure|qualification|membership|listing|credential)s?\b/i,
+];
+
+// (b) DO an in-window action — checked only when NO profile-bar substance is present.
+const DO_THE_WORK_SHAPE: RegExp[] = [
+  /\b(?:submit|provide|furnish|deliver|include|complete|fill\s+out|propose|quote|upload|attend|acknowledge|sign|address|conform\s+to|comply\s+with|format(?:ted)?)\b/i,
+  /\b(?:price|pricing|priced)\b|\bfirm[- ]fixed[- ]price\b|\bFFP\b/i,
+  /\b(?:register(?:ed|ing)?|registration)\s+(?:in|with|as)?\s*(?:the\s+)?(?:System\s+for\s+Award\s+Management|SAM)\b|\bSAM(?:\.gov)?\s+registration\b|\bmaintain\s+(?:an?\s+)?active\s+(?:SAM\s+)?registration\b/i,
+  /\bobtain\s+(?:a\s+)?(?:CAC|common\s+access\s+card|base\s+(?:access|pass|id|identification)|piv)\b/i,
+  /\btechnical(?:ly)?\s+(?:acceptab|criteria|capabilit|qualif)/i,
+  /\bdemonstrate\s+(?:successful\s+)?(?:delivery|performance|experience|capability)\b/i,
+  /\bemail(?:ed|ing|s)?\b|\belectronic(?:ally)?\b|\bvia\s+email\b/i,
+];
+
+/** Classify a VERIFIED unmet hard gate by SHAPE (card #526). Order: do-the-work FORM override → acquirable-cert
+ *  escalation → profile-bar (HOLD/BE, priority) → do-the-work → else NEITHER. Escalation is the residual; only a
+ *  CLEAN do-the-work shape demotes. Pure → gate-testable. */
+export function classifyGateShape(requirement: string): GateShape {
+  const r = requirement ?? "";
+  // acquirable cert escalates BEFORE profile-bar (an obtainable-in-window cert is not a held bar). PROFILE-BAR is
+  // then checked BEFORE the do-the-work override, so a held credential COUPLED with a reps-certs mention
+  // ("hold a clearance AND complete the reps & certs") stays profile_bar — the override can never false-demote a
+  // real bar (adversarial round 2 finding). The override only reaches a bare reps-certs form with no HOLD substance.
+  if (ACQUIRABLE_CERT.some((re) => re.test(r))) return "neither";
+  if (PROFILE_BAR_SHAPE.some((re) => re.test(r))) return "profile_bar";
+  if (DO_THE_WORK_OVERRIDE.some((re) => re.test(r))) return "do_the_work";
+  if (DO_THE_WORK_SHAPE.some((re) => re.test(r))) return "do_the_work";
+  return "neither";
+}
+
 export interface PanelStructuredInput {
   /** the panelists exactly as runPanelJudge holds them (structured output, null on lens failure). */
   panelists: Array<{ key: string; name: string; output: PanelistOutput | null }>;
@@ -45,21 +114,26 @@ export function panelFindingsToTyped(inp: PanelStructuredInput): TypedFinding[] 
       if ((inp.stateByRef.get(ref)?.state ?? "UNVERIFIABLE") !== "VERIFIED") return; // 2b — only VERIFIED cross
       const excerpt = (g.excerpt ?? "").trim();
       if (!excerpt) return; // a VERIFIED gate without its grounding span is not a fact we can stand behind
-      findings.push({
+      // MET → structurally satisfied now (already_satisfied, non-blocking). UNMET + VERIFIED → type by SHAPE
+      // (card #526 two-allowlist classifier): do-the-work → bidder_controls (curable, in-window action);
+      // profile-bar → fail-closed bar; neither → escalate (NHR). Escalation is the residual — nothing defaults
+      // to bidder_controls; only a CLEAN do-the-work shape demotes.
+      const shape: GateShape | "met" = g.met ? "met" : classifyGateShape(g.gate);
+      const f: TypedFinding = {
         id: `panel:${ref}`,
         requirement: g.gate,
         citation: g.citation ?? "",
         excerpt,
-        // A named hard gate is eligibility-class. MET → structurally satisfied now (already_satisfied, non-
-        // blocking). UNMET + VERIFIED → a confirmed bar, but the panel cannot certify universality or a profile
-        // failure → FAIL CLOSED: bidder_cannot_move + curableInWindow UNDEFINED ⇒ deriveVerdict → NHR.
-        kind: "eligibility_bar",
-        controllability: g.met ? "already_satisfied" : "bidder_cannot_move",
+        // do-the-work is a submission/action obligation, never an eligibility bar; profile-bar/neither stay eligibility-class.
+        kind: shape === "do_the_work" ? "submission" : "eligibility_bar",
+        controllability: shape === "met" ? "already_satisfied" : shape === "do_the_work" ? "bidder_controls" : "bidder_cannot_move",
         grounded: true, // VERIFIED ⇒ the excerpt passed the runner's structural grounding pre-filter
         lens: p.name,
-        // curableInWindow deliberately LEFT UNDEFINED on the unmet-gate branch — that undefined IS the
-        // fail-closed-to-NHR signal (audit-findings.ts curableInWindow contract). Do not default it.
-      });
+      };
+      // curableInWindow: do-the-work → true (a curable, in-window action); profile-bar / neither → LEFT UNDEFINED,
+      // which IS the fail-closed-to-NHR signal (audit-findings.ts contract). met → not a bar, no curability needed.
+      if (shape === "do_the_work") f.curableInWindow = true;
+      findings.push(f);
     });
 
     // ── residual risks (advisory materiality — NEVER a bar) ─────────────────────
