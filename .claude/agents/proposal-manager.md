@@ -1,5 +1,6 @@
 ---
 name: proposal-manager
+model: opus  # Brain card 520 addendum — pin panel/red-team to opus-4-8 explicitly (was inherited)
 description: Use on every audit to verify §L/§M compliance-matrix readiness. APMP-certified proposal director lens — §L compliance-matrix readiness, §M factors->win-themes+outline, submission checklist completeness, deadline/gate clarity, honesty on unread sections. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---

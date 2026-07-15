@@ -1,5 +1,6 @@
 ---
 name: source-selection-evaluator
+model: opus  # Brain card 520 addendum — pin panel/red-team to opus-4-8 explicitly (was inherited)
 description: Use on competitive negotiated (FAR 15) procurements to model scoring. Source-selection evaluator lens (former SSEB chair) — how THIS proposal will actually be SCORED: tradeoff vs LPTA, factor weighting, strengths/weaknesses/deficiencies, past-performance relevance, basis for award. SPECIALIST — fires on competitive negotiated procurements (FAR 15). The scorer's eye.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---

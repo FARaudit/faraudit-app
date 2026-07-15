@@ -1,5 +1,6 @@
 ---
 name: adversarial-redteam
+model: opus  # Brain card 520 addendum — pin panel/red-team to opus-4-8 explicitly (was inherited)
 description: Use LAST on every audit/panel review — attack the findings AND the solicitation. Adversarial red-team lens (GAO protest counsel + audit QA skeptic) — attacks the AUDIT for fabrication/errors AND the SOLICITATION for protest grounds. Default to refute unless grounded in source. ALWAYS runs LAST as the panel's calibration guardian.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 memory: project

@@ -140,6 +140,13 @@ export interface TypedFinding {
   // FAT finding (tension present but not proven) — gate duration (days, post-order-anchored), delivery window
   // (days, order-anchored), and whether the gate provably exceeds the window. The temporal arm NEVER emits NO_BID.
   temporalEvidence?: { gateDays: number | null; windowDays: number | null; gateExceedsWindow: boolean };
+  // INQUIRY-DEADLINE BENIGN GUARD (Brain card 520, R1) — set when the SHAPE allowlist re-typed a benign
+  // information-exchange milestone (a questions/inquiries/RFI-submission window or a Q&A answer-posting date)
+  // that a lens mis-typed no_one_can_move → bidder_controls (a routine schedule fact that does NOT gate offer
+  // submission or award eligibility). NEVER fires on a participation-prerequisite deadline (mandatory site
+  // visit / conference registration, vehicle/BOA enrollment) or a real offer-submission deadline — those stay
+  // universal-path candidates. Marker only; deriveVerdict reads controllability, not this field.
+  inquiryDeadlineGuard?: boolean;
 }
 
 /** KNOWN firm attributes. null = unknown → a bidder_cannot_move bar CANNOT be proven failed → caution,

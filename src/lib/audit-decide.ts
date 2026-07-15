@@ -1131,6 +1131,162 @@ export function applyStructuralBarWhitelist(findings: TypedFinding[], profile: B
   });
 }
 
+// ── INQUIRY-DEADLINE BENIGN GUARD (Brain card 520, R1) ────────────────────────────────────────────────
+// A lens types an information-exchange milestone (a questions/inquiries/RFI-submission window or a Q&A
+// answer-posting date) as no_one_can_move — reading "questions can no longer be submitted" as a universal
+// impossibility. But an information-exchange deadline is a ROUTINE SCHEDULE FACT: it does NOT gate offer
+// submission or award eligibility (the RESPONSE/quote deadline is the bar, not the Q&A window). Left un-typed
+// it lands in Fork-2's unmarkedUniversalClaim → a false NEEDS_HUMAN_REVIEW (live driver, seq-1 run 5d0477e7).
+// SHAPE ALLOWLIST (Rule 61, default OFF): demote a positively information-exchange-shaped no_one_can_move
+// finding → bidder_controls (informational; NOT even a caution — a passed Q&A window has nothing to cure).
+//
+// HARD BOUNDARY (Brain R1) — a PARTICIPATION-PREREQUISITE deadline is NOT benign: a mandatory site visit /
+// pre-proposal conference registration, a vehicle/BOA/IDIQ/GWAC enrollment or on-ramp/open-season window, or
+// ANY milestone whose lapse gates offer submission or award eligibility STAYS a universal-path candidate. Any
+// such signal (or a genuine structural-bar token, or an offer/quote/proposal/response submission deadline)
+// VETOES the demotion → the finding is left exactly as typed (→ escalation). Shape/position ONLY; NO vocab
+// blocklist is the demotion basis (the demotion rests on the POSITIVE information-exchange shape; the veto only
+// ever keeps MORE in the universal path). Ambiguity → ESCALATE (never demote on doubt). State applies
+// regardless of open/closed/pending — a passed, active, or future Q&A window is equally benign.
+//
+// POSITIVE information-exchange SHAPE — an inquiry/RFI/Q&A subject bound to a submission-or-posting event.
+// Position-checked (info-exchange noun within a short window of a schedule verb) so a §M "answer the following
+// technical questions in your proposal" (a proposal-content gate, not a milestone) does NOT match.
+const INQUIRY_MILESTONE_RE = /\b(?:questions?|inquir(?:y|ies)|requests?\s+for\s+information|\bRFIs?\b|clarification\s+questions?|q\s*&\s*a|q\s*and\s*a)\b[^.\n]{0,70}?\b(?:due|submit(?:ted|tal)?|deadline|no\s+later\s+than|by\b|cut[-\s]?off|received|accepted|posted|provided|answered|response\s+(?:date|deadline)|closing)\b/i;
+const INQUIRY_ANSWER_RE = /\b(?:answers?|responses?)\b[^.\n]{0,40}?\bto\b[^.\n]{0,25}?\b(?:questions?|inquir(?:y|ies)|\bRFIs?\b)\b/i;
+// VETO — the CONSEQUENCE-SHAPE test (card 520 R1, adversarial-hardened round 1). A genuinely benign inquiry
+// milestone is a BARE SCHEDULE FACT — a Q&A date and nothing else. Every smuggler the red-team produced is a
+// real bar (mandatory site-visit/conference attendance, IDIQ/BOA enrollment, a hard credential, a real quote
+// deadline) that ATTACHES a consequence to inquiry-milestone wording. So the veto does NOT chase bar-VOCAB
+// synonyms (the blocklist treadmill the doctrine forbids as a release basis); it fires whenever the finding
+// asserts ANY CONSEQUENCE BEYOND a schedule fact — a participation/attendance/access event, an eligibility
+// consequence, a prerequisite/condition, or an OFFER-submission condition/deadline. Bare category tokens need
+// no proximity, so a period/newline split cannot separate a trigger from its object. Matched on the FULL hay.
+// The demotion still rests on the POSITIVE inquiry shape; this veto only ever keeps MORE in the universal path
+// (fails toward escalation). Ambiguity → ESCALATE.
+const PARTICIPATION_PREREQ_RE = new RegExp([
+  // ── participation / attendance / access events + enrollment (bare — presence anywhere vetoes) ──
+  "site\\s+(?:visit|tour|inspection|walk|meeting)", "job\\s?walk", "walk[-\\s]?(?:through|down)", "walkdown",
+  "(?:facility|plant|project)\\s+(?:tour|visit)", "\\borientation\\b", "teleconference", "roll\\s+call", "on[-\\s]?site", "in[-\\s]?person",
+  "pre[-\\s]?(?:proposal|bid|award|quote|solicitation)\\s+(?:conference|meeting|briefing|session)",
+  "\\bpre[-\\s]?bid\\b", "\\bconference\\b", "\\bwebinar\\b", "\\bbriefing\\b", "information\\s+session", "industry\\s+day",
+  "\\bBOA\\b", "basic\\s+ordering\\s+agreement", "\\bIDIQ\\b", "\\bGWAC\\b", "\\bBPA\\b", "on[-\\s]?ramp", "open\\s+season",
+  "(?:vehicle|schedule|contract)\\s+(?:enroll|eligib|on[-\\s]?ramp)",
+  "\\battend(?:ance|ed|ing|ee)?\\b", "must\\s+be\\s+present", "\\bpresent\\s+(?:at|for|during|on|in\\s+person)", "expected\\s+to\\s+(?:attend|be\\s+present)",
+  "\\bparticipat", "\\bRSVP\\b", "regist(?:er|ration|ered)", "enroll(?:ment|ed)?",
+  "sign[-\\s]?up", "sign[-\\s]?in", "check[-\\s]?in", "\\bonboard", "credential", "\\bbadge\\b", "\\broster\\b", "accredit", "access\\s+(?:is\\s+)?(?:grant|restrict|limit)",
+  // ── eligibility consequence (bare) ──
+  "eligib", "ineligib", "disqualif", "\\bforfeit", "exclud(?:e|ed|ing)", "not\\s+be\\s+(?:considered|evaluated|eligible|permitted|accepted)", "\\breject",
+  // ── prerequisite / condition (bare) ──
+  "prerequisite", "precondition", "contingent", "condition(?:ed|al)?\\s+(?:on|upon|of|to)", "required\\s+(?:to|before|prior|for)",
+  "must\\s+(?:first|have\\s+(?:attended|participated|registered|completed|submitted))",
+  // ── the OFFER INSTRUMENT named as a noun (a pure Q&A milestone never mentions 'the offer/quote/proposal/bid';
+  //    when it does — e.g. an RFI whose response CONSTITUTES the offer — the milestone is really an offer
+  //    deadline in disguise → ambiguous → escalate). 'bidders' is not matched (\bbid\b needs a word boundary). ──
+  "\\b(?:offers?|quotes?|proposals?|bids?)\\b",
+  // ── real OFFER-submission condition / deadline (offer NOUN required, so 'questions must be submitted' never trips) ──
+  "\\b(?:offers?|quotes?|proposals?|bids?)\\b[^.\\n]{0,40}?\\b(?:due|deadline|no\\s+later|received|closing|cut[-\\s]?off|accepted|considered|shall\\s+be\\s+submitted|will\\s+be\\s+accepted)\\b",
+  "\\b(?:due|deadline|closing|cut[-\\s]?off)\\b[^.\\n]{0,40}?\\b(?:offers?|quotes?|proposals?|bids?)\\b",
+  // ── 'only [firms/those who …] may submit/propose/be considered/eligible' access gate ──
+  "\\bonly\\b[^.\\n]{0,70}?\\b(?:may|shall|will|can|are\\s+(?:eligible|permitted))\\b[^.\\n]{0,25}?\\b(?:submit|propose|offer|bid|quote|compete|participat|considered|evaluated|accepted|eligible)",
+  "\\bonly\\b[^.\\n]{0,55}?\\b(?:firms?|offerors?|vendors?|contractors?|bidders?|those|attendees?)\\b[^.\\n]{0,45}?\\b(?:may|eligible|permitted|considered|evaluated)",
+].join("|"), "i");
+
+// CLAUSE-PURITY SHAPE GATE (card 520 R1, adversarial-hardened round 2 — the treadmill-ending structural fix).
+// Round 2 proved a vocab veto is a losing game: a real bar dressed in synonyms outside the list (tender, sealed
+// envelope, "on-site presence", "predicated on", "will not advance", "offeror") slips through. But EVERY smuggler
+// shares one SHAPE: it CONJOINS a benign Q&A clause with a SEPARATE bar clause. A genuinely benign milestone is
+// PURE — every clause is about the inquiry/Q&A schedule and nothing else. So instead of enumerating bar vocab, we
+// require PURITY: split the finding into clauses; every clause must be EITHER an inquiry clause (names the Q&A
+// subject) OR a trivial fragment (no obligation). A clause that carries an OBLIGATION/CONSEQUENCE verb but does
+// NOT name the inquiry subject = a second proposition beyond "a Q&A date" → the finding is not a pure milestone →
+// ESCALATE. This is position-checked SHAPE (per-clause), not a bar-vocab blocklist, and it fails toward escalation.
+const CLAUSE_SPLIT_RE = /[.;:,\n—–]|\band\b|\bbut\b|\bhowever\b|\bprovided\b|\bexcept\b|\bwhile\b|\bwhereas\b|\bor\b|\bafter\s+which\b|\bwhereupon\b/i;
+// The inquiry SUBJECT — tight on purpose (the ALLOWLIST side): only the Q&A subject nouns + "answers/responses TO
+// questions/inquiries" + "answers posted/provided". Bare "answered"/"response" is NOT here — else a smuggler clause
+// ("firms that answered the roll call may bid") would masquerade as an inquiry clause. A clause naming this is allowed.
+const INQUIRY_SUBJECT_RE = /\b(?:questions?|inquir(?:y|ies)|requests?\s+for\s+information|\bRFIs?\b|clarification|q\s*&\s*a|q\s*and\s*a)\b|\b(?:answers?|responses?)\b[^.\n]{0,20}?\bto\b[^.\n]{0,20}?\b(?:questions?|inquir|\bRFIs?\b)\b|\banswers?\s+(?:posted|provided|will\s+be\s+(?:posted|provided))\b/i;
+// A non-inquiry clause is DANGEROUS (→ escalate) when it names a bidder-side ACTOR, an OFFER INSTRUMENT, or a
+// PARTICIPATION event. Rationale: a benign trailing Q&A clause is either passive ("can no longer be submitted") or
+// about the government ("answers will be posted") — it never conditions something on the FIRM, the OFFER, or an
+// EVENT. Every smuggler payload references exactly one of these three. This is SHAPE, not bar-vocab, and the actor/
+// instrument axes are near-impossible to evade (a bar must say who/what it bars). Bare modals are deliberately NOT
+// a trigger (they over-escalate benign govt clauses); a real bar pairs them with an actor/instrument/event.
+const CLAUSE_ACTOR_RE = /\b(?:firms?|offerors?|bidders?|vendors?|contractors?|entrants?|attendees?|respondents?|participants?|awardees?|concerns?|proposers?|quoters?|part(?:y|ies)|entit(?:y|ies)|interested\s+part|your\s+(?:firm|company|team|representative|organization|personnel)|the\s+representative)\b/i;
+const CLAUSE_INSTRUMENT_RE = /\b(?:offers?|quotes?|proposals?|bids?|tenders?|envelopes?|packages?|submissions?|submittals?)\b/i;
+// A CONDITION → CONSEQUENCE shape (checked on EVERY clause, incl. inquiry clauses, to catch a bar FUSED into an
+// inquiry clause — "answers to questions will be honored only where the earlier presence was logged"). A bare date
+// announcement never states a conditional or a consequence-of-participation; a bar always does. This is the SHAPE
+// of "eligibility/advancement turns on X", captured by connective + consequence-verb frames rather than by naming
+// the event (which synonyms evade). Conservative: it can only ESCALATE. 'only' is scoped so "may only be submitted
+// in writing" (benign) does not trip it.
+const CLAUSE_CONSEQUENCE_RE = new RegExp([
+  // conditional connectives that gate an outcome
+  "\\bonly\\s+(?:those|firms?|offerors?|vendors?|bidders?|contractors?|entrants?|attendees?|participants?|respondents?|where|if|after|upon|by\\s+attending|those\\s+who)",
+  "\\bunless\\b", "\\babsent\\s+(?:that|which|attendance|participation)", "provided\\s+that", "subject\\s+to\\b", "\\bcontingent\\b", "\\bconditioned\\b", "\\bpredicated\\b",
+  "failure\\s+to\\b", "\\bthose\\s+who\\b", "\\bwhoever\\b", "any\\s+(?:firm|offeror|vendor|bidder|contractor|entrant)\\s+(?:that|who|not|failing)",
+  "\\bdepends\\s+on\\b", "\\bturns\\s+on\\b", "\\bwhere\\s+the\\b[^.\\n]{0,40}\\b(?:was|were|is|are|has|have)\\b",
+  // consequence-of-participation frames
+  "is\\s+what\\s+(?:carries|settles|decides|governs|determines|qualifies|counts|matters|controls|advances)",
+  "\\b(?:governs|decides|determines|settles|dictates|controls|qualifies)\\b[^.\\n]{0,25}\\b(?:who|whether|continuation|eligib|standing|advance|forward|remain)",
+  "cannot\\s+(?:proceed|advance|go\\s+forward|continue|compete|move\\s+forward|be\\s+considered)", "will\\s+not\\s+(?:proceed|advance|be\\s+honored|count|continue|be\\s+considered)",
+  "\\b(?:is|are|was|were|be|remains?)\\s+(?:compulsory|mandatory|obligatory|prerequisite|decisive|requisite)\\b", "\\bcompulsory\\b", "\\bmandatory\\b",
+  // eligibility/award RESTRICTION frames (award narrowed to a class → a who-can-win bar; round 4: geographic /
+  // membership / directed-award / domestic-source axes). 'restricted/limited/reserved to' is the shape of a bar.
+  "\\b(?:restricted|limited|reserved|confined|available|open)\\s+(?:to|for|only\\s+to)\\b", "\\bsole\\s+(?:basis|source|award)\\b", "no\\s+other\\s+(?:source|firm|offeror|vendor)", "no\\s+further\\s+competition",
+  "\\bdirected\\s+(?:award|to|acquisition)\\b", "placed\\s+with\\s+the\\b", "\\bnullif", "\\bincumbent\\b", "current\\s+(?:holder|contractor|provider)", "domestically\\s+(?:sourced|produced|manufactured)", "\\bBerry\\b", "members?\\s+of\\s+the\\b", "\\bmembership\\b",
+].join("|"), "i");
+
+/** Brain card 520 R1 — SHAPE allowlist: is this no_one_can_move finding a benign information-exchange milestone?
+ *  Benign ONLY when it (1) POSITIVELY matches the inquiry/Q&A milestone shape, (2) matches NO participation-
+ *  prerequisite / offer-submission / structural-bar veto, AND (3) is CLAUSE-PURE (every clause is an inquiry
+ *  clause or a trivial fragment; no clause carries an obligation without naming the Q&A subject). Ambiguity →
+ *  false (left as-is → escalate). Pure. */
+export function isInquiryDeadlineBenign(f: TypedFinding): boolean {
+  if (f.universalDefect || f.verifiedBy) return false;         // never override a marked/verified universal defect
+  if (f.controllability !== "no_one_can_move") return false;   // scoped to the exact driver typing
+  // NORMALIZE — strip zero-width / soft-hyphen chars (OCR/copy artifacts a smuggler could hide a token behind) and
+  // collapse whitespace, so a token cannot be split by an invisible character (round 4b ZWSP break).
+  const norm = (s?: string) => (s ?? "").replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, "").replace(/\s+/g, " ");
+  const req = norm(f.requirement), exc = norm(f.excerpt), cite = norm(f.citation);
+  const subject = `${cite} ${req}`;                             // POSITIVE shape on the finding's own subject (altitude)
+  if (!INQUIRY_MILESTONE_RE.test(subject) && !INQUIRY_ANSWER_RE.test(subject)) return false;
+  const hay = `${cite} ${req} ${exc}`;                          // VETO on the full hay (conservative)
+  if (PARTICIPATION_PREREQ_RE.test(hay)) return false;         // participation prereq / real submission deadline → keep
+  if (STRUCTURAL_BAR_RE_114.test(hay)) return false;           // any genuine structural-bar token → keep
+  if (DELIVERY_IMPOSSIBILITY_RE.test(hay)) return false;       // a delivery/temporal/source-approval impossibility on another axis → keep (round 4)
+  if (/\b(?:deliver\w*|perform\w*|complet\w*|ship\w*|furnish\w*|install\w*)\b[^.\n]{0,45}\bwithin\s+(?:\w+\s+){0,2}(?:calendar\s+)?(?:day|hour|week|month)/i.test(hay) || /\brequired\s+within\b/i.test(hay)) return false; // a performance/delivery WINDOW on another axis → keep (round 4 P15)
+  // MANDATORY-INQUIRY PARTICIPATION prerequisite (round 5) — a bar that you MUST HAVE submitted a question / raised
+  // an inquiry to remain eligible (the Q&A-analogue of a mandatory site visit). Distinct from the benign deadline
+  // "questions must be submitted by X" (a schedule fact): the bar is a PERFECT-TENSE mandate ("shall have submitted
+  // a question") or an explicit "obligated/required to submit a question". The live driver ("questions must be
+  // submitted by 10 Jul") never matches (no perfect-tense / obligated-to frame). → keep as universal-path candidate.
+  if (/\b(?:shall|must|will|should)\s+have\s+(?:submitted|raised|asked|posed|filed|lodged)\b[^.\n]{0,30}\b(?:question|inquir|RFI)/i.test(hay)
+    || /\b(?:question|inquir\w*|RFI)\b[^.\n]{0,30}\b(?:shall|must|will)\s+have\s+been\s+(?:submitted|raised|asked|posed|filed)/i.test(hay)
+    || /\b(?:obligated|required|expected|compelled|bound)\s+to\s+(?:submit|raise|ask|pose|file|lodge)\b[^.\n]{0,25}\b(?:a\s+|one\s+|at\s+least\s+|the\s+)?(?:question|inquir|RFI)/i.test(hay)
+    || /\bmust\s+(?:submit|raise|ask|pose|file)\b[^.\n]{0,25}\b(?:at\s+least\s+)?(?:one|a)\s+(?:question|inquir)/i.test(hay)) return false;
+  // CLAUSE PURITY — every substantive clause (requirement AND excerpt) must be an inquiry clause. A non-inquiry
+  // clause bearing an obligation/consequence = a bar smuggled beside a benign Q&A date → escalate.
+  for (const raw of `${req} . ${exc}`.split(CLAUSE_SPLIT_RE)) {
+    const c = raw.trim();
+    if (c.length < 5) continue;                                // trivial fragment
+    if (CLAUSE_CONSEQUENCE_RE.test(c)) return false;           // a condition→consequence shape (even fused into an inquiry clause) → escalate
+    if (INQUIRY_SUBJECT_RE.test(c)) continue;                  // an inquiry clause → always allowed
+    if (CLAUSE_ACTOR_RE.test(c) || CLAUSE_INSTRUMENT_RE.test(c) || PARTICIPATION_PREREQ_RE.test(c)) return false; // a bar clause → escalate
+  }
+  return true;
+}
+
+/** Re-type a benign information-exchange milestone mis-typed no_one_can_move → bidder_controls (informational).
+ *  Pure → gate-tested. Flag-gated; OFF ⇒ byte-for-byte unchanged. deriveVerdict reads controllability only. */
+export function applyInquiryDeadlineBenignGuard(findings: TypedFinding[], opts?: { enabled?: boolean }): TypedFinding[] {
+  if (!opts?.enabled) return findings; // Rule 61 default-off ⇒ byte-for-byte unchanged
+  return findings.map((f): TypedFinding =>
+    isInquiryDeadlineBenign(f)
+      ? { ...f, controllability: "bidder_controls", curableInWindow: true, inquiryDeadlineGuard: true }
+      : f);
+}
+
 // ── CROSS-CLAUSE TEMPORAL-CONFLICT CHECK (Brain card 81, Step 2) ──────────────────────────────────────
 // Pure, no-model. Consumes the sweep-grounded `fat_precondition` + `delivery_window` findings (Step 1) and
 // detects a UNIVERSAL impossibility: a NON-WAIVABLE First-Article precondition whose minimum duration

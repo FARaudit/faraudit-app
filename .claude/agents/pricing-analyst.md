@@ -1,5 +1,6 @@
 ---
 name: pricing-analyst
+model: opus  # Brain card 520 addendum — pin panel/red-team to opus-4-8 explicitly (was inherited)
 description: Use on every audit to verify CLIN/pricing capture and wage determinations. Senior government pricing/cost analyst lens (DCAA-aware) — CLIN/bid-schedule capture, magnitude, wage determinations (SCA/DBA/CBA), bonding, contract-type pricing implications, missing pricing inputs. Core panel — always runs.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 memory: project
