@@ -60,9 +60,8 @@ const PROFILE_BAR_SHAPE: RegExp[] = [
   /\bletters?\s+of\s+(?:recommendation|reference|endorsement)\b|\b(?:endorsement|recommendation|attestation|reference)s?\s+from\s+[A-Za-z]/i,
   /\bbackground\s+(?:check|investigation|screening)\b|\b(?:security|facility|secret|top[- ]secret|interim|dod)\b[^.\n]{0,15}\bclearance\b|\bclearance\s+(?:level|eligibility)\b|\bfavorabl[ey]\s+adjudicat/i,
   /\b(?:NADCAP|AS\s?9100|ISO\s?900\d|ISO\/IEC|CMMI\s+(?:level|maturity)|QPL|QML|qualified\s+products?\s+list|approved\s+source\s+list)\b/i,
-  // R2 genuine third-party bars that COUPLE-escalate a set-aside: affiliation/ostensible-sub (#517 — NOT self-determinable),
-  // ITAR/export-control, mandatory site visit / pre-proposal conference.
-  /\b(?:affiliation|ostensible\s+subcontractor|affiliate\s+(?:rule|concern)|undue\s+reliance)\b/i,
+  // R2 genuine third-party bars that COUPLE-escalate a set-aside: ITAR/export-control, mandatory site visit /
+  // pre-proposal conference. (Affiliation is handled SEPARATELY below — card #529: bar ONLY with a document trigger.)
   /\bITAR\b|\bexport[- ]control(?:led)?\b|\bDDTC\b|\b22\s?CFR\s?12[0-9]/i,
   /\b(?:mandatory|required)\s+(?:pre[- ]proposal\s+|pre[- ]bid\s+)?(?:site\s+visit|conference)\b|\b(?:site\s+visit|pre[- ]proposal\s+conference)\s+(?:is\s+)?(?:mandatory|required)\b|\battendance\s+(?:at|is)\b[^.\n]{0,25}\b(?:mandatory|required)\b/i,
   /\bGSA\s+(?:schedule|MAS|multiple\s+award\s+schedule)\b|\bschedule\s+contract\s+holder\b|\bcontract\s+holder\s+to\s+(?:compete|respond)|\bincumbent\s+\w+\s+holder\b/i,
@@ -82,6 +81,14 @@ const SET_ASIDE_SHAPE: RegExp[] = [
   /\b(?:total\s+)?small\s+business\s+set[- ]aside\b|\bset[- ]aside\s+for\s+(?:small|women|veteran|hubzone|8\(a\))/i,
   /\bNAICS\b[^.\n]{0,45}\bsize\s+standard\b|\bsize\s+standard\b|\bsize\s+status\b|\bsmall\s+business\s+(?:size\s+)?(?:standard|status|eligib)/i,
 ];
+
+// AFFILIATION (card #529 grounding determination). #517 keeps a DOCUMENT-STATED affiliation constraint fail-closed
+// (not self-determinable) — but a lens-editorial regulatory advisory (cites 13 CFR 121.103 / "ostensible
+// subcontractor rule" with NO document-specific trigger) is NOT bar-eligible: it types as a verify-if-teaming
+// CAUTION under a null profile. Bar-eligibility requires a DOCUMENT-TEXT trigger (52.219-14 / limitations on
+// subcontracting / a stated teaming-agreement or joint-venture requirement / a named-subcontractor affiliation).
+const AFFILIATION_RE = /\b(?:affiliation|ostensible\s+subcontract(?:or|ing)|affiliate\s+(?:rule|concern)|undue\s+reliance)\b/i;
+const AFFILIATION_DOC_TRIGGER = /\b52\.219-14\b|\blimitations?\s+on\s+subcontracting\b|\bteaming\s+(?:agreement|arrangement)\b|\bjoint\s+venture\b|\bmentor[- ]prot[ée]g[ée]\b|\bsubcontracting\s+(?:plan|limit)\b/i;
 
 /** Extract the set-aside program key (for requiredAttribute → the tristate's eligible=null caution). */
 function setAsideAttribute(r: string): string {
@@ -116,6 +123,8 @@ export function classifyGateShape(requirement: string): GateShape {
   // real bar (adversarial round 2 finding). The override only reaches a bare reps-certs form with no HOLD substance.
   if (ACQUIRABLE_CERT.some((re) => re.test(r))) return "neither";
   if (PROFILE_BAR_SHAPE.some((re) => re.test(r))) return "profile_bar"; // coupled bar / held credential wins first (R2)
+  // affiliation (card #529): document-triggered → bar (#517); regulation-cite-only editorial → verify-if-teaming caution.
+  if (AFFILIATION_RE.test(r)) return AFFILIATION_DOC_TRIGGER.test(r) ? "profile_bar" : "set_aside_caution";
   if (SET_ASIDE_SHAPE.some((re) => re.test(r))) return "set_aside_caution"; // bare socioeconomic/size → verify-caution (R1)
   if (DO_THE_WORK_OVERRIDE.some((re) => re.test(r))) return "do_the_work";
   if (DO_THE_WORK_SHAPE.some((re) => re.test(r))) return "do_the_work";

@@ -94,7 +94,11 @@ const SET_ASIDE = [
 for (const g of SET_ASIDE) assert(shape(g) === "set_aside_caution", `set_aside_caution: "${g.slice(0, 52)}…" (got ${shape(g)})`);
 // R2 boundaries — coupled/affiliation/held-credential still escalate (NOT demoted to caution)
 assert(shape("WOSB set-aside; offeror must also hold an active facility clearance") === "profile_bar", "R2: set-aside COUPLED with clearance → profile_bar");
-assert(shape("Ostensible subcontractor / affiliation review under the size standard") === "profile_bar", "R2: affiliation riding size → profile_bar (#517, not self-determinable)");
+// card #529 grounding determination — affiliation is bar-eligible ONLY with a DOCUMENT-TEXT trigger.
+assert(shape("Ostensible Subcontractor / Affiliation Risk Under 13 CFR 121.103") === "set_aside_caution", "#529: regulation-cite-only affiliation (no doc trigger) → verify-if-teaming caution");
+assert(shape("Offeror must disclose any teaming agreement or joint venture; affiliation applies") === "profile_bar", "#529: document-triggered affiliation (teaming/JV) → profile_bar");
+assert(shape("Ostensible subcontractor rule with 52.219-14 limitations on subcontracting") === "profile_bar", "#529: affiliation + 52.219-14 doc trigger → profile_bar");
+assert(shape("Affiliation with a named subcontractor plus an active facility clearance") === "profile_bar", "#529: affiliation coupled with clearance → profile_bar (genuine bar wins)");
 assert(shape("ITAR-controlled effort under a small business set-aside") === "profile_bar", "R2: ITAR coupled → profile_bar");
 assert(shape("Mandatory site visit required for this small business set-aside") === "profile_bar", "R2: mandatory site visit coupled → profile_bar");
 // bridge outcome — set-aside caution types as curable eligibility caution (BID_WITH_CAUTION + eligible=null), never a bar
