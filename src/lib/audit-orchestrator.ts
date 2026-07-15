@@ -103,6 +103,13 @@ export interface OrchestratorInput {
   // is RE-GROUNDED here against real source with the SAME isGrounded check the lenses use — the proposer never
   // self-asserts grounding (audit-judgment-first.ts). Absent ⇒ the ladder path (P1 experts) is byte-identical.
   seedFindings?: TypedFinding[];
+  // PANEL WIRING ARC (card #523, P2a-wire) — the expert panel's VERIFIED typed facts (panel-findings-bridge),
+  // supplied by the executor ONLY when AUDIT_PANEL_JUDGE is on. Distinct from `seedFindings`: these are ADDITIVE
+  // to the P1 lens findings (the panel is a co-producer, not a replacement) — they are UNIONed into the finding set
+  // BEFORE dedup + every re-typing guard (so a panel finding is treated exactly like a lens finding) and
+  // RE-GROUNDED against the assembled source with the same isGrounded gate. deriveVerdict stays the SOLE authority.
+  // Absent/empty ⇒ byte-identical (flag-OFF customer path never sets it).
+  panelFindings?: TypedFinding[];
 }
 
 export interface AuditResult {
@@ -1434,6 +1441,21 @@ export async function runAgenticAudit(opts: OrchestratorInput): Promise<AuditRes
       trace[spec.key] = { converged: runs[i].converged, turns: runs[i].turns, sectionsRead: runs[i].sectionsRead, tools: runs[i].trace };
     });
     allConverged = runs.every((r) => r.converged);
+  }
+
+  // P1.4 — PANEL FINDINGS MERGE (card #523, P2a-wire). The expert panel (agentic-panel-runner) is a FINDINGS
+  //         PRODUCER: its VERIFIED claims arrive here already typed by panel-findings-bridge and are UNIONed into the
+  //         finding set the deterministic rail disposes over — deriveVerdict remains the SOLE authority. Merged HERE
+  //         (before the sweeps + dedup + every re-typing guard) so a panel finding is treated EXACTLY like a lens
+  //         finding: same protective over-type softening, same dedup collapse. RE-GROUNDED against the assembled
+  //         source with the SAME isGrounded gate the seed path uses — a panel excerpt not verbatim in ctx.fullSource
+  //         is DROPPED (fail-safe, Rule 64 / I3). Panel ids ("panel:<ref>") are preserved for provenance. Only the
+  //         executor supplies opts.panelFindings, and ONLY under AUDIT_PANEL_JUDGE ⇒ flag-OFF is byte-identical.
+  if (opts.panelFindings?.length) {
+    const reground = opts.panelFindings.map((f) => ({ ...f, grounded: isGrounded(ctx, f) })).filter((f) => f.grounded);
+    reground.forEach((f, j) => { f.id = f.id ?? `panel#${j}`; });
+    if (reground.length) { perLens["panel"] = reground.length; findings.push(...reground); }
+    console.log(`[orchestrator] panel merge: ${opts.panelFindings.length} verified typed finding(s) → ${reground.length} re-grounded (${opts.panelFindings.length - reground.length} dropped: excerpt not in assembled source)`);
   }
 
   // P1.5 — DETERMINISTIC HIGH-SIGNAL GROUNDING SWEEP (Brain card 81 Step 1). DEFAULT-ON (Brain card 98 GO-LIVE

@@ -26,6 +26,8 @@ import { assembleFullSourceChunked, makeChunkMapCaller, wouldOverflow, type DocR
 import { callStructuredClaude } from "./anthropic-structured";
 import { modelFor } from "./model-registry";
 import { auditPackage } from "./audit-package";
+import { AGENTIC_PANEL_ENABLED, runPanelJudge, type PanelResult } from "./agentic-panel-runner";
+import { buildPanelInputs } from "./panel-adapter";
 import { buildV3Payload } from "./audit-v3-report";
 import { detectAmendments, findingProvenance } from "./audit-orchestrator";
 import { sweepConstructionManifest } from "./audit-construction-manifest";
@@ -386,8 +388,27 @@ export async function executeAgenticPrimary(
   // Brain card 291 — grounding corpus = the pre-compression full text (all docs), so per-doc-decomposition findings
   // ground against source, not the digest. Only consumed when AUDIT_PERDOC_DECOMP is on; otherwise inert.
   const groundingSource = docs.map((d) => d.text).join("\n\n");
+  // PANEL WIRING ARC (card #523, P2a-wire) — run the 6-lens expert panel as a FINDINGS PRODUCER and feed its
+  // VERIFIED typed facts into the SAME auditPackage that derives the verdict (deriveVerdict = SOLE authority). Gated
+  // on AUDIT_PANEL_JUDGE (default-OFF ⇒ panelFindings undefined ⇒ auditPackage byte-identical). Panel inputs are the
+  // deterministic P1a adapter over the assembled fullSource; every panel model call lands in usageCalls (same COGS
+  // ledger) via onUsage. A panel honest-fail (manifest gate / all-lenses-failed) yields typedFindings=[] — the rail
+  // proceeds on the v3 lens findings alone, never blocked by the panel. The judge is REASON-only (2d, not yet folded).
+  let panelResult: PanelResult | null = null;
+  if (AGENTIC_PANEL_ENABLED) {
+    const panelInputs = buildPanelInputs(fullSource);
+    panelResult = await runPanelJudge({
+      sectionText: panelInputs.sectionText,
+      detectedSections: panelInputs.detectedSections,
+      unroutedBinding: panelInputs.unroutedBinding,
+      signal,
+      onUsage: (u) => usageCalls.push(u),
+    });
+    console.log(`[AGENTIC-V3-PRIMARY] ${auditId}: panel ${panelResult.fired ? `fired → ${panelResult.typedFindings.length} verified typed finding(s) merged` : `honest-fail (${panelResult.manifest.missing.length ? "manifest gate" : "no verdict"}) → 0 findings`}`);
+  }
   const res = await auditPackage({
     fullSource, bidderProfile, signal, manifestComplete: manifestComplete && !constructionOOS, constructionManifest, groundingSource,
+    panelFindings: panelResult?.typedFindings,   // card #523 (P2a-wire) — VERIFIED panel facts unioned into the rail (undefined when flag OFF ⇒ byte-identical)
     noticeBodyText: noticeBody?.text,   // B3 (card 421 Fork-3) — delimiter-independent notice-body eligibility floor
 
     naics: solicitation?.naicsCode ?? null, setAside: solicitation?.typeOfSetAside ?? null,
